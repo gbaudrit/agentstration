@@ -1,0 +1,27 @@
+type: Agentstration.Agents/agentTypes
+apiVersion: 2026-08-01
+name: readonly-expert
+resourceGroup: default
+location: local
+
+properties:
+  handler: prompt-agent
+  baseInstructions: |
+    You are a specialized read-only expert.
+    Never perform write operations.
+    Clearly indicate when information is missing.
+  defaultModelProfileId: reasoning-default
+  requiredToolIds: []
+  allowedToolIds: []
+  behaviorIds:
+    - grounded-answer
+  middlewareIds: []
+  contextProviderIds: []
+  policy:
+    allowAdditionalInstructions: true
+    allowModelOverride: true
+    allowAdditionalTools: false
+    allowToolRemoval: false
+    allowMemoryOverride: false
+    allowParameterOverrides: true
+    maximumAdditionalInstructionsLength: 10000

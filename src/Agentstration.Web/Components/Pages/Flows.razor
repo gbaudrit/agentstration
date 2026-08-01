@@ -1,0 +1,7 @@
+@page "/flows"
+@implements IDisposable
+@inject IFlowApiClient Client
+<PageTitle>Flows · Agentstration</PageTitle><PageHeader Title="Flows" Description="Routing, workflows, sequences and orchestration definitions." />
+@if(items is null){<LoadingState/>}else{<section class="dashboard-grid"><div><DataGrid TItem="FlowSummary" Items="items"><Header><tr><th>Flow</th><th>Kind</th><th>Version</th><th>Status</th><th>Steps</th><th>Runs</th></tr></Header><Row Context="item"><tr><td><strong>@item.Name</strong><br/><code>@item.Id</code></td><td>@item.Kind</td><td>@item.Version</td><td><StatusBadge Text="@item.Status" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.Steps</td><td>@item.ActiveExecutions</td></tr></Row></DataGrid></div><article class="panel"><div class="panel-header"><h2>Flow visualization</h2></div><div class="placeholder-canvas"><span>Definition graph preview<br/><small>Interactive editor planned</small></span></div></article></section>}
+@code{private readonly CancellationTokenSource cancellation=new();private IReadOnlyList<FlowSummary>? items;protected override async Task OnInitializedAsync()=>items=await Client.GetFlowsAsync(cancellation.Token);public void Dispose(){cancellation.Cancel();cancellation.Dispose();}}
+

@@ -1,0 +1,10 @@
+@if (IsOpen)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CancelAsync">
+        <section class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title" @onclick:stopPropagation>
+            <h2 id="confirmation-title">@Title</h2><p>@Message</p>
+            <div class="dialog-actions"><button class="button-secondary" @onclick="CancelAsync">Cancel</button><button class="button-danger" @onclick="ConfirmAsync">@ConfirmLabel</button></div>
+        </section>
+    </div>
+}
+@code { [Parameter] public bool IsOpen { get; set; } [Parameter] public string Title { get; set; } = "Confirm action"; [Parameter] public string Message { get; set; } = "This action cannot be undone."; [Parameter] public string ConfirmLabel { get; set; } = "Confirm"; [Parameter] public EventCallback OnConfirm { get; set; } [Parameter] public EventCallback OnCancel { get; set; } private Task ConfirmAsync() => OnConfirm.InvokeAsync(); private Task CancelAsync() => OnCancel.InvokeAsync(); }

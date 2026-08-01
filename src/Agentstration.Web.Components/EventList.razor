@@ -1,0 +1,4 @@
+@if (Items.Count == 0) { <EmptyState Title="No events" Message="Events emitted by the platform will appear here." /> }
+else { <ol class="event-list">@foreach (var item in Items) { <li><span class="event-marker level-@item.Level.ToLowerInvariant()" aria-hidden="true"></span><div><div class="event-heading"><strong>@item.Summary</strong><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("HH:mm:ss")</time></div><p>@item.Source · @item.Type</p>@if (!string.IsNullOrWhiteSpace(item.CorrelationId)) { <code>@item.CorrelationId</code> }</div></li> }</ol> }
+@code { [Parameter, EditorRequired] public IReadOnlyList<EventListItem> Items { get; set; } = []; }
+

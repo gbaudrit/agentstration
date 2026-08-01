@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" />
+    <PackageReference Include="OllamaSharp" />
+  </ItemGroup>
+</Project>

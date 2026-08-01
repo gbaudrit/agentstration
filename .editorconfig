@@ -1,0 +1,28 @@
+root = true
+
+[*.{cs,razor}]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+dotnet_sort_system_directives_first = true
+csharp_style_namespace_declarations = file_scoped:warning
+
+# These naming rules conflict with common .NET application patterns (Result<T>,
+# event handlers, and queues); correctness and security analyzers remain active.
+dotnet_diagnostic.CA1000.severity = none
+dotnet_diagnostic.CA1711.severity = none
+dotnet_diagnostic.CA1716.severity = none
+dotnet_diagnostic.CA1001.severity = none
+dotnet_diagnostic.CA1051.severity = none
+dotnet_diagnostic.CA1725.severity = none
+dotnet_diagnostic.CA1822.severity = none
+dotnet_diagnostic.CA1826.severity = none
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1859.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+[*.{json,md,yml,yaml,props,csproj,slnx}]
+indent_style = space
+indent_size = 2

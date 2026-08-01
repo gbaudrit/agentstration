@@ -1,0 +1,8 @@
+@page "/work"
+@implements IDisposable
+@inject IWorkApiClient Client
+<PageTitle>Work · Agentstration</PageTitle><PageHeader Title="Work items" Description="Delegate work and follow its functional lifecycle, ownership and outcome." />
+<FilterBar><SearchBox Value="search" ValueChanged="value => search = value" Placeholder="Search work items" /><select @bind="status" aria-label="Filter by status"><option value="">All statuses</option><option>Running</option><option>Queued</option><option>NeedsInput</option><option>Completed</option></select><button class="button-primary">New work item</button></FilterBar>
+@if (items is null) { <LoadingState /> } else { <DataGrid TItem="WorkSummary" Items="Filtered"><Header><tr><th>Work item</th><th>Type</th><th>Status</th><th>Priority</th><th>Owner</th><th>Updated</th></tr></Header><Row Context="item"><tr><td><strong>@item.Title</strong><br/><code>@item.Id.ToString()[..8]</code></td><td>@item.Type</td><td><StatusBadge Text="@item.Status" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.Priority</td><td>@item.Owner</td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row></DataGrid> }
+@code { private readonly CancellationTokenSource cancellation=new(); private IReadOnlyList<WorkSummary>? items; private string search="",status=""; private IReadOnlyList<WorkSummary> Filtered => items?.Where(item=>(string.IsNullOrWhiteSpace(search)||item.Title.Contains(search,StringComparison.OrdinalIgnoreCase))&&(string.IsNullOrWhiteSpace(status)||item.Status==status)).ToArray()??[]; protected override async Task OnInitializedAsync()=>items=await Client.GetWorkItemsAsync(cancellation.Token); public void Dispose(){cancellation.Cancel();cancellation.Dispose();} }
+

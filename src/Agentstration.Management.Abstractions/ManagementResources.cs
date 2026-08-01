@@ -1,0 +1,260 @@
+using System.Text.Json;
+
+namespace Agentstration.Management.Abstractions;
+
+public static class AgentstrationProviderNamespaces
+{
+    public const string Agents = "Agentstration.Agents";
+    public const string Models = "Agentstration.Models";
+    public const string Tools = "Agentstration.Tools";
+    public const string Runtime = "Agentstration.Runtime";
+    public const string Memory = "Agentstration.Memory";
+    public const string Identity = "Agentstration.Identity";
+}
+
+public static class AgentstrationResourceTypes
+{
+    public const string AgentTypes = AgentstrationProviderNamespaces.Agents + "/agentTypes";
+    public const string Agents = AgentstrationProviderNamespaces.Agents + "/agents";
+    public const string AgentRevisions = AgentstrationProviderNamespaces.Agents + "/agentRevisions";
+    public const string Deployments = AgentstrationProviderNamespaces.Agents + "/deployments";
+    public const string Operations = AgentstrationProviderNamespaces.Agents + "/operations";
+}
+
+public static class ManagementApiVersions
+{
+    public const string V20260801 = "2026-08-01";
+}
+
+public readonly record struct ResourceIdentifier(string Value)
+{
+    public static ResourceIdentifier Create(string resourceGroup, string providerNamespace, string resourceType, string name)
+    {
+        ValidateSegment(resourceGroup, nameof(resourceGroup));
+        ValidateSegment(providerNamespace, nameof(providerNamespace));
+        ValidateSegment(resourceType, nameof(resourceType));
+        ValidateSegment(name, nameof(name));
+        return new($"/resourceGroups/{resourceGroup}/providers/{providerNamespace}/{resourceType}/{name}");
+    }
+
+    public static ResourceIdentifier Parse(string value)
+    {
+        if (!TryParse(value, out var identifier))
+            throw new ArgumentException("The resource identifier must use '/resourceGroups/{group}/providers/{provider}/{type}/{name}'.", nameof(value));
+        return identifier;
+    }
+
+    public static bool TryParse(string? value, out ResourceIdentifier identifier)
+    {
+        identifier = default;
+        if (string.IsNullOrWhiteSpace(value) || value[0] != '/') return false;
+        var canonicalSegments = value.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (canonicalSegments.Length != 6
+            || !string.Equals(canonicalSegments[0], "resourceGroups", StringComparison.Ordinal)
+            || !string.Equals(canonicalSegments[2], "providers", StringComparison.Ordinal)) return false;
+        try
+        {
+            identifier = Create(canonicalSegments[1], canonicalSegments[3], canonicalSegments[4], canonicalSegments[5]);
+            return string.Equals(identifier.Value, value, StringComparison.Ordinal);
+        }
+        catch (ArgumentException)
+        {
+            identifier = default;
+            return false;
+        }
+    }
+
+    public string ResourceGroup => Segments()[1];
+    public string ProviderNamespace => Segments()[3];
+    public string ResourceType => Segments()[4];
+    public string Name => Segments()[5];
+
+    public override string ToString() => Value;
+
+    private static void ValidateSegment(string value, string parameterName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+        if (value.Contains('/', StringComparison.Ordinal)) throw new ArgumentException("Resource identifier segments cannot contain '/'.", parameterName);
+    }
+
+    private string[] Segments() => Value.Split('/', StringSplitOptions.RemoveEmptyEntries);
+}
+
+public abstract record Resource
+{
+    public string Id { get; init; } = string.Empty;
+    public required string Name { get; init; }
+    public required string Type { get; init; }
+    public required string ApiVersion { get; init; }
+    public string? ResourceGroup { get; init; }
+    public string? Location { get; init; }
+    public IReadOnlyDictionary<string, string> Tags { get; init; } = new Dictionary<string, string>();
+    public long Generation { get; init; }
+    public ResourceStatus Status { get; init; } = new() { ProvisioningState = ProvisioningState.Accepted };
+    public string? ETag { get; init; }
+}
+
+public sealed record ResourceCondition
+{
+    public required string Type { get; init; }
+    public required string Status { get; init; }
+    public string? Reason { get; init; }
+    public string? Message { get; init; }
+    public DateTimeOffset? LastTransitionTime { get; init; }
+}
+
+public sealed record ResourceStatus
+{
+    public required ProvisioningState ProvisioningState { get; init; }
+    public string? ResourceVersion { get; init; }
+    public IReadOnlyList<ResourceCondition> Conditions { get; init; } = [];
+}
+
+public sealed record AgentTypePolicy
+{
+    public bool AllowAdditionalInstructions { get; init; }
+    public bool AllowModelOverride { get; init; }
+    public bool AllowAdditionalTools { get; init; }
+    public bool AllowToolRemoval { get; init; }
+    public bool AllowMemoryOverride { get; init; }
+    public bool AllowParameterOverrides { get; init; }
+    public int MaximumAdditionalInstructionsLength { get; init; }
+}
+
+public sealed record AgentTypeDefinition
+{
+    public required string Key { get; init; }
+    public required int Version { get; init; }
+    public required string Handler { get; init; }
+    public required string BaseInstructions { get; init; }
+    public IReadOnlyCollection<string> RequiredToolIds { get; init; } = [];
+    public IReadOnlyCollection<string> AllowedToolIds { get; init; } = [];
+    public IReadOnlyCollection<string> BehaviorIds { get; init; } = [];
+    public IReadOnlyCollection<string> MiddlewareIds { get; init; } = [];
+    public IReadOnlyCollection<string> ContextProviderIds { get; init; } = [];
+    public required string DefaultModelProfileId { get; init; }
+    public required AgentTypePolicy Policy { get; init; }
+}
+
+public sealed record AgentTypeResource : Resource
+{
+    public required AgentTypeDefinition Properties { get; init; }
+}
+
+public sealed record AgentTypeReference(string ResourceId, int? Version = null);
+
+public sealed record ResourceReference(string ResourceId);
+
+public record AgentProperties
+{
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required AgentTypeReference AgentType { get; init; }
+    public string? AdditionalInstructions { get; init; }
+    public required ResourceReference ModelProfile { get; init; }
+    public IReadOnlyList<ResourceReference> Tools { get; init; } = [];
+    public IReadOnlyDictionary<string, JsonElement> Settings { get; init; } = new Dictionary<string, JsonElement>();
+}
+
+public sealed record AgentResource : Resource
+{
+    public required AgentProperties Properties { get; init; }
+}
+
+public sealed record AgentDeploymentSpec
+{
+    public required string Environment { get; init; }
+    public required string RuntimeProfileId { get; init; }
+    public required AgentHostingMode HostingMode { get; init; }
+}
+
+public sealed record ResolvedAgentDefinition
+{
+    public required Guid AgentId { get; init; }
+    public required string AgentKey { get; init; }
+    public required string DisplayName { get; init; }
+    public required string Description { get; init; }
+    public required long AgentVersion { get; init; }
+    public required string EffectiveInstructions { get; init; }
+    public required string ModelProfileId { get; init; }
+    public required string RuntimeProfileId { get; init; }
+    public required IReadOnlyCollection<string> EffectiveToolIds { get; init; }
+    public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
+    public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
+    public required IReadOnlyCollection<string> Capabilities { get; init; }
+    public required string Handler { get; init; }
+    public required string DefinitionHash { get; init; }
+}
+
+public sealed record ResolvedAgentSpec
+{
+    public required string AgentResourceId { get; init; }
+    public required long Generation { get; init; }
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required string Instructions { get; init; }
+    public required string AgentTypeResourceId { get; init; }
+    public required string ModelProfileResourceId { get; init; }
+    public required IReadOnlyList<string> ToolResourceIds { get; init; }
+}
+
+public enum AgentHostingMode { InProcess, SharedHost, DedicatedProcess, DedicatedContainer, RemoteEndpoint, FoundryHosted }
+public enum ProvisioningState { Accepted, Validating, Creating, Updating, Succeeded, Failed, Deleting, Canceled }
+public enum OperationalState { Starting, Ready, Degraded, Suspended, Stopped, Unavailable }
+public enum DesiredAgentState { Running, Stopped }
+public enum OperationStatus { Accepted, Running, Succeeded, Failed, Canceled }
+public enum AgentIdentityType { None, SystemAssigned, UserAssigned, External }
+
+public sealed record AgentRevision : Resource
+{
+    public required string AgentResourceId { get; init; }
+    public required long AgentVersion { get; init; }
+    public required int AgentTypeVersion { get; init; }
+    public required ResolvedAgentDefinition Definition { get; init; }
+    public required string DefinitionHash { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
+    public required ProvisioningState ProvisioningState { get; init; }
+}
+
+public sealed record AgentDeployment : Resource
+{
+    public required string RevisionId { get; init; }
+    public required string Environment { get; init; }
+    public required string RuntimeProfileId { get; init; }
+    public required AgentHostingMode HostingMode { get; init; }
+    public required DesiredAgentState DesiredState { get; init; }
+    public required ProvisioningState ProvisioningState { get; init; }
+    public required OperationalState OperationalState { get; init; }
+    public string? ObservedRevisionId { get; init; }
+    public IReadOnlyDictionary<string, int> TrafficWeights { get; init; } = new Dictionary<string, int>();
+    public string? LastError { get; init; }
+    public required DateTimeOffset UpdatedAt { get; init; }
+}
+
+public sealed record ManagementOperation : Resource
+{
+    public required string ResourceId { get; init; }
+    public required string OperationType { get; init; }
+    public required OperationStatus OperationStatus { get; init; }
+    public int? PercentComplete { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+public sealed record ModelProfile
+{
+    public required string Id { get; init; }
+    public required string Provider { get; init; }
+    public required string Model { get; init; }
+    public Uri? Endpoint { get; init; }
+    public IReadOnlyDictionary<string, JsonElement> Options { get; init; } = new Dictionary<string, JsonElement>();
+}
+
+public sealed record ExternalBinding
+{
+    public required Guid DeploymentId { get; init; }
+    public required string Provider { get; init; }
+    public required string ExternalResourceId { get; init; }
+    public string? ExternalVersionId { get; init; }
+    public Uri? Endpoint { get; init; }
+}

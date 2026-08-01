@@ -1,0 +1,22 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Domain/Agentstration.Domain.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Application/Agentstration.Application.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Evaluation/Agentstration.Evaluation.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Flow/Agentstration.Flow.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Flow.Storage.Abstractions/Agentstration.Flow.Storage.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../../src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
+    <ProjectReference Include="../../src/Agentstration.ModelProviders.Ollama/Agentstration.ModelProviders.Ollama.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Work/Agentstration.Work.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

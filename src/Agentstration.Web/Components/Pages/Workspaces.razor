@@ -1,0 +1,7 @@
+@page "/workspaces"
+@rendermode InteractiveServer
+@inject WorkspaceService Service
+<PageTitle>Workspaces</PageTitle><h1>Workspaces</h1>
+<div class="form"><label>Name <input @bind="name" /></label><button @onclick="CreateAsync">Create workspace</button><span>@message</span></div>
+@foreach (var workspace in workspaces) { <article class="row"><strong>@workspace.Name</strong><code>@workspace.Id</code></article> }
+@code { private IReadOnlyList<Workspace> workspaces = []; private string name = ""; private string message = ""; protected override async Task OnInitializedAsync() => workspaces = await Service.ListAsync(default); private async Task CreateAsync() { var result = await Service.CreateAsync(name, default); message = result.Error?.Message ?? "Created"; workspaces = await Service.ListAsync(default); } }

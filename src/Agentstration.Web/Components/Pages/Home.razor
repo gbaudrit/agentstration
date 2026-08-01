@@ -1,0 +1,31 @@
+@page "/"
+@implements IDisposable
+@inject PlatformDashboardService Dashboard
+@inject IAgentstrationEventStream EventStream
+@inject PlatformStatusState PlatformState
+<PageTitle>Overview · Agentstration</PageTitle>
+<PageHeader Title="Platform overview" Eyebrow="Operations center" Description="Live operational posture across management, runtime, work and flows." />
+@if (loading) { <LoadingState /> }
+else if (error is not null) { <ErrorState Message="@error" ErrorId="@errorId" /> }
+else if (snapshot is not null)
+{
+    <section class="metric-grid" aria-label="Platform metrics">
+        <MetricCard Label="Known agents" Value="@snapshot.KnownAgents.ToString()" Detail="Managed definitions" Status="UiStatus.Info" />
+        <MetricCard Label="Active agents" Value="@snapshot.ActiveAgents.ToString()" Detail="Ready for work" Status="UiStatus.Success" />
+        <MetricCard Label="Executions" Value="@snapshot.RunningExecutions.ToString()" Detail="Currently running" Status="UiStatus.Info" />
+        <MetricCard Label="Open work" Value="@snapshot.OpenWorkItems.ToString()" Detail="Needs attention" Status="UiStatus.Warning" />
+        <MetricCard Label="Active flows" Value="@snapshot.ActiveFlows.ToString()" Detail="Published and enabled" Status="UiStatus.Success" />
+        <MetricCard Label="Platform" Value="@snapshot.Status" Detail="Aggregate health" Status="@PlatformDashboardService.ToStatus(snapshot.Status)" />
+    </section>
+    <section class="dashboard-grid">
+        <article class="panel"><div class="panel-header"><h2>Latest events</h2><a href="/events">Open event stream →</a></div><EventList Items="events" /></article>
+        <article class="panel"><div class="panel-header"><h2>Component health</h2><a href="/runtime">Inspect runtime →</a></div><div class="health-list">@foreach (var component in snapshot.Components) { <HealthIndicator Label="@component.Name" StatusText="@component.Detail" Status="@component.Severity" /> }</div></article>
+    </section>
+}
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private PlatformSnapshot? snapshot; private IReadOnlyList<EventListItem> events = []; private bool loading = true; private string? error; private string? errorId;
+    protected override async Task OnInitializedAsync() { try { var dashboardTask = Dashboard.GetAsync(cancellation.Token); var eventsTask = EventStream.GetRecentEventsAsync(cancellation.Token); await Task.WhenAll(dashboardTask, eventsTask); snapshot = await dashboardTask; events = await eventsTask; PlatformState.Set(PlatformDashboardService.ToStatus(snapshot.Status), snapshot.Status); } catch (AgentstrationApiException exception) { error = exception.Message; errorId = exception.ErrorId; PlatformState.Set(UiStatus.Danger, "Unavailable"); } finally { loading = false; } }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}
+

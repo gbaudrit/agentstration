@@ -1,0 +1,115 @@
+@page "/agents"
+@implements IDisposable
+@inject IManagementApiClient Client
+@inject NotificationState Notifications
+
+<PageTitle>Agents · Agentstration</PageTitle>
+<PageHeader Title="Agents" Description="Create and govern canonical agent resources in the Management Plane.">
+    <Actions><a class="button-primary" href="/agents/new">Create agent</a></Actions>
+</PageHeader>
+
+<FilterBar>
+    <input @bind="resourceGroup" aria-label="Resource group" placeholder="Resource group" />
+    <SearchBox Value="search" ValueChanged="value => search = value" Placeholder="Search agents or resource IDs" />
+    <select @bind="status" aria-label="Filter agent status"><option value="">All statuses</option><option>Accepted</option><option>Succeeded</option><option>Failed</option></select>
+    <button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh</button>
+</FilterBar>
+
+@if (loading && items is null)
+{
+    <LoadingState />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else if (Filtered.Count == 0)
+{
+    <EmptyState Title="No agents found" Message="Create an agent resource or change the current filters."><a class="button-primary" href="/agents/new">Create agent</a></EmptyState>
+}
+else
+{
+    <DataGrid TItem="AgentSummary" Items="Filtered">
+        <Header><tr><th>Agent</th><th>Agent type</th><th>Status</th><th>Generation</th><th>Tools</th><th>Actions</th></tr></Header>
+        <Row Context="item"><tr>
+            <td><strong>@item.Name</strong><br /><code>@item.Id</code></td>
+            <td><code>@ResourceName(item.Type)</code></td>
+            <td><StatusBadge Text="@item.Status" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td>
+            <td>@item.Version</td>
+            <td>@(item.Capabilities.Count == 0 ? "None" : string.Join(" · ", item.Capabilities.Select(ResourceName)))</td>
+            <td><div class="table-actions"><a class="text-button" href="@RunUrl(item)">Run</a><a class="text-button" href="@EditUrl(item)">Edit</a><button class="text-button danger-text" @onclick="() => RequestDelete(item)">Delete</button></div></td>
+        </tr></Row>
+    </DataGrid>
+}
+
+<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="Delete agent" Message="@DeleteMessage" ConfirmLabel="Delete agent" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<AgentSummary>? items;
+    private AgentstrationApiException? error;
+    private AgentSummary? pendingDelete;
+    private string search = string.Empty;
+    private string status = string.Empty;
+    private string resourceGroup = "default";
+    private bool loading;
+
+    private IReadOnlyList<AgentSummary> Filtered => items?.Where(item =>
+        (string.IsNullOrWhiteSpace(search)
+            || item.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || item.Id.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || item.Capabilities.Any(capability => capability.Contains(search, StringComparison.OrdinalIgnoreCase)))
+        && (string.IsNullOrWhiteSpace(status) || string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase))).ToArray() ?? [];
+
+    private string DeleteMessage => pendingDelete is null ? string.Empty : $"Delete '{pendingDelete.Name}'? Existing revisions and deployments are not deleted automatically.";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try { items = await Client.GetAgentsAsync(resourceGroup.Trim(), cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    private void RequestDelete(AgentSummary item) => pendingDelete = item;
+    private void CancelDelete() => pendingDelete = null;
+
+    private async Task DeleteAsync()
+    {
+        if (pendingDelete is null) return;
+        var selected = pendingDelete;
+        pendingDelete = null;
+        try
+        {
+            var id = ResourceIdentifier.Parse(selected.Id);
+            var snapshot = await Client.GetAgentAsync(id.ResourceGroup, id.Name, cancellation.Token);
+            await Client.DeleteAgentAsync(id.ResourceGroup, id.Name, snapshot.ETag, cancellation.Token);
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), "Agent deleted", selected.Name, DateTimeOffset.Now, UiStatus.Success));
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception)
+        {
+            error = exception;
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), "Delete failed", exception.Message, DateTimeOffset.Now, UiStatus.Danger));
+        }
+    }
+
+    private static string EditUrl(AgentSummary item)
+    {
+        var id = ResourceIdentifier.Parse(item.Id);
+        return $"/agents/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}";
+    }
+
+    private static string RunUrl(AgentSummary item) => $"{EditUrl(item)}/run";
+
+    private static string ResourceName(string resourceId) => ResourceIdentifier.TryParse(resourceId, out var parsed) ? parsed.Name : resourceId;
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

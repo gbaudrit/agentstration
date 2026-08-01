@@ -1,0 +1,5 @@
+@rendermode InteractiveServer
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData"><RouteView RouteData="routeData" DefaultLayout="typeof(Agentstration.Web.Components.MainLayout)" /><FocusOnNavigate RouteData="routeData" Selector="h1" /></Found>
+    <NotFound><LayoutView Layout="typeof(Agentstration.Web.Components.MainLayout)"><EmptyState Title="Page not found" Message="The requested console page does not exist." /></LayoutView></NotFound>
+</Router>

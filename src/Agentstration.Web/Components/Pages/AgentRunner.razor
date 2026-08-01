@@ -1,0 +1,278 @@
+@page "/agents/{ResourceGroup}/{Name}/run"
+@page "/runs/{RunId}"
+@implements IDisposable
+@inject IManagementApiClient ManagementClient
+@inject IRuntimeApiClient RuntimeClient
+@inject IJSRuntime JavaScript
+
+<PageTitle>Agent Runner · Agentstration</PageTitle>
+<PageHeader Title="Agent Runner" Description="Create and inspect a direct Runtime Plane run without creating a Work Item.">
+    <Actions><a class="button-secondary" href="@BackUrl">Back to agent</a></Actions>
+</PageHeader>
+
+@if (loading)
+{
+    <LoadingState Message="Loading runner…" />
+}
+else if (agent is null)
+{
+    <ErrorState Message="@errorMessage" ErrorId="runtime-runner" />
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="form-alert form-alert-danger" role="alert"><strong>Runtime error</strong><span>@errorMessage</span></div>
+    }
+    @if (connectionLost)
+    {
+        <div class="form-alert form-alert-danger" role="alert"><strong>Event stream disconnected</strong><span>The console could not resume the SSE stream.</span></div>
+    }
+
+    <section class="runner-config panel">
+        <div><span>Agent</span><strong>@agent.Properties.DisplayName</strong></div>
+        <div><span>Version</span><strong>@agent.Generation</strong></div>
+        <div><span>Runtime</span><strong>@(state.Run?.Status.Runtime ?? "Local")</strong></div>
+        <div><span>Model profile</span><strong>@ResourceName(agent.Properties.ModelProfile.ResourceId)</strong></div>
+        <div><span>Execution mode</span><strong>Interactive</strong></div>
+    </section>
+
+    <EditForm Model="model" OnValidSubmit="RunAsync" FormName="agent-runner" class="resource-form">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <section class="panel form-section">
+            <div class="panel-header"><div><p class="eyebrow">Quick Run</p><h2>User input</h2></div><button class="text-button" type="button" @onclick="() => advanced = !advanced">@(advanced ? "Hide advanced" : "Advanced Run")</button></div>
+            <div class="form-grid">
+                <label class="form-span-2"><span>Prompt</span><InputTextArea @bind-Value="model.Prompt" rows="7" placeholder="Ask this agent to perform a task…" /><ValidationMessage For="() => model.Prompt" /></label>
+                @if (advanced)
+                {
+                    <label><span>Context · JSON or text</span><InputTextArea @bind-Value="model.Context" rows="7" /></label>
+                    <label><span>Runtime parameter overrides · JSON</span><InputTextArea @bind-Value="model.RuntimeParameters" rows="7" placeholder="{ &quot;temperature&quot;: 0.2 }" /><small>Overrides remain subject to Model Profile policy resolution.</small></label>
+                    <label><span>Timeout · seconds</span><InputNumber @bind-Value="model.TimeoutSeconds" /><ValidationMessage For="() => model.TimeoutSeconds" /></label>
+                }
+            </div>
+            <div class="runner-actions">
+                <button class="button-primary" type="submit" disabled="@IsBusy">@(IsBusy ? "Running…" : "Run")</button>
+                <button class="button-danger" type="button" @onclick="CancelAsync" disabled="@(!CanCancel)">Stop</button>
+                <button class="button-secondary" type="button" @onclick="RetryAsync" disabled="@(state.Run is null || IsBusy)">Retry</button>
+            </div>
+        </section>
+    </EditForm>
+
+    @if (state.Run is not null)
+    {
+        <section class="panel runner-inspector">
+            <div class="runner-tabs" role="tablist">
+                @foreach (var tab in Tabs)
+                {
+                    <button class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@tab</button>
+                }
+            </div>
+            <div class="runner-tab-content">
+                @if (activeTab == "Response")
+                {
+                    <div class="runner-response"><pre>@(string.IsNullOrWhiteSpace(state.Response) ? "Waiting for the agent response…" : state.Response)</pre></div>
+                }
+                else if (activeTab == "Execution")
+                {
+                    <dl class="runner-details">
+                        <dt>Run ID</dt><dd><code>@state.Run.Id</code></dd>
+                        <dt>Status</dt><dd><StatusBadge Text="@state.State.ToString()" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
+                        <dt>Duration</dt><dd>@Duration(state.Run)</dd>
+                        <dt>Agent version</dt><dd>@state.Run.Properties.Agent.Version</dd>
+                        <dt>Model profile</dt><dd>@(state.Run.Status.ModelProfile ?? "Not resolved")</dd>
+                        <dt>Resolved model</dt><dd>@(state.Run.Status.ResolvedModel ?? "Provider did not report it")</dd>
+                        <dt>Tokens</dt><dd>@(state.Run.Status.InputTokens?.ToString() ?? "—") input · @(state.Run.Status.OutputTokens?.ToString() ?? "—") output</dd>
+                        <dt>Started</dt><dd>@(state.Run.Status.StartedAt?.LocalDateTime.ToString("G") ?? "Pending")</dd>
+                        <dt>Completed</dt><dd>@(state.Run.Status.CompletedAt?.LocalDateTime.ToString("G") ?? "—")</dd>
+                        <dt>Initiator</dt><dd>@state.Run.Properties.Initiator</dd>
+                        <dt>Origin</dt><dd>@state.Run.Properties.Origin</dd>
+                    </dl>
+                }
+                else if (activeTab == "Messages")
+                {
+                    <div class="runner-messages">
+                        @foreach (var message in state.Run.Properties.Input.Messages) { <article><strong>@message.Role</strong><pre>@message.Content</pre></article> }
+                        @if (!string.IsNullOrWhiteSpace(state.Response)) { <article><strong>Assistant</strong><pre>@state.Response</pre></article> }
+                    </div>
+                }
+                else if (activeTab == "Tools")
+                {
+                    var tools = state.Events.Where(item => item.ToolCall is not null).Select(item => item.ToolCall!).GroupBy(tool => tool.Id).Select(group => group.Last()).ToArray();
+                    @if (tools.Length == 0) { <EmptyState Title="No tool calls" Message="This run has not reported a tool invocation." /> }
+                    else { @foreach (var tool in tools) { <details><summary>@tool.Name · @tool.State</summary><pre>@tool.Arguments</pre><pre>@(tool.Error ?? tool.Result)</pre></details> } }
+                }
+                else if (activeTab == "Trace")
+                {
+                    <ol class="runner-trace">@foreach (var item in state.Events) { <li><time>@item.Timestamp.LocalDateTime.ToString("T")</time><strong>@(item.Step ?? item.Kind.ToString())</strong><span>@item.Message</span></li> }</ol>
+                }
+                else if (activeTab == "Raw")
+                {
+                    <div class="runner-raw-actions"><button class="button-secondary" @onclick="() => CopyAsync(rawRequest)">Copy request JSON</button><button class="button-secondary" @onclick="() => CopyAsync(RawResponse)">Copy response JSON</button></div>
+                    <h3>Request</h3><pre class="runner-json">@rawRequest</pre>
+                    <h3>Run and events</h3><pre class="runner-json">@RawResponse</pre>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="panel">
+        <div class="panel-header"><div><p class="eyebrow">History</p><h2>Recent agent runs</h2></div></div>
+        @if (history.Count == 0) { <EmptyState Title="No runs yet" Message="Start a Quick Run to create this agent's first Runtime resource." /> }
+        else
+        {
+            <DataGrid TItem="RuntimeRun" Items="history">
+                <Header><tr><th>Run</th><th>Date</th><th>Status</th><th>Duration</th><th>Initiator</th><th>Version</th><th>Prompt</th><th>Origin</th></tr></Header>
+                <Row Context="run"><tr><td><a href="/runs/@run.Id"><code>@ShortId(run.Id)</code></a></td><td>@run.Status.CreatedAt.LocalDateTime.ToString("g")</td><td><StatusBadge Text="@run.Status.State.ToString()" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></td><td>@Duration(run)</td><td>@run.Properties.Initiator</td><td>@run.Properties.Agent.Version</td><td>@PromptPreview(run)</td><td>@run.Properties.Origin</td></tr></Row>
+            </DataGrid>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public string? ResourceGroup { get; set; }
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? RunId { get; set; }
+
+    private static readonly string[] Tabs = ["Response", "Execution", "Messages", "Tools", "Trace", "Raw"];
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly AgentRunnerState state = new();
+    private CancellationTokenSource? observation;
+    private AgentRunnerModel model = new();
+    private AgentResource? agent;
+    private IReadOnlyList<RuntimeRun> history = [];
+    private string activeTab = "Response";
+    private string? errorMessage;
+    private string rawRequest = "{}";
+    private bool loading = true;
+    private bool advanced;
+    private bool connectionLost;
+    private bool IsBusy => state.Run is not null && !state.State.IsTerminal();
+    private bool CanCancel => state.Run is not null && state.State is RuntimeRunState.Pending or RuntimeRunState.Running;
+    private string BackUrl => agent is null ? "/agents" : $"/agents/{Uri.EscapeDataString(agent.ResourceGroup!)}/{Uri.EscapeDataString(agent.Name)}";
+    private string RawResponse => JsonSerializer.Serialize(new { run = state.Run, events = state.Events }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        errorMessage = null;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(RunId))
+            {
+                var run = await RuntimeClient.GetRunAsync(RunId, cancellation.Token);
+                state.Reset(run);
+                var id = ResourceIdentifier.Parse(run.Properties.Agent.ResourceId);
+                agent = (await ManagementClient.GetAgentAsync(id.ResourceGroup, id.Name, cancellation.Token)).Value;
+                rawRequest = JsonSerializer.Serialize(ToRequest(run), new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+                await LoadHistoryAsync();
+                if (!run.Status.State.IsTerminal()) StartObservation(run.Id);
+            }
+            else
+            {
+                var group = string.IsNullOrWhiteSpace(ResourceGroup) ? "default" : ResourceGroup;
+                agent = (await ManagementClient.GetAgentAsync(group, Name!, cancellation.Token)).Value;
+                await LoadHistoryAsync();
+            }
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or ArgumentException)
+        {
+            errorMessage = exception.Message;
+        }
+        finally { loading = false; }
+    }
+
+    private async Task RunAsync()
+    {
+        if (agent is null) return;
+        errorMessage = null;
+        connectionLost = false;
+        try
+        {
+            var request = model.ToRequest(agent);
+            rawRequest = JsonSerializer.Serialize(request, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+            var run = await RuntimeClient.CreateRunAsync(request, cancellation.Token);
+            state.Reset(run);
+            history = [run, .. history.Where(item => item.Id != run.Id)];
+            StartObservation(run.Id);
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or ArgumentException or JsonException) { errorMessage = exception.Message; }
+    }
+
+    private async Task CancelAsync()
+    {
+        if (state.Run is null) return;
+        try { state.Refresh(await RuntimeClient.CancelRunAsync(state.Run.Id, cancellation.Token)); }
+        catch (AgentstrationApiException exception) { errorMessage = exception.Message; }
+    }
+
+    private async Task RetryAsync()
+    {
+        if (state.Run is null) return;
+        try
+        {
+            var run = await RuntimeClient.RetryRunAsync(state.Run.Id, cancellation.Token);
+            state.Reset(run);
+            history = [run, .. history.Where(item => item.Id != run.Id)];
+            StartObservation(run.Id);
+        }
+        catch (AgentstrationApiException exception) { errorMessage = exception.Message; }
+    }
+
+    private void StartObservation(string runId)
+    {
+        observation?.Cancel();
+        observation?.Dispose();
+        observation = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
+        _ = ObserveAsync(runId, observation.Token);
+    }
+
+    private async Task ObserveAsync(string runId, CancellationToken token)
+    {
+        var reconnects = 0;
+        while (!token.IsCancellationRequested && !state.State.IsTerminal())
+        {
+            try
+            {
+                await foreach (var runEvent in RuntimeClient.ObserveRunAsync(runId, state.LastSequence, token))
+                {
+                    state.Apply(runEvent);
+                    await InvokeAsync(StateHasChanged);
+                }
+                var refreshed = await RuntimeClient.GetRunAsync(runId, token);
+                state.Refresh(refreshed);
+                history = [refreshed, .. history.Where(item => item.Id != refreshed.Id)];
+                if (state.State.IsTerminal()) break;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
+            catch (Exception exception) when (exception is HttpRequestException or IOException or AgentstrationApiException)
+            {
+                errorMessage = exception.Message;
+            }
+            reconnects++;
+            if (reconnects >= 3) { connectionLost = true; break; }
+            await Task.Delay(TimeSpan.FromMilliseconds(500 * reconnects), token);
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        if (agent is not null) history = await RuntimeClient.GetRunsAsync(agent.Id, cancellation.Token);
+    }
+
+    private ValueTask CopyAsync(string value) => JavaScript.InvokeVoidAsync("navigator.clipboard.writeText", value);
+    private static string ResourceName(string id) => ResourceIdentifier.TryParse(id, out var parsed) ? parsed.Name : id;
+    private static string ShortId(string id) => id.Length > 13 ? id[..13] : id;
+    private static string PromptPreview(RuntimeRun run) { var value = run.Properties.Input.Messages.LastOrDefault(message => message.Role == RuntimeMessageRole.User)?.Content ?? "—"; return value.Length > 60 ? $"{value[..60]}…" : value; }
+    private static string Duration(RuntimeRun run) { var start = run.Status.StartedAt ?? run.Status.CreatedAt; var end = run.Status.CompletedAt; return end is null ? "Live" : (end.Value - start).ToString("g"); }
+    private static CreateRuntimeRunRequest ToRequest(RuntimeRun run) => new() { Agent = run.Properties.Agent, Input = run.Properties.Input, Execution = run.Properties.Execution, Origin = run.Properties.Origin, Initiator = run.Properties.Initiator };
+
+    public void Dispose()
+    {
+        observation?.Cancel();
+        observation?.Dispose();
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

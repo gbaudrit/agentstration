@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "cases": [
+    {
+      "name": "agent-framework-roadmap",
+      "source": "Microsoft Agent Framework supports provider-neutral agent workflows. The project roadmap includes local execution and structured observability.",
+      "requiredFacts": [
+        "Microsoft Agent Framework",
+        "provider-neutral",
+        "local execution"
+      ],
+      "expectedCategories": [
+        "artificial intelligence",
+        "project"
+      ]
+    },
+    {
+      "name": "invoice-budget",
+      "source": "The finance team reviewed the invoice and approved the project budget for the next milestone.",
+      "requiredFacts": [
+        "finance team",
+        "approved",
+        "project budget"
+      ],
+      "expectedCategories": [
+        "finance",
+        "project"
+      ]
+    }
+  ]
+}

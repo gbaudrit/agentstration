@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+.idea/
+.vscode/
+TestResults/
+.agentstration/
+*.user
+*.suo
+*.db
+*.log

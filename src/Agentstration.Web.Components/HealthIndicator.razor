@@ -1,0 +1,11 @@
+<div class="health-indicator" role="status" aria-label="@($"{Label}: {StatusText}")">
+    <span class="health-pulse health-@Status.ToString().ToLowerInvariant()" aria-hidden="true"></span>
+    <span><strong>@Label</strong><small>@StatusText</small></span>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string StatusText { get; set; } = string.Empty;
+    [Parameter] public UiStatus Status { get; set; }
+}
+

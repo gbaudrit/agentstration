@@ -1,0 +1,11 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Application/Agentstration.Application.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Domain/Agentstration.Domain.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Evaluation/Agentstration.Evaluation.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Data/content-workflow-cases.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,3 @@
+<ol class="timeline">@foreach (var item in Items) { <li><span class="timeline-node status-@item.Status.ToString().ToLowerInvariant()" aria-hidden="true"></span><div><strong>@item.Title</strong><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time>@if (!string.IsNullOrWhiteSpace(item.Detail)) { <p>@item.Detail</p> }</div></li> }</ol>
+@code { [Parameter, EditorRequired] public IReadOnlyList<TimelineItem> Items { get; set; } = []; }
+

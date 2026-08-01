@@ -1,0 +1,184 @@
+@page "/agents/new"
+@page "/agents/{ResourceGroup}/{Name}"
+@implements IDisposable
+@inject IManagementApiClient Client
+@inject NavigationManager Navigation
+@inject NotificationState Notifications
+
+<PageTitle>@(IsNew ? "Create agent" : "Edit agent") · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? "Create agent" : $"Edit {Name}")" Description="Declare the desired agent state. Runtime materialization remains separate.">
+    <Actions>@if (!IsNew) { <a class="button-primary" href="@RunUrl">Run</a> }<a class="button-secondary" href="/agents">Back to agents</a></Actions>
+</PageHeader>
+
+@if (!IsNew)
+{
+    <nav class="resource-tabs" aria-label="Agent sections"><a class="active" href="@OverviewUrl">Overview</a><span>Definition</span><span>Versions</span><a href="@RunUrl">Runs</a><span>Metrics</span></nav>
+}
+
+@if (loading || model is null)
+{
+    <LoadingState Message="Loading agent resource…" />
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="form-alert form-alert-danger" role="alert"><strong>Unable to save</strong><span>@errorMessage</span>@if (!string.IsNullOrWhiteSpace(errorId)) { <code>@errorId</code> }</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="form-alert form-alert-success" role="status">@successMessage</div>
+    }
+
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="agent-editor" class="resource-form">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <section class="panel form-section">
+            <div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Resource coordinates</h2></div>@if (!IsNew) { <StatusBadge Text="@($"Generation {generation}")" Status="UiStatus.Info" /> }</div>
+            <div class="form-grid">
+                <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
+                <label><span>Resource group</span><InputText @bind-Value="model.ResourceGroup" disabled="@(!IsNew)" /><ValidationMessage For="() => model.ResourceGroup" /></label>
+                <label><span>Location</span><InputText @bind-Value="model.Location" /><ValidationMessage For="() => model.Location" /></label>
+                <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">Resource ID: <code>@resourceId</code></p> }
+        </section>
+
+        <section class="panel form-section">
+            <div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Behavior and model</h2></div></div>
+            <div class="form-grid">
+                <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
+                <label><span>Agent type</span>
+                    <select value="@model.AgentTypeResourceId" @onchange="AgentTypeChanged">
+                        <option value="">Select an agent type</option>
+                        @foreach (var type in agentTypes) { <option value="@type.Id">@type.Name · v@type.Properties.Version</option> }
+                    </select>
+                    <ValidationMessage For="() => model.AgentTypeResourceId" />
+                </label>
+                <label><span>Agent type version</span><InputNumber @bind-Value="model.AgentTypeVersion" /><ValidationMessage For="() => model.AgentTypeVersion" /></label>
+                <label class="form-span-2"><span>Model profile resource ID</span><InputText @bind-Value="model.ModelProfileResourceId" /><ValidationMessage For="() => model.ModelProfileResourceId" /><small>Existence validation remains deferred until the Models provider is available.</small></label>
+                <label class="form-span-2"><span>Additional instructions</span><InputTextArea @bind-Value="model.AdditionalInstructions" rows="6" /></label>
+            </div>
+        </section>
+
+        <section class="panel form-section">
+            <div class="panel-header"><div><p class="eyebrow">References</p><h2>Tools and tags</h2></div></div>
+            <div class="form-grid">
+                <label><span>Tool resource IDs</span><InputTextArea @bind-Value="model.ToolResourceIds" rows="7" /><small>One canonical Agentstration.Tools/tools resource ID per line.</small></label>
+                <label><span>Tags</span><InputTextArea @bind-Value="model.Tags" rows="7" /><small>One key=value pair per line.</small></label>
+            </div>
+        </section>
+
+        <div class="form-actions">
+            <a class="button-secondary" href="/agents">Cancel</a>
+            <button class="button-primary" type="submit" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create agent" : "Save changes")</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public string? ResourceGroup { get; set; }
+    [Parameter] public string? Name { get; set; }
+
+    private readonly CancellationTokenSource cancellation = new();
+    private AgentEditorModel? model;
+    private IReadOnlyList<AgentTypeResource> agentTypes = [];
+    private string? etag;
+    private string? resourceId;
+    private string? errorMessage;
+    private string? errorId;
+    private string? successMessage;
+    private long generation;
+    private bool loading = true;
+    private bool saving;
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private string OverviewUrl => $"/agents/{Uri.EscapeDataString(ResourceGroup ?? "default")}/{Uri.EscapeDataString(Name ?? string.Empty)}";
+    private string RunUrl => $"{OverviewUrl}/run";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        errorMessage = null;
+        try
+        {
+            var group = string.IsNullOrWhiteSpace(ResourceGroup) ? "default" : ResourceGroup;
+            agentTypes = await Client.GetAgentTypesAsync(group, cancellation.Token);
+            if (IsNew)
+            {
+                model = new AgentEditorModel { ResourceGroup = group };
+                if (agentTypes.Count > 0) ApplyAgentType(agentTypes[0]);
+            }
+            else
+            {
+                var snapshot = await Client.GetAgentAsync(group, Name!, cancellation.Token);
+                model = AgentEditorModel.FromResource(snapshot.Value);
+                etag = snapshot.ETag;
+                resourceId = snapshot.Value.Id;
+                generation = snapshot.Value.Generation;
+            }
+        }
+        catch (AgentstrationApiException exception)
+        {
+            errorMessage = exception.Message;
+            errorId = exception.ErrorId;
+            model ??= new AgentEditorModel();
+        }
+        finally { loading = false; }
+    }
+
+    private void AgentTypeChanged(ChangeEventArgs args)
+    {
+        if (model is null) return;
+        var id = args.Value?.ToString() ?? string.Empty;
+        var selected = agentTypes.FirstOrDefault(type => string.Equals(type.Id, id, StringComparison.Ordinal));
+        if (selected is null) model.AgentTypeResourceId = id;
+        else ApplyAgentType(selected);
+    }
+
+    private void ApplyAgentType(AgentTypeResource type)
+    {
+        if (model is null) return;
+        model.AgentTypeResourceId = type.Id;
+        model.AgentTypeVersion = type.Properties.Version;
+        if (string.IsNullOrWhiteSpace(model.ModelProfileResourceId))
+        {
+            model.ModelProfileResourceId = ResourceIdentifier.TryParse(type.Properties.DefaultModelProfileId, out var parsed)
+                ? parsed.Value
+                : ResourceIdentifier.Create(model.ResourceGroup, AgentstrationProviderNamespaces.Models, "modelProfiles", type.Properties.DefaultModelProfileId).Value;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (model is null) return;
+        saving = true;
+        errorMessage = null;
+        errorId = null;
+        successMessage = null;
+        try
+        {
+            var request = model.ToRequest();
+            var snapshot = await Client.PutAgentAsync(request, etag, IsNew, cancellation.Token);
+            etag = snapshot.ETag;
+            resourceId = snapshot.Value.Id;
+            generation = snapshot.Value.Generation;
+            successMessage = IsNew ? "Agent created." : "Agent updated.";
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), successMessage, snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
+            Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.ResourceGroup!)}/{Uri.EscapeDataString(snapshot.Value.Name)}");
+        }
+        catch (ArgumentException exception) { errorMessage = exception.Message; }
+        catch (AgentstrationApiException exception)
+        {
+            errorMessage = exception.IsConcurrencyConflict ? "This agent changed on the server. Reload the page before saving again." : exception.Message;
+            errorId = exception.ErrorId;
+        }
+        finally { saving = false; }
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

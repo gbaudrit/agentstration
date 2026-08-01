@@ -1,0 +1,69 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationState Navigation
+@inject UserPreferencesState Preferences
+@inject NotificationState Notifications
+@inject PlatformStatusState PlatformStatus
+
+<div class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")">
+    <aside class="sidebar" aria-label="Main navigation">
+        <div class="brand-lockup"><span class="brand-mark" aria-hidden="true">A</span><span><strong>Agentstration</strong><small>Operations console</small></span></div>
+        <nav class="side-nav">
+            @foreach (var section in Sections)
+            {
+                <NavLink href="@section.Url" Match="@(section.Url == "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@section.Label"><span aria-hidden="true">@section.Icon</span><span class="nav-label">@section.Label</span></NavLink>
+            }
+        </nav>
+        <div class="sidebar-footer"><HealthIndicator Label="Platform" StatusText="@PlatformStatus.Label" Status="@PlatformStatus.Status" /></div>
+    </aside>
+
+    <div class="workspace">
+        <header class="topbar">
+            <div class="topbar-start"><button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="Toggle navigation" aria-expanded="@(!Navigation.IsSidebarCollapsed)">☰</button><nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Agentstration</a><span>/</span><span>@CurrentSection</span></nav></div>
+            <div class="topbar-actions">
+                <button class="icon-button" @onclick="Preferences.ToggleTheme" aria-label="Toggle color theme">@(Preferences.IsDarkTheme ? "☀" : "◐")</button>
+                <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="Notifications"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
+                <span class="environment-chip">DEV · LOCAL</span>
+            </div>
+        </header>
+        <main class="content" id="main-content">@Body</main>
+    </div>
+
+    @if (Notifications.IsPanelOpen)
+    {
+        <aside class="notification-panel" aria-label="Notifications">
+            <header><div><p class="eyebrow">Activity</p><h2>Notifications</h2></div><button class="icon-button" @onclick="Notifications.TogglePanel" aria-label="Close notifications">×</button></header>
+            @if (Notifications.Items.Count == 0) { <EmptyState Title="All quiet" Message="Operational notices will appear here." /> }
+            else { <button class="text-button" @onclick="Notifications.MarkAllRead">Mark all as read</button>@foreach (var item in Notifications.Items) { <article class="notification-item"><StatusBadge Text="@item.Title" Status="@item.Status" /><p>@item.Message</p><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time></article> } }
+        </aside>
+    }
+</div>
+
+@code {
+    private static readonly (string Label, string Url, string Icon)[] Sections =
+    [
+        ("Overview", "/", "⌂"), ("Management", "/management", "▦"), ("Runtime", "/runtime", "◉"),
+        ("Work", "/work", "✓"), ("Flows", "/flows", "⌘"), ("Agents", "/agents", "◎"),
+        ("Executions", "/executions", "▶"), ("Events", "/events", "≋"), ("Settings", "/settings", "⚙")
+    ];
+
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    private string CurrentSection => Sections.FirstOrDefault(item => NavigationManager.Uri.EndsWith(item.Url, StringComparison.OrdinalIgnoreCase)).Label ?? "Console";
+
+    protected override void OnInitialized()
+    {
+        Navigation.Changed += StateHasChanged;
+        Preferences.Changed += StateHasChanged;
+        Notifications.Changed += StateHasChanged;
+        PlatformStatus.Changed += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Navigation.Changed -= StateHasChanged;
+        Preferences.Changed -= StateHasChanged;
+        Notifications.Changed -= StateHasChanged;
+        PlatformStatus.Changed -= StateHasChanged;
+    }
+}
+

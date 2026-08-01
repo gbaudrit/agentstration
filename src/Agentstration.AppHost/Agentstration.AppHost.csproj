@@ -1,0 +1,12 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.2.0">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAspireHost>true</IsAspireHost>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Web/Agentstration.Web.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
+  </ItemGroup>
+</Project>

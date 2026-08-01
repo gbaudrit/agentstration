@@ -1,0 +1,7 @@
+<span class="status-badge status-@Status.ToString().ToLowerInvariant()"><span aria-hidden="true" class="status-dot"></span>@Text</span>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+    [Parameter] public UiStatus Status { get; set; }
+}
+

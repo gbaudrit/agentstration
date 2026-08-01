@@ -1,0 +1,43 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Agentstration.AppHost/Agentstration.AppHost.csproj" />
+    <Project Path="src/Agentstration.Application/Agentstration.Application.csproj" />
+    <Project Path="src/Agentstration.Contracts/Agentstration.Contracts.csproj" />
+    <Project Path="src/Agentstration.Domain/Agentstration.Domain.csproj" />
+    <Project Path="src/Agentstration.Evaluation/Agentstration.Evaluation.csproj" />
+    <Project Path="src/Agentstration.Flow/Agentstration.Flow.csproj" />
+    <Project Path="src/Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
+    <Project Path="src/Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
+    <Project Path="src/Agentstration.Flow.Storage.Abstractions/Agentstration.Flow.Storage.Abstractions.csproj" />
+    <Project Path="src/Agentstration.Flow.Storage.Sqlite/Agentstration.Flow.Storage.Sqlite.csproj" />
+    <Project Path="src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
+    <Project Path="src/Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <Project Path="src/Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
+    <Project Path="src/Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
+    <Project Path="src/Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
+    <Project Path="src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
+    <Project Path="src/Agentstration.ModelProviders.Ollama/Agentstration.ModelProviders.Ollama.csproj" />
+    <Project Path="src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
+    <Project Path="src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
+    <Project Path="src/Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
+    <Project Path="src/Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
+    <Project Path="src/Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />
+    <Project Path="src/Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
+    <Project Path="src/Agentstration.Web/Agentstration.Web.csproj" />
+    <Project Path="src/Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
+    <Project Path="src/Agentstration.Work/Agentstration.Work.csproj" />
+    <Project Path="src/Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
+    <Project Path="src/Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
+    <Project Path="src/Agentstration.Work.Storage.Sqlite/Agentstration.Work.Storage.Sqlite.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Agentstration.Application.Tests/Agentstration.Application.Tests.csproj" />
+    <Project Path="tests/Agentstration.ArchitectureTests/Agentstration.ArchitectureTests.csproj" />
+    <Project Path="tests/Agentstration.Evaluation.Tests/Agentstration.Evaluation.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Tests/Agentstration.Management.Tests.csproj" />
+    <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
+    <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />
+    <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
+    <Project Path="tests/Agentstration.Web.Components.Tests/Agentstration.Web.Components.Tests.csproj" />
+  </Folder>
+</Solution>

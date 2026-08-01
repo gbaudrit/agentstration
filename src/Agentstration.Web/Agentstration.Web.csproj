@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
+    <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
+    <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
+    <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
+    <ProjectReference Include="../Agentstration.ModelProviders.Ollama/Agentstration.ModelProviders.Ollama.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
+    <ProjectReference Include="../Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+  </ItemGroup>
+</Project>
