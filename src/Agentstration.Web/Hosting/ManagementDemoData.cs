@@ -8,8 +8,57 @@ public static class ManagementDemoData
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         var management = services.GetRequiredService<AgentManagementService>();
+        var modelProfiles = services.GetRequiredService<ModelProfileManagementService>();
+        var runtimeProfiles = services.GetRequiredService<RuntimeProfileManagementService>();
         var store = services.GetRequiredService<IControlPlaneStore>();
         const string resourceGroup = "default";
+        var runtimeProfileId = RuntimeProfileManagementService.ProfileId(resourceGroup, "maf-default");
+        if (await store.GetAsync<RuntimeProfileResource>(runtimeProfileId, cancellationToken) is null)
+        {
+            await runtimeProfiles.CreateAsync(new RuntimeProfileResource
+            {
+                Id = runtimeProfileId,
+                Name = "maf-default",
+                Type = AgentstrationResourceTypes.RuntimeProfiles,
+                ApiVersion = ManagementApiVersions.V20260801,
+                ResourceGroup = resourceGroup,
+                Location = "local",
+                Properties = new RuntimeProfileProperties
+                {
+                    DisplayName = "Microsoft Agent Framework",
+                    RuntimeType = "microsoft-agent-framework",
+                    Execution = new RuntimeExecutionDefaults
+                    {
+                        SessionMode = RuntimeSessionMode.Transient,
+                        ToolInvocation = RuntimeToolInvocationMode.Automatic,
+                        Streaming = StreamingMode.Automatic
+                    }
+                }
+            }, cancellationToken);
+        }
+        var profileId = ModelProfileManagementService.ProfileId(resourceGroup, "reasoning-default");
+        if (await store.GetAsync<ModelProfileResource>(profileId, cancellationToken) is null)
+        {
+            var configuration = services.GetRequiredService<IConfiguration>();
+            var modelName = configuration[$"Agentstration:ModelProviders:Deployments:local-reasoning:ModelName"] ?? "qwen3:1.7b";
+            await modelProfiles.CreateAsync(new ModelProfileResource
+            {
+                Id = profileId,
+                Name = "reasoning-default",
+                Type = AgentstrationResourceTypes.ModelProfiles,
+                ApiVersion = ManagementApiVersions.V20260801,
+                ResourceGroup = resourceGroup,
+                Location = "local",
+                Properties = new ModelProfileProperties
+                {
+                    DisplayName = "Default reasoning",
+                    Description = "General-purpose local reasoning profile.",
+                    Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local", resourceGroup)),
+                    Model = new ModelSelection { Name = modelName },
+                    Generation = new ModelGenerationOptions { Temperature = 0.2 }
+                }
+            }, cancellationToken);
+        }
         var existingTypes = await store.ListAsync<AgentTypeResource>(AgentstrationResourceTypes.AgentTypes, null, 0, 1, cancellationToken);
         var existingAgents = await store.ListAsync<AgentResource>(AgentstrationResourceTypes.Agents, null, 0, 1, cancellationToken);
         if (existingTypes.Count > 0 || existingAgents.Count > 0) return;
@@ -101,7 +150,12 @@ public static class ManagementDemoData
 
         var revisions = await store.ListAsync<AgentRevision>(AgentstrationResourceTypes.AgentRevisions, resourceGroup, 0, 1000, cancellationToken);
         var revision = revisions.Where(value => string.Equals(value.Value.AgentResourceId, agentId, StringComparison.Ordinal)).OrderByDescending(value => value.Value.CreatedAt).FirstOrDefault();
-        var spec = new AgentDeploymentSpec { Environment = "local", RuntimeProfileId = "standalone", HostingMode = AgentHostingMode.InProcess };
+        var spec = new AgentDeploymentSpec
+        {
+            Environment = "local",
+            RuntimeProfileId = RuntimeProfileManagementService.ProfileId(resourceGroup, "maf-default"),
+            HostingMode = AgentHostingMode.InProcess
+        };
         revision ??= await management.CreateRevisionAsync(agentId, spec, cancellationToken);
 
         var deploymentId = ResourceIdentifier.Create(resourceGroup, AgentstrationProviderNamespaces.Agents, "deployments", key).Value;

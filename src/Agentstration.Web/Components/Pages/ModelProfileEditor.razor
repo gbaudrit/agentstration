@@ -1,0 +1,169 @@
+@page "/modelprofiles/new"
+@page "/modelprofiles/{ResourceGroup}/{Name}"
+@implements IDisposable
+@inject IModelProfilesClient Client
+@inject IModelProvidersClient ProvidersClient
+@inject NavigationManager Navigation
+@inject NotificationState Notifications
+
+<PageTitle>@(IsNew ? "Create model profile" : $"{Name} · Model profile") · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? "Create model profile" : model?.DisplayName ?? Name)" Description="Declare a reusable provider and model selection without coupling agents to technical endpoints.">
+    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">Delete</button> }<a class="button-secondary" href="/modelprofiles">Back</a></Actions>
+</PageHeader>
+
+@if (loading || model is null)
+{
+    <LoadingState Message="Loading model profile…" />
+}
+else
+{
+    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@(error.IsConcurrencyConflict ? "This model profile has been modified by another user." : "Unable to save")</strong><span>@error.Message</span>@if (error.IsConcurrencyConflict) { <button class="text-button" @onclick="LoadAsync">Reload current version</button> }</div> }
+    @if (!string.IsNullOrWhiteSpace(warning)) { <div class="form-alert form-alert-warning" role="status">@warning</div> }
+    @if (!IsNew && usages.Count > 0) { <div class="form-alert form-alert-warning" role="status">Changing this profile will affect @usages.Count agent(s).</div> }
+
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-profile-editor" class="resource-form">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Profile resource</h2></div>@if (resolution is not null) { <StatusBadge Text="@ModelManagementUi.Label(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
+            <div class="form-grid">
+                <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
+                <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <label><span>Resource group</span><InputText @bind-Value="model.ResourceGroup" disabled="@(!IsNew)" /><ValidationMessage For="() => model.ResourceGroup" /></label>
+                <label><span>Location</span><InputText @bind-Value="model.Location" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Location" /></label>
+                <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
+            </div>
+        </section>
+
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Model selection</p><h2>Provider and model</h2></div></div>
+            <div class="form-grid">
+                <label><span>Provider</span><select value="@model.ProviderResourceId" @onchange="ProviderChangedAsync"><option value="">Select a provider</option>@foreach (var provider in providers) { <option value="@provider.Id">@provider.Properties.DisplayName — @provider.Name</option> }</select><ValidationMessage For="() => model.ProviderResourceId" /></label>
+                <label><span>Model</span><select @bind="model.ModelName" disabled="@loadingModels"><option value="">@(loadingModels ? "Loading models…" : "Select a model")</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — not currently discovered</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @ModelManagementUi.Label(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
+            </div>
+            @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderResourceId)) { <p class="inline-warning">No model is currently reported by this provider. An existing model name may remain configured while the provider is unavailable.</p> }
+        </section>
+
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Defaults</p><h2>Generation</h2></div><span>Canonical</span></div>
+            <div class="form-grid">
+                <label><span>Temperature</span><InputNumber @bind-Value="model.Temperature" step="0.1" /><ValidationMessage For="() => model.Temperature" /><small>Optional, from 0 to 2.</small></label>
+                <label><span>Top P</span><InputNumber @bind-Value="model.TopP" step="0.05" /><ValidationMessage For="() => model.TopP" /><small>Optional, from 0 to 1.</small></label>
+                <label><span>Top K</span><InputNumber @bind-Value="model.TopK" /><ValidationMessage For="() => model.TopK" /></label>
+                <label><span>Maximum output tokens</span><InputNumber @bind-Value="model.MaxOutputTokens" /><ValidationMessage For="() => model.MaxOutputTokens" /></label>
+                <label><span>Seed</span><InputNumber @bind-Value="model.Seed" /><small>Use a fixed seed when the provider supports it.</small></label>
+                <label class="form-span-2"><span>Stop sequences</span><InputTextArea @bind-Value="model.StopSequences" rows="3" /><small>One sequence per line.</small></label>
+            </div>
+        </section>
+
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Inference</p><h2>Reasoning and output</h2></div></div>
+            <div class="form-grid">
+                <label><span>Reasoning mode</span><InputSelect @bind-Value="model.ReasoningMode">@foreach (var value in Enum.GetValues<ReasoningMode>()) { <option value="@value">@value</option> }</InputSelect></label>
+                <label><span>Reasoning effort</span><InputSelect @bind-Value="model.ReasoningEffort"><option value="">Provider default</option>@foreach (var value in Enum.GetValues<ReasoningEffort>()) { <option value="@value">@value</option> }</InputSelect><small>Leave empty when reasoning is disabled.</small></label>
+                <label><span>Output format</span><InputSelect @bind-Value="model.OutputFormat">@foreach (var value in Enum.GetValues<ModelOutputFormat>()) { <option value="@value">@value</option> }</InputSelect></label>
+                <label class="checkbox-field"><InputCheckbox @bind-Value="model.StrictOutput" /><span>Strict structured output</span></label>
+                @if (model.OutputFormat == ModelOutputFormat.JsonSchema)
+                {
+                    <label class="form-span-2"><span>JSON schema</span><InputTextArea @bind-Value="model.JsonSchema" rows="10" class="runner-json" /><small>A valid JSON schema is required.</small></label>
+                }
+            </div>
+        </section>
+
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Adapter</p><h2>Provider options</h2></div><span>Advanced</span></div>
+            <div class="form-grid">
+                <label class="form-span-2"><span>Provider-specific JSON</span><InputTextArea @bind-Value="model.ProviderOptionsJson" rows="8" class="runner-json form-code-editor" /><small>Top-level keys must match the selected provider type, for example <code>ollama</code>.</small></label>
+            </div>
+        </section>
+
+        <div class="form-actions"><a class="button-secondary" href="/modelprofiles">Cancel</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create profile" : "Save changes")</button></div>
+    </EditForm>
+
+    @if (!IsNew)
+    {
+        <section class="details-grid resource-section">
+            <article class="panel"><div class="panel-header"><div><p class="eyebrow">Overview</p><h2>Effective resolution</h2></div></div>
+                @if (resolution is null) { <p>Resolution is not available.</p> } else { <dl class="resource-details"><dt>Declared profile</dt><dd>@resolution.Profile.DisplayName <code>@resolution.Profile.Name</code></dd><dt>Resolved provider</dt><dd>@(resolution.Provider?.DisplayName ?? resolution.Provider?.Name ?? "Not resolved")</dd><dt>Resolved model</dt><dd>@resolution.Model.Name</dd><dt>Status</dt><dd>@ModelManagementUi.Label(resolution.Status)</dd><dt>Streaming capability</dt><dd>@(resolution.Model.Capabilities?.Contains("streaming", StringComparer.OrdinalIgnoreCase) == true ? "Declared by model" : "Not declared by model")</dd><dt>Tool capability</dt><dd>@(resolution.Model.Capabilities?.Contains("tools", StringComparer.OrdinalIgnoreCase) == true ? "Declared by model" : "Not declared by model")</dd></dl>@foreach (var item in resolution.Warnings) { <p class="inline-warning">@item</p> } }
+            </article>
+            <article class="panel" id="agents"><div class="panel-header"><div><p class="eyebrow">Usages</p><h2>Agents</h2></div><span>@usages.Count</span></div>
+                @if (usages.Count == 0) { <p>No agent references this profile.</p> } else { <ul class="resource-links">@foreach (var usage in usages) { <li><a href="@AgentUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul> }
+            </article>
+        </section>
+        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Declarative resource</h2></div><span>Read only</span></div><pre class="runner-json">@Definition</pre></section>
+    }
+}
+
+<ConfirmationDialog IsOpen="@confirmDelete" Title="Delete model profile" Message="@($"Delete model profile '{Name}'?")" ConfirmLabel="Delete model profile" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+
+@code {
+    [Parameter] public string? ResourceGroup { get; set; }
+    [Parameter] public string? Name { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = [];
+    private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
+    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool confirmDelete;
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private string Definition
+    {
+        get
+        {
+            if (model is null) return string.Empty;
+            try { return JsonSerializer.Serialize(new { type = AgentstrationResourceTypes.ModelProfiles, apiVersion = ManagementApiVersions.V20260801, name = model.Name, resourceGroup = model.ResourceGroup, location = model.Location, properties = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
+            catch (ArgumentException) { return "The declarative definition is unavailable until the configuration is structurally valid."; }
+        }
+    }
+    protected override Task OnParametersSetAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null; warning = null;
+        try
+        {
+            providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
+            if (IsNew) model = new ModelProfileEditorModel();
+            else
+            {
+                var group = string.IsNullOrWhiteSpace(ResourceGroup) ? "default" : ResourceGroup;
+                var snapshot = await Client.GetModelProfileAsync(group, Name!, cancellation.Token);
+                model = ModelProfileEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag;
+                usages = (await Client.GetModelProfileUsagesAsync(group, Name!, cancellation.Token)).Value;
+                resolution = await Client.GetModelProfileResolutionAsync(group, Name!, cancellation.Token);
+            }
+            if (!string.IsNullOrWhiteSpace(model.ProviderResourceId)) await LoadModelsAsync(clearSelection: false);
+        }
+        catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProfileEditorModel(); }
+        finally { loading = false; }
+    }
+    private async Task ProviderChangedAsync(ChangeEventArgs args)
+    {
+        if (model is null) return; model.ProviderResourceId = args.Value?.ToString() ?? string.Empty; await LoadModelsAsync(clearSelection: true);
+    }
+    private async Task LoadModelsAsync(bool clearSelection)
+    {
+        if (model is null) return; if (clearSelection) model.ModelName = string.Empty; models = []; warning = null;
+        if (!ResourceIdentifier.TryParse(model.ProviderResourceId, out var id)) return;
+        loadingModels = true;
+        try { models = await ProvidersClient.GetProviderModelsAsync(id.Name, cancellation.Token); }
+        catch (AgentstrationApiException exception) { warning = $"Models cannot currently be discovered: {exception.Message}"; }
+        finally { loadingModels = false; }
+    }
+    private async Task SaveAsync()
+    {
+        if (model is null || saving) return; saving = true; error = null;
+        try
+        {
+            ResourceSnapshot<ModelProfileResource> snapshot = IsNew
+                ? await Client.CreateModelProfileAsync(model.ToCreateRequest(), cancellation.Token)
+                : await Client.UpdateModelProfileAsync(model.ResourceGroup, model.Name, model.ToPutRequest(), etag!, cancellation.Token);
+            etag = snapshot.ETag; Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? "Model profile created" : "Model profile updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
+            Navigation.NavigateTo($"/modelprofiles/{Uri.EscapeDataString(snapshot.Value.ResourceGroup ?? "default")}/{Uri.EscapeDataString(snapshot.Value.Name)}");
+        }
+        catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { saving = false; }
+    }
+    private void RequestDelete() { if (usages.Count > 0) { warning = $"This model profile cannot be deleted because it is used by {usages.Count} agent(s): {string.Join(", ", usages.Select(item => item.DisplayName))}."; return; } confirmDelete = true; }
+    private async Task DeleteAsync()
+    {
+        if (model is null || etag is null) return; confirmDelete = false;
+        try { await Client.DeleteModelProfileAsync(model.ResourceGroup, model.Name, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+    private static bool IsUnavailable(AvailableModelResponse model) => string.Equals(model.Status, "unavailable", StringComparison.OrdinalIgnoreCase);
+    private static string AgentUrl(ModelProfileUsageResponse usage) { var id = ResourceIdentifier.Parse(usage.ResourceId); return $"/agents/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}"; }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

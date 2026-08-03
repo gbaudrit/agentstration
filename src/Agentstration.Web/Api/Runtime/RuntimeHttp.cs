@@ -1,4 +1,5 @@
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Web.Api.Runtime;
 
@@ -10,6 +11,8 @@ internal static class RuntimeHttp
         catch (RuntimeRunNotFoundException exception) { return Results.Problem(statusCode: 404, title: "run_not_found", detail: exception.Message); }
         catch (RuntimeRunConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
         catch (RuntimeRunValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
+        catch (ControlPlaneResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
+        catch (ControlPlaneConcurrencyException exception) { return Results.Problem(statusCode: 409, title: "resource_version_conflict", detail: exception.Message); }
         catch (ArgumentException exception) { return Results.Problem(statusCode: 400, title: "validation_failed", detail: exception.Message); }
         catch (InvalidOperationException exception) { return Results.Problem(statusCode: 409, title: "operation_conflict", detail: exception.Message); }
     }

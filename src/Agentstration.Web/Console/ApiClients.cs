@@ -24,6 +24,11 @@ public interface IManagementApiClient
     Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken);
 }
 
+public interface IAgentRunnerManagementClient
+{
+    Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string resourceGroup, string name, CancellationToken cancellationToken);
+}
+
 public interface IRuntimeApiClient
 {
     Task<IReadOnlyList<RuntimeInstanceSummary>> GetInstancesAsync(CancellationToken cancellationToken);
@@ -34,6 +39,12 @@ public interface IRuntimeApiClient
     IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, CancellationToken cancellationToken);
     Task<RuntimeRun> CancelRunAsync(string runId, CancellationToken cancellationToken);
     Task<RuntimeRun> RetryRunAsync(string runId, CancellationToken cancellationToken);
+}
+
+public interface IAgentRunnerRuntimeClient : IRuntimeApiClient
+{
+    Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string resourceGroup, string agentName, long generation, CancellationToken cancellationToken);
+    Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string resourceGroup, string agentName, long generation, CancellationToken cancellationToken);
 }
 
 public interface IWorkApiClient
@@ -52,7 +63,7 @@ public interface IAgentstrationEventStream
     IAsyncEnumerable<EventListItem> SubscribeAsync(CancellationToken cancellationToken);
 }
 
-public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiClient
+public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiClient, IAgentRunnerManagementClient
 {
     public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken) =>
         GetAgentsAsync("default", cancellationToken);
@@ -140,7 +151,7 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     }
 }
 
-public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient
+public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient, IAgentRunnerRuntimeClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -218,6 +229,22 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient
         return await ReadRunAsync(response, cancellationToken);
     }
 
+    public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string resourceGroup, string agentName, long generation, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<AgentRuntimeReadinessResponse>(httpClient,
+            $"api/runtime/agents/{Uri.EscapeDataString(agentName)}/readiness?resourceGroup={Uri.EscapeDataString(resourceGroup)}&generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            cancellationToken);
+
+    public async Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string resourceGroup, string agentName, long generation, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync(
+            $"api/runtime/agents/{Uri.EscapeDataString(agentName)}/prepare?resourceGroup={Uri.EscapeDataString(resourceGroup)}&generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            null,
+            cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<PrepareAgentRuntimeResponse>(cancellationToken)
+            ?? throw new AgentstrationApiException("Runtime returned an empty preparation response.", Guid.NewGuid().ToString("N"));
+    }
+
     private static async Task<RuntimeRun> ReadRunAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
@@ -258,5 +285,6 @@ public sealed class AgentstrationApiException(string message, string errorId, Ht
     public string ErrorId { get; } = errorId;
     public HttpStatusCode? StatusCode { get; } = statusCode;
     public string? ProblemTitle { get; } = problemTitle;
-    public bool IsConcurrencyConflict => StatusCode == HttpStatusCode.PreconditionFailed;
+    public bool IsConcurrencyConflict => StatusCode == HttpStatusCode.PreconditionFailed
+        || StatusCode == HttpStatusCode.Conflict && string.Equals(ProblemTitle, "Resource version conflict", StringComparison.OrdinalIgnoreCase);
 }

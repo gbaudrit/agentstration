@@ -14,6 +14,7 @@ public sealed class AgentManagementService(
     IAgentRouter router,
     IRuntimeRegistry runtimes,
     IManagementEventPublisher eventBus,
+    IModelProfileReferenceValidator modelProfiles,
     TimeProvider timeProvider)
 {
     public Task InitializeAsync(CancellationToken cancellationToken) => store.InitializeAsync(cancellationToken);
@@ -30,6 +31,7 @@ public sealed class AgentManagementService(
     {
         ValidateResource(resource, AgentstrationResourceTypes.Agents);
         ValidateAgentProperties(resource.Properties);
+        await modelProfiles.ValidateAsync(resource.Properties.ModelProfile.ResourceId, cancellationToken);
         var expectedId = ResourceIdentifier.Create(resource.ResourceGroup!, AgentstrationProviderNamespaces.Agents, "agents", resource.Name).Value;
         if (!string.Equals(resource.Id, expectedId, StringComparison.Ordinal))
             throw new AgentDefinitionValidationException("resource_id_mismatch", $"Agent id must be '{expectedId}'.");
@@ -90,6 +92,7 @@ public sealed class AgentManagementService(
 
     public async Task<StoredResource<AgentRevision>> CreateRevisionAsync(string agentResourceId, AgentDeploymentSpec spec, CancellationToken cancellationToken)
     {
+        await ValidateRuntimeProfileAsync(spec.RuntimeProfileId, cancellationToken);
         var agent = await store.GetAsync<AgentResource>(agentResourceId, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(agentResourceId);
         var type = await store.GetAsync<AgentTypeResource>(agent.Value.Properties.AgentType.ResourceId, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(agent.Value.Properties.AgentType.ResourceId);
         var resolved = compiler.Compile(type.Value.Properties, agent.Value, spec);
@@ -119,7 +122,8 @@ public sealed class AgentManagementService(
 
     public async Task<StoredResource<AgentDeployment>> CreateDeploymentAsync(string resourceGroup, string name, string location, string revisionId, AgentDeploymentSpec spec, CancellationToken cancellationToken)
     {
-        _ = await store.GetAsync<AgentRevision>(revisionId, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(revisionId);
+        await ValidateRuntimeProfileAsync(spec.RuntimeProfileId, cancellationToken);
+        var revision = await store.GetAsync<AgentRevision>(revisionId, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(revisionId);
         var id = ResourceIdentifier.Create(resourceGroup, AgentstrationProviderNamespaces.Agents, "deployments", name).Value;
         var deployment = new AgentDeployment
         {
@@ -130,6 +134,8 @@ public sealed class AgentManagementService(
             ResourceGroup = resourceGroup,
             Location = location,
             RevisionId = revisionId,
+            AgentResourceId = revision.Value.AgentResourceId,
+            ModelProfileId = revision.Value.Definition.ModelProfileId,
             Environment = spec.Environment,
             RuntimeProfileId = spec.RuntimeProfileId,
             HostingMode = spec.HostingMode,
@@ -152,6 +158,46 @@ public sealed class AgentManagementService(
         var result = await reconciler.ReconcileAsync(deployment.Value, cancellationToken);
         if (!result.Changed) return deployment;
         return await store.PutAsync(result.Deployment with { UpdatedAt = timeProvider.GetUtcNow() }, deployment.ETag, false, cancellationToken);
+    }
+
+    public async Task<StoredResource<AgentDeployment>> PrepareLocalRuntimeAsync(string agentResourceId, long generation, CancellationToken cancellationToken)
+    {
+        var agent = await store.GetAsync<AgentResource>(agentResourceId, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(agentResourceId);
+        if (agent.Value.Generation != generation)
+            throw new ArgumentException($"Only the current agent generation '{agent.Value.Generation}' can be prepared.", nameof(generation));
+
+        var spec = new AgentDeploymentSpec
+        {
+            Environment = "local",
+            RuntimeProfileId = RuntimeProfileManagementService.ProfileId(agent.Value.ResourceGroup!, "maf-default"),
+            HostingMode = AgentHostingMode.InProcess
+        };
+        var revisions = await store.ListAsync<AgentRevision>(AgentstrationResourceTypes.AgentRevisions, agent.Value.ResourceGroup, 0, 1000, cancellationToken);
+        var revision = revisions.FirstOrDefault(item =>
+            string.Equals(item.Value.AgentResourceId, agentResourceId, StringComparison.Ordinal)
+            && item.Value.AgentVersion == generation)
+            ?? await CreateRevisionAsync(agentResourceId, spec, cancellationToken);
+
+        var deployments = await store.ListAsync<AgentDeployment>(AgentstrationResourceTypes.Deployments, agent.Value.ResourceGroup, 0, 1000, cancellationToken);
+        var deployment = deployments.FirstOrDefault(item => string.Equals(item.Value.RevisionId, revision.Value.Id, StringComparison.Ordinal));
+        if (deployment is null)
+        {
+            var name = $"{agent.Value.Name}--g{generation:000000}";
+            deployment = await CreateDeploymentAsync(agent.Value.ResourceGroup!, name, agent.Value.Location ?? "local", revision.Value.Id, spec, cancellationToken);
+        }
+        if (deployment.Value.DesiredState != DesiredAgentState.Running)
+            deployment = await StartAsync(deployment, cancellationToken);
+        return await ReconcileAsync(deployment, cancellationToken);
+    }
+
+    private async Task ValidateRuntimeProfileAsync(string resourceId, CancellationToken cancellationToken)
+    {
+        if (!ResourceIdentifier.TryParse(resourceId, out var id)
+            || !string.Equals(id.ProviderNamespace, AgentstrationProviderNamespaces.Runtime, StringComparison.Ordinal)
+            || !string.Equals(id.ResourceType, "runtimeProfiles", StringComparison.Ordinal))
+            throw new AgentDefinitionValidationException("runtime_profile_reference_invalid", "RuntimeProfileId must reference Agentstration.Runtime/runtimeProfiles.");
+        _ = await store.GetAsync<RuntimeProfileResource>(resourceId, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(resourceId);
     }
 
     public async Task ReconcileAllAsync(CancellationToken cancellationToken)

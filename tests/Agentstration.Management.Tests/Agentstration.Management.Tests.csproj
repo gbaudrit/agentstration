@@ -5,6 +5,7 @@
     <ProjectReference Include="../../src/Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
     <ProjectReference Include="../../src/Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../../src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
   </ItemGroup>
   <ItemGroup>

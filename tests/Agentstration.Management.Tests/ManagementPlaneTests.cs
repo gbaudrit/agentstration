@@ -9,7 +9,6 @@ using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Storage.Sqlite;
-using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +18,8 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ManagementPlaneTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     [TestMethod]
     public void ManagementRoutesAreOwnedByIndependentMinimalApiEndpointClasses()
     {
@@ -297,74 +298,19 @@ public sealed class ManagementPlaneTests
     }
 
     [TestMethod]
-    public async Task SqliteStoreReadsLegacyAgentDocumentsWithoutDataLoss()
+    public void AgentResourceSerializesOnlyTheCurrentCanonicalSchema()
     {
-        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-legacy-management-tests-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
-        var database = Path.Combine(directory, "control-plane.db");
-        var connectionString = $"Data Source={database};Pooling=False";
-        try
-        {
-            var services = new ServiceCollection();
-            services.AddLogging();
-            services.AddSingleton(TimeProvider.System);
-            services.AddSqliteControlPlane(connectionString);
-            await using var provider = services.BuildServiceProvider();
-            var store = provider.GetRequiredService<IControlPlaneStore>();
-            await store.InitializeAsync(default);
+        var resource = AgentResource("default", CreateAgent("dotnet-expert", CreateType()));
+        var json = JsonSerializer.Serialize(resource, JsonOptions);
+        using var document = JsonDocument.Parse(json);
+        var properties = document.RootElement.GetProperty("properties");
 
-            var id = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Agents, "agents", "legacy-agent").Value;
-            var typeId = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Agents, "agentTypes", "readonly-expert").Value;
-            var payload = $$"""
-                {
-                  "id": "{{id}}",
-                  "name": "legacy-agent",
-                  "type": "Agentstration.Agents/agents",
-                  "apiVersion": "2026-08-01",
-                  "resourceGroup": "default",
-                  "location": "local",
-                  "tags": { "legacy": "true" },
-                  "properties": {
-                    "id": "6d36fdce-d1dc-42ac-b401-a9b175d15e90",
-                    "version": 3,
-                    "key": "legacy-agent",
-                    "displayName": "Legacy Agent",
-                    "description": "Stored with the previous schema.",
-                    "type": { "resourceId": "{{typeId}}", "version": 1 },
-                    "additionalInstructions": "Preserve this value.",
-                    "modelProfileOverride": null,
-                    "additionalToolIds": [],
-                    "settings": {}
-                  }
-                }
-                """;
-            await using (var connection = new SqliteConnection(connectionString))
-            {
-                await connection.OpenAsync();
-                await using var command = connection.CreateCommand();
-                command.CommandText = "INSERT INTO ControlPlaneResources (ResourceId, ResourceType, ResourceGroup, Payload, ETag, UpdatedAt) VALUES ($id, $type, $group, $payload, $etag, $updatedAt)";
-                command.Parameters.AddWithValue("$id", id);
-                command.Parameters.AddWithValue("$type", AgentstrationResourceTypes.Agents);
-                command.Parameters.AddWithValue("$group", "default");
-                command.Parameters.AddWithValue("$payload", payload);
-                command.Parameters.AddWithValue("$etag", "\"legacy\"");
-                command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
-                await command.ExecuteNonQueryAsync();
-            }
-
-            var stored = await store.GetAsync<AgentResource>(id, default);
-
-            Assert.IsNotNull(stored);
-            Assert.AreEqual(3L, stored.Value.Generation);
-            Assert.AreEqual(typeId, stored.Value.Properties.AgentType.ResourceId);
-            Assert.AreEqual("Preserve this value.", stored.Value.Properties.AdditionalInstructions);
-            Assert.AreEqual("reasoning-default", ResourceIdentifier.Parse(stored.Value.Properties.ModelProfile.ResourceId).Name);
-            Assert.AreEqual("true", stored.Value.Tags["legacy"]);
-        }
-        finally
-        {
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
-        }
+        Assert.IsTrue(properties.TryGetProperty("agentType", out _));
+        Assert.IsTrue(properties.TryGetProperty("modelProfile", out _));
+        Assert.IsTrue(properties.TryGetProperty("tools", out _));
+        Assert.IsFalse(properties.TryGetProperty("modelProfileOverride", out _));
+        Assert.IsFalse(properties.TryGetProperty("additionalToolIds", out _));
+        Assert.IsFalse(properties.TryGetProperty("type", out _));
     }
 
     private static AgentTypeDefinition CreateType() => new()
@@ -421,7 +367,7 @@ public sealed class ManagementPlaneTests
         Properties = CreateAgent(name, CreateType())
     };
 
-    private static AgentDeploymentSpec LocalSpec() => new() { Environment = "local", RuntimeProfileId = "standalone", HostingMode = AgentHostingMode.InProcess };
+    private static AgentDeploymentSpec LocalSpec() => new() { Environment = "local", RuntimeProfileId = RuntimeProfileManagementService.ProfileId("default", "maf-default"), HostingMode = AgentHostingMode.InProcess };
 
     private sealed class ManagementFixture : IAsyncDisposable
     {
@@ -454,6 +400,18 @@ public sealed class ManagementPlaneTests
             services.AddSingleton<IManagementEventHandler<AgentDeleted>>(events);
             var provider = services.BuildServiceProvider();
             await provider.GetRequiredService<AgentManagementService>().InitializeAsync(default);
+            var runtimeProfiles = provider.GetRequiredService<RuntimeProfileManagementService>();
+            var runtimeProfileId = RuntimeProfileManagementService.ProfileId("default", "maf-default");
+            await runtimeProfiles.CreateAsync(new RuntimeProfileResource
+            {
+                Id = runtimeProfileId,
+                Name = "maf-default",
+                Type = AgentstrationResourceTypes.RuntimeProfiles,
+                ApiVersion = ManagementApiVersions.V20260801,
+                ResourceGroup = "default",
+                Location = "local",
+                Properties = new RuntimeProfileProperties { DisplayName = "MAF default", RuntimeType = "microsoft-agent-framework" }
+            }, default);
             return new ManagementFixture(directory, provider, events);
         }
 

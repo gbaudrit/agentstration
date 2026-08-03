@@ -1,0 +1,29 @@
+@page "/runtimeprofiles"
+@implements IDisposable
+@inject IRuntimeProfilesClient Client
+
+<PageTitle>Runtime profiles · Agentstration</PageTitle>
+<PageHeader Title="Runtime profiles" Description="Configure runtime execution defaults independently from model inference settings.">
+    <Actions><a class="button-primary" href="/runtimeprofiles/new">Create runtime profile</a></Actions>
+</PageHeader>
+
+@if (error is not null) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState> }
+else if (profiles is null) { <LoadingState Message="Loading runtime profiles…" /> }
+else if (profiles.Count == 0) { <EmptyState Title="No runtime profiles" Message="Create a runtime profile before deploying agents."><a class="button-primary" href="/runtimeprofiles/new">Create runtime profile</a></EmptyState> }
+else
+{
+    <DataGrid TItem="RuntimeProfileSummaryResponse" Items="profiles">
+        <Header><tr><th>Profile</th><th>Runtime</th><th>Session</th><th>Streaming</th><th>Usage</th><th></th></tr></Header>
+        <Row Context="profile"><tr><td><strong>@profile.Properties.DisplayName</strong><br /><code>@profile.Name</code></td><td><code>@profile.Properties.RuntimeType</code></td><td>@profile.Properties.Execution.SessionMode</td><td>@profile.Properties.Execution.Streaming</td><td>@profile.UsageCount deployment(s)</td><td><a class="text-button" href="@Url(profile)">Open</a></td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<RuntimeProfileSummaryResponse>? profiles;
+    private AgentstrationApiException? error;
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync() { error = null; try { profiles = await Client.GetRuntimeProfilesAsync(cancellation.Token); } catch (AgentstrationApiException exception) { error = exception; } }
+    private static string Url(RuntimeProfileSummaryResponse profile) => $"/runtimeprofiles/{Uri.EscapeDataString(profile.ResourceGroup)}/{Uri.EscapeDataString(profile.Name)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

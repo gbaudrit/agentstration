@@ -1,0 +1,51 @@
+@page "/modelproviders"
+@implements IDisposable
+@inject IModelProvidersClient Client
+
+<PageTitle>Model providers · Agentstration</PageTitle>
+<PageHeader Title="Model providers" Description="Inspect configured technical providers and their dynamically discovered models.">
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh</button></Actions>
+</PageHeader>
+
+@if (loading && providers is null)
+{
+    <LoadingState Message="Loading model providers…" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else if (providers?.Count == 0)
+{
+    <EmptyState Title="No model providers" Message="No technical provider is configured for this environment." />
+}
+else
+{
+    <DataGrid TItem="ModelProviderResponse" Items="providers ?? []">
+        <Header><tr><th>Provider</th><th>Type</th><th>Location</th><th>Management</th><th>Status</th><th>Models</th><th></th></tr></Header>
+        <Row Context="provider"><tr>
+            <td><strong>@provider.Properties.DisplayName</strong><br /><code>@provider.Name</code></td>
+            <td>@provider.Properties.ProviderType</td><td>@provider.Location</td><td>@provider.Properties.ManagementMode</td>
+            <td><StatusBadge Text="@ModelManagementUi.Label(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></td>
+            <td>@provider.Properties.ModelCount</td>
+            <td><a class="text-button" href="@DetailsUrl(provider.Name)">View details →</a></td>
+        </tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<ModelProviderResponse>? providers;
+    private AgentstrationApiException? error;
+    private bool loading;
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { providers = await Client.GetModelProvidersAsync(cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private static string DetailsUrl(string name) => $"/modelproviders/{Uri.EscapeDataString(name)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

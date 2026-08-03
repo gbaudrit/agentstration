@@ -2,6 +2,7 @@
 @page "/agents/{ResourceGroup}/{Name}"
 @implements IDisposable
 @inject IManagementApiClient Client
+@inject IAgentsModelClient AgentsModelClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 
@@ -57,10 +58,21 @@ else
                     <ValidationMessage For="() => model.AgentTypeResourceId" />
                 </label>
                 <label><span>Agent type version</span><InputNumber @bind-Value="model.AgentTypeVersion" /><ValidationMessage For="() => model.AgentTypeVersion" /></label>
-                <label class="form-span-2"><span>Model profile resource ID</span><InputText @bind-Value="model.ModelProfileResourceId" /><ValidationMessage For="() => model.ModelProfileResourceId" /><small>Existence validation remains deferred until the Models provider is available.</small></label>
+                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileResourceId" ValueChanged="ModelProfileChanged" /><ValidationMessage For="() => model.ModelProfileResourceId" /></div>
                 <label class="form-span-2"><span>Additional instructions</span><InputTextArea @bind-Value="model.AdditionalInstructions" rows="6" /></label>
             </div>
         </section>
+
+        @if (!IsNew)
+        {
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">Model configuration</p><h2>Declared and resolved</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelManagementUi.Label(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
+                <div class="declaration-resolution-grid">
+                    <article><h3>Declared configuration</h3><dl class="resource-details"><dt>Model profile</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? ResourceName(model.ModelProfileResourceId))</dd><dt>Resource ID</dt><dd><code>@model.ModelProfileResourceId</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">Open model profile →</a> }</article>
+                    <article><h3>Resolved configuration</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>Provider</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? "Not resolved")</dd><dt>Provider type</dt><dd>@(agentModel.Resolved.Provider?.ProviderType ?? "Not resolved")</dd><dt>Model</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>Status</dt><dd>@ModelManagementUi.Label(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">Open provider →</a> }}</article>
+                </div>
+            </section>
+        }
 
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">References</p><h2>Tools and tags</h2></div></div>
@@ -89,6 +101,8 @@ else
     private string? errorMessage;
     private string? errorId;
     private string? successMessage;
+    private string? modelResolutionWarning;
+    private AgentModelResponse? agentModel;
     private long generation;
     private bool loading = true;
     private bool saving;
@@ -116,6 +130,8 @@ else
                 etag = snapshot.ETag;
                 resourceId = snapshot.Value.Id;
                 generation = snapshot.Value.Generation;
+                try { agentModel = await AgentsModelClient.GetAgentModelResolutionAsync(group, Name!, cancellation.Token); }
+                catch (AgentstrationApiException exception) { modelResolutionWarning = exception.Message; }
             }
         }
         catch (AgentstrationApiException exception)
@@ -135,6 +151,20 @@ else
         if (selected is null) model.AgentTypeResourceId = id;
         else ApplyAgentType(selected);
     }
+
+    private Task ModelProfileChanged(string value)
+    {
+        if (model is not null) model.ModelProfileResourceId = value;
+        return Task.CompletedTask;
+    }
+
+    private static string ResourceName(string resourceId) => ResourceIdentifier.TryParse(resourceId, out var parsed) ? parsed.Name : resourceId;
+    private static string ProfileUrl(AgentModelResponse value)
+    {
+        var id = ResourceIdentifier.Parse(value.Declared.ModelProfile.ResourceId);
+        return $"/modelprofiles/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}";
+    }
+    private static string ProviderUrl(AgentModelResponse value) => $"/modelproviders/{Uri.EscapeDataString(value.Resolved.Provider!.Name)}";
 
     private void ApplyAgentType(AgentTypeResource type)
     {

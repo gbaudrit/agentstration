@@ -42,8 +42,9 @@
 @code {
     private static readonly (string Label, string Url, string Icon)[] Sections =
     [
-        ("Overview", "/", "⌂"), ("Management", "/management", "▦"), ("Runtime", "/runtime", "◉"),
-        ("Work", "/work", "✓"), ("Flows", "/flows", "⌘"), ("Agents", "/agents", "◎"),
+        ("Overview", "/", "⌂"), ("Management", "/management", "▦"), ("Agents", "/agents", "◎"),
+        ("Model profiles", "/modelprofiles", "◇"), ("Model providers", "/modelproviders", "⬡"), ("Runtime profiles", "/runtimeprofiles", "◈"), ("Runtime", "/runtime", "◉"),
+        ("Work", "/work", "✓"), ("Flows", "/flows", "⌘"),
         ("Executions", "/executions", "▶"), ("Events", "/events", "≋"), ("Settings", "/settings", "⚙")
     ];
 
@@ -66,4 +67,3 @@
         PlatformStatus.Changed -= StateHasChanged;
     }
 }
-

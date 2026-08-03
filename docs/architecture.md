@@ -60,7 +60,7 @@ Management.Storage.Sqlite -> Management.Abstractions + EF Core SQLite
 Infrastructure -> SQLite control-plane storage + local/MAF runtime adapters
 Web -> ModelProviders.Ollama -> ModelProviders + Microsoft.Extensions.AI
 AppHost -> Aspire Ollama hosting integration
-Runtime.AgentFramework -> runtime abstractions + Microsoft Agent Framework
+Runtime.AgentFramework -> runtime abstractions + ModelProviders + Microsoft Agent Framework
 Application -> Work + Work storage abstractions
 Flow.Application -> Flow + Flow.Storage.Abstractions
 Flow.Storage.Sqlite -> Flow.Storage.Abstractions + EF Core SQLite
@@ -76,10 +76,10 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 
 | Module | Current responsibility | Planned extension |
 |---|---|---|
-| Management plane | canonical declarative agent resources, typed references, desired state, generations, provisioning status, lifecycle events, deterministic revisions, deployments, ETag API | operations, policies, provider-backed existence resolution, connections, identities, manifest import |
+| Management plane | canonical declarative agent and model-profile resources, typed references, desired state, generations, provisioning status, lifecycle events, deterministic revisions, deployments, ETag API | operations, policies, connections, identities, manifest import |
 | Control storage | SQLite JSON resources with indexed metadata and optimistic concurrency | richer relational projections and migrations |
 | Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, MAF `ChatClientAgent`, in-process/shared-host provisioning, registry, reconciliation | provider-native token/tool streaming, sessions, dedicated hosts, containers, remote and Foundry adapters |
-| Model providers | provider-neutral resolver plus local OllamaSharp adapter exposed as `IChatClient`; Aspire provisions the development container and model | additional local or remote adapters selected at composition time |
+| Model providers | read-only configured technical providers, dynamic health/model discovery, persisted logical profiles, provider-neutral resolver, and local OllamaSharp adapter | mutable external provider registration and additional local or remote adapters |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
 | Flow definitions | Direct, Routing, Workflow, Orchestration, Composite specifications; immutable published versions | FlowRun compilation and execution adapters |
@@ -220,12 +220,28 @@ An interactive console Run is owned entirely by the Runtime Plane and does not c
 
 ```text
 AppHost --provisions--> Ollama container + persistent model volume
-   |--injects connection--> Web composition
-Web -> ModelProviders.Ollama -> OllamaSharp IChatClient
-Runtime.AgentFramework -> IChatClient (provider-neutral)
+   |--injects local-chat connection--> Web composition
+Agent modelProfile.resourceId
+   -> persisted Management profile
+   -> deployment
+   -> provider configuration
+   -> ModelProviders.Ollama
+   -> OllamaSharp IChatClient
+   -> Runtime.AgentFramework
+   -> MAF AIAgent
 ```
 
-The standalone Web process still defaults to the deterministic client. Selecting `AI:Provider=Ollama` activates the Ollama provider adapter; the Agent Runner then exercises it through the normal Runtime path. The development-only diagnostic endpoint checks connectivity without becoming a second business workflow. Prompts and model responses are not written to logs.
+The standalone Web process still defaults to the deterministic client. Selecting `AI:Provider=Ollama` activates persisted-profile resolution: `reasoning-default -> ollama-local -> qwen3:1.7b`. The profile resource ID remains in the immutable agent revision; no provider or endpoint is embedded in the agent. The Agent Runner exercises the normal durable Runtime path, and successful Run status records the resolved provider type and model. The development-only diagnostic endpoint checks connectivity without becoming a second business workflow. Prompts and model responses are not written to logs.
+
+Model profiles are now persisted as `Agentstration.Models/modelProfiles` documents in the Management control plane. The internal deployment configuration used by the runtime resolver is projected from the stored profile; it is not a separate public resource. Providers remain configuration-backed technical resources, while discovered models are dynamic views and are not persisted individually. Agent writes validate profile existence and structure without requiring the provider to be online. Profile deletion queries agent references and fails while usages remain.
+
+The Interactive Server console consumes these same HTTP contracts through dedicated model-management clients. `/modelproviders` presents the technical, read-only provider view and dynamic discovery. `/modelprofiles` manages canonical inference resources (`generation`, `reasoning`, `output`, and provider-keyed options) with ETags and usage protection. `/runtimeprofiles` independently manages session, tool invocation, streaming defaults, and runtime-keyed options; deployments must reference an existing canonical runtime-profile resource ID. The reusable agent picker emits only the canonical model-profile resource ID, while agent details query `/api/agents/{name}/model` to keep declared and resolved configuration visually and structurally distinct.
+
+Model behavior and runtime behavior are now separate canonical categories. `ModelProfileResource` carries `generation`, `reasoning`, `output`, and provider-keyed `providerOptions`; `RuntimeProfileResource` carries session/tool/streaming defaults and runtime-keyed `runtimeOptions`. `AgentDeployment` records the resolved agent and model-profile references alongside the runtime-profile reference. Runtime option layers are merged by category from provider/model defaults through profile, agent, runtime, Work/Flow, and explicit execution override, then validated as one effective configuration.
+
+Runtime adapters expose normalized `AgentExecutionEvent` values rather than MAF updates. Effective capability resolution intersects provider, selected model, runtime, and concrete adapter support and preserves `Unsupported`, `Native`, `Emulated`, or `Partial`. The MAF adapter maps canonical options to `ChatOptions`; the Ollama adapter alone parses `think`, `keepAlive`, engine sizing, `endpointMode`, and its forward-compatible additional options. See ADR-0017.
+
+Agent Runner always uses canonical Management and Runtime HTTP clients, independently of simulated dashboard projections. Before enabling Run it combines `/api/agents/{name}/model` with `/api/runtime/agents/{name}/readiness`. A missing exact-generation runtime can be prepared explicitly through `/prepare`, which creates or reuses its revision and local deployment and reconciles it. At execution time the MAF adapter resolves the current profile again, merges profile defaults with the only supported overrides (`temperature`, `maxOutputTokens`), selects the deployment model through `ChatOptions.ModelId`, and records the actual provider/model/effective options on the durable Run.
 
 ### URL security flow
 
@@ -249,6 +265,10 @@ Activity sources exist for ingestion, workflows, and missions. Spans carry works
 10. **Next management increment:** durable long-running operations, manifest importer, resource groups, model/tool/connection/identity providers, and management authentication.
 11. **Next runtime increment:** provider-native streaming and tool telemetry, session storage, tool catalog policies, revision traffic splitting, dedicated process/container and remote endpoint adapters.
 12. **Delivered local model-provider increment:** provider-neutral resolver, OllamaSharp adapter, Aspire-provisioned Ollama/model volume, Runner integration, development diagnostic, and offline tests.
+13. **Delivered declared model resolution increment:** agent profile reference to profile/deployment/provider resolution, async `IChatClient` resolution, MAF materialization, resolved model Run metadata, and boundary tests.
+14. **Delivered model management API increment:** read-only provider discovery/status/models, persisted profile CRUD with ETags, filters, usages, resolution, agent model expansion, Problem Details, and deletion protection.
+15. **Delivered model management UI increment:** provider/model inspection, profile CRUD and declarative view, ETag conflict recovery, usage-aware deletion, reusable agent profile picker, and declared-versus-resolved agent model details.
+16. **Delivered real Agent Runner invocation increment:** canonical Runner clients, exact-generation readiness/preparation, per-run profile resolution, dynamic Ollama model selection, effective generation options, and durable resolved-model metadata.
 
 ## ADR catalog
 
@@ -262,3 +282,7 @@ Activity sources exist for ingestion, workflows, and missions. Spans carry works
 - ADR-0011: dedicated Management module
 - ADR-0012: durable Runtime Run resource and observable execution
 - ADR-0013: model-provider boundary and local Ollama adapter
+- ADR-0014: configuration-backed model resolution into MAF
+- ADR-0015: persisted model profiles and read-only provider APIs
+- ADR-0016: real model invocation from Agent Runner
+- ADR-0017: canonical runtime, model options, and effective capabilities

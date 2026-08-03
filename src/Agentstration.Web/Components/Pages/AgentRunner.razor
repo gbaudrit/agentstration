@@ -1,8 +1,9 @@
 @page "/agents/{ResourceGroup}/{Name}/run"
 @page "/runs/{RunId}"
 @implements IDisposable
-@inject IManagementApiClient ManagementClient
-@inject IRuntimeApiClient RuntimeClient
+@inject IAgentRunnerManagementClient ManagementClient
+@inject IAgentRunnerRuntimeClient RuntimeClient
+@inject IAgentsModelClient ModelsClient
 @inject IJSRuntime JavaScript
 
 <PageTitle>Agent Runner · Agentstration</PageTitle>
@@ -34,8 +35,21 @@ else
         <div><span>Version</span><strong>@agent.Generation</strong></div>
         <div><span>Runtime</span><strong>@(state.Run?.Status.Runtime ?? "Local")</strong></div>
         <div><span>Model profile</span><strong>@ResourceName(agent.Properties.ModelProfile.ResourceId)</strong></div>
+        <div><span>Provider</span><strong>@(modelResolution?.Resolved.Provider?.Name ?? "Not resolved")</strong></div>
+        <div><span>Model</span><strong>@(modelResolution?.Resolved.Model.Name ?? "Not resolved")</strong></div>
+        <div><span>Deployment</span><strong><StatusBadge Text="@(readiness?.State ?? "Unknown")" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /></strong></div>
+        <div><span>Runtime profile</span><strong>@(readiness?.RuntimeProfileId is null ? "Not resolved" : ResourceName(readiness.RuntimeProfileId))</strong></div>
         <div><span>Execution mode</span><strong>Interactive</strong></div>
     </section>
+
+    @if (readiness is { Ready: false })
+    {
+        <div class="form-alert form-alert-warning" role="status"><strong>Runtime not ready</strong><span>@readiness.Error</span><button class="text-button" @onclick="PrepareRuntimeAsync" disabled="@preparing">@(preparing ? "Preparing…" : "Prepare runtime")</button><button class="text-button" @onclick="LoadExecutionContextAsync">Refresh</button></div>
+    }
+    @if (!string.IsNullOrWhiteSpace(modelWarning))
+    {
+        <div class="form-alert form-alert-warning" role="status">@modelWarning</div>
+    }
 
     <EditForm Model="model" OnValidSubmit="RunAsync" FormName="agent-runner" class="resource-form">
         <DataAnnotationsValidator />
@@ -49,10 +63,11 @@ else
                     <label><span>Context · JSON or text</span><InputTextArea @bind-Value="model.Context" rows="7" /></label>
                     <label><span>Runtime parameter overrides · JSON</span><InputTextArea @bind-Value="model.RuntimeParameters" rows="7" placeholder="{ &quot;temperature&quot;: 0.2 }" /><small>Overrides remain subject to Model Profile policy resolution.</small></label>
                     <label><span>Timeout · seconds</span><InputNumber @bind-Value="model.TimeoutSeconds" /><ValidationMessage For="() => model.TimeoutSeconds" /></label>
+                    <label><span>Streaming</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@value</option> }</InputSelect><small>Automatic inherits the runtime profile default.</small></label>
                 }
             </div>
             <div class="runner-actions">
-                <button class="button-primary" type="submit" disabled="@IsBusy">@(IsBusy ? "Running…" : "Run")</button>
+                <button class="button-primary" type="submit" disabled="@(IsBusy || !CanRun)">@(IsBusy ? "Running…" : "Run")</button>
                 <button class="button-danger" type="button" @onclick="CancelAsync" disabled="@(!CanCancel)">Stop</button>
                 <button class="button-secondary" type="button" @onclick="RetryAsync" disabled="@(state.Run is null || IsBusy)">Retry</button>
             </div>
@@ -82,6 +97,8 @@ else
                         <dt>Agent version</dt><dd>@state.Run.Properties.Agent.Version</dd>
                         <dt>Model profile</dt><dd>@(state.Run.Status.ModelProfile ?? "Not resolved")</dd>
                         <dt>Resolved model</dt><dd>@(state.Run.Status.ResolvedModel ?? "Provider did not report it")</dd>
+                        <dt>Temperature</dt><dd>@(state.Run.Status.EffectiveTemperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Profile default")</dd>
+                        <dt>Maximum output tokens</dt><dd>@(state.Run.Status.EffectiveMaxOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Provider default")</dd>
                         <dt>Tokens</dt><dd>@(state.Run.Status.InputTokens?.ToString() ?? "—") input · @(state.Run.Status.OutputTokens?.ToString() ?? "—") output</dd>
                         <dt>Started</dt><dd>@(state.Run.Status.StartedAt?.LocalDateTime.ToString("G") ?? "Pending")</dd>
                         <dt>Completed</dt><dd>@(state.Run.Status.CompletedAt?.LocalDateTime.ToString("G") ?? "—")</dd>
@@ -143,11 +160,17 @@ else
     private IReadOnlyList<RuntimeRun> history = [];
     private string activeTab = "Response";
     private string? errorMessage;
+    private string? modelWarning;
+    private AgentModelResponse? modelResolution;
+    private AgentRuntimeReadinessResponse? readiness;
     private string rawRequest = "{}";
     private bool loading = true;
     private bool advanced;
     private bool connectionLost;
+    private bool preparing;
     private bool IsBusy => state.Run is not null && !state.State.IsTerminal();
+    private bool CanRun => readiness is { Ready: true }
+        && modelResolution?.Status is not ("providerUnavailable" or "modelUnavailable" or "invalidConfiguration");
     private bool CanCancel => state.Run is not null && state.State is RuntimeRunState.Pending or RuntimeRunState.Running;
     private string BackUrl => agent is null ? "/agents" : $"/agents/{Uri.EscapeDataString(agent.ResourceGroup!)}/{Uri.EscapeDataString(agent.Name)}";
     private string RawResponse => JsonSerializer.Serialize(new { run = state.Run, events = state.Events }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
@@ -164,6 +187,7 @@ else
                 state.Reset(run);
                 var id = ResourceIdentifier.Parse(run.Properties.Agent.ResourceId);
                 agent = (await ManagementClient.GetAgentAsync(id.ResourceGroup, id.Name, cancellation.Token)).Value;
+                await LoadExecutionContextAsync(run.Properties.Agent.Version);
                 rawRequest = JsonSerializer.Serialize(ToRequest(run), new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
                 await LoadHistoryAsync();
                 if (!run.Status.State.IsTerminal()) StartObservation(run.Id);
@@ -172,6 +196,7 @@ else
             {
                 var group = string.IsNullOrWhiteSpace(ResourceGroup) ? "default" : ResourceGroup;
                 agent = (await ManagementClient.GetAgentAsync(group, Name!, cancellation.Token)).Value;
+                await LoadExecutionContextAsync();
                 await LoadHistoryAsync();
             }
         }
@@ -259,6 +284,37 @@ else
     private async Task LoadHistoryAsync()
     {
         if (agent is not null) history = await RuntimeClient.GetRunsAsync(agent.Id, cancellation.Token);
+    }
+
+    private Task LoadExecutionContextAsync() => LoadExecutionContextAsync(agent?.Generation);
+
+    private async Task LoadExecutionContextAsync(long? generation)
+    {
+        if (agent is null || generation is null) return;
+        modelWarning = null;
+        try
+        {
+            modelResolution = await ModelsClient.GetAgentModelResolutionAsync(agent.ResourceGroup ?? "default", agent.Name, cancellation.Token);
+            if (modelResolution.Status is "providerUnavailable" or "modelUnavailable" or "invalidConfiguration")
+                modelWarning = string.Join(" ", modelResolution.Warnings.DefaultIfEmpty($"Model resolution state is {ModelManagementUi.Label(modelResolution.Status)}."));
+        }
+        catch (AgentstrationApiException exception) { modelWarning = $"Model resolution is unavailable: {exception.Message}"; }
+        try { readiness = await RuntimeClient.GetAgentReadinessAsync(agent.ResourceGroup ?? "default", agent.Name, generation.Value, cancellation.Token); }
+        catch (AgentstrationApiException exception) { readiness = null; modelWarning = $"Runtime readiness is unavailable: {exception.Message}"; }
+    }
+
+    private async Task PrepareRuntimeAsync()
+    {
+        if (agent is null || preparing) return;
+        preparing = true;
+        errorMessage = null;
+        try
+        {
+            _ = await RuntimeClient.PrepareAgentAsync(agent.ResourceGroup ?? "default", agent.Name, agent.Generation, cancellation.Token);
+            await LoadExecutionContextAsync();
+        }
+        catch (AgentstrationApiException exception) { errorMessage = exception.Message; }
+        finally { preparing = false; }
     }
 
     private ValueTask CopyAsync(string value) => JavaScript.InvokeVoidAsync("navigator.clipboard.writeText", value);

@@ -1,0 +1,63 @@
+@page "/modelproviders/{Name}"
+@implements IDisposable
+@inject IModelProvidersClient Client
+
+<PageTitle>@Name · Model provider · Agentstration</PageTitle>
+<PageHeader Title="@(provider?.Properties.DisplayName ?? Name)" Description="Technical provider identity, hosting state and dynamically discovered models.">
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh</button><a class="button-secondary" href="/modelproviders">Back</a></Actions>
+</PageHeader>
+
+@if (loading && provider is null)
+{
+    <LoadingState Message="Loading model provider…" />
+}
+else if (error is not null && provider is null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else if (provider is not null)
+{
+    <section class="details-grid">
+        <article class="panel"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Provider resource</h2></div></div>
+            <dl class="resource-details"><dt>Name</dt><dd>@provider.Name</dd><dt>Display name</dt><dd>@provider.Properties.DisplayName</dd><dt>Provider type</dt><dd>@provider.Properties.ProviderType</dd><dt>Resource group</dt><dd>@provider.ResourceGroup</dd><dt>Location</dt><dd>@provider.Location</dd></dl>
+        </article>
+        <article class="panel"><div class="panel-header"><div><p class="eyebrow">Hosting</p><h2>Observed state</h2></div><StatusBadge Text="@ModelManagementUi.Label(Status)" Status="@ModelManagementUi.Status(Status)" /></div>
+            <dl class="resource-details"><dt>Management mode</dt><dd>@provider.Properties.ManagementMode</dd><dt>Endpoint name</dt><dd>@(provider.Properties.EndpointDisplayName ?? "Not exposed")</dd><dt>Last checked</dt><dd>@(status?.CheckedAt.ToLocalTime().ToString("g") ?? provider.Properties.LastCheckedAt?.ToLocalTime().ToString("g") ?? "Not checked")</dd></dl>
+            @if (string.Equals(provider.Properties.ManagementMode, "aspire", StringComparison.OrdinalIgnoreCase)) { <p class="inline-info">This provider is managed by the local Aspire environment.</p> }
+        </article>
+    </section>
+
+    <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">Discovery</p><h2>Available models</h2></div><span>@models.Count model(s)</span></div>
+        @if (modelsError is not null) { <div class="form-alert form-alert-warning" role="status">Models cannot currently be discovered: @modelsError.Message</div> }
+        else if (models.Count == 0) { <EmptyState Title="No models discovered" Message="The provider is available but did not report any model." /> }
+        else {
+            <DataGrid TItem="AvailableModelResponse" Items="models"><Header><tr><th>Model</th><th>Status</th><th>Capabilities</th><th>Parameter size</th><th>Quantization</th></tr></Header><Row Context="model"><tr>
+                <td><strong>@model.DisplayName</strong><br /><code>@model.Name</code></td><td><StatusBadge Text="@ModelManagementUi.Label(model.Status)" Status="@ModelManagementUi.Status(model.Status)" /></td><td>@(model.Capabilities.Count == 0 ? "Not reported" : string.Join(" · ", model.Capabilities))</td><td>@Metadata(model, "parameterSize")</td><td>@Metadata(model, "quantization")</td>
+            </tr></Row></DataGrid>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public string Name { get; set; } = string.Empty;
+    private readonly CancellationTokenSource cancellation = new();
+    private ModelProviderResponse? provider; private ModelProviderStatusResponse? status;
+    private IReadOnlyList<AvailableModelResponse> models = [];
+    private AgentstrationApiException? error; private AgentstrationApiException? modelsError; private bool loading;
+    private string Status => status?.Status ?? provider?.Properties.Status ?? "unknown";
+    protected override Task OnParametersSetAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null; modelsError = null;
+        try
+        {
+            provider = await Client.GetModelProviderAsync(Name, cancellation.Token);
+            try { status = await Client.GetProviderStatusAsync(Name, cancellation.Token); } catch (AgentstrationApiException exception) { modelsError = exception; }
+            try { models = await Client.GetProviderModelsAsync(Name, cancellation.Token); } catch (AgentstrationApiException exception) { modelsError = exception; models = []; }
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private static string Metadata(AvailableModelResponse model, string key) => model.Metadata.TryGetValue(key, out var value) ? value : "Not reported";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

@@ -19,18 +19,20 @@ The current design system includes `StatusBadge`, `HealthIndicator`, `MetricCard
 dotnet run --project src/Agentstration.Web
 ```
 
-Open `http://localhost:5080`. The console provides Overview, Management, Runtime, Work, Flows, Agents, Executions, Events, and Settings. Existing Workspaces, Ingest, and Missions routes remain available for the original content vertical.
+Open `http://localhost:5080`. The console provides Overview, Management, Agents, Model Profiles, Model Providers, Runtime, Work, Flows, Executions, Events, and Settings. Existing Workspaces, Ingest, and Missions routes remain available for the original content vertical.
 
 ## Management resource editing
 
-The Agents section provides a complete declarative CRUD workflow:
+The Management area provides declarative CRUD workflows for agents and logical model profiles:
 
 - list, filter, create, edit, and delete canonical `Agentstration.Agents/agents` resources;
 - select an available AgentType and retain its explicit version;
-- edit model profile and tool references as canonical resource IDs;
+- select a model profile through a reusable picker that persists only its canonical resource ID;
 - edit tags as `key=value` pairs;
 - preserve ETags and send `If-None-Match` for creation and `If-Match` for updates/deletion;
 - surface Problem Details and prevent silent overwrites on HTTP 412 conflicts.
+
+`/modelproviders` displays configured providers, health and dynamically discovered models without persisting provider models. `/modelprofiles` provides searchable canonical profile CRUD, provider/model selection, full generation/reasoning/output options, usage inspection, effective resolution, declarative JSON, ETag conflict recovery, and deletion protection. `/runtimeprofiles` provides the equivalent CRUD surface for runtime type, sessions, tool invocation, streaming and adapter options. Agent details deliberately separate the declared profile from the provider and model resolved through `/api/agents/{name}/model`; the Agent Runner displays the deployment runtime profile and exposes streaming for advanced runs.
 
 The simulated client implements the same mutable workflow in memory. In HTTP mode the UI delegates to the Management API, which remains the authority for validation, generations, provisioning state, and lifecycle events.
 
@@ -40,9 +42,11 @@ Each persisted agent exposes a **Run** action leading to `/agents/{resourceGroup
 
 Stopping a run calls the Runtime cancellation endpoint. Retry creates a new Run from the original payload. Direct console Runs never create Work Items. Advanced context, JSON runtime parameters and timeout are accepted now; final policy resolution remains the Runtime and Model Profile responsibility.
 
+The Runner uses dedicated real HTTP clients even when `UseSimulatedData=true`. It displays model resolution and exact-generation deployment readiness before enabling Run. **Prepare runtime** calls the idempotent local preparation endpoint when a revision or deployment is missing. Runtime parameters are restricted to `temperature` and `maxOutputTokens`; profile defaults are merged in Runtime and the effective values are passed to MAF and displayed with the completed Run.
+
 ## API configuration
 
-Console data access is isolated behind `IManagementApiClient`, `IRuntimeApiClient`, `IWorkApiClient`, and `IFlowApiClient`. HTTP implementations use `HttpClientFactory`, explicit timeouts, limited retry, total request timeout, and circuit-breaking defaults from the standard .NET resilience handler. API failures surface a safe error identifier in the UI.
+Console data access is isolated behind `IManagementApiClient`, `IModelProvidersClient`, `IModelProfilesClient`, `IAgentsModelClient`, `IRuntimeApiClient`, `IWorkApiClient`, and `IFlowApiClient`. HTTP implementations use `HttpClientFactory`, explicit timeouts, limited retry, total request timeout, and circuit-breaking defaults from the standard .NET resilience handler. API failures surface a safe error identifier in the UI.
 
 The development default is simulated data:
 
@@ -58,7 +62,7 @@ The development default is simulated data:
 }
 ```
 
-Set `Agentstration__UseSimulatedData=false` and configure each base address to activate the typed HTTP clients. Simulated data is implemented only by `MockApiClient`; pages consume the same interfaces in both modes. Secrets are never passed to Razor components or browser code.
+Set `Agentstration__UseSimulatedData=false` and configure each base address to activate all typed HTTP clients. Model-provider, model-profile and agent-model-resolution screens always use the canonical Management HTTP APIs so that they display the persisted definitions consumed by Runtime; the other dashboard areas may still use `MockApiClient` in demonstration mode. Secrets are never passed to Razor components or browser code.
 
 The existing backend does not yet expose every runtime projection required by the console. In HTTP mode, the Runtime client verifies `/health` and reports only the local runtime shell; detailed resource and execution projections will replace this adapter when public Runtime endpoints land.
 
@@ -72,4 +76,4 @@ Local launch uses an explicitly configured development authentication handler. A
 
 ## Tests
 
-`Agentstration.Web.Tests` covers API client mapping, conditional request headers, Problem Details, editor and runner payload mapping, simulated CRUD, SSE processing, retry, and dashboard aggregation. `Agentstration.Web.Components.Tests` covers focused UI state services. Both use MSTest and remain offline.
+`Agentstration.Web.Tests` covers API client mapping, model discovery, profile filtering and selection rules, conditional request headers, Problem Details, editor and runner payload mapping, simulated CRUD, SSE processing, retry, and dashboard aggregation. `Agentstration.Web.Components.Tests` covers focused UI state services. Both use MSTest and remain offline.

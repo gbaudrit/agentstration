@@ -1,0 +1,118 @@
+@implements IDisposable
+@inject IModelProfilesClient Client
+
+<div class="model-profile-picker">
+    <label>
+        <span>Search model profiles</span>
+        <input value="@search" @oninput="SearchChanged" placeholder="Name, provider or model" aria-label="Search model profiles" />
+    </label>
+    @if (loading)
+    {
+        <LoadingState Message="Loading model profiles…" />
+    }
+    else if (error is not null)
+    {
+        <div class="form-alert form-alert-danger" role="alert">@error.Message <button type="button" class="text-button" @onclick="LoadAsync">Retry</button></div>
+    }
+    else if (filtered.Count == 0)
+    {
+        <EmptyState Title="No model profiles" Message="Create a model profile or change the search." />
+    }
+    else
+    {
+        <label>
+            <span>Model profile</span>
+            <select value="@Value" @onchange="SelectAsync" aria-label="Model profile">
+                <option value="">Select a model profile</option>
+                @foreach (var profile in filtered)
+                {
+                    <option value="@profile.Id" disabled="@ModelManagementUi.IsInvalid(profile)">@OptionLabel(profile)</option>
+                }
+            </select>
+        </label>
+    }
+
+    @if (Selected is not null)
+    {
+        <article class="model-summary-card">
+            <div><p class="eyebrow">Selected model profile</p><strong>@Selected.Properties.DisplayName</strong><code>@Selected.Name</code></div>
+            <dl class="compact-details">
+                <dt>Provider</dt><dd>@(Selected.Properties.Provider.DisplayName ?? Selected.Properties.Provider.Name)</dd>
+                <dt>Model</dt><dd>@Selected.Properties.Model.Name</dd>
+                <dt>Status</dt><dd><StatusBadge Text="@ModelManagementUi.Label(Selected.Properties.Status)" Status="@ModelManagementUi.Status(Selected.Properties.Status)" /></dd>
+            </dl>
+            <a class="text-button" href="@ProfileUrl(Selected)">View model profile →</a>
+            @if (string.Equals(Selected.Properties.Status, "providerUnavailable", StringComparison.OrdinalIgnoreCase))
+            {
+                <p class="inline-warning">The provider for this profile is currently unavailable.</p>
+            }
+            else if (string.Equals(Selected.Properties.Status, "modelUnavailable", StringComparison.OrdinalIgnoreCase))
+            {
+                <p class="inline-warning">The selected model is currently unavailable.</p>
+            }
+        </article>
+    }
+    else if (!loading)
+    {
+        <p class="resource-hint">Agents reference a reusable logical profile. Provider endpoints and model names are resolved separately.</p>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public EventCallback<ModelProfileSummaryResponse?> SelectedChanged { get; set; }
+
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<ModelProfileSummaryResponse> profiles = [];
+    private IReadOnlyList<ModelProfileSummaryResponse> filtered = [];
+    private AgentstrationApiException? error;
+    private string search = string.Empty;
+    private bool loading;
+    private ModelProfileSummaryResponse? Selected => profiles.FirstOrDefault(item => string.Equals(item.Id, Value, StringComparison.OrdinalIgnoreCase));
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            profiles = await Client.GetModelProfilesAsync(null, null, null, cancellation.Token);
+            ApplyFilter();
+            await SelectedChanged.InvokeAsync(Selected);
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    private void SearchChanged(ChangeEventArgs args)
+    {
+        search = args.Value?.ToString() ?? string.Empty;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter() => filtered = ModelManagementUi.FilterProfiles(profiles, search);
+
+    private async Task SelectAsync(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? string.Empty;
+        var selected = profiles.FirstOrDefault(item => string.Equals(item.Id, value, StringComparison.OrdinalIgnoreCase));
+        if (selected is not null && ModelManagementUi.IsInvalid(selected)) return;
+        await ValueChanged.InvokeAsync(value);
+        await SelectedChanged.InvokeAsync(selected);
+    }
+
+    private static string OptionLabel(ModelProfileSummaryResponse item) =>
+        $"{item.Properties.DisplayName} — {item.Name} · {item.Properties.Provider.Name} / {item.Properties.Model.Name} · {ModelManagementUi.Label(item.Properties.Status)}";
+
+    private static string ProfileUrl(ModelProfileSummaryResponse item) =>
+        $"/modelprofiles/{Uri.EscapeDataString(item.ResourceGroup)}/{Uri.EscapeDataString(item.Name)}";
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

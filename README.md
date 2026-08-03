@@ -152,14 +152,56 @@ $env:AI__Model = "qwen3:1.7b"
 dotnet run --project src/Agentstration.Web
 ```
 
-The Agent Runner uses the selected `IChatClient`, so no Ollama-specific execution path exists in the Runtime Plane. In Development, a small connectivity diagnostic is also available:
+The configured `reasoning-default` profile resolves to the `local-reasoning` deployment, then to the `ollama-local` provider and its `qwen3:1.7b` model. The endpoint comes from Aspire's `local-chat` service reference; `localhost` is used only by the direct Web launch path.
+
+The Agent Runner uses this resolver through Microsoft Agent Framework, so no Ollama-specific execution path exists in the Runtime Plane. Create a normal durable Runtime Run to exercise the entire declared-agent path:
+
+```powershell
+$agentId = "/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert"
+$body = @{
+  agent = @{ resourceId = $agentId; version = 1 }
+  input = @{ messages = @(@{ role = "User"; content = "Quelle est la différence entre WHERE et HAVING ?" }) }
+  execution = @{ mode = "Interactive"; timeoutSeconds = 120 }
+  origin = "Api"
+} | ConvertTo-Json -Depth 8
+Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5080/api/runtime/runs
+```
+
+The returned Run is processed asynchronously and exposes `status.modelProvider`, `status.resolvedModel`, and the final response when complete. In Development, the smaller connectivity diagnostic remains available:
 
 ```powershell
 $body = @{ prompt = "Reply with one short sentence." } | ConvertTo-Json
 Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5080/api/diagnostics/models/ollama/chat
 ```
 
-`Agentstration.ModelProviders` defines provider resolution, `Agentstration.ModelProviders.Ollama` owns the OllamaSharp client integration, and `Agentstration.AppHost` alone owns container provisioning. `Runtime.AgentFramework` continues to depend only on `IChatClient` and has no Ollama dependency. Other OpenAI-compatible endpoints can still be configured with `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` under a non-`Deterministic`, non-`Ollama` provider name.
+`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders.Ollama` owns the OllamaSharp client integration, while `Agentstration.AppHost` alone owns container provisioning. `Runtime.AgentFramework` consumes the resolver and `IChatClient`; it has no Ollama dependency.
+
+Current limitations are deliberate: one Aspire-managed local provider, no provider mutation API, no Flow execution, no tools, no conversation persistence, and no provider-native streaming yet. Other OpenAI-compatible endpoints can still be configured with `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` under a non-`Deterministic`, non-`Ollama` provider name.
+
+### Model provider and profile APIs
+
+Model providers are read-only technical resources in this increment. Ollama is declared by configuration and managed by Aspire:
+
+```powershell
+Invoke-RestMethod http://localhost:5080/api/modelproviders
+Invoke-RestMethod http://localhost:5080/api/modelproviders/ollama-local/status
+Invoke-RestMethod http://localhost:5080/api/modelproviders/ollama-local/models
+```
+
+Model profiles are durable Management Plane resources with ETag concurrency and usage protection:
+
+```powershell
+Invoke-RestMethod http://localhost:5080/api/modelprofiles
+Invoke-RestMethod http://localhost:5080/api/modelprofiles/reasoning-default/resolution
+Invoke-RestMethod http://localhost:5080/api/modelprofiles/reasoning-default/usages
+Invoke-RestMethod http://localhost:5080/api/agents/sql-expert/model
+```
+
+Model profiles separate portable `generation`, `reasoning`, and `output` intent from provider-keyed `providerOptions`. V1 has no legacy `options` shape: reset/reseed the local control-plane database after upgrading from an earlier development snapshot. Runtime behavior is represented independently by `RuntimeProfileResource`; streaming is an execution/runtime option, not a model-profile property. The MAF adapter maps these canonical values to `ChatOptions` and normalized Agentstration execution events, while the Ollama adapter owns `think`, `keepAlive`, engine options, and the chat-versus-generate compatibility check.
+
+The seeded `reasoning-default` profile references the stable `ollama-local` provider resource and `qwen3:1.7b`. Profiles remain valid when Ollama or a selected model is temporarily unavailable; only structurally invalid profiles are rejected. An in-use profile cannot be deleted. Agent definitions continue to persist only the model-profile resource ID.
+
+The Blazor console exposes this vertical through `/modelproviders`, `/modelprofiles`, `/runtimeprofiles`, the agent editor, and the Agent Runner. Provider pages show read-only hosting state and dynamically discovered models. Model profile pages edit all canonical inference categories; runtime profile pages manage session, tool invocation, streaming, and runtime-specific options with ETag conflict and usage protection. The runner shows the resolved runtime profile and lets an advanced run choose its streaming mode. The reusable agent picker saves only `modelProfile.resourceId`; agent details render the declared profile separately from the resolved provider and model.
 
 ## REST quickstart
 
@@ -197,6 +239,8 @@ Invoke-RestMethod "http://localhost:5080/api/runtime/runs/$($run.id)"
 ```
 
 Run history and ordered events are stored independently in `.agentstration/runtime-plane.db`. The console exposes Quick Run, advanced context/parameters, SSE progress, cancellation, retry, trace and raw inspection from each agent page.
+
+Agent Runner always calls the canonical Management and Runtime APIs, even when the remaining console dashboard uses simulated projections. It checks the exact agent generation and offers **Prepare runtime** when a local revision/deployment is missing. A Run resolves the current persisted Model Profile, invokes the deployment model through Microsoft Agent Framework and the selected provider, and records the provider, model, temperature, and maximum output tokens actually used. Advanced overrides accept only `temperature` and `maxOutputTokens`; provider, endpoint, and model overrides are rejected.
 
 ### Content and missions
 

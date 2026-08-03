@@ -17,6 +17,7 @@ using Agentstration.Infrastructure.Workflows;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Storage.Sqlite;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
@@ -75,7 +76,9 @@ public static class DependencyInjection
         controlPlaneConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "control-plane.db")}";
         services.AddSqliteControlPlane(controlPlaneConnectionString);
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
-        services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();
+        services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();
+        if (!string.Equals(aiOptions.Provider, "Ollama", StringComparison.OrdinalIgnoreCase))
+            services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();
         services.AddSingleton<IToolCatalog, EmptyToolCatalog>();
         services.AddSingleton<AgentRuntimeContext>();
         services.AddSingleton<Agentstration.Runtime.Abstractions.IAgentRuntimeFactory, AgentFrameworkRuntimeFactory>();
@@ -87,6 +90,7 @@ public static class DependencyInjection
         services.AddSingleton<IAgentDeploymentReconciler, LocalAgentDeploymentReconciler>();
         services.AddSingleton<IAgentRouter, AgentFrameworkAgentRouter>();
         services.AddSingleton<AgentManagementService>();
+        services.AddSingleton<RuntimeProfileManagementService>();
         runtimeConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "runtime-plane.db")}";
         services.AddSqliteRuntimeRuns(runtimeConnectionString);
         services.AddSingleton<RuntimeRunService>();

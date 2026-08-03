@@ -86,6 +86,42 @@ public sealed class RuntimeRunService(
     public Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(string? agentResourceId, int skip, int take, CancellationToken cancellationToken) =>
         runs.ListAsync(agentResourceId, skip, take, cancellationToken);
 
+    public async Task<AgentRuntimeReadiness> GetReadinessAsync(string agentResourceId, long generation, CancellationToken cancellationToken)
+    {
+        var agent = await management.GetAsync<AgentResource>(agentResourceId, cancellationToken);
+        if (agent is null)
+            return new AgentRuntimeReadiness(agentResourceId, generation, false, "AgentNotFound", null, null, $"Agent '{agentResourceId}' was not found.");
+
+        var deployments = await management.ListAsync<AgentDeployment>(AgentstrationResourceTypes.Deployments, agent.Value.ResourceGroup, 0, 1000, cancellationToken);
+        foreach (var deployment in deployments)
+        {
+            var revision = await management.GetAsync<AgentRevision>(deployment.Value.RevisionId, cancellationToken);
+            if (revision is null
+                || !string.Equals(revision.Value.AgentResourceId, agentResourceId, StringComparison.Ordinal)
+                || revision.Value.AgentVersion != generation)
+                continue;
+
+            var registered = runtimes.TryGet(deployment.Value.Id, out _);
+            var ready = deployment.Value.DesiredState == DesiredAgentState.Running
+                && deployment.Value.OperationalState == OperationalState.Ready
+                && registered;
+            var error = ready ? null : deployment.Value.LastError
+                ?? (registered ? $"Deployment is {deployment.Value.OperationalState}." : "Runtime instance is not provisioned yet.");
+            return new AgentRuntimeReadiness(
+                agentResourceId,
+                generation,
+                ready,
+                ready ? "Ready" : deployment.Value.OperationalState.ToString(),
+                deployment.Value.Id,
+                revision.Value.Id,
+                error,
+                deployment.Value.RuntimeProfileId,
+                deployment.Value.ModelProfileId ?? revision.Value.Definition.ModelProfileId);
+        }
+
+        return new AgentRuntimeReadiness(agentResourceId, generation, false, "DeploymentNotFound", null, null, $"Agent generation '{generation}' has no deployment.");
+    }
+
     public async Task<StoredRuntimeRun> CancelAsync(string runId, CancellationToken cancellationToken)
     {
         var stored = await GetRequiredAsync(runId, cancellationToken);
@@ -119,12 +155,42 @@ public sealed class RuntimeRunService(
             await TraceStepAsync(runId, "Prompt composed", timeout.Token);
             await AppendEventAsync(runId, RuntimeRunEventKind.StepStarted, "Model invocation started", "Model invoked", cancellationToken: timeout.Token);
             var prompt = ComposePrompt(stored.Value.Properties.Input);
-            var execution = await runtimes.ExecuteAsync(deployment.Id, new AgentExecutionRequest(prompt, runId), timeout.Token);
-            await AppendEventAsync(runId, RuntimeRunEventKind.ResponseDelta, content: execution.Output, cancellationToken: timeout.Token);
+            var executionOptions = ParseExecutionOptions(stored.Value.Properties.Execution);
+            AgentExecutionResult? execution = null;
+            await foreach (var executionEvent in runtimes.ExecuteEventsAsync(
+                deployment.Id,
+                new AgentExecutionRequest(
+                    prompt,
+                    runId,
+                    executionOptions,
+                    new AgentExecutionOptions { Streaming = stored.Value.Properties.Execution.Streaming }),
+                timeout.Token))
+            {
+                switch (executionEvent)
+                {
+                    case ContentDelta delta:
+                        await AppendEventAsync(runId, RuntimeRunEventKind.ResponseDelta, content: delta.Content, cancellationToken: timeout.Token);
+                        break;
+                    case ExecutionCompleted completed:
+                        execution = completed.Result;
+                        break;
+                    case ExecutionFailed failed:
+                        throw new InvalidOperationException(failed.Error.Message);
+                }
+            }
+            if (execution is null) throw new InvalidOperationException("The runtime completed without an execution result.");
             await AppendEventAsync(runId, RuntimeRunEventKind.StepCompleted, "Model invocation completed", "Model invoked", cancellationToken: timeout.Token);
             stored = await GetRequiredAsync(runId, stoppingToken);
             if (stored.Value.Status.State == RuntimeRunState.Cancelled) return;
-            await TransitionAsync(stored, RuntimeRunState.Succeeded, execution.Output, null, stoppingToken);
+            await TransitionAsync(
+                stored,
+                RuntimeRunState.Succeeded,
+                execution.Output,
+                null,
+                stoppingToken,
+                execution.ProviderType,
+                execution.ModelName,
+                execution.EffectiveOptions);
             await AppendEventAsync(runId, RuntimeRunEventKind.StatusChanged, "Run succeeded", state: RuntimeRunState.Succeeded, cancellationToken: stoppingToken);
             await AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, "Response completed", state: RuntimeRunState.Succeeded, cancellationToken: stoppingToken);
         }
@@ -187,7 +253,15 @@ public sealed class RuntimeRunService(
         await AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, error, state: state, cancellationToken: cancellationToken);
     }
 
-    private async Task<StoredRuntimeRun> TransitionAsync(StoredRuntimeRun stored, RuntimeRunState state, string? response, string? error, CancellationToken cancellationToken)
+    private async Task<StoredRuntimeRun> TransitionAsync(
+        StoredRuntimeRun stored,
+        RuntimeRunState state,
+        string? response,
+        string? error,
+        CancellationToken cancellationToken,
+        string? modelProvider = null,
+        string? resolvedModel = null,
+        ModelExecutionOptions? effectiveOptions = null)
     {
         var now = timeProvider.GetUtcNow();
         var status = stored.Value.Status with
@@ -196,7 +270,11 @@ public sealed class RuntimeRunService(
             StartedAt = state == RuntimeRunState.Running ? now : stored.Value.Status.StartedAt,
             CompletedAt = state.IsTerminal() ? now : null,
             Response = response ?? stored.Value.Status.Response,
-            Error = error
+            Error = error,
+            ModelProvider = modelProvider ?? stored.Value.Status.ModelProvider,
+            ResolvedModel = resolvedModel ?? stored.Value.Status.ResolvedModel,
+            EffectiveTemperature = effectiveOptions?.Temperature ?? stored.Value.Status.EffectiveTemperature,
+            EffectiveMaxOutputTokens = effectiveOptions?.MaxOutputTokens ?? stored.Value.Status.EffectiveMaxOutputTokens
         };
         return await runs.UpdateAsync(stored.Value with { Status = status }, stored.ETag, cancellationToken);
     }
@@ -247,6 +325,33 @@ public sealed class RuntimeRunService(
             throw new RuntimeRunValidationException("input_required", "At least one non-empty user message is required.");
         if (execution.Mode != RuntimeExecutionMode.Interactive) throw new RuntimeRunValidationException("execution_mode_unsupported", "Only interactive execution is currently supported.");
         if (execution.TimeoutSeconds is < 1 or > 600) throw new RuntimeRunValidationException("timeout_invalid", "Timeout must be between 1 and 600 seconds.");
+        _ = ParseExecutionOptions(execution);
         ArgumentException.ThrowIfNullOrWhiteSpace(initiator);
+    }
+
+    private static ModelExecutionOptions ParseExecutionOptions(RuntimeExecutionOptions execution)
+    {
+        float? temperature = null;
+        int? maxOutputTokens = null;
+        foreach (var parameter in execution.Parameters)
+        {
+            if (string.Equals(parameter.Key, "temperature", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!parameter.Value.TryGetSingle(out var value) || value is < 0 or > 2)
+                    throw new RuntimeRunValidationException("temperature_invalid", "Temperature must be a number between 0 and 2.");
+                temperature = value;
+            }
+            else if (string.Equals(parameter.Key, "maxOutputTokens", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!parameter.Value.TryGetInt32(out var value) || value <= 0)
+                    throw new RuntimeRunValidationException("max_output_tokens_invalid", "MaxOutputTokens must be a positive integer.");
+                maxOutputTokens = value;
+            }
+            else
+            {
+                throw new RuntimeRunValidationException("runtime_parameter_unsupported", $"Runtime parameter '{parameter.Key}' is not supported.");
+            }
+        }
+        return new ModelExecutionOptions(temperature, maxOutputTokens);
     }
 }

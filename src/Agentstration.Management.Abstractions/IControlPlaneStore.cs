@@ -12,5 +12,10 @@ public interface IControlPlaneStore
     Task DeleteAsync(string resourceId, string? ifMatch, CancellationToken cancellationToken);
 }
 
+public interface IModelProfileReferenceValidator
+{
+    Task ValidateAsync(string profileResourceId, CancellationToken cancellationToken);
+}
+
 public sealed class ControlPlaneConcurrencyException(string message) : Exception(message);
 public sealed class ControlPlaneResourceNotFoundException(string resourceId) : Exception($"Resource '{resourceId}' was not found.");

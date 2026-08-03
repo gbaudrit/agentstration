@@ -36,6 +36,16 @@ public static class WebConsoleServiceCollectionExtensions
             services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
         }
 
+        // Model management always uses the canonical HTTP APIs so that the console
+        // displays the same persisted profiles consumed by Runtime, even when the
+        // remaining dashboard widgets use simulated demonstration data.
+        AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
+        AddClient<ModelProfilesApiClient, IModelProfilesClient>(services, configured.ManagementApi);
+        AddClient<AgentsModelApiClient, IAgentsModelClient>(services, configured.ManagementApi);
+        AddClient<RuntimeProfilesApiClient, IRuntimeProfilesClient>(services, configured.ManagementApi);
+        AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
+        AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi);
+
         services.AddAuthentication(DevelopmentAuthenticationHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, DevelopmentAuthenticationHandler>(DevelopmentAuthenticationHandler.SchemeName, _ => { });
         services.AddAuthorizationBuilder()

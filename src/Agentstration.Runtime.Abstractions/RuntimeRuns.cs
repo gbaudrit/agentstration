@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Runtime.Abstractions;
 
@@ -37,6 +38,7 @@ public sealed record RuntimeExecutionOptions
 {
     public RuntimeExecutionMode Mode { get; init; } = RuntimeExecutionMode.Interactive;
     public int TimeoutSeconds { get; init; } = 120;
+    public StreamingMode Streaming { get; init; } = StreamingMode.Automatic;
     public IReadOnlyDictionary<string, JsonElement> Parameters { get; init; } = new Dictionary<string, JsonElement>();
 }
 
@@ -73,8 +75,11 @@ public sealed record RuntimeRunStatus
     public string Runtime { get; init; } = "Local";
     public string? ModelProfile { get; init; }
     public string? ResolvedModel { get; init; }
+    public string? ModelProvider { get; init; }
     public int? InputTokens { get; init; }
     public int? OutputTokens { get; init; }
+    public float? EffectiveTemperature { get; init; }
+    public int? EffectiveMaxOutputTokens { get; init; }
     public IReadOnlyList<RuntimeToolCall> ToolCalls { get; init; } = [];
 }
 

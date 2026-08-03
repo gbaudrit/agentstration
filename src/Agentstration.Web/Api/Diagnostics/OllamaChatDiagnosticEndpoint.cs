@@ -1,19 +1,21 @@
 using Agentstration.ModelProviders;
-using Agentstration.ModelProviders.Ollama;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Options;
 
 namespace Agentstration.Web.Api.Diagnostics;
 
 internal sealed class OllamaChatDiagnosticEndpoint
 {
+    private const string ProfileResourceId = "/resourceGroups/default/providers/Agentstration.Models/modelProfiles/reasoning-default";
+
     public static void Map(IEndpointRouteBuilder endpoints) =>
         endpoints.MapPost("/api/diagnostics/models/ollama/chat", HandleAsync);
 
     private static async Task<IResult> HandleAsync(
         OllamaChatDiagnosticRequest request,
-        IModelProviderResolver resolver,
-        IOptions<OllamaModelProviderOptions> options,
+        IChatClientResolver resolver,
+        IModelProfileStore profiles,
+        IModelDeploymentStore deployments,
+        IModelProviderConfigurationStore providers,
         ILogger<OllamaChatDiagnosticEndpoint> logger,
         CancellationToken cancellationToken)
     {
@@ -25,22 +27,30 @@ internal sealed class OllamaChatDiagnosticEndpoint
             });
         }
 
-        var provider = resolver.GetRequiredProvider(OllamaModelProvider.ProviderTypeName);
-        var model = options.Value.DefaultModel;
+        var profile = await profiles.GetRequiredAsync(ProfileResourceId, cancellationToken);
+        var deployment = await deployments.GetRequiredAsync(profile.DeploymentName, cancellationToken);
+        var provider = await providers.GetRequiredAsync(deployment.ProviderName, cancellationToken);
         if (logger.IsEnabled(LogLevel.Information))
         {
-            logger.LogInformation("Running local model diagnostic with provider {ProviderType} and model {Model}", provider.ProviderType, model);
+            logger.LogInformation(
+                "Running local model diagnostic with profile {ModelProfile}, deployment {Deployment}, provider {ProviderType}/{ProviderName}, and model {Model}",
+                profile.Name,
+                deployment.Name,
+                provider.ProviderType,
+                provider.Name,
+                deployment.ModelName);
         }
 
         try
         {
+            var client = await resolver.ResolveAsync(ProfileResourceId, cancellationToken);
             var messages = new[] { new ChatMessage(ChatRole.User, request.Prompt) };
-            var response = await provider.CreateChatClient(model).GetResponseAsync(messages, cancellationToken: cancellationToken);
-            return Results.Ok(new OllamaChatDiagnosticResponse(provider.ProviderType, model, response.Text));
+            var response = await client.GetResponseAsync(messages, cancellationToken: cancellationToken);
+            return Results.Ok(new OllamaChatDiagnosticResponse(provider.ProviderType, deployment.ModelName, response.Text));
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "Local model diagnostic failed for provider {ProviderType} and model {Model}", provider.ProviderType, model);
+            logger.LogWarning(exception, "Local model diagnostic failed for provider {ProviderType} and model {Model}", provider.ProviderType, deployment.ModelName);
             return Results.Problem("The local Ollama model is unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
         }
     }

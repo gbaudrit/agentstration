@@ -1,0 +1,50 @@
+@page "/runtimeprofiles/new"
+@page "/runtimeprofiles/{ResourceGroup}/{Name}"
+@implements IDisposable
+@inject IRuntimeProfilesClient Client
+@inject NavigationManager Navigation
+@inject NotificationState Notifications
+
+<PageTitle>@(IsNew ? "Create runtime profile" : $"{Name} · Runtime profile") · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? "Create runtime profile" : model?.DisplayName ?? Name)" Description="Select execution, session, tool and streaming behavior for an agent deployment.">
+    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">Delete</button> }<a class="button-secondary" href="/runtimeprofiles">Back</a></Actions>
+</PageHeader>
+
+@if (model is null) { <LoadingState Message="Loading runtime profile…" /> }
+else
+{
+    @if (error is not null) { <div class="form-alert form-alert-danger"><strong>Unable to save</strong><span>@error.Message</span></div> }
+    @if (usages.Count > 0) { <div class="form-alert form-alert-warning">This profile is used by @usages.Count deployment(s). Changes affect their next reconciliation.</div> }
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="runtime-profile-editor" class="resource-form">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Runtime resource</h2></div></div><div class="form-grid">
+            <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /></label><label><span>Display name</span><InputText @bind-Value="model.DisplayName" /></label>
+            <label><span>Resource group</span><InputText @bind-Value="model.ResourceGroup" disabled="@(!IsNew)" /></label><label><span>Location</span><InputText @bind-Value="model.Location" disabled="@(!IsNew)" /></label>
+            <label class="form-span-2"><span>Runtime type</span><InputText @bind-Value="model.RuntimeType" /><small>Use <code>microsoft-agent-framework</code> for the standalone runtime.</small></label>
+        </div></section>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Defaults</p><h2>Execution policy</h2></div></div><div class="form-grid">
+            <label><span>Session mode</span><InputSelect @bind-Value="model.SessionMode">@foreach (var value in Enum.GetValues<RuntimeSessionMode>()) { <option value="@value">@value</option> }</InputSelect></label>
+            <label><span>Tool invocation</span><InputSelect @bind-Value="model.ToolInvocation">@foreach (var value in Enum.GetValues<RuntimeToolInvocationMode>()) { <option value="@value">@value</option> }</InputSelect></label>
+            <label><span>Streaming</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@value</option> }</InputSelect></label>
+        </div></section>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Adapter</p><h2>Runtime options</h2></div><span>Advanced</span></div><div class="form-grid"><label class="form-span-2"><span>Runtime-specific JSON</span><InputTextArea @bind-Value="model.RuntimeOptionsJson" rows="8" class="runner-json form-code-editor" /><small>Top-level keys must match the runtime type.</small></label></div></section>
+        <div class="form-actions"><a class="button-secondary" href="/runtimeprofiles">Cancel</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create profile" : "Save changes")</button></div>
+    </EditForm>
+    @if (!IsNew && usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>Deployments</h2><span>@usages.Count</span></div><ul>@foreach (var usage in usages) { <li><strong>@usage.Name</strong> · @usage.Environment</li> }</ul></section> }
+}
+
+<ConfirmationDialog IsOpen="@confirmDelete" Title="Delete runtime profile" Message="@($"Delete runtime profile '{Name}'?")" ConfirmLabel="Delete runtime profile" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+
+@code {
+    [Parameter] public string? ResourceGroup { get; set; }
+    [Parameter] public string? Name { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private RuntimeProfileEditorModel? model; private IReadOnlyList<RuntimeProfileUsageResponse> usages = []; private string? etag; private AgentstrationApiException? error; private bool saving; private bool confirmDelete;
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    protected override Task OnParametersSetAsync() => LoadAsync();
+    private async Task LoadAsync() { error = null; if (IsNew) { model = new RuntimeProfileEditorModel(); return; } try { var snapshot = await Client.GetRuntimeProfileAsync(ResourceGroup ?? "default", Name!, cancellation.Token); model = RuntimeProfileEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; usages = (await Client.GetRuntimeProfileUsagesAsync(model.ResourceGroup, model.Name, cancellation.Token)).Value; } catch (AgentstrationApiException exception) { error = exception; model ??= new RuntimeProfileEditorModel(); } }
+    private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var snapshot = IsNew ? await Client.CreateRuntimeProfileAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateRuntimeProfileAsync(model.ResourceGroup, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? "Runtime profile created" : "Runtime profile updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo($"/runtimeprofiles/{Uri.EscapeDataString(snapshot.Value.ResourceGroup ?? "default")}/{Uri.EscapeDataString(snapshot.Value.Name)}"); } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
+    private void RequestDelete() { if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException($"This profile is used by {usages.Count} deployment(s).", Guid.NewGuid().ToString("N")); }
+    private async Task DeleteAsync() { if (model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteRuntimeProfileAsync(model.ResourceGroup, model.Name, etag, cancellation.Token); Navigation.NavigateTo("/runtimeprofiles"); } catch (AgentstrationApiException exception) { error = exception; } }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

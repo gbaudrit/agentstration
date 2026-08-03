@@ -13,6 +13,9 @@ public static class RuntimeEndpoints
         StreamRuntimeRunEventsEndpoint.Map(group);
         CancelRuntimeRunEndpoint.Map(group);
         RetryRuntimeRunEndpoint.Map(group);
+        var agents = endpoints.MapGroup("/api/runtime/agents");
+        GetAgentRuntimeReadinessEndpoint.Map(agents);
+        PrepareAgentRuntimeEndpoint.Map(agents);
         return endpoints;
     }
 }

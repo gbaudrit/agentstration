@@ -46,7 +46,9 @@ public static class OllamaModelProviderExtensions
             .AddChatClient();
         builder.Services.AddSingleton<OllamaModelProvider>();
         builder.Services.AddSingleton<IModelProvider>(provider => provider.GetRequiredService<OllamaModelProvider>());
-        builder.Services.AddSingleton<IModelProviderResolver, ModelProviderResolver>();
+        builder.Services.AddSingleton<IModelProviderOptionsValidator>(provider => provider.GetRequiredService<OllamaModelProvider>());
+        builder.Services.AddSingleton<OllamaModelProviderDiscovery>();
+        builder.Services.AddSingleton<IModelProviderDiscovery>(provider => provider.GetRequiredService<OllamaModelProviderDiscovery>());
         return builder;
     }
 }

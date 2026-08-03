@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Agentstration.Management.Abstractions;
+using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.AI;
 
@@ -17,20 +18,31 @@ public sealed class RuntimeRegistry : IRuntimeRegistry
         if (!_runtimes.TryGetValue(deploymentId, out var runtime)) throw new InvalidOperationException($"Deployment '{deploymentId}' has no active runtime instance.");
         return await runtime.ExecuteAsync(request, cancellationToken);
     }
+
+    public IAsyncEnumerable<AgentExecutionEvent> ExecuteEventsAsync(
+        string deploymentId,
+        AgentExecutionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_runtimes.TryGetValue(deploymentId, out var runtime))
+            throw new InvalidOperationException($"Deployment '{deploymentId}' has no active runtime instance.");
+        return runtime.ExecuteEventsAsync(request, cancellationToken);
+    }
 }
 
 public sealed class SingleChatClientResolver(IChatClient chatClient) : IChatClientResolver
 {
-    public IChatClient Resolve(string modelProfileId)
+    public ValueTask<IChatClient> ResolveAsync(string modelProfileResourceId, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(modelProfileId);
-        return chatClient;
+        ArgumentException.ThrowIfNullOrWhiteSpace(modelProfileResourceId);
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(chatClient);
     }
 }
 
 public sealed class EmptyToolCatalog : IToolCatalog
 {
-    public IReadOnlyCollection<AITool> Resolve(IEnumerable<string> toolIds)
+    public IReadOnlyCollection<IAgentTool> Resolve(IEnumerable<string> toolIds)
     {
         var requested = toolIds.Distinct(StringComparer.Ordinal).ToArray();
         if (requested.Length > 0) throw new InvalidOperationException($"No tools are registered in the standalone catalog. Requested: {string.Join(", ", requested)}.");

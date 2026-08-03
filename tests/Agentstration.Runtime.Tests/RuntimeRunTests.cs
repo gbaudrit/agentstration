@@ -12,6 +12,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Work.Contracts;
+using System.Text.Json;
 
 namespace Agentstration.Runtime.Tests;
 
@@ -46,9 +47,51 @@ public sealed class RuntimeRunTests
         Assert.IsNotNull(completed);
         Assert.AreEqual(RuntimeRunState.Succeeded, completed.Value.Status.State);
         Assert.AreEqual("runtime response", completed.Value.Status.Response);
+        Assert.AreEqual("ollama", completed.Value.Status.ModelProvider);
+        Assert.AreEqual("qwen3:1.7b", completed.Value.Status.ResolvedModel);
         Assert.IsTrue(events.Any(item => item.Kind == RuntimeRunEventKind.ResponseDelta));
         Assert.IsTrue(events.Any(item => item.Kind == RuntimeRunEventKind.StepCompleted && item.Step == "Model profile resolved"));
         Assert.AreEqual(RuntimeRunEventKind.RunCompleted, events[^1].Kind);
+    }
+
+    [TestMethod]
+    public async Task ExecutionAppliesValidatedOverridesAndReportsReadiness()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var options = new RuntimeExecutionOptions
+        {
+            Parameters = new Dictionary<string, JsonElement>
+            {
+                ["temperature"] = JsonSerializer.SerializeToElement(0.6f),
+                ["maxOutputTokens"] = JsonSerializer.SerializeToElement(750)
+            }
+        };
+        var created = await fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 3), Input("test prompt"), options, RuntimeRunOrigin.Console, "operator", default);
+
+        var readiness = await fixture.Service.GetReadinessAsync(fixture.AgentId, 3, default);
+        await fixture.Service.ExecuteAsync(created.Value.Id, default);
+        var completed = await fixture.Service.GetAsync(created.Value.Id, default);
+
+        Assert.IsTrue(readiness.Ready);
+        Assert.AreEqual(0.6f, fixture.Registry.LastRequest?.Options?.Temperature);
+        Assert.AreEqual(750, fixture.Registry.LastRequest?.Options?.MaxOutputTokens);
+        Assert.AreEqual(0.6f, completed!.Value.Status.EffectiveTemperature);
+        Assert.AreEqual(750, completed.Value.Status.EffectiveMaxOutputTokens);
+    }
+
+    [TestMethod]
+    public async Task UnsupportedRuntimeParameterIsRejectedBeforeRunCreation()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var options = new RuntimeExecutionOptions
+        {
+            Parameters = new Dictionary<string, JsonElement> { ["model"] = JsonSerializer.SerializeToElement("other-model") }
+        };
+
+        var exception = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(
+            new RuntimeAgentReference(fixture.AgentId, 3), Input("test prompt"), options, RuntimeRunOrigin.Console, "operator", default));
+
+        Assert.AreEqual("runtime_parameter_unsupported", exception.Code);
     }
 
     [TestMethod]
@@ -110,6 +153,8 @@ public sealed class RuntimeRunTests
             Origin = RuntimeRunOrigin.Api
         };
 
+        var readiness = await client.GetFromJsonAsync<AgentRuntimeReadinessResponse>($"/api/runtime/agents/sql-expert/readiness?resourceGroup=default&generation={agent.Generation}");
+
         using var createdResponse = await client.PostAsJsonAsync("/api/runtime/runs", request);
         Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);
         var created = await createdResponse.Content.ReadFromJsonAsync<RuntimeRun>();
@@ -126,6 +171,7 @@ public sealed class RuntimeRunTests
         var workAfter = await client.GetFromJsonAsync<WorkItemPageResponse>("/api/work/workitems?top=100");
 
         Assert.AreEqual(RuntimeRunState.Succeeded, completed!.Status.State);
+        Assert.IsTrue(readiness?.Ready);
         StringAssert.Contains(eventStream, "event: ResponseDelta");
         StringAssert.Contains(eventStream, "event: RunCompleted");
         Assert.AreEqual(workBefore!.Value.Count, workAfter!.Value.Count);
@@ -142,16 +188,18 @@ public sealed class RuntimeRunTests
     private sealed class FakeRuntimeRegistry : IRuntimeRegistry
     {
         public RuntimeBehavior Behavior { get; set; }
+        public AgentExecutionRequest? LastRequest { get; private set; }
         public TaskCompletionSource ExecutionStarted { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public void Set(string deploymentId, IAgentRuntime runtime) { }
-        public bool TryGet(string deploymentId, out IAgentRuntime? runtime) { runtime = null; return false; }
+        public bool TryGet(string deploymentId, out IAgentRuntime? runtime) { runtime = null; return true; }
         public bool Remove(string deploymentId) => false;
         public async Task<AgentExecutionResult> ExecuteAsync(string deploymentId, AgentExecutionRequest request, CancellationToken cancellationToken)
         {
+            LastRequest = request;
             ExecutionStarted.TrySetResult();
             if (Behavior == RuntimeBehavior.Fail) throw new InvalidOperationException("runtime failed");
             if (Behavior == RuntimeBehavior.Block) await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-            return new AgentExecutionResult("runtime response", request.SessionId);
+            return new AgentExecutionResult("runtime response", request.SessionId, "ollama", "qwen3:1.7b", request.Options);
         }
     }
 
@@ -245,7 +293,7 @@ public sealed class RuntimeRunTests
             Definition = new ResolvedAgentDefinition
             {
                 AgentId = Guid.NewGuid(), AgentKey = "sql-expert", DisplayName = "SQL Expert", Description = "Test", AgentVersion = 3,
-                EffectiveInstructions = "Test", ModelProfileId = "reasoning-default", RuntimeProfileId = "standalone", EffectiveToolIds = [], MiddlewareIds = [], ContextProviderIds = [], Capabilities = [], Handler = "prompt-agent", DefinitionHash = "hash"
+                EffectiveInstructions = "Test", ModelProfileId = "reasoning-default", RuntimeProfileId = "/resourceGroups/default/providers/Agentstration.Runtime/runtimeProfiles/maf-default", EffectiveToolIds = [], MiddlewareIds = [], ContextProviderIds = [], Capabilities = [], Handler = "prompt-agent", DefinitionHash = "hash"
             }
         };
 
@@ -259,7 +307,7 @@ public sealed class RuntimeRunTests
             Location = "local",
             RevisionId = revisionId,
             Environment = "local",
-            RuntimeProfileId = "standalone",
+            RuntimeProfileId = "/resourceGroups/default/providers/Agentstration.Runtime/runtimeProfiles/maf-default",
             HostingMode = AgentHostingMode.InProcess,
             DesiredState = DesiredAgentState.Running,
             ProvisioningState = ProvisioningState.Succeeded,

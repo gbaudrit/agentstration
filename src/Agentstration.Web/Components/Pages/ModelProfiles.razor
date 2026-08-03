@@ -1,0 +1,102 @@
+@page "/modelprofiles"
+@implements IDisposable
+@inject IModelProfilesClient Client
+@inject IModelProvidersClient ProvidersClient
+@inject NotificationState Notifications
+
+<PageTitle>Model profiles · Agentstration</PageTitle>
+<PageHeader Title="Model profiles" Description="Manage reusable logical model selections referenced by agents.">
+    <Actions><a class="button-primary" href="/modelprofiles/new">Create model profile</a></Actions>
+</PageHeader>
+
+<FilterBar>
+    <SearchBox Value="search" ValueChanged="SearchChanged" Placeholder="Search name or display name" />
+    <select @bind="providerFilter" aria-label="Filter by provider"><option value="">All providers</option>@foreach (var provider in providers) { <option value="@provider.Name">@provider.Properties.DisplayName</option> }</select>
+    <select @bind="statusFilter" aria-label="Filter by status"><option value="">All statuses</option><option value="ready">Ready</option><option value="providerUnavailable">Provider unavailable</option><option value="modelUnavailable">Model unavailable</option><option value="invalidConfiguration">Invalid configuration</option><option value="unknown">Unknown</option></select>
+    <button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Apply filters</button>
+</FilterBar>
+
+@if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else if (loading && profiles is null)
+{
+    <LoadingState Message="Loading model profiles…" />
+}
+else if (profiles?.Count == 0)
+{
+    <EmptyState Title="No model profiles" Message="Create a logical profile or change the current filters."><a class="button-primary" href="/modelprofiles/new">Create model profile</a></EmptyState>
+}
+else
+{
+    <DataGrid TItem="ModelProfileSummaryResponse" Items="profiles ?? []">
+        <Header><tr><th>Profile</th><th>Provider</th><th>Model</th><th>Usage</th><th>Status</th><th>Actions</th></tr></Header>
+        <Row Context="profile"><tr>
+            <td><strong>@profile.Properties.DisplayName</strong><br /><code>@profile.Name</code></td>
+            <td>@(profile.Properties.Provider.DisplayName ?? profile.Properties.Provider.Name)</td><td><code>@profile.Properties.Model.Name</code></td>
+            <td>@profile.Properties.UsageCount agent(s)</td><td><StatusBadge Text="@ModelManagementUi.Label(profile.Properties.Status)" Status="@ModelManagementUi.Status(profile.Properties.Status)" /></td>
+            <td><div class="table-actions"><a class="text-button" href="@DetailsUrl(profile)">Open</a><button class="text-button danger-text" @onclick="() => RequestDeleteAsync(profile)">Delete</button></div></td>
+        </tr></Row>
+    </DataGrid>
+}
+
+@if (deleteConflictUsages.Count > 0)
+{
+    <section class="panel resource-section"><div class="panel-header"><h2>Profile cannot be deleted</h2></div><p>This model profile is still referenced by @deleteConflictUsages.Count agent(s).</p><ul>@foreach (var usage in deleteConflictUsages) { <li><a href="@AgentUrl(usage)">@usage.DisplayName <code>@usage.Name</code></a></li> }</ul></section>
+}
+
+<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="Delete model profile" Message="@DeleteMessage" ConfirmLabel="Delete model profile" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<ModelProfileSummaryResponse>? profiles; private IReadOnlyList<ModelProviderResponse> providers = [];
+    private IReadOnlyList<ModelProfileUsageResponse> deleteConflictUsages = [];
+    private ModelProfileSummaryResponse? pendingDelete; private AgentstrationApiException? error;
+    private string search = string.Empty; private string providerFilter = string.Empty; private string statusFilter = string.Empty; private bool loading;
+    private string DeleteMessage => pendingDelete is null ? string.Empty : $"Delete model profile '{pendingDelete.Name}'? This action cannot be undone.";
+    protected override async Task OnInitializedAsync() { try { providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token); } catch (AgentstrationApiException) { } await LoadAsync(); }
+    private async Task SearchChanged(string value) { search = value; await LoadAsync(); }
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { profiles = await Client.GetModelProfilesAsync(search, providerFilter, statusFilter, cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private async Task RequestDeleteAsync(ModelProfileSummaryResponse profile)
+    {
+        deleteConflictUsages = [];
+        try
+        {
+            var usages = await Client.GetModelProfileUsagesAsync(profile.ResourceGroup, profile.Name, cancellation.Token);
+            if (usages.Count > 0) { deleteConflictUsages = usages.Value; return; }
+            pendingDelete = profile;
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+    private void CancelDelete() => pendingDelete = null;
+    private async Task DeleteAsync()
+    {
+        if (pendingDelete is null) return;
+        var selected = pendingDelete; pendingDelete = null;
+        try
+        {
+            var snapshot = await Client.GetModelProfileAsync(selected.ResourceGroup, selected.Name, cancellation.Token);
+            await Client.DeleteModelProfileAsync(selected.ResourceGroup, selected.Name, snapshot.ETag, cancellation.Token);
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", selected.Name, DateTimeOffset.Now, UiStatus.Success));
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception)
+        {
+            error = exception;
+            if (exception.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                try { deleteConflictUsages = (await Client.GetModelProfileUsagesAsync(selected.ResourceGroup, selected.Name, cancellation.Token)).Value; } catch (AgentstrationApiException) { }
+            }
+        }
+    }
+    private static string DetailsUrl(ModelProfileSummaryResponse profile) => $"/modelprofiles/{Uri.EscapeDataString(profile.ResourceGroup)}/{Uri.EscapeDataString(profile.Name)}";
+    private static string AgentUrl(ModelProfileUsageResponse usage) { var id = ResourceIdentifier.Parse(usage.ResourceId); return $"/agents/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}"; }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

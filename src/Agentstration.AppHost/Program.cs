@@ -9,5 +9,6 @@ builder.AddProject<Projects.Agentstration_Web>("agentstration-web")
     .WithEnvironment("AI__Provider", "Ollama")
     .WithEnvironment("AI__Model", localChatModelName)
     .WithEnvironment("Agentstration__ModelProviders__Ollama__DefaultModel", localChatModelName)
+    .WithEnvironment("Agentstration__ModelProviders__Deployments__local-reasoning__ModelName", localChatModelName)
     .WithHttpHealthCheck("/health");
 await builder.Build().RunAsync();

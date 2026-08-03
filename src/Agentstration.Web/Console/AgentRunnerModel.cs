@@ -13,6 +13,7 @@ public sealed class AgentRunnerModel
 
     public string? Context { get; set; }
     public string? RuntimeParameters { get; set; }
+    public StreamingMode Streaming { get; set; } = StreamingMode.Automatic;
     [Range(1, 600)] public int TimeoutSeconds { get; set; } = 120;
 
     public CreateRuntimeRunRequest ToRequest(AgentResource agent)
@@ -23,6 +24,23 @@ public sealed class AgentRunnerModel
             using var document = JsonDocument.Parse(RuntimeParameters);
             if (document.RootElement.ValueKind != JsonValueKind.Object) throw new ArgumentException("Runtime parameters must be a JSON object.");
             parameters = document.RootElement.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal);
+            foreach (var parameter in parameters)
+            {
+                if (string.Equals(parameter.Key, "temperature", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!parameter.Value.TryGetSingle(out var temperature) || temperature is < 0 or > 2)
+                        throw new ArgumentException("Temperature must be a number between 0 and 2.");
+                }
+                else if (string.Equals(parameter.Key, "maxOutputTokens", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!parameter.Value.TryGetInt32(out var maxOutputTokens) || maxOutputTokens <= 0)
+                        throw new ArgumentException("MaxOutputTokens must be a positive integer.");
+                }
+                else
+                {
+                    throw new ArgumentException($"Runtime parameter '{parameter.Key}' is not supported. Use temperature or maxOutputTokens.");
+                }
+            }
         }
         if (!string.IsNullOrWhiteSpace(Context))
         {
@@ -40,6 +58,7 @@ public sealed class AgentRunnerModel
             Execution = new RuntimeExecutionOptions
             {
                 Mode = RuntimeExecutionMode.Interactive,
+                Streaming = Streaming,
                 TimeoutSeconds = TimeoutSeconds,
                 Parameters = parameters
             },

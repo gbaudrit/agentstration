@@ -6,6 +6,7 @@ public static class AgentstrationProviderNamespaces
 {
     public const string Agents = "Agentstration.Agents";
     public const string Models = "Agentstration.Models";
+    public const string ModelProviders = "Agentstration.ModelProviders";
     public const string Tools = "Agentstration.Tools";
     public const string Runtime = "Agentstration.Runtime";
     public const string Memory = "Agentstration.Memory";
@@ -19,6 +20,9 @@ public static class AgentstrationResourceTypes
     public const string AgentRevisions = AgentstrationProviderNamespaces.Agents + "/agentRevisions";
     public const string Deployments = AgentstrationProviderNamespaces.Agents + "/deployments";
     public const string Operations = AgentstrationProviderNamespaces.Agents + "/operations";
+    public const string ModelProviders = AgentstrationProviderNamespaces.ModelProviders + "/modelProviders";
+    public const string ModelProfiles = AgentstrationProviderNamespaces.Models + "/modelProfiles";
+    public const string RuntimeProfiles = AgentstrationProviderNamespaces.Runtime + "/runtimeProfiles";
 }
 
 public static class ManagementApiVersions
@@ -219,6 +223,8 @@ public sealed record AgentRevision : Resource
 public sealed record AgentDeployment : Resource
 {
     public required string RevisionId { get; init; }
+    public string? AgentResourceId { get; init; }
+    public string? ModelProfileId { get; init; }
     public required string Environment { get; init; }
     public required string RuntimeProfileId { get; init; }
     public required AgentHostingMode HostingMode { get; init; }
@@ -241,13 +247,78 @@ public sealed record ManagementOperation : Resource
     public string? ErrorMessage { get; init; }
 }
 
-public sealed record ModelProfile
+public sealed record ModelSelection
 {
-    public required string Id { get; init; }
-    public required string Provider { get; init; }
-    public required string Model { get; init; }
-    public Uri? Endpoint { get; init; }
-    public IReadOnlyDictionary<string, JsonElement> Options { get; init; } = new Dictionary<string, JsonElement>();
+    public required string Name { get; init; }
+}
+
+public sealed record ModelGenerationOptions
+{
+    public double? Temperature { get; init; }
+    public double? TopP { get; init; }
+    public int? TopK { get; init; }
+    public int? MaxOutputTokens { get; init; }
+    public int? Seed { get; init; }
+    public IReadOnlyList<string>? StopSequences { get; init; }
+}
+
+public enum ReasoningMode { Automatic, Enabled, Disabled }
+public enum ReasoningEffort { Minimal, Low, Medium, High }
+
+public sealed record ModelReasoningOptions
+{
+    public ReasoningMode Mode { get; init; } = ReasoningMode.Automatic;
+    public ReasoningEffort? Effort { get; init; }
+}
+
+public enum ModelOutputFormat { Text, JsonObject, JsonSchema }
+
+public sealed record ModelOutputOptions
+{
+    public ModelOutputFormat Format { get; init; } = ModelOutputFormat.Text;
+    public JsonElement? JsonSchema { get; init; }
+    public bool Strict { get; init; }
+}
+
+public sealed record ModelProfileProperties
+{
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required ResourceReference Provider { get; init; }
+    public required ModelSelection Model { get; init; }
+    public ModelGenerationOptions Generation { get; init; } = new();
+    public ModelReasoningOptions Reasoning { get; init; } = new();
+    public ModelOutputOptions Output { get; init; } = new();
+    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+}
+
+public sealed record ModelProfileResource : Resource
+{
+    public required ModelProfileProperties Properties { get; init; }
+}
+
+public enum RuntimeSessionMode { Transient, Persistent }
+public enum RuntimeToolInvocationMode { Automatic, Required, Disabled }
+public enum StreamingMode { Automatic, Enabled, Disabled }
+
+public sealed record RuntimeExecutionDefaults
+{
+    public RuntimeSessionMode SessionMode { get; init; } = RuntimeSessionMode.Transient;
+    public RuntimeToolInvocationMode ToolInvocation { get; init; } = RuntimeToolInvocationMode.Automatic;
+    public StreamingMode Streaming { get; init; } = StreamingMode.Automatic;
+}
+
+public sealed record RuntimeProfileProperties
+{
+    public required string DisplayName { get; init; }
+    public required string RuntimeType { get; init; }
+    public RuntimeExecutionDefaults Execution { get; init; } = new();
+    public IReadOnlyDictionary<string, JsonElement> RuntimeOptions { get; init; } = new Dictionary<string, JsonElement>();
+}
+
+public sealed record RuntimeProfileResource : Resource
+{
+    public required RuntimeProfileProperties Properties { get; init; }
 }
 
 public sealed record ExternalBinding

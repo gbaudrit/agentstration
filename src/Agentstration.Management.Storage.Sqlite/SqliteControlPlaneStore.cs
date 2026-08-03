@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Agentstration.Management.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -132,56 +131,9 @@ public sealed class SqliteControlPlaneStore(IDbContextFactory<ControlPlaneDbCont
 
     private static StoredResource<T> Deserialize<T>(ControlPlaneDocument document) where T : Resource
     {
-        T value;
-        try
-        {
-            value = JsonSerializer.Deserialize<T>(document.Payload, JsonOptions) ?? throw new InvalidOperationException($"Stored resource '{document.ResourceId}' is invalid.");
-        }
-        catch (JsonException) when (typeof(T) == typeof(AgentResource))
-        {
-            value = (T)(Resource)DeserializeLegacyAgent(document);
-        }
+        var value = JsonSerializer.Deserialize<T>(document.Payload, JsonOptions)
+            ?? throw new InvalidOperationException($"Stored resource '{document.ResourceId}' is invalid.");
         return new StoredResource<T>(WithETag(value, document.ETag), document.ETag, document.UpdatedAt);
-    }
-
-    private static AgentResource DeserializeLegacyAgent(ControlPlaneDocument document)
-    {
-        var root = JsonNode.Parse(document.Payload)?.AsObject() ?? throw new InvalidOperationException($"Stored resource '{document.ResourceId}' is invalid.");
-        var properties = root["properties"]?.AsObject() ?? throw new InvalidOperationException($"Stored resource '{document.ResourceId}' has no agent properties.");
-        if (properties["agentType"] is null && properties["type"] is JsonNode legacyType)
-            properties["agentType"] = legacyType.DeepClone();
-
-        var resourceGroup = root["resourceGroup"]?.GetValue<string>() ?? ResourceIdentifier.Parse(document.ResourceId).ResourceGroup;
-        var modelProfile = properties["modelProfileOverride"]?.GetValue<string>();
-        modelProfile = string.IsNullOrWhiteSpace(modelProfile) ? "reasoning-default" : modelProfile;
-        if (!ResourceIdentifier.TryParse(modelProfile, out var modelProfileId))
-            modelProfileId = ResourceIdentifier.Create(resourceGroup, AgentstrationProviderNamespaces.Models, "modelProfiles", modelProfile);
-        properties["modelProfile"] = new JsonObject { ["resourceId"] = modelProfileId.Value };
-
-        var tools = new JsonArray();
-        if (properties["additionalToolIds"] is JsonArray legacyTools)
-        {
-            foreach (var item in legacyTools)
-            {
-                var tool = item?.GetValue<string>();
-                if (string.IsNullOrWhiteSpace(tool)) continue;
-                if (!ResourceIdentifier.TryParse(tool, out var toolId))
-                    toolId = ResourceIdentifier.Create(resourceGroup, AgentstrationProviderNamespaces.Tools, "tools", tool);
-                tools.Add(new JsonObject { ["resourceId"] = toolId.Value });
-            }
-        }
-        properties["tools"] = tools;
-
-        if ((root["generation"]?.GetValue<long>() ?? 0) == 0 && properties["version"] is JsonNode version)
-            root["generation"] = version.GetValue<long>();
-        properties.Remove("id");
-        properties.Remove("version");
-        properties.Remove("key");
-        properties.Remove("type");
-        properties.Remove("modelProfileOverride");
-        properties.Remove("additionalToolIds");
-
-        return root.Deserialize<AgentResource>(JsonOptions) ?? throw new InvalidOperationException($"Stored resource '{document.ResourceId}' could not be upgraded.");
     }
 
     private static async Task SaveAsync(ControlPlaneDbContext context, CancellationToken cancellationToken)
@@ -200,6 +152,8 @@ public sealed class SqliteControlPlaneStore(IDbContextFactory<ControlPlaneDbCont
         AgentRevision value => value with { ETag = etag, Status = status },
         AgentDeployment value => value with { ETag = etag, Status = status },
         ManagementOperation value => value with { ETag = etag, Status = status },
+        ModelProfileResource value => value with { ETag = etag, Status = status },
+        RuntimeProfileResource value => value with { ETag = etag, Status = status },
         _ => throw new NotSupportedException($"Resource type '{resource.GetType().Name}' is not supported by the control plane store.")
     });
     }

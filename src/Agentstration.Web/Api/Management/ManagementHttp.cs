@@ -11,6 +11,18 @@ internal static class ManagementHttp
         catch (ControlPlaneResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
         catch (ControlPlaneConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
         catch (AgentDefinitionValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
+        catch (ModelProfileValidationException exception)
+        {
+            var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+            {
+                Type = $"https://agentstration.dev/problems/{exception.Code}",
+                Title = "Invalid model profile reference",
+                Status = StatusCodes.Status422UnprocessableEntity,
+                Detail = exception.Message
+            };
+            problem.Extensions["errors"] = exception.Errors;
+            return Results.Problem(problem);
+        }
         catch (ArgumentException exception) { return Results.Problem(statusCode: 400, title: "validation_failed", detail: exception.Message); }
         catch (InvalidOperationException exception) { return Results.Problem(statusCode: 409, title: "operation_conflict", detail: exception.Message); }
     }

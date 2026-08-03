@@ -2,6 +2,7 @@ using Agentstration.Application.Ingestion;
 using Agentstration.Application.Missions;
 using Agentstration.Application.Workflows;
 using Agentstration.Management.Core;
+using Agentstration.ModelProviders;
 using Agentstration.ModelProviders.Ollama;
 using Agentstration.Runtime.Core;
 using Agentstration.Application.Work;
@@ -46,9 +47,15 @@ var runtimePath = builder.Environment.IsEnvironment("Testing")
     : builder.Configuration["Data:RuntimePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "runtime-plane.db");
 var runtimeDirectory = Path.GetDirectoryName(runtimePath);
 if (!string.IsNullOrWhiteSpace(runtimeDirectory)) Directory.CreateDirectory(runtimeDirectory);
+builder.Services.AddAgentstrationModelProviders(builder.Configuration);
 builder.Services.AddAgentstration(dataPath, builder.Environment.IsEnvironment("Testing"), aiOptions, $"Data Source={controlPlanePath}", $"Data Source={workPlanePath}", $"Data Source={flowPath}", $"Data Source={runtimePath}");
+builder.Services.AddAgentstrationModelManagement();
 if (string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase))
 {
+    if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("local-chat")))
+    {
+        builder.Configuration[$"{ModelProviderConfigurationSections.Root}:Providers:ollama-local:Endpoint"] = parsedAiEndpoint.AbsoluteUri;
+    }
     builder.AddOllamaModelProvider("local-chat", parsedAiEndpoint, aiOptions.Model);
 }
 builder.Services.AddProblemDetails();
@@ -89,6 +96,7 @@ app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 app.MapAgentstrationApi();
 app.MapAgentstrationManagementApi();
+app.MapAgentstrationModelManagementApi();
 app.MapAgentstrationWorkApi();
 app.MapAgentstrationFlowApi();
 app.MapAgentstrationRuntimeApi();
