@@ -117,7 +117,7 @@ dotnet run --project src/Agentstration.Web
 
 Open `http://localhost:5080`. Data is persisted to `src/Agentstration.Web/.agentstration/data.json` and is intentionally ignored by Git.
 
-The same process now hosts the Blazor operations console in Interactive Server mode. Its default simulated console data makes every operational section immediately explorable without calling a remote API; the existing platform stores and REST endpoints retain their normal local behavior. See the [Web console guide](src/Agentstration.Web/README.md) for API client, authentication, rendering, and UI component configuration.
+The same process now hosts the Blazor operations console in Interactive Server mode. Agent and model management always use the canonical persisted HTTP APIs; unrelated dashboard projections remain simulated by default so every operational section is immediately explorable. See the [Web console guide](src/Agentstration.Web/README.md) for API client, authentication, rendering, and UI component configuration.
 
 For the Aspire dashboard and orchestration experience:
 
@@ -135,7 +135,9 @@ docker compose up --build
 
 ## AI modes
 
-The default provider is deterministic and needs no model:
+The normal `Managed` mode resolves the provider, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; no `AI__Provider=Ollama` environment variable is required. Configure the seeded `ollama-local` URL from `/modelproviders/default/ollama-local`.
+
+Use the deterministic offline mode explicitly for tests or fallback diagnostics:
 
 ```powershell
 $env:AI__Provider = "Deterministic"
@@ -146,13 +148,10 @@ To use an already running Ollama instance directly, without Aspire:
 
 ```powershell
 ollama pull qwen3:1.7b
-$env:AI__Provider = "Ollama"
-$env:AI__Endpoint = "http://localhost:11434"
-$env:AI__Model = "qwen3:1.7b"
 dotnet run --project src/Agentstration.Web
 ```
 
-The configured `reasoning-default` profile resolves to the `local-reasoning` deployment, then to the `ollama-local` provider and its `qwen3:1.7b` model. The endpoint comes from Aspire's `local-chat` service reference; `localhost` is used only by the direct Web launch path.
+The seeded `reasoning-default` profile resolves to the persisted `ollama-local` provider and its `qwen3:1.7b` model. Aspire uses its `local-chat` service reference when one is declared; otherwise startup seeds `http://localhost:11434`. The persisted provider can be edited without restarting the host and is authoritative for subsequent runtime resolution.
 
 The Agent Runner uses this resolver through Microsoft Agent Framework, so no Ollama-specific execution path exists in the Runtime Plane. Create a normal durable Runtime Run to exercise the entire declared-agent path:
 
@@ -176,17 +175,21 @@ Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://
 
 `Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders.Ollama` owns the OllamaSharp client integration, while `Agentstration.AppHost` alone owns container provisioning. `Runtime.AgentFramework` consumes the resolver and `IChatClient`; it has no Ollama dependency.
 
-Current limitations are deliberate: one Aspire-managed local provider, no provider mutation API, no Flow execution, no tools, no conversation persistence, and no provider-native streaming yet. Other OpenAI-compatible endpoints can still be configured with `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` under a non-`Deterministic`, non-`Ollama` provider name.
+Current limitations are deliberate: Ollama is the only mutable provider type, credentials are not stored on provider resources, and there is no Flow execution, tool execution, conversation persistence, or provider-native streaming yet. Other OpenAI-compatible endpoints still use the legacy host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 
 ### Model provider and profile APIs
 
-Model providers are read-only technical resources in this increment. Ollama is declared by configuration and managed by Aspire:
+Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Aspire only provisions Ollama and supplies the initial seed URL; it is not the provider source of truth:
 
 ```powershell
 Invoke-RestMethod http://localhost:5080/api/modelproviders
 Invoke-RestMethod http://localhost:5080/api/modelproviders/ollama-local/status
 Invoke-RestMethod http://localhost:5080/api/modelproviders/ollama-local/models
+Invoke-RestMethod -Method Post http://localhost:5080/api/modelproviders/ollama-local/test
+Invoke-RestMethod http://localhost:5080/api/modelproviders/ollama-local/usages
 ```
+
+Create or edit a local Ollama declaration from the Blazor console at `/modelproviders`. Provider URLs must be absolute HTTP(S) URLs without embedded credentials, query strings, or fragments. Saving a provider does not require Ollama to be online; health and installed models remain observed state. Deleting a provider is rejected while a model profile references its exact resource ID.
 
 Model profiles are durable Management Plane resources with ETag concurrency and usage protection:
 
@@ -201,7 +204,7 @@ Model profiles separate portable `generation`, `reasoning`, and `output` intent 
 
 The seeded `reasoning-default` profile references the stable `ollama-local` provider resource and `qwen3:1.7b`. Profiles remain valid when Ollama or a selected model is temporarily unavailable; only structurally invalid profiles are rejected. An in-use profile cannot be deleted. Agent definitions continue to persist only the model-profile resource ID.
 
-The Blazor console exposes this vertical through `/modelproviders`, `/modelprofiles`, `/runtimeprofiles`, the agent editor, and the Agent Runner. Provider pages show read-only hosting state and dynamically discovered models. Model profile pages edit all canonical inference categories; runtime profile pages manage session, tool invocation, streaming, and runtime-specific options with ETag conflict and usage protection. The runner shows the resolved runtime profile and lets an advanced run choose its streaming mode. The reusable agent picker saves only `modelProfile.resourceId`; agent details render the declared profile separately from the resolved provider and model.
+The Blazor console exposes this vertical through `/modelproviders`, `/modelprofiles`, `/runtimeprofiles`, the agent editor, and the Agent Runner. Provider pages create and edit declarations, test connectivity, show dynamic models and usages, and enforce ETag/deletion protection. Model profile pages edit all canonical inference categories; runtime profile pages manage session, tool invocation, streaming, and runtime-specific options with ETag conflict and usage protection. The runner shows the resolved runtime profile and lets an advanced run choose its streaming mode. The reusable agent picker saves only `modelProfile.resourceId`; agent details render the declared profile separately from the resolved provider and model.
 
 ## REST quickstart
 
@@ -240,7 +243,7 @@ Invoke-RestMethod "http://localhost:5080/api/runtime/runs/$($run.id)"
 
 Run history and ordered events are stored independently in `.agentstration/runtime-plane.db`. The console exposes Quick Run, advanced context/parameters, SSE progress, cancellation, retry, trace and raw inspection from each agent page.
 
-Agent Runner always calls the canonical Management and Runtime APIs, even when the remaining console dashboard uses simulated projections. It checks the exact agent generation and offers **Prepare runtime** when a local revision/deployment is missing. A Run resolves the current persisted Model Profile, invokes the deployment model through Microsoft Agent Framework and the selected provider, and records the provider, model, temperature, and maximum output tokens actually used. Advanced overrides accept only `temperature` and `maxOutputTokens`; provider, endpoint, and model overrides are rejected.
+Agent management and Agent Runner always call the canonical Management and Runtime APIs, even when the remaining console dashboard uses simulated projections. Saving an agent activates its current generation; **Reconcile runtime** retries that idempotent activation manually. A successful replacement is made ready before superseded instances are deprovisioned. A Run resolves the current persisted Model Profile, invokes the deployment model through Microsoft Agent Framework and the selected provider, and records the provider, model, temperature, and maximum output tokens actually used. Advanced overrides accept only `temperature` and `maxOutputTokens`; provider, endpoint, and model overrides are rejected.
 
 ### Content and missions
 
@@ -323,6 +326,48 @@ The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5080/mcp`. 
 ```
 
 Tools: `list_workspaces`, `list_inboxes`, `ingest_text`, `ingest_url`, `search_memory`, `create_mission`, `get_mission`, `list_mission_runs`, and `run_mission_now`.
+
+## Runtime and MAF observability
+
+GenAI observability is enabled by default without capturing prompts or responses. A Runtime Run produces correlated OpenTelemetry spans for the Runtime lifecycle, the Microsoft Agent Framework invocation, the effective `IChatClient` request, and the outbound HTTP call. Structured Runtime logs carry the same Run and agent correlation scope.
+
+Run through Aspire to inspect traces, metrics, and logs in the local dashboard:
+
+```powershell
+dotnet run --project src/Agentstration.AppHost
+```
+
+For a direct Web launch, set `OTEL_EXPORTER_OTLP_ENDPOINT` to any OTLP-compatible collector. Disable GenAI instrumentation, without affecting normal execution, with:
+
+```json
+{
+  "Observability": {
+    "GenAI": {
+      "Enabled": false
+    }
+  }
+}
+```
+
+Prompt, response, function argument, function result, credential, and authorization-header capture is intentionally unavailable in the default logging pipeline. Runtime inputs and outputs remain inspectable through the Runtime Run API and console rather than being duplicated into operational telemetry.
+
+For local troubleshooting only, Development can capture the final JSON body sent by the OpenAI-compatible or OllamaSharp HTTP transport:
+
+```json
+{
+  "Observability": {
+    "GenAI": {
+      "HttpPayloadCapture": {
+        "Enabled": true,
+        "MaximumBodyLength": 16384,
+        "CaptureResponse": false
+      }
+    }
+  }
+}
+```
+
+The capture creates a correlated `gen_ai.http.payload_capture` span between the GenAI `chat` span and the network `POST`, and also emits structured payload logs. It removes URI query strings, never records HTTP headers, recursively redacts common JSON credential fields, and truncates the captured value. The application refuses to start with this option outside `Development`. Capturing responses is disabled by default because it buffers the complete response and therefore changes streaming behavior. These spans and logs are exported through OTLP when an exporter is configured, so the collector and its retention policy must be treated as containing sensitive data.
 
 ## Quality gates
 

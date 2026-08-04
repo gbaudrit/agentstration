@@ -8,6 +8,7 @@ using Agentstration.Application.Workspaces;
 using Agentstration.Contracts;
 using Agentstration.Domain;
 using Agentstration.Infrastructure.Agents;
+using Agentstration.Runtime.Local;
 using Agentstration.Infrastructure.Missions;
 using Agentstration.Infrastructure.Persistence;
 using Agentstration.Web.Mcp;
@@ -137,7 +138,7 @@ public sealed class VerticalTests
             Workspaces = new WorkspaceService(Store, TimeProvider.System);
             Ingestion = new IngestionService(Store, Bus, new StubContentReader(), TimeProvider.System);
             Memory = new MemoryService(Store);
-            runtime ??= new MicrosoftExtensionsAiAgentRuntime(new DeterministicChatClient());
+            runtime ??= new MicrosoftExtensionsAiAgentRuntime(new SingleChatClientResolver(new DeterministicChatClient()));
             Workflow = new ContentProcessingWorkflow(Store, new DeterministicIntentRouter(), runtime, Memory, Bus, TimeProvider.System);
             Missions = new MissionService(Store, new DemoObservationTool(), Bus, TimeProvider.System);
         }

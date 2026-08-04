@@ -1,63 +1,65 @@
-@page "/modelproviders/{Name}"
+@page "/modelproviders/new"
+@page "/modelproviders/{ResourceGroup}/{Name}"
 @implements IDisposable
 @inject IModelProvidersClient Client
+@inject NavigationManager Navigation
+@inject NotificationState Notifications
 
-<PageTitle>@Name · Model provider · Agentstration</PageTitle>
-<PageHeader Title="@(provider?.Properties.DisplayName ?? Name)" Description="Technical provider identity, hosting state and dynamically discovered models.">
-    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh</button><a class="button-secondary" href="/modelproviders">Back</a></Actions>
+<PageTitle>@(IsNew ? "Create model provider" : $"{Name} · Model provider") · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? "Create model provider" : model?.DisplayName ?? Name)" Description="Declare the technical endpoint used for health, model discovery and runtime inference.">
+    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">Delete</button> }<a class="button-secondary" href="/modelproviders">Back</a></Actions>
 </PageHeader>
 
-@if (loading && provider is null)
+@if (model is null) { <LoadingState Message="Loading model provider…" /> }
+else
 {
-    <LoadingState Message="Loading model provider…" />
-}
-else if (error is not null && provider is null)
-{
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
-}
-else if (provider is not null)
-{
-    <section class="details-grid">
-        <article class="panel"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Provider resource</h2></div></div>
-            <dl class="resource-details"><dt>Name</dt><dd>@provider.Name</dd><dt>Display name</dt><dd>@provider.Properties.DisplayName</dd><dt>Provider type</dt><dd>@provider.Properties.ProviderType</dd><dt>Resource group</dt><dd>@provider.ResourceGroup</dd><dt>Location</dt><dd>@provider.Location</dd></dl>
-        </article>
-        <article class="panel"><div class="panel-header"><div><p class="eyebrow">Hosting</p><h2>Observed state</h2></div><StatusBadge Text="@ModelManagementUi.Label(Status)" Status="@ModelManagementUi.Status(Status)" /></div>
-            <dl class="resource-details"><dt>Management mode</dt><dd>@provider.Properties.ManagementMode</dd><dt>Endpoint name</dt><dd>@(provider.Properties.EndpointDisplayName ?? "Not exposed")</dd><dt>Last checked</dt><dd>@(status?.CheckedAt.ToLocalTime().ToString("g") ?? provider.Properties.LastCheckedAt?.ToLocalTime().ToString("g") ?? "Not checked")</dd></dl>
-            @if (string.Equals(provider.Properties.ManagementMode, "aspire", StringComparison.OrdinalIgnoreCase)) { <p class="inline-info">This provider is managed by the local Aspire environment.</p> }
-        </article>
-    </section>
+    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>Provider error</strong><span>@error.Message</span></div> }
+    @if (usages.Count > 0) { <div class="form-alert form-alert-warning">This provider is referenced by @usages.Count model profile(s).</div> }
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-provider-editor" class="resource-form">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Provider resource</h2></div>@if (status is not null) { <StatusBadge Text="@ModelManagementUi.Label(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</div><div class="form-grid">
+            <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
+            <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+            <label><span>Resource group</span><InputText @bind-Value="model.ResourceGroup" disabled="@(!IsNew)" /></label>
+            <label><span>Location</span><InputText @bind-Value="model.Location" disabled="@(!IsNew)" /></label>
+            <label><span>Provider type</span><InputSelect @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="ollama">Ollama</option></InputSelect></label>
+            <label><span>Management mode</span><InputSelect @bind-Value="model.ManagementMode">@foreach (var value in Enum.GetValues<ModelProviderManagementMode>()) { <option value="@value">@value</option> }</InputSelect></label>
+        </div></section>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Connection</p><h2>Ollama endpoint</h2></div>@if (!IsNew) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@testing">@(testing ? "Testing…" : "Test connection")</button> }</div><div class="form-grid">
+            <label class="form-span-2"><span>Endpoint URL</span><InputText @bind-Value="model.Endpoint" placeholder="http://localhost:11434" /><ValidationMessage For="() => model.Endpoint" /><small>Use <code>localhost</code> for native Ollama when Agentstration runs on the host. A containerized caller may require <code>host.docker.internal</code>.</small></label>
+        </div>@if (status is not null) { <p class="@(status.Status == "available" ? "inline-info" : "inline-warning")">Last test @status.CheckedAt.ToLocalTime().ToString("g"): @ModelManagementUi.Label(status.Status)@if (!string.IsNullOrWhiteSpace(status.Details)) { <span> — @status.Details</span> }</p> }</section>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Adapter</p><h2>Provider options</h2></div><span>Advanced</span></div><div class="form-grid"><label class="form-span-2"><span>Provider-specific JSON</span><InputTextArea @bind-Value="model.ProviderOptionsJson" rows="7" class="runner-json form-code-editor" /><small>Top-level keys must match <code>@model.ProviderType</code>. Credentials are not accepted here.</small></label></div></section>
+        <div class="form-actions"><a class="button-secondary" href="/modelproviders">Cancel</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create provider" : "Save changes")</button></div>
+    </EditForm>
 
-    <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">Discovery</p><h2>Available models</h2></div><span>@models.Count model(s)</span></div>
-        @if (modelsError is not null) { <div class="form-alert form-alert-warning" role="status">Models cannot currently be discovered: @modelsError.Message</div> }
-        else if (models.Count == 0) { <EmptyState Title="No models discovered" Message="The provider is available but did not report any model." /> }
-        else {
-            <DataGrid TItem="AvailableModelResponse" Items="models"><Header><tr><th>Model</th><th>Status</th><th>Capabilities</th><th>Parameter size</th><th>Quantization</th></tr></Header><Row Context="model"><tr>
-                <td><strong>@model.DisplayName</strong><br /><code>@model.Name</code></td><td><StatusBadge Text="@ModelManagementUi.Label(model.Status)" Status="@ModelManagementUi.Status(model.Status)" /></td><td>@(model.Capabilities.Count == 0 ? "Not reported" : string.Join(" · ", model.Capabilities))</td><td>@Metadata(model, "parameterSize")</td><td>@Metadata(model, "quantization")</td>
-            </tr></Row></DataGrid>
-        }
-    </section>
+    @if (!IsNew)
+    {
+        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">Discovery</p><h2>Available models</h2></div><span>@models.Count model(s)</span></div>
+            @if (modelsError is not null) { <div class="form-alert form-alert-warning">@modelsError</div> }
+            else if (models.Count == 0) { <EmptyState Title="No models discovered" Message="Test the endpoint or pull a model into Ollama." /> }
+            else { <DataGrid TItem="AvailableModelResponse" Items="models"><Header><tr><th>Model</th><th>Status</th><th>Capabilities</th><th>Parameters</th><th>Quantization</th></tr></Header><Row Context="item"><tr><td><strong>@item.DisplayName</strong><br /><code>@item.Name</code></td><td><StatusBadge Text="@ModelManagementUi.Label(item.Status)" Status="@ModelManagementUi.Status(item.Status)" /></td><td>@(item.Capabilities.Count == 0 ? "Not reported" : string.Join(" · ", item.Capabilities))</td><td>@Metadata(item, "parameterSize")</td><td>@Metadata(item, "quantization")</td></tr></Row></DataGrid> }
+        </section>
+        @if (usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>Model profile usages</h2><span>@usages.Count</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><a href="@ProfileUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul></section> }
+    }
 }
+
+<ConfirmationDialog IsOpen="@confirmDelete" Title="Delete model provider" Message="@($"Delete model provider '{Name}'?")" ConfirmLabel="Delete model provider" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {
-    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter] public string? ResourceGroup { get; set; }
+    [Parameter] public string? Name { get; set; }
     private readonly CancellationTokenSource cancellation = new();
-    private ModelProviderResponse? provider; private ModelProviderStatusResponse? status;
-    private IReadOnlyList<AvailableModelResponse> models = [];
-    private AgentstrationApiException? error; private AgentstrationApiException? modelsError; private bool loading;
-    private string Status => status?.Status ?? provider?.Properties.Status ?? "unknown";
+    private ModelProviderEditorModel? model; private IReadOnlyList<ModelProviderUsageResponse> usages = []; private IReadOnlyList<AvailableModelResponse> models = [];
+    private ModelProviderStatusResponse? status; private AgentstrationApiException? error; private string? modelsError; private string? etag; private bool saving; private bool testing; private bool confirmDelete;
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
     protected override Task OnParametersSetAsync() => LoadAsync();
-    private async Task LoadAsync()
-    {
-        loading = true; error = null; modelsError = null;
-        try
-        {
-            provider = await Client.GetModelProviderAsync(Name, cancellation.Token);
-            try { status = await Client.GetProviderStatusAsync(Name, cancellation.Token); } catch (AgentstrationApiException exception) { modelsError = exception; }
-            try { models = await Client.GetProviderModelsAsync(Name, cancellation.Token); } catch (AgentstrationApiException exception) { modelsError = exception; models = []; }
-        }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
-    }
-    private static string Metadata(AvailableModelResponse model, string key) => model.Metadata.TryGetValue(key, out var value) ? value : "Not reported";
+    private async Task LoadAsync() { error = null; modelsError = null; if (IsNew) { model = new ModelProviderEditorModel(); return; } try { var group = ResourceGroup ?? "default"; var snapshot = await Client.GetModelProviderAsync(group, Name!, cancellation.Token); model = ModelProviderEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; usages = (await Client.GetModelProviderUsagesAsync(group, Name!, cancellation.Token)).Value; await LoadObservedAsync(group); } catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProviderEditorModel(); } }
+    private async Task LoadObservedAsync(string group) { try { status = await Client.GetProviderStatusAsync(group, Name!, cancellation.Token); if (status.Status == "available") models = await Client.GetProviderModelsAsync(group, Name!, cancellation.Token); else models = []; } catch (AgentstrationApiException exception) { modelsError = exception.Message; models = []; } }
+    private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var wasNew = IsNew; var snapshot = wasNew ? await Client.CreateModelProviderAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateModelProviderAsync(model.ResourceGroup, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), wasNew ? "Model provider created" : "Model provider updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); if (wasNew) { Navigation.NavigateTo($"/modelproviders/{Uri.EscapeDataString(snapshot.Value.ResourceGroup ?? "default")}/{Uri.EscapeDataString(snapshot.Value.Name)}"); } else { model = ModelProviderEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; await LoadObservedAsync(model.ResourceGroup); } } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
+    private async Task TestAsync() { if (model is null || testing) return; testing = true; error = null; try { status = await Client.TestProviderAsync(model.ResourceGroup, model.Name, cancellation.Token); await LoadObservedAsync(model.ResourceGroup); } catch (AgentstrationApiException exception) { error = exception; } finally { testing = false; } }
+    private void RequestDelete() { if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException($"This provider is used by {usages.Count} model profile(s).", Guid.NewGuid().ToString("N")); }
+    private async Task DeleteAsync() { if (model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteModelProviderAsync(model.ResourceGroup, model.Name, etag, cancellation.Token); Navigation.NavigateTo("/modelproviders"); } catch (AgentstrationApiException exception) { error = exception; } }
+    private static string Metadata(AvailableModelResponse item, string key) => item.Metadata.TryGetValue(key, out var value) ? value : "Not reported";
+    private static string ProfileUrl(ModelProviderUsageResponse usage) { var id = ResourceIdentifier.Parse(usage.ResourceId); return $"/modelprofiles/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}"; }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

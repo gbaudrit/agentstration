@@ -8,9 +8,14 @@ namespace Agentstration.Web.Console;
 public interface IModelProvidersClient
 {
     Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken);
-    Task<ModelProviderResponse> GetModelProviderAsync(string providerName, CancellationToken cancellationToken);
-    Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken);
-    Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string resourceGroup, string providerName, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(string resourceGroup, string providerName, PutModelProviderRequest request, string etag, CancellationToken cancellationToken);
+    Task DeleteModelProviderAsync(string resourceGroup, string providerName, string etag, CancellationToken cancellationToken);
+    Task<ModelProviderUsagesResponse> GetModelProviderUsagesAsync(string resourceGroup, string providerName, CancellationToken cancellationToken);
+    Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string resourceGroup, string providerName, CancellationToken cancellationToken);
+    Task<ModelProviderStatusResponse> GetProviderStatusAsync(string resourceGroup, string providerName, CancellationToken cancellationToken);
+    Task<ModelProviderStatusResponse> TestProviderAsync(string resourceGroup, string providerName, CancellationToken cancellationToken);
 }
 
 public interface IModelProfilesClient
@@ -44,14 +49,57 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
     public async Task<IReadOnlyList<ModelProviderResponse>> GetModelProvidersAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ModelProviderResponse>>(httpClient, "api/modelproviders", cancellationToken)).Value;
 
-    public Task<ModelProviderResponse> GetModelProviderAsync(string providerName, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<ModelProviderResponse>(httpClient, $"api/modelproviders/{Escape(providerName)}", cancellationToken);
+    public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string resourceGroup, string providerName, CancellationToken cancellationToken) =>
+        ReadResourceAsync(HttpMethod.Get, Path(resourceGroup, providerName), null, null, cancellationToken);
 
-    public async Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string providerName, CancellationToken cancellationToken) =>
-        (await ApiResponse.ReadAsync<ValueResponse<AvailableModelResponse>>(httpClient, $"api/modelproviders/{Escape(providerName)}/models", cancellationToken)).Value;
+    public Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken) =>
+        ReadResourceAsync(HttpMethod.Post, "api/modelproviders", JsonContent.Create(request), null, cancellationToken);
 
-    public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<ModelProviderStatusResponse>(httpClient, $"api/modelproviders/{Escape(providerName)}/status", cancellationToken);
+    public Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(string resourceGroup, string providerName, PutModelProviderRequest request, string etag, CancellationToken cancellationToken) =>
+        ReadResourceAsync(HttpMethod.Put, Path(resourceGroup, providerName), JsonContent.Create(request), etag, cancellationToken);
+
+    public async Task DeleteModelProviderAsync(string resourceGroup, string providerName, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Delete, Path(resourceGroup, providerName));
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<ModelProviderUsagesResponse> GetModelProviderUsagesAsync(string resourceGroup, string providerName, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<ModelProviderUsagesResponse>(httpClient, ChildPath(resourceGroup, providerName, "usages"), cancellationToken);
+
+    public async Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(string resourceGroup, string providerName, CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<AvailableModelResponse>>(httpClient, ChildPath(resourceGroup, providerName, "models"), cancellationToken)).Value;
+
+    public Task<ModelProviderStatusResponse> GetProviderStatusAsync(string resourceGroup, string providerName, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<ModelProviderStatusResponse>(httpClient, ChildPath(resourceGroup, providerName, "status"), cancellationToken);
+
+    public async Task<ModelProviderStatusResponse> TestProviderAsync(string resourceGroup, string providerName, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync(ChildPath(resourceGroup, providerName, "test"), null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ModelProviderStatusResponse>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty provider status.", Guid.NewGuid().ToString("N"));
+    }
+
+    private async Task<ResourceSnapshot<ModelProviderResource>> ReadResourceAsync(HttpMethod method, string path, HttpContent? content, string? etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(method, path) { Content = content };
+        if (!string.IsNullOrWhiteSpace(etag)) message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        var value = await response.Content.ReadFromJsonAsync<ModelProviderResource>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty model provider.", Guid.NewGuid().ToString("N"));
+        var responseEtag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(responseEtag)) throw new AgentstrationApiException("Agentstration API did not return the provider ETag.", Guid.NewGuid().ToString("N"));
+        return new ResourceSnapshot<ModelProviderResource>(value, responseEtag);
+    }
+
+    private static string Path(string resourceGroup, string providerName) =>
+        $"api/modelproviders/{Escape(providerName)}?resourceGroup={Escape(resourceGroup)}";
+    private static string ChildPath(string resourceGroup, string providerName, string child) =>
+        $"api/modelproviders/{Escape(providerName)}/{child}?resourceGroup={Escape(resourceGroup)}";
 
     private static string Escape(string value) => Uri.EscapeDataString(value);
 }

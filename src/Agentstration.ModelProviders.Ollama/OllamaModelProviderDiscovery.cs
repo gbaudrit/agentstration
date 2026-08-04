@@ -3,7 +3,7 @@ using OllamaSharp;
 
 namespace Agentstration.ModelProviders.Ollama;
 
-public sealed class OllamaModelProviderDiscovery(IOllamaApiClient client) : IModelProviderDiscovery
+public sealed class OllamaModelProviderDiscovery(IOllamaClientFactory clients) : IModelProviderDiscovery
 {
     public string ProviderType => OllamaModelProvider.ProviderTypeName;
 
@@ -13,6 +13,7 @@ public sealed class OllamaModelProviderDiscovery(IOllamaApiClient client) : IMod
     {
         try
         {
+            using var client = clients.CreateApiClient(provider);
             return await client.IsRunningAsync(cancellationToken)
                 ? new ModelProviderHealth("available")
                 : new ModelProviderHealth("unavailable", "Ollama did not respond to its lightweight version probe.");
@@ -27,6 +28,7 @@ public sealed class OllamaModelProviderDiscovery(IOllamaApiClient client) : IMod
         ModelProviderConfiguration provider,
         CancellationToken cancellationToken = default)
     {
+        using var client = clients.CreateApiClient(provider);
         var models = await client.ListLocalModelsAsync(cancellationToken);
         return models.Select(model =>
         {

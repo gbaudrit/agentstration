@@ -16,11 +16,17 @@ using Agentstration.Web.Hosting;
 using ModelContextProtocol.AspNetCore;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
+using Agentstration.Runtime.AgentFramework;
 
 var builder = WebApplication.CreateBuilder(args);
+var genAiObservability = builder.Configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new();
+genAiObservability.Validate(builder.Environment.IsDevelopment());
 var dataPath = builder.Configuration["Data:Path"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "data.json");
-var aiProvider = builder.Configuration["AI:Provider"] ?? "Deterministic";
+var aiProvider = builder.Configuration["AI:Provider"] ?? "Managed";
+var useManagedProfileResolver = string.Equals(aiProvider, "Managed", StringComparison.OrdinalIgnoreCase)
+    || string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase);
 var defaultAiEndpoint = string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase)
     ? "http://localhost:11434"
     : "http://localhost:11434/v1/";
@@ -47,17 +53,12 @@ var runtimePath = builder.Environment.IsEnvironment("Testing")
     : builder.Configuration["Data:RuntimePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "runtime-plane.db");
 var runtimeDirectory = Path.GetDirectoryName(runtimePath);
 if (!string.IsNullOrWhiteSpace(runtimeDirectory)) Directory.CreateDirectory(runtimeDirectory);
-builder.Services.AddAgentstrationModelProviders(builder.Configuration);
 builder.Services.AddAgentstration(dataPath, builder.Environment.IsEnvironment("Testing"), aiOptions, $"Data Source={controlPlanePath}", $"Data Source={workPlanePath}", $"Data Source={flowPath}", $"Data Source={runtimePath}");
+builder.Services.AddAgentstrationModelProviders(
+    builder.Configuration,
+    useManagedProfileResolver);
 builder.Services.AddAgentstrationModelManagement();
-if (string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase))
-{
-    if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("local-chat")))
-    {
-        builder.Configuration[$"{ModelProviderConfigurationSections.Root}:Providers:ollama-local:Endpoint"] = parsedAiEndpoint.AbsoluteUri;
-    }
-    builder.AddOllamaModelProvider("local-chat", parsedAiEndpoint, aiOptions.Model);
-}
+builder.AddOllamaModelProvider();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
@@ -70,6 +71,13 @@ builder.Services.AddHostedService<LocalWorkExecutionWorker>();
 builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
 
 var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+builder.Logging.AddOpenTelemetry(logging =>
+{
+    logging.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("Agentstration.Web"));
+    logging.IncludeScopes = true;
+    logging.IncludeFormattedMessage = true;
+    if (otlpEnabled) logging.AddOtlpExporter();
+});
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService("Agentstration.Web"))
     .WithTracing(tracing =>
@@ -77,16 +85,36 @@ builder.Services.AddOpenTelemetry()
         tracing
         .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
-            .AddSource(IngestionService.ActivitySource.Name, ContentProcessingWorkflow.ActivitySource.Name, MissionService.ActivitySource.Name, WorkItemService.ActivitySource.Name);
+            .AddSource(
+                IngestionService.ActivitySource.Name,
+                ContentProcessingWorkflow.ActivitySource.Name,
+                MissionService.ActivitySource.Name,
+                WorkItemService.ActivitySource.Name,
+                RuntimeRunService.ActivitySource.Name,
+                AgentFrameworkRuntimeFactory.TelemetrySourceName,
+                GenAiObservabilityOptions.ChatClientSourceName,
+                GenAiHttpPayloadCaptureHandler.TelemetrySourceName);
         if (otlpEnabled) tracing.AddOtlpExporter();
     })
     .WithMetrics(metrics =>
     {
-        metrics.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddMeter(WorkItemService.Meter.Name);
+        metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddMeter(
+                WorkItemService.Meter.Name,
+                AgentFrameworkRuntimeFactory.TelemetrySourceName,
+                GenAiObservabilityOptions.ChatClientSourceName);
         if (otlpEnabled) metrics.AddOtlpExporter();
     });
 
 var app = builder.Build();
+if (genAiObservability.HttpPayloadCapture.Enabled)
+{
+    app.Logger.LogWarning(
+        "Advanced AI HTTP payload capture is enabled with a maximum body length of {MaximumBodyLength}. Request payloads may contain sensitive data",
+        genAiObservability.HttpPayloadCapture.MaximumBodyLength);
+}
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapOpenApi();

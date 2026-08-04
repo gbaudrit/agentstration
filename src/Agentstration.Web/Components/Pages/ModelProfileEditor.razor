@@ -137,7 +137,7 @@ else
         if (model is null) return; if (clearSelection) model.ModelName = string.Empty; models = []; warning = null;
         if (!ResourceIdentifier.TryParse(model.ProviderResourceId, out var id)) return;
         loadingModels = true;
-        try { models = await ProvidersClient.GetProviderModelsAsync(id.Name, cancellation.Token); }
+        try { models = await ProvidersClient.GetProviderModelsAsync(id.ResourceGroup, id.Name, cancellation.Token); }
         catch (AgentstrationApiException exception) { warning = $"Models cannot currently be discovered: {exception.Message}"; }
         finally { loadingModels = false; }
     }

@@ -252,6 +252,22 @@ public sealed record ModelSelection
     public required string Name { get; init; }
 }
 
+public enum ModelProviderManagementMode { External, Aspire }
+
+public sealed record ModelProviderProperties
+{
+    public required string DisplayName { get; init; }
+    public required string ProviderType { get; init; }
+    public required Uri Endpoint { get; init; }
+    public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
+    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+}
+
+public sealed record ModelProviderResource : Resource
+{
+    public required ModelProviderProperties Properties { get; init; }
+}
+
 public sealed record ModelGenerationOptions
 {
     public double? Temperature { get; init; }

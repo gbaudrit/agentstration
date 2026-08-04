@@ -6,11 +6,14 @@ namespace Agentstration.ModelProviders;
 
 public sealed record ModelProviderConfiguration
 {
+    public required string ResourceId { get; init; }
     public required string Name { get; init; }
+    public string ResourceGroup { get; init; } = "default";
+    public string Location { get; init; } = "local";
     public required string ProviderType { get; init; }
     public required Uri Endpoint { get; init; }
     public string? DisplayName { get; init; }
-    public string ManagementMode { get; init; } = "external";
+    public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
     public string? EndpointDisplayName { get; init; }
     public IReadOnlyList<string> Capabilities { get; init; } = ["chat"];
 }

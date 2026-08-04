@@ -9,8 +9,13 @@ using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Runtime.AgentFramework;
 
-public sealed class AgentFrameworkRuntimeFactory(IChatClientResolver chatClients, ILoggerFactory loggerFactory) : IAgentRuntimeFactory
+public sealed class AgentFrameworkRuntimeFactory(
+    IChatClientResolver chatClients,
+    ILoggerFactory loggerFactory,
+    GenAiObservabilityOptions observability) : IAgentRuntimeFactory
 {
+    public const string TelemetrySourceName = "Agentstration.MAF";
+
     public string Handler => "prompt-agent";
 
     public Task<IAgentRuntime> CreateAsync(ResolvedAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken)
@@ -27,6 +32,7 @@ public sealed class AgentFrameworkRuntimeFactory(IChatClientResolver chatClients
             definition.Description,
             tools,
             chatClients,
+            observability.Enabled,
             loggerFactory.CreateLogger<AgentFrameworkRuntime>()));
     }
 
@@ -44,6 +50,7 @@ public sealed class AgentFrameworkRuntimeFactory(IChatClientResolver chatClients
         string? description,
         IList<Microsoft.Extensions.AI.AITool> tools,
         IChatClientResolver chatClients,
+        bool observabilityEnabled,
         ILogger<AgentFrameworkRuntime> logger) : IAgentRuntime
     {
         public string AgentId { get; } = agentId;
@@ -67,12 +74,12 @@ public sealed class AgentFrameworkRuntimeFactory(IChatClientResolver chatClients
             ArgumentException.ThrowIfNullOrWhiteSpace(request.Input);
             var chatClient = await chatClients.ResolveAsync(modelProfileId, cancellationToken);
             var model = chatClient.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
-            AIAgent agent = new ChatClientAgent(
+            AIAgent agent = Observe(new ChatClientAgent(
                 chatClient,
                 instructions: instructions,
                 name: AgentId,
                 description: description,
-                tools: tools);
+                tools: tools), observabilityEnabled);
             if (logger.IsEnabled(LogLevel.Information))
             {
                 logger.LogInformation(
@@ -111,7 +118,7 @@ public sealed class AgentFrameworkRuntimeFactory(IChatClientResolver chatClients
             yield return new ExecutionStarted(executionId);
             var chatClient = await chatClients.ResolveAsync(modelProfileId, cancellationToken);
             var model = chatClient.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
-            var agent = new ChatClientAgent(chatClient, instructions: instructions, name: AgentId, description: description, tools: tools);
+            var agent = Observe(new ChatClientAgent(chatClient, instructions: instructions, name: AgentId, description: description, tools: tools), observabilityEnabled);
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
             var effective = new ModelExecutionOptions(
                 chatOptions.Temperature,
@@ -161,10 +168,16 @@ public sealed class AgentFrameworkRuntimeFactory(IChatClientResolver chatClients
             }
             yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ProviderType, model?.ModelName, effective));
         }
+
+        private static AIAgent Observe(AIAgent agent, bool enabled) => enabled
+            ? agent.AsBuilder()
+                .UseOpenTelemetry(TelemetrySourceName, telemetry => telemetry.EnableSensitiveData = false)
+                .Build()
+            : agent;
     }
 }
 
-public sealed class AgentFrameworkAgentRouter(IChatClientResolver chatClients) : IAgentRouter
+public sealed class AgentFrameworkAgentRouter(IChatClientResolver chatClients, GenAiObservabilityOptions observability) : IAgentRouter
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly string RouterModelProfileId = ResourceIdentifier.Create(
@@ -183,6 +196,12 @@ public sealed class AgentFrameworkAgentRouter(IChatClientResolver chatClients) :
             instructions: "AGENTSTRATION_ROUTER: Select exactly one candidate for the request. Return only JSON with agentId, confidence, and reason. Never execute the selected agent.",
             name: "agentstration-router",
             description: "Selects one deployed specialized agent.");
+        if (observability.Enabled)
+        {
+            router = router.AsBuilder()
+                .UseOpenTelemetry(AgentFrameworkRuntimeFactory.TelemetrySourceName, telemetry => telemetry.EnableSensitiveData = false)
+                .Build();
+        }
         var payload = JsonSerializer.Serialize(new { request = request.Input, candidates }, JsonOptions);
         var response = await router.RunAsync(payload, cancellationToken: cancellationToken);
         var result = JsonSerializer.Deserialize<AgentRouteResult>(response.Text.Trim().Trim('`'), JsonOptions)

@@ -34,7 +34,7 @@ The Management area provides declarative CRUD workflows for agents and logical m
 
 `/modelproviders` displays configured providers, health and dynamically discovered models without persisting provider models. `/modelprofiles` provides searchable canonical profile CRUD, provider/model selection, full generation/reasoning/output options, usage inspection, effective resolution, declarative JSON, ETag conflict recovery, and deletion protection. `/runtimeprofiles` provides the equivalent CRUD surface for runtime type, sessions, tool invocation, streaming and adapter options. Agent details deliberately separate the declared profile from the provider and model resolved through `/api/agents/{name}/model`; the Agent Runner displays the deployment runtime profile and exposes streaming for advanced runs.
 
-The simulated client implements the same mutable workflow in memory. In HTTP mode the UI delegates to the Management API, which remains the authority for validation, generations, provisioning state, and lifecycle events.
+Agent and model management always delegate to the canonical Management HTTP API, which remains the authority for validation, generations, provisioning state, and lifecycle events. `MockApiClient` is retained only for unrelated demonstration projections.
 
 ## Agent Runner
 
@@ -42,13 +42,13 @@ Each persisted agent exposes a **Run** action leading to `/agents/{resourceGroup
 
 Stopping a run calls the Runtime cancellation endpoint. Retry creates a new Run from the original payload. Direct console Runs never create Work Items. Advanced context, JSON runtime parameters and timeout are accepted now; final policy resolution remains the Runtime and Model Profile responsibility.
 
-The Runner uses dedicated real HTTP clients even when `UseSimulatedData=true`. It displays model resolution and exact-generation deployment readiness before enabling Run. **Prepare runtime** calls the idempotent local preparation endpoint when a revision or deployment is missing. Runtime parameters are restricted to `temperature` and `maxOutputTokens`; profile defaults are merged in Runtime and the effective values are passed to MAF and displayed with the completed Run.
+The agent editor and Runner use dedicated real HTTP clients even when `UseSimulatedData=true`, ensuring that saved and activated generations come from the same persisted resource. Saving calls the idempotent activation endpoint; the Runner displays model resolution and exact-generation deployment readiness and exposes **Reconcile runtime** for a manual retry. Runtime parameters are restricted to `temperature` and `maxOutputTokens`; profile defaults are merged in Runtime and the effective values are passed to MAF and displayed with the completed Run.
 
 ## API configuration
 
 Console data access is isolated behind `IManagementApiClient`, `IModelProvidersClient`, `IModelProfilesClient`, `IAgentsModelClient`, `IRuntimeApiClient`, `IWorkApiClient`, and `IFlowApiClient`. HTTP implementations use `HttpClientFactory`, explicit timeouts, limited retry, total request timeout, and circuit-breaking defaults from the standard .NET resilience handler. API failures surface a safe error identifier in the UI.
 
-The development default is simulated data:
+The development default uses simulated data for dashboard, Work, Flow, and general Runtime projections while Agent and model management remain canonical:
 
 ```json
 {
@@ -62,7 +62,7 @@ The development default is simulated data:
 }
 ```
 
-Set `Agentstration__UseSimulatedData=false` and configure each base address to activate all typed HTTP clients. Model-provider, model-profile and agent-model-resolution screens always use the canonical Management HTTP APIs so that they display the persisted definitions consumed by Runtime; the other dashboard areas may still use `MockApiClient` in demonstration mode. Secrets are never passed to Razor components or browser code.
+Set `Agentstration__UseSimulatedData=false` and configure each base address to activate all typed HTTP clients. Agent CRUD, model-provider, model-profile and agent-model-resolution screens always use the canonical Management HTTP APIs so that they display the persisted definitions consumed by Runtime; the other dashboard areas may still use `MockApiClient` in demonstration mode. Secrets are never passed to Razor components or browser code.
 
 The existing backend does not yet expose every runtime projection required by the console. In HTTP mode, the Runtime client verifies `/health` and reports only the local runtime shell; detailed resource and execution projections will replace this adapter when public Runtime endpoints land.
 

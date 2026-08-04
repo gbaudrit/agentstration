@@ -3,11 +3,12 @@
 @implements IDisposable
 @inject IManagementApiClient Client
 @inject IAgentsModelClient AgentsModelClient
+@inject IAgentRunnerRuntimeClient RuntimeClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 
 <PageTitle>@(IsNew ? "Create agent" : "Edit agent") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? "Create agent" : $"Edit {Name}")" Description="Declare the desired agent state. Runtime materialization remains separate.">
+<PageHeader Title="@(IsNew ? "Create agent" : $"Edit {Name}")" Description="Save the desired state and activate its current runtime generation.">
     <Actions>@if (!IsNew) { <a class="button-primary" href="@RunUrl">Run</a> }<a class="button-secondary" href="/agents">Back to agents</a></Actions>
 </PageHeader>
 
@@ -24,7 +25,7 @@ else
 {
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
-        <div class="form-alert form-alert-danger" role="alert"><strong>Unable to save</strong><span>@errorMessage</span>@if (!string.IsNullOrWhiteSpace(errorId)) { <code>@errorId</code> }</div>
+        <div class="form-alert form-alert-danger" role="alert"><strong>Unable to apply</strong><span>@errorMessage</span>@if (!string.IsNullOrWhiteSpace(errorId)) { <code>@errorId</code> }</div>
     }
     @if (!string.IsNullOrWhiteSpace(successMessage))
     {
@@ -84,7 +85,7 @@ else
 
         <div class="form-actions">
             <a class="button-secondary" href="/agents">Cancel</a>
-            <button class="button-primary" type="submit" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create agent" : "Save changes")</button>
+            <button class="button-primary" type="submit" disabled="@saving">@(saving ? "Applying…" : IsNew ? "Create and deploy" : "Save and apply")</button>
         </div>
     </EditForm>
 }
@@ -130,8 +131,7 @@ else
                 etag = snapshot.ETag;
                 resourceId = snapshot.Value.Id;
                 generation = snapshot.Value.Generation;
-                try { agentModel = await AgentsModelClient.GetAgentModelResolutionAsync(group, Name!, cancellation.Token); }
-                catch (AgentstrationApiException exception) { modelResolutionWarning = exception.Message; }
+                await LoadAgentModelAsync(group, Name!);
             }
         }
         catch (AgentstrationApiException exception)
@@ -164,7 +164,19 @@ else
         var id = ResourceIdentifier.Parse(value.Declared.ModelProfile.ResourceId);
         return $"/modelprofiles/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}";
     }
-    private static string ProviderUrl(AgentModelResponse value) => $"/modelproviders/{Uri.EscapeDataString(value.Resolved.Provider!.Name)}";
+    private static string ProviderUrl(AgentModelResponse value)
+    {
+        var id = ResourceIdentifier.Parse(value.Resolved.Provider!.ResourceId);
+        return $"/modelproviders/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}";
+    }
+
+    private async Task LoadAgentModelAsync(string resourceGroup, string name)
+    {
+        agentModel = null;
+        modelResolutionWarning = null;
+        try { agentModel = await AgentsModelClient.GetAgentModelResolutionAsync(resourceGroup, name, cancellation.Token); }
+        catch (AgentstrationApiException exception) { modelResolutionWarning = exception.Message; }
+    }
 
     private void ApplyAgentType(AgentTypeResource type)
     {
@@ -188,14 +200,39 @@ else
         successMessage = null;
         try
         {
+            var wasNew = IsNew;
             var request = model.ToRequest();
-            var snapshot = await Client.PutAgentAsync(request, etag, IsNew, cancellation.Token);
+            var snapshot = await Client.PutAgentAsync(request, etag, wasNew, cancellation.Token);
             etag = snapshot.ETag;
             resourceId = snapshot.Value.Id;
             generation = snapshot.Value.Generation;
-            successMessage = IsNew ? "Agent created." : "Agent updated.";
+            model = AgentEditorModel.FromResource(snapshot.Value);
+            var activation = await RuntimeClient.PrepareAgentAsync(
+                snapshot.Value.ResourceGroup!,
+                snapshot.Value.Name,
+                snapshot.Value.Generation,
+                cancellation.Token);
+            if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
+            {
+                var message = $"The agent definition was saved, but generation {snapshot.Value.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";
+                Notifications.Add(new NotificationItem(Guid.NewGuid(), "Runtime activation failed", message, DateTimeOffset.Now, UiStatus.Warning));
+                if (wasNew)
+                {
+                    Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.ResourceGroup!)}/{Uri.EscapeDataString(snapshot.Value.Name)}");
+                    return;
+                }
+
+                errorMessage = message;
+                await LoadAgentModelAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name);
+                return;
+            }
+
+            successMessage = wasNew ? "Agent created and deployed." : $"Agent updated and generation {snapshot.Value.Generation} activated.";
             Notifications.Add(new NotificationItem(Guid.NewGuid(), successMessage, snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
-            Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.ResourceGroup!)}/{Uri.EscapeDataString(snapshot.Value.Name)}");
+            if (wasNew)
+                Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.ResourceGroup!)}/{Uri.EscapeDataString(snapshot.Value.Name)}");
+            else
+                await LoadAgentModelAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name);
         }
         catch (ArgumentException exception) { errorMessage = exception.Message; }
         catch (AgentstrationApiException exception)

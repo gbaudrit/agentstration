@@ -21,7 +21,7 @@ public sealed class ApiClientTests
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [TestMethod]
-    public void AgentRunnerUsesCanonicalHttpClientsWhenDashboardSimulationIsEnabled()
+    public void AgentManagementAndRunnerUseCanonicalHttpClientsWhenDashboardSimulationIsEnabled()
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -37,7 +37,7 @@ public sealed class ApiClientTests
 
         Assert.IsInstanceOfType<ManagementApiClient>(scope.ServiceProvider.GetRequiredService<IAgentRunnerManagementClient>());
         Assert.IsInstanceOfType<RuntimeApiClient>(scope.ServiceProvider.GetRequiredService<IAgentRunnerRuntimeClient>());
-        Assert.IsInstanceOfType<MockApiClient>(scope.ServiceProvider.GetRequiredService<IManagementApiClient>());
+        Assert.IsInstanceOfType<ManagementApiClient>(scope.ServiceProvider.GetRequiredService<IManagementApiClient>());
     }
 
     [TestMethod]
@@ -147,7 +147,7 @@ public sealed class ApiClientTests
         var client = new ModelProvidersApiClient(httpClient);
 
         var providers = await client.GetModelProvidersAsync(default);
-        var models = await client.GetProviderModelsAsync("ollama-local", default);
+        var models = await client.GetProviderModelsAsync("default", "ollama-local", default);
 
         Assert.AreEqual("aspire", providers[0].Properties.ManagementMode);
         Assert.AreEqual("qwen3:4b", models[0].Name);

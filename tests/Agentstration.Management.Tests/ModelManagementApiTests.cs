@@ -16,6 +16,25 @@ namespace Agentstration.Management.Tests;
 public sealed class ModelManagementApiTests
 {
     [TestMethod]
+    public async Task ManagedHostCompositionUsesPersistedModelProfileResolver()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("AI:Provider", "Managed");
+            builder.UseSetting("ConnectionStrings:local-chat", "Endpoint=http://127.0.0.1:1");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/health");
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.IsNotNull(factory.Services.GetRequiredService<Agentstration.Application.IAgentRuntime>());
+        Assert.IsInstanceOfType<ChatClientResolver>(factory.Services.GetRequiredService<IChatClientResolver>());
+    }
+
+    [TestMethod]
     public async Task ReadOnlyProviderApisExposeConfiguredProviderAndUnavailableDiscovery()
     {
         await using var factory = Factory();
@@ -27,7 +46,7 @@ public sealed class ModelManagementApiTests
         using var models = await client.GetAsync("/api/modelproviders/ollama-local/models");
 
         Assert.AreEqual("aspire", provider.Properties.ManagementMode);
-        Assert.AreEqual("unknown", status!.Status);
+        Assert.AreEqual("unavailable", status!.Status);
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, models.StatusCode);
         Assert.AreEqual("application/problem+json", models.Content.Headers.ContentType?.MediaType);
     }
@@ -48,7 +67,7 @@ public sealed class ModelManagementApiTests
         var deploymentStore = factory.Services.GetRequiredService<IModelDeploymentStore>();
         var runtimeProfile = await profileStore.GetRequiredAsync(created.Id);
         var runtimeDeployment = await deploymentStore.GetRequiredAsync(runtimeProfile.DeploymentName);
-        Assert.AreEqual("ollama-local", runtimeDeployment.ProviderName);
+        Assert.AreEqual(ModelProviderManagementService.ModelProviderId("ollama-local"), runtimeDeployment.ProviderName);
         Assert.AreEqual("model-not-downloaded", runtimeDeployment.ModelName);
 
         var updatedProperties = created.Properties with { Description = "Updated profile" };
@@ -62,7 +81,7 @@ public sealed class ModelManagementApiTests
         Assert.AreNotEqual(createdResponse.Headers.ETag, updatedResponse.Headers.ETag);
 
         var filtered = await client.GetFromJsonAsync<ValueResponse<ModelProfileSummaryResponse>>(
-            "/api/modelprofiles?provider=ollama-local&model=model-not-downloaded&status=unknown&search=api-test");
+            "/api/modelprofiles?provider=ollama-local&model=model-not-downloaded&status=providerUnavailable&search=api-test");
         Assert.IsTrue(filtered!.Value.Any(profile => profile.Name == "api-test-profile"));
 
         using var staleUpdate = new HttpRequestMessage(HttpMethod.Put, "/api/modelprofiles/api-test-profile")
@@ -92,7 +111,7 @@ public sealed class ModelManagementApiTests
 
         Assert.IsTrue(usages!.Count >= 1);
         Assert.IsTrue(usages.Value.Any(usage => usage.Name == "sql-expert"));
-        Assert.AreEqual("unknown", resolution!.Status);
+        Assert.AreEqual("providerUnavailable", resolution!.Status);
         Assert.AreEqual("reasoning-default", agentModel!.Declared.ModelProfile.Name);
         Assert.AreEqual(HttpStatusCode.Conflict, deleted.StatusCode);
         Assert.AreEqual("application/problem+json", deleted.Content.Headers.ContentType?.MediaType);
@@ -127,6 +146,50 @@ public sealed class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task AgentModelExpansionUsesTheNewProfileImmediatelyAfterUpdate()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        const string agentPath = "/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert?api-version=2026-08-01";
+        const string profileName = "deep-reasoning";
+        var profileRequest = Request(profileName, "qwen3.6:latest") with
+        {
+            Properties = Request(profileName, "qwen3.6:latest").Properties with { DisplayName = "Deep reasoning" }
+        };
+        using var createdProfile = await client.PostAsJsonAsync("/api/modelprofiles", profileRequest);
+        Assert.AreEqual(HttpStatusCode.Created, createdProfile.StatusCode);
+
+        using var currentResponse = await client.GetAsync(agentPath);
+        Assert.AreEqual(HttpStatusCode.OK, currentResponse.StatusCode);
+        Assert.IsNotNull(currentResponse.Headers.ETag);
+        var current = await currentResponse.Content.ReadFromJsonAsync<AgentResource>();
+        Assert.IsNotNull(current);
+        var updateRequest = new AgentResourceRequest
+        {
+            Type = current.Type,
+            ApiVersion = current.ApiVersion,
+            Name = current.Name,
+            ResourceGroup = current.ResourceGroup!,
+            Location = current.Location!,
+            Tags = current.Tags,
+            Properties = current.Properties with
+            {
+                ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId("default", profileName))
+            }
+        };
+        using var update = new HttpRequestMessage(HttpMethod.Put, agentPath) { Content = JsonContent.Create(updateRequest) };
+        update.Headers.IfMatch.Add(currentResponse.Headers.ETag);
+        using var updatedResponse = await client.SendAsync(update);
+        Assert.AreEqual(HttpStatusCode.OK, updatedResponse.StatusCode);
+
+        var expanded = await client.GetFromJsonAsync<AgentModelResponse>("/api/agents/sql-expert/model");
+        Assert.IsNotNull(expanded);
+        Assert.AreEqual(profileName, expanded.Declared.ModelProfile.Name);
+        Assert.AreEqual("Deep reasoning", expanded.Declared.ModelProfile.DisplayName);
+        Assert.AreEqual("qwen3.6:latest", expanded.Resolved.Model.Name);
+    }
+
+    [TestMethod]
     public async Task ProfileCreationRejectsUnknownProviderWithProblemDetails()
     {
         await using var factory = Factory();
@@ -143,6 +206,92 @@ public sealed class ModelManagementApiTests
 
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.AreEqual("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [TestMethod]
+    public async Task ProviderCrudUsesETagAndPersistsItsOllamaEndpoint()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var properties = new ModelProviderProperties
+        {
+            DisplayName = "Ollama lab",
+            ProviderType = "ollama",
+            Endpoint = new Uri("http://127.0.0.1:11435"),
+            ManagementMode = ModelProviderManagementMode.External
+        };
+
+        using var createdResponse = await client.PostAsJsonAsync(
+            "/api/modelproviders",
+            new CreateModelProviderRequest("ollama-lab", "default", "local", properties));
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        Assert.IsNotNull(createdResponse.Headers.ETag);
+        var created = await createdResponse.Content.ReadFromJsonAsync<ModelProviderResource>();
+        Assert.IsNotNull(created);
+        Assert.AreEqual(new Uri("http://127.0.0.1:11435/"), created.Properties.Endpoint);
+
+        using var getResponse = await client.GetAsync("/api/modelproviders/ollama-lab");
+        Assert.AreEqual(HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.AreEqual(createdResponse.Headers.ETag, getResponse.Headers.ETag);
+
+        var updatedProperties = created.Properties with
+        {
+            DisplayName = "Ollama workstation",
+            Endpoint = new Uri("http://127.0.0.1:11436")
+        };
+        using var update = new HttpRequestMessage(HttpMethod.Put, "/api/modelproviders/ollama-lab")
+        {
+            Content = JsonContent.Create(new PutModelProviderRequest(updatedProperties))
+        };
+        update.Headers.IfMatch.Add(createdResponse.Headers.ETag);
+        using var updatedResponse = await client.SendAsync(update);
+        Assert.AreEqual(HttpStatusCode.OK, updatedResponse.StatusCode);
+        Assert.AreNotEqual(createdResponse.Headers.ETag, updatedResponse.Headers.ETag);
+
+        using var staleUpdate = new HttpRequestMessage(HttpMethod.Put, "/api/modelproviders/ollama-lab")
+        {
+            Content = JsonContent.Create(new PutModelProviderRequest(updatedProperties))
+        };
+        staleUpdate.Headers.IfMatch.Add(createdResponse.Headers.ETag);
+        using var staleResponse = await client.SendAsync(staleUpdate);
+        Assert.AreEqual(HttpStatusCode.Conflict, staleResponse.StatusCode);
+
+        var usages = await client.GetFromJsonAsync<ModelProviderUsagesResponse>("/api/modelproviders/ollama-lab/usages");
+        Assert.AreEqual(0, usages!.Count);
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, "/api/modelproviders/ollama-lab");
+        delete.Headers.IfMatch.Add(updatedResponse.Headers.ETag!);
+        using var deleted = await client.SendAsync(delete);
+        Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
+        using var missing = await client.GetAsync("/api/modelproviders/ollama-lab");
+        Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ProviderValidationAndDeletionProtectionReturnProblemDetails()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var invalid = new CreateModelProviderRequest(
+            "invalid-provider",
+            "default",
+            "local",
+            new ModelProviderProperties
+            {
+                DisplayName = "Invalid",
+                ProviderType = "ollama",
+                Endpoint = new Uri("file:///tmp/ollama")
+            });
+
+        using var invalidResponse = await client.PostAsJsonAsync("/api/modelproviders", invalid);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalidResponse.StatusCode);
+        Assert.AreEqual("application/problem+json", invalidResponse.Content.Headers.ContentType?.MediaType);
+
+        var usages = await client.GetFromJsonAsync<ModelProviderUsagesResponse>("/api/modelproviders/ollama-local/usages");
+        Assert.IsTrue(usages!.Count >= 1);
+        Assert.IsTrue(usages.Value.Any(usage => usage.ResourceType == AgentstrationResourceTypes.ModelProfiles));
+        using var deleted = await client.DeleteAsync("/api/modelproviders/ollama-local");
+        Assert.AreEqual(HttpStatusCode.Conflict, deleted.StatusCode);
+        Assert.AreEqual("application/problem+json", deleted.Content.Headers.ContentType?.MediaType);
     }
 
     [TestMethod]
@@ -231,7 +380,12 @@ public sealed class ModelManagementApiTests
     }
 
     private static WebApplicationFactory<Program> Factory() =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("ConnectionStrings:local-chat", "Endpoint=http://127.0.0.1:1");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
 
     private static CreateModelProfileRequest Request(string name, string model) => new(
         name,

@@ -9,6 +9,7 @@ using Agentstration.Contracts;
 using Agentstration.Domain;
 using Agentstration.Evaluation;
 using Agentstration.Infrastructure.Agents;
+using Agentstration.Runtime.Local;
 using Agentstration.Infrastructure.Persistence;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
@@ -89,7 +90,7 @@ public sealed class ContentWorkflowEvaluationTests
         var workspaces = new WorkspaceService(store, TimeProvider.System);
         var ingestion = new IngestionService(store, eventBus, new NoOpContentSourceReader(), TimeProvider.System);
         var memory = new MemoryService(store);
-        var runtime = new MicrosoftExtensionsAiAgentRuntime(new DeterministicChatClient());
+        var runtime = new MicrosoftExtensionsAiAgentRuntime(new SingleChatClientResolver(new DeterministicChatClient()));
         var workflow = new ContentProcessingWorkflow(store, new DeterministicIntentRouter(), runtime, memory, eventBus, TimeProvider.System);
         var workspace = (await workspaces.CreateAsync("Evaluation workspace", cancellationToken)).Value!;
         var inbox = (await workspaces.CreateInboxAsync(workspace.Id, new CreateInboxRequest("Evaluation inbox", null, null), cancellationToken)).Value!.Inbox;

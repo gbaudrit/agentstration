@@ -4,7 +4,7 @@
 
 <PageTitle>Model providers · Agentstration</PageTitle>
 <PageHeader Title="Model providers" Description="Inspect configured technical providers and their dynamically discovered models.">
-    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh</button></Actions>
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh</button><a class="button-primary" href="/modelproviders/new">Create model provider</a></Actions>
 </PageHeader>
 
 @if (loading && providers is null)
@@ -28,7 +28,7 @@ else
             <td>@provider.Properties.ProviderType</td><td>@provider.Location</td><td>@provider.Properties.ManagementMode</td>
             <td><StatusBadge Text="@ModelManagementUi.Label(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></td>
             <td>@provider.Properties.ModelCount</td>
-            <td><a class="text-button" href="@DetailsUrl(provider.Name)">View details →</a></td>
+            <td><a class="text-button" href="@DetailsUrl(provider)">View details →</a></td>
         </tr></Row>
     </DataGrid>
 }
@@ -46,6 +46,7 @@ else
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
     }
-    private static string DetailsUrl(string name) => $"/modelproviders/{Uri.EscapeDataString(name)}";
+    private static string DetailsUrl(ModelProviderResponse provider) =>
+        $"/modelproviders/{Uri.EscapeDataString(provider.ResourceGroup)}/{Uri.EscapeDataString(provider.Name)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

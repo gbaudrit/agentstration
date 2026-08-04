@@ -14,6 +14,12 @@ internal static class ModelManagementHttp
     {
         try { return await action(); }
         catch (ModelProviderResourceNotFoundException exception) { return Problem("model-provider-not-found", "Model provider not found", 404, exception.Message); }
+        catch (ModelProviderInUseException exception)
+        {
+            return Problem("model-provider-in-use", "Model provider is in use", 409, exception.Message,
+                new Dictionary<string, object?> { ["references"] = exception.Usages });
+        }
+        catch (ModelProviderValidationException exception) { return Problem("model-provider-invalid", "Invalid model provider", 422, exception.Message); }
         catch (ControlPlaneResourceNotFoundException exception) { return Problem("model-profile-not-found", "Resource not found", 404, exception.Message); }
         catch (ControlPlaneConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
         catch (RuntimeProfileInUseException exception)
@@ -40,6 +46,12 @@ internal static class ModelManagementHttp
     }
 
     public static IResult ResourceResult(StoredResource<ModelProfileResource> stored, HttpResponse response, int statusCode)
+    {
+        response.Headers.ETag = stored.ETag;
+        return Results.Json(stored.Value, statusCode: statusCode);
+    }
+
+    public static IResult ResourceResult(StoredResource<ModelProviderResource> stored, HttpResponse response, int statusCode)
     {
         response.Headers.ETag = stored.ETag;
         return Results.Json(stored.Value, statusCode: statusCode);

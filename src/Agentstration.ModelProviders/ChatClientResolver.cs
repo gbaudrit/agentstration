@@ -8,6 +8,8 @@ public sealed class ChatClientResolver(
     IModelDeploymentStore deployments,
     IModelProviderConfigurationStore providerConfigurations,
     IModelProviderResolver providers,
+    GenAiObservabilityOptions observability,
+    ILoggerFactory loggerFactory,
     ILogger<ChatClientResolver> logger) : IChatClientResolver
 {
     public async ValueTask<IChatClient> ResolveAsync(string modelProfileResourceId, CancellationToken cancellationToken = default)
@@ -27,6 +29,15 @@ public sealed class ChatClientResolver(
                 deployment.ModelName);
         }
         var client = provider.CreateChatClient(providerConfiguration, deployment);
+        if (observability.Enabled)
+        {
+            client = client.AsBuilder()
+                .UseOpenTelemetry(
+                    loggerFactory,
+                    GenAiObservabilityOptions.ChatClientSourceName,
+                    telemetry => telemetry.EnableSensitiveData = false)
+                .Build();
+        }
         return new ResolvedModelChatClient(
             client,
             new ModelChatClientMetadata(

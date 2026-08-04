@@ -21,7 +21,6 @@ public static class WebConsoleServiceCollectionExtensions
         if (configured.UseSimulatedData)
         {
             services.AddScoped<MockApiClient>();
-            services.AddScoped<IManagementApiClient>(provider => provider.GetRequiredService<MockApiClient>());
             services.AddScoped<IRuntimeApiClient>(provider => provider.GetRequiredService<MockApiClient>());
             services.AddScoped<IWorkApiClient>(provider => provider.GetRequiredService<MockApiClient>());
             services.AddScoped<IFlowApiClient>(provider => provider.GetRequiredService<MockApiClient>());
@@ -29,16 +28,16 @@ public static class WebConsoleServiceCollectionExtensions
         }
         else
         {
-            AddClient<ManagementApiClient, IManagementApiClient>(services, configured.ManagementApi);
             AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi);
             AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
             AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi);
             services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
         }
 
-        // Model management always uses the canonical HTTP APIs so that the console
-        // displays the same persisted profiles consumed by Runtime, even when the
-        // remaining dashboard widgets use simulated demonstration data.
+        // Agent and model management always use the canonical HTTP APIs so that
+        // edits and Runtime activation observe the same persisted generations and
+        // profiles, even when unrelated dashboard widgets use simulated data.
+        AddClient<ManagementApiClient, IManagementApiClient>(services, configured.ManagementApi);
         AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
         AddClient<ModelProfilesApiClient, IModelProfilesClient>(services, configured.ManagementApi);
         AddClient<AgentsModelApiClient, IAgentsModelClient>(services, configured.ManagementApi);

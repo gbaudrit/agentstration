@@ -29,6 +29,14 @@ public sealed record AvailableModelResponse(
     IReadOnlyDictionary<string, string> Metadata);
 
 public sealed record ModelProviderStatusResponse(string Provider, string Status, DateTimeOffset CheckedAt, string? Details);
+public sealed record CreateModelProviderRequest(
+    string Name,
+    string ResourceGroup,
+    string Location,
+    ModelProviderProperties Properties);
+public sealed record PutModelProviderRequest(ModelProviderProperties Properties);
+public sealed record ModelProviderUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
+public sealed record ModelProviderUsagesResponse(IReadOnlyList<ModelProviderUsageResponse> Value, int Count);
 
 public sealed record CreateModelProfileRequest(
     string Name,

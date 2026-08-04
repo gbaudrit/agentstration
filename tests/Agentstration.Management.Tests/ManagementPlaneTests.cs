@@ -151,6 +151,88 @@ public sealed class ManagementPlaneTests
     }
 
     [TestMethod]
+    public async Task ActivatingCurrentGenerationCreatesRuntimeRecyclesPreviousAndIsIdempotent()
+    {
+        await using var fixture = await ManagementFixture.CreateAsync();
+        var management = fixture.Services.GetRequiredService<AgentManagementService>();
+        var store = fixture.Services.GetRequiredService<IControlPlaneStore>();
+        var runtimes = fixture.Services.GetRequiredService<Agentstration.Runtime.Abstractions.IRuntimeRegistry>();
+        var type = TypeResource("default", "readonly-expert", CreateType() with
+        {
+            Policy = CreatePolicy() with { AllowAdditionalInstructions = true }
+        });
+        await management.PutAgentTypeAsync(type, null, true, default);
+        var created = await management.PutAgentAsync(AgentResource("default", CreateAgent("sql-expert", type.Properties)), null, true, default);
+
+        var first = await management.PrepareLocalRuntimeAsync(created.Value.Id, created.Value.Generation, default);
+        Assert.AreEqual(OperationalState.Ready, first.Value.OperationalState);
+        Assert.IsTrue(runtimes.TryGet(first.Value.Id, out _));
+
+        var updated = await management.PutAgentAsync(
+            created.Value with { Properties = created.Value.Properties with { AdditionalInstructions = "Use the new generation." } },
+            created.ETag,
+            false,
+            default);
+        var second = await management.PrepareLocalRuntimeAsync(updated.Value.Id, updated.Value.Generation, default);
+        var repeated = await management.PrepareLocalRuntimeAsync(updated.Value.Id, updated.Value.Generation, default);
+
+        Assert.AreEqual(OperationalState.Ready, second.Value.OperationalState);
+        Assert.AreEqual(second.Value.Id, repeated.Value.Id);
+        Assert.AreNotEqual(first.Value.Id, second.Value.Id);
+        Assert.IsTrue(runtimes.TryGet(second.Value.Id, out _));
+        Assert.IsFalse(runtimes.TryGet(first.Value.Id, out _));
+
+        var persistedFirst = await store.GetAsync<AgentDeployment>(first.Value.Id, default);
+        Assert.IsNotNull(persistedFirst);
+        Assert.AreEqual(DesiredAgentState.Stopped, persistedFirst!.Value.DesiredState);
+        Assert.AreEqual(OperationalState.Stopped, persistedFirst.Value.OperationalState);
+        var deployments = await store.ListAsync<AgentDeployment>(AgentstrationResourceTypes.Deployments, "default", 0, 1000, default);
+        Assert.AreEqual(2, deployments.Count(item => string.Equals(item.Value.AgentResourceId, created.Value.Id, StringComparison.Ordinal)));
+
+        var selected = await management.SelectAgentAsync("test", "sql-expert", default);
+        Assert.AreEqual(second.Value.Id, selected.DeploymentId);
+    }
+
+    [TestMethod]
+    public async Task FailedReplacementKeepsPreviousGenerationRunning()
+    {
+        await using var fixture = await ManagementFixture.CreateAsync();
+        var management = fixture.Services.GetRequiredService<AgentManagementService>();
+        var store = fixture.Services.GetRequiredService<IControlPlaneStore>();
+        var runtimes = fixture.Services.GetRequiredService<Agentstration.Runtime.Abstractions.IRuntimeRegistry>();
+        var validType = TypeResource("default", "readonly-expert", CreateType());
+        await management.PutAgentTypeAsync(validType, null, true, default);
+        var created = await management.PutAgentAsync(AgentResource("default", CreateAgent("sql-expert", validType.Properties)), null, true, default);
+        var first = await management.PrepareLocalRuntimeAsync(created.Value.Id, created.Value.Generation, default);
+
+        var invalidDefinition = CreateType() with { Key = "invalid-runtime", RequiredToolIds = ["missing-runtime-tool"] };
+        var invalidType = TypeResource("default", invalidDefinition.Key, invalidDefinition);
+        await management.PutAgentTypeAsync(invalidType, null, true, default);
+        var updated = await management.PutAgentAsync(
+            created.Value with
+            {
+                Properties = created.Value.Properties with
+                {
+                    AgentType = new AgentTypeReference(invalidType.Id, invalidDefinition.Version)
+                }
+            },
+            created.ETag,
+            false,
+            default);
+
+        var replacement = await management.PrepareLocalRuntimeAsync(updated.Value.Id, updated.Value.Generation, default);
+
+        Assert.AreEqual(OperationalState.Degraded, replacement.Value.OperationalState);
+        Assert.IsTrue(runtimes.TryGet(first.Value.Id, out _));
+        var persistedFirst = await store.GetAsync<AgentDeployment>(first.Value.Id, default);
+        Assert.IsNotNull(persistedFirst);
+        Assert.AreEqual(DesiredAgentState.Running, persistedFirst!.Value.DesiredState);
+        Assert.AreEqual(OperationalState.Ready, persistedFirst.Value.OperationalState);
+        var selected = await management.SelectAgentAsync("test", "sql-expert", default);
+        Assert.AreEqual(first.Value.Id, selected.DeploymentId);
+    }
+
+    [TestMethod]
     public async Task SqliteStoreEnforcesOptimisticConcurrencyWithETag()
     {
         await using var fixture = await ManagementFixture.CreateAsync();

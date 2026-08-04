@@ -8,7 +8,7 @@
 
 <PageTitle>Agent Runner · Agentstration</PageTitle>
 <PageHeader Title="Agent Runner" Description="Create and inspect a direct Runtime Plane run without creating a Work Item.">
-    <Actions><a class="button-secondary" href="@BackUrl">Back to agent</a></Actions>
+    <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(agent is null || preparing)">@(preparing ? "Reconciling…" : "Reconcile runtime")</button><a class="button-secondary" href="@BackUrl">Back to agent</a></Actions>
 </PageHeader>
 
 @if (loading)
@@ -44,7 +44,7 @@ else
 
     @if (readiness is { Ready: false })
     {
-        <div class="form-alert form-alert-warning" role="status"><strong>Runtime not ready</strong><span>@readiness.Error</span><button class="text-button" @onclick="PrepareRuntimeAsync" disabled="@preparing">@(preparing ? "Preparing…" : "Prepare runtime")</button><button class="text-button" @onclick="LoadExecutionContextAsync">Refresh</button></div>
+        <div class="form-alert form-alert-warning" role="status"><strong>Runtime not ready</strong><span>@readiness.Error</span><button class="text-button" @onclick="PrepareRuntimeAsync" disabled="@preparing">@(preparing ? "Activating…" : "Retry activation")</button><button class="text-button" @onclick="LoadExecutionContextAsync">Refresh</button></div>
     }
     @if (!string.IsNullOrWhiteSpace(modelWarning))
     {
@@ -310,8 +310,10 @@ else
         errorMessage = null;
         try
         {
-            _ = await RuntimeClient.PrepareAgentAsync(agent.ResourceGroup ?? "default", agent.Name, agent.Generation, cancellation.Token);
+            var activation = await RuntimeClient.PrepareAgentAsync(agent.ResourceGroup ?? "default", agent.Name, agent.Generation, cancellation.Token);
             await LoadExecutionContextAsync();
+            if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
+                errorMessage = $"Generation {agent.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";
         }
         catch (AgentstrationApiException exception) { errorMessage = exception.Message; }
         finally { preparing = false; }

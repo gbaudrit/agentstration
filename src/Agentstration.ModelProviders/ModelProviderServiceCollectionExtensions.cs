@@ -5,14 +5,16 @@ namespace Agentstration.ModelProviders;
 
 public static class ModelProviderServiceCollectionExtensions
 {
-    public static IServiceCollection AddAgentstrationModelProviders(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddAgentstrationModelProviders(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool useManagedProfileResolver = true)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        services.AddSingleton<IModelProfileStore, ConfigurationModelProfileStore>();
-        services.AddSingleton<IModelDeploymentStore, ConfigurationModelDeploymentStore>();
-        services.AddSingleton<IModelProviderConfigurationStore, ConfigurationModelProviderStore>();
+        services.AddSingleton(configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new());
+        services.AddTransient<GenAiHttpPayloadCaptureHandler>();
         services.AddSingleton<IModelProviderResolver, ModelProviderResolver>();
-        services.AddSingleton<IChatClientResolver, ChatClientResolver>();
+        if (useManagedProfileResolver) services.AddSingleton<IChatClientResolver, ChatClientResolver>();
         return services;
     }
 }

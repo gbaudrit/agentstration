@@ -26,6 +26,7 @@ using Agentstration.Runtime.Storage.Sqlite;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.AI;
 
 namespace Agentstration.Infrastructure;
@@ -43,6 +44,8 @@ public static class DependencyInjection
         string? runtimeConnectionString = null)
     {
         services.AddSingleton(TimeProvider.System);
+        services.TryAddSingleton(new GenAiObservabilityOptions());
+        services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();
         if (inMemory) services.AddSingleton<IPlatformStore, InMemoryPlatformStore>();
         else services.AddSingleton<IPlatformStore>(_ => new JsonFilePlatformStore(dataPath));
         services.AddSingleton<IEventBus, InProcessEventBus>();
@@ -54,13 +57,16 @@ public static class DependencyInjection
         services.AddSingleton<IMemorySearch>(provider => provider.GetRequiredService<MemoryService>());
         aiOptions ??= new AiProviderOptions("Deterministic", new Uri("http://localhost/"), "deterministic", null);
         services.AddSingleton(aiOptions);
+        var useManagedProfileResolver = string.Equals(aiOptions.Provider, "Managed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(aiOptions.Provider, "Ollama", StringComparison.OrdinalIgnoreCase);
         if (string.Equals(aiOptions.Provider, "Deterministic", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IChatClient, DeterministicChatClient>();
         }
-        else if (!string.Equals(aiOptions.Provider, "Ollama", StringComparison.OrdinalIgnoreCase))
+        else if (!useManagedProfileResolver)
         {
-            services.AddHttpClient<OpenAiCompatibleChatClient>(client => client.Timeout = TimeSpan.FromSeconds(90));
+            services.AddHttpClient<OpenAiCompatibleChatClient>(client => client.Timeout = TimeSpan.FromSeconds(90))
+                .AddHttpMessageHandler<GenAiHttpPayloadCaptureHandler>();
             services.AddSingleton<IChatClient>(provider => provider.GetRequiredService<OpenAiCompatibleChatClient>());
         }
         services.AddSingleton<MicrosoftExtensionsAiAgentRuntime>();
@@ -77,7 +83,7 @@ public static class DependencyInjection
         services.AddSqliteControlPlane(controlPlaneConnectionString);
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
         services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();
-        if (!string.Equals(aiOptions.Provider, "Ollama", StringComparison.OrdinalIgnoreCase))
+        if (!useManagedProfileResolver)
             services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();
         services.AddSingleton<IToolCatalog, EmptyToolCatalog>();
         services.AddSingleton<AgentRuntimeContext>();

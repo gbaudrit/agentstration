@@ -3,7 +3,8 @@
     <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="OllamaSharp" />
   </ItemGroup>
 </Project>

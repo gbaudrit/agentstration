@@ -152,6 +152,7 @@ public sealed class SqliteControlPlaneStore(IDbContextFactory<ControlPlaneDbCont
         AgentRevision value => value with { ETag = etag, Status = status },
         AgentDeployment value => value with { ETag = etag, Status = status },
         ManagementOperation value => value with { ETag = etag, Status = status },
+        ModelProviderResource value => value with { ETag = etag, Status = status },
         ModelProfileResource value => value with { ETag = etag, Status = status },
         RuntimeProfileResource value => value with { ETag = etag, Status = status },
         _ => throw new NotSupportedException($"Resource type '{resource.GetType().Name}' is not supported by the control plane store.")

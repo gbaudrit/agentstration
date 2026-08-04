@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using System.Data.Common;
 
 namespace Agentstration.Web.Hosting;
 
@@ -8,10 +9,40 @@ public static class ManagementDemoData
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         var management = services.GetRequiredService<AgentManagementService>();
+        var modelProviders = services.GetRequiredService<ModelProviderManagementService>();
         var modelProfiles = services.GetRequiredService<ModelProfileManagementService>();
         var runtimeProfiles = services.GetRequiredService<RuntimeProfileManagementService>();
         var store = services.GetRequiredService<IControlPlaneStore>();
         const string resourceGroup = "default";
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var providerId = ModelProviderManagementService.ModelProviderId("ollama-local", resourceGroup);
+        if (await store.GetAsync<ModelProviderResource>(providerId, cancellationToken) is null)
+        {
+            var connectionString = configuration.GetConnectionString("local-chat");
+            var endpoint = ResolveEndpoint(connectionString)
+                ?? (string.Equals(configuration["AI:Provider"], "Ollama", StringComparison.OrdinalIgnoreCase)
+                    && Uri.TryCreate(configuration["AI:Endpoint"], UriKind.Absolute, out var configuredEndpoint)
+                        ? configuredEndpoint
+                        : new Uri("http://localhost:11434"));
+            await modelProviders.CreateAsync(new ModelProviderResource
+            {
+                Id = providerId,
+                Name = "ollama-local",
+                Type = AgentstrationResourceTypes.ModelProviders,
+                ApiVersion = ManagementApiVersions.V20260801,
+                ResourceGroup = resourceGroup,
+                Location = "local",
+                Properties = new ModelProviderProperties
+                {
+                    DisplayName = "Ollama local",
+                    ProviderType = "ollama",
+                    Endpoint = endpoint,
+                    ManagementMode = string.IsNullOrWhiteSpace(connectionString)
+                        ? ModelProviderManagementMode.External
+                        : ModelProviderManagementMode.Aspire
+                }
+            }, cancellationToken);
+        }
         var runtimeProfileId = RuntimeProfileManagementService.ProfileId(resourceGroup, "maf-default");
         if (await store.GetAsync<RuntimeProfileResource>(runtimeProfileId, cancellationToken) is null)
         {
@@ -39,8 +70,7 @@ public static class ManagementDemoData
         var profileId = ModelProfileManagementService.ProfileId(resourceGroup, "reasoning-default");
         if (await store.GetAsync<ModelProfileResource>(profileId, cancellationToken) is null)
         {
-            var configuration = services.GetRequiredService<IConfiguration>();
-            var modelName = configuration[$"Agentstration:ModelProviders:Deployments:local-reasoning:ModelName"] ?? "qwen3:1.7b";
+            var modelName = configuration["Agentstration:Seed:OllamaModel"] ?? configuration["AI:Model"] ?? "qwen3:1.7b";
             await modelProfiles.CreateAsync(new ModelProfileResource
             {
                 Id = profileId,
@@ -111,6 +141,20 @@ public static class ManagementDemoData
             "Focus on SQL performance and read-only diagnostics.",
             ["sql", "database", "query-performance"],
             cancellationToken);
+    }
+
+    private static Uri? ResolveEndpoint(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString)) return null;
+        if (Uri.TryCreate(connectionString, UriKind.Absolute, out var endpoint)) return endpoint;
+        try
+        {
+            var values = new DbConnectionStringBuilder { ConnectionString = connectionString };
+            return values.TryGetValue("Endpoint", out var value) && Uri.TryCreate(value?.ToString(), UriKind.Absolute, out endpoint)
+                ? endpoint
+                : null;
+        }
+        catch (ArgumentException) { return null; }
     }
 
     private static async Task EnsureAgentAsync(

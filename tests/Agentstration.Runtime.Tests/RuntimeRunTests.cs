@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
@@ -52,6 +54,29 @@ public sealed class RuntimeRunTests
         Assert.IsTrue(events.Any(item => item.Kind == RuntimeRunEventKind.ResponseDelta));
         Assert.IsTrue(events.Any(item => item.Kind == RuntimeRunEventKind.StepCompleted && item.Step == "Model profile resolved"));
         Assert.AreEqual(RuntimeRunEventKind.RunCompleted, events[^1].Kind);
+    }
+
+    [TestMethod]
+    public async Task ExecutionEmitsCorrelatedRuntimeActivityWithoutPromptContent()
+    {
+        var stopped = new ConcurrentQueue<Activity>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == RuntimeRunService.ActivitySource.Name,
+            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = stopped.Enqueue
+        };
+        ActivitySource.AddActivityListener(listener);
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var created = await fixture.CreateRunAsync();
+
+        await fixture.Service.ExecuteAsync(created.Value.Id, default);
+
+        Assert.HasCount(1, stopped);
+        var activity = stopped.Single();
+        Assert.AreEqual(created.Value.Id, activity.GetTagItem("agentstration.run.id"));
+        Assert.AreEqual(fixture.AgentId, activity.GetTagItem("agentstration.agent.id"));
+        Assert.IsFalse(activity.TagObjects.Any(tag => tag.Value?.ToString()?.Contains("test prompt", StringComparison.Ordinal) == true));
     }
 
     [TestMethod]
@@ -177,6 +202,20 @@ public sealed class RuntimeRunTests
         Assert.AreEqual(workBefore!.Value.Count, workAfter!.Value.Count);
     }
 
+    [TestMethod]
+    public void HttpPayloadCaptureIsRejectedOutsideDevelopment()
+    {
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            builder.UseSetting("Observability:GenAI:HttpPayloadCapture:Enabled", "true");
+        });
+
+        var exception = Assert.ThrowsExactly<InvalidOperationException>(() => factory.CreateClient());
+
+        StringAssert.Contains(exception.Message, "Development environment");
+    }
+
     private static RuntimeRunInput Input(string prompt, string? context = null) => new()
     {
         Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, prompt)],
@@ -227,6 +266,7 @@ public sealed class RuntimeRunTests
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
             var services = new ServiceCollection();
+            services.AddLogging();
             services.AddSingleton(TimeProvider.System);
             services.AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")}");
             services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")}");

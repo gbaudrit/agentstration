@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Agentstration.Management.Abstractions;
 using Agentstration.Runtime.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Runtime.Core;
 
@@ -10,8 +12,11 @@ public sealed class RuntimeRunService(
     IRuntimeRunCancellationRegistry cancellations,
     IControlPlaneStore management,
     IRuntimeRegistry runtimes,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<RuntimeRunService> logger)
 {
+    public static readonly ActivitySource ActivitySource = new("Agentstration.Runtime");
+
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         await runs.InitializeAsync(cancellationToken);
@@ -137,6 +142,19 @@ public sealed class RuntimeRunService(
     {
         var stored = await GetRequiredAsync(runId, stoppingToken);
         if (stored.Value.Status.State.IsTerminal()) return;
+        using var activity = ActivitySource.StartActivity("runtime.run.execute", ActivityKind.Internal);
+        activity?.SetTag("agentstration.run.id", runId);
+        activity?.SetTag("agentstration.agent.id", stored.Value.Properties.Agent.ResourceId);
+        activity?.SetTag("agentstration.agent.version", stored.Value.Properties.Agent.Version);
+        activity?.SetTag("agentstration.run.origin", stored.Value.Properties.Origin.ToString());
+        using var logScope = logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["RunId"] = runId,
+            ["AgentId"] = stored.Value.Properties.Agent.ResourceId,
+            ["AgentVersion"] = stored.Value.Properties.Agent.Version
+        });
+        var startedAt = Stopwatch.GetTimestamp();
+        logger.LogInformation("Runtime run execution started");
         var runToken = cancellations.Register(runId, stoppingToken);
         using var timeoutTimer = new CancellationTokenSource(TimeSpan.FromSeconds(stored.Value.Properties.Execution.TimeoutSeconds), timeProvider);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(runToken, timeoutTimer.Token);
@@ -152,6 +170,8 @@ public sealed class RuntimeRunService(
             await TraceStepAsync(runId, "Model profile resolved", timeout.Token);
 
             var deployment = await ResolveDeploymentAsync(agent.Value, stored.Value.Properties.Agent.Version, timeout.Token);
+            activity?.SetTag("agentstration.deployment.id", deployment.Id);
+            activity?.SetTag("agentstration.model.profile", stored.Value.Status.ModelProfile);
             await TraceStepAsync(runId, "Prompt composed", timeout.Token);
             await AppendEventAsync(runId, RuntimeRunEventKind.StepStarted, "Model invocation started", "Model invoked", cancellationToken: timeout.Token);
             var prompt = ComposePrompt(stored.Value.Properties.Input);
@@ -179,6 +199,10 @@ public sealed class RuntimeRunService(
                 }
             }
             if (execution is null) throw new InvalidOperationException("The runtime completed without an execution result.");
+            activity?.SetTag("agentstration.model.provider", execution.ProviderType);
+            activity?.SetTag("agentstration.model.name", execution.ModelName);
+            activity?.SetTag("agentstration.model.temperature", execution.EffectiveOptions?.Temperature);
+            activity?.SetTag("agentstration.model.max_output_tokens", execution.EffectiveOptions?.MaxOutputTokens);
             await AppendEventAsync(runId, RuntimeRunEventKind.StepCompleted, "Model invocation completed", "Model invoked", cancellationToken: timeout.Token);
             stored = await GetRequiredAsync(runId, stoppingToken);
             if (stored.Value.Status.State == RuntimeRunState.Cancelled) return;
@@ -193,14 +217,25 @@ public sealed class RuntimeRunService(
                 execution.EffectiveOptions);
             await AppendEventAsync(runId, RuntimeRunEventKind.StatusChanged, "Run succeeded", state: RuntimeRunState.Succeeded, cancellationToken: stoppingToken);
             await AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, "Response completed", state: RuntimeRunState.Succeeded, cancellationToken: stoppingToken);
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            if (logger.IsEnabled(LogLevel.Information))
+                logger.LogInformation("Runtime run execution succeeded in {DurationMs} ms", Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
         }
         catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
         {
             var state = runToken.IsCancellationRequested ? RuntimeRunState.Cancelled : RuntimeRunState.TimedOut;
+            activity?.SetStatus(ActivityStatusCode.Error, state.ToString());
+            activity?.SetTag("error.type", state.ToString());
+            if (logger.IsEnabled(LogLevel.Warning))
+                logger.LogWarning("Runtime run execution ended as {RunState} after {DurationMs} ms", state, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             await CompleteFailureAsync(runId, state, state == RuntimeRunState.Cancelled ? "Run cancelled." : "Run timed out.", stoppingToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, exception.GetType().Name);
+            activity?.SetTag("error.type", exception.GetType().FullName);
+            if (logger.IsEnabled(LogLevel.Error))
+                logger.LogError(exception, "Runtime run execution failed after {DurationMs} ms", Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             await CompleteFailureAsync(runId, RuntimeRunState.Failed, exception.Message, stoppingToken);
         }
         finally

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
@@ -21,7 +23,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             Metadata = new ModelChatClientMetadata("reasoning-default", "local-reasoning", "ollama", "ollama-local", "qwen3:4b", new ModelGenerationOptions { Temperature = 0.2, MaxOutputTokens = 1000 })
         };
         var resolver = new RecordingResolver(chatClient);
-        var factory = new AgentFrameworkRuntimeFactory(resolver, NullLoggerFactory.Instance);
+        var factory = new AgentFrameworkRuntimeFactory(resolver, NullLoggerFactory.Instance, new GenAiObservabilityOptions { Enabled = false });
         var definition = Definition();
 
         var runtime = await factory.CreateAsync(definition, "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
@@ -44,7 +46,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         using var first = new RecordingChatClient { Metadata = new ModelChatClientMetadata("profile", "deployment", "ollama", "local", "qwen3:1.7b") };
         using var second = new RecordingChatClient { Metadata = new ModelChatClientMetadata("profile", "deployment", "ollama", "local", "qwen3:4b") };
         var resolver = new RecordingResolver(first);
-        var runtime = await new AgentFrameworkRuntimeFactory(resolver, NullLoggerFactory.Instance)
+        var runtime = await new AgentFrameworkRuntimeFactory(resolver, NullLoggerFactory.Instance, new GenAiObservabilityOptions { Enabled = false })
             .CreateAsync(Definition(), "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
 
         _ = await runtime.ExecuteAsync(new AgentExecutionRequest("first"), default);
@@ -79,7 +81,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 Reasoning: new ModelReasoningOptions { Mode = ReasoningMode.Enabled, Effort = Agentstration.Management.Abstractions.ReasoningEffort.Medium },
                 Output: new ModelOutputOptions { Format = ModelOutputFormat.JsonSchema, JsonSchema = schema.RootElement.Clone(), Strict = true })
         };
-        var runtime = await new AgentFrameworkRuntimeFactory(new RecordingResolver(chatClient), NullLoggerFactory.Instance)
+        var runtime = await new AgentFrameworkRuntimeFactory(new RecordingResolver(chatClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions { Enabled = false })
             .CreateAsync(Definition(), "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
 
         var events = new List<AgentExecutionEvent>();
@@ -99,6 +101,39 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         Assert.IsNotNull(chatClient.Options?.ResponseFormat);
         Assert.AreEqual("medium", chatClient.Options?.AdditionalProperties?["reasoning_effort"]);
     }
+
+    [TestMethod]
+    public async Task MafTelemetryIsEmittedWithoutPromptContent()
+    {
+        const string secretPrompt = "secret-customer-prompt";
+        var stopped = new ConcurrentQueue<Activity>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == AgentFrameworkRuntimeFactory.TelemetrySourceName,
+            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = stopped.Enqueue
+        };
+        ActivitySource.AddActivityListener(listener);
+        using var chatClient = new RecordingChatClient
+        {
+            Metadata = new ModelChatClientMetadata("profile", "deployment", "ollama", "local", "qwen3:1.7b")
+        };
+        var runtime = await new AgentFrameworkRuntimeFactory(
+                new RecordingResolver(chatClient),
+                NullLoggerFactory.Instance,
+                new GenAiObservabilityOptions())
+            .CreateAsync(Definition(), "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
+
+        _ = await runtime.ExecuteAsync(new AgentExecutionRequest(secretPrompt, "run-telemetry"), default);
+
+        Assert.IsNotEmpty(stopped);
+        var emittedData = string.Join(' ', stopped.SelectMany(ActivityData));
+        Assert.IsFalse(emittedData.Contains(secretPrompt, StringComparison.Ordinal));
+    }
+
+    private static IEnumerable<string> ActivityData(Activity activity) =>
+        activity.TagObjects.Select(tag => $"{tag.Key}={tag.Value}")
+            .Concat(activity.Events.SelectMany(activityEvent => activityEvent.Tags.Select(tag => $"{tag.Key}={tag.Value}")));
 
     private static ResolvedAgentDefinition Definition() => new()
     {

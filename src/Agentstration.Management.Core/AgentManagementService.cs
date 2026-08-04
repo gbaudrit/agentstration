@@ -187,7 +187,31 @@ public sealed class AgentManagementService(
         }
         if (deployment.Value.DesiredState != DesiredAgentState.Running)
             deployment = await StartAsync(deployment, cancellationToken);
-        return await ReconcileAsync(deployment, cancellationToken);
+
+        var activated = await ReconcileAsync(deployment, cancellationToken);
+        if (activated.Value.OperationalState != OperationalState.Ready)
+            return activated;
+
+        // Do not retire a healthy generation if the declaration changed while the
+        // replacement was being materialized. A later activation will converge it.
+        var currentAgent = await store.GetAsync<AgentResource>(agentResourceId, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(agentResourceId);
+        if (currentAgent.Value.Generation != generation)
+            throw new ControlPlaneConcurrencyException($"Agent '{agentResourceId}' changed while generation '{generation}' was being activated.");
+
+        deployments = await store.ListAsync<AgentDeployment>(AgentstrationResourceTypes.Deployments, agent.Value.ResourceGroup, 0, 1000, cancellationToken);
+        var superseded = deployments.Where(item =>
+            !string.Equals(item.Value.Id, activated.Value.Id, StringComparison.Ordinal)
+            && string.Equals(item.Value.AgentResourceId, agentResourceId, StringComparison.Ordinal)
+            && item.Value.DesiredState != DesiredAgentState.Stopped);
+
+        foreach (var previous in superseded)
+        {
+            var stopped = await StopAsync(previous, cancellationToken);
+            _ = await ReconcileAsync(stopped, cancellationToken);
+        }
+
+        return activated;
     }
 
     private async Task ValidateRuntimeProfileAsync(string resourceId, CancellationToken cancellationToken)
@@ -221,15 +245,27 @@ public sealed class AgentManagementService(
     {
         var deployments = await store.ListAsync<AgentDeployment>(AgentstrationResourceTypes.Deployments, null, 0, 1000, cancellationToken);
         var ready = deployments.Where(item => item.Value.DesiredState == DesiredAgentState.Running && item.Value.OperationalState == OperationalState.Ready).ToArray();
-        var candidates = new List<RoutableAgent>();
-        var deploymentByAgent = new Dictionary<string, AgentDeployment>(StringComparer.Ordinal);
+        var readyRevisions = new List<(AgentDeployment Deployment, AgentRevision Revision)>();
         foreach (var item in ready)
         {
             var revision = await store.GetAsync<AgentRevision>(item.Value.RevisionId, cancellationToken);
-            if (revision is null) continue;
-            var definition = revision.Value.Definition;
+            if (revision is not null) readyRevisions.Add((item.Value, revision.Value));
+        }
+
+        var newestReadyByAgent = readyRevisions
+            .GroupBy(item => item.Revision.Definition.AgentKey, StringComparer.Ordinal)
+            .Select(group => group
+                .OrderByDescending(item => item.Revision.AgentVersion)
+                .ThenByDescending(item => item.Deployment.UpdatedAt)
+                .ThenBy(item => item.Deployment.Id, StringComparer.Ordinal)
+                .First());
+        var candidates = new List<RoutableAgent>();
+        var deploymentByAgent = new Dictionary<string, AgentDeployment>(StringComparer.Ordinal);
+        foreach (var item in newestReadyByAgent)
+        {
+            var definition = item.Revision.Definition;
             candidates.Add(new RoutableAgent(definition.AgentKey, definition.Description, definition.Capabilities));
-            deploymentByAgent[definition.AgentKey] = item.Value;
+            deploymentByAgent[definition.AgentKey] = item.Deployment;
         }
         if (candidates.Count == 0) throw new InvalidOperationException("No ready and routable agent deployment is available.");
         var route = string.IsNullOrWhiteSpace(requestedAgentId)

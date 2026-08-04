@@ -3,11 +3,9 @@ using System.Text.Json;
 using Agentstration.ModelProviders;
 using Agentstration.ModelProviders.Ollama;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace Agentstration.ModelProviders.Tests;
 
@@ -15,17 +13,6 @@ namespace Agentstration.ModelProviders.Tests;
 public sealed class OllamaModelProviderTests
 {
     private static readonly Uri Endpoint = new("http://localhost:11434");
-
-    [TestMethod]
-    public void OptionsRequireAnHttpEndpointAndModel()
-    {
-        Assert.ThrowsExactly<InvalidOperationException>(() => new OllamaModelProviderOptions().Validate());
-        Assert.ThrowsExactly<InvalidOperationException>(() => new OllamaModelProviderOptions
-        {
-            Endpoint = new Uri("file:///tmp/ollama"),
-            DefaultModel = "qwen3:1.7b"
-        }.Validate());
-    }
 
     [TestMethod]
     public void ProviderResolverFindsProvidersCaseInsensitivelyAndRejectsUnknownProviders()
@@ -41,7 +28,8 @@ public sealed class OllamaModelProviderTests
     public async Task OllamaProviderSelectsDeploymentModelPerRequest()
     {
         using var chatClient = new StubChatClient();
-        var provider = CreateProvider(chatClient);
+        var factory = new StubClientFactory(chatClient);
+        var provider = new OllamaModelProvider(factory, NullLogger<OllamaModelProvider>.Instance);
         var deployment = DeploymentConfiguration() with { ModelName = "qwen3:4b" };
 
         using var resolved = provider.CreateChatClient(ProviderConfiguration(), deployment);
@@ -52,14 +40,16 @@ public sealed class OllamaModelProviderTests
     }
 
     [TestMethod]
-    public void OllamaProviderRejectsInvalidEndpointAndModel()
+    public void OllamaProviderUsesConfiguredEndpointAndRejectsMissingModel()
     {
         using var chatClient = new StubChatClient();
-        var provider = CreateProvider(chatClient);
+        var factory = new StubClientFactory(chatClient);
+        var provider = new OllamaModelProvider(factory, NullLogger<OllamaModelProvider>.Instance);
         var wrongEndpoint = ProviderConfiguration() with { Endpoint = new Uri("http://ollama.example:11434") };
         var missingModel = DeploymentConfiguration() with { ModelName = string.Empty };
 
-        Assert.ThrowsExactly<ModelProviderConfigurationException>(() => provider.CreateChatClient(wrongEndpoint, DeploymentConfiguration()));
+        using var resolved = provider.CreateChatClient(wrongEndpoint, DeploymentConfiguration());
+        Assert.AreEqual(wrongEndpoint.Endpoint, factory.LastProvider?.Endpoint);
         Assert.ThrowsExactly<ModelProviderConfigurationException>(() => provider.CreateChatClient(ProviderConfiguration(), missingModel));
     }
 
@@ -113,24 +103,36 @@ public sealed class OllamaModelProviderTests
     public void RegistrationUsesDiscoveredEndpointAndConfiguredModelWithoutNetworkAccess()
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Configuration.AddInMemoryCollection(ConfigurationValues());
 
         builder.Services.AddAgentstrationModelProviders(builder.Configuration);
-        builder.AddOllamaModelProvider("local-chat");
+        builder.AddOllamaModelProvider();
         using var services = builder.Services.BuildServiceProvider();
 
-        Assert.IsNotNull(services.GetRequiredService<IChatClient>());
+        Assert.IsNotNull(services.GetRequiredService<IOllamaClientFactory>());
         Assert.AreEqual("ollama", services.GetRequiredService<IModelProviderResolver>().GetRequiredProvider("ollama").ProviderType);
-        Assert.AreEqual(Endpoint, services.GetRequiredService<IOptions<OllamaModelProviderOptions>>().Value.Endpoint);
+        var pipeline = services.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler("agentstration-ollama-dynamic");
+        Assert.IsTrue(ContainsPayloadCaptureHandler(pipeline));
+    }
+
+    private static bool ContainsPayloadCaptureHandler(HttpMessageHandler handler)
+    {
+        HttpMessageHandler? current = handler;
+        while (current is not null)
+        {
+            if (current is GenAiHttpPayloadCaptureHandler) return true;
+            if (current is not DelegatingHandler) break;
+            current = (current as DelegatingHandler)?.InnerHandler;
+        }
+        return false;
     }
 
     private static OllamaModelProvider CreateProvider(IChatClient client) => new(
-        client,
-        Options.Create(new OllamaModelProviderOptions { Endpoint = Endpoint, DefaultModel = "qwen3:1.7b" }),
+        new StubClientFactory(client),
         NullLogger<OllamaModelProvider>.Instance);
 
     private static ModelProviderConfiguration ProviderConfiguration() => new()
     {
+        ResourceId = "/resourceGroups/default/providers/Agentstration.Model/modelProviders/ollama-local",
         Name = "ollama-local",
         ProviderType = "ollama",
         Endpoint = Endpoint
@@ -143,23 +145,24 @@ public sealed class OllamaModelProviderTests
         ModelName = "qwen3:1.7b"
     };
 
-    internal static Dictionary<string, string?> ConfigurationValues() => new()
-    {
-        ["ConnectionStrings:local-chat"] = "Endpoint=http://localhost:11434",
-        [$"{OllamaModelProviderOptions.SectionName}:DefaultModel"] = "qwen3:1.7b",
-        [$"{ModelProviderConfigurationSections.Root}:Providers:ollama-local:ProviderType"] = "ollama",
-        [$"{ModelProviderConfigurationSections.Root}:Providers:ollama-local:ConnectionName"] = "local-chat",
-        [$"{ModelProviderConfigurationSections.Root}:Deployments:local-reasoning:ProviderName"] = "ollama-local",
-        [$"{ModelProviderConfigurationSections.Root}:Deployments:local-reasoning:ModelName"] = "qwen3:1.7b",
-        [$"{ModelProviderConfigurationSections.Root}:Profiles:reasoning-default:DeploymentName"] = "local-reasoning",
-        [$"{ModelProviderConfigurationSections.Root}:Profiles:reasoning-default:Generation:Temperature"] = "0.2",
-        [$"{ModelProviderConfigurationSections.Root}:Profiles:reasoning-default:Generation:MaxOutputTokens"] = "1000"
-    };
-
     private sealed class StubModelProvider : IModelProvider
     {
         public string ProviderType => "ollama";
         public IChatClient CreateChatClient(ModelProviderConfiguration provider, ModelDeploymentConfiguration deployment) => throw new NotSupportedException();
+    }
+
+    private sealed class StubClientFactory(IChatClient client) : IOllamaClientFactory
+    {
+        public ModelProviderConfiguration? LastProvider { get; private set; }
+
+        public OllamaSharp.OllamaApiClient CreateApiClient(ModelProviderConfiguration provider, string? modelName = null) =>
+            throw new NotSupportedException();
+
+        public IChatClient CreateChatClient(ModelProviderConfiguration provider, string modelName)
+        {
+            LastProvider = provider;
+            return client;
+        }
     }
 
     internal sealed class StubChatClient : IChatClient

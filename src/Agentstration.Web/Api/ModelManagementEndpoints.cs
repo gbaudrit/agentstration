@@ -10,7 +10,12 @@ public static class ModelManagementEndpoints
         ListModelProvidersEndpoint.Map(providers);
         ListProviderModelsEndpoint.Map(providers);
         GetModelProviderStatusEndpoint.Map(providers);
+        GetModelProviderUsagesEndpoint.Map(providers);
+        TestModelProviderEndpoint.Map(providers);
         GetModelProviderEndpoint.Map(providers);
+        CreateModelProviderEndpoint.Map(providers);
+        PutModelProviderEndpoint.Map(providers);
+        DeleteModelProviderEndpoint.Map(providers);
 
         var profiles = endpoints.MapGroup("/api/modelprofiles");
         ListModelProfilesEndpoint.Map(profiles);
