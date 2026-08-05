@@ -82,7 +82,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Model providers | SQLite-backed provider declarations with ETag CRUD and usage protection, dynamic health/model discovery, persisted logical profiles, provider-neutral resolver, and dynamic OllamaSharp clients | credentials/connections, additional local or remote adapters, cached discovery |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
-| Flow definitions | Direct, Routing, Workflow, Orchestration, Composite specifications; immutable published versions | FlowRun compilation and execution adapters |
+| Flows | typed graph drafts, validation, YAML/JSON source, immutable versions, durable sequential Runs, visual designer and SignalR replay | checkpoints, parallel and long-running steps |
 | Flow storage | independent readable JSON documents, ETags, active/current definition separation | migrations, indirect reference projections |
 | Identity | local-user boundary only | OIDC, users, members, workspace authorization |
 | Workspaces | workspace and inbox lifecycle | teams, organizations, policies |
@@ -182,10 +182,24 @@ POST /api/flows/{id}/versions
   -> immutable FlowVersion snapshot
   -> optional active-version pointer update
 WorkItem -> optional FlowReference (exact or active)
-Runtime  -> future FlowReference resolution -> FlowRun
+Flow Run -> resolves exact published FlowReference -> sequential local execution
 ```
 
-The Flow module is physically independent but belongs functionally to the Management Plane. It models orchestration strategies without referencing Microsoft Agent Framework and deliberately contains no graph scheduler or FlowRun engine.
+The Flow module is physically independent and owns editable typed graph drafts, immutable published snapshots, constrained expressions, and the provider-neutral Flow Run model. The local executor traverses `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps sequentially without referencing Microsoft Agent Framework; Infrastructure adapts agent steps and Management resource lookups.
+
+### Flow Run vertical
+
+```text
+Console / API / future Work adapter
+  -> POST published Flow Run returns 202 Accepted
+  -> bounded local Flow queue
+  -> validate input and persist the exact draft or published definition snapshot
+  -> traverse typed steps and execute selected managed Agents through the Flow agent port
+  -> persist differential events, transitions, diagnostics, usage, and failures
+  -> SignalR updates with persisted replay, cancellation, global and per-Flow history
+```
+
+Flow Runs and direct agent Runtime Runs remain distinct resources and stores. A Flow Run may use an agent internally, while its public trace and lifecycle stay owned by Flow.
 
 ### Declarative agent vertical
 
@@ -268,8 +282,8 @@ MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and i
 3. **Delivered runtime vertical:** isolated Microsoft Agent Framework adapter, in-process/shared-host provisioners, runtime registry, periodic reconciliation, single-agent routing, execution, and standalone sample data.
 4. **Delivered content and monitoring verticals:** ingestion, memory/search, deterministic/OpenAI-compatible AI, missions, change detection, and internal notifications.
 5. **Delivered Work vertical:** domain-controlled lifecycle, typed identifiers, interactions, idempotent Runtime events, independent SQLite persistence, local execution gateway, canonical REST API, metrics, traces, and tests.
-6. **Delivered Flow definition vertical:** independent projects, five discriminated kinds, graph/reference validation, CRUD, ETags, immutable versions, active resolution, Work references, OpenAPI, and SQLite.
-7. **Next Flow Runtime increment:** FlowRun contracts, compiled execution plan, state/checkpoints, deterministic routing and simple workflow execution.
+6. **Delivered Flow authoring vertical:** independent projects, typed seven-step graphs, draft revisions and ETags, structural/resource/expression validation, YAML/JSON source, immutable publication, visual authoring, Work references, OpenAPI, and SQLite.
+7. **Delivered Flow Runtime vertical:** durable FlowRun contracts and event history, immutable draft/published snapshots, bounded sequential typed-graph execution, input validation, cancellation, SignalR replay, telemetry, and the Flow-centered console.
 8. **Next Work increment:** durable execution dispatch/recovery, requester authorization, external artifact storage, cancel propagation, and retry/relaunch operations.
 9. **Delivered Runtime Run increment:** durable Run resources, local queue, exact agent-generation resolution, SQLite history, SSE observation, cancellation, retry, and Agent Runner console.
 10. **Next management increment:** durable long-running operations, manifest importer, resource groups, model/tool/connection/identity providers, and management authentication.
@@ -297,3 +311,4 @@ MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and i
 - ADR-0016: real model invocation from Agent Runner
 - ADR-0017: canonical runtime, model options, and effective capabilities
 - ADR-0018: persisted model-provider declarations and dynamic clients
+- ADR-0019: Flow-owned Run resource and execution console

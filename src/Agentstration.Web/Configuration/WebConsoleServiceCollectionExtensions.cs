@@ -2,6 +2,7 @@ using Agentstration.Web.Components;
 using Agentstration.Web.Console;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
+using Agentstration.Web.Features.Flows.Designer;
 
 namespace Agentstration.Web.Configuration;
 
@@ -16,6 +17,7 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddSingleton(TimeProvider.System);
         services.AddAgentstrationWebComponents();
         services.AddScoped<PlatformDashboardService>();
+        services.AddScoped<FlowEditorStore>();
 
         var configured = configuration.GetSection(AgentstrationWebOptions.SectionName).Get<AgentstrationWebOptions>() ?? new();
         if (configured.UseSimulatedData)
@@ -23,16 +25,16 @@ public static class WebConsoleServiceCollectionExtensions
             services.AddScoped<MockApiClient>();
             services.AddScoped<IRuntimeApiClient>(provider => provider.GetRequiredService<MockApiClient>());
             services.AddScoped<IWorkApiClient>(provider => provider.GetRequiredService<MockApiClient>());
-            services.AddScoped<IFlowApiClient>(provider => provider.GetRequiredService<MockApiClient>());
             services.AddScoped<IAgentstrationEventStream>(provider => provider.GetRequiredService<MockApiClient>());
         }
         else
         {
             AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi);
             AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
-            AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi);
             services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
         }
+
+        AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi);
 
         // Agent and model management always use the canonical HTTP APIs so that
         // edits and Runtime activation observe the same persisted generations and

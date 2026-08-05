@@ -1,0 +1,13 @@
+@page "/flows/new"
+@implements IDisposable
+@inject IFlowApiClient Client
+@inject NavigationManager Navigation
+<PageTitle>New Flow · Agentstration</PageTitle>
+<PageHeader Title="New Flow" Description="Create a mutable Draft from a focused starting template." />
+<EditForm Model="model" OnValidSubmit="CreateAsync"><DataAnnotationsValidator/><article class="panel flow-create-form"><label>Technical name<InputText @bind-Value="model.Name" /></label><label>Display name<InputText @bind-Value="model.DisplayName" /></label><label>Description<InputTextArea @bind-Value="model.Description" /></label><div class="form-columns"><label>Resource group<InputText @bind-Value="model.ResourceGroup" /></label><label>Location<InputText @bind-Value="model.Location" /></label></div><label>Starting template<InputSelect @bind-Value="model.Template"><option value="EmptyFlow">Empty flow</option><option value="AgentRouting">Agent routing</option><option value="SequentialProcessing">Sequential processing</option><option value="ConditionalFlow">Conditional flow</option></InputSelect></label>@if(error is not null){<p class="error-panel">@error</p>}<div class="dialog-actions"><a class="button-secondary" href="/flows">Cancel</a><button class="button-primary" disabled="@submitting">@(submitting?"Creating…":"Create Draft")</button></div></article></EditForm>
+@code{
+    private readonly CancellationTokenSource cancellation=new();private readonly NewFlowModel model=new();private bool submitting;private string? error;
+    private async Task CreateAsync(){try{submitting=true;error=null;var draft=await Client.CreateDraftAsync(new CreateFlowDraftRequest(model.Name,model.DisplayName,model.Description,model.ResourceGroup,model.Location,Template:model.Template),cancellation.Token);Navigation.NavigateTo($"/flows/{draft.Value.FlowId.Value}/designer");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
+    public void Dispose(){cancellation.Cancel();cancellation.Dispose();}
+    private sealed class NewFlowModel{[System.ComponentModel.DataAnnotations.Required]public string Name{get;set;}="specialized-agent-routing";[System.ComponentModel.DataAnnotations.Required]public string DisplayName{get;set;}="Specialized agent routing";public string? Description{get;set;}="Routes a request to the best specialized agent.";public string ResourceGroup{get;set;}="default";public string Location{get;set;}="local";public string Template{get;set;}="AgentRouting";}
+}

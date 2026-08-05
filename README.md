@@ -95,7 +95,7 @@ Runtime
 Agents
 ```
 
-The Management Plane manages versioned Flow definitions. The Runtime Plane will instantiate and execute FlowRuns in a future increment. Supported definition kinds are `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite`. Orchestration strategies such as Sequential, Concurrent, Handoff, GroupChat, and Magentic remain provider-neutral domain values; they do not reference Microsoft Agent Framework. `Pipeline` may describe a specialized Workflow, but it is not the root concept.
+The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. Its local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary.
 
 The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework. The existing ingestion, memory, mission, REST, Razor, and MCP verticals remain available as product capabilities.
 
@@ -175,7 +175,7 @@ Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://
 
 `Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders.Ollama` owns the OllamaSharp client integration, while `Agentstration.AppHost` alone owns container provisioning. `Runtime.AgentFramework` consumes the resolver and `IChatClient`; it has no Ollama dependency.
 
-Current limitations are deliberate: Ollama is the only mutable provider type, credentials are not stored on provider resources, and there is no Flow execution, tool execution, conversation persistence, or provider-native streaming yet. Other OpenAI-compatible endpoints still use the legacy host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
+Current limitations are deliberate: Ollama is the only mutable provider type, credentials are not stored on provider resources, and there is no parallel Flow execution, conversation persistence, or provider-native streaming yet. Other OpenAI-compatible endpoints still use the legacy host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 
 ### Model provider and profile APIs
 
@@ -310,6 +310,8 @@ Invoke-RestMethod -Method Post -ContentType application/json -Body (@{ version="
 
 Flow definitions are stored in `.agentstration/flow-plane.db`. Published versions are immutable; a `WorkItem` may carry a lightweight exact or active `FlowReference` without embedding the definition.
 
+The Flow console at `/flows` provides creation templates, a four-zone visual designer, Designer/Definition/Split modes, YAML or JSON source editing, validation, optimistic draft saving, publication, published versions and per-Flow Runs. A Draft Run validates its JSON input and retains its exact draft revision, hash, and immutable definition snapshot. Run details receive differential SignalR events with replay from persisted history; `/flowruns` provides the global searchable Run history. Flow data remains in the independent `.agentstration/flow-plane.db` store.
+
 ## MCP
 
 The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5080/mcp`. Example VS Code `.vscode/mcp.json`:
@@ -397,6 +399,6 @@ This baseline is intentionally offline and cost-free. LLM-as-judge quality evalu
 
 ## Current boundaries
 
-This is a product foundation, not a production multi-tenant release. FlowRun execution, semantic/LLM routing, graph scheduling, checkpoints, indirect cycle detection, durable distributed Work dispatch, requester authorization, external artifact storage, execution recovery, retries, JSON/YAML manifest import, model/tool/connection/identity resource providers, revision traffic splitting, dedicated process/container hosting, remote endpoints, Foundry bindings, runtime session storage, and management authentication remain planned.
+This is a product foundation, not a production multi-tenant release. Parallel Flow scheduling, loops, waits, approvals, subflows, semantic/LLM routing, checkpoints, durable distributed Work dispatch, requester authorization, external artifact storage, execution recovery, retries, model/tool/connection/identity resource providers, revision traffic splitting, dedicated process/container hosting, remote endpoints, Foundry bindings, runtime session storage, and management authentication remain planned.
 
 See [architecture](docs/architecture.md), [decisions](docs/decisions/), [security](SECURITY.md), and [contributing](CONTRIBUTING.md).

@@ -1,0 +1,51 @@
+@page "/flows/{FlowId}"
+@implements IDisposable
+@inject IFlowApiClient Client
+@inject NavigationManager Navigation
+<PageTitle>@(flow?.Name ?? "Flow") · Agentstration</PageTitle>
+@if (flow is null) { <LoadingState /> }
+else
+{
+    <PageHeader Title="@flow.Name" Description="@(flow.Description ?? "Flow definition and execution history")">
+        <Actions><StatusBadge Text="@Status" Status="@PlatformDashboardService.ToStatus(Status)" /></Actions>
+    </PageHeader>
+    <nav class="section-tabs" aria-label="Flow details">
+        @foreach (var tab in Tabs) { <button class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@tab</button> }
+    </nav>
+    @if (activeTab == "Overview")
+    {
+        <section class="metric-grid flow-metrics"><MetricCard Label="Current version" Value="@flow.Version" Detail="@(flow.ActiveVersion is null ? "Not published" : $"Active {flow.ActiveVersion}")" Status="UiStatus.Info" /><MetricCard Label="Status" Value="@Status" Detail="Immutable versions" Status="@(flow.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="Steps" Value="@GraphNodes.Count.ToString()" Detail="Entry: Input" Status="UiStatus.Neutral" /><MetricCard Label="Recent runs" Value="@runs.Count.ToString()" Detail="@($"{runs.Count(x => x.Status == FlowRunStatus.Succeeded)} succeeded")" Status="UiStatus.Success" /></section>
+        <article class="panel definition-grid"><div><span class="field-label">Display name</span><strong>@flow.Name</strong></div><div><span class="field-label">Resource ID</span><code>@flow.Id</code></div><div><span class="field-label">Kind</span><strong>@flow.Kind</strong></div><div><span class="field-label">Location</span><strong>local</strong></div><div><span class="field-label">Resource group</span><strong>default</strong></div><div><span class="field-label">Last publication</span><strong>@(versions.FirstOrDefault()?.PublishedAt.LocalDateTime.ToString("g") ?? "—")</strong></div></article>
+    }
+    else if (activeTab == "Designer")
+    {
+        <div class="toolbar"><a class="button-primary" href="/flows/@FlowId/designer">Open Flow Designer</a></div><section class="designer-layout"><FlowGraph Nodes="GraphNodes" SelectedName="selectedNode" OnSelected="SelectNode" /><article class="panel inspector"><div class="panel-header"><h2>Step properties</h2></div>@if(selectedNode is null){<p class="muted">Select a step in the graph.</p>}else{<label>Name<input value="@selectedNode" readonly /></label><label>Type<input value="@GraphNodes.First(x => x.Name == selectedNode).Type" readonly /></label><p class="muted">Open the full Designer to edit the Draft, transitions, mappings and YAML source.</p>}</article></section>
+    }
+    else if (activeTab == "Runs")
+    {
+        <div class="toolbar"><button class="button-primary" @onclick="OpenRun">Run flow</button><a class="button-secondary" href="/flowruns">All Flow Runs</a></div>
+        @if(runs.Count == 0){<EmptyState Title="No runs yet" Message="Run the active published version to create the first trace." />}else{<RunGrid Runs="runs" />}
+    }
+    else
+    {
+        <DataGrid TItem="FlowVersionResponse" Items="versions"><Header><tr><th>Deployment</th><th>Version</th><th>Status</th><th>Published</th></tr></Header><Row Context="version"><tr><td><code>local</code></td><td>@version.Version</td><td><StatusBadge Text="@(version.Version == flow.ActiveVersion ? "Active" : "Published")" Status="@(version.Version == flow.ActiveVersion ? UiStatus.Success : UiStatus.Info)" /></td><td>@version.PublishedAt.LocalDateTime.ToString("g")</td></tr></Row></DataGrid>
+    }
+    @if (showRun)
+    {
+        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true"><h2>Run flow</h2><label>Published version<select @bind="runVersion">@foreach(var version in versions){<option value="@version.Version">@version.Version</option>}</select></label><label>Deployment<select @bind="deployment"><option value="local">local</option></select></label><label>Input JSON<textarea rows="11" @bind="inputJson"></textarea></label>@if(error is not null){<p class="error-panel">@error</p>}<div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun=false">Cancel</button><button class="button-primary" disabled="@submitting" @onclick="SubmitRunAsync">@(submitting ? "Starting…" : "Run flow")</button></div></section></div>
+    }
+}
+@code {
+    [Parameter] public string FlowId { get; set; } = string.Empty;
+    private static readonly string[] Tabs = ["Overview", "Designer", "Runs", "Deployments"];
+    private readonly CancellationTokenSource cancellation = new();
+    private FlowResponse? flow; private IReadOnlyList<FlowVersionResponse> versions=[]; private IReadOnlyList<FlowRun> runs=[];
+    private string activeTab="Overview", inputJson="{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}", deployment="local", runVersion=""; private string? selectedNode,error; private bool showRun,submitting;
+    private string Status => flow?.ActiveVersion is not null ? "Published" : "Draft";
+    private IReadOnlyList<FlowGraphNode> GraphNodes => flow is null ? [] : FlowGraphNode.From(flow.Spec);
+    protected override async Task OnParametersSetAsync(){flow=await Client.GetFlowAsync(FlowId,cancellation.Token);versions=await Client.GetFlowVersionsAsync(FlowId,cancellation.Token);runs=await Client.GetFlowRunsAsync(FlowId,cancellation.Token);runVersion=flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";}
+    private void SelectNode(string name)=>selectedNode=name;
+    private void OpenRun(){activeTab="Runs";showRun=true;error=null;}
+    private async Task SubmitRunAsync(){try{submitting=true;error=null;using var document=JsonDocument.Parse(inputJson);var run=await Client.CreateFlowRunAsync(FlowId,new CreateFlowRunRequest(document.RootElement.Clone(),runVersion,deployment,FlowRunTrigger.Manual,"local-user"),cancellation.Token);Navigation.NavigateTo($"/flowruns/{run.Id}");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
+    public void Dispose(){cancellation.Cancel();cancellation.Dispose();}
+}

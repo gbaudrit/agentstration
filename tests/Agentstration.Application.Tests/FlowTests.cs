@@ -135,6 +135,216 @@ public sealed class FlowTests
         Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync("/api/flows/direct-sql")).StatusCode);
     }
 
+    [TestMethod]
+    public async Task FlowRunExecutesPublishedSnapshotAndPersistsDiagnosticSteps()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(new CreateFlowCommand("routing-run", "Routes SQL", FlowKind.Routing, "1.0.0", true,
+            new RoutingFlowSpec(FlowRoutingStrategy.Deterministic,
+            [
+                new FlowTargetReference(FlowTargetKind.Agent, "dotnet-expert"),
+                new FlowTargetReference(FlowTargetKind.Agent, "sql-expert")
+            ])), default);
+        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        var queue = new TestFlowRunQueue();
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(
+            fixture.Repository,
+            queue,
+            new TestCancellationRegistry(),
+            new TestAgentExecutor(),
+            expressions,
+            expressions,
+            new NullFlowRunEventSink(),
+            TimeProvider.System);
+        using var input = JsonDocument.Parse("""{"prompt":"Review this SQL query"}""");
+
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "correlation-1", input.RootElement, default);
+        Assert.AreEqual(FlowRunStatus.Pending, pending.Value.Status);
+        Assert.AreEqual(pending.Value.Id, queue.Enqueued.Single());
+
+        await runs.ExecuteAsync(pending.Value.Id, default);
+        var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
+        Assert.AreEqual("1.0.0", completed.DefinitionSnapshot.Version);
+        CollectionAssert.AreEqual(new[] { "Input", "Router", "Agent", "Output" }, completed.Steps.Select(step => step.StepName).ToArray());
+        Assert.IsTrue(completed.Steps.All(step => step.Status == FlowStepRunStatus.Succeeded));
+        Assert.AreEqual("sql-expert", completed.Steps.Single(step => step.StepName == "Router").SelectedTransition);
+        var agent = completed.Steps.Single(step => step.StepName == "Agent");
+        Assert.AreEqual(3L, agent.AgentVersion);
+        Assert.AreEqual("Deterministic", agent.Provider);
+        Assert.AreEqual(12, agent.Usage!.InputTokens);
+        Assert.AreEqual("done", completed.Output!.Value.GetString());
+        Assert.AreEqual(1, (await runs.ListAsync(created.Value.Id, FlowRunStatus.Succeeded, 0, 20, default)).Items.Count);
+    }
+
+    [TestMethod]
+    public async Task FlowRunApiCreatesAndListsRunsFromTheSameContract()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var definition = new CreateFlowRequest("api-run-flow", "API run", FlowKind.Direct, "1.0.0", true,
+            new DirectFlowSpec(new FlowTargetReference(FlowTargetKind.Agent, "sql-expert")));
+        Assert.AreEqual(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/flows", definition, JsonOptions)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/flows/api-run-flow/versions", new CreateFlowVersionRequest("1.0.0"))).StatusCode);
+        using var input = JsonDocument.Parse("""{"prompt":"Explain SQL joins"}""");
+        using var createdResponse = await client.PostAsJsonAsync("/api/flows/api-run-flow/runs",
+            new CreateFlowRunRequest(input.RootElement.Clone(), StartedBy: "api-test"), JsonOptions);
+        Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);
+        var run = await createdResponse.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
+        Assert.IsNotNull(run);
+        Assert.AreEqual("1.0.0", run.FlowVersion);
+        Assert.AreEqual(3, run.Steps.Count);
+        var global = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flowRuns", JsonOptions);
+        Assert.IsTrue(global!.Value.Any(item => item.Id == run.Id));
+        var scoped = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flows/api-run-flow/runs", JsonOptions);
+        Assert.IsTrue(scoped!.Value.Any(item => item.Id == run.Id));
+    }
+
+    [TestMethod]
+    public async Task TypedGraphValidationReportsStructuralAndExpressionIssues()
+    {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new ConditionFlowStepDefinition { Name = "decision", Mode = "Advanced", Expression = "${system.now()}" },
+                new OutputFlowStepDefinition { Name = "output" }
+            ],
+            Transitions =
+            [
+                new("to-decision", "input", "completed", "decision"),
+                new("cycle", "decision", "true", "input")
+            ]
+        };
+
+        var result = await new FlowGraphValidator(new ExistingResourceResolver()).ValidateAsync(graph, new FlowValidationContext(false), default);
+
+        Assert.IsFalse(result.IsValid);
+        Assert.IsTrue(result.Issues.Any(issue => issue.Code == "expression_invalid" && issue.StepId == "decision"));
+        Assert.IsTrue(result.Issues.Any(issue => issue.Code == "flow_cycle_not_supported"));
+        Assert.IsTrue(result.Issues.Any(issue => issue.Code == "step_unreachable" && issue.StepId == "output"));
+    }
+
+    [TestMethod]
+    public async Task DraftApiValidatesInputRunsImmutableSnapshotPublishesAndRoundTripsYaml()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        using var createdResponse = await client.PostAsJsonAsync("/api/flows/drafts",
+            new CreateFlowDraftRequest("designer-api-flow", "Designer API Flow", Template: "AgentRouting"), JsonOptions);
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        Assert.IsNotNull(createdResponse.Headers.ETag);
+        var draft = await createdResponse.Content.ReadFromJsonAsync<FlowDraftResponse>(JsonOptions);
+        Assert.IsNotNull(draft);
+        Assert.AreEqual(1L, draft.Value.Revision);
+        Assert.AreEqual(7, Enum.GetValues<FlowNodeKind>().Count(kind => kind is FlowNodeKind.Input or FlowNodeKind.Agent or FlowNodeKind.Router or FlowNodeKind.Condition or FlowNodeKind.Transform or FlowNodeKind.Output or FlowNodeKind.Failure));
+
+        using var validationResponse = await client.PostAsync("/api/flows/designer-api-flow/validate", null);
+        Assert.AreEqual(HttpStatusCode.OK, validationResponse.StatusCode);
+        var validation = await validationResponse.Content.ReadFromJsonAsync<FlowValidationResponse>(JsonOptions);
+        Assert.IsTrue(validation!.IsValid, string.Join(Environment.NewLine, validation.Issues.Select(issue => issue.Message)));
+
+        var source = await client.GetFromJsonAsync<FlowSourceResponse>("/api/flows/designer-api-flow/draft/source?format=yaml", JsonOptions);
+        Assert.IsNotNull(source);
+        StringAssert.Contains(source.Source, "entryStep:");
+        StringAssert.Contains(source.Source, "type: router");
+        using var replaceSource = new HttpRequestMessage(HttpMethod.Put, "/api/flows/designer-api-flow/draft/source")
+        {
+            Content = JsonContent.Create(new ReplaceFlowSourceRequest(source.Source, "yaml", "source-test"), options: JsonOptions)
+        };
+        replaceSource.Headers.TryAddWithoutValidation("If-Match", draft.ETag);
+        using var replacedResponse = await client.SendAsync(replaceSource);
+        Assert.AreEqual(HttpStatusCode.OK, replacedResponse.StatusCode);
+        var replaced = await replacedResponse.Content.ReadFromJsonAsync<FlowDraftResponse>(JsonOptions);
+        Assert.AreEqual(2L, replaced!.Value.Revision);
+        using var staleSource = new HttpRequestMessage(HttpMethod.Put, "/api/flows/designer-api-flow/draft/source")
+        {
+            Content = JsonContent.Create(new ReplaceFlowSourceRequest(source.Source, "yaml", "source-test"), options: JsonOptions)
+        };
+        staleSource.Headers.TryAddWithoutValidation("If-Match", draft.ETag);
+        using var staleResponse = await client.SendAsync(staleSource);
+        Assert.AreEqual(HttpStatusCode.PreconditionFailed, staleResponse.StatusCode);
+
+        using var missingInput = JsonDocument.Parse("{}");
+        using var rejectedRun = await client.PostAsJsonAsync("/api/flows/designer-api-flow/draft/runs", new CreateFlowRunRequest(missingInput.RootElement.Clone()), JsonOptions);
+        Assert.AreEqual(HttpStatusCode.BadRequest, rejectedRun.StatusCode);
+
+        using var input = JsonDocument.Parse("""{"prompt":"Review this SQL query"}""");
+        using var acceptedRun = await client.PostAsJsonAsync("/api/flows/designer-api-flow/draft/runs", new CreateFlowRunRequest(input.RootElement.Clone()), JsonOptions);
+        Assert.AreEqual(HttpStatusCode.Accepted, acceptedRun.StatusCode);
+        var run = await acceptedRun.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
+        Assert.AreEqual(FlowDefinitionState.Draft, run!.DefinitionState);
+        Assert.AreEqual(2L, run.DraftRevision);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(run.DefinitionHash));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(run.DefinitionSnapshotId));
+
+        using var publishResponse = await client.PostAsJsonAsync("/api/flows/designer-api-flow/publish", new PublishFlowDraftRequest("1.0.0", "Initial designer release"), JsonOptions);
+        Assert.AreEqual(HttpStatusCode.Created, publishResponse.StatusCode);
+        var version = await publishResponse.Content.ReadFromJsonAsync<FlowVersionResponse>(JsonOptions);
+        Assert.AreEqual("Initial designer release", version!.ReleaseNotes);
+        Assert.IsNotNull(version.Graph);
+        Assert.AreEqual(replaced.Value.DefinitionHash, version.DefinitionHash);
+
+        using var recreateResponse = await client.PostAsync("/api/flows/designer-api-flow/versions/1.0.0/draft", null);
+        Assert.AreEqual(HttpStatusCode.OK, recreateResponse.StatusCode);
+        var recreated = await recreateResponse.Content.ReadFromJsonAsync<FlowDraftResponse>(JsonOptions);
+        Assert.AreEqual(3L, recreated!.Value.Revision);
+    }
+
+    [TestMethod]
+    public async Task DraftRunExecutesTypedGraphAndPersistsDifferentialEvents()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input" },
+                new TransformFlowStepDefinition { Name = "transform", Mapping = JsonSerializer.SerializeToElement(new { prompt = "${input.prompt}", eligible = true }) },
+                new ConditionFlowStepDefinition { Name = "condition", Left = "${steps.transform.output.eligible}", Operator = "equals", Right = "true" },
+                new RouterFlowStepDefinition { Name = "router", Candidates = [new("sql", new("/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert"), Examples: ["query"])], Fallback = new("/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert") },
+                new AgentFlowStepDefinition { Name = "agent", Agent = new("${steps.router.output.selectedAgent}"), InputMapping = JsonSerializer.SerializeToElement(new { prompt = "${steps.transform.output.prompt}" }) },
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement(new { result = "${steps.agent.output}" }) },
+                new FailureFlowStepDefinition { Name = "failure" }
+            ],
+            Transitions =
+            [
+                new("t1", "input", "completed", "transform"),
+                new("t2", "transform", "completed", "condition"),
+                new("t3", "condition", "true", "router"),
+                new("t4", "condition", "false", "failure"),
+                new("t5", "router", "selected", "agent"),
+                new("t6", "router", "failed", "failure"),
+                new("t7", "agent", "completed", "output"),
+                new("t8", "agent", "failed", "failure")
+            ]
+        };
+        var now = TimeProvider.System.GetUtcNow();
+        var draft = new FlowDraft { Id = "typed-draft", FlowId = new("typed-run"), DisplayName = "Typed run", Definition = graph, CreatedAt = now, UpdatedAt = now };
+        var queue = new TestFlowRunQueue();
+        var expressionEngine = new FlowExpressionParser();
+        var runs = new FlowRunService(fixture.Repository, queue, new TestCancellationRegistry(), new TestAgentExecutor(), expressionEngine, expressionEngine, new NullFlowRunEventSink(), TimeProvider.System);
+        using var input = JsonDocument.Parse("""{"prompt":"Review this query"}""");
+
+        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "typed-correlation", input.RootElement, default);
+        await runs.ExecuteAsync(pending.Value.Id, default);
+
+        var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
+        CollectionAssert.AreEqual(new[] { "input", "transform", "condition", "router", "agent", "output" }, completed.Steps.Where(step => step.Status == FlowStepRunStatus.Succeeded).Select(step => step.StepName).ToArray());
+        Assert.AreEqual(FlowStepRunStatus.Skipped, completed.Steps.Single(step => step.StepName == "failure").Status);
+        Assert.AreEqual("done", completed.Output!.Value.GetProperty("result").GetString());
+        var events = await runs.ListEventsAsync(completed.Id, 0, default);
+        Assert.IsTrue(events.Count >= 15);
+        Assert.AreEqual(FlowRunEventType.FlowRunCreated, events[0].Type);
+        Assert.AreEqual(FlowRunEventType.FlowRunCompleted, events[^1].Type);
+        CollectionAssert.AreEqual(events.Select(item => item.Sequence).Order().ToArray(), events.Select(item => item.Sequence).ToArray());
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static FlowDefinition Definition(string name, FlowKind kind, FlowSpec spec) => new(new FlowId(name), name, null, kind, "1.0.0", true, null, spec, new Dictionary<string, string>(), Now, Now);
 
@@ -143,6 +353,7 @@ public sealed class FlowTests
         private readonly string _directory;
         private readonly ServiceProvider _provider;
         public FlowService Service => _provider.GetRequiredService<FlowService>();
+        public IFlowRepository Repository => _provider.GetRequiredService<IFlowRepository>();
         private FlowFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
         public static async Task<FlowFixture> CreateAsync()
         {
@@ -162,5 +373,30 @@ public sealed class FlowTests
             await _provider.DisposeAsync();
             if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
         }
+    }
+
+    private sealed class TestFlowRunQueue : IFlowRunQueue
+    {
+        public List<string> Enqueued { get; } = [];
+        public ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken) { Enqueued.Add(runId); return ValueTask.CompletedTask; }
+        public async IAsyncEnumerable<string> ReadAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken) { await Task.CompletedTask; yield break; }
+    }
+
+    private sealed class TestCancellationRegistry : IFlowRunCancellationRegistry
+    {
+        public CancellationToken Register(string runId, CancellationToken stoppingToken) => stoppingToken;
+        public bool Cancel(string runId) => true;
+        public void Complete(string runId) { }
+    }
+
+    private sealed class TestAgentExecutor : IFlowAgentExecutor
+    {
+        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken) =>
+            Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), $"/agents/{target.Id}", 3, "/profiles/default", "Deterministic", new FlowStepRunUsage(12, 4), ["lookup"], ["executed"]));
+    }
+
+    private sealed class ExistingResourceResolver : IFlowResourceReferenceResolver
+    {
+        public Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 }

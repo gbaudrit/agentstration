@@ -14,6 +14,7 @@ using Agentstration.Infrastructure.Ingestion;
 using Agentstration.Infrastructure.Missions;
 using Agentstration.Infrastructure.Persistence;
 using Agentstration.Infrastructure.Workflows;
+using Agentstration.Infrastructure.Flows;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Storage.Sqlite;
 using Agentstration.Management.Storage.Sqlite;
@@ -109,6 +110,18 @@ public static class DependencyInjection
         flowConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "flow-plane.db")}";
         services.AddSqliteFlowStorage(flowConnectionString);
         services.AddSingleton<FlowService>();
+        services.AddSingleton<IFlowRunQueue, LocalFlowRunQueue>();
+        services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
+        services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();
+        services.AddSingleton<IFlowAgentExecutor, ManagedFlowAgentExecutor>();
+        services.AddSingleton<IFlowResourceReferenceResolver, ManagementFlowResourceReferenceResolver>();
+        services.AddSingleton<FlowExpressionParser>();
+        services.AddSingleton<IExpressionParser>(provider => provider.GetRequiredService<FlowExpressionParser>());
+        services.AddSingleton<IExpressionValidator>(provider => provider.GetRequiredService<FlowExpressionParser>());
+        services.AddSingleton<IExpressionEvaluator>(provider => provider.GetRequiredService<FlowExpressionParser>());
+        services.AddSingleton<IFlowDefinitionValidator, FlowGraphValidator>();
+        services.AddSingleton<FlowDraftService>();
+        services.AddSingleton<FlowRunService>();
         return services;
     }
 }

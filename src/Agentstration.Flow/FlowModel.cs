@@ -13,9 +13,13 @@ public sealed record FlowReference(FlowId FlowId, string? Version = null, bool U
 public enum FlowKind { Direct, Routing, Workflow, Orchestration, Composite }
 public enum FlowTargetKind { Agent, AgentType, Flow }
 public enum FlowRoutingStrategy { Deterministic, Capabilities, Semantic, Llm, Hybrid, Custom }
-public enum FlowNodeKind { Agent, Flow, Function, ExternalCall, HumanApproval, Custom }
+public enum FlowNodeKind { Input, Agent, Router, Condition, Transform, Output, Failure, Flow, Function, ExternalCall, HumanApproval, Custom }
 public enum FlowOrchestrationStrategy { Sequential, Concurrent, Handoff, GroupChat, Magentic, Custom }
 public enum FlowCompositionMode { Sequential, Concurrent, Custom }
+public enum FlowRunStatus { Pending, Running, Succeeded, Failed, Cancelled, TimedOut }
+public enum FlowRunTrigger { Manual, Api, WorkItem, Flow, Schedule, Event }
+public enum FlowStepRunStatus { NotStarted, Running, Succeeded, Failed, Skipped, Cancelled }
+public enum FlowRunEventType { FlowRunCreated, FlowRunStarted, StepRunStarted, StepRunCompleted, StepRunFailed, FlowRunCompleted, FlowRunFailed, FlowRunCancelled }
 
 public sealed record FlowTargetReference(FlowTargetKind Kind, string Id, string? Version = null);
 
@@ -66,7 +70,11 @@ public sealed record FlowDefinition(
     FlowSpec Spec,
     IReadOnlyDictionary<string, string> Metadata,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? DisplayName = null,
+    string ResourceGroup = "default",
+    string Location = "local",
+    FlowGraphDefinition? Graph = null);
 
 public sealed record FlowVersion(
     FlowId FlowId,
@@ -75,7 +83,66 @@ public sealed record FlowVersion(
     FlowKind Kind,
     FlowSpec Spec,
     IReadOnlyDictionary<string, string> Metadata,
-    DateTimeOffset PublishedAt);
+    DateTimeOffset PublishedAt,
+    FlowGraphDefinition? Graph = null,
+    string? DefinitionHash = null,
+    string? ReleaseNotes = null);
+
+public sealed record FlowRunError(string Code, string Message, string? Details = null);
+public sealed record FlowRunEvent(string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp);
+public sealed record FlowStepRunUsage(int? InputTokens = null, int? OutputTokens = null);
+public sealed record FlowStepRun
+{
+    public required string StepName { get; init; }
+    public required string StepType { get; init; }
+    public FlowStepRunStatus Status { get; init; } = FlowStepRunStatus.NotStarted;
+    public JsonElement? DeclaredInput { get; init; }
+    public JsonElement? ResolvedInput { get; init; }
+    public JsonElement? Output { get; init; }
+    public string? SelectedTransition { get; init; }
+    public DateTimeOffset? StartedAt { get; init; }
+    public DateTimeOffset? CompletedAt { get; init; }
+    public int Attempt { get; init; }
+    public string? AgentResourceId { get; init; }
+    public long? AgentVersion { get; init; }
+    public string? ModelProfileResourceId { get; init; }
+    public string? Provider { get; init; }
+    public IReadOnlyList<string> Tools { get; init; } = [];
+    public IReadOnlyList<string> Logs { get; init; } = [];
+    public FlowStepRunUsage? Usage { get; init; }
+    public FlowRunError? Error { get; init; }
+}
+
+public sealed record FlowRun
+{
+    public required string Id { get; init; }
+    public required FlowId FlowId { get; init; }
+    public required string FlowVersion { get; init; }
+    public FlowDefinitionState DefinitionState { get; init; } = FlowDefinitionState.Published;
+    public long? DraftRevision { get; init; }
+    public string? DefinitionSnapshotId { get; init; }
+    public string? DefinitionHash { get; init; }
+    public string? DeploymentResourceId { get; init; }
+    public FlowRunStatus Status { get; init; } = FlowRunStatus.Pending;
+    public FlowRunTrigger Trigger { get; init; }
+    public string? StartedBy { get; init; }
+    public string? CorrelationId { get; init; }
+    public string? WorkItemResourceId { get; init; }
+    public string? ParentFlowRunId { get; init; }
+    public required JsonElement Input { get; init; }
+    public JsonElement? Output { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? StartedAt { get; init; }
+    public DateTimeOffset? CompletedAt { get; init; }
+    public FlowRunError? Error { get; init; }
+    public required FlowVersion DefinitionSnapshot { get; init; }
+    public IReadOnlyList<FlowStepRun> Steps { get; init; } = [];
+}
+
+public static class FlowRunStatusExtensions
+{
+    public static bool IsTerminal(this FlowRunStatus status) => status is FlowRunStatus.Succeeded or FlowRunStatus.Failed or FlowRunStatus.Cancelled or FlowRunStatus.TimedOut;
+}
 
 public sealed class FlowValidationException(string code, string message) : ArgumentException(message)
 {

@@ -19,6 +19,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 using Agentstration.Runtime.AgentFramework;
+using Agentstration.Web.Features.Flows;
 
 var builder = WebApplication.CreateBuilder(args);
 var genAiObservability = builder.Configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new();
@@ -62,6 +63,8 @@ builder.AddOllamaModelProvider();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IFlowRunEventSink, SignalRFlowRunEventSink>();
 builder.Services.AddAgentstrationWebConsole(builder.Configuration);
 builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
 builder.Services.AddHostedService<ItemProcessingWorker>();
@@ -69,6 +72,7 @@ builder.Services.AddHostedService<MissionSchedulerWorker>();
 builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
 builder.Services.AddHostedService<LocalWorkExecutionWorker>();
 builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
+builder.Services.AddHostedService<FlowRunExecutionWorker>();
 
 var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 builder.Logging.AddOpenTelemetry(logging =>
@@ -91,6 +95,7 @@ builder.Services.AddOpenTelemetry()
                 MissionService.ActivitySource.Name,
                 WorkItemService.ActivitySource.Name,
                 RuntimeRunService.ActivitySource.Name,
+                FlowRunService.ActivitySource.Name,
                 AgentFrameworkRuntimeFactory.TelemetrySourceName,
                 GenAiObservabilityOptions.ChatClientSourceName,
                 GenAiHttpPayloadCaptureHandler.TelemetrySourceName);
@@ -103,6 +108,7 @@ builder.Services.AddOpenTelemetry()
             .AddHttpClientInstrumentation()
             .AddMeter(
                 WorkItemService.Meter.Name,
+                FlowRunService.Meter.Name,
                 AgentFrameworkRuntimeFactory.TelemetrySourceName,
                 GenAiObservabilityOptions.ChatClientSourceName);
         if (otlpEnabled) metrics.AddOtlpExporter();
@@ -128,6 +134,7 @@ app.MapAgentstrationModelManagementApi();
 app.MapAgentstrationWorkApi();
 app.MapAgentstrationFlowApi();
 app.MapAgentstrationRuntimeApi();
+app.MapHub<FlowRunHub>("/hubs/flow-runs");
 if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();
 app.MapMcp("/mcp");
 app.MapStaticAssets();
@@ -135,6 +142,7 @@ app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembl
 await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
 await DemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);

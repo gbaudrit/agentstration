@@ -4,7 +4,7 @@ using Agentstration.Flow.Storage.Abstractions;
 namespace Agentstration.Flow.Application;
 
 public sealed record CreateFlowCommand(string Name, string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null);
-public sealed record UpdateFlowCommand(string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null);
+public sealed record UpdateFlowCommand(string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null, FlowGraphDefinition? Graph = null, string? DisplayName = null, string ResourceGroup = "default", string Location = "local");
 
 public sealed class FlowService(IFlowRepository repository, TimeProvider timeProvider)
 {
@@ -41,6 +41,10 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
             Enabled = command.Enabled,
             Spec = command.Spec,
             Metadata = Copy(command.Metadata),
+            Graph = command.Graph,
+            DisplayName = command.DisplayName ?? current.Value.DisplayName,
+            ResourceGroup = command.ResourceGroup,
+            Location = command.Location,
             UpdatedAt = timeProvider.GetUtcNow()
         };
         FlowValidator.Validate(updated);
@@ -49,12 +53,13 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
 
     public Task DeleteAsync(FlowId id, string? expectedETag, CancellationToken cancellationToken) => repository.DeleteAsync(id, expectedETag, cancellationToken);
 
-    public async Task<StoredFlowVersion> PublishVersionAsync(FlowId id, string version, bool activate, CancellationToken cancellationToken)
+    public async Task<StoredFlowVersion> PublishVersionAsync(FlowId id, string version, bool activate, CancellationToken cancellationToken, string? releaseNotes = null)
     {
         var stored = await repository.GetAsync(id, cancellationToken) ?? throw new FlowNotFoundException(id);
         if (!string.Equals(stored.Value.Version, version, StringComparison.Ordinal))
             throw new FlowValidationException("flow_version_mismatch", "The requested version must match the current Flow definition version.");
-        var published = new FlowVersion(id, version, stored.Value.Description, stored.Value.Kind, stored.Value.Spec, stored.Value.Metadata, timeProvider.GetUtcNow());
+        var published = new FlowVersion(id, version, stored.Value.Description, stored.Value.Kind, stored.Value.Spec, stored.Value.Metadata, timeProvider.GetUtcNow(), stored.Value.Graph,
+            stored.Value.Graph is null ? null : FlowDefinitionHash.Compute(stored.Value.Graph), releaseNotes);
         FlowValidator.ValidateVersion(published);
         var created = await repository.CreateVersionAsync(published, cancellationToken);
         if (activate)

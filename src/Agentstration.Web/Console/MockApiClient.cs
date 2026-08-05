@@ -4,6 +4,8 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Flow;
+using Agentstration.Flow.Contracts;
 using Agentstration.Web.Components.Models;
 
 namespace Agentstration.Web.Console;
@@ -209,6 +211,36 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         new("smart-triage", "Smart triage", "Routing", "1.4.0", "Active", 4, 1, Now.AddHours(-5)),
         new("approval-gate", "Human approval gate", "Composite", "1.0.0", "Draft", 3, 0, Now.AddDays(-3))
     ], cancellationToken);
+
+    public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>
+        Task.FromException<FlowResponse>(new KeyNotFoundException($"Simulated Flow '{flowId}' has no definition payload."));
+    public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) =>
+        Result<IReadOnlyList<FlowVersionResponse>>([], cancellationToken);
+    public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken) =>
+        Result<IReadOnlyList<FlowRun>>([], cancellationToken);
+    public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) =>
+        Task.FromException<FlowRun>(new KeyNotFoundException($"Simulated Flow Run '{runId}' was not found."));
+    public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
+        Result<IReadOnlyList<FlowRunEvent>>([], cancellationToken);
+    public Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) =>
+        Task.FromException<FlowRun>(new NotSupportedException("Simulated Flow Runs are not supported."));
+    public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) =>
+        Task.FromException<FlowRun>(new NotSupportedException("Simulated Flow Runs are not supported."));
+    public async IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await Task.CompletedTask;
+        yield break;
+    }
+    public Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken) => UnsupportedDraft();
+    public Task<FlowDraftResponse> GetDraftAsync(string flowId, CancellationToken cancellationToken) => UnsupportedDraft();
+    public Task<FlowDraftResponse> SaveDraftAsync(string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) => UnsupportedDraft();
+    public Task<FlowValidationResponse> ValidateDraftAsync(string flowId, CancellationToken cancellationToken) => Task.FromResult(new FlowValidationResponse(false, []));
+    public Task<FlowSourceResponse> GetDraftSourceAsync(string flowId, string format, CancellationToken cancellationToken) => Task.FromException<FlowSourceResponse>(new NotSupportedException("Simulated Flow Drafts are not supported."));
+    public Task<FlowDraftResponse> ReplaceDraftSourceAsync(string flowId, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken) => UnsupportedDraft();
+    public Task<FlowVersionResponse> PublishDraftAsync(string flowId, PublishFlowDraftRequest request, CancellationToken cancellationToken) => Task.FromException<FlowVersionResponse>(new NotSupportedException("Simulated Flow Drafts are not supported."));
+    public Task<FlowRun> CreateDraftRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) => Task.FromException<FlowRun>(new NotSupportedException("Simulated Flow Drafts are not supported."));
+    public Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken) => UnsupportedDraft();
+    private static Task<FlowDraftResponse> UnsupportedDraft() => Task.FromException<FlowDraftResponse>(new NotSupportedException("Simulated Flow Drafts are not supported."));
 
     public Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken) => Result<IReadOnlyList<ExecutionSummary>>(
     [
