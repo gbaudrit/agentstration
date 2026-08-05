@@ -310,7 +310,7 @@ Invoke-RestMethod -Method Post -ContentType application/json -Body (@{ version="
 
 Flow definitions are stored in `.agentstration/flow-plane.db`. Published versions are immutable; a `WorkItem` may carry a lightweight exact or active `FlowReference` without embedding the definition.
 
-The Flow console at `/flows` provides creation templates, a four-zone visual designer, Designer/Definition/Split modes, YAML or JSON source editing, validation, optimistic draft saving, publication, published versions and per-Flow Runs. A Draft Run validates its JSON input and retains its exact draft revision, hash, and immutable definition snapshot. Run details receive differential SignalR events with replay from persisted history; `/flowruns` provides the global searchable Run history. Flow data remains in the independent `.agentstration/flow-plane.db` store.
+The Flow console at `/flows` provides creation templates, a four-zone visual designer, Designer/Definition/Split modes, YAML source editing, validation, optimistic draft saving, publication, published versions and per-Flow Runs. The specialized UI lives in the `Agentstration.Web.FlowDesigner` Razor Class Library: Z.Blazor.Diagrams owns canvas interaction and BlazorMonaco provides the locally served Monaco editor, while `Agentstration.Web` supplies backend and resource adapters. A Draft Run validates its JSON input and retains its exact draft revision, hash, and immutable definition snapshot. Run details receive differential SignalR events with replay from persisted history; `/flowruns` provides the global searchable Run history. Flow data remains in the independent `.agentstration/flow-plane.db` store.
 
 ## MCP
 

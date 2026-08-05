@@ -19,7 +19,7 @@ else
     }
     else if (activeTab == "Designer")
     {
-        <div class="toolbar"><a class="button-primary" href="/flows/@FlowId/designer">Open Flow Designer</a></div><section class="designer-layout"><FlowGraph Nodes="GraphNodes" SelectedName="selectedNode" OnSelected="SelectNode" /><article class="panel inspector"><div class="panel-header"><h2>Step properties</h2></div>@if(selectedNode is null){<p class="muted">Select a step in the graph.</p>}else{<label>Name<input value="@selectedNode" readonly /></label><label>Type<input value="@GraphNodes.First(x => x.Name == selectedNode).Type" readonly /></label><p class="muted">Open the full Designer to edit the Draft, transitions, mappings and YAML source.</p>}</article></section>
+        <div class="toolbar"><a class="button-primary" href="/flows/@FlowId/designer" data-enhance-nav="false">Open Flow Designer</a></div><section class="designer-layout"><FlowGraph Nodes="GraphNodes" SelectedName="selectedNode" OnSelected="SelectNode" /><article class="panel inspector"><div class="panel-header"><h2>Step properties</h2></div>@if(selectedNode is null){<p class="muted">Select a step in the graph.</p>}else{<label>Name<input value="@selectedNode" readonly /></label><label>Type<input value="@GraphNodes.First(x => x.Name == selectedNode).Type" readonly /></label><p class="muted">Open the full Designer to edit the Draft, transitions, mappings and YAML source.</p>}</article></section>
     }
     else if (activeTab == "Runs")
     {

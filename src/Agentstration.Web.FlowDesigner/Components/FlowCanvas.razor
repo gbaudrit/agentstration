@@ -1,0 +1,165 @@
+@implements IDisposable
+
+<div class="flow-diagram-canvas" role="application" aria-label="Flow diagram">
+    <CascadingValue Value="diagram" IsFixed="true">
+        <DiagramCanvas />
+    </CascadingValue>
+</div>
+
+@code {
+    private readonly BlazorDiagram diagram = new(new BlazorDiagramOptions
+    {
+        AllowMultiSelection = true,
+        Zoom = { Enabled = true },
+        Links = { RequireTarget = true }
+    });
+    private long renderedRevision = -1;
+    private long renderedFitRevision = -1;
+    private bool rebuilding;
+    private bool fitAfterRender;
+
+    [Parameter, EditorRequired] public FlowDesignerDocument Document { get; set; } = new([], []);
+    [Parameter] public long Revision { get; set; }
+    [Parameter] public long FitRevision { get; set; }
+    [Parameter] public bool IsReadOnly { get; set; }
+    [Parameter] public EventCallback<string?> SelectedStepChanged { get; set; }
+    [Parameter] public EventCallback<MoveStepCommand> StepMoved { get; set; }
+    [Parameter] public EventCallback<FlowTransitionDefinition> TransitionCreated { get; set; }
+    [Parameter] public EventCallback<string> TransitionRemoved { get; set; }
+
+    protected override void OnInitialized()
+    {
+        diagram.RegisterComponent<FlowDiagramNode, FlowNodeWidget>();
+        diagram.ContainerChanged += OnContainerChanged;
+        diagram.SelectionChanged += OnSelectionChanged;
+        diagram.Links.Added += OnLinkAdded;
+        diagram.Links.Removed += OnLinkRemoved;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Revision != renderedRevision)
+        {
+            renderedRevision = Revision;
+            Rebuild();
+        }
+        if (FitRevision != renderedFitRevision)
+        {
+            renderedFitRevision = FitRevision;
+            fitAfterRender = true;
+        }
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        TryFit();
+        return Task.CompletedTask;
+    }
+
+    public void Center()
+    {
+        fitAfterRender = true;
+        TryFit();
+    }
+
+    private void Rebuild()
+    {
+        rebuilding = true;
+        foreach (var node in diagram.Nodes.OfType<FlowDiagramNode>())
+        {
+            node.Moved -= OnNodeMoved;
+            node.SizeChanged -= OnDiagramMetricsChanged;
+        }
+        diagram.Links.Clear();
+        diagram.Nodes.Clear();
+        var projection = FlowDiagramMapper.Project(Document);
+        foreach (var node in projection.Nodes)
+        {
+            node.Locked = IsReadOnly;
+            node.Moved += OnNodeMoved;
+            node.SizeChanged += OnDiagramMetricsChanged;
+            diagram.Nodes.Add(node);
+        }
+        foreach (var link in projection.Links)
+        {
+            link.Locked = IsReadOnly;
+            diagram.Links.Add(link);
+        }
+        rebuilding = false;
+    }
+
+    private void OnDiagramMetricsChanged(Blazor.Diagrams.Core.Models.Base.Model _)
+    {
+        TryFit();
+    }
+
+    private void OnContainerChanged() => TryFit();
+
+    private void TryFit()
+    {
+        if (!fitAfterRender || diagram.Container is not { } container ||
+            !IsPositiveFinite(container.Width) || !IsPositiveFinite(container.Height) ||
+            diagram.Nodes.Count == 0 || diagram.Nodes.Any(node => node.Size is not { } size || !IsPositiveFinite(size.Width) || !IsPositiveFinite(size.Height)))
+            return;
+
+        try
+        {
+            diagram.ZoomToFit(80);
+            fitAfterRender = false;
+        }
+        catch (ArgumentException)
+        {
+            // Z.Blazor.Diagrams can still be between two resize measurements.
+            // Keep the request pending; the next container/node size event retries it.
+        }
+    }
+
+    private static bool IsPositiveFinite(double value) => double.IsFinite(value) && value > 0;
+
+    private void OnSelectionChanged(Blazor.Diagrams.Core.Models.Base.SelectableModel model)
+    {
+        if (model is FlowDiagramNode node)
+            _ = SelectedStepChanged.InvokeAsync(node.Source.Name);
+    }
+
+    private void OnNodeMoved(Blazor.Diagrams.Core.Models.Base.MovableModel model)
+    {
+        if (!IsReadOnly && model is FlowDiagramNode node)
+            _ = StepMoved.InvokeAsync(new MoveStepCommand(node.Source.Name, new(node.Position.X, node.Position.Y)));
+    }
+
+    private void OnLinkAdded(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
+    {
+        if (rebuilding || IsReadOnly) return;
+        link.TargetAttached += OnLinkAttached;
+    }
+
+    private void OnLinkAttached(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
+    {
+        if (link.Source.Model is not PortModel source || link.Target.Model is not PortModel target) return;
+        var from = source.Parent as FlowDiagramNode;
+        var to = target.Parent as FlowDiagramNode;
+        if (from is null || to is null) return;
+        var id = $"{from.Source.Name}-completed-{to.Source.Name}";
+        _ = TransitionCreated.InvokeAsync(new FlowTransitionDefinition(id, from.Source.Name, "completed", to.Source.Name));
+    }
+
+    private void OnLinkRemoved(Blazor.Diagrams.Core.Models.Base.BaseLinkModel link)
+    {
+        if (!rebuilding && !IsReadOnly)
+            _ = TransitionRemoved.InvokeAsync(link.Id);
+    }
+
+    public void Dispose()
+    {
+        diagram.ContainerChanged -= OnContainerChanged;
+        diagram.SelectionChanged -= OnSelectionChanged;
+        diagram.Links.Added -= OnLinkAdded;
+        diagram.Links.Removed -= OnLinkRemoved;
+        foreach (var node in diagram.Nodes.OfType<FlowDiagramNode>())
+        {
+            node.Moved -= OnNodeMoved;
+            node.SizeChanged -= OnDiagramMetricsChanged;
+        }
+    }
+}

@@ -11,6 +11,7 @@ src/
   Agentstration.AppHost/          Aspire orchestration and dashboard
   Agentstration.Web/              REST, Razor Components, MCP, hosted workers
   Agentstration.Web.Components/   reusable Razor components and console design system
+  Agentstration.Web.FlowDesigner/ Flow-specific Razor UI, editor state, Z diagrams, Monaco
   Agentstration.Application/      use cases and module contracts
   Agentstration.Domain/           entities, typed identifiers, domain events
   Agentstration.Evaluation/       offline workflow quality evaluators
@@ -44,6 +45,7 @@ tests/
   Agentstration.Management.Tests/
   Agentstration.Web.Tests/
   Agentstration.Web.Components.Tests/
+  Agentstration.Web.FlowDesigner.Tests/
 docs/decisions/
 ```
 
@@ -64,6 +66,8 @@ Runtime.AgentFramework -> runtime abstractions + ModelProviders + Microsoft Agen
 Application -> Work + Work storage abstractions
 Flow.Application -> Flow + Flow.Storage.Abstractions
 Flow.Storage.Sqlite -> Flow.Storage.Abstractions + EF Core SQLite
+Web.FlowDesigner -> Web.Components + Flow + Flow.Contracts
+Web -> Web.FlowDesigner (host adapters implement designer backend/resource ports)
 Runtime.Local -> Work execution port
 Runtime.Core -> Runtime.Abstractions + Management.Abstractions
 Runtime.Storage.Sqlite -> Runtime.Abstractions + EF Core SQLite

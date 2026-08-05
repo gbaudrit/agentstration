@@ -2,7 +2,7 @@
     @for(var index=0;index<Nodes.Count;index++)
     {
         var node=Nodes[index];
-        <button class="flow-node @StatusClass(node.Status) @(SelectedName==node.Name?"selected":null)" @onclick="() => OnSelected.InvokeAsync(node.Name)"><span class="node-icon">@Icon(node.Type)</span><strong>@node.Name</strong><small>@node.Type@if(node.Duration is not null){<text> · @FormatDuration(node.Duration.Value)</text>}</small>@if(node.Status is not null){<StatusBadge Text="@node.Status" Status="@PlatformDashboardService.ToStatus(node.Status)" />}</button>
+        <button class="flow-node @StatusClass(node.Status) @(SelectedName==node.Name?"selected":null)" @onclick="() => OnSelected.InvokeAsync(node.Name)"><span class="node-icon">@Icon(node.Type)</span><strong>@node.Name</strong><small>@node.Type@if(node.Duration is not null){<text> · @FormatDuration(node.Duration.Value)</text>}</small>@if(node.Status is not null){<StatusBadge Text="@node.Status" Status="@ToStatus(node.Status)" />}</button>
         @if(index<Nodes.Count-1){<span class="flow-edge" aria-hidden="true">→</span>}
     }
 </div>
@@ -12,5 +12,6 @@
     [Parameter] public EventCallback<string> OnSelected {get;set;}
     private static string Icon(string type)=>type switch{"router"=>"◇","agent"=>"◎","condition"=>"?","transform"=>"ƒ","output"=>"□","failure"=>"!",_=>"●"};
     private static string StatusClass(string? status)=>status?.ToLowerInvariant() switch{"succeeded"=>"node-success","running"=>"node-running","failed"=>"node-failed","cancelled"=>"node-cancelled","skipped"=>"node-skipped",_=>""};
+    private static Agentstration.Web.Components.Models.UiStatus ToStatus(string status)=>status.ToLowerInvariant() switch{"succeeded" or "running" or "completed"=>Agentstration.Web.Components.Models.UiStatus.Success,"queued" or "waiting"=>Agentstration.Web.Components.Models.UiStatus.Warning,"failed" or "error"=>Agentstration.Web.Components.Models.UiStatus.Danger,_=>Agentstration.Web.Components.Models.UiStatus.Neutral};
     private static string FormatDuration(TimeSpan value)=>value.TotalSeconds>=1?$"{value.TotalSeconds:0.##} s":$"{value.TotalMilliseconds:0} ms";
 }

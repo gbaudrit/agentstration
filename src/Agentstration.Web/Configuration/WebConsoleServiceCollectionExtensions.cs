@@ -3,6 +3,8 @@ using Agentstration.Web.Console;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using Agentstration.Web.Features.Flows.Designer;
+using Agentstration.Web.FlowDesigner.Backend;
+using Agentstration.Web.FlowDesigner.DependencyInjection;
 
 namespace Agentstration.Web.Configuration;
 
@@ -16,8 +18,10 @@ public static class WebConsoleServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton(TimeProvider.System);
         services.AddAgentstrationWebComponents();
+        services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
-        services.AddScoped<FlowEditorStore>();
+        services.AddScoped<IFlowDesignerBackend, FlowDesignerBackend>();
+        services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 
         var configured = configuration.GetSection(AgentstrationWebOptions.SectionName).Get<AgentstrationWebOptions>() ?? new();
         if (configured.UseSimulatedData)

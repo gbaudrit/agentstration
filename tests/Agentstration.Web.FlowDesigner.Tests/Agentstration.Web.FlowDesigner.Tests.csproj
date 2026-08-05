@@ -1,0 +1,8 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <PackageReference Include="bunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Web.FlowDesigner/Agentstration.Web.FlowDesigner.csproj" />
+  </ItemGroup>
+</Project>

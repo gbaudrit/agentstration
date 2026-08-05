@@ -1,0 +1,13 @@
+<div class="flow-node @Node.Source.Type" aria-label="@Node.Source.DisplayName">
+    <PortRenderer Port="Node.Input" />
+    <span class="flow-node-icon">@Icon(Node.Source.Type)</span>
+    <span class="flow-node-copy"><strong title="@Node.Source.DisplayName">@Node.Source.DisplayName</strong><small>@Node.Source.Type</small></span>
+    @if (Node.Source.Resource is not null) { <code title="@Node.Source.Resource">@Short(Node.Source.Resource)</code> }
+    <PortRenderer Port="Node.Output" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public FlowDiagramNode Node { get; set; } = default!;
+    private static string Icon(string type) => type switch { "agent" => "◎", "router" => "◇", "condition" => "?", "transform" => "ƒ", "output" => "□", "failure" => "!", _ => "●" };
+    private static string Short(string value) => value[(value.LastIndexOf('/') + 1)..];
+}

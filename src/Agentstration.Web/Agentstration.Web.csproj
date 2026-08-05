@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
+    <ProjectReference Include="../Agentstration.Web.FlowDesigner/Agentstration.Web.FlowDesigner.csproj" />
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />

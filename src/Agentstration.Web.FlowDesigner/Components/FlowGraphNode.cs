@@ -1,6 +1,6 @@
 using Agentstration.Flow;
 
-namespace Agentstration.Web.Components;
+namespace Agentstration.Web.FlowDesigner.Components;
 
 public sealed record FlowGraphNode(string Name, string Type, string? Status = null, TimeSpan? Duration = null)
 {

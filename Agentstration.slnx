@@ -25,6 +25,7 @@
     <Project Path="src/Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
     <Project Path="src/Agentstration.Web/Agentstration.Web.csproj" />
     <Project Path="src/Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
+    <Project Path="src/Agentstration.Web.FlowDesigner/Agentstration.Web.FlowDesigner.csproj" />
     <Project Path="src/Agentstration.Work/Agentstration.Work.csproj" />
     <Project Path="src/Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
     <Project Path="src/Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
@@ -39,5 +40,6 @@
     <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Components.Tests/Agentstration.Web.Components.Tests.csproj" />
+    <Project Path="tests/Agentstration.Web.FlowDesigner.Tests/Agentstration.Web.FlowDesigner.Tests.csproj" />
   </Folder>
 </Solution>

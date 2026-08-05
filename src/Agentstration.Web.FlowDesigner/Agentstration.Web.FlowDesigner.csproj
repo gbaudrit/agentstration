@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="BlazorMonaco" />
+    <PackageReference Include="Z.Blazor.Diagrams" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Flow/Agentstration.Flow.csproj" />
+    <ProjectReference Include="../Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
+  </ItemGroup>
+</Project>
