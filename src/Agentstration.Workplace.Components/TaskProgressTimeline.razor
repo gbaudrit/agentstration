@@ -1,0 +1,22 @@
+@if (Activities.Count == 0)
+{
+    <div class="progress-waiting"><span class="progress-pulse"></span><span>@(Status == WorkTaskStatus.Pending ? "Waiting to start" : "Preparing progress updates")</span></div>
+}
+else
+{
+    <ol class="task-progress" aria-label="Task progress">
+        @foreach (var activity in Activities.OrderBy(value => value.CreatedAt))
+        {
+            <li class="progress-step"><span class="progress-marker"><UiIcon Name="check" /></span><div><strong>@activity.Title</strong>@if (!string.IsNullOrWhiteSpace(activity.Description)){<p>@activity.Description</p>}<time datetime="@activity.CreatedAt.ToString("O")">@activity.CreatedAt.ToLocalTime().ToString("HH:mm")</time></div></li>
+        }
+        @if (Status is WorkTaskStatus.Running or WorkTaskStatus.Pending)
+        {
+            <li class="progress-step current" aria-current="step"><span class="progress-marker"></span><div><strong>In progress</strong><p>Agentstration is working on the next step.</p></div></li>
+        }
+    </ol>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<WorkTaskActivity> Activities { get; set; } = [];
+    [Parameter] public WorkTaskStatus Status { get; set; }
+}

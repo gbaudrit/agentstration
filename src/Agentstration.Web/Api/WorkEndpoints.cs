@@ -27,7 +27,7 @@ public static class WorkEndpoints
         ExecuteAsync(async () =>
         {
             var inputs = request.Inputs?.Select(value => new WorkInput(value.Text, value.Structured, value.Metadata)).ToArray();
-            var attachments = request.Attachments?.Select(ToAttachment).ToArray();
+            var attachments = request.Attachments?.Select(ToWorkAttachment).ToArray();
             WorkCorrelationId? correlation = string.IsNullOrWhiteSpace(request.CorrelationId) ? null : new WorkCorrelationId(request.CorrelationId.Trim());
             var stored = await service.SubmitAsync(new SubmitWorkItemCommand(
                 request.Type, request.Instruction, request.Title, request.Description, request.RequesterIdentity,
@@ -123,7 +123,7 @@ public static class WorkEndpoints
             return Results.Ok(ToResponse(stored.Value));
         });
 
-    private static WorkAttachment ToAttachment(WorkAttachmentRequest request)
+    internal static WorkAttachment ToWorkAttachment(WorkAttachmentRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name)) throw new WorkValidationException("attachment_name_required", "An attachment name is required.");
         if (!Uri.TryCreate(request.Uri, UriKind.Absolute, out _)) throw new WorkValidationException("attachment_uri_invalid", "An attachment must reference an absolute URI.");

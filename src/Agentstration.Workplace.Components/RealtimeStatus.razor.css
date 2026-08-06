@@ -1,0 +1,1 @@
+.realtime-status{display:inline-flex;align-items:center;gap:.4rem;color:var(--color-text-muted);font-size:.75rem}.status-dot{width:.45rem;height:.45rem;border-radius:50%;background:#d92d20}.connected .status-dot{background:#12a150;box-shadow:0 0 0 .2rem rgba(18,161,80,.12)}

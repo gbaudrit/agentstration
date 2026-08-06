@@ -18,5 +18,9 @@
     <ProjectReference Include="../../src/Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
     <ProjectReference Include="../../src/Agentstration.Work/Agentstration.Work.csproj" />
     <ProjectReference Include="../../src/Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Workplace.Client/Agentstration.Workplace.Client.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Work.Api/Agentstration.Work.Api.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
   </ItemGroup>
 </Project>

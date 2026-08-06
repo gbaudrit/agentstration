@@ -1,0 +1,64 @@
+<section class="interaction-view" aria-labelledby="interaction-title">
+    <header class="interaction-header">
+        <div><p class="eyebrow">Current request</p><h2 id="interaction-title">Conversation</h2></div>
+        <div class="interaction-actions"><RealtimeStatus Connected="RealtimeConnected" /><button class="button-secondary" type="button" @onclick="OnNewRequest"><UiIcon Name="plus" /> New request</button></div>
+    </header>
+
+    <div class="conversation-thread" aria-live="polite">
+        @foreach (var message in Messages.OrderBy(value => value.CreatedAt))
+        {
+            <ConversationMessageView Message="message" />
+        }
+        @if (Action is RespondAction response && !Messages.Any(value => value.Role == ConversationRole.Agentstration && value.Content == response.Content))
+        {
+            <article class="assistant-response"><span><UiIcon Name="sparkle" /></span><div><strong>Agentstration</strong><p>@response.Content</p></div></article>
+        }
+        @if (Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction)
+        {
+            <div class="inline-pending"><PendingActionPanel Action="Action" Busy="Busy" OnSubmit="OnPendingAction" ConversationMode="true" /></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <p class="interaction-error" role="alert">@Error</p>
+        }
+        @if (Task is not null)
+        {
+            <InlineTaskCard Task="Task" LatestActivity="@Activities.OrderByDescending(value => value.CreatedAt).FirstOrDefault()" ResultsCount="Results.Count" ArtifactsCount="Artifacts.Count" />
+        }
+        @if (Task is not null && Task.Status is WorkTaskStatus.Running or WorkTaskStatus.Pending && Activities.Count == 0)
+        {
+            <div class="processing-feedback" role="status"><span></span>Agentstration is starting the task…</div>
+        }
+    </div>
+
+    @if (Results.Count > 0 || Artifacts.Count > 0)
+    {
+        <div class="interaction-output">
+            @foreach (var result in Results.OrderByDescending(value => value.CreatedAt)) { <TaskResultView Result="result" /> }
+            @if (Artifacts.Count > 0) { <section><h2>Deliverables</h2><ArtifactList Artifacts="Artifacts" ContentUrl="ArtifactContentUrl" /></section> }
+        </div>
+    }
+    <ConversationComposer Busy="Busy" DisabledReason="@ComposerDisabledReason" OnSubmit="OnMessage" />
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<ConversationMessage> Messages { get; set; } = [];
+    [Parameter] public WorkplaceAction? Action { get; set; }
+    [Parameter] public WorkTaskResponse? Task { get; set; }
+    [Parameter] public IReadOnlyList<WorkTaskActivity> Activities { get; set; } = [];
+    [Parameter] public IReadOnlyList<WorkTaskResult> Results { get; set; } = [];
+    [Parameter] public IReadOnlyList<WorkTaskArtifact> Artifacts { get; set; } = [];
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool RealtimeConnected { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public InteractionStatus Status { get; set; } = InteractionStatus.Active;
+    [Parameter] public EventCallback<PendingActionAnswer> OnPendingAction { get; set; }
+    [Parameter] public EventCallback<string> OnMessage { get; set; }
+    [Parameter] public EventCallback OnNewRequest { get; set; }
+    [Parameter, EditorRequired] public required Func<WorkTaskArtifact, string> ArtifactContentUrl { get; set; }
+    private string? ComposerDisabledReason => Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction || Status == InteractionStatus.WaitingForUser
+        ? "Answer the question above to continue."
+        : Status == InteractionStatus.Closed ? "This conversation is closed."
+        : !string.IsNullOrWhiteSpace(Error) ? "The conversation will be available again after reconnecting."
+        : null;
+}

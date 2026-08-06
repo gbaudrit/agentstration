@@ -1,0 +1,23 @@
+<article class="inline-task-card task-@Task.Status.ToString().ToLowerInvariant()">
+    <div class="task-card-icon"><UiIcon Name="tasks" /></div>
+    <div class="task-card-body">
+        <div class="task-card-heading">
+            <div><p class="eyebrow">Task</p><h3>@Task.Title</h3></div>
+            <span class="task-status">@StatusLabel</span>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Task.Description)) { <p>@Task.Description</p> }
+        <div class="task-card-footer">
+            <span>@ProgressLabel · @ResultsCount result@(ResultsCount == 1 ? "" : "s") · @ArtifactsCount file@(ArtifactsCount == 1 ? "" : "s")</span>
+            <a href="@($"/tasks/{Task.Id}")">View details <span aria-hidden="true">→</span></a>
+        </div>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public required WorkTaskResponse Task { get; set; }
+    [Parameter] public WorkTaskActivity? LatestActivity { get; set; }
+    [Parameter] public int ResultsCount { get; set; }
+    [Parameter] public int ArtifactsCount { get; set; }
+    private string StatusLabel => Task.Status switch { WorkTaskStatus.ActionRequired => "Needs input", WorkTaskStatus.Completed => "Completed", WorkTaskStatus.Failed => "Failed", WorkTaskStatus.Cancelled => "Cancelled", WorkTaskStatus.Running => "In progress", _ => Task.Status.ToString() };
+    private string ProgressLabel => LatestActivity?.Title ?? (Task.Status == WorkTaskStatus.Completed ? "Result ready" : "Preparing the task");
+}

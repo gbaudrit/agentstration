@@ -1,0 +1,2 @@
+@if(Artifacts.Count==0){<div class="compact-empty"><EmptyState Title="No deliverables yet" Message="Generated files will appear here." /></div>}else{<div class="artifact-list">@foreach(var artifact in Artifacts){<ArtifactCard Artifact="artifact" ContentUrl="@ContentUrl(artifact)" />}</div>}
+@code { [Parameter] public IReadOnlyList<WorkTaskArtifact> Artifacts{get;set;}=[]; [Parameter,EditorRequired] public required Func<WorkTaskArtifact,string> ContentUrl{get;set;} }

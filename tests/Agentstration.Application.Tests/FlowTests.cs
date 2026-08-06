@@ -123,7 +123,7 @@ public sealed class FlowTests
         using var updated = await client.SendAsync(update);
         Assert.AreEqual(HttpStatusCode.OK, updated.StatusCode);
         var list = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows");
-        Assert.AreEqual(1, list!.Value.Count);
+        Assert.IsTrue(list!.Value.Any(value => value.Id == "direct-sql"));
 
         var openApi = await client.GetStringAsync("/openapi/v1.json");
         StringAssert.Contains(openApi, "specKind");

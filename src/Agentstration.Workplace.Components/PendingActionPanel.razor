@@ -1,0 +1,94 @@
+<section class="panel pending-action @(ConversationMode ? "pending-conversation" : null)" aria-live="polite" aria-busy="@Busy">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Action required</p>
+            <h2>@Title</h2>
+        </div>
+        <StatusBadge Text="Required" Status="Agentstration.Web.Components.Models.UiStatus.Warning" />
+    </div>
+    @if (Description is not null)
+    {
+        <p>@Description</p>
+    }
+
+    @if (Action is RequestChoiceAction choice)
+    {
+        <div class="choice-grid">
+            @foreach (var option in choice.Options)
+            {
+                <button class="@(selected == option.Value ? "selected" : null)" aria-pressed="@(selected == option.Value)" disabled="@(Busy || submitting)" @onclick="() => SubmitChoice(choice, option)">@(selected == option.Value && submitting ? $"{option.Label}…" : option.Label)</button>
+            }
+        </div>
+    }
+    else if (Action is RequestConfirmationAction confirmation)
+    {
+        <div class="confirmation-actions">
+            <button class="button-secondary" disabled="@(Busy || submitting)" @onclick="() => SubmitConfirmation(confirmation, false)">Cancel</button>
+            <button class="button-primary" disabled="@(Busy || submitting)" @onclick="() => SubmitConfirmation(confirmation, true)">Confirm</button>
+        </div>
+    }
+    else if (Action is RequestInputAction input)
+    {
+        <textarea @bind="text" placeholder="Your response"></textarea>
+        <button class="button-primary action-button" disabled="@(string.IsNullOrWhiteSpace(text) || Busy)" @onclick="() => SubmitInput(input)">Continue</button>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public required WorkplaceAction Action { get; set; }
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public bool ConversationMode { get; set; }
+
+    [Parameter]
+    public EventCallback<PendingActionAnswer> OnSubmit { get; set; }
+
+    private string? selected = null;
+    private string text = string.Empty;
+    private bool submitting;
+    private string Title => Action switch
+    {
+        RequestInputAction value => value.Title,
+        RequestConfirmationAction value => value.Title,
+        RequestChoiceAction value => value.Title,
+        ShowResultAction value => value.Title,
+        ShowErrorAction value => value.Title,
+        CreateTaskAction value => value.Title,
+        _ => "Continue"
+    };
+    private string? Description => Action switch
+    {
+        RequestInputAction value => value.Description,
+        RequestConfirmationAction value => value.Description,
+        RequestChoiceAction value => value.Description,
+        ShowErrorAction value => value.Description,
+        CreateTaskAction value => value.Description,
+        _ => null
+    };
+
+    private async Task SubmitChoice(RequestChoiceAction action, EntryFieldOption option)
+    {
+        if (submitting || Busy) return;
+        selected = option.Value;
+        submitting = true;
+        try { await OnSubmit.InvokeAsync(new(action.PendingActionId, action.ResumeToken, new Dictionary<string, JsonElement> { [action.FieldName] = JsonSerializer.SerializeToElement(option.Value) })); }
+        finally { submitting = false; }
+    }
+
+    private async Task SubmitConfirmation(RequestConfirmationAction action, bool value)
+    {
+        if (submitting || Busy) return;
+        submitting = true;
+        try { await OnSubmit.InvokeAsync(new(action.PendingActionId, action.ResumeToken, new Dictionary<string, JsonElement> { ["confirmed"] = JsonSerializer.SerializeToElement(value) })); }
+        finally { submitting = false; }
+    }
+
+    private Task SubmitInput(RequestInputAction action) => OnSubmit.InvokeAsync(new(
+        action.PendingActionId,
+        action.ResumeToken,
+        new Dictionary<string, JsonElement> { [action.Fields.First().Name] = JsonSerializer.SerializeToElement(text) }));
+}

@@ -1,0 +1,21 @@
+<section class="primary-entry-container" aria-labelledby="primary-entry-heading">
+    <div class="primary-entry-copy">
+        <span class="primary-entry-mark"><UiIcon Name="sparkle" /></span>
+        <div>
+            <p class="eyebrow">Start here</p>
+            <h1 id="primary-entry-heading">@Title</h1>
+            @if (!string.IsNullOrWhiteSpace(Description))
+            {
+                <p>@Description</p>
+            }
+        </div>
+    </div>
+    <div class="primary-entry-content" aria-busy="@Busy">@ChildContent</div>
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = "What would you like to accomplish?";
+    [Parameter] public string? Description { get; set; } = "Describe the outcome. Agentstration will ask only for the details it needs.";
+    [Parameter] public bool Busy { get; set; }
+    [Parameter, EditorRequired] public required RenderFragment ChildContent { get; set; }
+}

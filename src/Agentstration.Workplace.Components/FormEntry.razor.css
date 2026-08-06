@@ -1,0 +1,1 @@
+.entry-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.entry-submit{margin-top:1rem;padding:.8rem 1.2rem;border:0;border-radius:12px;background:#5b61e6;color:#fff;font-weight:700}@media(max-width:640px){.entry-fields{grid-template-columns:1fr}}

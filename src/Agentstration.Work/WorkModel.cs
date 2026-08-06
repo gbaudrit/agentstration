@@ -10,6 +10,7 @@ public enum WorkItemStatus
     Running,
     WaitingForInput,
     WaitingForApproval,
+    Paused,
     Completed,
     Failed,
     Cancelled

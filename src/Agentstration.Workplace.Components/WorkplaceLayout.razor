@@ -1,0 +1,9 @@
+@inherits LayoutComponentBase
+<div class="app-shell theme-light workplace-shell">
+    <aside class="sidebar" aria-label="Workplace navigation">
+        <a class="brand-lockup" href="/" aria-label="Agentstration Workplace home"><span class="brand-mark"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></span><span><strong>Agentstration</strong><small>Workplace</small></span></a>
+        <nav class="side-nav"><NavLink href="/" Match="NavLinkMatch.All"><UiIcon Name="home" /><span class="nav-label">Home</span></NavLink><NavLink href="/tasks"><UiIcon Name="tasks" /><span class="nav-label">Tasks</span></NavLink><NavLink href="/notifications"><UiIcon Name="notifications" /><span class="nav-label">Notifications</span></NavLink></nav>
+        <div class="sidebar-footer"><strong>Personal workspace</strong><small>Local mode</small></div>
+    </aside>
+    <div class="workspace"><header class="topbar"><div class="topbar-start"><nav class="breadcrumb"><a href="/">My Workplace</a></nav></div><div class="topbar-actions"><span class="environment-chip">LOCAL</span><a class="icon-button" href="/notifications" aria-label="Open notifications"><UiIcon Name="notifications" /></a></div></header><main class="content">@Body</main></div>
+</div>

@@ -32,6 +32,48 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public void WorkplaceResourcesEnforcePrimaryEntryAndDeterministicFieldRules()
+    {
+        var entryId = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/request");
+        var duplicatePrimary = new WorkplaceWorkspace
+        {
+            Id = new WorkplaceWorkspaceId("/resourceGroups/default/providers/Agentstration.Work/workspaces/personal"),
+            Name = "personal",
+            DisplayName = "Personal",
+            Entries =
+            [
+                new WorkspaceEntryReference { EntryResourceId = entryId, Role = WorkspaceEntryRole.Primary },
+                new WorkspaceEntryReference { EntryResourceId = new EntryId(entryId.Value + "-two"), Role = WorkspaceEntryRole.Primary }
+            ]
+        };
+        Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(duplicatePrimary));
+
+        var entry = new EntryResource
+        {
+            Id = entryId,
+            Name = "request",
+            DisplayName = "Request",
+            Presentation = new EntryPresentation
+            {
+                Kind = EntryPresentationKind.Form,
+                Fields =
+                [
+                    new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Validation = new EntryFieldValidation(3, 20) },
+                    new EntryFieldDefinition { Name = "detail", Type = EntryFieldType.Choice, Options = [new EntryFieldOption("standard", "Standard")] }
+                ]
+            },
+            Target = new EntryTarget("/resourceGroups/default/providers/Agentstration.Flows/flows/router")
+        };
+        WorkplaceValidation.Validate(entry);
+        Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateSubmission(entry, new Dictionary<string, System.Text.Json.JsonElement>()));
+        Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateSubmission(entry, new Dictionary<string, System.Text.Json.JsonElement>
+        {
+            ["request"] = System.Text.Json.JsonSerializer.SerializeToElement("valid request"),
+            ["detail"] = System.Text.Json.JsonSerializer.SerializeToElement("unsupported")
+        }));
+    }
+
+    [TestMethod]
     public void WorkItemSupportsInputAndApprovalLifecycle()
     {
         var item = CreatePending();
@@ -88,6 +130,24 @@ public sealed class WorkPlaneTests
         Assert.IsFalse(item.ApplyRuntimeEvent(completed));
         Assert.AreEqual(version, item.Version);
         Assert.AreEqual(1, item.History.Count(value => value.EventId == completed.EventId));
+    }
+
+    [TestMethod]
+    public void PauseAndResumeAreIdempotentAndPreserveExecutionCorrelation()
+    {
+        var item = Running();
+        var executionId = item.CurrentExecutionId;
+
+        Assert.IsTrue(item.Pause(Guid.NewGuid(), Now.AddSeconds(3)));
+        Assert.AreEqual(WorkItemStatus.Paused, item.Status);
+        Assert.IsFalse(item.Pause(Guid.NewGuid(), Now.AddSeconds(4)));
+        Assert.AreEqual(executionId, item.CurrentExecutionId);
+
+        Assert.IsTrue(item.Resume(Guid.NewGuid(), Now.AddSeconds(5)));
+        Assert.AreEqual(WorkItemStatus.Running, item.Status);
+        Assert.IsFalse(item.Resume(Guid.NewGuid(), Now.AddSeconds(6)));
+        Assert.AreEqual(executionId, item.CurrentExecutionId);
+        CollectionAssert.IsSubsetOf(new[] { "WorkItemPaused", "WorkItemResumed" }, item.History.Select(value => value.Type).ToArray());
     }
 
     [TestMethod]
@@ -204,6 +264,38 @@ public sealed class WorkPlaneTests
         Assert.IsFalse(string.IsNullOrWhiteSpace(result.Contents.Single().Text));
         var events = await client.GetFromJsonAsync<WorkEventResponse[]>($"/api/work/workitems/{created.Id}/events");
         CollectionAssert.IsSubsetOf(new[] { "WorkItemSubmitted", "WorkItemQueued", "WorkItemStarted", "WorkItemCompleted" }, events!.Select(value => value.Type).ToArray());
+    }
+
+    [TestMethod]
+    public async Task WorkplaceApiRunsPrimaryEntryThroughFlowAndReturnsWorkspaceScopedTask()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>($"/api/workspaces?api-version={WorkplaceApiVersions.V20260805}");
+        var workspace = workspaces!.Single(value => value.Name == "personal");
+        Assert.AreEqual(WorkspaceEntryRole.Primary, workspace.Entries.Single(value => value.Role == WorkspaceEntryRole.Primary).Role);
+
+        using var submittedResponse = await client.PostAsJsonAsync("/api/entries/universal-request/interactions", new CreateInteractionRequest(
+            workspace.Id,
+            new Dictionary<string, System.Text.Json.JsonElement> { ["request"] = System.Text.Json.JsonSerializer.SerializeToElement("Explain dependency injection in .NET") }));
+        Assert.AreEqual(HttpStatusCode.Created, submittedResponse.StatusCode);
+        var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
+        Assert.IsNotNull(submitted?.Task);
+        Assert.IsInstanceOfType<CreateTaskAction>(submitted.Action);
+
+        WorkTaskResponse? task = null;
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            task = await client.GetFromJsonAsync<WorkTaskResponse>($"/api/workspaces/personal/tasks/{submitted.Task.Id}");
+            if (task?.Status is WorkTaskStatus.Completed or WorkTaskStatus.Failed) break;
+            await Task.Delay(25);
+        }
+        Assert.AreEqual(WorkTaskStatus.Completed, task!.Status);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(task.FlowRunId));
+        Assert.IsNotNull(task.Result);
+
+        using var wrongWorkspace = await client.GetAsync($"/api/workspaces/other/tasks/{task.Id}");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongWorkspace.StatusCode);
     }
 
     private static WorkItem CreatePending(string type = "analysis", string? requester = "requester-1") =>

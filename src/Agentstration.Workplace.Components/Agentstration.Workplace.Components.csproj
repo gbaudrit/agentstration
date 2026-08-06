@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Agentstration.Work/Agentstration.Work.csproj" />
+    <ProjectReference Include="../Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
+  </ItemGroup>
+</Project>

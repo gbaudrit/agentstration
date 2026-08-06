@@ -1,0 +1,4 @@
+@page "/notifications"
+@inject IWorkplaceApiClient Api
+<PageTitle>Notifications · Workplace</PageTitle><PageHeader Title="Notifications" Description="Workspace-level updates requiring your attention." Eyebrow="Workplace"/>@if(items is null){<LoadingState/>}else{<NotificationCenter Notifications="items" OnMarkRead="ReadAsync" OnMarkAllRead="ReadAllAsync"/>}
+@code { private IReadOnlyList<WorkNotification>? items;protected override async Task OnInitializedAsync()=>await RefreshAsync();private async Task RefreshAsync()=>items=await Api.ListNotificationsAsync("personal",false,default);private async Task ReadAsync(WorkNotificationId id){await Api.MarkNotificationReadAsync("personal",id.Value,default);await RefreshAsync();}private async Task ReadAllAsync(){await Api.MarkAllNotificationsReadAsync("personal",default);await RefreshAsync();}}

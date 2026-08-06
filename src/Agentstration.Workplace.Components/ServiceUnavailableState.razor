@@ -1,0 +1,9 @@
+<section class="service-unavailable" role="alert">
+    <span><UiIcon Name="offline" /></span>
+    <div><h2>Workplace is temporarily unavailable</h2><p>@Message</p></div>
+    <button class="button-primary" type="button" @onclick="OnRetry"><UiIcon Name="refresh" /> Try again</button>
+</section>
+@code {
+    [Parameter] public string Message { get; set; } = "Check that the local Work API is running, then retry.";
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

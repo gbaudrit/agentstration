@@ -76,6 +76,21 @@ public sealed class FlowRunService(
         string? correlationId,
         JsonElement input,
         CancellationToken cancellationToken)
+        => await CreateAsync(flowId, version, deploymentResourceId, trigger, startedBy, correlationId, input, null, null, null, null, cancellationToken);
+
+    public async Task<StoredFlowRun> CreateAsync(
+        FlowId flowId,
+        string? version,
+        string? deploymentResourceId,
+        FlowRunTrigger trigger,
+        string? startedBy,
+        string? correlationId,
+        JsonElement input,
+        string? parentFlowRunId,
+        string? interactionId,
+        string? workTaskId,
+        string? triggerMessageId,
+        CancellationToken cancellationToken)
     {
         var resolved = await ResolveVersionAsync(flowId, version, cancellationToken);
         ValidateInput(resolved.Graph?.InputSchema, input);
@@ -89,6 +104,10 @@ public sealed class FlowRunService(
             Trigger = trigger,
             StartedBy = string.IsNullOrWhiteSpace(startedBy) ? "local-user" : startedBy,
             CorrelationId = string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString("N") : correlationId,
+            ParentFlowRunId = parentFlowRunId,
+            InteractionId = interactionId,
+            WorkTaskId = workTaskId,
+            TriggerMessageId = triggerMessageId,
             Input = input.Clone(),
             CreatedAt = now,
             DefinitionSnapshot = resolved,

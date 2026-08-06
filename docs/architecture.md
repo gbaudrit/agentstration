@@ -2,16 +2,20 @@
 
 ## Outcome and constraints
 
-Agentstration starts as one deployable ASP.NET Core process with explicit Management Plane, Runtime Plane, and Work Plane boundaries. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, Aspire, PostgreSQL, Ollama, and OTLP are optional profiles.
+Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase. The operations Console remains an independent ASP.NET Core application; the end-user Workplace is deployed with its standalone Work API so it can run and publish without the Console. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire can orchestrate the three local resources.
 
 ## Solution tree
 
 ```text
 src/
   Agentstration.AppHost/          Aspire orchestration and dashboard
-  Agentstration.Web/              REST, Razor Components, MCP, hosted workers
+  Agentstration.Web/              independent operations Console, management REST and MCP
   Agentstration.Web.Components/   reusable Razor components and console design system
   Agentstration.Web.FlowDesigner/ Flow-specific Razor UI, editor state, Z diagrams, Monaco
+  Agentstration.Work.Api/         standalone Work HTTP, SignalR and local execution host
+  Agentstration.Workplace.Client/ typed HTTP and reconnecting SignalR client
+  Agentstration.Workplace.Components/ reusable Workplace business components
+  Agentstration.Workplace.Web/    standalone end-user Blazor host
   Agentstration.Application/      use cases and module contracts
   Agentstration.Domain/           entities, typed identifiers, domain events
   Agentstration.Evaluation/       offline workflow quality evaluators
@@ -316,3 +320,6 @@ MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and i
 - ADR-0017: canonical runtime, model options, and effective capabilities
 - ADR-0018: persisted model-provider declarations and dynamic clients
 - ADR-0019: Flow-owned Run resource and execution console
+- ADR-0020: Workplace Entry, Interaction, and Task vertical
+- ADR-0021: standalone Workplace and Work API hosts
+- ADR-0022: Interaction as durable conversation and FlowRun continuation

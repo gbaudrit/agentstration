@@ -1,0 +1,33 @@
+<div class="conversation-composer" aria-busy="@(Busy || submitting)">
+    <form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
+        <label class="sr-only" for="conversation-message">Continue the conversation</label>
+        <textarea id="conversation-message" @ref="composer" @bind="message" @bind:event="oninput" @onkeydown="HandleKeyDown" placeholder="@Placeholder" disabled="@IsDisabled" aria-describedby="composer-help composer-reason"></textarea>
+        <button type="submit" disabled="@(IsDisabled || string.IsNullOrWhiteSpace(message))" aria-label="Send message"><UiIcon Name="send" /><span>@(Busy || submitting ? "Sending…" : "Send")</span></button>
+    </form>
+    <div class="composer-meta">
+        @if (!string.IsNullOrWhiteSpace(DisabledReason)) { <small id="composer-reason" role="status">@DisabledReason</small> }
+        else { <small id="composer-help">Ctrl + Enter to send · Enter for a new line</small> }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Placeholder { get; set; } = "Ask for a change or continue the conversation…";
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? DisabledReason { get; set; }
+    [Parameter] public EventCallback<string> OnSubmit { get; set; }
+    private string message = string.Empty;
+    private bool submitting;
+    private ElementReference composer;
+    private bool IsDisabled => Busy || submitting || !string.IsNullOrWhiteSpace(DisabledReason);
+
+    private async Task HandleKeyDown(KeyboardEventArgs args) { if ((args.CtrlKey || args.MetaKey) && args.Key == "Enter") await SubmitAsync(); }
+    private async Task SubmitAsync()
+    {
+        if (IsDisabled || string.IsNullOrWhiteSpace(message)) return;
+        submitting = true;
+        var content = message.Trim();
+        try { await OnSubmit.InvokeAsync(content); message = string.Empty; }
+        finally { submitting = false; }
+        await composer.FocusAsync();
+    }
+}

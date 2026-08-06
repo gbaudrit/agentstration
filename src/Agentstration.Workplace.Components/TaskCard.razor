@@ -1,0 +1,9 @@
+<a class="task-card" href="@($"/workplace/tasks/{Task.Id}")">
+    <span class="task-status status-@Task.Status.ToString().ToLowerInvariant()">@Label(Task.Status)</span>
+    <strong>@Task.Title</strong>
+    <small>Updated @Task.UpdatedAt.LocalDateTime.ToString("g")</small>
+</a>
+@code {
+    [Parameter, EditorRequired] public required WorkTask Task { get; set; }
+    private static string Label(WorkTaskStatus status) => status switch { WorkTaskStatus.ActionRequired => "Action required", _ => status.ToString() };
+}

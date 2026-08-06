@@ -1,0 +1,26 @@
+using Agentstration.Application.Work;
+using Agentstration.Flow.Application;
+using Agentstration.Infrastructure;
+using Agentstration.Infrastructure.Agents;
+using Agentstration.Management.Core;
+using Agentstration.ModelProviders;
+using Agentstration.ModelProviders.Ollama;
+using Agentstration.Runtime.Core;
+using Agentstration.Web;
+using Agentstration.Web.Features.Workplace;
+using Agentstration.Web.Hosting;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+
+var builder = WebApplication.CreateBuilder(args);
+var dataDirectory = builder.Configuration["Data:Directory"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration"); Directory.CreateDirectory(dataDirectory);
+var dataPath = Path.Combine(dataDirectory, "data.json"); var aiOptions = new AiProviderOptions(builder.Configuration["AI:Provider"] ?? "Deterministic", new Uri(builder.Configuration["AI:Endpoint"] ?? "http://localhost/"), builder.Configuration["AI:Model"] ?? "deterministic", builder.Configuration["AI:ApiKey"]);
+builder.Services.AddAgentstration(dataPath, builder.Environment.IsEnvironment("Testing"), aiOptions, $"Data Source={Path.Combine(dataDirectory,"control-plane.db")}", $"Data Source={Path.Combine(dataDirectory,"work-plane.db")}", $"Data Source={Path.Combine(dataDirectory,"flow-plane.db")}", $"Data Source={Path.Combine(dataDirectory,"runtime-plane.db")}");
+builder.Services.AddAgentstrationModelProviders(builder.Configuration, false); builder.Services.AddAgentstrationModelManagement(); builder.AddOllamaModelProvider();
+builder.Services.AddProblemDetails(); builder.Services.AddOpenApi(); builder.Services.AddSignalR(); builder.Services.AddHealthChecks();
+builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>(); builder.Services.AddHostedService<LocalWorkExecutionWorker>(); builder.Services.AddHostedService<FlowRunExecutionWorker>();
+var otlp = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]); builder.Services.AddOpenTelemetry().ConfigureResource(value=>value.AddService("Agentstration.Work.Api")).WithTracing(value=>{value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddSource(WorkItemService.ActivitySource.Name,FlowRunService.ActivitySource.Name);if(otlp)value.AddOtlpExporter();}).WithMetrics(value=>{value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddMeter(WorkItemService.Meter.Name,FlowRunService.Meter.Name);if(otlp)value.AddOtlpExporter();});
+var app=builder.Build();app.UseExceptionHandler();app.UseStatusCodePages();if(app.Environment.IsDevelopment()||app.Environment.IsEnvironment("Testing"))app.MapOpenApi();app.MapHealthChecks("/health");app.MapAgentstrationWorkApi();app.MapAgentstrationWorkplaceApi();app.MapHub<WorkplaceHub>("/hubs/workplace");
+await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Lifetime.ApplicationStopping);await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);await ManagementDemoData.SeedAsync(app.Services,app.Lifetime.ApplicationStopping);await WorkplaceDemoData.SeedAsync(app.Services,app.Lifetime.ApplicationStopping);await app.RunAsync();
+public partial class Program;

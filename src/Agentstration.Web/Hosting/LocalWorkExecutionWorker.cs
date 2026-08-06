@@ -2,6 +2,9 @@ using Agentstration.Management.Core;
 using Agentstration.Application.Work;
 using Agentstration.Runtime.Local;
 using Agentstration.Work;
+using Agentstration.Flow;
+using Agentstration.Flow.Application;
+using System.Text.Json;
 
 namespace Agentstration.Web.Hosting;
 
@@ -9,6 +12,7 @@ public sealed class LocalWorkExecutionWorker(
     ILocalWorkExecutionQueue queue,
     WorkItemService workItems,
     AgentManagementService management,
+    FlowRunService flowRuns,
     TimeProvider timeProvider,
     ILogger<LocalWorkExecutionWorker> logger) : BackgroundService
 {
@@ -18,6 +22,11 @@ public sealed class LocalWorkExecutionWorker(
         {
             try
             {
+                if (execution.Request.Flow is not null)
+                {
+                    await ExecuteFlowAsync(execution, stoppingToken);
+                    continue;
+                }
                 var selected = await management.SelectAgentAsync(execution.Request.Instruction, execution.Request.RequestedAgentId, stoppingToken);
                 var started = new WorkExecutionStarted(
                     Guid.NewGuid(), execution.Request.WorkItemId, execution.Accepted.ExecutionId,
@@ -52,6 +61,62 @@ public sealed class LocalWorkExecutionWorker(
                     logger.LogError(persistenceException, "Could not persist failure for work item {WorkItemId}", execution.Request.WorkItemId.Value);
                 }
             }
+        }
+    }
+
+    private async Task ExecuteFlowAsync(LocalWorkExecution execution, CancellationToken cancellationToken)
+    {
+        var flow = execution.Request.Flow!;
+        var selectedAgent = $"flow:{flow.FlowId.Value}";
+        await workItems.ApplyExecutionEventAsync(new WorkExecutionStarted(
+            Guid.NewGuid(), execution.Request.WorkItemId, execution.Accepted.ExecutionId,
+            timeProvider.GetUtcNow(), selectedAgent), cancellationToken);
+        var input = JsonSerializer.SerializeToElement(new
+        {
+            prompt = execution.Request.Instruction,
+            inputs = execution.Request.Inputs.Select(value => value.Structured ?? JsonSerializer.SerializeToElement(value.Text)).ToArray()
+        });
+        var created = await flowRuns.CreateAsync(
+            flow.FlowId, flow.UseActiveVersion ? null : flow.Version, "local", FlowRunTrigger.WorkItem,
+            "workplace",
+            execution.Request.CorrelationId.Value, input,
+            execution.Request.Metadata.GetValueOrDefault("workplace.parentFlowRunId"),
+            execution.Request.Metadata.GetValueOrDefault("workplace.interactionId"),
+            execution.Request.Metadata.GetValueOrDefault("workplace.taskId") ?? execution.Request.WorkItemId.Value.ToString("D"),
+            execution.Request.Metadata.GetValueOrDefault("workplace.triggerMessageId"),
+            cancellationToken);
+        FlowRun current = created.Value;
+        await foreach (var observed in flowRuns.ObserveAsync(created.Value.Id, cancellationToken)) current = observed;
+        if (!await WaitUntilTaskCanCompleteAsync(execution.Request.WorkItemId, cancellationToken)) return;
+        if (current.Status != FlowRunStatus.Succeeded)
+        {
+            var error = new WorkError(
+                current.Error?.Code ?? "flow_run_failed", current.Error?.Message ?? "The Flow Run failed.",
+                WorkErrorCategory.Execution, true, timeProvider.GetUtcNow(), execution.Accepted.ExecutionId, current.Error?.Details);
+            await workItems.ApplyExecutionEventAsync(new WorkExecutionFailed(
+                Guid.NewGuid(), execution.Request.WorkItemId, execution.Accepted.ExecutionId, timeProvider.GetUtcNow(), error), cancellationToken);
+            return;
+        }
+
+        var output = current.Output;
+        var text = output is { ValueKind: JsonValueKind.String } ? output.Value.GetString() : null;
+        var result = new WorkResult(
+            [new WorkResultContent(text, output?.Clone(), output?.ValueKind == JsonValueKind.String ? "text/plain" : "application/json")],
+            [],
+            new Dictionary<string, string> { ["flowRunId"] = current.Id, ["flowId"] = current.FlowId.Value },
+            timeProvider.GetUtcNow());
+        await workItems.ApplyExecutionEventAsync(new WorkExecutionCompleted(
+            Guid.NewGuid(), execution.Request.WorkItemId, execution.Accepted.ExecutionId, timeProvider.GetUtcNow(), result), cancellationToken);
+    }
+
+    private async Task<bool> WaitUntilTaskCanCompleteAsync(WorkItemId workItemId, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var stored = await workItems.GetAsync(workItemId, cancellationToken);
+            if (stored is null || stored.Value.Status is WorkItemStatus.Cancelled or WorkItemStatus.Completed or WorkItemStatus.Failed) return false;
+            if (stored.Value.Status != WorkItemStatus.Paused) return true;
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
         }
     }
 }

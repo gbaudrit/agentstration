@@ -1,0 +1,2 @@
+<ol class="timeline">@foreach(var item in Activities){<li><span class="timeline-node"></span><div><strong>@item.Title</strong>@if(item.Description is not null){<p>@item.Description</p>}<time>@item.CreatedAt.LocalDateTime.ToString("g")</time></div></li>}</ol>
+@code { [Parameter] public IReadOnlyList<WorkTaskActivity> Activities{get;set;}=[]; }

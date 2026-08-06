@@ -1,0 +1,54 @@
+<form class="prompt-entry" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" aria-busy="@(Busy || submitting)">
+    <div class="entry-heading">
+        <div>
+            <h2>@Definition.DisplayName</h2>
+            @if (Definition.Description is not null) { <p>@Definition.Description</p> }
+        </div>
+    </div>
+    <div class="prompt-composer">
+        <textarea @bind="request" @bind:event="oninput" @onkeydown="HandleKeyDown" placeholder="@Definition.Presentation.Placeholder" aria-label="@Definition.DisplayName" aria-describedby="prompt-help prompt-error" disabled="@(Disabled || Busy || submitting)"></textarea>
+        <button class="prompt-submit" type="submit" disabled="@(Disabled || Busy || submitting || string.IsNullOrWhiteSpace(request))">
+            <UiIcon Name="send" /><span>@(Busy || submitting ? "Sending…" : "Send request")</span>
+        </button>
+    </div>
+    @if (Definition.Presentation.Suggestions.Count > 0)
+    {
+        <div class="entry-suggestions" aria-label="Suggestions">
+            @foreach (var suggestion in Definition.Presentation.Suggestions)
+            {
+                <button type="button" disabled="@(Disabled || Busy || submitting)" @onclick="() => request = suggestion.Value">@suggestion.Label</button>
+            }
+        </div>
+    }
+    <div class="prompt-meta">
+        <small id="prompt-help">Ctrl + Enter to send</small>
+        @if (error is not null) { <small id="prompt-error" class="entry-error" role="alert">@error</small> }
+    </div>
+</form>
+
+@code {
+    [Parameter, EditorRequired] public required EntryResource Definition { get; set; }
+    [Parameter, EditorRequired] public required EventCallback<IReadOnlyDictionary<string, JsonElement>> OnSubmit { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    private string request = string.Empty;
+    private string? error;
+    private bool submitting;
+
+    private async Task HandleKeyDown(KeyboardEventArgs args)
+    {
+        if ((args.CtrlKey || args.MetaKey) && args.Key == "Enter") await SubmitAsync();
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (Disabled || Busy || submitting) return;
+        var field = Definition.Presentation.Fields.FirstOrDefault(value => value.Name == "request");
+        var minimum = field?.Validation?.MinimumLength ?? 1;
+        if (request.Trim().Length < minimum) { error = $"Enter at least {minimum} characters."; return; }
+        error = null;
+        submitting = true;
+        try { await OnSubmit.InvokeAsync(new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement(request.Trim()) }); }
+        finally { submitting = false; }
+    }
+}

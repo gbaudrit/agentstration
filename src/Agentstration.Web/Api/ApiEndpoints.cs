@@ -15,7 +15,7 @@ public static class ApiEndpoints
     {
         var api = endpoints.MapGroup("/api");
         api.MapPost("/workspaces", CreateWorkspaceAsync);
-        api.MapGet("/workspaces", (WorkspaceService service, CancellationToken token) => service.ListAsync(token));
+        api.MapGet("/workspaces", ListWorkspacesAsync);
         api.MapPost("/workspaces/{workspaceId:guid}/inboxes", CreateInboxAsync);
         api.MapGet("/workspaces/{workspaceId:guid}/inboxes", (Guid workspaceId, WorkspaceService service, CancellationToken token) => service.ListInboxesAsync(new WorkspaceId(workspaceId), token));
         api.MapPost("/workspaces/{workspaceId:guid}/inboxes/{inboxId:guid}/items", IngestAsync).DisableAntiforgery();
@@ -27,6 +27,17 @@ public static class ApiEndpoints
         api.MapPost("/workspaces/{workspaceId:guid}/missions/{missionId:guid}/run", RunMissionAsync);
         api.MapGet("/workspaces/{workspaceId:guid}/missions/{missionId:guid}/runs", async (Guid workspaceId, Guid missionId, IPlatformStore store, CancellationToken token) => await store.ListMissionRunsAsync(new WorkspaceId(workspaceId), new MissionId(missionId), token));
         return endpoints;
+    }
+
+    private static async Task<IResult> ListWorkspacesAsync(
+        [Microsoft.AspNetCore.Mvc.FromQuery(Name = "api-version")] string? apiVersion,
+        WorkspaceService legacyService,
+        Agentstration.Application.Work.WorkplaceService workplaceService,
+        CancellationToken token)
+    {
+        if (string.Equals(apiVersion, Agentstration.Work.WorkplaceApiVersions.V20260805, StringComparison.Ordinal))
+            return await WorkplaceEndpoints.ListWorkspacesAsync(workplaceService, token);
+        return Results.Ok(await legacyService.ListAsync(token));
     }
 
     private static async Task<IResult> CreateWorkspaceAsync(CreateWorkspaceRequest request, WorkspaceService service, CancellationToken token) => ToHttp(await service.CreateAsync(request.Name, token), value => Results.Created($"/api/workspaces/{value.Id}", value));

@@ -28,3 +28,8 @@ public interface IWorkExecutionGateway
     Task<WorkExecutionAccepted> RequestExecutionAsync(WorkExecutionRequest request, CancellationToken cancellationToken);
     Task ConfirmQueuedAsync(WorkExecutionAccepted accepted, CancellationToken cancellationToken);
 }
+
+public interface IWorkTaskEventSink
+{
+    Task PublishAsync(WorkItemSnapshot snapshot, CancellationToken cancellationToken);
+}

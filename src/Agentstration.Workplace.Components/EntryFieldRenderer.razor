@@ -1,0 +1,31 @@
+<label class="entry-field">
+    <span>@(Definition.Label ?? Definition.Name)@if (Definition.Required) { <em>Required</em> }</span>
+    @if (Definition.Type is EntryFieldType.Textarea or EntryFieldType.Prompt)
+    {
+        <textarea value="@StringValue" @oninput="ChangeString" placeholder="@Definition.Placeholder" disabled="@Disabled"></textarea>
+    }
+    else if (Definition.Type == EntryFieldType.Choice)
+    {
+        <select value="@StringValue" @onchange="ChangeString" disabled="@Disabled"><option value="">Select…</option>@foreach (var option in Definition.Options) { <option value="@option.Value">@option.Label</option> }</select>
+    }
+    else if (Definition.Type == EntryFieldType.Boolean)
+    {
+        <input type="checkbox" checked="@BooleanValue" @onchange="ChangeBoolean" disabled="@Disabled" />
+    }
+    else
+    {
+        <input type="@(Definition.Type == EntryFieldType.Date ? "date" : Definition.Type == EntryFieldType.Number ? "number" : "text")" value="@StringValue" @oninput="ChangeString" placeholder="@Definition.Placeholder" disabled="@Disabled" />
+    }
+    @if (Definition.Description is not null) { <small>@Definition.Description</small> }
+</label>
+
+@code {
+    [Parameter, EditorRequired] public required EntryFieldDefinition Definition { get; set; }
+    [Parameter] public JsonElement Value { get; set; }
+    [Parameter] public EventCallback<JsonElement> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    private string StringValue => Value.ValueKind == JsonValueKind.String ? Value.GetString() ?? string.Empty : string.Empty;
+    private bool BooleanValue => Value.ValueKind is JsonValueKind.True or JsonValueKind.False && Value.GetBoolean();
+    private Task ChangeString(ChangeEventArgs args) => ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(args.Value?.ToString() ?? string.Empty));
+    private Task ChangeBoolean(ChangeEventArgs args) => ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(bool.TryParse(args.Value?.ToString(), out var value) && value));
+}

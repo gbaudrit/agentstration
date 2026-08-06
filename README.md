@@ -117,6 +117,16 @@ dotnet run --project src/Agentstration.Web
 
 Open `http://localhost:5080`. Data is persisted to `src/Agentstration.Web/.agentstration/data.json` and is intentionally ignored by Git.
 
+The end-user Workplace is now an autonomous host. Start its offline Work API and UI in separate terminals:
+
+```powershell
+$env:AI__Provider = "Deterministic"
+dotnet run --project src/Agentstration.Work.Api
+dotnet run --project src/Agentstration.Workplace.Web
+```
+
+Open `http://localhost:5180`; its API defaults to `http://localhost:5080`. The responsive UX uses the same design system and visual language as the Console while retaining end-user vocabulary. See [the Workplace guide](docs/workplace.md).
+
 The same process now hosts the Blazor operations console in Interactive Server mode. Agent and model management always use the canonical persisted HTTP APIs; unrelated dashboard projections remain simulated by default so every operational section is immediately explorable. See the [Web console guide](src/Agentstration.Web/README.md) for API client, authentication, rendering, and UI component configuration.
 
 For the Aspire dashboard and orchestration experience:
@@ -125,7 +135,7 @@ For the Aspire dashboard and orchestration experience:
 dotnet run --project src/Agentstration.AppHost
 ```
 
-This profile provisions an Ollama container, persists its model cache in a Docker volume, pulls `qwen3:1.7b` on first startup, and connects the Web application to it through Aspire service discovery. Override the development model with `Agentstration__LocalModels__Chat`; the first launch can take longer while Ollama downloads it.
+The AppHost exposes the Console, Work API, and Workplace as separate resources and wires Workplace to the Work API through service discovery. The default Work API remains deterministic and offline; optional Ollama settings continue to apply to the Console profile.
 
 Or with containers:
 

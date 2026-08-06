@@ -16,6 +16,10 @@ using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Storage.Sqlite;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
+using Agentstration.Workplace.Client;
+using Agentstration.Workplace.Components;
+using Agentstration.Work.Api;
+using Agentstration.Workplace.Web;
 
 namespace Agentstration.ArchitectureTests;
 
@@ -168,6 +172,37 @@ public sealed class DependencyTests
     {
         var references = typeof(IWorkItemRepository).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void WorkplaceClientAndComponentsDoNotReferenceProvidersAzureRuntimeOrStorage()
+    {
+        var assemblies = new[] { typeof(IWorkplaceApiClient).Assembly, typeof(EntryRenderer).Assembly };
+        Assert.IsFalse(assemblies.SelectMany(assembly => assembly.GetReferencedAssemblies()).Any(reference =>
+            reference.Name!.Contains("Azure", StringComparison.Ordinal)
+            || reference.Name.Contains("Ollama", StringComparison.Ordinal)
+            || reference.Name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || reference.Name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || reference.Name.Contains("Storage.Sqlite", StringComparison.Ordinal)
+            || reference.Name.Contains("EntityFramework", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void WorkplaceWebReferencesOnlyClientContractsAndNeutralComponents()
+    {
+        var references = typeof(WorkplaceWebAssemblyMarker).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Equals("Agentstration.Web", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Application", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
+            || name.Contains("Storage.Sqlite", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void WorkApiDoesNotReferenceTheConsoleAssembly()
+    {
+        var references = typeof(WorkApiAssemblyMarker).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Equals("Agentstration.Web", StringComparison.Ordinal)));
     }
 
     [TestMethod]

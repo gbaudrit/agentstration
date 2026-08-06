@@ -24,7 +24,8 @@ public sealed class WorkItemService(
     IWorkItemRepository repository,
     IWorkExecutionGateway executionGateway,
     TimeProvider timeProvider,
-    ILogger<WorkItemService> logger)
+    ILogger<WorkItemService> logger,
+    IEnumerable<IWorkTaskEventSink> eventSinks)
 {
     public static readonly ActivitySource ActivitySource = new("Agentstration.Work");
     public static readonly Meter Meter = new("Agentstration.Work");
@@ -62,6 +63,7 @@ public sealed class WorkItemService(
         await executionGateway.ConfirmQueuedAsync(accepted, cancellationToken);
         SubmittedCounter.Add(1);
         WorkAcceptedLog(logger, item.Id.Value, item.CorrelationId.Value, accepted.ExecutionId.Value, null);
+        await PublishAsync(stored.Value, cancellationToken);
         return stored;
     }
 
@@ -95,6 +97,7 @@ public sealed class WorkItemService(
         }
         if (updated.Value.Status == WorkItemStatus.Failed) FailedCounter.Add(1);
         RuntimeEventAppliedLog(logger, executionEvent.GetType().Name, executionEvent.WorkItemId.Value, updated.Value.Version, null);
+        await PublishAsync(updated.Value, cancellationToken);
         return updated;
     }
 
@@ -105,6 +108,7 @@ public sealed class WorkItemService(
         stored.Value.Cancel(authorId, Guid.NewGuid(), timeProvider.GetUtcNow());
         var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
         CancelledCounter.Add(1);
+        await PublishAsync(updated.Value, cancellationToken);
         return updated;
     }
 
@@ -113,7 +117,29 @@ public sealed class WorkItemService(
         var stored = await GetRequiredAsync(id, cancellationToken);
         var expectedVersion = stored.Value.Version;
         stored.Value.AddMessage(content, authorId, Guid.NewGuid(), timeProvider.GetUtcNow());
-        return await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
+        var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
+        await PublishAsync(updated.Value, cancellationToken);
+        return updated;
+    }
+
+    public async Task<StoredWorkItem> PauseAsync(WorkItemId id, CancellationToken cancellationToken)
+    {
+        var stored = await GetRequiredAsync(id, cancellationToken);
+        var expectedVersion = stored.Value.Version;
+        if (!stored.Value.Pause(Guid.NewGuid(), timeProvider.GetUtcNow())) return stored;
+        var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
+        await PublishAsync(updated.Value, cancellationToken);
+        return updated;
+    }
+
+    public async Task<StoredWorkItem> ResumeAsync(WorkItemId id, CancellationToken cancellationToken)
+    {
+        var stored = await GetRequiredAsync(id, cancellationToken);
+        var expectedVersion = stored.Value.Version;
+        if (!stored.Value.Resume(Guid.NewGuid(), timeProvider.GetUtcNow())) return stored;
+        var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
+        await PublishAsync(updated.Value, cancellationToken);
+        return updated;
     }
 
     public async Task<StoredWorkItem> ProvideInputAsync(WorkItemId id, WorkInput input, string? authorId, CancellationToken cancellationToken)
@@ -121,7 +147,9 @@ public sealed class WorkItemService(
         var stored = await GetRequiredAsync(id, cancellationToken);
         var expectedVersion = stored.Value.Version;
         stored.Value.ProvideInput(input, authorId, Guid.NewGuid(), timeProvider.GetUtcNow());
-        return await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
+        var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
+        await PublishAsync(updated.Value, cancellationToken);
+        return updated;
     }
 
     public async Task<StoredWorkItem> SubmitApprovalAsync(WorkItemId id, WorkApprovalDecision decision, string? authorId, string? comment, CancellationToken cancellationToken)
@@ -129,9 +157,16 @@ public sealed class WorkItemService(
         var stored = await GetRequiredAsync(id, cancellationToken);
         var expectedVersion = stored.Value.Version;
         stored.Value.SubmitApproval(decision, authorId, comment, Guid.NewGuid(), timeProvider.GetUtcNow());
-        return await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
+        var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
+        await PublishAsync(updated.Value, cancellationToken);
+        return updated;
     }
 
     private async Task<StoredWorkItem> GetRequiredAsync(WorkItemId id, CancellationToken cancellationToken) =>
         await repository.GetAsync(id, cancellationToken) ?? throw new KeyNotFoundException($"Work item '{id}' was not found.");
+
+    private async Task PublishAsync(WorkItem item, CancellationToken cancellationToken)
+    {
+        foreach (var sink in eventSinks) await sink.PublishAsync(item.ToSnapshot(), cancellationToken);
+    }
 }

@@ -129,6 +129,9 @@ public sealed record FlowRun
     public string? CorrelationId { get; init; }
     public string? WorkItemResourceId { get; init; }
     public string? ParentFlowRunId { get; init; }
+    public string? InteractionId { get; init; }
+    public string? WorkTaskId { get; init; }
+    public string? TriggerMessageId { get; init; }
     public required JsonElement Input { get; init; }
     public JsonElement? Output { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }

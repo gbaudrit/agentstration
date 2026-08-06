@@ -9,6 +9,15 @@ namespace Agentstration.Work.Storage.Sqlite;
 public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbContext(options)
 {
     internal DbSet<WorkItemDocument> WorkItems => Set<WorkItemDocument>();
+    internal DbSet<WorkplaceWorkspaceDocument> Workspaces => Set<WorkplaceWorkspaceDocument>();
+    internal DbSet<EntryDocument> Entries => Set<EntryDocument>();
+    internal DbSet<InteractionDocument> Interactions => Set<InteractionDocument>();
+    internal DbSet<ConversationMessageDocument> ConversationMessages => Set<ConversationMessageDocument>();
+    internal DbSet<PendingActionDocument> PendingActions => Set<PendingActionDocument>();
+    internal DbSet<WorkNotificationDocument> WorkNotifications => Set<WorkNotificationDocument>();
+    internal DbSet<WorkTaskActivityDocument> WorkTaskActivities => Set<WorkTaskActivityDocument>();
+    internal DbSet<WorkTaskResultDocument> WorkTaskResults => Set<WorkTaskResultDocument>();
+    internal DbSet<WorkTaskArtifactDocument> WorkTaskArtifacts => Set<WorkTaskArtifactDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,8 +37,120 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.HasIndex(value => new { value.Type, value.CreatedAt });
         item.HasIndex(value => new { value.RequesterIdentity, value.CreatedAt });
         item.HasIndex(value => new { value.SelectedAgentId, value.CreatedAt });
+
+        var workspace = modelBuilder.Entity<WorkplaceWorkspaceDocument>();
+        workspace.ToTable("WorkplaceWorkspaces");
+        workspace.HasKey(value => value.Id);
+        workspace.Property(value => value.Id).HasMaxLength(512);
+        workspace.Property(value => value.Name).HasMaxLength(128);
+
+        var entry = modelBuilder.Entity<EntryDocument>();
+        entry.ToTable("Entries");
+        entry.HasKey(value => value.Id);
+        entry.Property(value => value.Id).HasMaxLength(512);
+        entry.Property(value => value.Name).HasMaxLength(128);
+
+        var interaction = modelBuilder.Entity<InteractionDocument>();
+        interaction.ToTable("Interactions");
+        interaction.HasKey(value => value.Id);
+        interaction.Property(value => value.Id).HasMaxLength(36);
+        interaction.Property(value => value.WorkspaceId).HasMaxLength(512);
+        interaction.Property(value => value.EntryId).HasMaxLength(512);
+        interaction.Property(value => value.Status).HasConversion<string>().HasMaxLength(32);
+        interaction.Property(value => value.LastActivityAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
+        interaction.Property(value => value.Version).IsConcurrencyToken();
+        interaction.HasIndex(value => new { value.WorkspaceId, value.LastActivityAt });
+
+        ConfigureConversationMessage(modelBuilder.Entity<ConversationMessageDocument>());
+        ConfigurePendingAction(modelBuilder.Entity<PendingActionDocument>());
+        ConfigureNotification(modelBuilder.Entity<WorkNotificationDocument>());
+        ConfigureTaskEntity(modelBuilder.Entity<WorkTaskActivityDocument>(), "WorkTaskActivities");
+        ConfigureTaskEntity(modelBuilder.Entity<WorkTaskResultDocument>(), "WorkTaskResults");
+        ConfigureTaskEntity(modelBuilder.Entity<WorkTaskArtifactDocument>(), "WorkTaskArtifacts");
+    }
+
+    private static void ConfigureConversationMessage(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<ConversationMessageDocument> entity)
+    {
+        entity.ToTable("ConversationMessages"); entity.HasKey(value => value.Id);
+        entity.Property(value => value.WorkspaceId).HasMaxLength(512); entity.Property(value => value.InteractionId).HasMaxLength(36);
+        entity.Property(value => value.WorkTaskId).HasMaxLength(36); entity.HasIndex(value => new { value.WorkspaceId, value.InteractionId, value.CreatedAt });
+    }
+
+    private static void ConfigurePendingAction(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<PendingActionDocument> entity)
+    {
+        entity.ToTable("PendingActions"); entity.HasKey(value => value.Id); entity.Property(value => value.WorkspaceId).HasMaxLength(512);
+        entity.Property(value => value.InteractionId).HasMaxLength(36); entity.Property(value => value.WorkTaskId).HasMaxLength(36);
+        entity.Property(value => value.Status).HasConversion<string>().HasMaxLength(32); entity.Property(value => value.ResumeTokenHash).HasMaxLength(128);
+        entity.HasIndex(value => new { value.WorkspaceId, value.Status }); entity.HasIndex(value => new { value.InteractionId, value.CreatedAt });
+        entity.HasIndex(value => value.ResumeTokenHash).IsUnique();
+    }
+
+    private static void ConfigureNotification(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<WorkNotificationDocument> entity)
+    {
+        entity.ToTable("WorkNotifications"); entity.HasKey(value => value.Id); entity.Property(value => value.WorkspaceId).HasMaxLength(512);
+        entity.Property(value => value.Kind).HasConversion<string>().HasMaxLength(32); entity.HasIndex(value => new { value.WorkspaceId, value.CreatedAt });
+        entity.HasIndex(value => new { value.WorkspaceId, value.ReadAt }); entity.Property(value => value.Version).IsConcurrencyToken();
+    }
+
+    private static void ConfigureTaskEntity<T>(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<T> entity, string table) where T : class, IWorkTaskEntityDocument
+    {
+        entity.ToTable(table); entity.HasKey(value => value.Id); entity.Property(value => value.WorkspaceId).HasMaxLength(512);
+        entity.Property(value => value.WorkTaskId).HasMaxLength(36); entity.HasIndex(value => new { value.WorkspaceId, value.WorkTaskId, value.CreatedAt });
     }
 }
+
+internal sealed class WorkplaceWorkspaceDocument
+{
+    public required string Id { get; set; }
+    public required string Name { get; set; }
+    public required string Payload { get; set; }
+}
+
+internal sealed class EntryDocument
+{
+    public required string Id { get; set; }
+    public required string Name { get; set; }
+    public required string Payload { get; set; }
+}
+
+internal sealed class InteractionDocument
+{
+    public required string Id { get; set; }
+    public required string WorkspaceId { get; set; }
+    public required string EntryId { get; set; }
+    public InteractionStatus Status { get; set; }
+    public DateTimeOffset LastActivityAt { get; set; }
+    public long Version { get; set; }
+    public required string Payload { get; set; }
+}
+
+internal sealed class ConversationMessageDocument
+{
+    public required string Id { get; set; } public required string WorkspaceId { get; set; } public required string InteractionId { get; set; }
+    public string? WorkTaskId { get; set; } public DateTimeOffset CreatedAt { get; set; } public required string Payload { get; set; }
+}
+
+internal sealed class PendingActionDocument
+{
+    public required string Id { get; set; } public required string WorkspaceId { get; set; } public required string InteractionId { get; set; }
+    public string? WorkTaskId { get; set; } public PendingActionStatus Status { get; set; } public required string ResumeTokenHash { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } public long Version { get; set; } public required string Payload { get; set; }
+}
+
+internal sealed class WorkNotificationDocument
+{
+    public required string Id { get; set; } public required string WorkspaceId { get; set; } public WorkNotificationKind Kind { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } public DateTimeOffset? ReadAt { get; set; } public long Version { get; set; }
+    public required string Payload { get; set; }
+}
+
+internal interface IWorkTaskEntityDocument
+{
+    string Id { get; set; } string WorkspaceId { get; set; } string WorkTaskId { get; set; } DateTimeOffset CreatedAt { get; set; } string Payload { get; set; }
+}
+internal sealed class WorkTaskActivityDocument : IWorkTaskEntityDocument { public required string Id { get; set; } public required string WorkspaceId { get; set; } public required string WorkTaskId { get; set; } public DateTimeOffset CreatedAt { get; set; } public required string Payload { get; set; } }
+internal sealed class WorkTaskResultDocument : IWorkTaskEntityDocument { public required string Id { get; set; } public required string WorkspaceId { get; set; } public required string WorkTaskId { get; set; } public DateTimeOffset CreatedAt { get; set; } public required string Payload { get; set; } }
+internal sealed class WorkTaskArtifactDocument : IWorkTaskEntityDocument { public required string Id { get; set; } public required string WorkspaceId { get; set; } public required string WorkTaskId { get; set; } public DateTimeOffset CreatedAt { get; set; } public required string Payload { get; set; } }
 
 internal sealed class WorkItemDocument
 {
@@ -53,6 +174,45 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS WorkplaceWorkspaces (
+                Id TEXT NOT NULL CONSTRAINT PK_WorkplaceWorkspaces PRIMARY KEY,
+                Name TEXT NOT NULL,
+                Payload TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS Entries (
+                Id TEXT NOT NULL CONSTRAINT PK_Entries PRIMARY KEY,
+                Name TEXT NOT NULL,
+                Payload TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS Interactions (
+                Id TEXT NOT NULL CONSTRAINT PK_Interactions PRIMARY KEY,
+                WorkspaceId TEXT NOT NULL,
+                EntryId TEXT NOT NULL,
+                Status TEXT NOT NULL,
+                LastActivityAt INTEGER NOT NULL,
+                Version INTEGER NOT NULL,
+                Payload TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS IX_Interactions_WorkspaceId_LastActivityAt ON Interactions (WorkspaceId, LastActivityAt);
+            CREATE TABLE IF NOT EXISTS ConversationMessages (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, InteractionId TEXT NOT NULL, WorkTaskId TEXT NULL, CreatedAt TEXT NOT NULL, Payload TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS IX_ConversationMessages_WorkspaceId_InteractionId_CreatedAt ON ConversationMessages (WorkspaceId, InteractionId, CreatedAt);
+            CREATE TABLE IF NOT EXISTS PendingActions (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, InteractionId TEXT NOT NULL, WorkTaskId TEXT NULL, Status TEXT NOT NULL, ResumeTokenHash TEXT NOT NULL, CreatedAt TEXT NOT NULL, Version INTEGER NOT NULL, Payload TEXT NOT NULL);
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_PendingActions_ResumeTokenHash ON PendingActions (ResumeTokenHash);
+            CREATE INDEX IF NOT EXISTS IX_PendingActions_WorkspaceId_Status ON PendingActions (WorkspaceId, Status);
+            CREATE INDEX IF NOT EXISTS IX_PendingActions_InteractionId_CreatedAt ON PendingActions (InteractionId, CreatedAt);
+            CREATE TABLE IF NOT EXISTS WorkNotifications (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, Kind TEXT NOT NULL, CreatedAt TEXT NOT NULL, ReadAt TEXT NULL, Version INTEGER NOT NULL, Payload TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS IX_WorkNotifications_WorkspaceId_CreatedAt ON WorkNotifications (WorkspaceId, CreatedAt);
+            CREATE INDEX IF NOT EXISTS IX_WorkNotifications_WorkspaceId_ReadAt ON WorkNotifications (WorkspaceId, ReadAt);
+            CREATE TABLE IF NOT EXISTS WorkTaskActivities (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, WorkTaskId TEXT NOT NULL, CreatedAt TEXT NOT NULL, Payload TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS IX_WorkTaskActivities_WorkspaceId_WorkTaskId_CreatedAt ON WorkTaskActivities (WorkspaceId, WorkTaskId, CreatedAt);
+            CREATE TABLE IF NOT EXISTS WorkTaskResults (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, WorkTaskId TEXT NOT NULL, CreatedAt TEXT NOT NULL, Payload TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS IX_WorkTaskResults_WorkspaceId_WorkTaskId_CreatedAt ON WorkTaskResults (WorkspaceId, WorkTaskId, CreatedAt);
+            CREATE TABLE IF NOT EXISTS WorkTaskArtifacts (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, WorkTaskId TEXT NOT NULL, CreatedAt TEXT NOT NULL, Payload TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS IX_WorkTaskArtifacts_WorkspaceId_WorkTaskId_CreatedAt ON WorkTaskArtifacts (WorkspaceId, WorkTaskId, CreatedAt);
+            """,
+            cancellationToken);
     }
 
     public async Task<StoredWorkItem> CreateAsync(WorkItem workItem, CancellationToken cancellationToken)
@@ -150,6 +310,219 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
     private static string ETag(long version) => $"\"{version}\"";
 }
 
+public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> contextFactory) : IWorkplaceRepository
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public async Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await context.Database.EnsureCreatedAsync(cancellationToken);
+    }
+
+    public async Task UpsertWorkspaceAsync(WorkplaceWorkspace workspace, CancellationToken cancellationToken)
+    {
+        WorkplaceValidation.Validate(workspace);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Workspaces.SingleOrDefaultAsync(value => value.Id == workspace.Id.Value, cancellationToken);
+        if (document is null) context.Workspaces.Add(new WorkplaceWorkspaceDocument { Id = workspace.Id.Value, Name = workspace.Name, Payload = JsonSerializer.Serialize(workspace, JsonOptions) });
+        else { document.Name = workspace.Name; document.Payload = JsonSerializer.Serialize(workspace, JsonOptions); }
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkplaceWorkspace>> ListWorkspacesAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.Workspaces.AsNoTracking().OrderBy(value => value.Name).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<WorkplaceWorkspace>).ToArray();
+    }
+
+    public async Task<WorkplaceWorkspace?> GetWorkspaceAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payload = await context.Workspaces.AsNoTracking().Where(value => value.Id == workspaceId.Value).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<WorkplaceWorkspace>(payload);
+    }
+
+    public async Task UpsertEntryAsync(EntryResource entry, CancellationToken cancellationToken)
+    {
+        WorkplaceValidation.Validate(entry);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Entries.SingleOrDefaultAsync(value => value.Id == entry.Id.Value, cancellationToken);
+        if (document is null) context.Entries.Add(new EntryDocument { Id = entry.Id.Value, Name = entry.Name, Payload = JsonSerializer.Serialize(entry, JsonOptions) });
+        else { document.Name = entry.Name; document.Payload = JsonSerializer.Serialize(entry, JsonOptions); }
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<EntryResource>> ListEntriesAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.Entries.AsNoTracking().OrderBy(value => value.Name).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<EntryResource>).ToArray();
+    }
+
+    public async Task<EntryResource?> GetEntryAsync(EntryId entryId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payload = await context.Entries.AsNoTracking().Where(value => value.Id == entryId.Value).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<EntryResource>(payload);
+    }
+
+    public async Task CreateInteractionAsync(WorkplaceInteraction interaction, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        context.Interactions.Add(ToDocument(interaction));
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) { throw new WorkplaceConcurrencyException(exception.InnerException?.Message ?? exception.Message); }
+    }
+
+    public async Task<WorkplaceInteraction?> GetInteractionAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payload = await context.Interactions.AsNoTracking()
+            .Where(value => value.Id == interactionId.ToString() && value.WorkspaceId == workspaceId.Value)
+            .Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<WorkplaceInteraction>(payload);
+    }
+
+    public async Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkplaceWorkspaceId workspaceId, int take, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.Interactions.AsNoTracking()
+            .Where(value => value.WorkspaceId == workspaceId.Value)
+            .OrderByDescending(value => value.LastActivityAt)
+            .Take(Math.Clamp(take, 1, 100))
+            .Select(value => value.Payload)
+            .ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<WorkplaceInteraction>).ToArray();
+    }
+
+    public async Task SaveInteractionAsync(WorkplaceInteraction interaction, long expectedVersion, CancellationToken cancellationToken)
+    {
+        if (interaction.Version <= expectedVersion) throw new WorkplaceConcurrencyException("The Interaction version must increase before it is saved.");
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Interactions.SingleOrDefaultAsync(value => value.Id == interaction.Id.ToString() && value.WorkspaceId == interaction.WorkspaceId.Value, cancellationToken)
+            ?? throw new KeyNotFoundException($"Interaction '{interaction.Id}' was not found in Workspace '{interaction.WorkspaceId}'.");
+        if (document.Version != expectedVersion) throw new WorkplaceConcurrencyException("The supplied Interaction version is stale.");
+        document.Status = interaction.Status;
+        document.LastActivityAt = interaction.LastActivityAt;
+        document.Version = interaction.Version;
+        document.Payload = JsonSerializer.Serialize(interaction, JsonOptions);
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateConcurrencyException exception) { throw new WorkplaceConcurrencyException(exception.Message); }
+    }
+
+    public async Task AddMessageAsync(ConversationMessage message, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        context.ConversationMessages.Add(new ConversationMessageDocument { Id = message.Id.ToString(), WorkspaceId = message.WorkspaceId.Value, InteractionId = message.InteractionId.ToString(), WorkTaskId = message.WorkTaskId?.ToString(), CreatedAt = message.CreatedAt, Payload = JsonSerializer.Serialize(message, JsonOptions) });
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.ConversationMessages.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.InteractionId == interactionId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<ConversationMessage>).OrderBy(value => value.CreatedAt).ToArray();
+    }
+
+    public async Task CreatePendingActionAsync(PendingAction action, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        context.PendingActions.Add(new PendingActionDocument { Id = action.Id.ToString(), WorkspaceId = action.WorkspaceId.Value, InteractionId = action.InteractionId.ToString(), WorkTaskId = action.WorkTaskId?.ToString(), Status = action.Status, ResumeTokenHash = action.ResumeTokenHash, CreatedAt = action.CreatedAt, Version = action.Version, Payload = JsonSerializer.Serialize(action, JsonOptions) });
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<PendingAction?> GetPendingActionAsync(WorkplaceWorkspaceId workspaceId, PendingActionId actionId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payload = await context.PendingActions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.Id == actionId.ToString()).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<PendingAction>(payload);
+    }
+
+    public async Task<IReadOnlyList<PendingAction>> ListPendingActionsAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.PendingActions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.InteractionId == interactionId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<PendingAction>).OrderBy(value => value.CreatedAt).ToArray();
+    }
+
+    public async Task SavePendingActionAsync(PendingAction action, long expectedVersion, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.PendingActions.SingleOrDefaultAsync(value => value.WorkspaceId == action.WorkspaceId.Value && value.Id == action.Id.ToString(), cancellationToken) ?? throw new KeyNotFoundException($"Pending action '{action.Id}' was not found.");
+        if (document.Version != expectedVersion) throw new WorkplaceConcurrencyException("The PendingAction version is stale.");
+        document.Status = action.Status; document.Version = action.Version; document.Payload = JsonSerializer.Serialize(action, JsonOptions);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddActivityAsync(WorkTaskActivity activity, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        context.WorkTaskActivities.Add(new WorkTaskActivityDocument { Id = activity.Id.ToString(), WorkspaceId = activity.WorkspaceId.Value, WorkTaskId = activity.WorkTaskId.ToString(), CreatedAt = activity.CreatedAt, Payload = JsonSerializer.Serialize(activity, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payloads = await context.WorkTaskActivities.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.WorkTaskId == taskId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkTaskActivity>).OrderBy(value => value.CreatedAt).ToArray();
+    }
+
+    public async Task AddResultAsync(WorkTaskResult result, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); context.WorkTaskResults.Add(new WorkTaskResultDocument { Id = result.Id.ToString(), WorkspaceId = result.WorkspaceId.Value, WorkTaskId = result.WorkTaskId.ToString(), CreatedAt = result.CreatedAt, Payload = JsonSerializer.Serialize(result, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payloads = await context.WorkTaskResults.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.WorkTaskId == taskId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkTaskResult>).OrderBy(value => value.CreatedAt).ToArray();
+    }
+
+    public async Task AddArtifactAsync(WorkTaskArtifact artifact, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); context.WorkTaskArtifacts.Add(new WorkTaskArtifactDocument { Id = artifact.Id.ToString(), WorkspaceId = artifact.WorkspaceId.Value, WorkTaskId = artifact.WorkTaskId.ToString(), CreatedAt = artifact.CreatedAt, Payload = JsonSerializer.Serialize(artifact, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payloads = await context.WorkTaskArtifacts.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.WorkTaskId == taskId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkTaskArtifact>).OrderBy(value => value.CreatedAt).ToArray();
+    }
+
+    public async Task<WorkTaskArtifact?> GetArtifactAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, WorkTaskArtifactId artifactId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payload = await context.WorkTaskArtifacts.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.WorkTaskId == taskId.ToString() && value.Id == artifactId.ToString()).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken); return payload is null ? null : Deserialize<WorkTaskArtifact>(payload);
+    }
+
+    public async Task CreateNotificationAsync(WorkNotification notification, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); context.WorkNotifications.Add(new WorkNotificationDocument { Id = notification.Id.ToString(), WorkspaceId = notification.WorkspaceId.Value, Kind = notification.Kind, CreatedAt = notification.CreatedAt, ReadAt = notification.ReadAt, Version = notification.Version, Payload = JsonSerializer.Serialize(notification, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkNotification>> ListNotificationsAsync(WorkplaceWorkspaceId workspaceId, bool? unreadOnly, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var query = context.WorkNotifications.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value); if (unreadOnly == true) query = query.Where(value => value.ReadAt == null); var payloads = await query.Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkNotification>).OrderByDescending(value => value.CreatedAt).ToArray();
+    }
+
+    public async Task<WorkNotification?> GetNotificationAsync(WorkplaceWorkspaceId workspaceId, WorkNotificationId notificationId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payload = await context.WorkNotifications.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.Id == notificationId.ToString()).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken); return payload is null ? null : Deserialize<WorkNotification>(payload);
+    }
+
+    public async Task SaveNotificationAsync(WorkNotification notification, long expectedVersion, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var document = await context.WorkNotifications.SingleOrDefaultAsync(value => value.WorkspaceId == notification.WorkspaceId.Value && value.Id == notification.Id.ToString(), cancellationToken) ?? throw new KeyNotFoundException($"Notification '{notification.Id}' was not found."); if (document.Version != expectedVersion) throw new WorkplaceConcurrencyException("The notification version is stale."); document.ReadAt = notification.ReadAt; document.Version = notification.Version; document.Payload = JsonSerializer.Serialize(notification, JsonOptions); await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static InteractionDocument ToDocument(WorkplaceInteraction interaction) => new()
+    {
+        Id = interaction.Id.ToString(), WorkspaceId = interaction.WorkspaceId.Value, EntryId = interaction.EntryId.Value,
+        Status = interaction.Status, LastActivityAt = interaction.LastActivityAt, Version = interaction.Version,
+        Payload = JsonSerializer.Serialize(interaction, JsonOptions)
+    };
+
+    private static T Deserialize<T>(string payload) => JsonSerializer.Deserialize<T>(payload, JsonOptions)
+        ?? throw new InvalidOperationException($"Stored {typeof(T).Name} document is invalid.");
+}
+
 public static class SqliteWorkServiceCollectionExtensions
 {
     public static IServiceCollection AddSqliteWorkPlane(this IServiceCollection services, string connectionString)
@@ -157,6 +530,7 @@ public static class SqliteWorkServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         services.AddDbContextFactory<WorkDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IWorkItemRepository, SqliteWorkItemRepository>();
+        services.AddSingleton<IWorkplaceRepository, SqliteWorkplaceRepository>();
         return services;
     }
 }

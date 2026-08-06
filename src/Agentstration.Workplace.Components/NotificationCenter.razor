@@ -1,0 +1,45 @@
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Activity</p>
+            <h2>Notifications</h2>
+        </div>
+        @if (Notifications.Any(value => value.ReadAt is null))
+        {
+            <button class="text-button" @onclick="OnMarkAllRead">Mark all read</button>
+        }
+    </div>
+
+    @if (Notifications.Count == 0)
+    {
+        <div class="compact-empty"><EmptyState Title="All quiet" Message="Task updates will appear here." /></div>
+    }
+    else
+    {
+        @foreach (var item in Notifications.OrderBy(value => value.ReadAt is not null).ThenByDescending(value => value.CreatedAt))
+        {
+            <article class="notification-row @(item.ReadAt is null ? "unread" : null)">
+                <div>
+                    <strong>@item.Title</strong>
+                    <p>@item.Message</p>
+                    <time>@item.CreatedAt.LocalDateTime.ToString("g")</time>
+                </div>
+                @if (item.ReadAt is null)
+                {
+                    <button class="text-button" @onclick="() => OnMarkRead.InvokeAsync(item.Id)">Mark read</button>
+                }
+            </article>
+        }
+    }
+</section>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<WorkNotification> Notifications { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<WorkNotificationId> OnMarkRead { get; set; }
+
+    [Parameter]
+    public EventCallback OnMarkAllRead { get; set; }
+}

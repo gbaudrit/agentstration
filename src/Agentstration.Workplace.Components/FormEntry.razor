@@ -1,0 +1,32 @@
+<form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true" aria-busy="@(Busy || submitting)">
+    <header><div><h2>@Definition.DisplayName</h2>@if (Definition.Description is not null) { <p>@Definition.Description</p> }</div></header>
+    <div class="entry-fields">
+        @foreach (var field in Definition.Presentation.Fields.OrderBy(value => value.Order))
+        {
+            <EntryFieldRenderer Definition="field" Value="GetValue(field)" ValueChanged="value => values[field.Name] = value" Disabled="@(Disabled || Busy || submitting)" />
+        }
+    </div>
+    <button class="entry-submit" type="submit" disabled="@(Disabled || Busy || submitting)"><UiIcon Name="send" /> @(Busy || submitting ? "Sending…" : "Continue")</button>
+    @if (error is not null) { <p class="entry-error" role="alert">@error</p> }
+</form>
+
+@code {
+    [Parameter, EditorRequired] public required EntryResource Definition { get; set; }
+    [Parameter, EditorRequired] public required EventCallback<IReadOnlyDictionary<string, JsonElement>> OnSubmit { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    private readonly Dictionary<string, JsonElement> values = new(StringComparer.Ordinal);
+    private string? error;
+    private bool submitting;
+    private JsonElement GetValue(EntryFieldDefinition field) => values.TryGetValue(field.Name, out var value) ? value : field.DefaultValue ?? default;
+    private async Task SubmitAsync()
+    {
+        if (Disabled || Busy || submitting) return;
+        var missing = Definition.Presentation.Fields.FirstOrDefault(field => field.Required && (!values.TryGetValue(field.Name, out var value) || value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null || value.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(value.GetString())));
+        if (missing is not null) { error = $"{missing.Label ?? missing.Name} is required."; return; }
+        error = null;
+        submitting = true;
+        try { await OnSubmit.InvokeAsync(values); }
+        finally { submitting = false; }
+    }
+}

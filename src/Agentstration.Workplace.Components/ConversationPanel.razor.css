@@ -1,0 +1,1 @@
+.conversation{display:grid;gap:12px}.message{max-width:82%;padding:12px 14px;border-radius:10px;background:var(--surface-2)}.message.role-user{justify-self:end;background:var(--primary-soft)}.message p{margin:5px 0}.message time{color:var(--muted);font-size:.7rem}@media(max-width:620px){.message{max-width:94%}}

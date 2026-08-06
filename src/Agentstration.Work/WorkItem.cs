@@ -187,6 +187,22 @@ public sealed class WorkItem
         Transition(WorkItemStatus.Cancelled, "WorkItemCancelled", eventId, WorkInteractionOrigin.Requester, now);
     }
 
+    public bool Pause(Guid eventId, DateTimeOffset now)
+    {
+        if (Status == WorkItemStatus.Paused) return false;
+        RequireStatus(WorkItemStatus.Running, "pause_not_allowed");
+        Transition(WorkItemStatus.Paused, "WorkItemPaused", eventId, WorkInteractionOrigin.Requester, now);
+        return true;
+    }
+
+    public bool Resume(Guid eventId, DateTimeOffset now)
+    {
+        if (Status == WorkItemStatus.Running) return false;
+        RequireStatus(WorkItemStatus.Paused, "resume_not_allowed");
+        Transition(WorkItemStatus.Running, "WorkItemResumed", eventId, WorkInteractionOrigin.Requester, now);
+        return true;
+    }
+
     private void Start(WorkExecutionId executionId, string selectedAgentId, Guid eventId, DateTimeOffset now)
     {
         RequireStatus(WorkItemStatus.Queued, "start_not_allowed");

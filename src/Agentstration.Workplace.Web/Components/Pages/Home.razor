@@ -1,0 +1,44 @@
+@page "/"
+@attribute [StreamRendering]
+@implements IDisposable
+@inject IWorkplaceApiClient Api
+@inject WorkplaceRealtimeClient Realtime
+
+<PageTitle>Workplace · Agentstration</PageTitle>
+
+@if (loading) { <LoadingState /> }
+else if (loadError is not null) { <ServiceUnavailableState Message="@loadError" OnRetry="LoadAsync" /> }
+else
+{
+    <div class="workplace-heading"><div><p class="eyebrow">Workspace</p><h1>@(workspace?.DisplayName ?? "Workplace")</h1></div><RealtimeStatus Connected="RealtimeConnected" /></div>
+    <div class="workplace-shell">
+        <main>
+            @if (primary is not null && interaction is null)
+            {
+                <PrimaryEntryContainer Busy="busy"><EntryRenderer Definition="@ToDefinition(primary)" Role="WorkspaceEntryRole.Primary" OnSubmit="values => SubmitAsync(primary, values)" Disabled="busy" Busy="busy" /></PrimaryEntryContainer>
+                @if (standardEntries.Count > 0)
+                {
+                    <section class="standard-entries"><div class="section-heading"><div><p class="eyebrow">Shortcuts</p><h2>Other ways to start</h2></div></div><div class="standard-entry-grid">@foreach(var entry in standardEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="WorkspaceEntryRole.Standard" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
+                }
+            }
+            else if (interaction is not null)
+            {
+                <InteractionView Messages="messages" Action="currentAction" Status="interaction.Status" Task="activeTask" Activities="activities" Results="results" Artifacts="artifacts" Busy="busy" RealtimeConnected="RealtimeConnected" Error="@interactionError" OnPendingAction="RespondAsync" OnMessage="ContinueAsync" OnNewRequest="NewRequest" ArtifactContentUrl="ArtifactUrl" />
+            }
+            @if (interaction is null && primary is null) { <EmptyState Title="No primary entry" Message="This workspace has no starting point configured yet." /> }
+            <section class="home-section recent-work">
+                <div class="section-heading"><div><p class="eyebrow">Work</p><h2>Recent tasks</h2></div><a href="/tasks">View all</a></div>
+                @if (tasks.Count == 0) { <div class="compact-empty"><EmptyState Title="No tasks yet" Message="Start with a request above. Tasks that need more time will appear here." /></div> }
+                else { <div class="task-cards">@foreach (var item in tasks.Take(4)) { <a class="task-card-link" href="/tasks/@item.Id"><TaskStatusBadge Value="item.Status" /><strong>@item.Title</strong><small>Updated @item.UpdatedAt.LocalDateTime.ToString("g")</small></a> }</div> }
+            </section>
+            @if (recentInteractions.Count > 0)
+            {
+                <section class="home-section recent-conversations"><div class="section-heading"><div><p class="eyebrow">History</p><h2>Recent conversations</h2></div></div><div class="conversation-cards">@foreach(var item in recentInteractions.Where(value => value.Id != interaction?.Id).Take(5)){<a href="/?interaction=@item.Id"><span>@ConversationTitle(item)</span><small>@ConversationStatus(item.Status) · @item.LastActivityAt.LocalDateTime.ToString("g")</small></a>}</div></section>
+            }
+        </main>
+        <aside class="attention-rail">
+            <section class="attention-summary"><div><strong>@tasks.Count(value => value.Status == WorkTaskStatus.ActionRequired)</strong><span>Need your input</span></div><div><strong>@unread</strong><span>Unread updates</span></div></section>
+            <NotificationCenter Notifications="notifications.Take(5).ToArray()" OnMarkRead="MarkReadAsync" OnMarkAllRead="MarkAllReadAsync" />
+        </aside>
+    </div>
+}

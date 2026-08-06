@@ -1,0 +1,17 @@
+@inject IJSRuntime JavaScript
+
+<section class="task-result" aria-labelledby="@HeadingId">
+    <div class="result-heading">
+        <div><p class="eyebrow">Result · Version @Result.Sequence</p><h2 id="@HeadingId">@Result.Title</h2></div>
+        <button class="button-secondary result-copy" type="button" @onclick="CopyAsync"><UiIcon Name="copy" /> @(copied ? "Copied" : "Copy")</button>
+    </div>
+    <div class="result-content">@FormattedContent</div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public required WorkTaskResult Result { get; set; }
+    private bool copied;
+    private string HeadingId => $"result-{Result.Id.Value:N}";
+    private string FormattedContent => Result.Content.ValueKind == JsonValueKind.String ? Result.Content.GetString() ?? string.Empty : JsonSerializer.Serialize(Result.Content, new JsonSerializerOptions { WriteIndented = true });
+    private async Task CopyAsync() { await JavaScript.InvokeVoidAsync("navigator.clipboard.writeText", FormattedContent); copied = true; }
+}
