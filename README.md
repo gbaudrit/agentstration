@@ -115,7 +115,7 @@ The most direct route is:
 dotnet run --project src/Agentstration.Web
 ```
 
-Open `http://localhost:5080`. Data is persisted to `src/Agentstration.Web/.agentstration/data.json` and is intentionally ignored by Git.
+Open the Console at `http://localhost:5100`. Port `5080` is reserved for Work API and its root path intentionally has no UI. Data is persisted to `src/Agentstration.Web/.agentstration/data.json` and is intentionally ignored by Git.
 
 The end-user Workplace is now an autonomous host. Start its offline Work API and UI in separate terminals:
 
@@ -126,6 +126,8 @@ dotnet run --project src/Agentstration.Workplace.Web
 ```
 
 Open `http://localhost:5180`; its API defaults to `http://localhost:5080`. The responsive UX uses the same design system and visual language as the Console while retaining end-user vocabulary. See [the Workplace guide](docs/workplace.md).
+
+The Console Tasks section at `/tasks` supervises the real WorkTasks exposed by Work API. It uses server-side pagination and SignalR updates, remains readable when Workplace is stopped, and never substitutes fictitious Tasks when Work API is unavailable.
 
 The same process now hosts the Blazor operations console in Interactive Server mode. Agent and model management always use the canonical persisted HTTP APIs; unrelated dashboard projections remain simulated by default so every operational section is immediately explorable. See the [Web console guide](src/Agentstration.Web/README.md) for API client, authentication, rendering, and UI component configuration.
 

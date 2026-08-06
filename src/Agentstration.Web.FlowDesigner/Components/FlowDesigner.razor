@@ -4,7 +4,11 @@
 @inject FlowEditorStore Editor
 @inject NavigationManager Navigation
 
-@if (Editor.State.Draft is null)
+@if (Editor.State.Draft is null && error is not null)
+{
+    <section class="error-panel designer-error"><strong>Flow Designer unavailable</strong><p>@error</p></section>
+}
+else if (Editor.State.Draft is null)
 {
     <LoadingState />
 }
@@ -180,16 +184,21 @@ else
         if (loadedResource == ResourceId) return;
         loadedResource = ResourceId;
         Editor.StateChanged += EditorChanged;
-        var draftTask = Backend.GetDraftAsync(ResourceId, cancellation.Token);
-        var sourceTask = Backend.GetSourceAsync(ResourceId, cancellation.Token);
-        await Task.WhenAll(draftTask, sourceTask);
-        var draft = await draftTask;
-        sourceText = (await sourceTask).Source;
-        Editor.Load(draft, sourceText);
-        routerResourceGroup = draft.Value.ResourceGroup;
-        agents = routerAgents = await Resources.GetAgentsAsync(routerResourceGroup, cancellation.Token);
-        transitionFrom = draft.Value.Definition.EntryStep;
-        transitionTo = draft.Value.Definition.Steps.Skip(1).FirstOrDefault()?.Name ?? transitionFrom;
+        try
+        {
+            error = null;
+            var draft = await Backend.GetDraftAsync(ResourceId, cancellation.Token);
+            sourceText = (await Backend.GetSourceAsync(ResourceId, cancellation.Token)).Source;
+            Editor.Load(draft, sourceText);
+            routerResourceGroup = draft.Value.ResourceGroup;
+            agents = routerAgents = await Resources.GetAgentsAsync(routerResourceGroup, cancellation.Token);
+            transitionFrom = draft.Value.Definition.EntryStep;
+            transitionTo = draft.Value.Definition.Steps.Skip(1).FirstOrDefault()?.Name ?? transitionFrom;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            error = exception.Message;
+        }
     }
 
     private async Task DispatchAsync(IFlowEditorCommand command)

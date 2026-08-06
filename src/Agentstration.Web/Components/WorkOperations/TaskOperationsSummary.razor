@@ -1,0 +1,11 @@
+@using Agentstration.Work.Contracts
+<section class="task-summary-grid" aria-label="Task status summary">
+    @foreach (var item in Items)
+    {
+        <article class="panel task-summary-card"><span>@item.Label</span><strong>@item.Value</strong></article>
+    }
+</section>
+@code {
+    [Parameter, EditorRequired] public WorkTaskOperationsCountersResponse Summary { get; set; } = new(0, 0, 0, 0, 0);
+    private IReadOnlyList<(string Label, int Value)> Items => [("Running", Summary.Running), ("Needs attention", Summary.ActionRequired), ("Paused", Summary.Paused), ("Failed", Summary.Failed), ("Completed · 24h", Summary.CompletedRecently)];
+}

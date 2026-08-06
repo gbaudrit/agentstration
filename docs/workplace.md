@@ -6,6 +6,8 @@ The third increment turns the existing functional vertical into one continuous e
 
 ## Iteration 4 durable conversation
 
+The Console supervises these durable Tasks through Work API. It does not reuse Workplace UI state or read Work SQLite: `/tasks` is a paginated operational projection, while Workplace remains the place to converse and answer PendingActions. Optional links from Console reopen the corresponding Workplace Task or Interaction.
+
 An Entry now opens a durable Interaction rather than a terminal Task funnel. The active conversation has a permanent composer after immediate replies, during non-blocking work, and after results or artifacts. A completed Task moves its Interaction to `Idle`; it does not close it. `New request` returns to the Primary Entry while the previous Interaction remains available under Recent conversations.
 
 `prepare-report` applies the standard detail level by default and starts work immediately. A follow-up such as “Make it shorter and suitable for executives” is accepted asynchronously, builds a controlled `InteractionContinuationContext`, and starts a new FlowRun. The new run records its terminal predecessor as `ParentFlowRunId`, retains the Interaction, public Task, and triggering message identifiers, and never reopens the previous FlowRun. The same public Task then exposes Initial report, Executive version, and later revisions as successive results with matching versioned artifacts.
@@ -55,7 +57,7 @@ dotnet run --project src/Agentstration.Work.Api
 dotnet run --project src/Agentstration.Workplace.Web
 ```
 
-The defaults are `http://localhost:5080` for Work API and `http://localhost:5180` for Workplace. Aspire starts `agentstration-console`, `agentstration-work-api`, and `agentstration-workplace` as separate resources and injects the API endpoint into Workplace.
+The defaults are `http://localhost:5080` for Work API, `http://localhost:5100` for the Console, and `http://localhost:5180` for Workplace. Aspire starts `agentstration-console`, `agentstration-work-api`, and `agentstration-workplace` as separate resources and injects their endpoints.
 
 ## Isolation and public model
 

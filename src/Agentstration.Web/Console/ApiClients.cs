@@ -9,6 +9,7 @@ using Agentstration.Flow;
 using Agentstration.Management.Contracts;
 using Agentstration.Web.Components.Models;
 using Agentstration.Work.Contracts;
+using Agentstration.Work;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 
@@ -51,6 +52,14 @@ public interface IAgentRunnerRuntimeClient : IRuntimeApiClient
 public interface IWorkApiClient
 {
     Task<IReadOnlyList<WorkSummary>> GetWorkItemsAsync(CancellationToken cancellationToken);
+    Task<WorkTaskOperationsPageResponse> GetTasksAsync(string? workspaceId, WorkTaskStatus? status, string? search, bool? hasPendingAction, int page, int pageSize, string sort, string direction, CancellationToken cancellationToken);
+    Task<WorkTaskOperationsCountersResponse> GetTaskSummaryAsync(string? workspaceId, CancellationToken cancellationToken);
+    Task<WorkTaskOperationsDetailResponse> GetTaskAsync(Guid taskId, CancellationToken cancellationToken);
+    Task<FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken);
+    Task PauseTaskAsync(Guid taskId, CancellationToken cancellationToken);
+    Task ResumeTaskAsync(Guid taskId, CancellationToken cancellationToken);
+    Task CancelTaskAsync(Guid taskId, CancellationToken cancellationToken);
 }
 
 public interface IFlowApiClient
@@ -155,9 +164,35 @@ public sealed class WorkApiClient(HttpClient httpClient) : IWorkApiClient
 {
     public async Task<IReadOnlyList<WorkSummary>> GetWorkItemsAsync(CancellationToken cancellationToken)
     {
-        var page = await ApiResponse.ReadAsync<WorkItemPageResponse>(httpClient, "api/work/workitems?top=100", cancellationToken);
-        return page.Value.Select(item => new WorkSummary(item.Id, item.Title ?? item.Type, item.Type, item.Status.ToString(), "Normal", item.SelectedAgentId ?? "Unassigned", item.CreatedAt, item.UpdatedAt)).ToArray();
+        var page = await GetTasksAsync(null, null, null, null, 1, 100, "updatedAt", "desc", cancellationToken);
+        return page.Items.Select(item => new WorkSummary(item.Id, item.Title, "WorkTask", item.Status.ToString(), "—", WorkspaceName(item.WorkspaceId), item.CreatedAt, item.UpdatedAt)).ToArray();
     }
+
+    public Task<WorkTaskOperationsPageResponse> GetTasksAsync(string? workspaceId, WorkTaskStatus? status, string? search, bool? hasPendingAction, int page, int pageSize, string sort, string direction, CancellationToken cancellationToken)
+    {
+        var values = new List<string> { $"page={Math.Max(1, page)}", $"pageSize={Math.Clamp(pageSize, 1, 100)}", $"sort={Uri.EscapeDataString(sort)}", $"direction={Uri.EscapeDataString(direction)}" };
+        if (!string.IsNullOrWhiteSpace(workspaceId)) values.Add($"workspaceId={Uri.EscapeDataString(workspaceId)}");
+        if (status is not null) values.Add($"status={status}");
+        if (!string.IsNullOrWhiteSpace(search)) values.Add($"search={Uri.EscapeDataString(search.Trim())}");
+        if (hasPendingAction is not null) values.Add($"hasPendingAction={hasPendingAction.Value.ToString().ToLowerInvariant()}");
+        return ApiResponse.ReadAsync<WorkTaskOperationsPageResponse>(httpClient, $"api/tasks?{string.Join('&', values)}", cancellationToken);
+    }
+
+    public Task<WorkTaskOperationsCountersResponse> GetTaskSummaryAsync(string? workspaceId, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<WorkTaskOperationsCountersResponse>(httpClient, string.IsNullOrWhiteSpace(workspaceId) ? "api/tasks/summary" : $"api/tasks/summary?workspaceId={Uri.EscapeDataString(workspaceId)}", cancellationToken);
+    public Task<WorkTaskOperationsDetailResponse> GetTaskAsync(Guid taskId, CancellationToken cancellationToken) => ApiResponse.ReadAsync<WorkTaskOperationsDetailResponse>(httpClient, $"api/tasks/{taskId}", cancellationToken);
+    public Task<FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken) => ApiResponse.ReadAsync<FlowRun>(httpClient, $"api/tasks/{taskId}/flow-runs/{Uri.EscapeDataString(runId)}", cancellationToken);
+    public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) => await ApiResponse.ReadAsync<WorkplaceWorkspaceResponse[]>(httpClient, "api/workspaces", cancellationToken);
+    public Task PauseTaskAsync(Guid taskId, CancellationToken cancellationToken) => CommandAsync(taskId, "pause", cancellationToken);
+    public Task ResumeTaskAsync(Guid taskId, CancellationToken cancellationToken) => CommandAsync(taskId, "resume", cancellationToken);
+    public Task CancelTaskAsync(Guid taskId, CancellationToken cancellationToken) => CommandAsync(taskId, "cancel", cancellationToken);
+
+    private async Task CommandAsync(Guid taskId, string command, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync($"api/tasks/{taskId}/{command}", null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+    private static string WorkspaceName(string id) => id[(id.LastIndexOf('/') + 1)..];
 }
 
 public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient

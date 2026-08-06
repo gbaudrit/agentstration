@@ -64,7 +64,7 @@ public sealed class ConsoleResourceSearchProvider(
                 .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, $"/flows/{Escape(item.Id)}", item.Status, "⌘", $"{item.Kind} {item.Version}")),
                 .. runtimesTask.Result.Select(item => new ResourceSearchResult(item.Id, "Runtime", item.Id, "/runtime", item.Status, "◉", $"{item.Agent} {item.Location}")),
                 .. executionsTask.Result.Select(item => new ResourceSearchResult(item.Id, "Execution", item.Id, $"/runs/{Escape(item.Id)}", item.Status, "▶", $"{item.Agent} {item.Flow}")),
-                .. workTask.Result.Select(item => new ResourceSearchResult(item.Title, "Work item", item.Id.ToString(), "/work", item.Status, "✓", $"{item.Type} {item.Owner}"))
+                .. workTask.Result.Select(item => new ResourceSearchResult(item.Title, "Task", item.Id.ToString(), $"/tasks/{item.Id}", item.Status, "✓", $"{item.Type} {item.Owner}"))
             ];
             loadedAt = timeProvider.GetUtcNow();
         }

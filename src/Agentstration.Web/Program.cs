@@ -136,6 +136,7 @@ app.MapAgentstrationManagementApi();
 app.MapAgentstrationModelManagementApi();
 app.MapAgentstrationWorkApi();
 app.MapAgentstrationWorkplaceApi();
+app.MapAgentstrationWorkOperationsApi();
 app.MapAgentstrationFlowApi();
 app.MapAgentstrationRuntimeApi();
 app.MapHub<FlowRunHub>("/hubs/flow-runs");

@@ -1,0 +1,7 @@
+@using Agentstration.Work
+<StatusBadge Text="@Label" Status="@Severity" />
+@code {
+    [Parameter, EditorRequired] public WorkTaskStatus Status { get; set; }
+    private string Label => Status == WorkTaskStatus.ActionRequired ? "Needs attention" : Status.ToString();
+    private UiStatus Severity => Status switch { WorkTaskStatus.Completed => UiStatus.Success, WorkTaskStatus.Failed or WorkTaskStatus.Cancelled => UiStatus.Danger, WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused => UiStatus.Warning, WorkTaskStatus.Running => UiStatus.Info, _ => UiStatus.Neutral };
+}

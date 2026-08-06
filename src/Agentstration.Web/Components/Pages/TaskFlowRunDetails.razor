@@ -1,0 +1,72 @@
+@page "/tasks/{TaskId:guid}/flowruns/{RunId}"
+@implements IDisposable
+@inject IWorkApiClient Client
+
+<PageTitle>@(run is null ? "Task FlowRun" : run.Id) · Agentstration</PageTitle>
+@if (unavailable)
+{
+    <WorkApiUnavailableState OnRetry="LoadAsync" />
+}
+else if (notFound)
+{
+    <ErrorState Title="FlowRun not found" Message="This FlowRun does not exist or does not belong to the selected Task." />
+}
+else if (run is null)
+{
+    <LoadingState />
+}
+else
+{
+    <PageHeader Title="Task FlowRun" Description="@run.Id">
+        <Actions><button class="button-secondary" @onclick="LoadAsync">Refresh</button><a class="button-secondary" href="/tasks/@TaskId">Back to Task</a></Actions>
+    </PageHeader>
+    <section class="run-summary">
+        <div><span class="field-label">Status</span><StatusBadge Text="@run.Status.ToString()" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></div>
+        <div><span class="field-label">Flow / version</span><strong>@run.FlowId.Value · @run.FlowVersion</strong></div>
+        <div><span class="field-label">Definition state</span><strong>@run.DefinitionState</strong></div>
+        <div><span class="field-label">Trigger / started by</span><strong>@run.Trigger · @(run.StartedBy ?? "—")</strong></div>
+        <div><span class="field-label">Correlation ID</span><code>@run.CorrelationId</code></div>
+        <div><span class="field-label">Duration</span><strong>@Duration(run.StartedAt, run.CompletedAt)</strong></div>
+    </section>
+    @if (run.Error is not null)
+    {
+        <article class="panel run-error"><strong>@run.Error.Code</strong><p>@run.Error.Message</p><code>@run.Error.Details</code></article>
+    }
+    <section class="designer-layout run-layout">
+        <div>
+            <FlowGraph Nodes="FlowGraphNode.From(run)" SelectedName="selected?.StepName" OnSelected="SelectStep" />
+            <article class="panel io-panel"><div class="panel-header"><h2>Run input and output</h2></div><div class="io-grid"><div><span class="field-label">Input</span><pre>@Pretty(run.Input)</pre></div><div><span class="field-label">Output</span><pre>@Pretty(run.Output)</pre></div></div></article>
+        </div>
+        <article class="panel inspector step-inspector">
+            <div class="panel-header"><h2>Step diagnostic</h2></div>
+            @if (selected is null) { <p class="muted">Select a step to inspect its execution.</p> }
+            else
+            {
+                <dl class="details-list"><dt>Status</dt><dd>@selected.Status</dd><dt>Type</dt><dd>@selected.StepType</dd><dt>Duration</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>Attempt</dt><dd>@selected.Attempt</dd><dt>Transition</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>Agent</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>Provider</dt><dd>@(selected.Provider ?? "—")</dd><dt>Tokens</dt><dd>@(selected.Usage is null ? "—" : $"{selected.Usage.InputTokens ?? 0} in / {selected.Usage.OutputTokens ?? 0} out")</dd></dl>
+                <span class="field-label">Declared input</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">Resolved input</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">Output</span><pre>@Pretty(selected.Output)</pre><span class="field-label">Logs</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
+            }
+        </article>
+    </section>
+}
+
+@code {
+    [Parameter] public Guid TaskId { get; set; }
+    [Parameter] public string RunId { get; set; } = string.Empty;
+    private readonly CancellationTokenSource lifetime = new();
+    private FlowRun? run;
+    private FlowStepRun? selected;
+    private bool unavailable, notFound;
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+    private async Task LoadAsync()
+    {
+        unavailable = false; notFound = false;
+        try { run = await Client.GetTaskFlowRunAsync(TaskId, RunId, lifetime.Token); selected = run.Steps.FirstOrDefault(value => value.StepName == selected?.StepName) ?? run.Steps.FirstOrDefault(); }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { notFound = true; run = null; }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or Polly.Timeout.TimeoutRejectedException) { unavailable = true; run = null; }
+    }
+    private void SelectStep(string name) => selected = run?.Steps.FirstOrDefault(value => value.StepName == name);
+    private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
+    private static string Pretty(JsonElement? value) => value is null ? "—" : Pretty(value.Value);
+    private static string Duration(DateTimeOffset? start, DateTimeOffset? end) { if (start is null) return "—"; var value = (end ?? DateTimeOffset.UtcNow) - start.Value; return value.TotalSeconds >= 1 ? $"{value.TotalSeconds:0.##} s" : $"{value.TotalMilliseconds:0} ms"; }
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

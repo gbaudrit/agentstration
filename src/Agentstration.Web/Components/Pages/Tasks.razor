@@ -1,0 +1,81 @@
+@page "/tasks"
+@page "/work"
+@implements IDisposable
+@inject IWorkApiClient Client
+@inject IWorkOperationsRealtimeClient Realtime
+@inject NavigationManager Navigation
+
+<PageTitle>Tasks · Agentstration</PageTitle>
+<PageHeader Title="Tasks" Description="Operational supervision of WorkTasks owned by Work API.">
+    <Actions><RealtimeStatus State="Realtime.State" /><button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@loading">Refresh</button></Actions>
+</PageHeader>
+
+@if (unavailable)
+{
+    <WorkApiUnavailableState OnRetry="LoadAsync" />
+}
+else if (page is null || counters is null)
+{
+    <LoadingState />
+}
+else
+{
+    <TaskOperationsSummary Summary="counters" />
+    <section class="panel task-filters" aria-label="Task filters">
+        <label>Search<input @bind="searchValue" placeholder="Title, description, Task or Interaction ID" /></label>
+        <label>Workspace<select @bind="workspaceValue"><option value="">All workspaces</option>@foreach(var workspace in workspaces){<option value="@workspace.Id">@workspace.Name</option>}</select></label>
+        <label>Status<select @bind="statusValue"><option value="">All statuses</option>@foreach(var value in Enum.GetValues<WorkTaskStatus>()){<option value="@value">@(value == WorkTaskStatus.ActionRequired ? "Needs attention" : value)</option>}</select></label>
+        <label>Attention<select @bind="attentionValue"><option value="">Any</option><option value="true">Needs attention</option><option value="false">No pending action</option></select></label>
+        <div class="form-actions"><button class="button-primary" type="button" @onclick="ApplyFilters">Apply</button><button class="text-button" type="button" @onclick="ClearFilters">Clear filters</button></div>
+    </section>
+    <TaskOperationsTable Items="page.Items" Filtered="Filtered" />
+    @if (page.TotalCount > 0)
+    {
+        <nav class="task-pagination" aria-label="Task pages"><span>Page @(page.Page) · @(page.TotalCount) task(s)</span><span><button class="button-secondary" disabled="@(page.Page <= 1)" @onclick="PreviousPage">Previous</button><button class="button-secondary" disabled="@(page.Page * page.PageSize >= page.TotalCount)" @onclick="NextPage">Next</button></span></nav>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name="workspaceId")] public string? WorkspaceId { get; set; }
+    [SupplyParameterFromQuery(Name="status")] public string? Status { get; set; }
+    [SupplyParameterFromQuery(Name="search")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name="hasPendingAction")] public bool? HasPendingAction { get; set; }
+    [SupplyParameterFromQuery(Name="page")] public int CurrentPage { get; set; } = 1;
+    private readonly CancellationTokenSource lifetime = new();
+    private WorkTaskOperationsPageResponse? page; private WorkTaskOperationsCountersResponse? counters; private IReadOnlyList<WorkplaceWorkspaceResponse> workspaces=[];
+    private string workspaceValue="",statusValue="",searchValue="",attentionValue=""; private bool loading,unavailable,realtimeStarted;
+    private WorkTaskStatus? ParsedStatus => Enum.TryParse<WorkTaskStatus>(Status, true, out var parsed) ? parsed : null;
+    private bool Filtered => !string.IsNullOrWhiteSpace(WorkspaceId) || ParsedStatus is not null || !string.IsNullOrWhiteSpace(Search) || HasPendingAction is not null;
+
+    protected override async Task OnParametersSetAsync(){workspaceValue=WorkspaceId??"";statusValue=ParsedStatus?.ToString()??"";searchValue=Search??"";attentionValue=HasPendingAction?.ToString().ToLowerInvariant()??"";await LoadAsync();}
+    private async Task LoadAsync()
+    {
+        loading=true;unavailable=false;try
+        {
+            var workspaceTask=Client.GetWorkspacesAsync(lifetime.Token);var pageTask=Client.GetTasksAsync(WorkspaceId,ParsedStatus,Search,HasPendingAction,Math.Max(1,CurrentPage),25,"updatedAt","desc",lifetime.Token);var summaryTask=Client.GetTaskSummaryAsync(WorkspaceId,lifetime.Token);
+            await Task.WhenAll(workspaceTask,pageTask,summaryTask);workspaces=await workspaceTask;page=await pageTask;counters=await summaryTask;
+            if(!realtimeStarted){realtimeStarted=true;Realtime.Updated+=OnRealtimeUpdate;Realtime.StateChanged+=OnRealtimeStateChanged;await Realtime.StartAsync(workspaces.Select(value=>value.Id),lifetime.Token);}
+        }
+        catch(Exception exception) when(exception is HttpRequestException or AgentstrationApiException or Polly.Timeout.TimeoutRejectedException){unavailable=true;page=null;counters=null;}
+        finally{loading=false;}
+    }
+    private async Task OnRealtimeUpdate(WorkOperationsRealtimeUpdate update)
+    {
+        await InvokeAsync(async()=>
+        {
+            if(update.RequiresResynchronization||update.TaskId is null||page is null||!page.Items.Any(value=>value.Id==update.TaskId)){await LoadAsync();return;}
+            try{var detail=await Client.GetTaskAsync(update.TaskId.Value,lifetime.Token);page=page with{Items=page.Items.Select(value=>value.Id==update.TaskId?detail.Task:value).ToArray()};counters=await Client.GetTaskSummaryAsync(WorkspaceId,lifetime.Token);}catch(AgentstrationApiException){await LoadAsync();}
+            StateHasChanged();
+        });
+    }
+    private void OnRealtimeStateChanged()=>InvokeAsync(StateHasChanged);
+    private void ApplyFilters()=>Navigate(1,workspaceValue,Enum.TryParse<WorkTaskStatus>(statusValue,out var parsed)?parsed:null,searchValue,bool.TryParse(attentionValue,out var attention)?attention:null);
+    private void ClearFilters()=>Navigate(1,null,null,null,null);
+    private void PreviousPage()=>Navigate(Math.Max(1,CurrentPage-1),WorkspaceId,ParsedStatus,Search,HasPendingAction);
+    private void NextPage()=>Navigate(CurrentPage+1,WorkspaceId,ParsedStatus,Search,HasPendingAction);
+    private void Navigate(int targetPage,string? workspace,WorkTaskStatus? status,string? search,bool? attention)
+    {
+        var query=new List<string>();if(!string.IsNullOrWhiteSpace(workspace))query.Add($"workspaceId={Uri.EscapeDataString(workspace)}");if(status is not null)query.Add($"status={status}");if(!string.IsNullOrWhiteSpace(search))query.Add($"search={Uri.EscapeDataString(search.Trim())}");if(attention is not null)query.Add($"hasPendingAction={attention.Value.ToString().ToLowerInvariant()}");if(targetPage>1)query.Add($"page={targetPage}");Navigation.NavigateTo(query.Count==0?"/tasks":$"/tasks?{string.Join('&',query)}");
+    }
+    public void Dispose(){Realtime.Updated-=OnRealtimeUpdate;Realtime.StateChanged-=OnRealtimeStateChanged;lifetime.Cancel();lifetime.Dispose();}
+}

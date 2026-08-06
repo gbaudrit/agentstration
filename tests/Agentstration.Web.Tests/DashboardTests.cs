@@ -1,6 +1,8 @@
 using Agentstration.Web.Console;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Work;
+using Agentstration.Work.Contracts;
 
 namespace Agentstration.Web.Tests;
 
@@ -11,7 +13,7 @@ public sealed class DashboardTests
     public async Task SimulatedDashboardAggregatesEveryPlane()
     {
         var fake = new MockApiClient(new FixedTimeProvider(new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero)));
-        var service = new PlatformDashboardService(fake, fake, fake, fake);
+        var service = new PlatformDashboardService(fake, fake, new StubWorkClient(), fake);
 
         var snapshot = await service.GetAsync(CancellationToken.None);
 
@@ -52,5 +54,21 @@ public sealed class DashboardTests
     private sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => value;
+    }
+
+    private sealed class StubWorkClient : IWorkApiClient
+    {
+        public Task<IReadOnlyList<WorkSummary>> GetWorkItemsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WorkSummary>>([
+            new(Guid.NewGuid(), "One", "WorkTask", "Running", "—", "personal", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow),
+            new(Guid.NewGuid(), "Two", "WorkTask", "Pending", "—", "personal", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow),
+            new(Guid.NewGuid(), "Three", "WorkTask", "ActionRequired", "—", "personal", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)]);
+        public Task<WorkTaskOperationsPageResponse> GetTasksAsync(string? workspaceId, WorkTaskStatus? status, string? search, bool? hasPendingAction, int page, int pageSize, string sort, string direction, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<WorkTaskOperationsCountersResponse> GetTaskSummaryAsync(string? workspaceId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<WorkTaskOperationsDetailResponse> GetTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Agentstration.Flow.FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task PauseTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task ResumeTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task CancelTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

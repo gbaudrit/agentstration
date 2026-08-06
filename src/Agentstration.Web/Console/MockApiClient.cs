@@ -10,7 +10,7 @@ using Agentstration.Web.Components.Models;
 
 namespace Agentstration.Web.Console;
 
-public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiClient, IRuntimeApiClient, IWorkApiClient, IFlowApiClient, IAgentstrationEventStream
+public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiClient, IRuntimeApiClient, IFlowApiClient, IAgentstrationEventStream
 {
     private readonly Dictionary<string, ResourceSnapshot<AgentResource>> agents = CreateAgents();
     private readonly IReadOnlyList<AgentTypeResource> agentTypes = CreateAgentTypes();
@@ -197,14 +197,6 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         }, cancellationToken);
     }
 
-    public Task<IReadOnlyList<WorkSummary>> GetWorkItemsAsync(CancellationToken cancellationToken) => Result<IReadOnlyList<WorkSummary>>(
-    [
-        new(Guid.Parse("956124c8-b579-4b19-9097-450687a70ce1"), "Review data access boundaries", "review", "Running", "High", ".NET Expert", Now.AddMinutes(-34), Now.AddMinutes(-2)),
-        new(Guid.Parse("bf88eb82-cda9-41ef-9b9d-c73f90b7b810"), "Optimize customer query", "question", "Queued", "Normal", "SQL Expert", Now.AddMinutes(-12), Now.AddMinutes(-10)),
-        new(Guid.Parse("4022fd69-82a4-4d18-8276-bc12b8c23dd5"), "Classify incoming incident", "triage", "NeedsInput", "Critical", "Triage Router", Now.AddHours(-1), Now.AddMinutes(-18)),
-        new(Guid.Parse("86b42b89-c322-4cd8-a013-fe8ceec49b68"), "Generate release summary", "content", "Completed", "Low", ".NET Expert", Now.AddHours(-3), Now.AddHours(-2))
-    ], cancellationToken);
-
     public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Result<IReadOnlyList<FlowSummary>>(
     [
         new("engineering-review", "Engineering review", "Workflow", "2.1.0", "Active", 5, 2, Now.AddDays(-1)),
@@ -254,7 +246,6 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
     [
         new(Now.AddSeconds(-18), "Information", "Runtime", "ExecutionStarted", "Engineering review started", "run-7f8a"),
         new(Now.AddMinutes(-2), "Warning", "Runtime", "HealthChanged", "Triage runtime is degraded", "runtime-local-02"),
-        new(Now.AddMinutes(-10), "Information", "Work", "WorkItemQueued", "Optimize customer query queued", "bf88eb82"),
         new(Now.AddHours(-1), "Error", "Flow", "StepFailed", "Routing step could not reach its runtime", "run-113d")
     ], cancellationToken);
 

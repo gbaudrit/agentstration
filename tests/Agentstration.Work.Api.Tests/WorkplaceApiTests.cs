@@ -132,6 +132,26 @@ public sealed class WorkplaceApiTests
             Assert.IsTrue(storedMessages.Any(value => value.Role == ConversationRole.Agentstration && value.Content.Contains("Executive version is ready", StringComparison.Ordinal)));
             var history = await client.GetFromJsonAsync<InteractionPageResponse>("/api/workspaces/personal/interactions?take=10");
             Assert.IsTrue(history!.Value.Any(value => value.Id == submitted.Interaction.Id));
+
+            var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workspaces");
+            Assert.IsTrue(workspaces?.Any(value => value.Name == "personal"));
+            var operationalPage = await client.GetFromJsonAsync<WorkTaskOperationsPageResponse>("/api/tasks?page=1&pageSize=1&sort=updatedAt&direction=desc&status=Completed&search=report");
+            Assert.IsNotNull(operationalPage); Assert.HasCount(1, operationalPage.Items); Assert.AreEqual(1, operationalPage.TotalCount);
+            Assert.AreEqual(2, operationalPage.Items[0].FlowRunCount); Assert.AreEqual(2, operationalPage.Items[0].ResultCount); Assert.AreEqual(2, operationalPage.Items[0].ArtifactCount);
+            var detail = await client.GetFromJsonAsync<WorkTaskOperationsDetailResponse>($"/api/tasks/{submitted.Task.Id}");
+            Assert.IsNotNull(detail); Assert.HasCount(2, detail.FlowRuns); Assert.AreEqual(firstFlowRunId, detail.FlowRuns[1].ParentFlowRunId); Assert.HasCount(2, detail.Results); Assert.HasCount(2, detail.Artifacts);
+            var supervisedRun = await client.GetFromJsonAsync<Agentstration.Flow.FlowRun>($"/api/tasks/{submitted.Task.Id}/flow-runs/{detail.FlowRuns[0].Id}");
+            Assert.AreEqual(submitted.Task.Id.ToString(), supervisedRun?.WorkTaskId);
+            using var foreignRunResponse = await client.GetAsync($"/api/tasks/{Guid.NewGuid()}/flow-runs/{detail.FlowRuns[0].Id}");
+            Assert.AreEqual(HttpStatusCode.NotFound, foreignRunResponse.StatusCode);
+            var artifactJson = await client.GetStringAsync($"/api/tasks/{submitted.Task.Id}/artifacts");
+            Assert.IsFalse(artifactJson.Contains("storageKey", StringComparison.OrdinalIgnoreCase));
+            var otherWorkspace = await client.GetFromJsonAsync<WorkTaskOperationsPageResponse>("/api/tasks?workspaceId=other&page=1&pageSize=25");
+            Assert.AreEqual(0, otherWorkspace?.TotalCount);
+            var outOfRange = await client.GetFromJsonAsync<WorkTaskOperationsPageResponse>("/api/tasks?page=999&pageSize=25");
+            Assert.HasCount(0, outOfRange!.Items);
+            var counters = await client.GetFromJsonAsync<WorkTaskOperationsCountersResponse>("/api/tasks/summary");
+            Assert.IsTrue(counters!.CompletedRecently >= 1);
         }
         finally
         {
@@ -154,6 +174,10 @@ public sealed class WorkplaceApiTests
             });
             using var client = factory.CreateClient();
             var taskCreated = new TaskCompletionSource<TaskCreatedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var taskStatusChanged = new TaskCompletionSource<TaskStatusChangedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var resultAdded = new TaskCompletionSource<TaskResultAddedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var artifactAdded = new TaskCompletionSource<TaskArtifactAddedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pendingResolved = new TaskCompletionSource<PendingActionResolvedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
             await using var connection = new HubConnectionBuilder()
                 .WithUrl("http://localhost/hubs/workplace", options =>
                 {
@@ -162,6 +186,10 @@ public sealed class WorkplaceApiTests
                 })
                 .Build();
             connection.On<TaskCreatedEvent>("TaskCreated", value => taskCreated.TrySetResult(value));
+            connection.On<TaskStatusChangedEvent>("TaskStatusChanged", value => taskStatusChanged.TrySetResult(value));
+            connection.On<TaskResultAddedEvent>("TaskResultAdded", value => resultAdded.TrySetResult(value));
+            connection.On<TaskArtifactAddedEvent>("TaskArtifactAdded", value => artifactAdded.TrySetResult(value));
+            connection.On<PendingActionResolvedEvent>("PendingActionResolved", value => pendingResolved.TrySetResult(value));
             await connection.StartAsync();
             await connection.InvokeAsync("SubscribeAsync", "/resourceGroups/default/providers/Agentstration.Work/workspaces/personal", 0L);
 
@@ -177,6 +205,8 @@ public sealed class WorkplaceApiTests
             var choice = submitted.Action as RequestChoiceAction;
             Assert.IsNotNull(choice);
             Assert.IsNull(submitted.Task);
+            var attentionPage = await client.GetFromJsonAsync<WorkTaskOperationsPageResponse>("/api/tasks?hasPendingAction=true&page=1&pageSize=25");
+            Assert.AreEqual(0, attentionPage?.TotalCount, "A PendingAction without a WorkTask is supervised through its Interaction, not invented as a Task.");
             var persistedInteraction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}");
             Assert.IsNull(persistedInteraction?.ImmediateResult, "Resume tokens must only be returned to the initiating client and never persisted with an interaction.");
 
@@ -200,7 +230,9 @@ public sealed class WorkplaceApiTests
                 new PendingActionResponseRequest(choice.ResumeToken, Choice("concise")));
             choiceResponse.EnsureSuccessStatusCode();
             var choiceResolution = await choiceResponse.Content.ReadFromJsonAsync<PendingActionResolutionResponse>();
-            Assert.IsNotNull(choiceResolution?.Task, "A guided one-click choice must resume directly into the Task.");
+            var resolvedTask = choiceResolution?.Task; Assert.IsNotNull(resolvedTask, "A guided one-click choice must resume directly into the Task.");
+            var supervisedActions = await client.GetFromJsonAsync<PendingActionContract[]>($"/api/tasks/{resolvedTask.Id}/pending-actions");
+            var supervised = supervisedActions ?? []; Assert.HasCount(1, supervised); Assert.AreEqual(resolvedTask.Id, supervised[0].WorkTaskId); Assert.AreEqual(PendingActionStatus.Completed, supervised[0].Status);
             persistedInteraction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}");
             Assert.IsInstanceOfType<CreateTaskAction>(persistedInteraction?.ImmediateResult);
 
@@ -212,6 +244,7 @@ public sealed class WorkplaceApiTests
             Assert.IsNotNull(confirmed?.Task);
             var createdEvent = await taskCreated.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.AreEqual(confirmed.Task.Id, createdEvent.TaskId);
+            Assert.AreEqual(confirmed.Task.Id, (await pendingResolved.Task.WaitAsync(TimeSpan.FromSeconds(5))).TaskId);
 
             WorkTaskResponse? task = null;
             for (var attempt = 0; attempt < 100; attempt++)
@@ -238,6 +271,11 @@ public sealed class WorkplaceApiTests
             Assert.HasCount(1, results);
             Assert.HasCount(1, artifacts);
             var artifact = artifacts.Single();
+            Assert.AreEqual(completedTask.Id, (await taskStatusChanged.Task.WaitAsync(TimeSpan.FromSeconds(5))).TaskId);
+            Assert.AreEqual(completedTask.Id, (await resultAdded.Task.WaitAsync(TimeSpan.FromSeconds(5))).Result.WorkTaskId.Value);
+            var artifactEvent = await artifactAdded.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.AreEqual(completedTask.Id, artifactEvent.Artifact.WorkTaskId);
+            Assert.IsNull(typeof(WorkTaskArtifactEventContract).GetProperty("StorageKey"));
 
             using var artifactResponse = await client.GetAsync($"/api/workspaces/personal/tasks/{completedTask.Id}/artifacts/{artifact.Id.Value}/content");
             artifactResponse.EnsureSuccessStatusCode();

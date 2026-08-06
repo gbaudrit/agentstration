@@ -114,7 +114,7 @@ public partial class Home
                 await RefreshActiveTaskAsync(activeTask!.Id); await RefreshOverviewAsync(); break;
             case TaskResultAddedEvent result when result.Result.WorkTaskId.Value == activeTask?.Id:
                 await RefreshActiveTaskAsync(activeTask!.Id); await RefreshOverviewAsync(); break;
-            case TaskArtifactAddedEvent artifact when artifact.Artifact.WorkTaskId.Value == activeTask?.Id:
+            case TaskArtifactAddedEvent artifact when artifact.Artifact.WorkTaskId == activeTask?.Id:
                 await RefreshActiveTaskAsync(activeTask!.Id); await RefreshOverviewAsync(); break;
             case FlowRunStartedEvent started when started.InteractionId == interaction?.Id:
                 if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id); break;

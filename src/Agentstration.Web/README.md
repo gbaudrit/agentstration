@@ -19,7 +19,7 @@ The current design system includes `StatusBadge`, `HealthIndicator`, `MetricCard
 dotnet run --project src/Agentstration.Web
 ```
 
-Open `http://localhost:5080`. The console provides Overview, Management, Agents, Model Profiles, Model Providers, Runtime, Work, Flows, Executions, Events, and Settings. Existing Workspaces, Ingest, and Missions routes remain available for the original content vertical.
+Open `http://localhost:5100`. Port `5080` belongs to Work API. The console provides Overview, Management, Agents, Model Profiles, Model Providers, Runtime, Tasks, Flows, Executions, Events, and Settings. Existing Workspaces, Ingest, and Missions routes remain available for the original content vertical.
 
 ## Management resource editing
 
@@ -34,7 +34,7 @@ The Management area provides declarative CRUD workflows for agents and logical m
 
 `/modelproviders` displays configured providers, health and dynamically discovered models without persisting provider models. `/modelprofiles` provides searchable canonical profile CRUD, provider/model selection, full generation/reasoning/output options, usage inspection, effective resolution, declarative JSON, ETag conflict recovery, and deletion protection. `/runtimeprofiles` provides the equivalent CRUD surface for runtime type, sessions, tool invocation, streaming and adapter options. Agent details deliberately separate the declared profile from the provider and model resolved through `/api/agents/{name}/model`; the Agent Runner displays the deployment runtime profile and exposes streaming for advanced runs.
 
-Agent and model management always delegate to the canonical Management HTTP API, which remains the authority for validation, generations, provisioning state, and lifecycle events. `MockApiClient` is retained only for unrelated demonstration projections.
+Agent and model management always delegate to the canonical Management HTTP API, which remains the authority for validation, generations, provisioning state, and lifecycle events. `MockApiClient` is retained only for unrelated demonstration projections. Tasks are never simulated: `/tasks` always uses the configured Work API.
 
 ## Agent Runner
 
@@ -48,7 +48,18 @@ The agent editor and Runner use dedicated real HTTP clients even when `UseSimula
 
 Console data access is isolated behind `IManagementApiClient`, `IModelProvidersClient`, `IModelProfilesClient`, `IAgentsModelClient`, `IRuntimeApiClient`, `IWorkApiClient`, and `IFlowApiClient`. HTTP implementations use `HttpClientFactory`, explicit timeouts, limited retry, total request timeout, and circuit-breaking defaults from the standard .NET resilience handler. API failures surface a safe error identifier in the UI.
 
-The development default uses simulated data for dashboard, Work, Flow, and general Runtime projections while Agent and model management remain canonical:
+The development default may use simulated data for legacy dashboard, Flow, and general Runtime projections while Agent/model management and Task supervision remain canonical:
+
+```json
+{
+  "Agentstration": {
+    "WorkApi": { "BaseAddress": "http://localhost:5080/" },
+    "WorkplaceBaseUrl": "http://localhost:5180/"
+  }
+}
+```
+
+Work API may be unavailable at Console startup. The rest of the Console remains usable and `/tasks` presents an explicit retry state without demo fallback. `WorkplaceBaseUrl` is optional; when omitted, Workplace deep links are hidden.
 
 ```json
 {
@@ -62,7 +73,7 @@ The development default uses simulated data for dashboard, Work, Flow, and gener
 }
 ```
 
-Set `Agentstration__UseSimulatedData=false` and configure each base address to activate all typed HTTP clients. Agent CRUD, model-provider, model-profile and agent-model-resolution screens always use the canonical Management HTTP APIs so that they display the persisted definitions consumed by Runtime; the other dashboard areas may still use `MockApiClient` in demonstration mode. Secrets are never passed to Razor components or browser code.
+Set `Agentstration__UseSimulatedData=false` and configure each base address to activate the remaining typed HTTP clients. Work Task supervision, Agent CRUD, model-provider, model-profile and agent-model-resolution screens always use canonical APIs; unrelated dashboard areas may still use `MockApiClient` in demonstration mode. Secrets are never passed to Razor components or browser code.
 
 The existing backend does not yet expose every runtime projection required by the console. In HTTP mode, the Runtime client verifies `/health` and reports only the local runtime shell; detailed resource and execution projections will replace this adapter when public Runtime endpoints land.
 

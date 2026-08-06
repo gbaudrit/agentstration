@@ -1,0 +1,6 @@
+@using Agentstration.Web.Console
+<span class="realtime-status state-@State.ToString().ToLowerInvariant()"><span aria-hidden="true">●</span> @Label</span>
+@code {
+    [Parameter] public WorkOperationsRealtimeState State { get; set; }
+    private string Label => State switch { WorkOperationsRealtimeState.Live => "Live", WorkOperationsRealtimeState.Reconnecting => "Reconnecting", WorkOperationsRealtimeState.Connecting => "Connecting", _ => "Offline" };
+}

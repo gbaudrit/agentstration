@@ -29,15 +29,19 @@ public static class WebConsoleServiceCollectionExtensions
         {
             services.AddScoped<MockApiClient>();
             services.AddScoped<IRuntimeApiClient>(provider => provider.GetRequiredService<MockApiClient>());
-            services.AddScoped<IWorkApiClient>(provider => provider.GetRequiredService<MockApiClient>());
             services.AddScoped<IAgentstrationEventStream>(provider => provider.GetRequiredService<MockApiClient>());
         }
         else
         {
             AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi);
-            AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
             services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
         }
+
+        // Tasks are always real Work API resources, even when unrelated Console
+        // projections still use deterministic demonstration data.
+        AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
+        services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
+            new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"), provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
 
         AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi);
 
@@ -78,8 +82,9 @@ public static class WebConsoleServiceCollectionExtensions
         });
     }
 
-    private static bool Validate(AgentstrationWebOptions options) => options.UseSimulatedData ||
-        ValidateEndpoint(options.ManagementApi) && ValidateEndpoint(options.RuntimeApi) && ValidateEndpoint(options.WorkApi) && ValidateEndpoint(options.FlowApi);
+    private static bool Validate(AgentstrationWebOptions options) => ValidateEndpoint(options.WorkApi) && (options.UseSimulatedData ||
+        ValidateEndpoint(options.ManagementApi) && ValidateEndpoint(options.RuntimeApi) && ValidateEndpoint(options.FlowApi)) &&
+        (string.IsNullOrWhiteSpace(options.WorkplaceBaseUrl) || Uri.TryCreate(options.WorkplaceBaseUrl, UriKind.Absolute, out var workplace) && workplace.Scheme is "http" or "https");
 
     private static bool ValidateEndpoint(ApiEndpointOptions options) =>
         options.TimeoutSeconds is >= 1 and <= 120 &&

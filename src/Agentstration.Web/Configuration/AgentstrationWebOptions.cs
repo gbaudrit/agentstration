@@ -8,6 +8,7 @@ public sealed class AgentstrationWebOptions
     public ApiEndpointOptions RuntimeApi { get; set; } = new();
     public ApiEndpointOptions WorkApi { get; set; } = new();
     public ApiEndpointOptions FlowApi { get; set; } = new();
+    public string? WorkplaceBaseUrl { get; set; }
     public AuthenticationOptions Authentication { get; set; } = new();
 }
 
@@ -21,4 +22,3 @@ public sealed class AuthenticationOptions
 {
     public bool DevelopmentMode { get; set; } = true;
 }
-

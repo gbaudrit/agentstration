@@ -15,10 +15,20 @@ public sealed record WorkItemQuery(
     DateTimeOffset? CreatedFrom = null,
     DateTimeOffset? CreatedTo = null,
     WorkItemSortField SortBy = WorkItemSortField.CreatedAt,
-    WorkItemSortDirection SortDirection = WorkItemSortDirection.Descending);
+    WorkItemSortDirection SortDirection = WorkItemSortDirection.Descending,
+    string? WorkspaceId = null,
+    string? InteractionId = null,
+    string? EntryId = null,
+    string? AnchorTaskId = null,
+    bool? IsContinuation = null,
+    string? Search = null,
+    bool? HasPendingAction = null,
+    bool OperationalTasks = false,
+    DateTimeOffset? UpdatedFrom = null,
+    DateTimeOffset? UpdatedTo = null);
 
 public sealed record StoredWorkItem(WorkItem Value, string ETag, DateTimeOffset UpdatedAt);
-public sealed record WorkItemPage(IReadOnlyList<StoredWorkItem> Items, bool HasMore);
+public sealed record WorkItemPage(IReadOnlyList<StoredWorkItem> Items, bool HasMore, int TotalCount = -1);
 
 public interface IWorkItemRepository
 {

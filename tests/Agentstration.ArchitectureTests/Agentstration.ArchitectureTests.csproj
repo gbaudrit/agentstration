@@ -1,5 +1,6 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
     <ProjectReference Include="../../src/Agentstration.Domain/Agentstration.Domain.csproj" />
     <ProjectReference Include="../../src/Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../../src/Agentstration.Evaluation/Agentstration.Evaluation.csproj" />

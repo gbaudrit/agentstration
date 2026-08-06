@@ -24,6 +24,7 @@ public sealed record InteractionContinuationContext(
     IReadOnlyList<ContinuationArtifactReference> ArtifactReferences,
     EntryId EntryResourceId);
 public sealed record MessageContinuation(ConversationMessage Message, WorkplaceInteraction Interaction, WorkplaceAction Action, WorkTask? Task);
+public sealed record OperationalWorkTaskPage(IReadOnlyList<WorkTask> Items, int TotalCount);
 
 public interface IWorkplaceEventSink
 {
@@ -113,7 +114,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         var resolved = action with { Status = PendingActionStatus.Completed, ResolvedAt = now, Response = new PendingActionResponse(values.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal), now), ResumeTokenHash = HashToken($"used:{Guid.NewGuid():N}"), Version = action.Version + 1 };
         await repository.SavePendingActionAsync(resolved, action.Version, cancellationToken);
         var message = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, interaction.TaskId, ConversationRole.User, ResponseText(action, values), now, PendingActionId: action.Id);
-        await repository.AddMessageAsync(message, cancellationToken); await PublishAsync(new PendingActionResolvedEvent(EventId(), workspaceId.Value, Sequence(), now, action.Id.Value), cancellationToken); await PublishAsync(new MessageAddedEvent(EventId(), workspaceId.Value, Sequence(), now, message), cancellationToken);
+        await repository.AddMessageAsync(message, cancellationToken); await PublishAsync(new MessageAddedEvent(EventId(), workspaceId.Value, Sequence(), now, message), cancellationToken);
 
         if (action.ResumeStep == 1)
         {
@@ -121,6 +122,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
             await repository.CreatePendingActionAsync(confirmation, cancellationToken);
             interaction = interaction with { PendingActionId = confirmation.Id, ImmediateResult = null, LastActivityAt = now, Messages = [.. interaction.Messages, message], Version = interaction.Version + 1 };
             await repository.SaveInteractionAsync(interaction, interaction.Version - 1, cancellationToken); await PublishAsync(new PendingActionCreatedEvent(EventId(), workspaceId.Value, Sequence(), now, ToContract(confirmation)), cancellationToken);
+            await PublishAsync(new PendingActionResolvedEvent(EventId(), workspaceId.Value, Sequence(), now, action.Id.Value), cancellationToken);
             return new PendingActionResolution(resolved, contract, interaction with { ImmediateResult = contract }, null);
         }
 
@@ -130,18 +132,22 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
             var guidedValues = interaction.InputValues.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal);
             foreach (var value in values) guidedValues[value.Key] = value.Value.Clone();
             var guidedSubmission = await CreateTaskAsync(interaction with { Messages = [.. interaction.Messages, message] }, guidedEntry, guidedValues, interaction.Attachments, interaction.Version, cancellationToken);
+            resolved = await LinkPendingActionAsync(resolved, guidedSubmission.Task, cancellationToken);
+            await PublishAsync(new PendingActionResolvedEvent(EventId(), workspaceId.Value, Sequence(), now, action.Id.Value, resolved.WorkTaskId?.Value), cancellationToken);
             return new PendingActionResolution(resolved, guidedSubmission.Action, guidedSubmission.Interaction, guidedSubmission.Task);
         }
 
         if (!values.TryGetValue("confirmed", out var confirmed) || confirmed.ValueKind is not JsonValueKind.True)
         {
             var cancelled = new RespondAction("Report generation was cancelled."); interaction = interaction with { Status = InteractionStatus.Cancelled, PendingActionId = null, ImmediateResult = cancelled, LastActivityAt = now, Messages = [.. interaction.Messages, message], Version = interaction.Version + 1 };
-            await repository.SaveInteractionAsync(interaction, interaction.Version - 1, cancellationToken); return new PendingActionResolution(resolved, cancelled, interaction, null);
+            await repository.SaveInteractionAsync(interaction, interaction.Version - 1, cancellationToken); await PublishAsync(new PendingActionResolvedEvent(EventId(), workspaceId.Value, Sequence(), now, action.Id.Value), cancellationToken); return new PendingActionResolution(resolved, cancelled, interaction, null);
         }
 
         var entry = await GetEntryAsync(interaction.EntryId, cancellationToken); var merged = interaction.InputValues.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal);
         foreach (var pending in await repository.ListPendingActionsAsync(workspaceId, interactionId, cancellationToken)) if (pending.Response is not null) foreach (var value in pending.Response.Values) merged[value.Key] = value.Value.Clone();
         var submission = await CreateTaskAsync(interaction with { Messages = [.. interaction.Messages, message] }, entry, merged, interaction.Attachments, interaction.Version, cancellationToken);
+        resolved = await LinkPendingActionAsync(resolved, submission.Task, cancellationToken);
+        await PublishAsync(new PendingActionResolvedEvent(EventId(), workspaceId.Value, Sequence(), now, action.Id.Value, resolved.WorkTaskId?.Value), cancellationToken);
         return new PendingActionResolution(resolved, submission.Action, submission.Interaction, submission.Task);
     }
 
@@ -216,11 +222,41 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
 
     public async Task<WorkTask> GetTaskAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
     {
-        var page = await workItems.QueryAsync(new WorkItemQuery(Take: 500), cancellationToken);
-        var items = page.Items.Select(value => value.Value).ToArray();
-        var anchor = items.SingleOrDefault(value => value.Id == taskId.ToWorkItemId()) ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
+        var anchor = (await workItems.GetAsync(taskId.ToWorkItemId(), cancellationToken))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         RequireWorkspace(anchor, workspaceId);
-        return ProjectTask(anchor, LatestExecution(anchor, items), taskId);
+        var continuations = await workItems.QueryAsync(new WorkItemQuery(Take: 100, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
+        return ProjectTask(anchor, LatestExecution(anchor, continuations.Items.Select(value => value.Value).ToArray()), taskId);
+    }
+
+    public async Task<(WorkplaceWorkspaceId WorkspaceId, WorkTask Task)> GetOperationalTaskAsync(WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        var anchor = (await workItems.GetAsync(taskId.ToWorkItemId(), cancellationToken))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
+        if (!anchor.Metadata.TryGetValue(WorkspaceMetadata, out var workspaceId) || string.IsNullOrWhiteSpace(workspaceId) || anchor.Metadata.ContainsKey(TaskMetadata))
+            throw new KeyNotFoundException($"Task '{taskId}' was not found.");
+        var workspace = new WorkplaceWorkspaceId(workspaceId);
+        return (workspace, await GetTaskAsync(workspace, taskId, cancellationToken));
+    }
+
+    public async Task<OperationalWorkTaskPage> QueryOperationalTasksAsync(
+        string? workspaceId, WorkTaskStatus? status, string? search, bool? hasPendingAction,
+        int page, int pageSize, WorkItemSortField sort, WorkItemSortDirection direction, CancellationToken cancellationToken,
+        DateTimeOffset? updatedFrom = null, DateTimeOffset? updatedTo = null)
+    {
+        page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
+        var query = new WorkItemQuery(
+            Skip: (page - 1) * pageSize, Take: pageSize, Status: status is null ? null : ToItemStatus(status.Value),
+            SortBy: sort, SortDirection: direction, WorkspaceId: string.IsNullOrWhiteSpace(workspaceId) ? null : workspaceId,
+            IsContinuation: false, Search: search, HasPendingAction: hasPendingAction, OperationalTasks: true,
+            UpdatedFrom: updatedFrom, UpdatedTo: updatedTo);
+        var anchors = await workItems.QueryAsync(query, cancellationToken);
+        var tasks = new List<WorkTask>(anchors.Items.Count);
+        foreach (var stored in anchors.Items)
+        {
+            var anchor = stored.Value; var taskId = WorkTaskId.FromWorkItem(anchor.Id);
+            var continuations = await workItems.QueryAsync(new WorkItemQuery(Take: 100, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
+            tasks.Add(ProjectTask(anchor, LatestExecution(anchor, continuations.Items.Select(value => value.Value).ToArray()), taskId));
+        }
+        return new OperationalWorkTaskPage(tasks, Math.Max(0, anchors.TotalCount));
     }
 
     public async Task<IReadOnlyList<WorkTask>> ListTasksAsync(WorkplaceWorkspaceId workspaceId, WorkTaskStatus? status, CancellationToken cancellationToken)
@@ -296,19 +332,40 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
     private Task PublishInteractionAsync(WorkplaceInteraction interaction, CancellationToken token) =>
         PublishAsync(new InteractionUpdatedEvent(EventId(), interaction.WorkspaceId.Value, Sequence(), interaction.LastActivityAt, interaction.Id.Value, interaction.Status), token);
 
+    private async Task<PendingAction> LinkPendingActionAsync(PendingAction action, WorkTask? task, CancellationToken token)
+    {
+        if (task is null || action.WorkTaskId is not null) return action;
+        var linked = action with { WorkTaskId = task.Id, Version = action.Version + 1 };
+        await repository.SavePendingActionAsync(linked, action.Version, token);
+        return linked;
+    }
+
     private async Task<WorkItem> GetCurrentExecutionAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token)
     {
-        var page = await workItems.QueryAsync(new WorkItemQuery(Take: 500), token);
-        var items = page.Items.Select(value => value.Value).ToArray();
-        var anchor = items.SingleOrDefault(value => value.Id == taskId.ToWorkItemId()) ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
+        var anchor = (await workItems.GetAsync(taskId.ToWorkItemId(), token))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         RequireWorkspace(anchor, workspaceId);
-        return LatestExecution(anchor, items);
+        var page = await workItems.QueryAsync(new WorkItemQuery(Take: 100, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), token);
+        return LatestExecution(anchor, page.Items.Select(value => value.Value).ToArray());
     }
 
     private static WorkItem LatestExecution(WorkItem anchor, IReadOnlyList<WorkItem> items) => items
+        .Append(anchor)
         .Where(value => value.Id == anchor.Id || value.Metadata.GetValueOrDefault(TaskMetadata) == WorkTaskId.FromWorkItem(anchor.Id).ToString())
         .OrderByDescending(value => value.CreatedAt)
         .First();
+
+    private static WorkItemStatus ToItemStatus(WorkTaskStatus status) => status switch
+    {
+        WorkTaskStatus.Draft => WorkItemStatus.Pending,
+        WorkTaskStatus.Pending => WorkItemStatus.Pending,
+        WorkTaskStatus.Running => WorkItemStatus.Running,
+        WorkTaskStatus.ActionRequired => WorkItemStatus.WaitingForInput,
+        WorkTaskStatus.Paused => WorkItemStatus.Paused,
+        WorkTaskStatus.Completed => WorkItemStatus.Completed,
+        WorkTaskStatus.Failed => WorkItemStatus.Failed,
+        WorkTaskStatus.Cancelled => WorkItemStatus.Cancelled,
+        _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
+    };
 
     private static WorkTask ProjectTask(WorkItem anchor, WorkItem latest, WorkTaskId publicId)
     {

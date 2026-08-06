@@ -15,6 +15,7 @@
   <ItemGroup>
     <Compile Include="../Agentstration.Web/Api/WorkEndpoints.cs" Link="Api/WorkEndpoints.cs" />
     <Compile Include="../Agentstration.Web/Api/WorkplaceEndpoints.cs" Link="Api/WorkplaceEndpoints.cs" />
+    <Compile Include="../Agentstration.Web/Api/WorkOperationsEndpoints.cs" Link="Api/WorkOperationsEndpoints.cs" />
     <Compile Include="../Agentstration.Web/Features/Workplace/WorkplaceHub.cs" Link="Features/WorkplaceHub.cs" />
     <Compile Include="../Agentstration.Web/Hosting/LocalWorkExecutionWorker.cs" Link="Hosting/LocalWorkExecutionWorker.cs" />
     <Compile Include="../Agentstration.Web/Hosting/FlowRunExecutionWorker.cs" Link="Hosting/FlowRunExecutionWorker.cs" />

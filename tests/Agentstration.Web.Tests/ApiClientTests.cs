@@ -11,6 +11,9 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Components;
+using Agentstration.Flow;
+using Agentstration.Flow.Contracts;
+using Agentstration.Web.Features.Flows.Designer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -39,6 +42,7 @@ public sealed class ApiClientTests
         Assert.IsInstanceOfType<ManagementApiClient>(scope.ServiceProvider.GetRequiredService<IAgentRunnerManagementClient>());
         Assert.IsInstanceOfType<RuntimeApiClient>(scope.ServiceProvider.GetRequiredService<IAgentRunnerRuntimeClient>());
         Assert.IsInstanceOfType<ManagementApiClient>(scope.ServiceProvider.GetRequiredService<IManagementApiClient>());
+        Assert.IsInstanceOfType<WorkApiClient>(scope.ServiceProvider.GetRequiredService<IWorkApiClient>());
         Assert.IsInstanceOfType<ConsoleResourceSearchProvider>(scope.ServiceProvider.GetRequiredService<IResourceSearchProvider>());
     }
 
@@ -46,9 +50,9 @@ public sealed class ApiClientTests
     public async Task WorkClientMapsPublicContractToConsoleModel()
     {
         var timestamp = new DateTimeOffset(2026, 8, 1, 10, 0, 0, TimeSpan.Zero);
-        var response = new WorkItemPageResponse(
-            [new WorkItemSummaryResponse(Guid.NewGuid(), "review", "Review API", WorkItemStatus.Running, timestamp, timestamp, "operator", "dotnet-expert", 3)],
-            null);
+        var response = new WorkTaskOperationsPageResponse(
+            [new WorkTaskOperationsSummary(Guid.NewGuid(), "/resourceGroups/default/providers/Agentstration.Work/workspaces/personal", "/resourceGroups/default/providers/Agentstration.Work/entries/review", Guid.NewGuid(), "Review API", null, WorkTaskStatus.Running, timestamp, timestamp, timestamp, null, "flowrun-1", null, 0, 0, 0, 1, "Work started", null)],
+            1, 100, 1);
         using var httpClient = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) }))
         {
             BaseAddress = new Uri("http://localhost/")
@@ -60,7 +64,7 @@ public sealed class ApiClientTests
         Assert.HasCount(1, items);
         Assert.AreEqual("Review API", items[0].Title);
         Assert.AreEqual("Running", items[0].Status);
-        Assert.AreEqual("dotnet-expert", items[0].Owner);
+        Assert.AreEqual("personal", items[0].Owner);
     }
 
     [TestMethod]
@@ -75,6 +79,41 @@ public sealed class ApiClientTests
         var exception = await Assert.ThrowsAsync<AgentstrationApiException>(() => client.GetWorkItemsAsync(CancellationToken.None));
 
         Assert.IsFalse(string.IsNullOrWhiteSpace(exception.ErrorId));
+    }
+
+    [TestMethod]
+    public async Task FlowDesignerMaterializesDraftFromActivePublishedVersion()
+    {
+        var now = new DateTimeOffset(2026, 8, 6, 12, 0, 0, TimeSpan.Zero);
+        var flowId = new FlowId("universal-router");
+        var spec = new DirectFlowSpec(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
+        var flow = new FlowResponse(flowId.Value, flowId.Value, null, FlowKind.Direct, "1.0.0", true, "1.0.0", spec, new Dictionary<string, string>(), now, now);
+        var draft = new FlowDraftResponse(new FlowDraft
+        {
+            Id = "draft-universal-router", FlowId = flowId, DisplayName = "Universal router",
+            Definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] },
+            CreatedAt = now, UpdatedAt = now
+        }, "\"draft-etag\"");
+        var requests = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add($"{request.Method} {request.RequestUri!.AbsolutePath}");
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath.EndsWith("/draft", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.NotFound) { Content = JsonContent.Create(new { title = "flow_draft_not_found", status = 404 }) };
+            if (request.Method == HttpMethod.Get)
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) };
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(draft) };
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        var actual = await new FlowDesignerBackend(new FlowApiClient(httpClient)).GetDraftAsync(flowId.Value, default);
+
+        Assert.AreEqual(flowId, actual.Value.FlowId);
+        CollectionAssert.AreEqual(new[]
+        {
+            "GET /api/flows/universal-router/draft",
+            "GET /api/flows/universal-router",
+            "POST /api/flows/universal-router/versions/1.0.0/draft"
+        }, requests);
     }
 
     [TestMethod]

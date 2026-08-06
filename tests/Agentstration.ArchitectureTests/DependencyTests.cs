@@ -20,6 +20,7 @@ using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Components;
 using Agentstration.Work.Api;
 using Agentstration.Workplace.Web;
+using Agentstration.Web.Console;
 
 namespace Agentstration.ArchitectureTests;
 
@@ -203,6 +204,17 @@ public sealed class DependencyTests
     {
         var references = typeof(WorkApiAssemblyMarker).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Equals("Agentstration.Web", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ConsoleWorkOperationsClientDependsOnlyOnHttpAndPublicContracts()
+    {
+        var type = typeof(WorkApiClient);
+        Assert.IsTrue(type.GetConstructors().SelectMany(value => value.GetParameters()).All(value => value.ParameterType == typeof(HttpClient)));
+        Assert.IsFalse(type.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .Any(value => value.FieldType.FullName?.Contains("Repository", StringComparison.Ordinal) == true
+                || value.FieldType.Namespace?.Contains("Storage", StringComparison.Ordinal) == true
+                || value.FieldType.FullName?.Contains("WorkplaceService", StringComparison.Ordinal) == true));
     }
 
     [TestMethod]

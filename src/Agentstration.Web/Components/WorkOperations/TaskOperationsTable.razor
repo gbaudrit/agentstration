@@ -1,0 +1,30 @@
+@using Agentstration.Work.Contracts
+@if (Items.Count == 0)
+{
+    <EmptyState Title="@EmptyTitle" Message="@EmptyMessage" />
+}
+else
+{
+    <DataGrid TItem="WorkTaskOperationsSummary" Items="Items">
+        <Header><tr><th>Status</th><th>Task</th><th>Workspace</th><th>Interaction</th><th>Current activity</th><th>FlowRuns</th><th>Results</th><th>Artifacts</th><th>Updated</th><th></th></tr></Header>
+        <Row Context="item"><tr>
+            <td><TaskStatusBadge Status="item.Status" /></td>
+            <td><strong>@item.Title</strong>@if(!string.IsNullOrWhiteSpace(item.Description)){<small class="table-secondary">@item.Description</small>}</td>
+            <td>@ShortResource(item.WorkspaceId)</td>
+            <td><code>@ShortId(item.InteractionId)</code></td>
+            <td>@(item.CurrentActivity ?? "—")@if(item.PendingActionCount > 0){<small class="attention-count">@item.PendingActionCount pending</small>}</td>
+            <td>@item.FlowRunCount</td><td>@item.ResultCount</td><td>@item.ArtifactCount</td>
+            <td><time datetime="@item.UpdatedAt.ToString("O")" title="@item.UpdatedAt.ToLocalTime().ToString("F")">@Relative(item.UpdatedAt)</time></td>
+            <td><a class="text-button" href="/tasks/@item.Id">Inspect</a></td>
+        </tr></Row>
+    </DataGrid>
+}
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<WorkTaskOperationsSummary> Items { get; set; } = [];
+    [Parameter] public bool Filtered { get; set; }
+    private string EmptyTitle => Filtered ? "No task matches these filters" : "No tasks yet";
+    private string EmptyMessage => Filtered ? "Clear or adjust the operational filters." : "Tasks created from Workplace will appear here.";
+    private static string ShortResource(string value) => value[(value.LastIndexOf('/') + 1)..];
+    private static string ShortId(Guid value) => value.ToString("N")[..8];
+    private static string Relative(DateTimeOffset value) { var elapsed = DateTimeOffset.UtcNow - value.ToUniversalTime(); return elapsed.TotalMinutes < 1 ? "Just now" : elapsed.TotalHours < 1 ? $"{(int)elapsed.TotalMinutes}m ago" : elapsed.TotalDays < 1 ? $"{(int)elapsed.TotalHours}h ago" : value.ToLocalTime().ToString("d MMM yyyy"); }
+}
