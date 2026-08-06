@@ -18,6 +18,7 @@ public static class WebConsoleServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton(TimeProvider.System);
         services.AddAgentstrationWebComponents();
+        services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
         services.AddScoped<IFlowDesignerBackend, FlowDesignerBackend>();

@@ -1,0 +1,6 @@
+<nav class="resource-tabs" aria-label="@Label">@ChildContent</nav>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Resource sections";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

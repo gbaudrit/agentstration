@@ -1,5 +1,6 @@
 using Agentstration.Web.Components.State;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Web.Components;
 
@@ -11,7 +12,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<UserPreferencesState>();
         services.AddScoped<NotificationState>();
         services.AddScoped<PlatformStatusState>();
+        services.TryAddScoped<IResourceSearchProvider, EmptyResourceSearchProvider>();
         return services;
     }
 }
-

@@ -7,14 +7,13 @@
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 
-<PageTitle>@(IsNew ? "Create agent" : "Edit agent") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? "Create agent" : $"Edit {Name}")" Description="Save the desired state and activate its current runtime generation.">
-    <Actions>@if (!IsNew) { <a class="button-primary" href="@RunUrl">Run</a> }<a class="button-secondary" href="/agents">Back to agents</a></Actions>
-</PageHeader>
+<PageTitle>@(IsNew ? "Create agent" : Name) · Agentstration</PageTitle>
 
-@if (!IsNew)
+@if (IsNew)
 {
-    <nav class="resource-tabs" aria-label="Agent sections"><a class="active" href="@OverviewUrl">Overview</a><span>Definition</span><span>Versions</span><a href="@RunUrl">Runs</a><span>Metrics</span></nav>
+    <PageHeader Eyebrow="Agent" Title="Create agent" Description="Define the desired state for a new specialized agent resource.">
+        <Actions><a class="button-secondary" href="/agents">Back to agents</a></Actions>
+    </PageHeader>
 }
 
 @if (loading || model is null)
@@ -23,6 +22,18 @@
 }
 else
 {
+    @if (!IsNew)
+    {
+        <ResourceHeader ResourceType="Agent" Domain="agent" Icon="◎" Name="@model.DisplayName" Description="@model.Description" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
+            <Metadata><span><code>@model.Name</code></span><span>Generation @generation</span><span>@model.Location</span></Metadata>
+            <Actions><a class="button-primary" href="@RunUrl">Run</a><button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">Reconcile deployment</button></Actions>
+        </ResourceHeader>
+        <ResourceTabs Label="Agent sections"><a class="active" href="@OverviewUrl">Overview</a><a href="#definition">Definition</a><span>Deployments</span><a href="@RunUrl">Runs</a><span>Metrics</span><span>Events</span><span>Source</span></ResourceTabs>
+        <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? "Modified · not saved" : "Saved definition")" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
+            <Actions>@if (!IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">Apply generation</button> }</Actions>
+        </StateComparison>
+    }
+
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
         <div class="form-alert form-alert-danger" role="alert"><strong>Unable to apply</strong><span>@errorMessage</span>@if (!string.IsNullOrWhiteSpace(errorId)) { <code>@errorId</code> }</div>
@@ -32,11 +43,11 @@ else
         <div class="form-alert form-alert-success" role="status">@successMessage</div>
     }
 
-    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="agent-editor" class="resource-form">
+    <EditForm Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" FormName="agent-editor" class="resource-form" @oninput="MarkDirty" @onchange="MarkDirty">
         <DataAnnotationsValidator />
         <ValidationSummary />
 
-        <section class="panel form-section">
+        <section class="panel form-section" id="definition">
             <div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Resource coordinates</h2></div>@if (!IsNew) { <StatusBadge Text="@($"Generation {generation}")" Status="UiStatus.Info" /> }</div>
             <div class="form-grid">
                 <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
@@ -83,10 +94,16 @@ else
             </div>
         </section>
 
-        <div class="form-actions">
-            <a class="button-secondary" href="/agents">Cancel</a>
-            <button class="button-primary" type="submit" disabled="@saving">@(saving ? "Applying…" : IsNew ? "Create and deploy" : "Save and apply")</button>
-        </div>
+        @if (IsNew)
+        {
+            <div class="form-actions"><a class="button-secondary" href="/agents">Cancel</a><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? "Creating…" : "Create and deploy")</button></div>
+        }
+        else
+        {
+            <UnsavedChangesBar IsVisible="@isDirty">
+                <Actions><button class="button-secondary" type="button" @onclick="DiscardAsync" disabled="@saving">Discard</button><button class="button-secondary" type="submit" @onclick="() => applyRuntimeOnSubmit = false" disabled="@saving">Save draft</button><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? "Applying…" : "Save and apply")</button></Actions>
+            </UnsavedChangesBar>
+        }
     </EditForm>
 }
 
@@ -104,12 +121,23 @@ else
     private string? successMessage;
     private string? modelResolutionWarning;
     private AgentModelResponse? agentModel;
+    private AgentRuntimeReadinessResponse? readiness;
+    private string provisioningStatus = "Valid";
     private long generation;
     private bool loading = true;
     private bool saving;
+    private bool isDirty;
+    private bool applyRuntimeOnSubmit = true;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private string OverviewUrl => $"/agents/{Uri.EscapeDataString(ResourceGroup ?? "default")}/{Uri.EscapeDataString(Name ?? string.Empty)}";
     private string RunUrl => $"{OverviewUrl}/run";
+    private bool IsStateSynchronized => !isDirty && readiness?.Ready == true && readiness.Generation == generation;
+    private long? ActiveGeneration => readiness?.Ready == true ? readiness.Generation : null;
+    private string ActiveStatus => readiness?.Ready == true ? StatusPresentation.Label(readiness.State) : readiness?.Error ?? readiness?.State ?? "Not deployed";
+    private string? ActiveRuntime => readiness?.RuntimeProfileId is null ? readiness?.DeploymentId : ResourceName(readiness.RuntimeProfileId);
+    private string StateSummary => IsStateSynchronized ? $"Generation {generation} is ready." : isDirty ? "Save or apply the modified desired definition." : "The current generation is not active.";
+    private string HeaderStatus => readiness?.Ready == true ? "Ready" : StatusPresentation.Label(provisioningStatus);
+    private UiStatus HeaderStatusTone => readiness?.Ready == true ? UiStatus.Success : StatusPresentation.Tone(provisioningStatus);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -131,8 +159,11 @@ else
                 etag = snapshot.ETag;
                 resourceId = snapshot.Value.Id;
                 generation = snapshot.Value.Generation;
+                provisioningStatus = snapshot.Value.Status.ProvisioningState.ToString();
                 await LoadAgentModelAsync(group, Name!);
+                await LoadReadinessAsync(group, Name!, generation);
             }
+            isDirty = false;
         }
         catch (AgentstrationApiException exception)
         {
@@ -154,9 +185,12 @@ else
 
     private Task ModelProfileChanged(string value)
     {
-        if (model is not null) model.ModelProfileResourceId = value;
+        if (model is not null) { model.ModelProfileResourceId = value; isDirty = true; }
         return Task.CompletedTask;
     }
+
+    private void MarkDirty(EventArgs _) => isDirty = true;
+    private Task DiscardAsync() => OnParametersSetAsync();
 
     private static string ResourceName(string resourceId) => ResourceIdentifier.TryParse(resourceId, out var parsed) ? parsed.Name : resourceId;
     private static string ProfileUrl(AgentModelResponse value)
@@ -178,6 +212,13 @@ else
         catch (AgentstrationApiException exception) { modelResolutionWarning = exception.Message; }
     }
 
+    private async Task LoadReadinessAsync(string resourceGroup, string name, long desiredGeneration)
+    {
+        readiness = null;
+        try { readiness = await RuntimeClient.GetAgentReadinessAsync(resourceGroup, name, desiredGeneration, cancellation.Token); }
+        catch (AgentstrationApiException) { }
+    }
+
     private void ApplyAgentType(AgentTypeResource type)
     {
         if (model is null) return;
@@ -191,7 +232,7 @@ else
         }
     }
 
-    private async Task SaveAsync()
+    private async Task SaveAsync(bool applyRuntime)
     {
         if (model is null) return;
         saving = true;
@@ -206,33 +247,31 @@ else
             etag = snapshot.ETag;
             resourceId = snapshot.Value.Id;
             generation = snapshot.Value.Generation;
+            provisioningStatus = snapshot.Value.Status.ProvisioningState.ToString();
             model = AgentEditorModel.FromResource(snapshot.Value);
-            var activation = await RuntimeClient.PrepareAgentAsync(
-                snapshot.Value.ResourceGroup!,
-                snapshot.Value.Name,
-                snapshot.Value.Generation,
-                cancellation.Token);
-            if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
+            isDirty = false;
+            if (applyRuntime)
             {
-                var message = $"The agent definition was saved, but generation {snapshot.Value.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";
-                Notifications.Add(new NotificationItem(Guid.NewGuid(), "Runtime activation failed", message, DateTimeOffset.Now, UiStatus.Warning));
-                if (wasNew)
+                var activation = await RuntimeClient.PrepareAgentAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name, snapshot.Value.Generation, cancellation.Token);
+                if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 {
-                    Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.ResourceGroup!)}/{Uri.EscapeDataString(snapshot.Value.Name)}");
+                    var message = $"The agent definition was saved, but generation {snapshot.Value.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";
+                    Notifications.Add(new NotificationItem(Guid.NewGuid(), "Runtime activation failed", message, DateTimeOffset.Now, UiStatus.Warning));
+                    if (wasNew) Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.ResourceGroup!)}/{Uri.EscapeDataString(snapshot.Value.Name)}");
+                    else { errorMessage = message; await LoadAgentModelAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name); await LoadReadinessAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name, snapshot.Value.Generation); }
                     return;
                 }
-
-                errorMessage = message;
-                await LoadAgentModelAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name);
-                return;
             }
 
-            successMessage = wasNew ? "Agent created and deployed." : $"Agent updated and generation {snapshot.Value.Generation} activated.";
+            successMessage = wasNew ? (applyRuntime ? "Agent created and deployed." : "Agent draft created.") : applyRuntime ? $"Agent updated and generation {snapshot.Value.Generation} activated." : $"Desired generation {snapshot.Value.Generation} saved without changing the active deployment.";
             Notifications.Add(new NotificationItem(Guid.NewGuid(), successMessage, snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
             if (wasNew)
                 Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.ResourceGroup!)}/{Uri.EscapeDataString(snapshot.Value.Name)}");
             else
+            {
                 await LoadAgentModelAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name);
+                await LoadReadinessAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name, snapshot.Value.Generation);
+            }
         }
         catch (ArgumentException exception) { errorMessage = exception.Message; }
         catch (AgentstrationApiException exception)
@@ -240,6 +279,21 @@ else
             errorMessage = exception.IsConcurrencyConflict ? "This agent changed on the server. Reload the page before saving again." : exception.Message;
             errorId = exception.ErrorId;
         }
+        finally { saving = false; }
+    }
+
+    private async Task ReconcileAsync()
+    {
+        if (model is null || IsNew || isDirty) return;
+        saving = true;
+        errorMessage = null;
+        try
+        {
+            var activation = await RuntimeClient.PrepareAgentAsync(model.ResourceGroup, model.Name, generation, cancellation.Token);
+            await LoadReadinessAsync(model.ResourceGroup, model.Name, generation);
+            successMessage = string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal) ? $"Generation {generation} is active." : $"Reconciliation completed with state {activation.State}.";
+        }
+        catch (AgentstrationApiException exception) { errorMessage = exception.Message; errorId = exception.ErrorId; }
         finally { saving = false; }
     }
 

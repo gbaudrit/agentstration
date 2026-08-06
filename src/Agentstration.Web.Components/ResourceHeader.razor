@@ -1,0 +1,27 @@
+<header class="resource-header resource-domain-@Domain">
+    <div class="resource-header-identity">
+        <div class="resource-icon" aria-hidden="true">@Icon</div>
+        <div>
+            <p class="eyebrow">@ResourceType</p>
+            <div class="resource-title-row">
+                <h1>@Name</h1>
+                @if (!string.IsNullOrWhiteSpace(StatusText)) { <StatusIndicator Text="@StatusText" Status="@Status" /> }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(Description)) { <p class="resource-description">@Description</p> }
+            @if (Metadata is not null) { <div class="resource-metadata">@Metadata</div> }
+        </div>
+    </div>
+    @if (Actions is not null) { <div class="page-actions">@Actions</div> }
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string ResourceType { get; set; } = string.Empty;
+    [Parameter] public string Domain { get; set; } = "neutral";
+    [Parameter] public string Icon { get; set; } = "◇";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? StatusText { get; set; }
+    [Parameter] public UiStatus Status { get; set; }
+    [Parameter] public RenderFragment? Metadata { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

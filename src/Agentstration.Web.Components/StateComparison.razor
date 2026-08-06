@@ -1,0 +1,27 @@
+<section class="state-comparison @(IsSynchronized ? "is-synchronized" : "has-drift")" aria-label="Desired and active state comparison">
+    @if (IsSynchronized)
+    {
+        <div class="state-match"><span aria-hidden="true">✓</span><div><strong>Desired state matches active generation</strong><small>@Summary</small></div></div>
+    }
+    else
+    {
+        <header><strong>Desired state differs from active deployment</strong><span>@Summary</span></header>
+    }
+    <div class="state-comparison-grid">
+        <article><p class="eyebrow">Desired state</p><strong>Generation @DesiredGeneration</strong><span>@DesiredStatus</span></article>
+        <article><p class="eyebrow">Active deployment</p><strong>@ActiveGenerationLabel</strong><span>@ActiveStatus</span>@if (!string.IsNullOrWhiteSpace(RuntimeLabel)) { <code>@RuntimeLabel</code> }</article>
+    </div>
+    @if (Actions is not null) { <div class="state-comparison-actions">@Actions</div> }
+</section>
+
+@code {
+    [Parameter] public long DesiredGeneration { get; set; }
+    [Parameter] public long? ActiveGeneration { get; set; }
+    [Parameter] public string DesiredStatus { get; set; } = "Saved";
+    [Parameter] public string ActiveStatus { get; set; } = "Not deployed";
+    [Parameter] public string? RuntimeLabel { get; set; }
+    [Parameter] public string Summary { get; set; } = string.Empty;
+    [Parameter] public bool IsSynchronized { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    private string ActiveGenerationLabel => ActiveGeneration is null ? "No active generation" : $"Generation {ActiveGeneration}";
+}

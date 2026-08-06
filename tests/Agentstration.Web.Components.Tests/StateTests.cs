@@ -7,6 +7,17 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class StateTests
 {
     [TestMethod]
+    public void StatusPresentationUsesOperationalVocabulary()
+    {
+        Assert.AreEqual("Valid", StatusPresentation.Label("Accepted"));
+        Assert.AreEqual("Published", StatusPresentation.Label("Succeeded"));
+        Assert.AreEqual("Timed out", StatusPresentation.Label("TimedOut"));
+        Assert.AreEqual(UiStatus.Success, StatusPresentation.Tone("Ready"));
+        Assert.AreEqual(UiStatus.Danger, StatusPresentation.Tone("Failed"));
+        Assert.AreEqual(UiStatus.Warning, StatusPresentation.Tone("Degraded"));
+    }
+
+    [TestMethod]
     public void NavigationStateTogglesSidebarAndNotifies()
     {
         var state = new NavigationState();

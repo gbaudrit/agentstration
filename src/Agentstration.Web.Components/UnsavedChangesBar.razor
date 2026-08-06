@@ -1,0 +1,14 @@
+@if (IsVisible)
+{
+    <div class="unsaved-changes-bar" role="status" aria-live="polite">
+        <div><strong>@Title</strong><span>@Message</span></div>
+        <div class="unsaved-changes-actions">@Actions</div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public string Title { get; set; } = "Unsaved changes";
+    [Parameter] public string Message { get; set; } = "The desired definition has been modified. Saving does not automatically update the active runtime generation.";
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

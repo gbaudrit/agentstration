@@ -4,16 +4,19 @@
 @inject NotificationState Notifications
 
 <PageTitle>Agents · Agentstration</PageTitle>
-<PageHeader Title="Agents" Description="Create and govern canonical agent resources in the Management Plane.">
+<PageHeader Eyebrow="Build · Agent resources" Title="Agents" Description="Define, publish and operate specialized agent resources.">
+    <Metadata><span>@Filtered.Count agents</span><span>@PublishedCount published</span><span>@FailedCount requiring attention</span></Metadata>
     <Actions><a class="button-primary" href="/agents/new">Create agent</a></Actions>
 </PageHeader>
 
-<FilterBar>
-    <input @bind="resourceGroup" aria-label="Resource group" placeholder="Resource group" />
-    <SearchBox Value="search" ValueChanged="value => search = value" Placeholder="Search agents or resource IDs" />
-    <select @bind="status" aria-label="Filter agent status"><option value="">All statuses</option><option>Accepted</option><option>Succeeded</option><option>Failed</option></select>
-    <button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh</button>
-</FilterBar>
+<ResourceToolbar Label="Agent filters">
+    <ChildContent>
+        <SearchBox Value="search" ValueChanged="value => search = value" Placeholder="Search agents…" Label="Search agents" />
+        <label class="resource-context-field"><span>Resource group:</span><input @bind="resourceGroup" aria-label="Resource group" /></label>
+        <select @bind="status" aria-label="Filter agent status"><option value="">Status: All</option><option value="Accepted">Valid</option><option value="Succeeded">Published</option><option value="Failed">Failed</option></select>
+    </ChildContent>
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@(loading ? "Refreshing…" : "Refresh")</button></Actions>
+</ResourceToolbar>
 
 @if (loading && items is null)
 {
@@ -30,16 +33,26 @@ else if (Filtered.Count == 0)
 else
 {
     <DataGrid TItem="AgentSummary" Items="Filtered">
-        <Header><tr><th>Agent</th><th>Agent type</th><th>Status</th><th>Generation</th><th>Tools</th><th>Actions</th></tr></Header>
+        <Header><tr><th>Agent</th><th>Definition</th><th>Model profile</th><th>Deployment</th><th>Last activity</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></Header>
         <Row Context="item"><tr>
-            <td><strong>@item.Name</strong><br /><code>@item.Id</code></td>
-            <td><code>@ResourceName(item.Type)</code></td>
-            <td><StatusBadge Text="@item.Status" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td>
-            <td>@item.Version</td>
-            <td>@(item.Capabilities.Count == 0 ? "None" : string.Join(" · ", item.Capabilities.Select(ResourceName)))</td>
-            <td><div class="table-actions"><a class="text-button" href="@RunUrl(item)">Run</a><a class="text-button" href="@EditUrl(item)">Edit</a><button class="text-button danger-text" @onclick="() => RequestDelete(item)">Delete</button></div></td>
+            <td><a class="resource-name-link" href="@EditUrl(item)">@item.Name</a><span class="resource-secondary"><code>@TechnicalName(item)</code></span></td>
+            <td><strong>@ResourceName(item.Type)</strong><span class="resource-secondary">generation @item.Version</span></td>
+            <td><a class="text-button" href="@ModelProfileUrl(item)">@ResourceName(item.ModelProfile)</a></td>
+            <td><span>@item.Runtime</span><span class="resource-secondary">Desired generation @item.Version</span></td>
+            <td>@LastActivity(item.LastActivity)</td>
+            <td><StatusIndicator Text="@StatusPresentation.Label(item.Status)" Status="@StatusPresentation.Tone(item.Status)" /></td>
+            <td><div class="table-actions"><a class="text-button" href="@RunUrl(item)">Run</a><details class="row-actions-menu"><summary aria-label="More actions for @item.Name">•••</summary><div><a href="@EditUrl(item)">Open</a><a href="@RunUrl(item)">Run</a><a href="@EditUrl(item)#definition">Edit definition</a><button type="button" @onclick="() => selected = item">Quick inspect</button><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">Delete</button></div></details></div></td>
         </tr></Row>
     </DataGrid>
+}
+
+@if (selected is not null)
+{
+    <aside class="quick-inspector" aria-label="Agent quick inspector">
+        <header><div><p class="eyebrow">Agent</p><h2>@selected.Name</h2><StatusIndicator Text="@StatusPresentation.Label(selected.Status)" Status="@StatusPresentation.Tone(selected.Status)" /></div><button class="icon-button" @onclick="() => selected = null" aria-label="Close inspector">×</button></header>
+        <dl class="resource-details resource-section"><dt>Definition</dt><dd>@ResourceName(selected.Type) · generation @selected.Version</dd><dt>Model profile</dt><dd>@ResourceName(selected.ModelProfile)</dd><dt>Deployment</dt><dd>@selected.Runtime</dd><dt>Resource ID</dt><dd><code>@selected.Id</code></dd></dl>
+        <div class="quick-inspector-actions"><a class="button-primary" href="@RunUrl(selected)">Run agent</a><a class="button-secondary" href="@EditUrl(selected)">Open details</a></div>
+    </aside>
 }
 
 <ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="Delete agent" Message="@DeleteMessage" ConfirmLabel="Delete agent" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
@@ -49,6 +62,7 @@ else
     private IReadOnlyList<AgentSummary>? items;
     private AgentstrationApiException? error;
     private AgentSummary? pendingDelete;
+    private AgentSummary? selected;
     private string search = string.Empty;
     private string status = string.Empty;
     private string resourceGroup = "default";
@@ -58,9 +72,11 @@ else
         (string.IsNullOrWhiteSpace(search)
             || item.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
             || item.Id.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || item.ModelProfile.Contains(search, StringComparison.OrdinalIgnoreCase)
             || item.Capabilities.Any(capability => capability.Contains(search, StringComparison.OrdinalIgnoreCase)))
         && (string.IsNullOrWhiteSpace(status) || string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase))).ToArray() ?? [];
-
+    private int PublishedCount => items?.Count(item => string.Equals(item.Status, "Succeeded", StringComparison.OrdinalIgnoreCase)) ?? 0;
+    private int FailedCount => items?.Count(item => string.Equals(item.Status, "Failed", StringComparison.OrdinalIgnoreCase)) ?? 0;
     private string DeleteMessage => pendingDelete is null ? string.Empty : $"Delete '{pendingDelete.Name}'? Existing revisions and deployments are not deleted automatically.";
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -80,14 +96,14 @@ else
     private async Task DeleteAsync()
     {
         if (pendingDelete is null) return;
-        var selected = pendingDelete;
+        var deleted = pendingDelete;
         pendingDelete = null;
         try
         {
-            var id = ResourceIdentifier.Parse(selected.Id);
+            var id = ResourceIdentifier.Parse(deleted.Id);
             var snapshot = await Client.GetAgentAsync(id.ResourceGroup, id.Name, cancellation.Token);
             await Client.DeleteAgentAsync(id.ResourceGroup, id.Name, snapshot.ETag, cancellation.Token);
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), "Agent deleted", selected.Name, DateTimeOffset.Now, UiStatus.Success));
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), "Agent deleted", deleted.Name, DateTimeOffset.Now, UiStatus.Success));
             await LoadAsync();
         }
         catch (AgentstrationApiException exception)
@@ -97,19 +113,11 @@ else
         }
     }
 
-    private static string EditUrl(AgentSummary item)
-    {
-        var id = ResourceIdentifier.Parse(item.Id);
-        return $"/agents/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}";
-    }
-
+    private static string EditUrl(AgentSummary item) { var id = ResourceIdentifier.Parse(item.Id); return $"/agents/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}"; }
     private static string RunUrl(AgentSummary item) => $"{EditUrl(item)}/run";
-
+    private static string ModelProfileUrl(AgentSummary item) { if (!ResourceIdentifier.TryParse(item.ModelProfile, out var id)) return "/modelprofiles"; return $"/modelprofiles/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}"; }
+    private static string TechnicalName(AgentSummary item) => ResourceIdentifier.TryParse(item.Id, out var id) ? id.Name : item.Id;
     private static string ResourceName(string resourceId) => ResourceIdentifier.TryParse(resourceId, out var parsed) ? parsed.Name : resourceId;
-
-    public void Dispose()
-    {
-        cancellation.Cancel();
-        cancellation.Dispose();
-    }
+    private static string LastActivity(DateTimeOffset value) => value == DateTimeOffset.MinValue ? "No activity reported" : value.LocalDateTime.ToString("g");
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

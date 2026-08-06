@@ -2,7 +2,7 @@ using Agentstration.Web.Components.Models;
 
 namespace Agentstration.Web.Console;
 
-public sealed record AgentSummary(string Id, string Name, string Type, string Version, string Status, IReadOnlyList<string> Capabilities, string Runtime, DateTimeOffset LastActivity);
+public sealed record AgentSummary(string Id, string Name, string Type, string Version, string Status, IReadOnlyList<string> Capabilities, string Runtime, DateTimeOffset LastActivity, string ModelProfile = "Not configured");
 public sealed record ResourceSnapshot<T>(T Value, string ETag);
 public sealed record RuntimeInstanceSummary(string Id, string Agent, string Status, string HostingMode, string Location, string Activity, double CpuPercent, double MemoryMb, string? Error = null);
 public sealed record WorkSummary(Guid Id, string Title, string Type, string Status, string Priority, string Owner, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);

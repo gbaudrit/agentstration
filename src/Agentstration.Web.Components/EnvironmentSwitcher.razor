@@ -1,0 +1,8 @@
+<button class="environment-switcher" type="button" aria-label="Environment: @Environment, location: @Location" title="Environment scope">
+    <span aria-hidden="true" class="environment-dot"></span><span><strong>@Environment</strong><small>@Location</small></span><span aria-hidden="true">⌄</span>
+</button>
+
+@code {
+    [Parameter] public string Environment { get; set; } = "Development";
+    [Parameter] public string Location { get; set; } = "local";
+}

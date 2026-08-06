@@ -90,7 +90,7 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
     {
         var path = $"resourceGroups/{Uri.EscapeDataString(resourceGroup)}/providers/{AgentstrationProviderNamespaces.Agents}/agents?api-version={ManagementApiVersions.V20260801}";
         var page = await ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, path, cancellationToken);
-        return page.Value.Select(agent => new AgentSummary(agent.Id, agent.Properties.DisplayName, agent.Properties.AgentType.ResourceId, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Properties.Tools.Select(tool => tool.ResourceId).ToArray(), "Not reported", DateTimeOffset.MinValue)).ToArray();
+        return page.Value.Select(agent => new AgentSummary(agent.Id, agent.Properties.DisplayName, agent.Properties.AgentType.ResourceId, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Properties.Tools.Select(tool => tool.ResourceId).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Properties.ModelProfile.ResourceId)).ToArray();
     }
 
     public async Task<IReadOnlyList<AgentTypeResource>> GetAgentTypesAsync(string resourceGroup, CancellationToken cancellationToken)

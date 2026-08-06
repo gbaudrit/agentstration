@@ -10,6 +10,7 @@ using Agentstration.Work.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Configuration;
+using Agentstration.Web.Components;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -38,6 +39,7 @@ public sealed class ApiClientTests
         Assert.IsInstanceOfType<ManagementApiClient>(scope.ServiceProvider.GetRequiredService<IAgentRunnerManagementClient>());
         Assert.IsInstanceOfType<RuntimeApiClient>(scope.ServiceProvider.GetRequiredService<IAgentRunnerRuntimeClient>());
         Assert.IsInstanceOfType<ManagementApiClient>(scope.ServiceProvider.GetRequiredService<IManagementApiClient>());
+        Assert.IsInstanceOfType<ConsoleResourceSearchProvider>(scope.ServiceProvider.GetRequiredService<IResourceSearchProvider>());
     }
 
     [TestMethod]

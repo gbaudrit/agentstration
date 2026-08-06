@@ -27,7 +27,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         var values = agents.Values.Select(snapshot => snapshot.Value)
             .Where(agent => string.Equals(agent.ResourceGroup, resourceGroup, StringComparison.Ordinal))
             .OrderBy(agent => agent.Name, StringComparer.Ordinal)
-            .Select(agent => new AgentSummary(agent.Id, agent.Properties.DisplayName, agent.Properties.AgentType.ResourceId, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Properties.Tools.Select(tool => tool.ResourceId).ToArray(), "Not reported", DateTimeOffset.MinValue))
+            .Select(agent => new AgentSummary(agent.Id, agent.Properties.DisplayName, agent.Properties.AgentType.ResourceId, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Properties.Tools.Select(tool => tool.ResourceId).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Properties.ModelProfile.ResourceId))
             .ToArray();
         return Task.FromResult<IReadOnlyList<AgentSummary>>(values);
     }

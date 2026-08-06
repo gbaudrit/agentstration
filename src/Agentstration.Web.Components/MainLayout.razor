@@ -1,29 +1,52 @@
 @inherits LayoutComponentBase
-@implements IDisposable
+@implements IAsyncDisposable
 @inject NavigationState Navigation
 @inject UserPreferencesState Preferences
 @inject NotificationState Notifications
 @inject PlatformStatusState PlatformStatus
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject IResourceSearchProvider ResourceSearch
 
 <div class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")">
     <aside class="sidebar" aria-label="Main navigation">
-        <div class="brand-lockup"><span class="brand-mark" aria-hidden="true">A</span><span><strong>Agentstration</strong><small>Operations console</small></span></div>
+        <a class="brand-lockup" href="/" aria-label="Agentstration Control Plane home">
+            <span class="brand-mark" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></span>
+            <span class="brand-copy"><strong>Agentstration</strong><small>Control plane</small></span>
+        </a>
         <nav class="side-nav">
-            @foreach (var section in Sections)
+            @foreach (var group in NavigationGroups)
             {
-                <NavLink href="@section.Url" Match="@(section.Url == "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@section.Label"><span aria-hidden="true">@section.Icon</span><span class="nav-label">@section.Label</span></NavLink>
+                <section class="navigation-group" aria-label="@group.Label">
+                    @if (!string.IsNullOrWhiteSpace(group.Label)) { <h2>@group.Label</h2> }
+                    @foreach (var item in group.Items)
+                    {
+                        <NavLink href="@item.Url" Match="@(item.Url == "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@item.Label" class="@($"domain-{item.Domain}")">
+                            <span class="nav-icon" aria-hidden="true">@item.Icon</span><span class="nav-label">@item.Label</span>
+                        </NavLink>
+                    }
+                </section>
             }
         </nav>
-        <div class="sidebar-footer"><HealthIndicator Label="Platform" StatusText="@PlatformStatus.Label" Status="@PlatformStatus.Status" /></div>
+        <a class="sidebar-footer" href="/" aria-label="Open platform health">
+            <HealthIndicator Label="Platform" StatusText="@PlatformStatus.Label" Status="@PlatformStatus.Status" />
+            @if (PlatformStatus.Status is UiStatus.Warning or UiStatus.Danger) { <small>Requires attention</small> }
+        </a>
     </aside>
 
     <div class="workspace">
         <header class="topbar">
-            <div class="topbar-start"><button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="Toggle navigation" aria-expanded="@(!Navigation.IsSidebarCollapsed)">☰</button><nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Agentstration</a><span>/</span><span>@CurrentSection</span></nav></div>
+            <div class="topbar-start">
+                <button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="Toggle navigation" aria-expanded="@(!Navigation.IsSidebarCollapsed)">☰</button>
+                <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">default</a><span>/</span><span>local</span><span>/</span><strong>@CurrentSection</strong></nav>
+            </div>
+            <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="Open command palette">
+                <span aria-hidden="true">⌕</span><span>Search pages or commands…</span><kbd>Ctrl K</kbd>
+            </button>
             <div class="topbar-actions">
+                <EnvironmentSwitcher />
                 <button class="icon-button" @onclick="Preferences.ToggleTheme" aria-label="Toggle color theme">@(Preferences.IsDarkTheme ? "☀" : "◐")</button>
                 <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="Notifications"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
-                <span class="environment-chip">DEV · LOCAL</span>
             </div>
         </header>
         <main class="content" id="main-content">@Body</main>
@@ -34,22 +57,117 @@
         <aside class="notification-panel" aria-label="Notifications">
             <header><div><p class="eyebrow">Activity</p><h2>Notifications</h2></div><button class="icon-button" @onclick="Notifications.TogglePanel" aria-label="Close notifications">×</button></header>
             @if (Notifications.Items.Count == 0) { <EmptyState Title="All quiet" Message="Operational notices will appear here." /> }
-            else { <button class="text-button" @onclick="Notifications.MarkAllRead">Mark all as read</button>@foreach (var item in Notifications.Items) { <article class="notification-item"><StatusBadge Text="@item.Title" Status="@item.Status" /><p>@item.Message</p><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time></article> } }
+            else { <button class="text-button" @onclick="Notifications.MarkAllRead">Mark all as read</button>@foreach (var item in Notifications.Items) { <article class="notification-item"><StatusIndicator Text="@item.Title" Status="@item.Status" /><p>@item.Message</p><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time></article> } }
         </aside>
+    }
+
+    @if (commandPaletteOpen)
+    {
+        <div class="command-palette-backdrop" @onclick="CloseCommandPalette">
+            <section class="command-palette" role="dialog" aria-modal="true" aria-label="Command palette" @onclick:stopPropagation="true">
+                <header>
+                    <span aria-hidden="true">⌕</span>
+                    <input @ref="commandInput" value="@commandQuery" @oninput="UpdateCommandQuery" @onkeydown="HandleCommandKeyDown" placeholder="Search pages or commands…" aria-label="Search pages or commands" autocomplete="off" />
+                    <button class="command-palette-close" type="button" @onclick="CloseCommandPalette" aria-label="Close command palette">Esc</button>
+                </header>
+                <div class="command-results" role="listbox" aria-label="Matching destinations" aria-busy="@searchingResources">
+                    @if (searchingResources)
+                    {
+                        <p class="command-searching"><span class="command-search-spinner" aria-hidden="true"></span>Searching resources…</p>
+                    }
+                    @if (DisplayedCommands.Count == 0 && !searchingResources)
+                    {
+                        <p class="command-empty">No matching page, command or resource.</p>
+                    }
+                    else
+                    {
+                        @for (var index = 0; index < DisplayedCommands.Count; index++)
+                        {
+                            var command = DisplayedCommands[index];
+                            var commandIndex = index;
+                            <button type="button" class="command-result @(selectedCommandIndex == commandIndex ? "selected" : null)" role="option" aria-selected="@(selectedCommandIndex == commandIndex)" @onmouseenter="() => selectedCommandIndex = commandIndex" @onclick="() => ExecuteCommand(command)">
+                                <span class="command-icon" aria-hidden="true">@command.Icon</span><span><strong>@command.Label</strong><small>@command.Category@if (!string.IsNullOrWhiteSpace(command.Detail)) { <span> · @command.Detail</span> }</small></span><kbd>↵</kbd>
+                            </button>
+                        }
+                    }
+                </div>
+                <footer><span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span><span><kbd>↵</kbd> Open</span><span><kbd>Esc</kbd> Close</span></footer>
+            </section>
+        </div>
     }
 </div>
 
 @code {
-    private static readonly (string Label, string Url, string Icon)[] Sections =
+    private sealed record NavigationItem(string Label, string Url, string Icon, string Domain = "neutral");
+    private sealed record NavigationGroup(string Label, IReadOnlyList<NavigationItem> Items);
+    private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null);
+
+    private static readonly NavigationGroup[] NavigationGroups =
     [
-        ("Overview", "/", "⌂"), ("Management", "/management", "▦"), ("Agents", "/agents", "◎"),
-        ("Model profiles", "/modelprofiles", "◇"), ("Model providers", "/modelproviders", "⬡"), ("Runtime profiles", "/runtimeprofiles", "◈"), ("Runtime", "/runtime", "◉"),
-        ("Work", "/work", "✓"), ("Flows", "/flows", "⌘"), ("Flow Runs", "/flowruns", "▷"),
-        ("Executions", "/executions", "▶"), ("Events", "/events", "≋"), ("Settings", "/settings", "⚙")
+        new("", [new("Overview", "/", "⌂")]),
+        new("Build", [new("Agents", "/agents", "◎", "agent"), new("Model profiles", "/modelprofiles", "◇", "model"), new("Flows", "/flows", "⌘", "flow")]),
+        new("Operate", [new("Runtimes", "/runtime", "◉", "runtime"), new("Executions", "/executions", "▶", "execution"), new("Flow runs", "/flowruns", "▷", "flow"), new("Work", "/work", "✓", "work"), new("Events", "/events", "≋")]),
+        new("Configure", [new("Model providers", "/modelproviders", "⬡", "model"), new("Runtime profiles", "/runtimeprofiles", "◈", "runtime")]),
+        new("System", [new("Settings", "/settings", "⚙")])
     ];
 
-    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
-    private string CurrentSection => Sections.FirstOrDefault(item => NavigationManager.Uri.EndsWith(item.Url, StringComparison.OrdinalIgnoreCase)).Label ?? "Console";
+    private static readonly CommandItem[] Commands =
+    [
+        new("Overview", "/", "⌂", "Navigate"),
+        new("Agents", "/agents", "◎", "Build", "agent resources"),
+        new("Create agent", "/agents/new", "+", "Command", "new agent"),
+        new("Model profiles", "/modelprofiles", "◇", "Build", "models"),
+        new("Create model profile", "/modelprofiles/new", "+", "Command", "new model"),
+        new("Flows", "/flows", "⌘", "Build", "workflow designer"),
+        new("Create flow", "/flows/new", "+", "Command", "new workflow"),
+        new("Runtimes", "/runtime", "◉", "Operate", "runtime"),
+        new("Executions", "/executions", "▶", "Operate", "runs history"),
+        new("Flow runs", "/flowruns", "▷", "Operate", "workflow executions"),
+        new("Work", "/work", "✓", "Operate", "work items"),
+        new("Events", "/events", "≋", "Operate", "activity notifications"),
+        new("Model providers", "/modelproviders", "⬡", "Configure", "providers"),
+        new("Create model provider", "/modelproviders/new", "+", "Command", "new provider"),
+        new("Runtime profiles", "/runtimeprofiles", "◈", "Configure", "runtime configuration"),
+        new("Create runtime profile", "/runtimeprofiles/new", "+", "Command", "new runtime profile"),
+        new("Settings", "/settings", "⚙", "System", "configuration")
+    ];
+
+    private IJSObjectReference? commandModule;
+    private IJSObjectReference? commandRegistration;
+    private DotNetObjectReference<MainLayout>? selfReference;
+    private ElementReference commandInput;
+    private string commandQuery = string.Empty;
+    private bool commandPaletteOpen;
+    private bool focusCommandInput;
+    private bool searchingResources;
+    private int selectedCommandIndex;
+    private IReadOnlyList<CommandItem> resourceCommands = [];
+    private CancellationTokenSource? resourceSearchCancellation;
+    private readonly CancellationTokenSource lifetimeCancellation = new();
+    private IReadOnlyList<CommandItem> FilteredCommands => Commands
+        .Where(command => string.IsNullOrWhiteSpace(commandQuery)
+            || command.Label.Contains(commandQuery, StringComparison.OrdinalIgnoreCase)
+            || command.Category.Contains(commandQuery, StringComparison.OrdinalIgnoreCase)
+            || command.Keywords.Contains(commandQuery, StringComparison.OrdinalIgnoreCase))
+        .Take(8)
+        .ToArray();
+    private IReadOnlyList<CommandItem> DisplayedCommands =>
+        FilteredCommands.Concat(resourceCommands)
+            .DistinctBy(command => command.Url, StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToArray();
+
+    private string CurrentSection
+    {
+        get
+        {
+            var path = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?', '#')[0];
+            return NavigationGroups.SelectMany(group => group.Items)
+                .Where(item => item.Url == "/" ? path == "/" : path.StartsWith(item.Url, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(item => item.Url.Length)
+                .FirstOrDefault()?.Label ?? "Control plane";
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -57,13 +175,123 @@
         Preferences.Changed += StateHasChanged;
         Notifications.Changed += StateHasChanged;
         PlatformStatus.Changed += StateHasChanged;
+        NavigationManager.LocationChanged += OnLocationChanged;
     }
 
-    public void Dispose()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            commandModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/command-palette.js");
+            selfReference = DotNetObjectReference.Create(this);
+            commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", selfReference);
+        }
+
+        if (focusCommandInput && commandRegistration is not null)
+        {
+            focusCommandInput = false;
+            await commandRegistration.InvokeVoidAsync("focus", commandInput);
+        }
+    }
+
+    [JSInvokable]
+    public Task ToggleCommandPalette() => InvokeAsync(() =>
+    {
+        if (commandPaletteOpen) CloseCommandPalette();
+        else OpenCommandPalette();
+        StateHasChanged();
+    });
+
+    private void OpenCommandPalette()
+    {
+        commandPaletteOpen = true;
+        commandQuery = string.Empty;
+        resourceCommands = [];
+        selectedCommandIndex = 0;
+        focusCommandInput = true;
+    }
+
+    private void CloseCommandPalette()
+    {
+        commandPaletteOpen = false;
+        commandQuery = string.Empty;
+        resourceCommands = [];
+        searchingResources = false;
+        resourceSearchCancellation?.Cancel();
+        selectedCommandIndex = 0;
+    }
+
+    private async Task UpdateCommandQuery(ChangeEventArgs args)
+    {
+        commandQuery = args.Value?.ToString() ?? string.Empty;
+        selectedCommandIndex = 0;
+        resourceCommands = [];
+        resourceSearchCancellation?.Cancel();
+        resourceSearchCancellation?.Dispose();
+        resourceSearchCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetimeCancellation.Token);
+        var cancellationToken = resourceSearchCancellation.Token;
+        if (commandQuery.Trim().Length < 2) { searchingResources = false; return; }
+
+        try
+        {
+            await Task.Delay(250, cancellationToken);
+            searchingResources = true;
+            var resources = await ResourceSearch.SearchAsync(commandQuery, cancellationToken);
+            resourceCommands = resources.Select(item => new CommandItem(
+                item.Label,
+                item.Url,
+                item.Icon,
+                item.ResourceType,
+                item.SearchText ?? item.Identifier,
+                $"{item.Status} · {ShortIdentifier(item.Identifier)}")).ToArray();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        finally
+        {
+            if (!cancellationToken.IsCancellationRequested) searchingResources = false;
+        }
+    }
+
+    private void HandleCommandKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") { CloseCommandPalette(); return; }
+        if (DisplayedCommands.Count == 0) return;
+        if (args.Key == "ArrowDown") selectedCommandIndex = (selectedCommandIndex + 1) % DisplayedCommands.Count;
+        else if (args.Key == "ArrowUp") selectedCommandIndex = (selectedCommandIndex - 1 + DisplayedCommands.Count) % DisplayedCommands.Count;
+        else if (args.Key == "Enter") ExecuteCommand(DisplayedCommands[Math.Clamp(selectedCommandIndex, 0, DisplayedCommands.Count - 1)]);
+    }
+
+    private void ExecuteCommand(CommandItem command)
+    {
+        CloseCommandPalette();
+        NavigationManager.NavigateTo(command.Url);
+    }
+
+    private static string ShortIdentifier(string value) => value.Length <= 48 ? value : $"…{value[^47..]}";
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => InvokeAsync(StateHasChanged);
+
+    public async ValueTask DisposeAsync()
     {
         Navigation.Changed -= StateHasChanged;
         Preferences.Changed -= StateHasChanged;
         Notifications.Changed -= StateHasChanged;
         PlatformStatus.Changed -= StateHasChanged;
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        lifetimeCancellation.Cancel();
+        resourceSearchCancellation?.Cancel();
+        resourceSearchCancellation?.Dispose();
+        lifetimeCancellation.Dispose();
+        try
+        {
+            if (commandRegistration is not null)
+            {
+                await commandRegistration.InvokeVoidAsync("dispose");
+                await commandRegistration.DisposeAsync();
+            }
+            if (commandModule is not null) await commandModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+        selfReference?.Dispose();
     }
 }
