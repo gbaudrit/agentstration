@@ -189,6 +189,18 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void PublishedEntryProjectionContainsOnlyAFlowTargetAndWorkplaceServiceHasNoAgentDependency()
+    {
+        Assert.IsNull(typeof(EntryResource).GetProperty("Binding"));
+        Assert.IsNotNull(typeof(EntryResource).GetProperty(nameof(EntryResource.ResolvedTarget)));
+        Assert.AreEqual(typeof(EntryResolvedTarget), typeof(EntryResource).GetProperty(nameof(EntryResource.ResolvedTarget))!.PropertyType);
+        var constructorDependencies = typeof(Agentstration.Application.Work.WorkplaceService).GetConstructors()
+            .SelectMany(value => value.GetParameters()).Select(value => value.ParameterType.FullName).ToArray();
+        Assert.IsFalse(constructorDependencies.Any(value => value?.Contains("AgentManagement", StringComparison.Ordinal) == true
+            || value?.Contains("Runtime", StringComparison.Ordinal) == true));
+    }
+
+    [TestMethod]
     public void WorkplaceWebReferencesOnlyClientContractsAndNeutralComponents()
     {
         var references = typeof(WorkplaceWebAssemblyMarker).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();

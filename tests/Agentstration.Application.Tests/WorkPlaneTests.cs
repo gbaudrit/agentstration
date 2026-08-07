@@ -58,11 +58,11 @@ public sealed class WorkPlaneTests
                 Kind = EntryPresentationKind.Form,
                 Fields =
                 [
-                    new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Validation = new EntryFieldValidation(3, 20) },
+                    new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Validation = new EntryFieldValidation(3, 20), Role = EntryFieldRole.PrimaryInput },
                     new EntryFieldDefinition { Name = "detail", Type = EntryFieldType.Choice, Options = [new EntryFieldOption("standard", "Standard")] }
                 ]
             },
-            Target = new EntryTarget("/resourceGroups/default/providers/Agentstration.Flows/flows/router")
+            ResolvedTarget = new EntryResolvedTarget("/resourceGroups/default/providers/Agentstration.Flows/flows/router", "1.0.0")
         };
         WorkplaceValidation.Validate(entry);
         Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateSubmission(entry, new Dictionary<string, System.Text.Json.JsonElement>()));
@@ -71,6 +71,33 @@ public sealed class WorkPlaneTests
             ["request"] = System.Text.Json.JsonSerializer.SerializeToElement("valid request"),
             ["detail"] = System.Text.Json.JsonSerializer.SerializeToElement("unsupported")
         }));
+
+        var draft = new EntryDraft
+        {
+            Id = entryId, Name = "request", DisplayName = "Request", Binding = new EntryBinding(EntryBindingKind.Flow, "/resourceGroups/default/providers/Agentstration.Flows/flows/router"),
+            Presentation = entry.Presentation with
+            {
+                Fields =
+                [
+                    new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput },
+                    new EntryFieldDefinition { Name = "format", Type = EntryFieldType.Choice, Options = [new("short", "Short"), new("short", "Duplicate")] }
+                ]
+            }
+        };
+        var optionError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(draft));
+        Assert.AreEqual("entry_field_options_invalid", optionError.Code);
+        var primaryError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(draft with
+        {
+            Presentation = draft.Presentation with
+            {
+                Fields = draft.Presentation.Fields.Select(value => value with
+                {
+                    Role = EntryFieldRole.Standard,
+                    Options = value.Type == EntryFieldType.Choice ? [new EntryFieldOption("short", "Short")] : value.Options
+                }).ToArray()
+            }
+        }));
+        Assert.AreEqual("entry_primary_input_required", primaryError.Code);
     }
 
     [TestMethod]

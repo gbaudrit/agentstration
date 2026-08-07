@@ -43,7 +43,13 @@ public sealed class WorkItemService(
 
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
 
-    public async Task<StoredWorkItem> SubmitAsync(SubmitWorkItemCommand command, CancellationToken cancellationToken)
+    public Task<StoredWorkItem> SubmitAsync(SubmitWorkItemCommand command, CancellationToken cancellationToken) =>
+        SubmitAsync(command, null, cancellationToken);
+
+    internal async Task<StoredWorkItem> SubmitAsync(
+        SubmitWorkItemCommand command,
+        Func<StoredWorkItem, CancellationToken, Task>? beforeExecutionConfirmed,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         using var activity = ActivitySource.StartActivity("work.submit");
@@ -60,6 +66,7 @@ public sealed class WorkItemService(
         var expectedVersion = item.Version;
         item.MarkQueued(accepted.ExecutionId, accepted.SelectedAgentId, accepted.EventId, accepted.AcceptedAt);
         var stored = await repository.SaveAsync(item, expectedVersion, cancellationToken);
+        if (beforeExecutionConfirmed is not null) await beforeExecutionConfirmed(stored, cancellationToken);
         await executionGateway.ConfirmQueuedAsync(accepted, cancellationToken);
         SubmittedCounter.Add(1);
         WorkAcceptedLog(logger, item.Id.Value, item.CorrelationId.Value, accepted.ExecutionId.Value, null);

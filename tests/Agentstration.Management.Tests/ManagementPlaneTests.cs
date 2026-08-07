@@ -474,7 +474,8 @@ public sealed class ManagementPlaneTests
                 Path.Combine(directory, "data.json"),
                 inMemory: true,
                 new AiProviderOptions("Deterministic", new Uri("http://localhost/"), "deterministic", null),
-                $"Data Source={Path.Combine(directory, "control-plane.db")};Pooling=False");
+                $"Data Source={Path.Combine(directory, "control-plane.db")};Pooling=False",
+                workPlaneConnectionString: $"Data Source={Path.Combine(directory, "work-plane.db")};Pooling=False");
             var events = new ManagementEventRecorder();
             services.AddSingleton(events);
             services.AddSingleton<IManagementEventHandler<AgentCreated>>(events);

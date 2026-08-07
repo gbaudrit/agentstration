@@ -3,6 +3,7 @@
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
     <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
     <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../Agentstration.ModelProviders.Ollama/Agentstration.ModelProviders.Ollama.csproj" />
@@ -16,6 +17,7 @@
     <Compile Include="../Agentstration.Web/Api/WorkEndpoints.cs" Link="Api/WorkEndpoints.cs" />
     <Compile Include="../Agentstration.Web/Api/WorkplaceEndpoints.cs" Link="Api/WorkplaceEndpoints.cs" />
     <Compile Include="../Agentstration.Web/Api/WorkOperationsEndpoints.cs" Link="Api/WorkOperationsEndpoints.cs" />
+    <Compile Include="../Agentstration.Web/Api/FlowEndpoints.cs" Link="Api/FlowEndpoints.cs" />
     <Compile Include="../Agentstration.Web/Features/Workplace/WorkplaceHub.cs" Link="Features/WorkplaceHub.cs" />
     <Compile Include="../Agentstration.Web/Hosting/LocalWorkExecutionWorker.cs" Link="Hosting/LocalWorkExecutionWorker.cs" />
     <Compile Include="../Agentstration.Web/Hosting/FlowRunExecutionWorker.cs" Link="Hosting/FlowRunExecutionWorker.cs" />

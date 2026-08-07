@@ -197,11 +197,11 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
             [ContinuationMetadata] = bool.TrueString
         };
         if (!string.IsNullOrWhiteSpace(context.LastFlowRunId)) metadata[ParentFlowRunMetadata] = context.LastFlowRunId;
-        var target = entry.Behavior.Conversation?.ContinuationTarget ?? entry.Target;
+        var target = entry.Behavior.Conversation?.ContinuationTarget ?? entry.ResolvedTarget;
         var stored = await workItems.SubmitAsync(new SubmitWorkItemCommand(
             "entry-continuation", message.Content, entry.DisplayName, $"Continuation of {entry.DisplayName}", Metadata: metadata,
             Inputs: [new WorkInput(Structured: JsonSerializer.SerializeToElement(context))],
-            Flow: WorkplaceValidation.FlowReferenceFrom(target.ResourceId)), cancellationToken);
+            Flow: WorkplaceValidation.FlowReferenceFrom(target)), cancellationToken);
         var task = ToTask(stored.Value, interaction.TaskId);
         var responseText = "I’m creating an updated version from the previous result.";
         var agentResponse = await AddAgentMessageAsync(interaction, responseText, now, cancellationToken);
@@ -288,15 +288,27 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
     {
         var metadata = new Dictionary<string, string>(StringComparer.Ordinal) { [WorkspaceMetadata] = interaction.WorkspaceId.Value, [EntryMetadata] = interaction.EntryId.Value, [InteractionMetadata] = interaction.Id.ToString() };
         var inputs = values.Select(value => new WorkInput(Structured: JsonSerializer.SerializeToElement(new { name = value.Key, value = value.Value }))).ToArray();
-        var stored = await workItems.SubmitAsync(new SubmitWorkItemCommand("entry", Instruction(entry, values), entry.DisplayName, entry.Description, Metadata: metadata, Inputs: inputs, Attachments: attachments, Flow: WorkplaceValidation.FlowReferenceFrom(entry.Target.ResourceId)), token);
-        var task = ToTask(stored.Value); var action = new CreateTaskAction(task.Id, task.Title, task.Description, $"/tasks/{task.Id}");
-        var now = timeProvider.GetUtcNow();
-        var response = string.Equals(entry.Name, "prepare-report", StringComparison.Ordinal)
-            ? "I’ll prepare a standard report and highlight the main changes."
-            : "I’ve started the work and will keep this conversation updated.";
-        var agentMessage = await AddAgentMessageAsync(interaction with { TaskId = task.Id }, response, now, token);
-        var updated = interaction with { Status = InteractionStatus.Processing, TaskId = task.Id, PendingActionId = null, ImmediateResult = action, LastActivityAt = now, Messages = [.. interaction.Messages, agentMessage], Version = expectedInteractionVersion + 1 };
-        await repository.SaveInteractionAsync(updated, expectedInteractionVersion, token);
+        WorkTask? task = null;
+        CreateTaskAction? action = null;
+        WorkplaceInteraction? updated = null;
+        var stored = await workItems.SubmitAsync(
+            new SubmitWorkItemCommand("entry", Instruction(entry, values), entry.DisplayName, entry.Description, Metadata: metadata, Inputs: inputs, Attachments: attachments, Flow: WorkplaceValidation.FlowReferenceFrom(entry.ResolvedTarget)),
+            async (queued, cancellationToken) =>
+            {
+                task = ToTask(queued.Value);
+                action = new CreateTaskAction(task.Id, task.Title, task.Description, $"/tasks/{task.Id}");
+                var now = timeProvider.GetUtcNow();
+                var response = string.Equals(entry.Name, "prepare-report", StringComparison.Ordinal)
+                    ? "I’ll prepare a standard report and highlight the main changes."
+                    : "I’ve started the work and will keep this conversation updated.";
+                var agentMessage = await AddAgentMessageAsync(interaction with { TaskId = task.Id }, response, now, cancellationToken);
+                updated = interaction with { Status = InteractionStatus.Processing, TaskId = task.Id, PendingActionId = null, ImmediateResult = action, LastActivityAt = now, Messages = [.. interaction.Messages, agentMessage], Version = expectedInteractionVersion + 1 };
+                await repository.SaveInteractionAsync(updated, expectedInteractionVersion, cancellationToken);
+            },
+            token);
+        task ??= ToTask(stored.Value);
+        action ??= new CreateTaskAction(task.Id, task.Title, task.Description, $"/tasks/{task.Id}");
+        updated ??= interaction with { Status = InteractionStatus.Processing, TaskId = task.Id, PendingActionId = null, ImmediateResult = action, Version = expectedInteractionVersion + 1 };
         await PublishInteractionAsync(updated, token);
         await PublishAsync(new TaskCreatedEvent(EventId(), interaction.WorkspaceId.Value, Sequence(), updated.LastActivityAt, task.Id.Value), token);
         return new EntrySubmission(updated, action, task);
@@ -382,7 +394,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
     private static string ResponseText(PendingAction action, IReadOnlyDictionary<string, JsonElement> values) => action.Kind == PendingActionKind.ConfirmationRequired ? values["confirmed"].GetBoolean() ? "Confirmed" : "Declined" : string.Join(", ", values.Select(value => $"{value.Key}: {value.Value}"));
     private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
     private static bool TokenMatches(string token, string expectedHash) { var actual = Encoding.ASCII.GetBytes(HashToken(token)); var expected = Encoding.ASCII.GetBytes(expectedHash); return actual.Length == expected.Length && CryptographicOperations.FixedTimeEquals(actual, expected); }
-    private static string Instruction(EntryResource entry, IReadOnlyDictionary<string, JsonElement> values) { if (values.TryGetValue("request", out var request) && request.ValueKind == JsonValueKind.String) return request.GetString()!.Trim(); var text = string.Join(Environment.NewLine, values.Where(value => value.Value.ValueKind == JsonValueKind.String).Select(value => $"{value.Key}: {value.Value.GetString()}")); return string.IsNullOrWhiteSpace(text) ? entry.DisplayName : text; }
+    private static string Instruction(EntryResource entry, IReadOnlyDictionary<string, JsonElement> values) { var primary = entry.Presentation.Fields.SingleOrDefault(field => field.Role == EntryFieldRole.PrimaryInput); if (primary is not null && values.TryGetValue(primary.Name, out var request) && request.ValueKind == JsonValueKind.String) return request.GetString()!.Trim(); var text = string.Join(Environment.NewLine, values.Where(value => value.Value.ValueKind == JsonValueKind.String).Select(value => $"{value.Key}: {value.Value.GetString()}")); return string.IsNullOrWhiteSpace(text) ? entry.DisplayName : text; }
     private static void RequireWorkspace(WorkItem item, WorkplaceWorkspaceId workspaceId) { if (!item.Metadata.TryGetValue(WorkspaceMetadata, out var actual) || actual != workspaceId.Value) throw new KeyNotFoundException($"Task '{item.Id}' was not found in Workspace '{workspaceId}'."); }
     internal static WorkTask ToTask(WorkItem item, WorkTaskId? publicId = null) { if (!item.Metadata.TryGetValue(WorkspaceMetadata, out var workspaceId) || !item.Metadata.TryGetValue(EntryMetadata, out var entryId) || !item.Metadata.TryGetValue(InteractionMetadata, out var interactionId) || !Guid.TryParse(interactionId, out var interactionGuid)) throw new InvalidOperationException($"Work item '{item.Id}' is not a Workplace Task."); item.Metadata.TryGetValue(FlowRunMetadata, out var flowRunId); if (flowRunId is null) item.Result?.Metadata.TryGetValue(FlowRunMetadata, out flowRunId); return new WorkTask(publicId ?? WorkTaskId.FromWorkItem(item.Id), new(workspaceId), new(entryId), new(interactionGuid), item.Title ?? item.Instruction, item.Description, ToTaskStatus(item.Status), item.CreatedAt, item.UpdatedAt, flowRunId, item.Messages, item.Interactions, item.Result?.Artifacts ?? [], item.Result, item.Error, item.Version); }
     internal static WorkTaskStatus ToTaskStatus(WorkItemStatus status) => status switch { WorkItemStatus.Pending or WorkItemStatus.Queued => WorkTaskStatus.Pending, WorkItemStatus.Running => WorkTaskStatus.Running, WorkItemStatus.WaitingForInput or WorkItemStatus.WaitingForApproval => WorkTaskStatus.ActionRequired, WorkItemStatus.Paused => WorkTaskStatus.Paused, WorkItemStatus.Completed => WorkTaskStatus.Completed, WorkItemStatus.Failed => WorkTaskStatus.Failed, WorkItemStatus.Cancelled => WorkTaskStatus.Cancelled, _ => throw new ArgumentOutOfRangeException(nameof(status), status, null) };

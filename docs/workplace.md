@@ -1,5 +1,15 @@
 # Agentstration Workplace
 
+## Published Entry execution targets
+
+Entry authoring and Entry execution are deliberately different contracts. The Console saves an `EntryDraft` whose binding selects either an Agent or a Flow. Publishing validates the resource and writes an immutable Workplace projection whose `resolvedTarget` is always an exact, pinned Flow reference. A draft edit is therefore invisible to Workplace until the next publication.
+
+Agent bindings are normalized through hidden, system-managed Direct Agent Flows. Workplace renders these Entries exactly like Flow-bound Entries and submits through the same Work API. Work API creates a WorkItem and FlowRun in both cases; the Flow engine invokes the Agent and maps its output into the existing Work result and Workplace action contracts. Workplace does not receive the administrative binding or any provider/runtime object.
+
+The primary input is declared explicitly with `EntryFieldRole.PrimaryInput`; it is unrelated to the Workspace's Primary Entry role. The latter remains exclusively on `WorkspaceEntryReference`.
+
+Entry dependency inspection exposes both the administration binding and the resolved Flow. Agent and user Flow deletion are rejected while a published Entry references them, and a system-managed Direct Agent Flow cannot be deleted independently.
+
 ## Iteration 3 UX
 
 The third increment turns the existing functional vertical into one continuous end-user journey without changing its boundaries. Home is organized around a visually emphasized Primary Entry, followed by configured Standard Entries, then the current Interaction, recent Tasks, and attention-first notifications. Primary is a Workspace presentation role only: `EntryRenderer` remains the single generic Prompt/Form renderer and `PrimaryEntryContainer` supplies visual emphasis without introducing a new business type.
@@ -57,7 +67,7 @@ dotnet run --project src/Agentstration.Work.Api
 dotnet run --project src/Agentstration.Workplace.Web
 ```
 
-The defaults are `http://localhost:5080` for Work API, `http://localhost:5100` for the Console, and `http://localhost:5180` for Workplace. Aspire starts `agentstration-console`, `agentstration-work-api`, and `agentstration-workplace` as separate resources and injects their endpoints.
+The defaults are `http://localhost:5080` for Work API, `http://localhost:5100` for the Console, and `http://localhost:5180` for Workplace. Flow authoring and Entry execution both use the Flow API hosted by Work API so that selection, publication, and execution resolve immutable versions from the same Flow store. Aspire starts `agentstration-console`, `agentstration-work-api`, and `agentstration-workplace` as separate resources and injects their endpoints.
 
 ## Isolation and public model
 

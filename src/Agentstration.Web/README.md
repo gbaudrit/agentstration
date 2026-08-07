@@ -1,5 +1,7 @@
 # Agentstration Web console
 
+The Console exposes Entry authoring at `/entries`. An administrator can select an Agent or Flow, preview with the same renderer as Workplace without executing it, validate references, inspect dependencies, and publish a pinned Flow target. Agent selection automatically creates or versions a hidden Direct Agent Flow; the Console never calls Runtime directly for Entry execution.
+
 `Agentstration.Web` is the official administration and operations console for Agentstration. It remains the existing single ASP.NET Core host: REST, MCP, workers, and the Blazor UI ship as one executable modular monolith.
 
 ## Stack and rendering

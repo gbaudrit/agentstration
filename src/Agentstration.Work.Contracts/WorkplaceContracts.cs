@@ -3,9 +3,15 @@ using Agentstration.Work;
 
 namespace Agentstration.Work.Contracts;
 
-public sealed record WorkplaceWorkspaceResponse(string Id, string Name, string Type, string ApiVersion, string ResourceGroup, string Location, string DisplayName, string? Description, IReadOnlyList<WorkspaceEntryReferenceResponse> Entries);
+public sealed record WorkplaceWorkspaceResponse(string Id, string Name, string Type, string ApiVersion, string ResourceGroup, string Location, string DisplayName, string? Description, IReadOnlyList<WorkspaceEntryReferenceResponse> Entries, int Version, DateTimeOffset PublishedAt);
+public sealed record WorkplaceWorkspaceDraftResponse(WorkplaceWorkspaceDraft Value, WorkplaceWorkspace? Published);
 public sealed record WorkspaceEntryReferenceResponse(string EntryResourceId, WorkspaceEntryRole Role, int Order);
-public sealed record EntryResponse(string Id, string Name, string Type, string ApiVersion, string ResourceGroup, string Location, string DisplayName, string? Description, EntryPresentation Presentation, EntryTarget Target, EntryBehavior Behavior);
+public sealed record EntryResponse(string Id, string Name, string Type, string ApiVersion, string ResourceGroup, string Location, string DisplayName, string? Description, EntryPresentation Presentation, EntryResolvedTarget ResolvedTarget, EntryBehavior Behavior, int Version, DateTimeOffset PublishedAt);
+public sealed record EntryDraftResponse(EntryDraft Value, EntryResource? Published);
+public sealed record EntryValidationResponse(bool IsValid, IReadOnlyList<EntryValidationIssueContract> Issues);
+public sealed record EntryValidationIssueContract(string Code, string Message);
+public sealed record EntryDependencyResponse(string ResourceId, string ResourceType, string Relationship);
+public sealed record ResourcePickerItem(string ResourceId, string Name, string? Description, string Version, string State, string ResourceType, IReadOnlyDictionary<string, string>? Details = null);
 public sealed record CreateInteractionRequest(string WorkspaceId, IReadOnlyDictionary<string, JsonElement> Values, IReadOnlyList<WorkAttachmentRequest>? Attachments = null);
 public sealed record EntrySubmissionResponse(InteractionResponse Interaction, WorkplaceAction Action, WorkTaskResponse? Task);
 public sealed record InteractionResponse(Guid Id, string WorkspaceId, string EntryId, InteractionStatus Status, DateTimeOffset StartedAt, DateTimeOffset LastActivityAt, IReadOnlyDictionary<string, JsonElement> InputValues, IReadOnlyList<WorkAttachment> Attachments, IReadOnlyList<ConversationMessage> Messages, Guid? PendingActionId, Guid? TaskId, WorkplaceAction? ImmediateResult, long Version, string? LastFlowRunId = null, Guid? LastTriggerMessageId = null);

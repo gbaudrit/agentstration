@@ -324,3 +324,4 @@ MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and i
 - ADR-0021: standalone Workplace and Work API hosts
 - ADR-0022: Interaction as durable conversation and FlowRun continuation
 - ADR-0023: Console supervision of WorkTasks through Work API
+- ADR-0024: Entries always target executable Flows

@@ -43,6 +43,7 @@ public sealed class ApiClientTests
         Assert.IsInstanceOfType<RuntimeApiClient>(scope.ServiceProvider.GetRequiredService<IAgentRunnerRuntimeClient>());
         Assert.IsInstanceOfType<ManagementApiClient>(scope.ServiceProvider.GetRequiredService<IManagementApiClient>());
         Assert.IsInstanceOfType<WorkApiClient>(scope.ServiceProvider.GetRequiredService<IWorkApiClient>());
+        Assert.IsInstanceOfType<EntryAdministrationApiClient>(scope.ServiceProvider.GetRequiredService<IEntryAdministrationApiClient>());
         Assert.IsInstanceOfType<ConsoleResourceSearchProvider>(scope.ServiceProvider.GetRequiredService<IResourceSearchProvider>());
     }
 
@@ -79,6 +80,44 @@ public sealed class ApiClientTests
         var exception = await Assert.ThrowsAsync<AgentstrationApiException>(() => client.GetWorkItemsAsync(CancellationToken.None));
 
         Assert.IsFalse(string.IsNullOrWhiteSpace(exception.ErrorId));
+    }
+
+    [TestMethod]
+    public async Task EntryResourcePickerLoadsFlowsFromCanonicalFlowApiInsteadOfWorkApi()
+    {
+        var requestedCatalogs = new List<string>();
+        var workRequests = new List<string>();
+        using var workClient = new HttpClient(new StubHandler(request =>
+        {
+            workRequests.Add(request.RequestUri!.AbsolutePath);
+            return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+        })) { BaseAddress = new Uri("http://work-api/") };
+        using var flowCatalog = new HttpClient(new StubHandler(request =>
+        {
+            Assert.AreEqual("/api/resources", request.RequestUri!.AbsolutePath);
+            Assert.AreEqual("Agentstration.Flows/flows", Uri.UnescapeDataString(request.RequestUri.Query.Replace("?type=", "", StringComparison.Ordinal)));
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new[]
+                {
+                    new ResourcePickerItem("/resourceGroups/default/providers/Agentstration.Flows/flows/universal-router", "Universal router", null, "1.0.0", "Active", "Agentstration.Flows/flows"),
+                    new ResourcePickerItem("/resourceGroups/default/providers/Agentstration.Flows/flows/my-flow", "My flow", null, "1.0.0", "Active", "Agentstration.Flows/flows")
+                })
+            };
+        })) { BaseAddress = new Uri("http://flow-api/") };
+        var factory = new StubHttpClientFactory(name =>
+        {
+            requestedCatalogs.Add(name);
+            return flowCatalog;
+        });
+        var client = new EntryAdministrationApiClient(workClient, factory);
+
+        var resources = await client.GetResourcesAsync(EntryBindingKind.Flow, CancellationToken.None);
+
+        Assert.HasCount(2, resources);
+        Assert.IsTrue(resources.Any(value => value.Name == "My flow"));
+        CollectionAssert.AreEqual(new[] { EntryAdministrationApiClient.FlowResourceCatalogClient }, requestedCatalogs);
+        Assert.IsEmpty(workRequests);
     }
 
     [TestMethod]
@@ -457,5 +496,10 @@ public sealed class ApiClientTests
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(responseFactory(request));
         }
+    }
+
+    private sealed class StubHttpClientFactory(Func<string, HttpClient> factory) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => factory(name);
     }
 }

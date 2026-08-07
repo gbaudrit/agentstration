@@ -1,5 +1,10 @@
 namespace Agentstration.Management.Abstractions;
 
+public interface IManagementResourceDeletionGuard
+{
+    Task ValidateDeleteAsync(string resourceId, CancellationToken cancellationToken);
+}
+
 public sealed record StoredResource<T>(T Value, string ETag, DateTimeOffset UpdatedAt) where T : Resource;
 
 public interface IControlPlaneStore

@@ -1,5 +1,9 @@
 # Flow definitions
 
+## System-managed Direct Agent Flows
+
+An Entry bound to an Agent is published through a normal immutable Direct Flow. Agentstration owns this Flow, derives its ID and version from the Agent identity and generation, and marks it `systemManaged`. System Flows are excluded from the normal Flow picker and are not independently editable or deletable. FlowRun resolution, execution, events, cancellation, errors, and output normalization remain identical to user-authored Flows.
+
 `Flow` is the root concept describing how work is routed and processed. `WorkItem` captures what must be accomplished, `FlowDefinition` captures the processing strategy, `FlowRun` will represent a concrete Runtime execution, and agents participate in that run.
 
 The Flow module is composed of independent Core, Contracts, Application, Storage.Abstractions, and Storage.Sqlite projects. It is functionally governed by the Management Plane while remaining independent of Management storage internals, Runtime implementations, AI providers, and Microsoft Agent Framework.

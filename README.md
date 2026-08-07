@@ -72,6 +72,8 @@ The agent resource ID is `/resourceGroups/{resourceGroup}/providers/Agentstratio
 
 ## Work, Flow, Run, and Agent
 
+Published Workplace Entries always target an immutable Flow version. The Console may present Agent or Flow as an authoring convenience; an Agent selection is normalized at publication through a hidden system-managed Direct Agent Flow. Consequently every submitted Entry follows `Entry -> FlowReference -> FlowRun -> Runtime`.
+
 ```text
 Work  = what needs to be accomplished
 Flow  = how the work is routed and processed

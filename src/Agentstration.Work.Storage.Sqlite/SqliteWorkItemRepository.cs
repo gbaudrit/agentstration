@@ -10,7 +10,9 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
 {
     internal DbSet<WorkItemDocument> WorkItems => Set<WorkItemDocument>();
     internal DbSet<WorkplaceWorkspaceDocument> Workspaces => Set<WorkplaceWorkspaceDocument>();
+    internal DbSet<WorkplaceWorkspaceDraftDocument> WorkspaceDrafts => Set<WorkplaceWorkspaceDraftDocument>();
     internal DbSet<EntryDocument> Entries => Set<EntryDocument>();
+    internal DbSet<EntryDraftDocument> EntryDrafts => Set<EntryDraftDocument>();
     internal DbSet<InteractionDocument> Interactions => Set<InteractionDocument>();
     internal DbSet<ConversationMessageDocument> ConversationMessages => Set<ConversationMessageDocument>();
     internal DbSet<PendingActionDocument> PendingActions => Set<PendingActionDocument>();
@@ -54,11 +56,23 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         workspace.Property(value => value.Id).HasMaxLength(512);
         workspace.Property(value => value.Name).HasMaxLength(128);
 
+        var workspaceDraft = modelBuilder.Entity<WorkplaceWorkspaceDraftDocument>();
+        workspaceDraft.ToTable("WorkplaceWorkspaceDrafts");
+        workspaceDraft.HasKey(value => value.Id);
+        workspaceDraft.Property(value => value.Id).HasMaxLength(512);
+        workspaceDraft.Property(value => value.Name).HasMaxLength(128);
+
         var entry = modelBuilder.Entity<EntryDocument>();
         entry.ToTable("Entries");
         entry.HasKey(value => value.Id);
         entry.Property(value => value.Id).HasMaxLength(512);
         entry.Property(value => value.Name).HasMaxLength(128);
+
+        var entryDraft = modelBuilder.Entity<EntryDraftDocument>();
+        entryDraft.ToTable("EntryDrafts");
+        entryDraft.HasKey(value => value.Id);
+        entryDraft.Property(value => value.Id).HasMaxLength(512);
+        entryDraft.Property(value => value.Name).HasMaxLength(128);
 
         var interaction = modelBuilder.Entity<InteractionDocument>();
         interaction.ToTable("Interactions");
@@ -116,7 +130,21 @@ internal sealed class WorkplaceWorkspaceDocument
     public required string Payload { get; set; }
 }
 
+internal sealed class WorkplaceWorkspaceDraftDocument
+{
+    public required string Id { get; set; }
+    public required string Name { get; set; }
+    public required string Payload { get; set; }
+}
+
 internal sealed class EntryDocument
+{
+    public required string Id { get; set; }
+    public required string Name { get; set; }
+    public required string Payload { get; set; }
+}
+
+internal sealed class EntryDraftDocument
 {
     public required string Id { get; set; }
     public required string Name { get; set; }
@@ -191,6 +219,12 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE TABLE IF NOT EXISTS WorkplaceWorkspaceDrafts (Id TEXT NOT NULL CONSTRAINT PK_WorkplaceWorkspaceDrafts PRIMARY KEY, Name TEXT NOT NULL, Payload TEXT NOT NULL);",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE TABLE IF NOT EXISTS EntryDrafts (Id TEXT NOT NULL CONSTRAINT PK_EntryDrafts PRIMARY KEY, Name TEXT NOT NULL, Payload TEXT NOT NULL);",
+            cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             """
             CREATE TABLE IF NOT EXISTS WorkplaceWorkspaces (
@@ -444,6 +478,30 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         return payload is null ? null : Deserialize<WorkplaceWorkspace>(payload);
     }
 
+    public async Task UpsertWorkspaceDraftAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken)
+    {
+        WorkplaceValidation.Validate(draft);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.WorkspaceDrafts.SingleOrDefaultAsync(value => value.Id == draft.Id.Value, cancellationToken);
+        if (document is null) context.WorkspaceDrafts.Add(new WorkplaceWorkspaceDraftDocument { Id = draft.Id.Value, Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
+        else { document.Name = draft.Name; document.Payload = JsonSerializer.Serialize(draft, JsonOptions); }
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkplaceWorkspaceDraft>> ListWorkspaceDraftsAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.WorkspaceDrafts.AsNoTracking().OrderBy(value => value.Name).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<WorkplaceWorkspaceDraft>).ToArray();
+    }
+
+    public async Task<WorkplaceWorkspaceDraft?> GetWorkspaceDraftAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payload = await context.WorkspaceDrafts.AsNoTracking().Where(value => value.Id == workspaceId.Value).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<WorkplaceWorkspaceDraft>(payload);
+    }
+
     public async Task UpsertEntryAsync(EntryResource entry, CancellationToken cancellationToken)
     {
         WorkplaceValidation.Validate(entry);
@@ -466,6 +524,30 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payload = await context.Entries.AsNoTracking().Where(value => value.Id == entryId.Value).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<EntryResource>(payload);
+    }
+
+    public async Task UpsertEntryDraftAsync(EntryDraft draft, CancellationToken cancellationToken)
+    {
+        WorkplaceValidation.Validate(draft);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.EntryDrafts.SingleOrDefaultAsync(value => value.Id == draft.Id.Value, cancellationToken);
+        if (document is null) context.EntryDrafts.Add(new EntryDraftDocument { Id = draft.Id.Value, Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
+        else { document.Name = draft.Name; document.Payload = JsonSerializer.Serialize(draft, JsonOptions); }
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<EntryDraft>> ListEntryDraftsAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.EntryDrafts.AsNoTracking().OrderBy(value => value.Name).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<EntryDraft>).ToArray();
+    }
+
+    public async Task<EntryDraft?> GetEntryDraftAsync(EntryId entryId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payload = await context.EntryDrafts.AsNoTracking().Where(value => value.Id == entryId.Value).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<EntryDraft>(payload);
     }
 
     public async Task CreateInteractionAsync(WorkplaceInteraction interaction, CancellationToken cancellationToken)

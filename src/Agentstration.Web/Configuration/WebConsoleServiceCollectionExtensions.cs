@@ -40,6 +40,9 @@ public static class WebConsoleServiceCollectionExtensions
         // Tasks are always real Work API resources, even when unrelated Console
         // projections still use deterministic demonstration data.
         AddClient<WorkApiClient, IWorkApiClient>(services, configured.WorkApi);
+        AddClient<EntryAdministrationApiClient, IEntryAdministrationApiClient>(services, configured.WorkApi);
+        AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi);
+        AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi);
         services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
             new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"), provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
 
@@ -69,7 +72,15 @@ public static class WebConsoleServiceCollectionExtensions
         where TImplementation : class, TContract
         where TContract : class
     {
-        services.AddHttpClient<TContract, TImplementation>(client =>
+        Configure(services.AddHttpClient<TContract, TImplementation>(), options);
+    }
+
+    private static void AddClient(IServiceCollection services, string name, ApiEndpointOptions options) =>
+        Configure(services.AddHttpClient(name), options);
+
+    private static void Configure(IHttpClientBuilder builder, ApiEndpointOptions options)
+    {
+        builder.ConfigureHttpClient(client =>
         {
             client.BaseAddress = new Uri(options.BaseAddress, UriKind.Absolute);
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);

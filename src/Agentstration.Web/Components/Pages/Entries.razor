@@ -1,0 +1,30 @@
+@page "/entries"
+@rendermode InteractiveServer
+@inject IEntryAdministrationApiClient Client
+
+<PageTitle>Entries · Agentstration</PageTitle>
+<PageHeader Eyebrow="Workplace" Title="Entries" Description="Configure what users can submit, then publish a pinned executable Flow target.">
+    <Actions><a class="button-primary" href="/entries/new">Create entry</a></Actions>
+</PageHeader>
+
+@if (loading) { <LoadingState Message="Loading Entries…" /> }
+else if (items.Count == 0) { <EmptyState Title="No Entries" Message="Create an Entry and bind it to an Agent or Flow." /> }
+else
+{
+    <section class="panel">
+        @foreach (var item in items)
+        {
+            <article class="row">
+                <div><strong><a href="@($"/entries/{item.Value.Name}")">@item.Value.DisplayName</a></strong><small>@item.Value.Binding.Kind · @ResourceName(item.Value.Binding.ResourceId)</small></div>
+                <StatusBadge Text="@(item.Published is null ? "Draft" : $"Published v{item.Published.Version}")" Status="@(item.Published is null ? UiStatus.Warning : UiStatus.Success)" />
+            </article>
+        }
+    </section>
+}
+
+@code {
+    private bool loading = true;
+    private IReadOnlyList<EntryDraftResponse> items = [];
+    protected override async Task OnInitializedAsync() { items = await Client.GetEntriesAsync(default); loading = false; }
+    private static string ResourceName(string id) => id[(id.LastIndexOf('/') + 1)..];
+}

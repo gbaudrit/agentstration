@@ -144,7 +144,7 @@ public sealed class WorkplaceUxTests
             Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Textarea, Required = true }],
             Suggestions = [new("Monthly report", "Prepare my monthly report")]
         },
-        Target = new EntryTarget("/resourceGroups/default/providers/Agentstration.Flow/flows/report"),
+        ResolvedTarget = new EntryResolvedTarget("/resourceGroups/default/providers/Agentstration.Flows/flows/report", "1.0.0"),
         Behavior = new EntryBehavior(),
         ResourceGroup = "default",
         Location = "local",

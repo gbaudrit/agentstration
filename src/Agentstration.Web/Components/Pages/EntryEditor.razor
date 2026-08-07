@@ -1,0 +1,281 @@
+@page "/entries/{Name}"
+@rendermode InteractiveServer
+@inject IEntryAdministrationApiClient Client
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsNew ? "Create Entry" : displayName) · Agentstration</PageTitle>
+<PageHeader Eyebrow="Workplace Entry" Title="@(IsNew ? "Create Entry" : displayName)" Description="Configure how this Entry appears in Workplace and which executable Flow it resolves to.">
+    <Actions><a class="button-secondary" href="/entries">Back to Entries</a></Actions>
+</PageHeader>
+
+@if (loading)
+{
+    <LoadingState Message="Loading Entry…" />
+}
+else
+{
+    <div class="entry-summary-bar" aria-label="Entry status">
+        <StatusBadge Text="Draft" Status="UiStatus.Info" />
+        <span>Revision @draftRevision</span>
+        @if (published is not null)
+        {
+            <StatusBadge Text="Published" Status="UiStatus.Success" />
+            <span>Version @published.Version</span>
+        }
+    </div>
+
+    <div class="entry-tabs">
+        <ResourceTabs Label="Entry sections">
+            @foreach (var tab in Tabs)
+            {
+                <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="entry-tab-panel" class="@(activeTab == tab ? "active" : null)" data-testid="@($"entry-tab-{tab.ToString().ToLowerInvariant()}")" @onclick="() => SelectTab(tab)">@TabLabel(tab)</button>
+            }
+        </ResourceTabs>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")">@message</div>
+    }
+
+    <main id="entry-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
+        @if (activeTab == EntryTab.Overview)
+        {
+            <section class="entry-overview-grid" aria-label="Entry overview">
+                <article class="panel entry-overview-card">
+                    <p class="eyebrow">Definition</p>
+                    <h2>Entry summary</h2>
+                    <dl class="entry-facts">
+                        <dt>Status</dt><dd>@(published is null ? "Draft only" : "Draft and published")</dd>
+                        <dt>Draft revision</dt><dd>@draftRevision</dd>
+                        <dt>Published version</dt><dd>@(published?.Version.ToString() ?? "Not published")</dd>
+                        <dt>Presentation</dt><dd>@presentationKind</dd>
+                    </dl>
+                </article>
+                <article class="panel entry-overview-card">
+                    <p class="eyebrow">Execution</p>
+                    <h2>Binding and resolution</h2>
+                    <dl class="entry-facts">
+                        <dt>Binding</dt><dd>@bindingKind</dd>
+                        <dt>Resource</dt><dd>@BindingResourceName</dd>
+                        <dt>Resolved Flow</dt><dd>@ResolvedFlowName</dd>
+                        <dt>Strategy</dt><dd>@(published is null ? "Pinned on publication" : $"Pinned · v{published.ResolvedTarget.Version}")</dd>
+                    </dl>
+                </article>
+                <article class="panel entry-overview-card">
+                    <p class="eyebrow">Usage</p>
+                    <h2>Workplace availability</h2>
+                    <dl class="entry-facts">
+                        <dt>Published workspaces</dt><dd>@PublishedUsages.Count</dd>
+                        <dt>Primary in</dt><dd>@PrimaryUsages.Count</dd>
+                        <dt>Workspaces</dt><dd>@UsageSummary</dd>
+                        <dt>Last publication</dt><dd>@FormatDate(published?.PublishedAt)</dd>
+                    </dl>
+                </article>
+            </section>
+        }
+        else if (activeTab == EntryTab.Definition)
+        {
+            <div class="entry-definition-toolbar">
+                <div><p class="eyebrow">Definition</p><h2>Draft revision @draftRevision</h2></div>
+                <div class="entry-primary-actions" aria-label="Entry actions">
+                    <button class="button-secondary" type="button" @onclick="SaveAsync" disabled="@busy">Save draft</button>
+                    <button class="button-secondary" type="button" @onclick="ValidateAsync" disabled="@busy">Validate</button>
+                    <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy">Publish pinned version</button>
+                </div>
+            </div>
+
+            @if (validation is not null && !validation.IsValid)
+            {
+                <div class="form-alert form-alert-danger" role="alert"><strong>Validation issues</strong><ul>@foreach (var issue in validation.Issues) { <li><code>@issue.Code</code> — @issue.Message</li> }</ul></div>
+            }
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">General</p><h2>Identity</h2></div></div>
+                <div class="form-grid">
+                    <label><span>Name</span><input @bind="resourceName" disabled="@(!IsNew)" /></label>
+                    <label><span>Display name</span><input @bind="displayName" /></label>
+                    <label class="form-span-2"><span>Description</span><textarea @bind="description" rows="2"></textarea></label>
+                </div>
+            </section>
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">Presentation</p><h2>Workplace appearance</h2></div></div>
+                <div class="form-grid">
+                    <label><span>Presentation</span><select data-testid="presentation-kind" @bind="presentationKind"><option value="Prompt">Prompt</option><option value="Form">Form</option></select></label>
+                    <label><span>Placeholder</span><input @bind="placeholder" /></label>
+                    <label class="entry-toggle"><input type="checkbox" @bind="allowAttachments" /><span>Allow attachments</span></label>
+                </div>
+            </section>
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">Fields</p><h2>Input schema</h2></div><button class="button-secondary" data-testid="add-field" type="button" @onclick="AddField">Add field</button></div>
+                <div class="entry-card-list">
+                    @for (var index = 0; index < fields.Count; index++)
+                    {
+                        var field = fields[index];
+                        <article class="entry-field-card" @key="field">
+                            <header><div><strong>@FieldTitle(field)</strong><span>@field.Type</span></div>@if (field.Primary) { <StatusBadge Text="Primary input" Status="UiStatus.Info" /> }</header>
+                            <div class="form-grid">
+                                <label><span>Name</span><input @bind="field.Name" /></label>
+                                <label><span>Label</span><input @bind="field.Label" /></label>
+                                <label><span>Type</span><select @bind="field.Type">@foreach (var type in Enum.GetValues<EntryFieldType>()) { <option value="@type">@type</option> }</select></label>
+                                @if (field.Type is EntryFieldType.Choice or EntryFieldType.MultiChoice) { <label><span>Options (value:label)</span><input @bind="field.Options" /></label> }
+                                <div class="entry-toggle-group">
+                                    <label class="entry-toggle"><input type="checkbox" @bind="field.Required" /><span>Required</span></label>
+                                    <label class="entry-toggle"><input type="radio" name="primary-input" checked="@field.Primary" @onclick="() => SetPrimary(field)" /><span>Primary input</span></label>
+                                </div>
+                                <div class="entry-row-actions">
+                                    <button type="button" class="button-secondary" title="Move up" aria-label="Move field up" @onclick="() => MoveField(field, -1)" disabled="@(index == 0)">↑</button>
+                                    <button type="button" class="button-secondary" title="Move down" aria-label="Move field down" @onclick="() => MoveField(field, 1)" disabled="@(index == fields.Count - 1)">↓</button>
+                                    <button type="button" class="text-button entry-remove" @onclick="() => RemoveField(field)" disabled="@(fields.Count == 1)">Remove</button>
+                                </div>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </section>
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">Execution</p><h2>Binding and resolved target</h2></div></div>
+                <div class="form-grid">
+                    <label><span>Target kind</span><select data-testid="target-kind" value="@bindingKind" @onchange="BindingKindChanged"><option value="Agent">Agent</option><option value="Flow">Flow</option></select></label>
+                    <label><span>Target resource</span><select data-testid="target-resource" @bind="resourceId"><option value="">Select a @bindingKind</option>@foreach (var resource in resources) { <option value="@resource.ResourceId">@resource.Name · @resource.Version · @resource.State</option> }</select></label>
+                </div>
+                @if (bindingKind == EntryBindingKind.Agent) { <p class="resource-hint">Agentstration will publish a system-managed Direct Agent Flow. Workplace and Runtime only receive the resulting Flow reference.</p> }
+                <div class="entry-resolution-grid">
+                    <article><h3>Declared binding</h3><dl class="entry-facts"><dt>Type</dt><dd>@bindingKind</dd><dt>Resource</dt><dd>@BindingResourceName</dd><dt>State</dt><dd>@(SelectedResource?.State ?? "Not selected")</dd>@if (SelectedModelProfile is not null) { <dt>Model profile</dt><dd>@SelectedModelProfile</dd> }</dl>@if (!string.IsNullOrWhiteSpace(resourceId)) { <details><summary>Resource ID</summary><code>@resourceId</code></details> }</article>
+                    <article><h3>Resolved target</h3><dl class="entry-facts"><dt>Flow</dt><dd>@ResolvedFlowName</dd><dt>Version</dt><dd>@(published?.ResolvedTarget.Version ?? "Resolved on publication")</dd><dt>Strategy</dt><dd>Pinned</dd></dl>@if (published is not null) { <details><summary>Flow resource ID</summary><code>@published.ResolvedTarget.FlowResourceId</code></details> }</article>
+                </div>
+            </section>
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">Behavior</p><h2>Conversation and execution</h2></div></div>
+                <div class="entry-behavior-layout">
+                    <label><span>Task creation</span><select @bind="taskMode"><option value="Automatic">Automatic</option><option value="OnDemand">On demand</option><option value="Never">Never</option></select></label>
+                    <div class="entry-toggle-list">
+                        <label class="entry-toggle"><input type="checkbox" @bind="allowConversation" /><span><strong>Allow conversation</strong><small>Keep the interaction open for follow-up messages.</small></span></label>
+                        <label class="entry-toggle"><input type="checkbox" @bind="streamResponse" /><span><strong>Stream response</strong><small>Show output progressively in Workplace.</small></span></label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">Suggestions</p><h2>Prompt starters</h2></div><button class="button-secondary" type="button" @onclick="AddSuggestion">Add suggestion</button></div>
+                @if (suggestions.Count == 0) { <p class="entry-empty-copy">No prompt starters configured.</p> }
+                else
+                {
+                    <div class="entry-card-list">@foreach (var suggestion in suggestions) { <article class="entry-suggestion-card" @key="suggestion"><div class="form-grid"><label><span>Label</span><input @bind="suggestion.Label" /></label><label><span>Value</span><input @bind="suggestion.Value" /></label><div class="entry-row-actions form-span-2"><button type="button" class="text-button entry-remove" @onclick="() => RemoveSuggestion(suggestion)">Remove</button></div></div></article> }</div>
+                }
+            </section>
+        }
+        else if (activeTab == EntryTab.Preview)
+        {
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">Preview</p><h2>Workplace renderer</h2><p>Current draft presentation. Inputs are disabled and nothing is executed.</p></div><StatusBadge Text="No execution" Status="UiStatus.Info" /></div>
+                <div class="entry-preview"><Agentstration.Workplace.Components.EntryRenderer Definition="PreviewDefinition" OnSubmit="PreviewSubmitted" Disabled="true" /></div>
+            </section>
+        }
+        else if (activeTab == EntryTab.Usage)
+        {
+            <section class="entry-usage-grid">
+                <article class="panel form-section">
+                    <div class="panel-header"><div><p class="eyebrow">Depends on</p><h2>Execution resources</h2></div><StatusBadge Text="@dependencies.Count.ToString()" Status="UiStatus.Neutral" /></div>
+                    @if (dependencies.Count == 0) { <p class="entry-empty-copy">Dependencies appear after the Entry is published.</p> }
+                    else { <div class="entry-card-list">@foreach (var dependency in dependencies) { <article class="entry-usage-card"><strong>@FriendlyResourceName(dependency.ResourceId)</strong><span>@dependency.ResourceType · @FriendlyRelationship(dependency.Relationship)</span><details><summary>Resource ID</summary><code>@dependency.ResourceId</code></details></article> }</div> }
+                </article>
+                <article class="panel form-section">
+                    <div class="panel-header"><div><p class="eyebrow">Used by</p><h2>Published workspaces</h2></div><StatusBadge Text="@PublishedUsages.Count.ToString()" Status="UiStatus.Neutral" /></div>
+                    @if (PublishedUsages.Count == 0) { <p class="entry-empty-copy">This Entry is not used by a published Workspace.</p> }
+                    else { <div class="entry-card-list">@foreach (var usage in PublishedUsages) { var reference = UsageReference(usage)!; <article class="entry-usage-card"><strong>@usage.Published!.DisplayName</strong><span>@reference.Role · position @(reference.Order + 1)</span><details><summary>Workspace resource ID</summary><code>@usage.Published.Id.Value</code></details></article> }</div> }
+                </article>
+            </section>
+        }
+        else
+        {
+            <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">Versions</p><h2>Published Entry</h2><p>The current MVP retains the current published version, not a fabricated version history.</p></div></div>
+                @if (published is null) { <p class="entry-empty-copy">No published version yet. Validate and publish the draft from Definition.</p> }
+                else
+                {
+                    <article class="entry-version-card"><div><StatusBadge Text="Published" Status="UiStatus.Success" /><strong>Version @published.Version</strong><span>Published @FormatDate(published.PublishedAt)</span></div><dl class="entry-facts"><dt>Binding</dt><dd>@PublishedBindingSummary</dd><dt>Resolved Flow</dt><dd>@FriendlyResourceName(published.ResolvedTarget.FlowResourceId)</dd><dt>Flow version</dt><dd>@published.ResolvedTarget.Version · pinned</dd></dl><details><summary>Resolved Flow resource ID</summary><code>@published.ResolvedTarget.FlowResourceId</code></details></article>
+                }
+            </section>
+        }
+    </main>
+}
+
+@code {
+    [Parameter] public string Name { get; set; } = "new";
+    private static readonly EntryTab[] Tabs = Enum.GetValues<EntryTab>();
+    private bool IsNew => string.Equals(Name, "new", StringComparison.OrdinalIgnoreCase);
+    private bool loading = true, busy, hasError;
+    private long draftRevision = 1;
+    private string resourceName = "", displayName = "", description = "", placeholder = "Ask Agentstration", resourceId = "", message = "";
+    private EntryTab activeTab = EntryTab.Overview;
+    private EntryBindingKind bindingKind = EntryBindingKind.Agent;
+    private EntryPresentationKind presentationKind = EntryPresentationKind.Prompt;
+    private TaskCreationMode taskMode = TaskCreationMode.Automatic;
+    private bool allowConversation = true, streamResponse = true, allowAttachments;
+    private readonly List<EditorField> fields = [new() { Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true, Primary = true }];
+    private readonly List<EditorSuggestion> suggestions = [];
+    private EntryResource? published;
+    private EntryBinding? publishedBinding;
+    private EntryValidationResponse? validation;
+    private IReadOnlyList<ResourcePickerItem> resources = [];
+    private IReadOnlyList<EntryDependencyResponse> dependencies = [];
+    private IReadOnlyList<WorkplaceWorkspaceDraftResponse> workspaces = [];
+    private ResourcePickerItem? SelectedResource => resources.FirstOrDefault(value => value.ResourceId == resourceId);
+    private string? SelectedModelProfile => SelectedResource?.Details?.GetValueOrDefault("modelProfile");
+    private string BindingResourceName => SelectedResource?.Name ?? (string.IsNullOrWhiteSpace(resourceId) ? "Not selected" : FriendlyResourceName(resourceId));
+    private string ResolvedFlowName => published is null ? "Resolved on publication" : FriendlyResourceName(published.ResolvedTarget.FlowResourceId);
+    private IReadOnlyList<WorkplaceWorkspaceDraftResponse> PublishedUsages => workspaces.Where(value => UsageReference(value) is not null).ToArray();
+    private IReadOnlyList<WorkplaceWorkspaceDraftResponse> PrimaryUsages => PublishedUsages.Where(value => UsageReference(value)?.Role == WorkspaceEntryRole.Primary).ToArray();
+    private string UsageSummary => PublishedUsages.Count == 0 ? "Not used" : string.Join(", ", PublishedUsages.Take(3).Select(value => value.Published!.DisplayName));
+    private string PublishedBindingSummary => publishedBinding is null ? "Not retained" : $"{publishedBinding.Kind} · {FriendlyResourceName(publishedBinding.ResourceId)}";
+    private EntryResource PreviewDefinition => new() { Id = new($"/resourceGroups/default/providers/Agentstration.Work/entries/{(string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName)}"), Name = string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName, DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Entry preview" : displayName, Description = description, Presentation = Presentation(), ResolvedTarget = published?.ResolvedTarget ?? new("/resourceGroups/default/providers/Agentstration.Flows/flows/preview", "1.0.0"), Behavior = Behavior() };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew)
+        {
+            var response = await Client.GetEntryAsync(Name, default); var draft = response.Value; published = response.Published; publishedBinding = draft.PublishedBinding; draftRevision = draft.Revision;
+            resourceName = draft.Name; displayName = draft.DisplayName; description = draft.Description ?? ""; placeholder = draft.Presentation.Placeholder ?? ""; presentationKind = draft.Presentation.Kind; bindingKind = draft.Binding.Kind; resourceId = draft.Binding.ResourceId; taskMode = draft.Behavior.TaskCreationMode; allowConversation = draft.Behavior.AllowConversation; streamResponse = draft.Behavior.StreamResponse; allowAttachments = draft.Presentation.AllowAttachments;
+            fields.Clear(); fields.AddRange(draft.Presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")) }));
+            suggestions.Clear(); suggestions.AddRange(draft.Presentation.Suggestions.Select(value => new EditorSuggestion { Label = value.Label, Value = value.Value }));
+            dependencies = await Client.GetDependenciesAsync(Name, default);
+        }
+        workspaces = await Client.GetWorkspacesAsync(default);
+        await LoadResourcesAsync(); loading = false;
+    }
+
+    private void SelectTab(EntryTab tab) { activeTab = tab; message = ""; }
+    private static string TabId(EntryTab tab) => $"entry-tab-{tab.ToString().ToLowerInvariant()}";
+    private static string TabLabel(EntryTab tab) => tab.ToString();
+    private WorkspaceEntryReference? UsageReference(WorkplaceWorkspaceDraftResponse workspace) => workspace.Published?.Entries.FirstOrDefault(value => string.Equals(value.EntryResourceId.Value, EntryIdValue, StringComparison.Ordinal));
+    private string EntryIdValue => $"/resourceGroups/default/providers/Agentstration.Work/entries/{resourceName}";
+    private static string FormatDate(DateTimeOffset? value) => value is null || value == default ? "Not published" : value.Value.LocalDateTime.ToString("g");
+    private static string FriendlyResourceName(string value) => value[(value.LastIndexOf('/') + 1)..];
+    private static string FriendlyRelationship(string value) => value == "ResolvedTarget" ? "Resolved target" : value;
+    private static string FieldTitle(EditorField field) => string.IsNullOrWhiteSpace(field.Label) ? (string.IsNullOrWhiteSpace(field.Name) ? "Untitled field" : field.Name) : field.Label;
+    private async Task BindingKindChanged(ChangeEventArgs args) { bindingKind = Enum.Parse<EntryBindingKind>(args.Value?.ToString() ?? "Agent"); resourceId = ""; await LoadResourcesAsync(); }
+    private async Task LoadResourcesAsync() => resources = await Client.GetResourcesAsync(bindingKind, default);
+    private void AddField() => fields.Add(new EditorField { Name = $"field{fields.Count + 1}", Label = "New field", Type = EntryFieldType.Text, Primary = fields.Count == 0 });
+    private void RemoveField(EditorField field) { fields.Remove(field); if (fields.Count > 0 && fields.All(value => !value.Primary)) fields[0].Primary = true; }
+    private void SetPrimary(EditorField field) { foreach (var value in fields) value.Primary = ReferenceEquals(value, field); }
+    private void MoveField(EditorField field, int offset) { var index = fields.IndexOf(field); var target = index + offset; if (index < 0 || target < 0 || target >= fields.Count) return; fields.RemoveAt(index); fields.Insert(target, field); }
+    private void AddSuggestion() => suggestions.Add(new EditorSuggestion { Label = "Suggestion", Value = "" });
+    private void RemoveSuggestion(EditorSuggestion suggestion) => suggestions.Remove(suggestion);
+    private EntryPresentation Presentation() => new() { Kind = presentationKind, Placeholder = placeholder, AllowAttachments = allowAttachments, Fields = fields.Select((value, index) => new EntryFieldDefinition { Name = value.Name.Trim(), Label = string.IsNullOrWhiteSpace(value.Label) ? null : value.Label.Trim(), Type = value.Type, Required = value.Required, Role = value.Primary ? EntryFieldRole.PrimaryInput : EntryFieldRole.Standard, Order = index, Options = ParseOptions(value.Options), Validation = value.Type is EntryFieldType.Prompt or EntryFieldType.Text or EntryFieldType.Textarea or EntryFieldType.Conversation ? new EntryFieldValidation(1, 10_000) : null }).ToArray(), Suggestions = suggestions.Where(value => !string.IsNullOrWhiteSpace(value.Label) && !string.IsNullOrWhiteSpace(value.Value)).Select(value => new EntrySuggestion(value.Label.Trim(), value.Value.Trim())).ToArray() };
+    private static IReadOnlyList<EntryFieldOption> ParseOptions(string options) => options.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(value => { var parts = value.Split(':', 2, StringSplitOptions.TrimEntries); return new EntryFieldOption(parts[0], parts.Length == 2 ? parts[1] : parts[0]); }).ToArray();
+    private EntryBehavior Behavior() => new(taskMode, allowConversation, streamResponse, new EntryConversationBehavior(allowConversation));
+    private EntryDraft Draft() => new() { Id = new(EntryIdValue), Name = resourceName.Trim(), DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Presentation = Presentation(), Binding = new(bindingKind, resourceId), PublishedBinding = publishedBinding, Behavior = Behavior(), Revision = draftRevision };
+    private async Task SaveAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; publishedBinding = saved.PublishedBinding; message = $"Draft revision {saved.Revision} saved. Workplace is unchanged."; if (IsNew) Navigation.NavigateTo($"/entries/{saved.Name}", forceLoad: true); }); }
+    private async Task ValidateAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(resourceName, default); message = validation.IsValid ? "Entry is valid and ready to publish." : "Validation found errors."; hasError = !validation.IsValid; }); }
+    private async Task PublishAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(resourceName, default); if (!validation.IsValid) { hasError = true; message = "Resolve validation errors before publication."; return; } published = await Client.PublishEntryAsync(resourceName, default); publishedBinding = new(bindingKind, resourceId); dependencies = await Client.GetDependenciesAsync(resourceName, default); workspaces = await Client.GetWorkspacesAsync(default); message = $"Published Entry v{published.Version} with pinned Flow {published.ResolvedTarget.Version}."; }); }
+    private async Task ExecuteAsync(Func<Task> action) { busy = true; hasError = false; message = ""; try { await action(); } catch (Exception exception) { hasError = true; message = exception.Message; } finally { busy = false; } }
+    private Task PreviewSubmitted(IReadOnlyDictionary<string, JsonElement> _) => Task.CompletedTask;
+    private enum EntryTab { Overview, Definition, Preview, Usage, Versions }
+    private sealed class EditorField { public string Name { get; set; } = ""; public string Label { get; set; } = ""; public string Options { get; set; } = ""; public EntryFieldType Type { get; set; } public bool Required { get; set; } public bool Primary { get; set; } }
+    private sealed class EditorSuggestion { public string Label { get; set; } = ""; public string Value { get; set; } = ""; }
+}

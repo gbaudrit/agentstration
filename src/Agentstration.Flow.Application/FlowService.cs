@@ -6,7 +6,12 @@ namespace Agentstration.Flow.Application;
 public sealed record CreateFlowCommand(string Name, string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null);
 public sealed record UpdateFlowCommand(string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null, FlowGraphDefinition? Graph = null, string? DisplayName = null, string ResourceGroup = "default", string Location = "local");
 
-public sealed class FlowService(IFlowRepository repository, TimeProvider timeProvider)
+public interface IFlowDeletionGuard
+{
+    Task ValidateDeleteAsync(FlowId flowId, CancellationToken cancellationToken);
+}
+
+public sealed class FlowService(IFlowRepository repository, TimeProvider timeProvider, IEnumerable<IFlowDeletionGuard> deletionGuards)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -51,7 +56,14 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
         return await repository.UpdateAsync(updated, expectedETag, cancellationToken);
     }
 
-    public Task DeleteAsync(FlowId id, string? expectedETag, CancellationToken cancellationToken) => repository.DeleteAsync(id, expectedETag, cancellationToken);
+    public async Task DeleteAsync(FlowId id, string? expectedETag, CancellationToken cancellationToken)
+    {
+        var stored = await repository.GetAsync(id, cancellationToken) ?? throw new FlowNotFoundException(id);
+        if (stored.Value.Metadata.TryGetValue("systemManaged", out var systemManaged) && bool.TryParse(systemManaged, out var isSystemManaged) && isSystemManaged)
+            throw new FlowValidationException("system_flow_managed", $"Flow '{id}' is managed by Agentstration and cannot be deleted independently.");
+        foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(id, cancellationToken);
+        await repository.DeleteAsync(id, expectedETag, cancellationToken);
+    }
 
     public async Task<StoredFlowVersion> PublishVersionAsync(FlowId id, string version, bool activate, CancellationToken cancellationToken, string? releaseNotes = null)
     {

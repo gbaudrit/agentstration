@@ -115,6 +115,12 @@ public static class DependencyInjection
         flowConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "flow-plane.db")}";
         services.AddSqliteFlowStorage(flowConnectionString);
         services.AddSingleton<FlowService>();
+        services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();
+        services.AddSingleton<EntryResourceDeletionGuard>();
+        services.AddSingleton<IManagementResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
+        services.AddSingleton<IFlowDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
+        services.AddSingleton<EntryAdministrationService>();
+        services.AddSingleton<WorkspaceAdministrationService>();
         services.AddSingleton<IFlowRunQueue, LocalFlowRunQueue>();
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();

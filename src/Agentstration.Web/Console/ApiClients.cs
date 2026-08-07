@@ -62,6 +62,22 @@ public interface IWorkApiClient
     Task CancelTaskAsync(Guid taskId, CancellationToken cancellationToken);
 }
 
+public interface IEntryAdministrationApiClient
+{
+    Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken);
+    Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken);
+    Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken);
+    Task<EntryValidationResponse> ValidateEntryAsync(string name, CancellationToken cancellationToken);
+    Task<EntryResource> PublishEntryAsync(string name, CancellationToken cancellationToken);
+    Task<IReadOnlyList<EntryDependencyResponse>> GetDependenciesAsync(string name, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ResourcePickerItem>> GetResourcesAsync(EntryBindingKind kind, CancellationToken cancellationToken);
+    Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkplaceWorkspaceDraftResponse>> GetWorkspacesAsync(CancellationToken cancellationToken);
+    Task<WorkplaceWorkspaceDraftResponse> GetWorkspaceAsync(string name, CancellationToken cancellationToken);
+    Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken);
+    Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken);
+}
+
 public interface IFlowApiClient
 {
     Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken);
@@ -193,6 +209,68 @@ public sealed class WorkApiClient(HttpClient httpClient) : IWorkApiClient
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
     }
     private static string WorkspaceName(string id) => id[(id.LastIndexOf('/') + 1)..];
+}
+
+public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpClientFactory httpClientFactory) : IEntryAdministrationApiClient
+{
+    public const string AgentResourceCatalogClient = "EntryAdministration.AgentResources";
+    public const string FlowResourceCatalogClient = "EntryAdministration.FlowResources";
+
+    public async Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<EntryDraftResponse[]>(httpClient, "api/management/entries", cancellationToken);
+
+    public Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<EntryDraftResponse>(httpClient, $"api/management/entries/{Uri.EscapeDataString(name)}", cancellationToken);
+
+    public async Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PutAsJsonAsync($"api/management/entries/{Uri.EscapeDataString(draft.Name)}", draft, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<EntryDraft>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty Entry draft.", Guid.NewGuid().ToString("N"));
+    }
+
+    public async Task<EntryValidationResponse> ValidateEntryAsync(string name, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync($"api/management/entries/{Uri.EscapeDataString(name)}/validate", null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<EntryValidationResponse>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty Entry validation.", Guid.NewGuid().ToString("N"));
+    }
+
+    public async Task<EntryResource> PublishEntryAsync(string name, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync($"api/management/entries/{Uri.EscapeDataString(name)}/publish", null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<EntryResource>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty published Entry.", Guid.NewGuid().ToString("N"));
+    }
+
+    public async Task<IReadOnlyList<EntryDependencyResponse>> GetDependenciesAsync(string name, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<EntryDependencyResponse[]>(httpClient, $"api/management/entries/{Uri.EscapeDataString(name)}/dependencies", cancellationToken);
+
+    public async Task<IReadOnlyList<ResourcePickerItem>> GetResourcesAsync(EntryBindingKind kind, CancellationToken cancellationToken)
+    {
+        var type = kind == EntryBindingKind.Agent ? "Agentstration.Agents/agents" : "Agentstration.Flows/flows";
+        var catalogClient = httpClientFactory.CreateClient(kind == EntryBindingKind.Agent ? AgentResourceCatalogClient : FlowResourceCatalogClient);
+        return await ApiResponse.ReadAsync<ResourcePickerItem[]>(catalogClient, $"api/resources?type={Uri.EscapeDataString(type)}", cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<EntryResponse[]>(httpClient, "api/entries", cancellationToken);
+    public async Task<IReadOnlyList<WorkplaceWorkspaceDraftResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<WorkplaceWorkspaceDraftResponse[]>(httpClient, "api/management/workspaces", cancellationToken);
+    public Task<WorkplaceWorkspaceDraftResponse> GetWorkspaceAsync(string name, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<WorkplaceWorkspaceDraftResponse>(httpClient, $"api/management/workspaces/{Uri.EscapeDataString(name)}", cancellationToken);
+    public async Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PutAsJsonAsync($"api/management/workspaces/{Uri.EscapeDataString(draft.Name)}", draft, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkplaceWorkspaceDraft>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty Workspace draft.", Guid.NewGuid().ToString("N"));
+    }
+    public async Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync($"api/management/workspaces/{Uri.EscapeDataString(name)}/publish", null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkplaceWorkspace>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty published Workspace.", Guid.NewGuid().ToString("N"));
+    }
 }
 
 public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient

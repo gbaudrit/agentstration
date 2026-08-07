@@ -47,6 +47,9 @@ public readonly record struct WorkTaskArtifactId(Guid Value) { public static Wor
 public enum WorkspaceEntryRole { Primary, Featured, Standard }
 public enum EntryPresentationKind { Prompt, Form, Conversation, Action, FileDrop }
 public enum EntryFieldType { Prompt, Text, Textarea, Number, Boolean, Choice, MultiChoice, Date, DateTime, File, Files, EntityPicker, ResourcePicker, Secret, Conversation }
+public enum EntryFieldRole { Standard, PrimaryInput }
+public enum EntryBindingKind { Agent, Flow }
+public enum EntryVersionStrategy { Pinned }
 public enum TaskCreationMode { Automatic, OnDemand, Never }
 public enum InteractionStatus { Active, WaitingForUser, ConvertedToTask, Completed, Cancelled, Failed, Processing, Idle, Closed }
 public enum WorkTaskStatus { Draft, Pending, Running, ActionRequired, Paused, Completed, Failed, Cancelled }
@@ -76,6 +79,21 @@ public sealed record WorkplaceWorkspace
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public IReadOnlyList<WorkspaceEntryReference> Entries { get; init; } = [];
+    public int Version { get; init; } = 1;
+    public DateTimeOffset PublishedAt { get; init; }
+}
+
+public sealed record WorkplaceWorkspaceDraft
+{
+    public required WorkplaceWorkspaceId Id { get; init; }
+    public required string Name { get; init; }
+    public string ResourceGroup { get; init; } = "default";
+    public string Location { get; init; } = "local";
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public IReadOnlyList<WorkspaceEntryReference> Entries { get; init; } = [];
+    public long Revision { get; init; } = 1;
+    public DateTimeOffset UpdatedAt { get; init; }
 }
 
 public sealed record EntryFieldValidation(int? MinimumLength = null, int? MaximumLength = null, IReadOnlyList<string>? AllowedExtensions = null);
@@ -94,6 +112,7 @@ public sealed record EntryFieldDefinition
     public IReadOnlyList<EntryFieldOption> Options { get; init; } = [];
     public int Order { get; init; }
     public EntryFieldValidation? Validation { get; init; }
+    public EntryFieldRole Role { get; init; }
 }
 
 public sealed record EntryPresentation
@@ -107,9 +126,28 @@ public sealed record EntryPresentation
     public IReadOnlyList<EntryFieldDefinition> Fields { get; init; } = [];
 }
 
-public sealed record EntryTarget(string ResourceId);
-public sealed record EntryConversationBehavior(bool Enabled = true, EntryTarget? ContinuationTarget = null);
+public sealed record EntryBinding(EntryBindingKind Kind, string ResourceId);
+public sealed record EntryResolvedTarget(string FlowResourceId, string Version, EntryVersionStrategy VersionStrategy = EntryVersionStrategy.Pinned);
+public sealed record EntryConversationBehavior(bool Enabled = true, EntryResolvedTarget? ContinuationTarget = null);
 public sealed record EntryBehavior(TaskCreationMode TaskCreationMode = TaskCreationMode.Automatic, bool AllowConversation = true, bool StreamResponse = true, EntryConversationBehavior? Conversation = null);
+
+public sealed record EntryDraft
+{
+    public required EntryId Id { get; init; }
+    public required string Name { get; init; }
+    public string Type { get; init; } = WorkResourceTypes.Entries;
+    public string ApiVersion { get; init; } = WorkplaceApiVersions.V20260805;
+    public string ResourceGroup { get; init; } = "default";
+    public string Location { get; init; } = "local";
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required EntryPresentation Presentation { get; init; }
+    public required EntryBinding Binding { get; init; }
+    public EntryBinding? PublishedBinding { get; init; }
+    public EntryBehavior Behavior { get; init; } = new();
+    public long Revision { get; init; } = 1;
+    public DateTimeOffset UpdatedAt { get; init; }
+}
 
 public sealed record EntryResource
 {
@@ -122,9 +160,13 @@ public sealed record EntryResource
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required EntryPresentation Presentation { get; init; }
-    public required EntryTarget Target { get; init; }
+    public required EntryResolvedTarget ResolvedTarget { get; init; }
     public EntryBehavior Behavior { get; init; } = new();
+    public int Version { get; init; } = 1;
+    public DateTimeOffset PublishedAt { get; init; }
 }
+
+public sealed record EntryDependency(string ResourceId, string ResourceType, string Relationship);
 
 public sealed record ConversationMessage(
     Guid Id, WorkplaceWorkspaceId WorkspaceId, InteractionId InteractionId, WorkTaskId? WorkTaskId,
@@ -253,18 +295,78 @@ public static class WorkplaceValidation
             throw new WorkValidationException("workspace_entry_duplicate", "A Workspace cannot reference the same Entry more than once.");
     }
 
+    public static void Validate(WorkplaceWorkspaceDraft workspace)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ValidateResourceId(workspace.Id.Value, "Agentstration.Work", "workspaces", "workspace_id_invalid");
+        if (string.IsNullOrWhiteSpace(workspace.DisplayName)) throw new WorkValidationException("workspace_display_name_required", "A Workspace display name is required.");
+        if (workspace.Entries.Count(reference => reference.Role == WorkspaceEntryRole.Primary) > 1)
+            throw new WorkValidationException("workspace_primary_entry_conflict", "A Workspace can expose at most one Primary Entry.");
+        if (workspace.Entries.Select(value => value.EntryResourceId).Distinct().Count() != workspace.Entries.Count)
+            throw new WorkValidationException("workspace_entry_duplicate", "A Workspace cannot reference the same Entry more than once.");
+    }
+
     public static void Validate(EntryResource entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ValidateResourceId(entry.Id.Value, "Agentstration.Work", "entries", "entry_id_invalid");
         if (string.IsNullOrWhiteSpace(entry.DisplayName)) throw new WorkValidationException("entry_display_name_required", "An Entry display name is required.");
-        if (string.IsNullOrWhiteSpace(entry.Target.ResourceId)) throw new WorkValidationException("entry_target_required", "An Entry target resource is required.");
-        if (entry.Presentation.Kind is not EntryPresentationKind.Prompt and not EntryPresentationKind.Form)
+        if (string.IsNullOrWhiteSpace(entry.ResolvedTarget.FlowResourceId)) throw new WorkValidationException("entry_target_required", "A published Entry requires a resolved Flow target.");
+        _ = FlowReferenceFrom(entry.ResolvedTarget);
+        ValidatePresentation(entry.Presentation);
+    }
+
+    public static void Validate(EntryDraft entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ValidateResourceId(entry.Id.Value, "Agentstration.Work", "entries", "entry_id_invalid");
+        if (string.IsNullOrWhiteSpace(entry.DisplayName)) throw new WorkValidationException("entry_display_name_required", "An Entry display name is required.");
+        ValidateBinding(entry.Binding);
+        ValidatePresentation(entry.Presentation);
+    }
+
+    private static void ValidatePresentation(EntryPresentation presentation)
+    {
+        if (presentation.Kind is not EntryPresentationKind.Prompt and not EntryPresentationKind.Form)
             throw new WorkValidationException("entry_kind_not_supported", "The MVP supports Prompt and Form Entries.");
-        if (entry.Presentation.Kind == EntryPresentationKind.Form && entry.Presentation.Fields.Count == 0)
+        if (presentation.Kind == EntryPresentationKind.Form && presentation.Fields.Count == 0)
             throw new WorkValidationException("entry_fields_required", "A Form Entry requires at least one field.");
-        if (entry.Presentation.Fields.Select(field => field.Name).Distinct(StringComparer.Ordinal).Count() != entry.Presentation.Fields.Count)
+        if (presentation.Fields.Select(field => field.Name).Distinct(StringComparer.Ordinal).Count() != presentation.Fields.Count)
             throw new WorkValidationException("entry_field_duplicate", "Entry field names must be unique.");
+        foreach (var field in presentation.Fields)
+        {
+            if (string.IsNullOrWhiteSpace(field.Name)) throw new WorkValidationException("entry_field_name_required", "Every Entry field requires a name.");
+            if (!Enum.IsDefined(field.Type)) throw new WorkValidationException("entry_field_type_invalid", $"Entry field '{field.Name}' has an unsupported type.");
+            if (field.Validation is { MinimumLength: int minimum, MaximumLength: int maximum } && minimum > maximum)
+                throw new WorkValidationException("entry_field_validation_invalid", $"Entry field '{field.Name}' has an invalid length range.");
+            if (field.Type is EntryFieldType.Choice or EntryFieldType.MultiChoice)
+            {
+                if (field.Options.Count == 0) throw new WorkValidationException("entry_field_options_required", $"Entry field '{field.Name}' requires at least one option.");
+                if (field.Options.Any(option => string.IsNullOrWhiteSpace(option.Value) || string.IsNullOrWhiteSpace(option.Label))
+                    || field.Options.Select(option => option.Value).Distinct(StringComparer.Ordinal).Count() != field.Options.Count)
+                    throw new WorkValidationException("entry_field_options_invalid", $"Entry field '{field.Name}' options require unique non-empty values and labels.");
+            }
+            else if (field.Options.Count > 0)
+            {
+                throw new WorkValidationException("entry_field_options_not_supported", $"Entry field '{field.Name}' only supports options when its type is Choice or MultiChoice.");
+            }
+        }
+        if (presentation.Suggestions.Any(value => string.IsNullOrWhiteSpace(value.Label) || string.IsNullOrWhiteSpace(value.Value))
+            || presentation.Suggestions.Select(value => value.Label).Distinct(StringComparer.Ordinal).Count() != presentation.Suggestions.Count)
+            throw new WorkValidationException("entry_suggestions_invalid", "Entry suggestions require unique non-empty labels and values.");
+        var primary = presentation.Fields.Count(field => field.Role == EntryFieldRole.PrimaryInput);
+        if (primary != 1) throw new WorkValidationException("entry_primary_input_required", "An Entry requires exactly one primary input field.");
+    }
+
+    public static void ValidateBinding(EntryBinding binding)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        var segments = binding.ResourceId.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var expectedProvider = binding.Kind == EntryBindingKind.Agent ? "Agentstration.Agents" : "Agentstration.Flows";
+        var expectedType = binding.Kind == EntryBindingKind.Agent ? "agents" : "flows";
+        if (segments.Length != 6 || !string.Equals(segments[3], expectedProvider, StringComparison.Ordinal)
+            || !string.Equals(segments[4], expectedType, StringComparison.Ordinal))
+            throw new WorkValidationException("entry_binding_invalid", $"The {binding.Kind} binding resource identifier is invalid.");
     }
 
     public static void ValidateSubmission(EntryResource entry, IReadOnlyDictionary<string, JsonElement> values)
@@ -301,13 +403,15 @@ public static class WorkplaceValidation
         }
     }
 
-    public static FlowReference FlowReferenceFrom(string resourceId)
+    public static FlowReference FlowReferenceFrom(EntryResolvedTarget target)
     {
+        var resourceId = target.FlowResourceId;
         var segments = resourceId.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length != 6 || !string.Equals(segments[3], "Agentstration.Flows", StringComparison.Ordinal)
             || !string.Equals(segments[4], "flows", StringComparison.Ordinal))
             throw new WorkValidationException("entry_target_not_supported", "The MVP Entry target must reference an Agentstration Flow resource.");
-        return new FlowReference(new FlowId(segments[5]));
+        if (string.IsNullOrWhiteSpace(target.Version)) throw new WorkValidationException("entry_target_version_required", "A published Entry target version is required.");
+        return new FlowReference(new FlowId(segments[5]), target.Version, UseActiveVersion: false);
     }
 
     private static void ValidateResourceId(string value, string provider, string type, string code)

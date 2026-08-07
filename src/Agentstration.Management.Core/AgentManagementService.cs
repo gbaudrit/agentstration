@@ -15,7 +15,8 @@ public sealed class AgentManagementService(
     IRuntimeRegistry runtimes,
     IManagementEventPublisher eventBus,
     IModelProfileReferenceValidator modelProfiles,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IEnumerable<IManagementResourceDeletionGuard> deletionGuards)
 {
     public Task InitializeAsync(CancellationToken cancellationToken) => store.InitializeAsync(cancellationToken);
 
@@ -80,6 +81,7 @@ public sealed class AgentManagementService(
     public async Task DeleteAgentAsync(string resourceId, string? ifMatch, CancellationToken cancellationToken)
     {
         _ = await store.GetAsync<AgentResource>(resourceId, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(resourceId);
+        foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(resourceId, cancellationToken);
         await store.DeleteAsync(resourceId, ifMatch, cancellationToken);
         await eventBus.PublishAsync(new AgentDeleted(resourceId, timeProvider.GetUtcNow()), cancellationToken);
     }

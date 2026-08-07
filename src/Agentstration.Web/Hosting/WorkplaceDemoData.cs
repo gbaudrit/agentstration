@@ -31,8 +31,9 @@ public static class WorkplaceDemoData
         }
 
         var workplace = services.GetRequiredService<WorkplaceService>();
+        var entries = services.GetRequiredService<EntryAdministrationService>();
         var entryId = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/universal-request");
-        await workplace.UpsertEntryAsync(new EntryResource
+        await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
             Id = entryId,
             Name = "universal-request",
@@ -48,16 +49,16 @@ public static class WorkplaceDemoData
                     new EntryFieldDefinition
                     {
                         Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true,
-                        Placeholder = "Describe what you need", Validation = new EntryFieldValidation(3, 10_000)
+                        Placeholder = "Describe what you need", Validation = new EntryFieldValidation(3, 10_000), Role = EntryFieldRole.PrimaryInput
                     }
                 ]
             },
-            Target = new EntryTarget("/resourceGroups/default/providers/Agentstration.Flows/flows/universal-router"),
+            Binding = new EntryBinding(EntryBindingKind.Agent, "/resourceGroups/default/providers/Agentstration.Agents/agents/dotnet-expert"),
             Behavior = new EntryBehavior(TaskCreationMode.Automatic, AllowConversation: true, StreamResponse: true)
         }, cancellationToken);
 
         var reportEntryId = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/prepare-report");
-        await workplace.UpsertEntryAsync(new EntryResource
+        await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
             Id = reportEntryId, Name = "prepare-report", DisplayName = "Prepare a report",
             Description = "Starts with a standard version, then lets you request further versions in the same conversation.",
@@ -71,13 +72,13 @@ public static class WorkplaceDemoData
                     new("Project brief", "Prepare a concise project brief for the next steering committee."),
                     new("Decision memo", "Prepare a decision memo comparing the available options.")
                 ],
-                Fields = [new EntryFieldDefinition { Name = "request", Label = "Report request", Type = EntryFieldType.Prompt, Required = true, Validation = new EntryFieldValidation(3, 10_000) }]
+                Fields = [new EntryFieldDefinition { Name = "request", Label = "Report request", Type = EntryFieldType.Prompt, Required = true, Validation = new EntryFieldValidation(3, 10_000), Role = EntryFieldRole.PrimaryInput }]
             },
-            Target = new EntryTarget("/resourceGroups/default/providers/Agentstration.Flows/flows/universal-router"),
+            Binding = new EntryBinding(EntryBindingKind.Flow, "/resourceGroups/default/providers/Agentstration.Flows/flows/universal-router"),
             Behavior = new EntryBehavior(TaskCreationMode.Automatic, true, true, new EntryConversationBehavior())
         }, cancellationToken);
         var guidedEntryId = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/guided-request");
-        await workplace.UpsertEntryAsync(new EntryResource
+        await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
             Id = guidedEntryId, Name = "guided-request", DisplayName = "Guided request", Description = "Demonstrates a one-click clarification inside the conversation.",
             Presentation = new EntryPresentation
@@ -85,13 +86,13 @@ public static class WorkplaceDemoData
                 Kind = EntryPresentationKind.Prompt,
                 Placeholder = "What should I prepare?",
                 Suggestions = [new("Draft a summary", "Draft a summary of the latest project update.")],
-                Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true }]
+                Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }]
             },
-            Target = new EntryTarget("/resourceGroups/default/providers/Agentstration.Flows/flows/universal-router"),
+            Binding = new EntryBinding(EntryBindingKind.Flow, "/resourceGroups/default/providers/Agentstration.Flows/flows/universal-router"),
             Behavior = new EntryBehavior(TaskCreationMode.Automatic, true, true, new EntryConversationBehavior())
         }, cancellationToken);
         var immediateEntryId = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/quick-answer");
-        await workplace.UpsertEntryAsync(new EntryResource
+        await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
             Id = immediateEntryId, Name = "quick-answer", DisplayName = "Quick acknowledgement", Description = "Demonstrates an Interaction that completes without a Task.",
             Presentation = new EntryPresentation
@@ -99,12 +100,13 @@ public static class WorkplaceDemoData
                 Kind = EntryPresentationKind.Prompt,
                 Placeholder = "Leave a short note",
                 Suggestions = [new("Try a quick answer", "Acknowledge that the Workplace UX iteration is ready for review."), new("Save an idea", "Remember this idea for my next request.")],
-                Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true }]
+                Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }]
             },
-            Target = new EntryTarget("/resourceGroups/default/providers/Agentstration.Flows/flows/universal-router"), Behavior = new EntryBehavior(TaskCreationMode.Never)
+            Binding = new EntryBinding(EntryBindingKind.Agent, "/resourceGroups/default/providers/Agentstration.Agents/agents/dotnet-expert"), Behavior = new EntryBehavior(TaskCreationMode.Never)
         }, cancellationToken);
 
-        await workplace.UpsertWorkspaceAsync(new WorkplaceWorkspace
+        var workspaceAdministration = services.GetRequiredService<WorkspaceAdministrationService>();
+        var workspaceDraft = new WorkplaceWorkspaceDraft
         {
             Id = new WorkplaceWorkspaceId("/resourceGroups/default/providers/Agentstration.Work/workspaces/personal"),
             Name = "personal",
@@ -117,6 +119,17 @@ public static class WorkplaceDemoData
                 new WorkspaceEntryReference { EntryResourceId = guidedEntryId, Role = WorkspaceEntryRole.Standard, Order = 20 },
                 new WorkspaceEntryReference { EntryResourceId = immediateEntryId, Role = WorkspaceEntryRole.Standard, Order = 30 }
             ]
-        }, cancellationToken);
+        };
+        if (!(await workspaceAdministration.ListAsync(cancellationToken)).Any(value => value.Id == workspaceDraft.Id))
+            await workspaceAdministration.SaveAsync(workspaceDraft, cancellationToken);
+        if (!(await workplace.ListWorkspacesAsync(cancellationToken)).Any(value => value.Id == workspaceDraft.Id))
+            await workspaceAdministration.PublishAsync(workspaceDraft.Id, cancellationToken);
+    }
+
+    private static async Task SaveAndPublishAsync(EntryAdministrationService service, WorkplaceService workplace, EntryDraft draft, CancellationToken cancellationToken)
+    {
+        var existing = await service.ListAsync(cancellationToken);
+        if (!existing.Any(value => value.Id == draft.Id)) await service.SaveAsync(draft, cancellationToken);
+        if (!(await workplace.ListEntriesAsync(cancellationToken)).Any(value => value.Id == draft.Id && value.ResolvedTarget is not null)) await service.PublishAsync(draft.Id, cancellationToken);
     }
 }
