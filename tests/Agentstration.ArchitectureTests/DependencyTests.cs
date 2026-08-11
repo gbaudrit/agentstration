@@ -1,3 +1,7 @@
+using Agentstration.Aep.Abstractions;
+using Agentstration.Aep.AspNetCore;
+using Agentstration.Aep.Client;
+using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Application;
 using Agentstration.Domain;
 using Agentstration.Management.Abstractions;
@@ -9,7 +13,7 @@ using Agentstration.Management.Core;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.ModelProviders;
-using Agentstration.ModelProviders.Ollama;
+using Agentstration.Extensions.Ollama;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
@@ -75,9 +79,27 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void OllamaProviderDoesNotReferenceRuntimeOrAspireHosting()
+    public void AepContractsClientAndServerDoNotReferenceMafMicrosoftExtensionsAiOrOllama()
     {
-        var references = typeof(OllamaModelProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var assemblies = new[] { typeof(AepProtocol).Assembly, typeof(AepClient).Assembly, typeof(IAepModelProvider).Assembly };
+        Assert.IsFalse(assemblies.SelectMany(value => value.GetReferencedAssemblies()).Any(reference =>
+            reference.Name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || reference.Name.Contains("Microsoft.Extensions.AI", StringComparison.Ordinal)
+            || reference.Name.Contains("Ollama", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void AepMicrosoftExtensionsAiAdapterDoesNotReferenceMafOrOllama()
+    {
+        var references = typeof(AepChatClient).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || name.Contains("Ollama", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void OllamaExtensionDoesNotReferenceRuntimeMafOrAspireHosting()
+    {
+        var references = typeof(OllamaAepModelProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Runtime", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || name.Contains("Aspire.Hosting.Ollama", StringComparison.Ordinal)));

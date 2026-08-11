@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup><ProjectReference Include="../Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" /></ItemGroup>
+  <ItemGroup><PackageReference Include="ModelContextProtocol.AspNetCore" /></ItemGroup>
+</Project>

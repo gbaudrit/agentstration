@@ -1,0 +1,128 @@
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Agentstration.Aep.Abstractions;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
+namespace Agentstration.Aep.AspNetCore;
+
+public interface IAepModelProvider
+{
+    AepModelProviderDescriptor Descriptor { get; }
+    Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken);
+    IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(AepChatRequest request, CancellationToken cancellationToken);
+    Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<AepModelDescriptor>>(Descriptor.Models ?? []);
+    Task<AepProviderHealth> GetHealthAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(new AepProviderHealth("available"));
+}
+
+public sealed class AepExtensionOptions
+{
+    public AepExtensionIdentity Extension { get; set; } = new("agentstration.extension", "Agentstration extension", "1.0.0");
+    public IList<AepMcpServerDescriptor> McpServers { get; } = [];
+    public IList<AepToolContribution> Tools { get; } = [];
+}
+
+public static class AepServerExtensions
+{
+    public static IServiceCollection AddAgentstrationAep(this IServiceCollection services, Action<AepExtensionOptions>? configure = null)
+    {
+        services.AddOptions<AepExtensionOptions>();
+        services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
+        if (configure is not null) services.Configure(configure);
+        services.AddHealthChecks();
+        return services;
+    }
+
+    public static IServiceCollection AddModelProvider<TProvider>(this IServiceCollection services)
+        where TProvider : class, IAepModelProvider => services.AddSingleton<IAepModelProvider, TProvider>();
+
+    public static IEndpointRouteBuilder MapAgentstrationAep(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGet(AepProtocol.DiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers) =>
+            Results.Json(CreateDescriptor(options.Value, providers), AepProtocol.JsonOptions));
+        endpoints.MapGet(AepProtocol.ModelProvidersPath, (IEnumerable<IAepModelProvider> providers) =>
+            Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions));
+        endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync);
+        endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync);
+        endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync);
+        endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/health", ProviderHealthAsync);
+        endpoints.MapHealthChecks("/health");
+        return endpoints;
+    }
+
+    private static AepExtensionDescriptor CreateDescriptor(AepExtensionOptions options, IEnumerable<IAepModelProvider> providers)
+    {
+        var descriptor = new AepExtensionDescriptor(
+            AepProtocol.Version,
+            options.Extension,
+            new AepExtensionCapabilities(),
+            new AepContributions(providers.Select(value => value.Descriptor).ToArray(), options.Tools.ToArray()),
+            options.McpServers.Count == 0 ? null : new AepMcpDescriptor(options.McpServers.ToArray()));
+        var errors = AepDescriptorValidator.Validate(descriptor);
+        if (errors.Count > 0) throw new InvalidOperationException($"The AEP extension descriptor is invalid: {string.Join(" ", errors)}");
+        return descriptor;
+    }
+
+    private static async Task<IResult> ProviderHealthAsync(string providerId, IEnumerable<IAepModelProvider> providers, CancellationToken cancellationToken)
+    {
+        var provider = Find(providers, providerId);
+        if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
+        return Results.Json(await provider.GetHealthAsync(cancellationToken), AepProtocol.JsonOptions);
+    }
+
+    private static async Task<IResult> ListModelsAsync(string providerId, IEnumerable<IAepModelProvider> providers, CancellationToken cancellationToken)
+    {
+        var provider = Find(providers, providerId);
+        if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
+        try { return Results.Json(await provider.ListModelsAsync(cancellationToken), AepProtocol.JsonOptions); }
+        catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
+    }
+
+    private static async Task<IResult> ChatAsync(string providerId, AepChatRequest request, IEnumerable<IAepModelProvider> providers, CancellationToken cancellationToken)
+    {
+        var provider = Find(providers, providerId);
+        if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
+        try { return Results.Json(await provider.ChatAsync(request, cancellationToken), AepProtocol.JsonOptions); }
+        catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
+    }
+
+    private static async Task StreamAsync(string providerId, AepChatRequest request, IEnumerable<IAepModelProvider> providers, HttpResponse response, CancellationToken cancellationToken)
+    {
+        var provider = Find(providers, providerId);
+        if (provider is null)
+        {
+            response.StatusCode = StatusCodes.Status404NotFound;
+            await response.WriteAsJsonAsync(new AepErrorResponse(new AepError("provider_unavailable", $"Model provider '{providerId}' is not registered.")), AepProtocol.JsonOptions, cancellationToken);
+            return;
+        }
+        response.StatusCode = StatusCodes.Status200OK;
+        response.ContentType = "text/event-stream";
+        response.Headers.CacheControl = "no-cache";
+        await foreach (var update in provider.ChatStreamingAsync(request, cancellationToken).WithCancellation(cancellationToken))
+        {
+            await response.WriteAsync("data: ", cancellationToken);
+            await JsonSerializer.SerializeAsync(response.Body, update, AepProtocol.JsonOptions, cancellationToken);
+            await response.WriteAsync("\n\n", cancellationToken);
+            await response.Body.FlushAsync(cancellationToken);
+        }
+    }
+
+    private static IAepModelProvider? Find(IEnumerable<IAepModelProvider> providers, string id) =>
+        providers.FirstOrDefault(value => string.Equals(value.Descriptor.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    private static IResult Error(int status, string code, string message) =>
+        Results.Json(new AepErrorResponse(new AepError(code, message)), AepProtocol.JsonOptions, statusCode: status);
+}
+
+public sealed class AepServerException(string code, string message, int statusCode = StatusCodes.Status502BadGateway, Exception? innerException = null)
+    : Exception(message, innerException)
+{
+    public string Code { get; } = code;
+    public int StatusCode { get; } = statusCode;
+}

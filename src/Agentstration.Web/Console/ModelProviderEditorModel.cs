@@ -15,7 +15,7 @@ public sealed class ModelProviderEditorModel
     [Required] public string Location { get; set; } = "local";
     [Required] public string DisplayName { get; set; } = string.Empty;
     [Required] public string ProviderType { get; set; } = "ollama";
-    [Required, Url] public string Endpoint { get; set; } = "http://localhost:11434";
+    [Required, Url] public string Endpoint { get; set; } = "http://localhost:5260";
     public ModelProviderManagementMode ManagementMode { get; set; } = ModelProviderManagementMode.External;
     public string? ProviderOptionsJson { get; set; }
 

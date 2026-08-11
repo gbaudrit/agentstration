@@ -10,6 +10,7 @@
     <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <ProjectReference Include="../Agentstration.Work.Storage.Sqlite/Agentstration.Work.Storage.Sqlite.csproj" />
   </ItemGroup>
   <ItemGroup>

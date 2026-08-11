@@ -4,7 +4,6 @@ using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
-using Agentstration.ModelProviders.Ollama;
 using Agentstration.Runtime.Core;
 using Agentstration.Web;
 using Agentstration.Web.Features.Workplace;
@@ -19,7 +18,7 @@ var flowPath = builder.Configuration["Data:FlowPath"] ?? Path.Combine(dataDirect
 var flowDirectory = Path.GetDirectoryName(flowPath); if (!string.IsNullOrWhiteSpace(flowDirectory)) Directory.CreateDirectory(flowDirectory);
 var dataPath = Path.Combine(dataDirectory, "data.json"); var aiOptions = new AiProviderOptions(builder.Configuration["AI:Provider"] ?? "Deterministic", new Uri(builder.Configuration["AI:Endpoint"] ?? "http://localhost/"), builder.Configuration["AI:Model"] ?? "deterministic", builder.Configuration["AI:ApiKey"]);
 builder.Services.AddAgentstration(dataPath, builder.Environment.IsEnvironment("Testing"), aiOptions, $"Data Source={Path.Combine(dataDirectory,"control-plane.db")}", $"Data Source={Path.Combine(dataDirectory,"work-plane.db")}", $"Data Source={flowPath}", $"Data Source={Path.Combine(dataDirectory,"runtime-plane.db")}");
-builder.Services.AddAgentstrationModelProviders(builder.Configuration, false); builder.Services.AddAgentstrationModelManagement(); builder.AddOllamaModelProvider();
+builder.Services.AddAgentstrationModelProviders(builder.Configuration, false); builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddProblemDetails(); builder.Services.AddOpenApi(); builder.Services.AddSignalR(); builder.Services.AddHealthChecks();
 builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>(); builder.Services.AddHostedService<LocalWorkExecutionWorker>(); builder.Services.AddHostedService<FlowRunExecutionWorker>();
 var otlp = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]); builder.Services.AddOpenTelemetry().ConfigureResource(value=>value.AddService("Agentstration.Work.Api")).WithTracing(value=>{value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddSource(WorkItemService.ActivitySource.Name,FlowRunService.ActivitySource.Name);if(otlp)value.AddOtlpExporter();}).WithMetrics(value=>{value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddMeter(WorkItemService.Meter.Name,FlowRunService.Meter.Name);if(otlp)value.AddOtlpExporter();});

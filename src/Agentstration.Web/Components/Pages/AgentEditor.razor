@@ -4,6 +4,7 @@
 @inject IManagementApiClient Client
 @inject IAgentsModelClient AgentsModelClient
 @inject IAgentRunnerRuntimeClient RuntimeClient
+@inject IToolsClient ToolsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 
@@ -89,7 +90,14 @@ else
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">References</p><h2>Tools and tags</h2></div></div>
             <div class="form-grid">
-                <label><span>Tool resource IDs</span><InputTextArea @bind-Value="model.ToolResourceIds" rows="7" /><small>One canonical Agentstration.Tools/tools resource ID per line.</small></label>
+                <div><span class="field-label">Governed tools</span>
+                    @if (catalogTools.Count == 0) { <small>No discovered tools are available. Configure them under Tools.</small> }
+                    @foreach (var tool in catalogTools)
+                    {
+                        var assigned = IsToolAssigned(tool.Id); var usable = tool.Properties.Enabled && tool.Properties.Discovery?.Available == true;
+                        <label><input type="checkbox" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => ToggleTool(tool.Id, (bool)args.Value!)" /> <span>@tool.Properties.DisplayName</span><small>@ResourceName(tool.Properties.Provider?.ResourceId ?? "") · @(usable ? "Available" : assigned ? "Assigned but unavailable or disabled" : "Not usable")</small></label>
+                    }
+                </div>
                 <label><span>Tags</span><InputTextArea @bind-Value="model.Tags" rows="7" /><small>One key=value pair per line.</small></label>
             </div>
         </section>
@@ -114,6 +122,7 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private AgentEditorModel? model;
     private IReadOnlyList<AgentTypeResource> agentTypes = [];
+    private IReadOnlyList<ToolResource> catalogTools = [];
     private string? etag;
     private string? resourceId;
     private string? errorMessage;
@@ -147,6 +156,7 @@ else
         {
             var group = string.IsNullOrWhiteSpace(ResourceGroup) ? "default" : ResourceGroup;
             agentTypes = await Client.GetAgentTypesAsync(group, cancellation.Token);
+            catalogTools = await ToolsClient.GetToolsAsync(group, cancellationToken: cancellation.Token);
             if (IsNew)
             {
                 model = new AgentEditorModel { ResourceGroup = group };
@@ -190,6 +200,14 @@ else
     }
 
     private void MarkDirty(EventArgs _) => isDirty = true;
+    private bool IsToolAssigned(string id) => model?.ToolResourceIds.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Contains(id, StringComparer.Ordinal) == true;
+    private void ToggleTool(string id, bool selected)
+    {
+        if (model is null) return;
+        var values = model.ToolResourceIds.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        if (selected && !values.Contains(id, StringComparer.Ordinal)) values.Add(id); else if (!selected) values.RemoveAll(value => value == id);
+        model.ToolResourceIds = string.Join(Environment.NewLine, values); isDirty = true;
+    }
     private Task DiscardAsync() => OnParametersSetAsync();
 
     private static string ResourceName(string resourceId) => ResourceIdentifier.TryParse(resourceId, out var parsed) ? parsed.Name : resourceId;

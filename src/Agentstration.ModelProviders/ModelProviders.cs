@@ -59,12 +59,14 @@ public sealed record ModelProviderHealth(string Status, string? Details = null);
 public interface IModelProvider
 {
     string ProviderType { get; }
+    bool CanHandle(string providerType) => string.Equals(ProviderType, providerType, StringComparison.OrdinalIgnoreCase);
     IChatClient CreateChatClient(ModelProviderConfiguration provider, ModelDeploymentConfiguration deployment);
 }
 
 public interface IModelProviderOptionsValidator
 {
     string ProviderType { get; }
+    bool CanHandle(string providerType) => string.Equals(ProviderType, providerType, StringComparison.OrdinalIgnoreCase);
     void Validate(IReadOnlyDictionary<string, JsonElement> providerOptions);
 }
 
@@ -92,6 +94,7 @@ public interface IModelProviderConfigurationStore
 public interface IModelProviderDiscovery
 {
     string ProviderType { get; }
+    bool CanHandle(string providerType) => string.Equals(ProviderType, providerType, StringComparison.OrdinalIgnoreCase);
     ValueTask<ModelProviderHealth> GetHealthAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default);
     ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default);
 }
@@ -110,9 +113,9 @@ public sealed class ModelProviderResolver(IEnumerable<IModelProvider> providers)
     public IModelProvider GetRequiredProvider(string providerType)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(providerType);
-        return providersByType.TryGetValue(providerType, out var provider)
-            ? provider
-            : throw new ModelProviderNotFoundException(providerType);
+        if (providersByType.TryGetValue(providerType, out var provider)) return provider;
+        provider = providersByType.Values.SingleOrDefault(value => value.CanHandle(providerType));
+        return provider ?? throw new ModelProviderNotFoundException(providerType);
     }
 }
 

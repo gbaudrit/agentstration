@@ -42,11 +42,12 @@ public sealed class SingleChatClientResolver(IChatClient chatClient) : IChatClie
 
 public sealed class EmptyToolCatalog : IToolCatalog
 {
-    public IReadOnlyCollection<IAgentTool> Resolve(IEnumerable<string> toolIds)
+    public ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var requested = toolIds.Distinct(StringComparer.Ordinal).ToArray();
         if (requested.Length > 0) throw new InvalidOperationException($"No tools are registered in the standalone catalog. Requested: {string.Join(", ", requested)}.");
-        return [];
+        return ValueTask.FromResult<IReadOnlyCollection<IAgentTool>>([]);
     }
 }
 

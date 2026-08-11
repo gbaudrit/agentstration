@@ -70,6 +70,12 @@ properties:
 
 The agent resource ID is `/resourceGroups/{resourceGroup}/providers/Agentstration.Agents/agents/{agentName}`. `PUT` is idempotent: an identical declaration preserves its generation and resource version, while a functional change increments the generation and publishes an independent `AgentCreated`, `AgentUpdated`, or `AgentDeleted` event.
 
+## Tool Providers and discovery
+
+The Management Plane persists `Agentstration.Tools/toolProviders` and the `Agentstration.Tools/tools` resources materialized by discovery. Tool Providers support AEP and MCP; MCP connections support STDIO and Streamable HTTP using the official SDK. Creation/configuration performs an initial discovery attempt and the Console exposes manual test and refresh operations. Refresh reports new, changed, unchanged, and unavailable counts without deleting disappeared tools or overwriting enablement.
+
+The Tools Console separates Providers and Catalog, displays provider status and schemas, and defaults every newly discovered tool to disabled. The Agent editor assigns canonical Tool resource IDs and warns when an existing assignment is unavailable. Runtime resolution requires provider enabled, tool enabled, tool available, and assignment before passing the official MCP `AITool` to MAF.
+
 ## Work, Flow, Run, and Agent
 
 Published Workplace Entries always target an immutable Flow version. The Console may present Agent or Flow as an authoring convenience; an Agent selection is normalized at publication through a hidden system-managed Direct Agent Flow. Consequently every submitted Entry follows `Entry -> FlowReference -> FlowRun -> Runtime`.
@@ -104,8 +110,7 @@ The standalone vertical uses SQLite for management resources and runs without Az
 ## Prerequisites
 
 - .NET SDK 10.0.300 or later feature band
-- Optional: a local Ollama installation for the direct Web launch path
-- Optional: Docker Desktop for the Aspire-managed Ollama path
+- Optional: a local Ollama installation for the managed Ollama profile, including Aspire launches
 
 No Azure subscription or remote API key is required.
 
@@ -139,7 +144,7 @@ For the Aspire dashboard and orchestration experience:
 dotnet run --project src/Agentstration.AppHost
 ```
 
-The AppHost exposes the Console, Work API, and Workplace as separate resources and wires Workplace to the Work API through service discovery. The default Work API remains deterministic and offline; optional Ollama settings continue to apply to the Console profile.
+The AppHost exposes the Console, Work API, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to the existing local Ollama installation configured by `Ollama:Endpoint` (default `http://localhost:11434`); it does not provision an Ollama server or model. The default Work API remains deterministic and offline.
 
 Or with containers:
 
@@ -149,7 +154,7 @@ docker compose up --build
 
 ## AI modes
 
-The normal `Managed` mode resolves the provider, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; no `AI__Provider=Ollama` environment variable is required. Configure the seeded `ollama-local` URL from `/modelproviders/default/ollama-local`.
+The normal `Managed` mode resolves the provider, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; no `AI__Provider=Ollama` environment variable is required. The seeded `ollama-local` Model Provider URL, editable from `/modelproviders/default/ollama-local`, is the AEP extension URL and never the native Ollama URL.
 
 Use the deterministic offline mode explicitly for tests or fallback diagnostics:
 
@@ -158,14 +163,15 @@ $env:AI__Provider = "Deterministic"
 dotnet run --project src/Agentstration.Web
 ```
 
-To use an already running Ollama instance directly, without Aspire:
+Before using the managed Ollama profile, ensure the local server and selected model are available:
 
 ```powershell
 ollama pull qwen3:1.7b
-dotnet run --project src/Agentstration.Web
+$env:Ollama__Endpoint = "http://localhost:11434"
+dotnet run --project src/Agentstration.AppHost
 ```
 
-The seeded `reasoning-default` profile resolves to the persisted `ollama-local` provider and its `qwen3:1.7b` model. Aspire uses its `local-chat` service reference when one is declared; otherwise startup seeds `http://localhost:11434`. The persisted provider can be edited without restarting the host and is authoritative for subsequent runtime resolution.
+The seeded `reasoning-default` profile resolves to the persisted `ollama-local` AEP contribution and its `qwen3:1.7b` model. Aspire injects the autonomous Ollama extension endpoint and passes `Ollama:Endpoint` to that extension. To target a non-default local address, set `Ollama__Endpoint` before starting the AppHost. Direct startup of the extension defaults to `http://localhost:11434`, while Agentstration’s persisted AEP endpoint defaults to `http://localhost:5260`. The persisted AEP endpoint can be edited without restarting the host and is authoritative for subsequent runtime resolution.
 
 The Agent Runner uses this resolver through Microsoft Agent Framework, so no Ollama-specific execution path exists in the Runtime Plane. Create a normal durable Runtime Run to exercise the entire declared-agent path:
 
@@ -187,13 +193,13 @@ $body = @{ prompt = "Reply with one short sentence." } | ConvertTo-Json
 Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5080/api/diagnostics/models/ollama/chat
 ```
 
-`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders.Ollama` owns the OllamaSharp client integration, while `Agentstration.AppHost` alone owns container provisioning. `Runtime.AgentFramework` consumes the resolver and `IChatClient`; it has no Ollama dependency.
+`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. The autonomous `Agentstration.Extensions.Ollama` service alone owns OllamaSharp, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no AEP or Ollama dependency.
 
 Current limitations are deliberate: Ollama is the only mutable provider type, credentials are not stored on provider resources, and there is no parallel Flow execution, conversation persistence, or provider-native streaming yet. Other OpenAI-compatible endpoints still use the legacy host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 
 ### Model provider and profile APIs
 
-Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Aspire only provisions Ollama and supplies the initial seed URL; it is not the provider source of truth:
+Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Aspire starts the AEP extension and supplies its initial seed URL, but relies on the configured local Ollama installation and remains outside the provider source of truth:
 
 ```powershell
 Invoke-RestMethod http://localhost:5080/api/modelproviders
@@ -367,7 +373,7 @@ For a direct Web launch, set `OTEL_EXPORTER_OTLP_ENDPOINT` to any OTLP-compatibl
 
 Prompt, response, function argument, function result, credential, and authorization-header capture is intentionally unavailable in the default logging pipeline. Runtime inputs and outputs remain inspectable through the Runtime Run API and console rather than being duplicated into operational telemetry.
 
-For local troubleshooting only, Development can capture the final JSON body sent by the OpenAI-compatible or OllamaSharp HTTP transport:
+For local troubleshooting only, Development can capture the final JSON body sent by the legacy OpenAI-compatible HTTP transport. AEP and the out-of-process Ollama extension do not capture prompt or response payloads by default:
 
 ```json
 {
@@ -413,6 +419,6 @@ This baseline is intentionally offline and cost-free. LLM-as-judge quality evalu
 
 ## Current boundaries
 
-This is a product foundation, not a production multi-tenant release. Parallel Flow scheduling, loops, waits, approvals, subflows, semantic/LLM routing, checkpoints, durable distributed Work dispatch, requester authorization, external artifact storage, execution recovery, retries, model/tool/connection/identity resource providers, revision traffic splitting, dedicated process/container hosting, remote endpoints, Foundry bindings, runtime session storage, and management authentication remain planned.
+This is a product foundation, not a production multi-tenant release. Parallel Flow scheduling, loops, waits, approvals, subflows, semantic/LLM routing, checkpoints, durable distributed Work dispatch, requester authorization, external artifact storage, execution recovery, retries, advanced connection/identity providers, revision traffic splitting, dedicated process/container hosting, Foundry bindings, runtime session storage, and management authentication remain planned.
 
 See [architecture](../architecture.md), [decisions](../decisions/index.md), [security](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/SECURITY.md), and [contributing](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/CONTRIBUTING.md).

@@ -4,7 +4,6 @@ using Agentstration.Application.Workflows;
 using Agentstration.Management.Core;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
-using Agentstration.ModelProviders.Ollama;
 using Agentstration.Runtime.Core;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
@@ -63,7 +62,6 @@ builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
 builder.Services.AddAgentstrationModelManagement();
-builder.AddOllamaModelProvider();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();

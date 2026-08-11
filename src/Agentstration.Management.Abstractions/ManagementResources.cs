@@ -11,6 +11,7 @@ public static class AgentstrationProviderNamespaces
     public const string Runtime = "Agentstration.Runtime";
     public const string Memory = "Agentstration.Memory";
     public const string Identity = "Agentstration.Identity";
+    public const string Integrations = "Agentstration.Integrations";
 }
 
 public static class AgentstrationResourceTypes
@@ -23,6 +24,119 @@ public static class AgentstrationResourceTypes
     public const string ModelProviders = AgentstrationProviderNamespaces.ModelProviders + "/modelProviders";
     public const string ModelProfiles = AgentstrationProviderNamespaces.Models + "/modelProfiles";
     public const string RuntimeProfiles = AgentstrationProviderNamespaces.Runtime + "/runtimeProfiles";
+    public const string Tools = AgentstrationProviderNamespaces.Tools + "/tools";
+    public const string ToolProviders = AgentstrationProviderNamespaces.Tools + "/toolProviders";
+    public const string McpServers = AgentstrationProviderNamespaces.Integrations + "/mcpServers";
+}
+
+public sealed record ToolTypeReference(string Extension, string Id);
+public sealed record DirectMcpToolReference(ResourceReference Server, string Tool);
+
+public enum ToolProviderType { Aep, Mcp }
+public enum McpToolProviderTransport { Stdio, StreamableHttp }
+
+public sealed record AepToolProviderConfiguration
+{
+    public required string ExtensionId { get; init; }
+}
+
+public sealed record McpToolProviderConfiguration
+{
+    public McpToolProviderTransport Transport { get; init; } = McpToolProviderTransport.Stdio;
+    public Uri? Endpoint { get; init; }
+    public string? Command { get; init; }
+    public IReadOnlyList<string> Arguments { get; init; } = [];
+    public string? WorkingDirectory { get; init; }
+    public IReadOnlyDictionary<string, string> EnvironmentReferences { get; init; } = new Dictionary<string, string>();
+}
+
+public sealed record ToolProviderDiscoveryState
+{
+    public DateTimeOffset? LastDiscoveryAt { get; init; }
+    public string Status { get; init; } = "notDiscovered";
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+    public int ToolCount { get; init; }
+    public IReadOnlyDictionary<string, bool> Capabilities { get; init; } = new Dictionary<string, bool>();
+    public IReadOnlyDictionary<string, string> ServerMetadata { get; init; } = new Dictionary<string, string>();
+}
+
+public sealed record ToolProviderProperties
+{
+    public required string DisplayName { get; init; }
+    public required ToolProviderType ProviderType { get; init; }
+    public bool Enabled { get; init; } = true;
+    public AepToolProviderConfiguration? Aep { get; init; }
+    public McpToolProviderConfiguration? Mcp { get; init; }
+    public ToolProviderDiscoveryState Discovery { get; init; } = new();
+}
+
+public sealed record ToolProviderResource : Resource
+{
+    public required ToolProviderProperties Properties { get; init; }
+}
+
+public sealed record ToolDiscoveryState
+{
+    public bool Discovered { get; init; } = true;
+    public bool Available { get; init; }
+    public required DateTimeOffset FirstSeenAt { get; init; }
+    public required DateTimeOffset LastSeenAt { get; init; }
+}
+
+public sealed record ToolSchema
+{
+    public required JsonElement Input { get; init; }
+    public JsonElement? Output { get; init; }
+}
+
+public sealed record ToolResourceProperties
+{
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public ToolTypeReference? ToolType { get; init; }
+    public DirectMcpToolReference? Mcp { get; init; }
+    public bool Enabled { get; init; } = true;
+    public IReadOnlyDictionary<string, JsonElement> Metadata { get; init; } = new Dictionary<string, JsonElement>();
+    public ResourceReference? Provider { get; init; }
+    public string? ExternalId { get; init; }
+    public ToolDiscoveryState? Discovery { get; init; }
+    public ToolSchema? Schema { get; init; }
+}
+
+public sealed record ToolResource : Resource
+{
+    public required ToolResourceProperties Properties { get; init; }
+}
+
+public sealed record McpServerProperties
+{
+    public required Uri Endpoint { get; init; }
+    public bool Enabled { get; init; } = true;
+}
+
+public sealed record McpServerResource : Resource
+{
+    public required McpServerProperties Properties { get; init; }
+}
+
+public sealed record DiscoveredToolDescriptor(
+    string ExternalId,
+    string DisplayName,
+    string? Description,
+    JsonElement InputSchema,
+    JsonElement? OutputSchema,
+    IReadOnlyDictionary<string, JsonElement> Metadata);
+
+public sealed record ToolProviderDiscoveryResult(
+    IReadOnlyCollection<DiscoveredToolDescriptor> Tools,
+    IReadOnlyDictionary<string, bool> Capabilities,
+    IReadOnlyDictionary<string, string> ServerMetadata);
+
+public interface IToolProviderDiscovery
+{
+    bool Supports(ToolProviderType providerType);
+    Task<ToolProviderDiscoveryResult> DiscoverAsync(ToolProviderResource provider, CancellationToken cancellationToken);
 }
 
 public static class ManagementApiVersions

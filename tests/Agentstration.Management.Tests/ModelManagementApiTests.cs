@@ -22,7 +22,7 @@ public sealed class ModelManagementApiTests
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("AI:Provider", "Managed");
-            builder.UseSetting("ConnectionStrings:local-chat", "Endpoint=http://127.0.0.1:1");
+            builder.UseSetting("ConnectionStrings:ollama-extension", "Endpoint=http://127.0.0.1:1");
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
         });
         using var client = factory.CreateClient();
@@ -32,6 +32,26 @@ public sealed class ModelManagementApiTests
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         Assert.IsNotNull(factory.Services.GetRequiredService<Agentstration.Application.IAgentRuntime>());
         Assert.IsInstanceOfType<ChatClientResolver>(factory.Services.GetRequiredService<IChatClientResolver>());
+    }
+
+    [TestMethod]
+    public async Task SeededOllamaProviderUsesAepExtensionEndpointInsteadOfNativeOllamaEndpoint()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("AI:Provider", "Ollama");
+            builder.UseSetting("AI:Endpoint", "http://localhost:11434");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint", "http://localhost:5265");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+        using var client = factory.CreateClient();
+
+        var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/ollama-local");
+
+        Assert.IsNotNull(provider);
+        Assert.AreEqual(new Uri("http://localhost:5265"), provider.Properties.Endpoint);
+        Assert.AreNotEqual(new Uri("http://localhost:11434"), provider.Properties.Endpoint);
     }
 
     [TestMethod]
@@ -383,7 +403,7 @@ public sealed class ModelManagementApiTests
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:local-chat", "Endpoint=http://127.0.0.1:1");
+            builder.UseSetting("ConnectionStrings:ollama-extension", "Endpoint=http://127.0.0.1:1");
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
         });
 

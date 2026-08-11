@@ -193,7 +193,7 @@ public sealed class ModelProviderManagementService(
                 throw new ModelProviderValidationException($"Provider options for '{key}' cannot be used with provider '{properties.ProviderType}'.");
         try
         {
-            optionsValidators.SingleOrDefault(validator => string.Equals(validator.ProviderType, properties.ProviderType, StringComparison.OrdinalIgnoreCase))
+            optionsValidators.SingleOrDefault(validator => validator.CanHandle(properties.ProviderType))
                 ?.Validate(properties.ProviderOptions);
         }
         catch (ModelProviderConfigurationException exception)
@@ -231,7 +231,7 @@ public sealed class ModelProviderManagementService(
     }
 
     private IModelProviderDiscovery? FindDiscovery(string providerType) => discoveries.SingleOrDefault(
-        discovery => string.Equals(discovery.ProviderType, providerType, StringComparison.OrdinalIgnoreCase));
+        discovery => discovery.CanHandle(providerType));
 }
 
 public sealed class ModelProfileManagementService(
@@ -327,7 +327,7 @@ public sealed class ModelProfileManagementService(
         {
             await ValidateDefinitionAsync(profile.Properties, cancellationToken);
             var provider = await providerConfigurations.GetRequiredAsync(profile.Properties.Provider.ResourceId, cancellationToken);
-            var discovery = discoveries.SingleOrDefault(candidate => string.Equals(candidate.ProviderType, provider.ProviderType, StringComparison.OrdinalIgnoreCase));
+            var discovery = discoveries.SingleOrDefault(candidate => candidate.CanHandle(provider.ProviderType));
             if (discovery is null)
                 return new ModelProfileResolution(profile, provider, new ModelProviderHealth("unknown"), null, "unknown", ["No provider discovery adapter is registered in this host."]);
             var health = await discovery.GetHealthAsync(provider, cancellationToken);
@@ -423,8 +423,7 @@ public sealed class ModelProfileManagementService(
             if (!string.Equals(providerOption, provider.ProviderType, StringComparison.OrdinalIgnoreCase))
                 throw Invalid($"properties.providerOptions.{providerOption}", $"Provider options for '{providerOption}' cannot be used with provider '{provider.ProviderType}'.");
         }
-        var providerValidator = optionsValidators.SingleOrDefault(candidate =>
-            string.Equals(candidate.ProviderType, provider.ProviderType, StringComparison.OrdinalIgnoreCase));
+        var providerValidator = optionsValidators.SingleOrDefault(candidate => candidate.CanHandle(provider.ProviderType));
         if (providerValidator is not null)
         {
             try { providerValidator.Validate(properties.ProviderOptions); }

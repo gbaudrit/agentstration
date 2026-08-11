@@ -171,9 +171,13 @@ public interface IAgentTool
     string Name { get; }
     string? Description { get; }
     ValueTask<JsonElement?> InvokeAsync(JsonElement? arguments, CancellationToken cancellationToken = default);
+    object? GetService(Type serviceType) => null;
 }
 
-public interface IToolCatalog { IReadOnlyCollection<IAgentTool> Resolve(IEnumerable<string> toolIds); }
+public interface IToolCatalog
+{
+    ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default);
+}
 
 public interface IAgentDeploymentProvisioner
 {

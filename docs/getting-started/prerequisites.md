@@ -14,7 +14,6 @@ dotnet --version
 ## Optional
 
 - Node.js 20 or later and npm, only to build or serve this documentation site.
-- Ollama, to execute the seeded managed model profile against a local model.
-- Docker Desktop, to use the container or Aspire-managed Ollama path.
+- A locally installed and running Ollama server, to execute the seeded managed model profile. Aspire connects to it but does not install or provision it.
 
 No cloud subscription or remote model credential is required for deterministic local operation.

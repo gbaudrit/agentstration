@@ -4,7 +4,7 @@ Agentstration is an open-source, self-hosted platform for governing, executing, 
 
 Agentstration currently provides:
 
-- declarative agents, agent types, model providers, model profiles, and deployments;
+- declarative agents, agent types, model/tool providers, governed tool catalogs, profiles, and deployments;
 - durable Work Items, Workplace interactions, tasks, results, and artifacts;
 - editable Flows, immutable published Flow versions, and observable Flow Runs;
 - persisted tenants, workspaces, users, memberships, scoped RBAC, and automatic standalone bootstrap;

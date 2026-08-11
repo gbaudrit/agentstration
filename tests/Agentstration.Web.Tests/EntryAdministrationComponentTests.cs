@@ -81,7 +81,7 @@ public sealed class EntryAdministrationComponentTests
         var roles = rendered.FindAll("[data-testid='workspace-entry-role']");
         Assert.HasCount(2, roles);
         await roles[1].ChangeAsync(new ChangeEventArgs { Value = "Primary" });
-        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish Workspace", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish workspace", StringComparison.Ordinal)).ClickAsync(new());
 
         Assert.IsNotNull(client.SavedWorkspace);
         Assert.HasCount(1, client.SavedWorkspace.Entries.Where(value => value.Role == WorkspaceEntryRole.Primary));
