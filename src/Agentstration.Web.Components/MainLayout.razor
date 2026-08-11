@@ -7,6 +7,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject IResourceSearchProvider ResourceSearch
+@inject ConsoleContextState ContextState
 
 <div class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")">
     <aside class="sidebar" aria-label="Main navigation">
@@ -21,7 +22,7 @@
                     @if (!string.IsNullOrWhiteSpace(group.Label)) { <h2>@group.Label</h2> }
                     @foreach (var item in group.Items)
                     {
-                        <NavLink href="@item.Url" Match="@(item.Url == "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@item.Label" class="@($"domain-{item.Domain}")">
+                        <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@item.Label" class="@($"domain-{item.Domain}")">
                             <span class="nav-icon" aria-hidden="true">@item.Icon</span><span class="nav-label">@item.Label</span>
                         </NavLink>
                     }
@@ -38,12 +39,28 @@
         <header class="topbar">
             <div class="topbar-start">
                 <button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="Toggle navigation" aria-expanded="@(!Navigation.IsSidebarCollapsed)">☰</button>
-                <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">default</a><span>/</span><span>local</span><span>/</span><strong>@CurrentSection</strong></nav>
+                <nav class="breadcrumb" aria-label="Current organization and workspace"><a href="/settings/organization">@(ContextState.Current?.TenantDisplayName ?? "Organization")</a><span>/</span><strong>@CurrentSection</strong></nav>
             </div>
             <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="Open command palette">
                 <span aria-hidden="true">⌕</span><span>Search pages or commands…</span><kbd>Ctrl K</kbd>
             </button>
             <div class="topbar-actions">
+                @if (ContextState.Current is { } context)
+                {
+                    @if (context.Workspaces.Count > 1)
+                    {
+                        <label class="context-switcher">
+                            <span class="sr-only">Workspace</span>
+                            <select value="@context.WorkspaceId" @onchange="SelectWorkspaceAsync" disabled="@switchingWorkspace" aria-label="Current workspace">
+                                @foreach (var workspace in context.Workspaces) { <option value="@workspace.Id">@workspace.DisplayName</option> }
+                            </select>
+                        </label>
+                    }
+                    else
+                    {
+                        <span class="context-workspace-static" title="Only one workspace is available">@context.WorkspaceDisplayName</span>
+                    }
+                }
                 <EnvironmentSwitcher />
                 <button class="icon-button" @onclick="Preferences.ToggleTheme" aria-label="Toggle color theme">@(Preferences.IsDarkTheme ? "☀" : "◐")</button>
                 <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="Notifications"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
@@ -107,8 +124,8 @@
         new("", [new("Overview", "/", "⌂")]),
         new("Build", [new("Agents", "/agents", "◎", "agent"), new("Model profiles", "/modelprofiles", "◇", "model"), new("Flows", "/flows", "⌘", "flow"), new("Entries", "/entries", "↳", "work")]),
         new("Operate", [new("Runtimes", "/runtime", "◉", "runtime"), new("Executions", "/executions", "▶", "execution"), new("Flow runs", "/flowruns", "▷", "flow"), new("Tasks", "/tasks", "✓", "work"), new("Events", "/events", "≋")]),
-        new("Configure", [new("Workspaces", "/workspaces", "▦", "work"), new("Model providers", "/modelproviders", "⬡", "model"), new("Runtime profiles", "/runtimeprofiles", "◈", "runtime")]),
-        new("System", [new("Settings", "/settings", "⚙")])
+        new("Configure", [new("Workplace setup", "/workspaces", "▦", "work"), new("Model providers", "/modelproviders", "⬡", "model"), new("Runtime profiles", "/runtimeprofiles", "◈", "runtime")]),
+        new("System", [new("Organization", "/settings/organization", "♙"), new("Settings", "/settings", "⚙")])
     ];
 
     private static readonly CommandItem[] Commands =
@@ -128,14 +145,18 @@
         new("Tasks", "/tasks", "✓", "Operate", "work tasks supervision"),
         new("Events", "/events", "≋", "Operate", "activity notifications"),
         new("Model providers", "/modelproviders", "⬡", "Configure", "providers"),
-        new("Workspaces", "/workspaces", "▦", "Configure", "workplace composition primary entries"),
+        new("Workplace setup", "/workspaces", "▦", "Configure", "workspace composition primary entries"),
         new("Create model provider", "/modelproviders/new", "+", "Command", "new provider"),
         new("Runtime profiles", "/runtimeprofiles", "◈", "Configure", "runtime configuration"),
         new("Create runtime profile", "/runtimeprofiles/new", "+", "Command", "new runtime profile"),
-        new("Settings", "/settings", "⚙", "System", "configuration")
+        new("Settings", "/settings", "⚙", "System", "configuration"),
+        new("Organization", "/settings/organization", "♙", "System", "tenant organization"),
+        new("Organization workspaces", "/settings/organization/workspaces", "▦", "System", "tenant workspaces"),
+        new("Organization members", "/settings/organization/members", "♙", "System", "users memberships roles")
     ];
 
     private IJSObjectReference? commandModule;
+    private IJSObjectReference? contextModule;
     private IJSObjectReference? commandRegistration;
     private DotNetObjectReference<MainLayout>? selfReference;
     private ElementReference commandInput;
@@ -172,13 +193,15 @@
         }
     }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Navigation.Changed += StateHasChanged;
         Preferences.Changed += StateHasChanged;
         Notifications.Changed += StateHasChanged;
         PlatformStatus.Changed += StateHasChanged;
+        ContextState.Changed += OnContextChanged;
         NavigationManager.LocationChanged += OnLocationChanged;
+        await ContextState.LoadAsync(lifetimeCancellation.Token);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -186,6 +209,7 @@
         if (firstRender)
         {
             commandModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/command-palette.js");
+            contextModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/context-selector.js");
             selfReference = DotNetObjectReference.Create(this);
             commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", selfReference);
         }
@@ -270,9 +294,25 @@
         NavigationManager.NavigateTo(command.Url);
     }
 
+    private bool switchingWorkspace;
+    private async Task SelectWorkspaceAsync(ChangeEventArgs args)
+    {
+        if (contextModule is null || !Guid.TryParse(args.Value?.ToString(), out var workspaceId) || workspaceId == ContextState.Current?.WorkspaceId) return;
+        switchingWorkspace = true;
+        try { await contextModule.InvokeVoidAsync("selectWorkspace", workspaceId); }
+        finally { switchingWorkspace = false; }
+    }
+
     private static string ShortIdentifier(string value) => value.Length <= 48 ? value : $"…{value[^47..]}";
 
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => InvokeAsync(StateHasChanged);
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(async () =>
+    {
+        StateHasChanged();
+        try { await JS.InvokeVoidAsync("window.scrollTo", 0, 0); }
+        catch (JSDisconnectedException) { }
+        catch (InvalidOperationException) { }
+    });
+    private void OnContextChanged() => _ = InvokeAsync(StateHasChanged);
 
     public async ValueTask DisposeAsync()
     {
@@ -280,6 +320,7 @@
         Preferences.Changed -= StateHasChanged;
         Notifications.Changed -= StateHasChanged;
         PlatformStatus.Changed -= StateHasChanged;
+        ContextState.Changed -= OnContextChanged;
         NavigationManager.LocationChanged -= OnLocationChanged;
         lifetimeCancellation.Cancel();
         resourceSearchCancellation?.Cancel();
@@ -293,6 +334,7 @@
                 await commandRegistration.DisposeAsync();
             }
             if (commandModule is not null) await commandModule.DisposeAsync();
+            if (contextModule is not null) await contextModule.DisposeAsync();
         }
         catch (JSDisconnectedException) { }
         selfReference?.Dispose();

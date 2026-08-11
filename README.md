@@ -7,6 +7,7 @@ Agentstration currently provides:
 - declarative agents, agent types, model providers, model profiles, and deployments;
 - durable Work Items, Workplace interactions, tasks, results, and artifacts;
 - editable Flows, immutable published Flow versions, and observable Flow Runs;
+- persisted tenants, workspaces, users, memberships, scoped RBAC, and automatic standalone bootstrap;
 - REST, Razor/Blazor, MCP, and local runtime surfaces backed by shared application services;
 - SQLite and deterministic local defaults that require no Azure subscription or remote API key.
 
@@ -21,7 +22,9 @@ $env:AI__Provider = "Deterministic"
 dotnet run --project src/Agentstration.Web
 ```
 
-Open the operations Console at `http://localhost:5100`. For the standalone end-user Workplace and its Work API, follow the [local installation guide](docs/getting-started/local-installation.md).
+Open the operations Console at `http://localhost:5100`. A fresh standalone installation automatically creates the local organization, default workspace, default resource group, and Local User with tenant-level Owner access.
+
+For the standalone end-user Workplace and its Work API, follow the [local installation guide](docs/getting-started/local-installation.md).
 
 ## Documentation
 

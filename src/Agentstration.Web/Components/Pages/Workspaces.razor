@@ -9,29 +9,43 @@
 else if (workspaces.Count == 0) { <EmptyState Title="No Workspace drafts" Message="Seed or create a Workplace Workspace before composing it." /> }
 else
 {
-    <section class="panel form-section">
-        <label><span>Workspace</span><select value="@selectedName" @onchange="WorkspaceChanged">@foreach (var workspace in workspaces) { <option value="@workspace.Value.Name">@workspace.Value.DisplayName</option> }</select></label>
+    <section class="panel workspace-overview">
+        <div class="workspace-picker">
+            <label for="workplace-workspace">Workspace</label>
+            <select id="workplace-workspace" value="@selectedName" @onchange="WorkspaceChanged">@foreach (var workspace in workspaces) { <option value="@workspace.Value.Name">@workspace.Value.DisplayName</option> }</select>
+        </div>
         @if (selected is not null)
         {
-            <dl class="resource-details"><dt>Draft revision</dt><dd>@selected.Value.Revision</dd><dt>Published version</dt><dd>@(selected.Published?.Version.ToString() ?? "Not published")</dd></dl>
+            <dl class="workspace-version-grid"><div><dt>Draft revision</dt><dd>@selected.Value.Revision</dd></div><div><dt>Published version</dt><dd>@(selected.Published?.Version.ToString() ?? "Not published")</dd></div></dl>
         }
     </section>
 
-    <section class="panel form-section">
+    <section class="panel workspace-composition">
         <div class="panel-header"><div><p class="eyebrow">Entries</p><h2>Published composition</h2></div></div>
-        @foreach (var entry in entries)
-        {
-            var configured = composition.FirstOrDefault(value => value.EntryResourceId.Value == entry.Id);
-            <article class="row">
-                <label><input type="checkbox" checked="@(configured is not null)" @onchange="args => ToggleEntry(entry, args)" /> <strong>@entry.DisplayName</strong><small>v@entry.Version · Flow @entry.ResolvedTarget.Version</small></label>
-                @if (configured is not null)
-                {
-                    <label><span>Role</span><select data-testid="workspace-entry-role" value="@configured.Role" @onchange="args => ChangeRole(entry.Id, args)"><option value="Primary">Primary</option><option value="Featured">Featured</option><option value="Standard">Standard</option></select></label>
-                    <label><span>Order</span><input type="number" value="@configured.Order" @onchange="args => ChangeOrder(entry.Id, args)" /></label>
-                }
-            </article>
-        }
-        <div class="form-actions"><button class="button-secondary" @onclick="SaveAsync" disabled="@busy">Save draft</button><button class="button-primary" @onclick="PublishAsync" disabled="@busy">Publish Workspace</button></div>
+        <div class="workspace-entry-list">
+            @foreach (var entry in entries)
+            {
+                var configured = composition.FirstOrDefault(value => value.EntryResourceId.Value == entry.Id);
+                <article class="workspace-entry-row @(configured is null ? "excluded" : null)">
+                    <label class="workspace-entry-toggle">
+                        <input type="checkbox" checked="@(configured is not null)" @onchange="args => ToggleEntry(entry, args)" />
+                        <span><strong>@entry.DisplayName</strong><small>Entry v@entry.Version · Flow @entry.ResolvedTarget.Version</small></span>
+                    </label>
+                    @if (configured is not null)
+                    {
+                        <div class="workspace-entry-config">
+                            <label><span>Role</span><select data-testid="workspace-entry-role" value="@configured.Role" @onchange="args => ChangeRole(entry.Id, args)"><option value="Primary">Primary</option><option value="Featured">Featured</option><option value="Standard">Standard</option></select></label>
+                            <label><span>Order</span><input type="number" min="0" step="10" value="@configured.Order" @onchange="args => ChangeOrder(entry.Id, args)" /></label>
+                        </div>
+                    }
+                    else
+                    {
+                        <span class="workspace-entry-excluded">Not included</span>
+                    }
+                </article>
+            }
+        </div>
+        <div class="form-actions workspace-actions"><button class="button-secondary" @onclick="SaveAsync" disabled="@busy">@(busy ? "Saving…" : "Save draft")</button><button class="button-primary" @onclick="PublishAsync" disabled="@busy">Publish workspace</button></div>
         @if (!string.IsNullOrWhiteSpace(message)) { <p class="@(error ? "inline-warning" : "resource-hint")">@message</p> }
     </section>
 }

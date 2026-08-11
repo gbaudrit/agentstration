@@ -1,0 +1,8 @@
+@inject ConsoleContextState ContextState
+@if (ContextState.HasPermission(Permission)) { @ChildContent }
+else if (DeniedContent is not null) { @DeniedContent }
+@code {
+    [Parameter, EditorRequired] public string Permission { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? DeniedContent { get; set; }
+}

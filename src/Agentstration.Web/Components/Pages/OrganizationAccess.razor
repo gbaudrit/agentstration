@@ -1,0 +1,20 @@
+@page "/settings/organization/access"
+@inject Agentstration.Management.Core.IdentityAdministrationService Service
+
+<PageTitle>Access control · Organization · Agentstration</PageTitle>
+<PageHeader Title="Access control" Description="Role assignments at tenant and workspace scopes. Tenant assignments are inherited." />
+<OrganizationSettingsNav />
+@if (view is null) { <LoadingState Message="Loading access assignments…" /> }
+else
+{
+    <DataGrid TItem="AccessRow" Items="Rows">
+        <Header><tr><th>Principal</th><th>Role</th><th>Scope</th><th>Inheritance</th></tr></Header>
+        <Row Context="row"><tr><td>@row.Member.User.DisplayName</td><td><strong>@row.Assignment.Role.DisplayName</strong></td><td><code>@row.Assignment.Scope</code></td><td>@if(row.Assignment.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="Inherited" Status="UiStatus.Info" />}else{<span>Explicit</span>}</td></tr></Row>
+    </DataGrid>
+}
+@code {
+    private sealed record AccessRow(Agentstration.Management.Core.MemberAdministrationView Member, Agentstration.Management.Core.AssignedRoleView Assignment);
+    private Agentstration.Management.Core.TenantAdministrationView? view;
+    private IReadOnlyList<AccessRow> Rows => view?.Members.SelectMany(member => member.Roles.Select(role => new AccessRow(member, role))).ToArray() ?? [];
+    protected override async Task OnInitializedAsync() => view = await Service.GetCurrentAsync(default);
+}

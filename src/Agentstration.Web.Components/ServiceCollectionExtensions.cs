@@ -12,6 +12,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<UserPreferencesState>();
         services.AddScoped<NotificationState>();
         services.AddScoped<PlatformStatusState>();
+        services.AddScoped<ConsoleContextState>();
+        services.TryAddScoped<IConsoleContextProvider, EmptyConsoleContextProvider>();
         services.TryAddScoped<IResourceSearchProvider, EmptyResourceSearchProvider>();
         return services;
     }

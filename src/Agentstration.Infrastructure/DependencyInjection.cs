@@ -47,6 +47,11 @@ public static class DependencyInjection
         string? runtimeConnectionString = null)
     {
         services.AddSingleton(TimeProvider.System);
+        services.TryAddSingleton<LocalBootstrapOptions>();
+        services.TryAddSingleton<CurrentRequestContext>();
+        services.TryAddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
+        services.TryAddSingleton<IRequestContextInitializer>(provider => provider.GetRequiredService<CurrentRequestContext>());
+        services.TryAddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton(new GenAiObservabilityOptions());
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();
         if (inMemory) services.AddSingleton<IPlatformStore, InMemoryPlatformStore>();
@@ -84,6 +89,11 @@ public static class DependencyInjection
         services.AddSingleton<IEventHandler<Domain.ItemReceived>, ItemReceivedHandler>();
         controlPlaneConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "control-plane.db")}";
         services.AddSqliteControlPlane(controlPlaneConnectionString);
+        services.AddSingleton<IIdentityProvider, LocalIdentityProvider>();
+        services.AddSingleton<IAuthorizationService, PermissionAuthorizationService>();
+        services.AddSingleton<ILocalEnvironmentBootstrapper, LocalEnvironmentBootstrapper>();
+        services.AddSingleton<IdentityAdministrationService>();
+        services.AddSingleton<IdentityExperienceService>();
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
         services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();
         if (!useManagedProfileResolver)

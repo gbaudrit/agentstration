@@ -2,6 +2,7 @@ using Agentstration.Application.Ingestion;
 using Agentstration.Application.Missions;
 using Agentstration.Application.Workflows;
 using Agentstration.Management.Core;
+using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.ModelProviders.Ollama;
 using Agentstration.Runtime.Core;
@@ -24,6 +25,7 @@ using Agentstration.Web.Features.Workplace;
 using Agentstration.Work;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton(builder.Configuration.GetSection("Agentstration:Bootstrap").Get<LocalBootstrapOptions>() ?? new LocalBootstrapOptions());
 var genAiObservability = builder.Configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new();
 genAiObservability.Validate(builder.Environment.IsDevelopment());
 var dataPath = builder.Configuration["Data:Path"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "data.json");
@@ -126,12 +128,14 @@ if (genAiObservability.HttpPayloadCapture.Enabled)
 }
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseMiddleware<RequestContextMiddleware>();
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 app.MapAgentstrationApi();
+app.MapAgentstrationIdentityApi();
 app.MapAgentstrationManagementApi();
 app.MapAgentstrationModelManagementApi();
 app.MapAgentstrationWorkApi();
@@ -146,6 +150,7 @@ app.MapMcp("/mcp");
 app.MapStaticAssets();
 app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode();
 await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);

@@ -1,4 +1,5 @@
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -18,6 +19,7 @@ public static class WebConsoleServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton(TimeProvider.System);
         services.AddAgentstrationWebComponents();
+        services.AddScoped<IConsoleContextProvider, ConsoleContextProvider>();
         services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();

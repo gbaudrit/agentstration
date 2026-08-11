@@ -1,0 +1,10 @@
+.workspace-create-panel { display:grid; gap:14px; margin-bottom:18px; }
+.workspace-create-form { display:grid; grid-template-columns:minmax(220px,1fr) minmax(220px,1fr) auto; align-items:end; gap:18px; }
+.workspace-create-form label { display:grid; gap:7px; color:var(--text); font-size:.82rem; font-weight:650; }
+.workspace-create-form input { width:100%; height:42px; padding:0 11px; border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text); font-weight:400; }
+.workspace-create-form input:focus { outline:2px solid color-mix(in srgb,var(--primary) 28%,transparent); border-color:var(--primary); }
+.workspace-create-form button { height:42px; white-space:nowrap; }
+.workspace-create-form button:disabled { cursor:not-allowed; opacity:.55; }
+.inline-warning { margin:0; color:#c83b48; font-size:.8rem; }
+@media(max-width:900px){.workspace-create-form{grid-template-columns:1fr 1fr}.workspace-create-form button{grid-column:1/-1;justify-self:end}}
+@media(max-width:620px){.workspace-create-form{grid-template-columns:1fr}.workspace-create-form button{grid-column:auto;width:100%}}
