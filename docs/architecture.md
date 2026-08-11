@@ -283,6 +283,12 @@ MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and i
 
 `Observability:GenAI:HttpPayloadCapture` is a separate, Development-only diagnostic boundary attached exclusively to the OpenAI-compatible and OllamaSharp model `HttpClient` pipelines. When explicitly enabled it inserts a correlated `gen_ai.http.payload_capture` span between the GenAI chat span and the network span, and records the final JSON request body in a span event and a structured log. Common credential fields are recursively redacted, URI query strings are removed, and a configured maximum length is applied. It never records headers and does not affect ingestion HTTP. Response capture is a separate opt-in because it buffers the response and changes streaming behavior. Payload traces and logs follow the configured exporters and must be treated as sensitive even after redaction.
 
+## Identity, tenancy, and local bootstrap
+
+The Management boundary now persists a `Tenant -> Workspace -> ResourceGroup` hierarchy and a global `User -> TenantMembership -> RoleAssignment -> RoleDefinition` authorization model in the SQLite control-plane database. Management resource rows carry explicit tenant, workspace, and resource-group scope columns in addition to their preserved JSON payload. Store reads, writes, lists, and deletes are filtered by the initialized request context.
+
+Standalone startup creates or repairs `local / default / default`, the local user, active tenant membership, and a tenant-level Owner assignment before management demo data is seeded. Parent tenant assignments inherit into every accessible workspace. The request pipeline validates the workspace selection stored in an HTTP-only cookie, installs it as an ambient request context, and restores the standalone fallback after the request. The Console exposes a dynamic workspace selector plus General, Workspaces, Members, and Access Control views; authorized users can create a workspace and its default resource group. Management HTTP routes accept both the compatibility resource-group form and the workspace-prefixed canonical form. See ADR-0025 for migration and bounded-context limitations.
+
 ## Implementation plan
 
 1. **Delivered foundation:** solution conventions, domain/application boundaries, local content store, API/UI/MCP, OTel, Aspire, and tests.

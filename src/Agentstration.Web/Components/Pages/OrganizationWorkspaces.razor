@@ -1,0 +1,80 @@
+@page "/settings/organization/workspaces"
+@inject Agentstration.Management.Core.IdentityAdministrationService Service
+@inject ConsoleContextState ContextState
+
+<PageTitle>Workspaces · Organization · Agentstration</PageTitle>
+<PageHeader Title="Workspaces" Description="Resource-management boundaries available in the current organization." />
+<OrganizationSettingsNav />
+
+@if (loading) { <LoadingState Message="Loading workspaces…" /> }
+else if (!string.IsNullOrWhiteSpace(loadError)) { <ErrorState Title="Unable to load workspaces" Message="@loadError" /> }
+else
+{
+    @if (CanCreate)
+    {
+        <section class="panel workspace-create-panel">
+            <div class="panel-header"><h2>Create workspace</h2></div>
+            <div class="workspace-create-form">
+                <label><span>Display name</span><input value="@displayName" @oninput="DisplayNameChanged" /></label>
+                <label><span>Technical name</span><input value="@technicalName" @oninput="TechnicalNameChanged" placeholder="support" /></label>
+                <button class="button-primary" @onclick="CreateAsync" disabled="@(!CanSubmit)">@(busy ? "Creating…" : "Create workspace")</button>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(operationError)) { <p class="inline-warning" role="alert">@operationError</p> }
+        </section>
+    }
+    <DataGrid TItem="Agentstration.Management.Abstractions.Workspace" Items="workspaces">
+        <Header><tr><th>Workspace</th><th>Technical name</th><th>Status</th><th>Created</th><th>Context</th></tr></Header>
+        <Row Context="workspace"><tr><td><strong>@workspace.DisplayName</strong><br /><small>@workspace.Id</small></td><td><code>@workspace.Name</code></td><td><StatusBadge Text="@workspace.Status.ToString()" Status="UiStatus.Success" /></td><td>@workspace.CreatedAt.ToLocalTime().ToString("g")</td><td>@if(workspace.Id == ContextState.Current?.WorkspaceId){<StatusBadge Text="Current" Status="UiStatus.Info" />}</td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private IReadOnlyList<Agentstration.Management.Abstractions.Workspace> workspaces = [];
+    private string displayName = string.Empty;
+    private string technicalName = string.Empty;
+    private string? loadError;
+    private string? operationError;
+    private bool loading = true;
+    private bool busy;
+    private bool technicalNameEdited;
+    private bool CanCreate => ContextState.HasPermission(AuthorizationPermissions.WorkspacesWrite);
+    private bool CanSubmit => !busy && displayName.Trim().Length >= 2 && technicalName.Trim().Length >= 2;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+    private async Task ReloadAsync()
+    {
+        loading = true;
+        loadError = null;
+        try { workspaces = (await Service.GetCurrentAsync(default)).Workspaces; }
+        catch (Exception exception) { loadError = exception.Message; }
+        finally { loading = false; }
+    }
+    private async Task CreateAsync()
+    {
+        if (busy) return;
+        busy = true; operationError = null;
+        try
+        {
+            await Service.CreateWorkspaceAsync(technicalName, displayName, default);
+            displayName = technicalName = string.Empty;
+            technicalNameEdited = false;
+            await ReloadAsync();
+            await ContextState.LoadAsync(default);
+        }
+        catch (Exception exception) { operationError = exception.Message; }
+        finally { busy = false; }
+    }
+    private void DisplayNameChanged(ChangeEventArgs args)
+    {
+        displayName = args.Value?.ToString() ?? string.Empty;
+        if (!technicalNameEdited) technicalName = Slug(displayName);
+    }
+    private void TechnicalNameChanged(ChangeEventArgs args)
+    {
+        technicalNameEdited = true;
+        technicalName = args.Value?.ToString() ?? string.Empty;
+    }
+    private static string Slug(string value) => string.Join('-', value.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        .Where(character => char.IsAsciiLetterOrDigit(character) || character == '-')
+        .Aggregate(string.Empty, (current, character) => current + character);
+}

@@ -1,0 +1,47 @@
+@page "/settings/organization"
+@inject Agentstration.Management.Core.IdentityAdministrationService Service
+
+<PageTitle>Organization · Agentstration</PageTitle>
+<PageHeader Title="Organization" Description="Current tenant, workspaces, members and inherited role assignments." />
+<OrganizationSettingsNav />
+
+@if (view is null)
+{
+    <LoadingState Message="Loading organization…" />
+}
+else
+{
+    <section class="dashboard-grid">
+        <article class="panel">
+            <div class="panel-header"><h2>@view.Tenant.DisplayName</h2><StatusBadge Text="@view.Tenant.Status.ToString()" Status="UiStatus.Success" /></div>
+            <p><strong>Technical name:</strong> @view.Tenant.Name</p>
+            <p><strong>Tenant ID:</strong> <code>@view.Tenant.Id</code></p>
+            <p><strong>Created:</strong> <time datetime="@view.Tenant.CreatedAt.ToString("O")">@view.Tenant.CreatedAt.ToLocalTime().ToString("g")</time></p>
+        </article>
+        <article class="panel">
+            <div class="panel-header"><h2>Workspaces</h2></div>
+            @foreach (var workspace in view.Workspaces)
+            {
+                <p><strong>@workspace.DisplayName</strong><br /><small>@workspace.Name · @workspace.Id</small></p>
+            }
+        </article>
+    </section>
+    <section class="panel">
+        <div class="panel-header"><h2>Members and roles</h2></div>
+        @foreach (var member in view.Members)
+        {
+            <article>
+                <p><strong>@member.User.DisplayName</strong> <StatusBadge Text="@member.Membership.Status.ToString()" Status="UiStatus.Success" /></p>
+                @foreach (var role in member.Roles)
+                {
+                    <p><span>@role.Role.DisplayName</span><br /><small>@role.Scope</small></p>
+                }
+            </article>
+        }
+    </section>
+}
+
+@code {
+    private Agentstration.Management.Core.TenantAdministrationView? view;
+    protected override async Task OnInitializedAsync() => view = await Service.GetCurrentAsync(CancellationToken.None);
+}

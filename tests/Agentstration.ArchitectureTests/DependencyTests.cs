@@ -30,7 +30,7 @@ public sealed class DependencyTests
     [TestMethod]
     public void DomainHasNoInfrastructureOrFrameworkDependencies()
     {
-        var references = typeof(Workspace).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var references = typeof(Agentstration.Domain.Workspace).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal) || name.Contains("Agents.AI", StringComparison.Ordinal) || name.Contains("Infrastructure", StringComparison.Ordinal)));
     }
 

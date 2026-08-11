@@ -101,6 +101,10 @@ The Flow module manages editable graph drafts, immutable published versions, and
 
 The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework. The existing ingestion, memory, mission, REST, Razor, and MCP verticals remain available as product capabilities.
 
+Standalone startup also bootstraps the persisted local security hierarchy: **Local organization → Default workspace → default resource group**, plus a **Local User** with a tenant-level **Owner** assignment. The Console is immediately usable without a login or first-run wizard. The same tenant, membership, principal, scoped role-assignment, and permission model is used for future hosted identity providers; local mode is not a separate business model.
+
+The Console top bar resolves this context dynamically and offers a workspace selector when more than one authorized workspace exists. Organization settings expose General, Workspaces, Members, and Access Control views; creating a workspace also creates its local `default` resource group.
+
 ## Prerequisites
 
 - .NET SDK 10.0.300 or later feature band

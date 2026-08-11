@@ -32,6 +32,13 @@ public static class ManagementApiVersions
 
 public readonly record struct ResourceIdentifier(string Value)
 {
+    public static ResourceIdentifier Create(Guid workspaceId, string resourceGroup, string providerNamespace, string resourceType, string name)
+    {
+        if (workspaceId == Guid.Empty) throw new ArgumentException("Workspace ID cannot be empty.", nameof(workspaceId));
+        var legacy = Create(resourceGroup, providerNamespace, resourceType, name);
+        return new($"/workspaces/{workspaceId:D}{legacy.Value}");
+    }
+
     public static ResourceIdentifier Create(string resourceGroup, string providerNamespace, string resourceType, string name)
     {
         ValidateSegment(resourceGroup, nameof(resourceGroup));
@@ -53,12 +60,18 @@ public readonly record struct ResourceIdentifier(string Value)
         identifier = default;
         if (string.IsNullOrWhiteSpace(value) || value[0] != '/') return false;
         var canonicalSegments = value.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (canonicalSegments.Length != 6
-            || !string.Equals(canonicalSegments[0], "resourceGroups", StringComparison.Ordinal)
-            || !string.Equals(canonicalSegments[2], "providers", StringComparison.Ordinal)) return false;
+        var offset = 0;
+        if (canonicalSegments.Length == 8
+            && string.Equals(canonicalSegments[0], "workspaces", StringComparison.Ordinal)
+            && Guid.TryParse(canonicalSegments[1], out _)) offset = 2;
+        if (canonicalSegments.Length != offset + 6
+            || !string.Equals(canonicalSegments[offset], "resourceGroups", StringComparison.Ordinal)
+            || !string.Equals(canonicalSegments[offset + 2], "providers", StringComparison.Ordinal)) return false;
         try
         {
-            identifier = Create(canonicalSegments[1], canonicalSegments[3], canonicalSegments[4], canonicalSegments[5]);
+            identifier = offset == 0
+                ? Create(canonicalSegments[1], canonicalSegments[3], canonicalSegments[4], canonicalSegments[5])
+                : Create(Guid.Parse(canonicalSegments[1]), canonicalSegments[3], canonicalSegments[5], canonicalSegments[6], canonicalSegments[7]);
             return string.Equals(identifier.Value, value, StringComparison.Ordinal);
         }
         catch (ArgumentException)
@@ -68,10 +81,11 @@ public readonly record struct ResourceIdentifier(string Value)
         }
     }
 
-    public string ResourceGroup => Segments()[1];
-    public string ProviderNamespace => Segments()[3];
-    public string ResourceType => Segments()[4];
-    public string Name => Segments()[5];
+    public Guid? WorkspaceId => Segments().Length == 8 ? Guid.Parse(Segments()[1]) : null;
+    public string ResourceGroup => Segments()[Segments().Length == 8 ? 3 : 1];
+    public string ProviderNamespace => Segments()[Segments().Length == 8 ? 5 : 3];
+    public string ResourceType => Segments()[Segments().Length == 8 ? 6 : 4];
+    public string Name => Segments()[Segments().Length == 8 ? 7 : 5];
 
     public override string ToString() => Value;
 
@@ -91,6 +105,9 @@ public abstract record Resource
     public required string Type { get; init; }
     public required string ApiVersion { get; init; }
     public string? ResourceGroup { get; init; }
+    public Guid TenantId { get; init; }
+    public Guid WorkspaceId { get; init; }
+    public Guid ResourceGroupId { get; init; }
     public string? Location { get; init; }
     public IReadOnlyDictionary<string, string> Tags { get; init; } = new Dictionary<string, string>();
     public long Generation { get; init; }
