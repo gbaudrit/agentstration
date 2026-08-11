@@ -1,0 +1,29 @@
+# Local installation
+
+Clone the repository, restore the solution, and build it:
+
+```powershell
+git clone https://github.com/gbaudrit/microsoft-agent-framework.git
+cd microsoft-agent-framework
+dotnet restore Agentstration.slnx
+dotnet build Agentstration.slnx --configuration Release --no-restore
+```
+
+Run the operations Console with the offline deterministic provider:
+
+```powershell
+$env:AI__Provider = "Deterministic"
+dotnet run --project src/Agentstration.Web
+```
+
+For the end-user Workplace, use two terminals:
+
+```powershell
+# Terminal 1
+dotnet run --project src/Agentstration.Work.Api
+
+# Terminal 2
+dotnet run --project src/Agentstration.Workplace.Web
+```
+
+The Work API defaults to deterministic AI. The direct Console defaults to the persisted managed provider configuration, which is why the explicit environment override is used in the offline command above.

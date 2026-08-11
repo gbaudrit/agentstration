@@ -1,0 +1,54 @@
+# Architecture Decision Records
+
+ADRs record durable architectural choices and their consequences. Existing decisions are numbered in chronological order and remain in Git when superseded.
+
+## Format
+
+```markdown
+# ADR-XXXX: Title
+
+## Status
+
+Proposed | Accepted | Deprecated | Superseded
+
+## Context
+
+...
+
+## Decision
+
+...
+
+## Consequences
+
+...
+```
+
+Use **Proposed** when implementation or repository evidence does not establish a settled choice. Never rewrite an accepted ADR to conceal a later decision; add a new ADR and mark the old one superseded.
+
+## Catalog
+
+1. [ADR-0001 — Start with a modular monolith](0001-modular-monolith.md)
+2. [ADR-0002 — Local JSON default, PostgreSQL target](0002-storage-profiles.md)
+3. [ADR-0003 — Microsoft.Extensions.AI boundary](0003-ai-boundaries.md)
+4. [ADR-0004 — Standalone scheduler before Quartz](0004-standalone-scheduler.md)
+5. [ADR-0005 — REST, UI, and MCP share application services](0005-shared-application-services.md)
+6. [ADR-0006 — Agentstration is the independent Management Plane](0006-independent-management-plane.md)
+7. [ADR-0007 — SQLite control-plane storage for standalone mode](0007-sqlite-control-plane.md)
+8. [ADR-0008 — Reconstructible Microsoft Agent Framework runtime](0008-reconstructible-maf-runtime.md)
+9. [ADR-0009 — Independent Work Plane with local Runtime dispatch](0009-independent-work-plane.md)
+10. [ADR-0010 — Independent Flow definition module](0010-independent-flow-module.md)
+11. [ADR-0011 — Dedicated Management module](0011-dedicated-management-module.md)
+12. [ADR-0012 — Runtime Run resource and observable execution](0012-runtime-run-resource.md)
+13. [ADR-0013 — Model-provider boundary and local Ollama adapter](0013-model-provider-boundary-and-ollama.md)
+14. [ADR-0014 — Configuration-backed model resolution into MAF](0014-configuration-backed-model-resolution.md)
+15. [ADR-0015 — Persisted model profiles and provider APIs](0015-model-management-apis.md)
+16. [ADR-0016 — Real model invocation from Agent Runner](0016-real-agent-runner-model-invocation.md)
+17. [ADR-0017 — Canonical runtime/model options and capabilities](0017-canonical-runtime-model-options-and-capabilities.md)
+18. [ADR-0018 — Persisted model-provider declarations and dynamic clients](0018-persisted-model-provider-crud.md)
+19. [ADR-0019 — Flow-owned Run resource and execution Console](0019-flow-run-resource-and-console.md)
+20. [ADR-0020 — Workplace Entry, Interaction, and Task vertical](0020-workplace-entry-interaction-task-vertical.md)
+21. [ADR-0021 — Standalone Workplace and Work API hosts](0021-standalone-workplace-and-work-api.md)
+22. [ADR-0022 — Interaction as durable conversation and FlowRun continuation](0022-interaction-durable-conversation-flow-continuation.md)
+23. [ADR-0023 — Console supervision of WorkTasks through Work API](0023-console-supervises-worktasks-through-work-api.md)
+24. [ADR-0024 — Entries always target executable Flows](0024-entries-always-target-executable-flows.md)
