@@ -74,6 +74,8 @@ The agent resource ID is `/resourceGroups/{resourceGroup}/providers/Agentstratio
 
 The Management Plane persists `Agentstration.Tools/toolProviders` and the `Agentstration.Tools/tools` resources materialized by discovery. Tool Providers support AEP and MCP; MCP connections support STDIO and Streamable HTTP using the official SDK. Creation/configuration performs an initial discovery attempt and the Console exposes manual test and refresh operations. Refresh reports new, changed, unchanged, and unavailable counts without deleting disappeared tools or overwriting enablement.
 
+AEP itself is staged as an autonomous repository under `aep/`, with protocol `2026-08-01`, canonical discovery at `/.well-known/aep`, versioned capability descriptors, a reusable validator and tracing client, a headless CLI, a generic sample, and a standalone Blazor Inspector. Agentstration uses local project references during extraction and can switch to versioned packages with `UseLocalAepProjects=false` after publication.
+
 The Tools Console separates Providers and Catalog, displays provider status and schemas, and defaults every newly discovered tool to disabled. The Agent editor assigns canonical Tool resource IDs and warns when an existing assignment is unavailable. Runtime resolution requires provider enabled, tool enabled, tool available, and assignment before passing the official MCP `AITool` to MAF.
 
 ## Work, Flow, Run, and Agent

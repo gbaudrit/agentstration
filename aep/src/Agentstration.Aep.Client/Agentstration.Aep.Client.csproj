@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><Description>Canonical .NET client for AEP extensions.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

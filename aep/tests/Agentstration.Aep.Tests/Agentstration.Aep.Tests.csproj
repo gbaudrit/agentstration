@@ -1,0 +1,13 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Aep.Validation/Agentstration.Aep.Validation.csproj" />
+    <ProjectReference Include="../../samples/HelloAepExtension/HelloAepExtension.csproj" />
+    <ProjectReference Include="../../samples/ModelProviderExtension/ModelProviderExtension.csproj" />
+    <ProjectReference Include="../../samples/ToolsExtension/ToolsExtension.csproj" />
+    <ProjectReference Include="../../inspector/Agentstration.Aep.Inspector/Agentstration.Aep.Inspector.csproj" />
+  </ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" /></ItemGroup>
+</Project>

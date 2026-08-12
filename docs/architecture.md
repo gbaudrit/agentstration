@@ -30,10 +30,7 @@ src/
   Agentstration.Management.Core/  Management validation, use cases, revisions, deployments
   Agentstration.Management.Contracts/
   Agentstration.Management.Storage.Sqlite/
-  Agentstration.Aep.Abstractions/    technology-neutral AEP V1 contracts
-  Agentstration.Aep.Client/          generic HTTP/JSON and SSE AEP client
-  Agentstration.Aep.AspNetCore/      reusable C# extension host framework
-  Agentstration.Aep.MicrosoftExtensionsAI/ AEP-to-IChatClient adapter
+  ../aep/                            autonomous future AEP repository subtree
   Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
   Agentstration.ModelProviders/      provider-neutral model-provider resolution through AEP
   Agentstration.Tools.Mcp/           Tool catalog, AEP-to-MCP resolution, official MCP client
@@ -366,3 +363,4 @@ Standalone startup creates or repairs `local / default / default`, the local use
 - ADR-0027: AEP tool contributions resolve to MCP
 - ADR-0028: Tool Providers materialize a governed catalog
 - ADR-0029: Aspire consumes an existing local Ollama installation
+- ADR-0030: AEP is an autonomous SDK and Inspector repository

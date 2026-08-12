@@ -13,6 +13,8 @@ Agentstration currently provides:
 
 The product is a modular monolith organized around a Management Plane, Runtime Plane, and Work Plane. See the [architecture overview](docs/architecture/overview.md) for the boundaries and dependency rules.
 
+The autonomous Agentstration Extension Protocol SDK, conformance validator, CLI, samples, and standalone Inspector are staged in [`aep/`](aep/README.md). That directory has its own solution and build configuration so it can be moved into a dedicated repository without carrying Agentstration application projects.
+
 ## Quick start
 
 Requirements: the .NET SDK version selected by [`global.json`](global.json) (currently .NET 10.0.300 or a compatible feature band).

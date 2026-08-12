@@ -1,9 +1,11 @@
 <Solution>
+  <Folder Name="/aep/">
+    <Project Path="aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
+    <Project Path="aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
+    <Project Path="aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
+    <Project Path="aep/src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
+  </Folder>
   <Folder Name="/src/">
-    <Project Path="src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
-    <Project Path="src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
-    <Project Path="src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
-    <Project Path="src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
     <Project Path="src/Agentstration.AppHost/Agentstration.AppHost.csproj" />
     <Project Path="src/Agentstration.Application/Agentstration.Application.csproj" />
     <Project Path="src/Agentstration.Contracts/Agentstration.Contracts.csproj" />

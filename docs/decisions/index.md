@@ -57,3 +57,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 27. [ADR-0027 — AEP tool contributions resolve to MCP](0027-aep-tool-contributions-resolve-to-mcp.md)
 28. [ADR-0028 — Tool Providers materialize a governed catalog](0028-tool-providers-governed-catalog.md)
 29. [ADR-0029 — Aspire consumes an existing local Ollama installation](0029-aspire-consumes-local-ollama.md)
+30. [ADR-0030 — AEP is an autonomous SDK and Inspector repository](0030-autonomous-aep-repository.md)

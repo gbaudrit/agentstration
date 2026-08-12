@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><Description>Lightweight ASP.NET Core server SDK for AEP extensions.</Description></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

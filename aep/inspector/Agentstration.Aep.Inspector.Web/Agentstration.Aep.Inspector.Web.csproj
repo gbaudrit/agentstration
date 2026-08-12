@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Aep.Inspector/Agentstration.Aep.Inspector.csproj" />
+    <ProjectReference Include="../Agentstration.Aep.Inspector.Components/Agentstration.Aep.Inspector.Components.csproj" />
+  </ItemGroup>
+</Project>

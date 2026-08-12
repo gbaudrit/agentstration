@@ -1,0 +1,12 @@
+@if (Snapshot is not null)
+{
+    <div class="section-heading"><div><p class="eyebrow">Extension overview</p><h2>@Snapshot.Manifest.Extension.Name</h2><p>@(Snapshot.Manifest.Extension.Description ?? "No extension description was provided.")</p></div><span class="protocol-badge">AEP @Snapshot.Manifest.ProtocolVersion</span></div>
+    <div class="metric-grid">
+        <article class="metric"><span>Health</span><strong class="health-text @Snapshot.Health.Status">@Snapshot.Health.Status</strong><small>@(Snapshot.Health.Details ?? "Extension endpoint is responding")</small></article>
+        <article class="metric"><span>Capabilities</span><strong>@Snapshot.Manifest.Capabilities.Count</strong><small>Versioned protocol surfaces</small></article>
+        <article class="metric"><span>Model providers</span><strong>@Snapshot.Manifest.Contributions.ModelProviders.Count</strong><small>Declared contributions</small></article>
+        <article class="metric"><span>Tools</span><strong>@(Snapshot.Manifest.Contributions.Tools?.Count ?? 0)</strong><small>AEP-to-MCP mappings</small></article>
+    </div>
+    <div class="detail-grid"><article><h3>Identity</h3><dl><dt>ID</dt><dd><code>@Snapshot.Manifest.Extension.Id</code></dd><dt>Version</dt><dd>@Snapshot.Manifest.Extension.Version</dd><dt>Endpoint</dt><dd><code>@Snapshot.Endpoint</code></dd></dl></article><article><h3>Session</h3><dl><dt>Connected</dt><dd>@Snapshot.ConnectedAt.ToLocalTime().ToString("g")</dd><dt>Conformance</dt><dd>@(Snapshot.Validation.IsValid ? "Valid" : "Issues detected")</dd><dt>MCP servers</dt><dd>@(Snapshot.Manifest.Mcp?.Servers.Count ?? 0)</dd></dl></article></div>
+}
+@code { [Parameter, EditorRequired] public AepInspectorSnapshot? Snapshot { get; set; } }

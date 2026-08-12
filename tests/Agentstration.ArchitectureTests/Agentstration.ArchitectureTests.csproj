@@ -1,9 +1,9 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
-    <ProjectReference Include="../../src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
+    <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
+    <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
+    <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
+    <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
     <ProjectReference Include="../../src/Agentstration.Domain/Agentstration.Domain.csproj" />
@@ -27,5 +27,11 @@
     <ProjectReference Include="../../src/Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
     <ProjectReference Include="../../src/Agentstration.Work.Api/Agentstration.Work.Api.csproj" />
     <ProjectReference Include="../../src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseLocalAepProjects)' != 'true'">
+    <PackageReference Include="Agentstration.Aep.Abstractions" />
+    <PackageReference Include="Agentstration.Aep.AspNetCore" />
+    <PackageReference Include="Agentstration.Aep.Client" />
+    <PackageReference Include="Agentstration.Aep.MicrosoftExtensionsAI" />
   </ItemGroup>
 </Project>

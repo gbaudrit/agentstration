@@ -1,3 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup><ProjectReference Include="../Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" /></ItemGroup>
-</Project>

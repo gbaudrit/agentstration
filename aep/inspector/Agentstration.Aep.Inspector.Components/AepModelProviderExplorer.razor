@@ -1,0 +1,47 @@
+@implements IDisposable
+
+<div class="section-heading"><div><p class="eyebrow">Interactive capability</p><h2>Model playground</h2><p>Discover models and send real AEP chat requests without provider-specific logic.</p></div></div>
+<div class="playground-layout">
+    <aside class="resource-list">
+        <h3>Providers</h3>
+        @foreach (var provider in Session.ModelProviders)
+        {
+            <button class="resource-item @(provider.Id == selectedProvider ? "selected" : "")" @onclick="() => SelectProviderAsync(provider.Id)"><strong>@provider.DisplayName</strong><code>@provider.Id</code><span>@CapabilitySummary(provider)</span></button>
+        }
+    </aside>
+    <div class="playground-content">
+        @if (loading) { <p class="muted">Loading provider…</p> }
+        else if (inspection is null) { <div class="empty"><h3>Select a provider</h3><p>Provider health and models will appear here.</p></div> }
+        else
+        {
+            <div class="provider-summary"><div><span class="status-dot @(inspection.Health.Status == "available" ? "ok" : "bad")"></span><strong>@inspection.Provider.DisplayName</strong><small>@inspection.Health.Status</small></div><button @onclick="ReloadAsync">Refresh models</button></div>
+            @if (!string.IsNullOrWhiteSpace(inspection.Health.Details)) { <p class="inline-warning">@inspection.Health.Details</p> }
+            <div class="form-grid">
+                <label>Model<select @bind="model">@foreach (var item in inspection.Models) { <option value="@item.Id">@item.DisplayName</option> }</select></label>
+                <label>Temperature<input type="number" min="0" max="2" step="0.1" @bind="temperature" /></label>
+                <label>Max output tokens<input type="number" min="1" @bind="maxOutputTokens" /></label>
+                <label class="check"><input type="checkbox" @bind="streaming" /> Stream response</label>
+                <label class="span-2">System instructions<textarea @bind="systemPrompt" rows="3" placeholder="Optional system instructions"></textarea></label>
+                <label class="span-2">Prompt<textarea @bind="prompt" rows="6" placeholder="Ask the selected model something…"></textarea></label>
+            </div>
+            <div class="action-row"><button class="primary" @onclick="SendAsync" disabled="@(sending || string.IsNullOrWhiteSpace(model) || string.IsNullOrWhiteSpace(prompt))">@(sending ? "Running…" : "Run chat")</button>@if (sending) { <button @onclick="Cancel">Cancel</button> }</div>
+            @if (chatError is not null) { <p class="inline-error">@chatError</p> }
+            @if (!string.IsNullOrEmpty(liveText) || result is not null)
+            {
+                <article class="result-card"><div class="result-heading"><strong>Assistant</strong>@if (result is not null) { <span>@result.Model · @result.Duration.TotalMilliseconds.ToString("F0") ms · @(result.Streaming ? "streaming" : "single response")</span> }</div><div class="assistant-output">@(result?.Text ?? liveText)</div>@if (result is not null) { <details><summary>Raw AEP response</summary><pre>@result.RawResponse</pre></details> }</article>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public InspectorSession Session { get; set; } = null!;
+    private string? selectedProvider; private AepProviderInspection? inspection; private string model = ""; private string prompt = ""; private string systemPrompt = ""; private float? temperature = 0.2f; private int? maxOutputTokens = 512; private bool streaming = true; private bool loading; private bool sending; private string? chatError; private string liveText = ""; private AepChatResult? result; private CancellationTokenSource? runCancellation;
+    protected override async Task OnInitializedAsync() { if (Session.ModelProviders.Count > 0) await SelectProviderAsync(Session.ModelProviders[0].Id); }
+    private async Task SelectProviderAsync(string id) { selectedProvider = id; await ReloadAsync(); }
+    private async Task ReloadAsync() { if (selectedProvider is null) return; loading = true; chatError = null; try { inspection = await Session.InspectProviderAsync(selectedProvider); model = inspection.Models.FirstOrDefault()?.Id ?? ""; } catch (Exception exception) { chatError = exception.Message; } finally { loading = false; } }
+    private async Task SendAsync() { if (selectedProvider is null) return; sending = true; chatError = null; result = null; liveText = ""; runCancellation?.Dispose(); runCancellation = new(); try { result = await Session.ChatAsync(selectedProvider, model, prompt, systemPrompt, temperature, maxOutputTokens, streaming, async value => { liveText = value; await InvokeAsync(StateHasChanged); }, runCancellation.Token); } catch (OperationCanceledException) { chatError = "Request cancelled."; } catch (Exception exception) { chatError = exception.Message; } finally { sending = false; } }
+    private void Cancel() => runCancellation?.Cancel();
+    private static string CapabilitySummary(AepModelProviderDescriptor provider) { var values = new List<string>(); if (provider.Capabilities.Chat) values.Add("chat"); if (provider.Capabilities.Streaming) values.Add("streaming"); if (provider.Capabilities.Tools) values.Add("tools"); return string.Join(" · ", values); }
+    public void Dispose() { runCancellation?.Cancel(); runCancellation?.Dispose(); }
+}

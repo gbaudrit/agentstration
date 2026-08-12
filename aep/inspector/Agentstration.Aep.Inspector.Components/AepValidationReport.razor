@@ -1,0 +1,8 @@
+@if (Result is not null)
+{
+    <div class="section-heading"><div><p class="eyebrow">Conformance</p><h2>Validation report</h2><p>Stable issue codes can be reused by the CLI and CI.</p></div><button @onclick="OnRun">Run validation</button></div>
+    <div class="validation-summary @(Result.IsValid ? "valid" : "invalid")"><span>@(Result.IsValid ? "✓" : "!")</span><div><strong>@(Result.IsValid ? "Extension is conformant" : "Conformance issues detected")</strong><p>@Result.Issues.Count issue(s): @Errors error(s), @Warnings warning(s)</p></div></div>
+    @if (Result.Issues.Count == 0) { <div class="empty"><h3>No validation issue</h3><p>The manifest, protocol version and health capability passed the current conformance suite.</p></div> }
+    else { <div class="issue-list">@foreach (var issue in Result.Issues.OrderByDescending(value => value.Severity)) { <article class="issue @issue.Severity.ToString().ToLowerInvariant()"><code>@issue.Code</code><div><strong>@issue.Message</strong><small>@issue.Target</small></div><span>@issue.Severity</span></article> }</div> }
+}
+@code { [Parameter, EditorRequired] public AepValidationResult? Result { get; set; } [Parameter] public EventCallback OnRun { get; set; } private int Errors => Result?.Issues.Count(value => value.Severity == AepValidationSeverity.Error) ?? 0; private int Warnings => Result?.Issues.Count(value => value.Severity == AepValidationSeverity.Warning) ?? 0; }

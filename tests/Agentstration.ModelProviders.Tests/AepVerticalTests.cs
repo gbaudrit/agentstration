@@ -23,17 +23,17 @@ public sealed class AepVerticalTests
     [TestMethod]
     public void ContractsRoundTripWithProtocolVersionAndExtensibleContent()
     {
-        var descriptor = new AepExtensionDescriptor(
+        var descriptor = new AepManifest(
             AepProtocol.Version,
             new("extension.test", "Test", "1.2.3"),
-            new(),
+            new Dictionary<string, AepCapabilityDescriptor>(),
             new([new("test", "Test provider", new(Tools: true, ModelDiscovery: true))]));
 
         var json = JsonSerializer.Serialize(descriptor, AepProtocol.JsonOptions);
-        var roundTrip = JsonSerializer.Deserialize<AepExtensionDescriptor>(json, AepProtocol.JsonOptions);
+        var roundTrip = JsonSerializer.Deserialize<AepManifest>(json, AepProtocol.JsonOptions);
 
         Assert.IsNotNull(roundTrip);
-        Assert.AreEqual("1.0", roundTrip.ProtocolVersion);
+        Assert.AreEqual(AepProtocol.Version, roundTrip.ProtocolVersion);
         Assert.IsTrue(roundTrip.Contributions.ModelProviders[0].Capabilities.Tools);
         StringAssert.Contains(json, "modelProviders");
     }
@@ -41,10 +41,10 @@ public sealed class AepVerticalTests
     [TestMethod]
     public void DescriptorSupportsMultipleMcpServersAndSchemaFreeToolMappings()
     {
-        var descriptor = new AepExtensionDescriptor(
+        var descriptor = new AepManifest(
             AepProtocol.Version,
             new("extension.tools", "Tools", "1.0.0"),
-            new(),
+            new Dictionary<string, AepCapabilityDescriptor>(),
             new([], [new("search", "Search", new("primary", "search_docs"), "Search documents")]),
             new([new("primary", "/mcp"), new("remote", "https://tools.example/mcp")]));
 
@@ -60,10 +60,10 @@ public sealed class AepVerticalTests
     [TestMethod]
     public void DescriptorRejectsUnknownMcpServerAndMalformedEndpoint()
     {
-        var descriptor = new AepExtensionDescriptor(
+        var descriptor = new AepManifest(
             AepProtocol.Version,
             new("extension.tools", "Tools", "1.0.0"),
-            new(),
+            new Dictionary<string, AepCapabilityDescriptor>(),
             new([], [new("search", "Search", new("missing", "search_docs"))]),
             new([new("primary", "ftp://invalid/mcp")]));
 
@@ -103,7 +103,7 @@ public sealed class AepVerticalTests
     [TestMethod]
     public async Task ClientRejectsIncompatibleProtocol()
     {
-        var descriptor = new AepExtensionDescriptor("2.0", new("x", "x", "1"), new(), new([]));
+        var descriptor = new AepManifest("2.0", new("x", "x", "1"), new Dictionary<string, AepCapabilityDescriptor>(), new([]));
         using var httpClient = new HttpClient(new StaticHandler(HttpStatusCode.OK, JsonSerializer.Serialize(descriptor, AepProtocol.JsonOptions))) { BaseAddress = new Uri("http://extension") };
 
         var exception = await Assert.ThrowsAsync<AepProtocolException>(() => new AepClient(httpClient).DiscoverAsync());

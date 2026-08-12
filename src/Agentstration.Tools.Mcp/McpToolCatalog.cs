@@ -103,7 +103,7 @@ public sealed class ToolProviderAdapter(
         return result;
     }
 
-    private async Task<(AepExtensionDescriptor Descriptor, Uri Endpoint)> DiscoverAepAsync(ToolProviderResource provider, CancellationToken cancellationToken)
+    private async Task<(AepManifest Descriptor, Uri Endpoint)> DiscoverAepAsync(ToolProviderResource provider, CancellationToken cancellationToken)
     {
         var extensionId = provider.Properties.Aep!.ExtensionId;
         var endpoint = extensionEndpoints.Resolve(extensionId);
