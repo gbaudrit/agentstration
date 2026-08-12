@@ -13,6 +13,11 @@ public static class ModelProviderServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
         services.AddSingleton(configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new());
         services.AddTransient<GenAiHttpPayloadCaptureHandler>();
+        services.AddHttpClient("agentstration-aep", client => client.Timeout = TimeSpan.FromSeconds(90));
+        services.AddSingleton<AepModelProvider>();
+        services.AddSingleton<IModelProvider>(services => services.GetRequiredService<AepModelProvider>());
+        services.AddSingleton<IModelProviderOptionsValidator>(services => services.GetRequiredService<AepModelProvider>());
+        services.AddSingleton<IModelProviderDiscovery>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IModelProviderResolver, ModelProviderResolver>();
         if (useManagedProfileResolver) services.AddSingleton<IChatClientResolver, ChatClientResolver>();
         return services;

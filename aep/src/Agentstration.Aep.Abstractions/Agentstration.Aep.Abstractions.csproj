@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Contracts and DTOs for the autonomous Agentstration Extension Protocol.</Description>
+  </PropertyGroup>
+</Project>

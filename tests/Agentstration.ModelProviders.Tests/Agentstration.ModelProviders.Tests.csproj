@@ -1,9 +1,20 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
+    <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
+    <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
+    <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
     <ProjectReference Include="../../src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
-    <ProjectReference Include="../../src/Agentstration.ModelProviders.Ollama/Agentstration.ModelProviders.Ollama.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseLocalAepProjects)' != 'true'">
+    <PackageReference Include="Agentstration.Aep.Abstractions" />
+    <PackageReference Include="Agentstration.Aep.AspNetCore" />
+    <PackageReference Include="Agentstration.Aep.Client" />
+    <PackageReference Include="Agentstration.Aep.MicrosoftExtensionsAI" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
 </Project>

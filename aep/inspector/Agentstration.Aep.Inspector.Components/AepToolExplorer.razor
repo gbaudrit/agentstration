@@ -1,0 +1,50 @@
+@using System.Text.Json
+
+<div class="section-heading"><div><p class="eyebrow">AEP → MCP</p><h2>Tool explorer</h2><p>Inspect schemas and invoke contributed tools through their declared MCP server.</p></div><button @onclick="LoadAsync" disabled="@loading">@(loading ? "Discovering…" : Session.Tools.Count == 0 ? "Discover tools" : "Refresh tools")</button></div>
+@if (error is not null) { <p class="inline-error">@error</p> }
+<div class="playground-layout">
+    <aside class="resource-list">
+        <h3>Tools <span>@Session.Tools.Count</span></h3>
+        @if (Session.Tools.Count == 0) { <p class="muted">Run discovery to load MCP schemas.</p> }
+        @foreach (var tool in Session.Tools) { <button class="resource-item @(tool.Id == selectedId ? "selected" : "")" @onclick="() => Select(tool)"><strong>@tool.Name</strong><code>@tool.Id</code><span>@tool.Server · @tool.NativeName</span></button> }
+    </aside>
+    <div class="playground-content">
+        @if (Selected is null) { <div class="empty"><h3>No tool selected</h3><p>Discover tools, then select one to inspect and invoke it.</p></div> }
+        else
+        {
+            <div class="tool-heading"><div><h3>@Selected.Name</h3><p>@(Selected.Description ?? "No description provided.")</p></div><code>@Selected.Id</code></div>
+            <div class="mode-switch"><button class="@(mode == "Form" ? "active" : "")" @onclick="() => mode = "Form"">Form</button><button class="@(mode == "JSON" ? "active" : "")" @onclick="() => mode = "JSON"">JSON</button></div>
+            @if (mode == "Form")
+            {
+                @if (TryProperties(out var properties))
+                {
+                    <div class="form-grid tool-form">@foreach (var property in properties.EnumerateObject()) { var type = PropertyType(property.Value); <label class="@(type == "object" || type == "array" ? "span-2" : "")"><span>@property.Name @if (IsRequired(property.Name)) { <em>required</em> }</span>@if (type == "boolean") { <select value="@Value(property.Name)" @onchange="e => SetValue(property.Name, e.Value?.ToString())"><option value="false">false</option><option value="true">true</option></select> } else if (type is "number" or "integer") { <input type="number" value="@Value(property.Name)" @oninput="e => SetValue(property.Name, e.Value?.ToString())" /> } else if (type is "object" or "array") { <textarea rows="4" value="@Value(property.Name)" @oninput="e => SetValue(property.Name, e.Value?.ToString())" placeholder="Valid JSON"></textarea> } else { <input value="@Value(property.Name)" @oninput="e => SetValue(property.Name, e.Value?.ToString())" /> }<small>@Description(property.Value, type)</small></label> }</div>
+                }
+                else { <p class="muted">This tool has no object properties. Use JSON mode for its schema.</p> }
+            }
+            else { <label>Arguments JSON<textarea class="code-input" rows="12" @bind="argumentsJson"></textarea></label> }
+            <div class="action-row"><button class="primary" @onclick="InvokeAsync" disabled="@invoking">@(invoking ? "Invoking…" : "Invoke tool")</button></div>
+            @if (invocation is not null) { <article class="result-card"><div class="result-heading"><strong>Tool result</strong><span>@invocation.Duration.TotalMilliseconds.ToString("F0") ms</span></div><pre>@invocation.RawResult</pre></article> }
+            <details class="schema"><summary>Input schema</summary><pre>@Pretty(Selected.InputSchema)</pre></details>
+            @if (Selected.OutputSchema is not null) { <details class="schema"><summary>Output schema</summary><pre>@Pretty(Selected.OutputSchema)</pre></details> }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public InspectorSession Session { get; set; } = null!;
+    private string? selectedId; private AepInspectorTool? Selected => Session.Tools.FirstOrDefault(value => value.Id == selectedId); private string mode = "Form"; private string argumentsJson = "{}"; private readonly Dictionary<string, string> formValues = new(StringComparer.Ordinal); private bool loading; private bool invoking; private string? error; private AepToolInvocationResult? invocation;
+    protected override async Task OnInitializedAsync() { if (Session.Tools.Count == 0) await LoadAsync(); else Select(Session.Tools[0]); }
+    private async Task LoadAsync() { loading = true; error = null; try { await Session.LoadToolsAsync(); if (Session.Tools.Count > 0) Select(Session.Tools[0]); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
+    private void Select(AepInspectorTool tool) { selectedId = tool.Id; invocation = null; error = null; argumentsJson = "{}"; formValues.Clear(); if (TryProperties(out var properties)) foreach (var property in properties.EnumerateObject()) formValues[property.Name] = DefaultValue(PropertyType(property.Value)); }
+    private async Task InvokeAsync() { if (Selected is null) return; invoking = true; error = null; invocation = null; try { var json = mode == "JSON" ? argumentsJson : BuildFormJson(); invocation = await Session.InvokeToolAsync(Selected.Id, json); } catch (Exception exception) { error = exception.Message; } finally { invoking = false; } }
+    private bool TryProperties(out JsonElement properties) { properties = default; return Selected?.InputSchema.ValueKind == JsonValueKind.Object && Selected.InputSchema.TryGetProperty("properties", out properties) && properties.ValueKind == JsonValueKind.Object; }
+    private bool IsRequired(string name) => Selected?.InputSchema.TryGetProperty("required", out var required) == true && required.ValueKind == JsonValueKind.Array && required.EnumerateArray().Any(value => value.GetString() == name);
+    private string BuildFormJson() { var values = new Dictionary<string, object?>(); if (TryProperties(out var properties)) foreach (var property in properties.EnumerateObject()) { var raw = Value(property.Name); if (raw.Length == 0 && !IsRequired(property.Name)) continue; values[property.Name] = Parse(raw, PropertyType(property.Value)); } return JsonSerializer.Serialize(values, AepProtocol.JsonOptions); }
+    private static object? Parse(string raw, string type) => type switch { "boolean" => bool.Parse(raw), "integer" => long.Parse(raw, System.Globalization.CultureInfo.InvariantCulture), "number" => double.Parse(raw, System.Globalization.CultureInfo.InvariantCulture), "object" or "array" => JsonDocument.Parse(string.IsNullOrWhiteSpace(raw) ? (type == "array" ? "[]" : "{}") : raw).RootElement.Clone(), _ => raw };
+    private string Value(string name) => formValues.GetValueOrDefault(name, ""); private void SetValue(string name, string? value) => formValues[name] = value ?? "";
+    private static string PropertyType(JsonElement schema) => schema.TryGetProperty("type", out var type) ? type.GetString() ?? "string" : "string";
+    private static string DefaultValue(string type) => type switch { "boolean" => "false", "object" => "{}", "array" => "[]", _ => "" };
+    private static string Description(JsonElement schema, string type) => schema.TryGetProperty("description", out var description) ? description.GetString() ?? type : type;
+    private static string Pretty(object value) => JsonSerializer.Serialize(value, new JsonSerializerOptions(AepProtocol.JsonOptions) { WriteIndented = true });
+}

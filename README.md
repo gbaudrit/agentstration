@@ -4,7 +4,7 @@ Agentstration is an open-source, self-hosted platform for governing, executing, 
 
 Agentstration currently provides:
 
-- declarative agents, agent types, model providers, model profiles, and deployments;
+- declarative agents, agent types, model/tool providers, governed tool catalogs, profiles, and deployments;
 - durable Work Items, Workplace interactions, tasks, results, and artifacts;
 - editable Flows, immutable published Flow versions, and observable Flow Runs;
 - persisted tenants, workspaces, users, memberships, scoped RBAC, and automatic standalone bootstrap;
@@ -12,6 +12,8 @@ Agentstration currently provides:
 - SQLite and deterministic local defaults that require no Azure subscription or remote API key.
 
 The product is a modular monolith organized around a Management Plane, Runtime Plane, and Work Plane. See the [architecture overview](docs/architecture/overview.md) for the boundaries and dependency rules.
+
+The autonomous Agentstration Extension Protocol SDK, conformance validator, CLI, samples, and standalone Inspector are staged in [`aep/`](aep/README.md). That directory has its own solution and build configuration so it can be moved into a dedicated repository without carrying Agentstration application projects.
 
 ## Quick start
 

@@ -7,8 +7,7 @@
     <ProjectReference Include="../Agentstration.Web/Agentstration.Web.csproj" />
     <ProjectReference Include="../Agentstration.Work.Api/Agentstration.Work.Api.csproj" />
     <ProjectReference Include="../Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
+    <ProjectReference Include="../Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,25 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
+    <Project Path="src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
+    <Project Path="src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
+    <Project Path="src/Agentstration.Aep.Validation/Agentstration.Aep.Validation.csproj" />
+    <Project Path="src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
+  </Folder>
+  <Folder Name="/inspector/">
+    <Project Path="inspector/Agentstration.Aep.Inspector/Agentstration.Aep.Inspector.csproj" />
+    <Project Path="inspector/Agentstration.Aep.Inspector.Components/Agentstration.Aep.Inspector.Components.csproj" />
+    <Project Path="inspector/Agentstration.Aep.Inspector.Web/Agentstration.Aep.Inspector.Web.csproj" />
+  </Folder>
+  <Folder Name="/cli/">
+    <Project Path="cli/Agentstration.Aep.Cli/Agentstration.Aep.Cli.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/HelloAepExtension/HelloAepExtension.csproj" />
+    <Project Path="samples/ModelProviderExtension/ModelProviderExtension.csproj" />
+    <Project Path="samples/ToolsExtension/ToolsExtension.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Agentstration.Aep.Tests/Agentstration.Aep.Tests.csproj" />
+  </Folder>
+</Solution>

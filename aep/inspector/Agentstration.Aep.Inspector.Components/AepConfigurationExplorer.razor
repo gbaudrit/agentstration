@@ -1,0 +1,6 @@
+<div class="section-heading"><div><p class="eyebrow">Schema-driven capability</p><h2>Configuration</h2><p>This extension declares configuration support.</p></div></div>
+@if (Manifest.Capabilities.TryGetValue(AepCapabilityNames.Configuration, out var capability))
+{
+    <article class="empty"><h3>Configuration capability @capability.Version</h3><p>The manifest advertises <code>@(capability.Endpoint ?? "no endpoint")</code>. Editing remains disabled until the capability publishes its configuration schema and secret annotations; the Inspector will never guess provider-specific fields.</p></article>
+}
+@code { [Parameter, EditorRequired] public AepManifest Manifest { get; set; } = null!; }

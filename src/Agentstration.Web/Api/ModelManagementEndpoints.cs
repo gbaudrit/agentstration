@@ -27,6 +27,7 @@ public static class ModelManagementEndpoints
         DeleteModelProfileEndpoint.Map(profiles);
 
         RuntimeProfileEndpoints.Map(endpoints.MapGroup("/api/runtimeprofiles"));
+        ToolProviderEndpoints.Map(endpoints);
 
         var agents = endpoints.MapGroup("/api/agents");
         GetAgentModelEndpoint.Map(agents);

@@ -1,0 +1,6 @@
+@if (Manifest is not null)
+{
+    <div class="section-heading"><div><p class="eyebrow">Protocol surface</p><h2>Capabilities</h2><p>The Inspector derives available actions entirely from this manifest.</p></div><span class="protocol-badge">@Manifest.Capabilities.Count declared</span></div>
+    <div class="capability-grid">@foreach (var capability in Manifest.Capabilities.OrderBy(value => value.Key)) { <article><div><span class="capability-icon">◇</span><strong>@capability.Key</strong></div><dl><dt>Version</dt><dd>@capability.Value.Version</dd><dt>Endpoint</dt><dd><code>@(capability.Value.Endpoint ?? "Discovered through manifest")</code></dd></dl>@if (capability.Value.Metadata?.Count > 0) { <details><summary>Metadata</summary><pre>@Pretty(capability.Value.Metadata)</pre></details> }</article> }</div>
+}
+@code { [Parameter, EditorRequired] public AepManifest? Manifest { get; set; } private static string Pretty(object value) => System.Text.Json.JsonSerializer.Serialize(value, new System.Text.Json.JsonSerializerOptions(AepProtocol.JsonOptions) { WriteIndented = true }); }

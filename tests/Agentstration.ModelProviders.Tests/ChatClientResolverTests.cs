@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Microsoft.Extensions.AI;
@@ -16,7 +17,7 @@ public sealed class ChatClientResolverTests
     [TestMethod]
     public async Task ResolverTraversesProfileDeploymentProviderAndTechnicalImplementation()
     {
-        using var chatClient = new OllamaModelProviderTests.StubChatClient();
+        using var chatClient = new StubChatClient();
         var provider = new RecordingProvider(chatClient);
         var resolver = new ChatClientResolver(
             new StubProfileStore(),
@@ -95,7 +96,7 @@ public sealed class ChatClientResolverTests
             ActivityStopped = stopped.Enqueue
         };
         ActivitySource.AddActivityListener(listener);
-        using var chatClient = new OllamaModelProviderTests.StubChatClient();
+        using var chatClient = new StubChatClient();
         var resolver = new ChatClientResolver(
             new StubProfileStore(),
             new StubDeploymentStore(),
@@ -162,7 +163,7 @@ public sealed class ChatClientResolverTests
             ValueTask.FromResult<IReadOnlyList<ModelProviderConfiguration>>(configured ? [Provider] : []);
     }
 
-    private sealed class RecordingProvider(OllamaModelProviderTests.StubChatClient client) : IModelProvider
+    private sealed class RecordingProvider(StubChatClient client) : IModelProvider
     {
         public string ProviderType => "ollama";
         public ModelProviderConfiguration? Provider { get; private set; }
@@ -174,5 +175,22 @@ public sealed class ChatClientResolverTests
             Deployment = deployment;
             return client;
         }
+    }
+
+    private sealed class StubChatClient : IChatClient
+    {
+        public ChatOptions? Options { get; private set; }
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            Options = options;
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok")));
+        }
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            foreach (var update in response.ToChatResponseUpdates()) yield return update;
+        }
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
     }
 }

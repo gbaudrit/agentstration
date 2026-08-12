@@ -18,13 +18,13 @@ public sealed class AgentFrameworkRuntimeFactory(
 
     public string Handler => "prompt-agent";
 
-    public Task<IAgentRuntime> CreateAsync(ResolvedAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken)
+    public async Task<IAgentRuntime> CreateAsync(ResolvedAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var tools = context.Tools.Resolve(definition.EffectiveToolIds)
+        var tools = (await context.Tools.ResolveAsync(definition.EffectiveToolIds, cancellationToken))
             .Select(MapTool)
             .ToList();
-        return Task.FromResult<IAgentRuntime>(new AgentFrameworkRuntime(
+        return new AgentFrameworkRuntime(
             definition.AgentKey,
             revisionId,
             definition.ModelProfileId,
@@ -33,11 +33,12 @@ public sealed class AgentFrameworkRuntimeFactory(
             tools,
             chatClients,
             observability.Enabled,
-            loggerFactory.CreateLogger<AgentFrameworkRuntime>()));
+            loggerFactory.CreateLogger<AgentFrameworkRuntime>());
     }
 
     private static Microsoft.Extensions.AI.AITool MapTool(IAgentTool tool) =>
-        Microsoft.Extensions.AI.AIFunctionFactory.Create(
+        tool.GetService(typeof(Microsoft.Extensions.AI.AITool)) as Microsoft.Extensions.AI.AITool
+        ?? Microsoft.Extensions.AI.AIFunctionFactory.Create(
             (JsonElement? arguments, CancellationToken cancellationToken) => tool.InvokeAsync(arguments, cancellationToken),
             tool.Name,
             tool.Description);

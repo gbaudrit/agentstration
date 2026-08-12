@@ -1,0 +1,81 @@
+@page "/"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject InspectorSession Session
+
+<div class="inspector-page">
+    <div class="connect-bar">
+        <div class="brand"><span class="brand-mark">A</span><div><h1>AEP Inspector</h1><p>Discover, exercise and validate any AEP extension.</p></div></div>
+        <div class="endpoint-control">
+            <label for="endpoint">Extension endpoint</label>
+            <div><input id="endpoint" @bind="endpoint" list="recent-endpoints" placeholder="http://localhost:5260" @onkeydown="EndpointKeyDown" /><button class="primary" @onclick="ConnectAsync" disabled="@connecting">@(connecting ? "Connecting…" : Session.Snapshot is null ? "Connect" : "Reconnect")</button></div>
+            <datalist id="recent-endpoints">@foreach (var recent in Session.RecentEndpoints) { <option value="@recent"></option> }</datalist>
+        </div>
+        @if (Session.Snapshot is { } current)
+        {
+            <div class="connection-state"><span class="status-dot @HealthClass(current.Health.Status)"></span><div><strong>@current.Health.Status</strong><small>@current.Manifest.Extension.Name · @current.Manifest.ProtocolVersion</small></div><button class="icon-button" title="Refresh health" @onclick="RefreshAsync">↻</button></div>
+        }
+    </div>
+
+    @if (error is not null) { <div class="banner error-banner"><strong>Connection failed</strong><span>@error</span><button @onclick="() => error = null">×</button></div> }
+
+    @if (Session.Snapshot is null)
+    {
+        <div class="welcome-grid">
+            <section class="welcome-card"><span class="step">1</span><h2>Connect</h2><p>Enter an extension base URL. Discovery always starts from <code>/.well-known/aep</code>.</p></section>
+            <section class="welcome-card"><span class="step">2</span><h2>Exercise</h2><p>Capabilities drive model and tool explorers automatically—no provider-specific UI.</p></section>
+            <section class="welcome-card"><span class="step">3</span><h2>Validate</h2><p>Review conformance issues and every redacted HTTP exchange in one workspace.</p></section>
+        </div>
+    }
+    else
+    {
+        <div class="workbench">
+            <aside class="navigation-panel">
+                <p class="nav-heading">Extension</p>
+                @NavButton("Overview", "Overview", "⌂")
+                @NavButton("Capabilities", "Capabilities", "◇", Session.Snapshot.Manifest.Capabilities.Count)
+                @if (Session.Snapshot.Manifest.Capabilities.ContainsKey(AepCapabilityNames.ModelProvider)) { @NavButton("Models", "Model playground", "✦", Session.ModelProviders.Count) }
+                @if (Session.Snapshot.Manifest.Capabilities.ContainsKey(AepCapabilityNames.Tools)) { @NavButton("Tools", "Tool explorer", "⌘", Session.Snapshot.Manifest.Contributions.Tools?.Count ?? 0) }
+                @if (Session.Snapshot.Manifest.Capabilities.ContainsKey(AepCapabilityNames.Configuration)) { @NavButton("Configuration", "Configuration", "⚙") }
+                <p class="nav-heading">Diagnostics</p>
+                @NavButton("Validation", "Validation", "✓", Session.Snapshot.Validation.Issues.Count)
+                @NavButton("Raw", "Raw manifest", "{ }")
+                <div class="extension-card"><small>Connected to</small><strong>@Session.Snapshot.Manifest.Extension.Name</strong><code>@Session.Snapshot.Manifest.Extension.Id</code><span>v@Session.Snapshot.Manifest.Extension.Version</span></div>
+            </aside>
+
+            <main class="main-panel">
+                @switch (view)
+                {
+                    case "Overview": <AepOverview Snapshot="Session.Snapshot" /> break;
+                    case "Capabilities": <AepCapabilities Manifest="Session.Snapshot.Manifest" /> break;
+                    case "Models": <AepModelProviderExplorer Session="Session" /> break;
+                    case "Tools": <AepToolExplorer Session="Session" /> break;
+                    case "Configuration": <AepConfigurationExplorer Manifest="Session.Snapshot.Manifest" /> break;
+                    case "Validation": <AepValidationReport Result="Session.Snapshot.Validation" OnRun="ValidateAsync" /> break;
+                    case "Raw": <AepRawViewer Json="Session.Snapshot.RawManifest" /> break;
+                }
+            </main>
+
+            <aside class="diagnostics-panel"><AepRequestViewer Traces="Session.Traces" OnClear="ClearTraces" /></aside>
+        </div>
+    }
+</div>
+
+@code {
+    private string endpoint = "http://localhost:5260"; private string view = "Overview"; private string? error; private bool connecting;
+    protected override void OnInitialized() => Session.Changed += SessionChanged;
+    private async Task ConnectAsync() { connecting = true; error = null; try { await Session.ConnectAsync(endpoint); view = "Overview"; } catch (Exception exception) { error = exception.Message; } finally { connecting = false; } }
+    private async Task RefreshAsync() { try { await Session.RefreshHealthAsync(); } catch (Exception exception) { error = exception.Message; } }
+    private async Task ValidateAsync() { try { await Session.ValidateAsync(); } catch (Exception exception) { error = exception.Message; } }
+    private void ClearTraces() => Session.ClearTraces();
+    private void SessionChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() { Session.Changed -= SessionChanged; GC.SuppressFinalize(this); }
+    private async Task EndpointKeyDown(KeyboardEventArgs args) { if (args.Key == "Enter") await ConnectAsync(); }
+    private static string HealthClass(string status) => status.Equals("available", StringComparison.OrdinalIgnoreCase) ? "ok" : status.Equals("degraded", StringComparison.OrdinalIgnoreCase) ? "warn" : "bad";
+    private RenderFragment NavButton(string id, string label, string icon, int? count = null) => builder =>
+    {
+        var sequence = 0; builder.OpenElement(sequence++, "button"); builder.AddAttribute(sequence++, "class", $"nav-item {(view == id ? "active" : "")}"); builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => view = id));
+        builder.OpenElement(sequence++, "span"); builder.AddAttribute(sequence++, "class", "nav-icon"); builder.AddContent(sequence++, icon); builder.CloseElement(); builder.AddContent(sequence++, label);
+        if (count is not null) { builder.OpenElement(sequence++, "span"); builder.AddAttribute(sequence++, "class", "count"); builder.AddContent(sequence++, count); builder.CloseElement(); } builder.CloseElement();
+    };
+}

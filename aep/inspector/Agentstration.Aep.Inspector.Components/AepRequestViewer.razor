@@ -1,0 +1,25 @@
+<div class="diagnostic-heading"><div><p class="eyebrow">HTTP trace</p><h2>Requests</h2></div><div><span>@Traces.Count</span><button class="icon-button" title="Clear traces" @onclick="OnClear">⌫</button></div></div>
+<div class="trace-list">
+    @if (Traces.Count == 0) { <p class="muted trace-empty">Protocol exchanges will appear here.</p> }
+    @for (var index = Traces.Count - 1; index >= 0; index--)
+    {
+        var trace = Traces[index]; var capturedIndex = index;
+        <button class="trace-item @(selected == capturedIndex ? "selected" : "")" @onclick="() => selected = capturedIndex"><span class="method @trace.Method.ToLowerInvariant()">@trace.Method</span><div><strong>@Path(trace.Url)</strong><small>@trace.Duration.TotalMilliseconds.ToString("F0") ms</small></div><span class="http-status @StatusClass(trace.StatusCode)">@trace.StatusCode</span></button>
+    }
+</div>
+@if (Selected is { } item)
+{
+    <div class="trace-detail"><div class="trace-tabs"><button class="@(detail == "Request" ? "active" : "")" @onclick="() => detail = "Request"">Request</button><button class="@(detail == "Response" ? "active" : "")" @onclick="() => detail = "Response"">Response</button></div>
+        @if (detail == "Request") { <h3>Headers</h3><pre>@Headers(item.RequestHeaders)</pre><h3>Body</h3><pre>@(item.RequestBody ?? "No request body")</pre> }
+        else { <h3>Headers</h3><pre>@Headers(item.ResponseHeaders)</pre><h3>Body</h3><pre>@(item.ResponseBody ?? "No response body")</pre> }
+    </div>
+}
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AepHttpTrace> Traces { get; set; } = [];
+    [Parameter] public EventCallback OnClear { get; set; }
+    private int? selected; private string detail = "Response"; private AepHttpTrace? Selected => selected is { } value && value >= 0 && value < Traces.Count ? Traces[value] : null;
+    protected override void OnParametersSet() { if (selected is null && Traces.Count > 0) selected = Traces.Count - 1; else if (selected >= Traces.Count) selected = Traces.Count - 1; }
+    private static string Path(Uri? uri) => uri?.PathAndQuery ?? "unknown";
+    private static string StatusClass(int? status) => status is >= 200 and < 300 ? "success" : status is >= 400 ? "failure" : "pending";
+    private static string Headers(IReadOnlyDictionary<string, string> headers) => headers.Count == 0 ? "No headers" : string.Join(Environment.NewLine, headers.OrderBy(value => value.Key).Select(value => $"{value.Key}: {value.Value}"));
+}

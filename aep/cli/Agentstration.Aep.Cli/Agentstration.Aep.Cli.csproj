@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><AssemblyName>aep</AssemblyName><PackAsTool>true</PackAsTool><ToolCommandName>aep</ToolCommandName><PackageId>Agentstration.Aep.Cli</PackageId></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Aep.Validation/Agentstration.Aep.Validation.csproj" />
+  </ItemGroup>
+</Project>

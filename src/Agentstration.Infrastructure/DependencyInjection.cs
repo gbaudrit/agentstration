@@ -27,6 +27,7 @@ using Agentstration.Runtime.Storage.Sqlite;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Sqlite;
 using Agentstration.Work.Storage.Abstractions;
+using Agentstration.Tools.Mcp;
 using Agentstration.Infrastructure.Artifacts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -98,7 +99,7 @@ public static class DependencyInjection
         services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();
         if (!useManagedProfileResolver)
             services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();
-        services.AddSingleton<IToolCatalog, EmptyToolCatalog>();
+        services.AddAgentstrationMcpTools();
         services.AddSingleton<AgentRuntimeContext>();
         services.AddSingleton<Agentstration.Runtime.Abstractions.IAgentRuntimeFactory, AgentFrameworkRuntimeFactory>();
         services.AddSingleton<IRuntimeRegistry, RuntimeRegistry>();
@@ -109,6 +110,7 @@ public static class DependencyInjection
         services.AddSingleton<IAgentDeploymentReconciler, LocalAgentDeploymentReconciler>();
         services.AddSingleton<IAgentRouter, AgentFrameworkAgentRouter>();
         services.AddSingleton<AgentManagementService>();
+        services.AddSingleton<ToolManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
         runtimeConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "runtime-plane.db")}";
         services.AddSqliteRuntimeRuns(runtimeConnectionString);

@@ -18,12 +18,12 @@ public static class ManagementDemoData
         var providerId = ModelProviderManagementService.ModelProviderId("ollama-local", resourceGroup);
         if (await store.GetAsync<ModelProviderResource>(providerId, cancellationToken) is null)
         {
-            var connectionString = configuration.GetConnectionString("local-chat");
+            var connectionString = configuration.GetConnectionString("ollama-extension");
+            var configuredExtensionEndpoint = configuration["Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint"];
             var endpoint = ResolveEndpoint(connectionString)
-                ?? (string.Equals(configuration["AI:Provider"], "Ollama", StringComparison.OrdinalIgnoreCase)
-                    && Uri.TryCreate(configuration["AI:Endpoint"], UriKind.Absolute, out var configuredEndpoint)
-                        ? configuredEndpoint
-                        : new Uri("http://localhost:11434"));
+                ?? (Uri.TryCreate(configuredExtensionEndpoint, UriKind.Absolute, out var extensionEndpoint)
+                    ? extensionEndpoint
+                    : new Uri("http://localhost:5260"));
             await modelProviders.CreateAsync(new ModelProviderResource
             {
                 Id = providerId,
@@ -34,7 +34,7 @@ public static class ManagementDemoData
                 Location = "local",
                 Properties = new ModelProviderProperties
                 {
-                    DisplayName = "Ollama local",
+                    DisplayName = "Ollama via AEP",
                     ProviderType = "ollama",
                     Endpoint = endpoint,
                     ManagementMode = string.IsNullOrWhiteSpace(connectionString)

@@ -30,8 +30,10 @@ src/
   Agentstration.Management.Core/  Management validation, use cases, revisions, deployments
   Agentstration.Management.Contracts/
   Agentstration.Management.Storage.Sqlite/
-  Agentstration.ModelProviders/      provider-neutral model-provider resolution
-  Agentstration.ModelProviders.Ollama/ OllamaSharp IChatClient adapter
+  ../aep/                            autonomous future AEP repository subtree
+  Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
+  Agentstration.ModelProviders/      provider-neutral model-provider resolution through AEP
+  Agentstration.Tools.Mcp/           Tool catalog, AEP-to-MCP resolution, official MCP client
   Agentstration.Runtime.Abstractions/
   Agentstration.Runtime.Core/       Runtime Run lifecycle, observation, cancellation
   Agentstration.Runtime.Contracts/  Public Runtime Run HTTP contracts
@@ -64,8 +66,9 @@ Management.Core -> Management.Abstractions + Runtime.Abstractions
 Management.Contracts -> Management.Abstractions
 Management.Storage.Sqlite -> Management.Abstractions + EF Core SQLite
 Infrastructure -> SQLite control-plane storage + local/MAF runtime adapters
-Web -> ModelProviders.Ollama -> ModelProviders + Microsoft.Extensions.AI
-AppHost -> Aspire Ollama hosting integration
+Web -> ModelProviders -> Aep.MicrosoftExtensionsAI -> Aep.Client
+Extensions.Ollama -> Aep.AspNetCore + OllamaSharp
+AppHost -> Extensions.Ollama (configured local Ollama endpoint)
 Runtime.AgentFramework -> runtime abstractions + ModelProviders + Microsoft Agent Framework
 Application -> Work + Work storage abstractions
 Flow.Application -> Flow + Flow.Storage.Abstractions
@@ -87,7 +90,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Management plane | canonical declarative agent and model-profile resources, typed references, desired state, generations, provisioning status, lifecycle events, deterministic revisions, deployments, ETag API | operations, policies, connections, identities, manifest import |
 | Control storage | SQLite JSON resources with indexed metadata and optimistic concurrency | richer relational projections and migrations |
 | Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, MAF `ChatClientAgent`, in-process/shared-host provisioning, registry, reconciliation | provider-native token/tool streaming, sessions, dedicated hosts, containers, remote and Foundry adapters |
-| Model providers | SQLite-backed provider declarations with ETag CRUD and usage protection, dynamic health/model discovery, persisted logical profiles, provider-neutral resolver, and dynamic OllamaSharp clients | credentials/connections, additional local or remote adapters, cached discovery |
+| Model providers | SQLite-backed provider declarations with ETag CRUD and usage protection, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | credentials/connections, additional AEP extensions, cached discovery |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
 | Flows | typed graph drafts, validation, YAML/JSON source, immutable versions, durable sequential Runs, visual designer and SignalR replay | checkpoints, parallel and long-running steps |
@@ -100,7 +103,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
 | Scheduling | standalone polling worker | Quartz persistent scheduler |
-| Tools | safe URL reader and deterministic observation | connector/tool catalog and permissions |
+| Tools | persisted Tool/MCP-server resources, AEP contribution resolution, MCP schema catalog and MAF invocation | richer permissions, credentials and connection policies |
 | Notifications | internal notification record/event | email, Teams, webhook channels |
 | MCP | nine tools reusing application services | resources and authorization |
 | Evaluation | deterministic `Microsoft.Extensions.AI.Evaluation` metrics and versioned content-workflow dataset | LLM-as-judge quality/safety evaluators and reports |
@@ -244,22 +247,44 @@ Console / API / future Work or Flow adapter
 
 An interactive console Run is owned entirely by the Runtime Plane and does not create a Work Item. Runtime Run storage is independent from Management and Work storage.
 
-### Local model provider flow
+### AEP model-provider flow
 
 ```text
-AppHost --provisions--> Ollama container + persistent model volume
-   |--injects local-chat connection--> Web composition
+Local Ollama installation <--native HTTP-- autonomous Agentstration.Extensions.Ollama
+AppHost --configures Ollama endpoint--> Agentstration.Extensions.Ollama
+   |--injects AEP extension endpoint--> Agentstration hosts
 Agent modelProfile.resourceId
    -> persisted Management profile
    -> projected runtime deployment
-   -> persisted Management provider (URL + adapter options)
-   -> ModelProviders.Ollama
-   -> endpoint-specific OllamaSharp IChatClient
+   -> persisted Management provider (AEP URL + contribution id + options)
+   -> generic AEP model provider
+   -> AepChatClient : Microsoft.Extensions.AI.IChatClient
    -> Runtime.AgentFramework
    -> MAF AIAgent
+   -> AEP HTTP/JSON or SSE
+   -> Agentstration.Extensions.Ollama
+   -> OllamaSharp -> Ollama
 ```
 
-The normal Web and Aspire composition uses the managed profile resolver: the persisted Model Profile and Model Provider are authoritative for provider, endpoint, and model selection. `Deterministic` is an explicit offline/test mode, selected with `AI__Provider=Deterministic`; `appsettings.Testing.json` enables it for the automated suite. Startup seeds `ollama-local` only when it is absent: Aspire supplies its service-discovery URL when configured, while direct launch uses `http://localhost:11434`. Subsequent URL changes are Management writes and take effect on the next runtime resolution because the Ollama adapter creates a client from the persisted provider for each resolution. The profile resource ID remains in the immutable agent revision; no provider or endpoint is embedded in the agent. Prompts and model responses are not written to logs.
+The normal Web and Aspire composition uses the managed profile resolver: the persisted Model Profile and Model Provider are authoritative for contribution, AEP endpoint, and model selection. `Deterministic` remains the explicit offline/test mode. Startup seeds `ollama-local` only when absent: Aspire starts the AEP extension and configures it to use the existing local Ollama endpoint from `Ollama:Endpoint`, defaulting to `http://localhost:11434`; it does not provision Ollama or pull models. Direct launch of the extension uses the same default. Subsequent AEP URL changes take effect on the next resolution. Only `Agentstration.Extensions.Ollama` knows OllamaSharp or the native Ollama API. The profile resource ID remains in the immutable agent revision; no provider endpoint is embedded in an agent.
+
+### AEP tool contribution and MCP flow
+
+```text
+Agent tool reference: Agentstration.Tools/tools/{name}
+  -> persisted Tool resource (enablement, availability, schema, provider reference)
+  -> persisted ToolProvider (AEP or MCP; provider enablement and connection)
+  -> AEP descriptor mapping OR direct MCP tools/list
+  -> MCP tools/list supplies input/output schemas and annotations
+  -> official McpClientTool (Microsoft.Extensions.AI AITool)
+  -> Runtime.AgentFramework -> MAF agent tool invocation -> MCP tools/call
+```
+
+AEP owns extension identity, presentation metadata, server declarations, and the mapping from a lightweight contribution to MCP. It deliberately carries no tool schema, invocation payload, result, or operational MCP error. MCP remains authoritative for `tools/list`, schema/annotations, `tools/call`, results, and protocol failures. Agentstration owns persistent `ToolProviderResource` and `ToolResource` documents, discovery state, assignment by canonical resource ID, enablement, and future policy. Direct external MCP is a ToolProvider and does not pass through AEP. The catalog is independent of MAF; the Runtime adapter consumes its provider-neutral `IAgentTool` and reuses the official SDK's native `AITool` when available.
+
+Discovery is performed on provider create/update and by an explicit refresh operation. It materializes new tools as disabled, updates provider-owned metadata while preserving administrator enablement, marks disappeared tools unavailable without deleting them, and restores availability if they reappear. Runtime usability requires provider enabled, tool enabled, tool available, and an Agent assignment.
+
+Extension endpoints are resolved from `Agentstration:Extensions:{extensionId}:Endpoint`. Relative MCP endpoints in AEP discovery are resolved against that extension base URL; absolute endpoints must use HTTP(S). The earlier AEP chat `AepToolDefinition`, `AepToolCall`, and `AepToolResult` contracts describe model-provider function-calling exchange only and are not an operational extension-tool protocol.
 
 Model profiles and providers are persisted as `Agentstration.Models/modelProfiles` and `Agentstration.ModelProviders/modelProviders` documents in the Management control plane. The internal deployment configuration used by the runtime resolver is projected from the stored profile; it is not a separate public resource. Provider connectivity and discovered models are dynamic views and are not persisted. Provider writes validate adapter type, endpoint shape, and native options without requiring connectivity. Provider deletion queries exact profile references and fails while usages remain; profile deletion applies the equivalent rule to agent references.
 
@@ -281,7 +306,7 @@ Activity sources exist for ingestion, workflows, missions, Runtime Runs, Microso
 
 MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and is enabled by `Observability:GenAI:Enabled`, which defaults to `true`. OpenTelemetry sensitive-data capture is explicitly disabled in code: raw documents, prompts, responses, tool arguments, tool results, credentials, and authorization headers are not emitted by the normal telemetry pipeline. Operational logs use scopes carrying the Run and agent identifiers and export through OTLP alongside traces and metrics when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Aspire supplies the local dashboard endpoint.
 
-`Observability:GenAI:HttpPayloadCapture` is a separate, Development-only diagnostic boundary attached exclusively to the OpenAI-compatible and OllamaSharp model `HttpClient` pipelines. When explicitly enabled it inserts a correlated `gen_ai.http.payload_capture` span between the GenAI chat span and the network span, and records the final JSON request body in a span event and a structured log. Common credential fields are recursively redacted, URI query strings are removed, and a configured maximum length is applied. It never records headers and does not affect ingestion HTTP. Response capture is a separate opt-in because it buffers the response and changes streaming behavior. Payload traces and logs follow the configured exporters and must be treated as sensitive even after redaction.
+`Observability:GenAI:HttpPayloadCapture` remains a separate, Development-only diagnostic boundary for the legacy OpenAI-compatible model pipeline. AEP requests and the out-of-process Ollama extension do not enable payload capture by default. Normal AEP `HttpClient` instrumentation records network telemetry without prompts, responses, tool arguments, credentials, or authorization headers.
 
 ## Identity, tenancy, and local bootstrap
 
@@ -302,11 +327,14 @@ Standalone startup creates or repairs `local / default / default`, the local use
 9. **Delivered Runtime Run increment:** durable Run resources, local queue, exact agent-generation resolution, SQLite history, SSE observation, cancellation, retry, and Agent Runner console.
 10. **Next management increment:** durable long-running operations, manifest importer, resource groups, model/tool/connection/identity providers, and management authentication.
 11. **Next runtime increment:** provider-native streaming and tool telemetry, session storage, tool catalog policies, revision traffic splitting, dedicated process/container and remote endpoint adapters.
-12. **Delivered local model-provider increment:** provider-neutral resolver, OllamaSharp adapter, Aspire-provisioned Ollama/model volume, Runner integration, development diagnostic, and offline tests.
+12. **Delivered local model-provider increment:** provider-neutral resolver, the former in-process OllamaSharp adapter, Aspire-provisioned Ollama/model volume, Runner integration, development diagnostic, and offline tests; its adapter placement is superseded by AEP V1.
 13. **Delivered declared model resolution increment:** agent profile reference to profile/deployment/provider resolution, async `IChatClient` resolution, MAF materialization, resolved model Run metadata, and boundary tests.
 14. **Delivered model management API increment:** provider and profile CRUD with ETags, dynamic discovery/status/models, filters, usages, resolution, agent model expansion, Problem Details, and deletion protection.
 15. **Delivered model management UI increment:** provider and profile CRUD, connection testing, dynamic model inspection, ETag conflict recovery, usage-aware deletion, reusable agent profile picker, and declared-versus-resolved agent model details.
 16. **Delivered real Agent Runner invocation increment:** canonical Runner clients, exact-generation readiness/preparation, per-run profile resolution, dynamic Ollama model selection, effective generation options, and durable resolved-model metadata.
+17. **Delivered AEP V1 increment:** technology-neutral protocol contracts, reusable client/server framework, Microsoft.Extensions.AI adapter, out-of-process Ollama extension, Aspire orchestration, SSE streaming, discovery/version checks, and offline boundary tests.
+18. **Delivered AEP Tool Contributions increment:** schema-free AEP mappings to one or more MCP servers, persisted Tool/MCP-server resources, an official-SDK Tool Catalog, direct external MCP support, and native MAF tool adaptation.
+19. **Delivered Tool Provider governance increment:** persistent AEP/MCP providers, STDIO and Streamable HTTP, manual discovery with durable diffs, secure-default Tool materialization, Console governance, Agent selection, and deterministic AEP utilities.
 
 ## ADR catalog
 
@@ -331,3 +359,8 @@ Standalone startup creates or repairs `local / default / default`, the local use
 - ADR-0022: Interaction as durable conversation and FlowRun continuation
 - ADR-0023: Console supervision of WorkTasks through Work API
 - ADR-0024: Entries always target executable Flows
+- ADR-0026: out-of-process model-provider extensions through AEP
+- ADR-0027: AEP tool contributions resolve to MCP
+- ADR-0028: Tool Providers materialize a governed catalog
+- ADR-0029: Aspire consumes an existing local Ollama installation
+- ADR-0030: AEP is an autonomous SDK and Inspector repository

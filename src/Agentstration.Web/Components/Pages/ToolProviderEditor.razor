@@ -1,0 +1,47 @@
+@page "/tools/providers/new"
+@page "/tools/providers/{ResourceGroup}/{Name}"
+@inject IToolsClient Client
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsNew ? "Add Tool Provider" : displayName) · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? "Add Tool Provider" : displayName)" Description="Tool discovery is explicit governance: discovered tools are disabled until approved."><Actions><a class="button-secondary" href="/tools/providers">Back</a>@if (!IsNew) { <button class="button-secondary" @onclick="TestAsync" disabled="@busy">Test connection</button><button class="button-primary" @onclick="RefreshAsync" disabled="@busy">Refresh discovery</button> }</Actions></PageHeader>
+
+@if (loading) { <LoadingState Message="Loading provider…" /> }
+else
+{
+    @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")">@message</div> }
+    @if (!IsNew) { <ResourceTabs Label="Provider sections"><a class="active" href="#overview">Overview</a><a href="#tools">Tools</a><a href="#connection">Connection</a></ResourceTabs> }
+    <section class="panel form-section" id="overview"><div class="panel-header"><h2>Overview</h2></div><div class="form-grid">
+        <label><span>Name</span><input @bind="name" disabled="@(!IsNew)" /></label><label><span>Display name</span><input @bind="displayName" /></label>
+        <label><span>Provider type</span><select @bind="providerType" disabled="@(!IsNew)"><option value="Mcp">MCP</option><option value="Aep">AEP</option></select></label>
+        <label><span>Enabled</span><input type="checkbox" @bind="enabled" /></label>
+        @if (!IsNew) { <div><span class="field-label">Status</span><p>@provider?.Properties.Discovery.Status</p></div><div><span class="field-label">Last discovery</span><p>@(provider?.Properties.Discovery.LastDiscoveryAt?.ToString("g") ?? "Never")</p></div> }
+    </div></section>
+    <section class="panel form-section" id="connection"><div class="panel-header"><h2>Connection</h2></div><div class="form-grid">
+        @if (providerType == ToolProviderType.Aep) { <label class="form-span-2"><span>AEP extension ID</span><input @bind="extensionId" /></label> }
+        else { <label><span>Transport</span><select @bind="transport"><option value="Stdio">STDIO</option><option value="StreamableHttp">Streamable HTTP</option></select></label>
+            @if (transport == McpToolProviderTransport.Stdio) { <label><span>Command</span><input @bind="command" placeholder="npx" /></label><label class="form-span-2"><span>Arguments (one per line)</span><textarea @bind="arguments" rows="4"></textarea></label><label><span>Working directory</span><input @bind="workingDirectory" /></label><label><span>Environment references</span><textarea @bind="environmentReferences" rows="4" placeholder="TOKEN=Secrets:Mcp:Token"></textarea><small>Values are configuration references; secrets are never stored in this resource.</small></label> }
+            else { <label class="form-span-2"><span>Endpoint</span><input @bind="endpoint" placeholder="https://server.example/mcp" /></label> }
+        }
+    </div></section>
+    <div class="form-actions"><button class="button-primary" @onclick="SaveAsync" disabled="@busy">@(busy ? "Saving…" : "Save provider")</button></div>
+
+    @if (!IsNew) { <section class="panel" id="tools"><div class="panel-header"><div><h2>Tools</h2><p>@tools.Count discovered; new tools are disabled by default.</p></div></div>
+        @if (tools.Count == 0) { <EmptyState Title="No tools discovered" Message="Refresh discovery after validating the connection." /> }
+        else { <DataGrid TItem="ToolResource" Items="tools"><Header><tr><th>Name</th><th>Status</th><th>Enabled</th><th></th></tr></Header><Row Context="tool"><tr><td><strong>@tool.Properties.DisplayName</strong><br/><code>@tool.Properties.ExternalId</code></td><td>@(tool.Properties.Discovery?.Available == true ? "Available" : "Unavailable")</td><td><input type="checkbox" checked="@tool.Properties.Enabled" @onchange="args => EnableAsync(tool, (bool)args.Value!)" /></td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.ResourceGroup!)}/{Uri.EscapeDataString(tool.Name)}")">Inspect →</a></td></tr></Row></DataGrid> }
+    </section> }
+}
+
+@code {
+    [Parameter] public string? ResourceGroup { get; set; } [Parameter] public string? Name { get; set; }
+    private bool IsNew => string.IsNullOrWhiteSpace(Name); private bool loading = true, busy, failed; private string? message, etag; private ToolProviderResource? provider; private IReadOnlyList<ToolResource> tools = [];
+    private string name = "", displayName = "", extensionId = "", command = "", arguments = "", workingDirectory = "", endpoint = "", environmentReferences = ""; private bool enabled = true; private ToolProviderType providerType = ToolProviderType.Mcp; private McpToolProviderTransport transport = McpToolProviderTransport.Stdio;
+    protected override async Task OnParametersSetAsync() { loading = true; if (!IsNew) { var snapshot = await Client.GetProviderAsync(ResourceGroup ?? "default", Name!, default); provider = snapshot.Value; etag = snapshot.ETag; From(provider); tools = await Client.GetToolsAsync(provider.ResourceGroup, provider.Name); } loading = false; }
+    private void From(ToolProviderResource value) { name=value.Name; displayName=value.Properties.DisplayName; enabled=value.Properties.Enabled; providerType=value.Properties.ProviderType; extensionId=value.Properties.Aep?.ExtensionId??""; transport=value.Properties.Mcp?.Transport??McpToolProviderTransport.Stdio; command=value.Properties.Mcp?.Command??""; arguments=string.Join(Environment.NewLine,value.Properties.Mcp?.Arguments??[]); workingDirectory=value.Properties.Mcp?.WorkingDirectory??""; endpoint=value.Properties.Mcp?.Endpoint?.ToString()??""; environmentReferences=string.Join(Environment.NewLine,(value.Properties.Mcp?.EnvironmentReferences??new Dictionary<string,string>()).Select(x=>$"{x.Key}={x.Value}")); }
+    private ToolProviderProperties Properties() => new() { DisplayName=displayName, ProviderType=providerType, Enabled=enabled, Aep=providerType==ToolProviderType.Aep?new AepToolProviderConfiguration{ExtensionId=extensionId}:null, Mcp=providerType==ToolProviderType.Mcp?new McpToolProviderConfiguration{Transport=transport,Command=Null(command),Arguments=Lines(arguments),WorkingDirectory=Null(workingDirectory),Endpoint=Uri.TryCreate(endpoint,UriKind.Absolute,out var uri)?uri:null,EnvironmentReferences=Pairs(environmentReferences)}:null };
+    private async Task SaveAsync() { busy=true; failed=false; message=null; try { if(IsNew){var saved=await Client.CreateProviderAsync(new(name,"default","local",Properties()),default); Navigation.NavigateTo($"/tools/providers/default/{Uri.EscapeDataString(saved.Value.Name)}");}else{var saved=await Client.UpdateProviderAsync(ResourceGroup??"default",Name!,new(Properties()),etag!,default);provider=saved.Value;etag=saved.ETag;tools=await Client.GetToolsAsync(provider.ResourceGroup,provider.Name);message=provider.Properties.Discovery.Status=="connected"?"Provider saved and discovery refreshed.":$"Provider saved; discovery status: {provider.Properties.Discovery.Status}.";}}catch(Exception ex){failed=true;message=ex.Message;}finally{busy=false;} }
+    private async Task TestAsync(){busy=true;try{var result=await Client.TestAsync(ResourceGroup??"default",Name!,default);failed=false;message=$"Connected. Protocol negotiation succeeded; {result.ToolCount} tools discovered.";}catch(Exception ex){failed=true;message=ex.Message;}finally{busy=false;}}
+    private async Task RefreshAsync(){busy=true;try{var diff=await Client.RefreshAsync(ResourceGroup??"default",Name!,default);tools=await Client.GetToolsAsync(ResourceGroup,Name!);failed=false;message=$"Discovery: {diff.Unchanged} unchanged, {diff.New} new, {diff.Changed} changed, {diff.Unavailable} unavailable.";}catch(Exception ex){failed=true;message=ex.Message;}finally{busy=false;}}
+    private async Task EnableAsync(ToolResource tool,bool value){await Client.SetEnabledAsync(tool.ResourceGroup!,tool.Name,value,null,default);tools=await Client.GetToolsAsync(ResourceGroup,Name!);}
+    private static string? Null(string value)=>string.IsNullOrWhiteSpace(value)?null:value.Trim(); private static string[] Lines(string value)=>value.Split(['\r','\n'],StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries); private static IReadOnlyDictionary<string,string> Pairs(string value)=>Lines(value).Select(line=>line.Split('=',2)).Where(x=>x.Length==2).ToDictionary(x=>x[0].Trim(),x=>x[1].Trim(),StringComparer.Ordinal);
+}
