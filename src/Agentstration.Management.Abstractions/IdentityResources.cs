@@ -21,13 +21,6 @@ public sealed record Workspace(
     WorkspaceStatus Status,
     DateTimeOffset CreatedAt);
 
-public sealed record ResourceGroup(
-    Guid Id,
-    Guid TenantId,
-    Guid WorkspaceId,
-    string Name,
-    DateTimeOffset CreatedAt);
-
 public sealed record User(
     Guid Id,
     string? ExternalSubject,
@@ -132,8 +125,6 @@ public interface IIdentityStore
     Task<Workspace?> GetWorkspaceAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Workspace>> ListWorkspacesAsync(Guid tenantId, CancellationToken cancellationToken);
     Task AddWorkspaceAsync(Workspace workspace, CancellationToken cancellationToken);
-    Task<ResourceGroup?> FindResourceGroupAsync(Guid tenantId, Guid workspaceId, string name, CancellationToken cancellationToken);
-    Task AddResourceGroupAsync(ResourceGroup resourceGroup, CancellationToken cancellationToken);
     Task<User?> FindUserByExternalSubjectAsync(string externalSubject, CancellationToken cancellationToken);
     Task<User?> GetUserAsync(Guid userId, CancellationToken cancellationToken);
     Task AddUserAsync(User user, CancellationToken cancellationToken);
@@ -149,7 +140,7 @@ public interface IIdentityStore
 
 public interface IResourceScopeMigrator
 {
-    Task BackfillUnscopedResourcesAsync(Guid tenantId, Guid workspaceId, Guid resourceGroupId, CancellationToken cancellationToken);
+    Task BackfillUnscopedResourcesAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken);
 }
 
 public sealed class AuthorizationDeniedException(string permission)

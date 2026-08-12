@@ -34,7 +34,7 @@ public sealed class IdentityFoundationTests
     {
         await using var fixture = await IdentityFixture.CreateAsync();
         var original = fixture.Context.Current;
-        await fixture.ExecuteSqlAsync("DELETE FROM RoleAssignments; DELETE FROM TenantMemberships; DELETE FROM ResourceGroups; DELETE FROM Workspaces;");
+        await fixture.ExecuteSqlAsync("DELETE FROM RoleAssignments; DELETE FROM TenantMemberships; DELETE FROM Workspaces;");
 
         await fixture.Bootstrap.EnsureInitializedAsync(default);
 
@@ -45,7 +45,6 @@ public sealed class IdentityFoundationTests
         Assert.AreNotEqual(original.WorkspaceId, repaired.WorkspaceId);
         Assert.IsNotNull(await store.FindMembershipAsync(repaired.TenantId, repaired.UserId, default));
         Assert.AreEqual(1, (await store.ListRoleAssignmentsAsync(repaired.TenantId, repaired.UserId, default)).Count);
-        Assert.IsNotNull(await store.FindResourceGroupAsync(repaired.TenantId, repaired.WorkspaceId, "default", default));
     }
 
     [TestMethod]
@@ -96,22 +95,20 @@ public sealed class IdentityFoundationTests
         var secondWorkspace = new Workspace(Guid.NewGuid(), first.TenantId, "finance", "Finance", WorkspaceStatus.Active, now);
         await identity.AddWorkspaceAsync(secondWorkspace, default);
 
-        var firstId = ResourceIdentifier.Create(first.WorkspaceId, "default", AgentstrationProviderNamespaces.Runtime, "runtimeProfiles", "shared").Value;
-        await resources.PutAsync(Profile(firstId, first), null, true, default);
+        var key = new ResourceKey(ResourceKinds.RuntimeProfile, "shared");
+        await resources.PutAsync(Profile("shared", first), null, true, default);
         fixture.Context.Initialize(first with { WorkspaceId = secondWorkspace.Id });
         var second = fixture.Context.Current;
-        var secondId = ResourceIdentifier.Create(second.WorkspaceId, "default", AgentstrationProviderNamespaces.Runtime, "runtimeProfiles", "shared").Value;
-        await resources.PutAsync(Profile(secondId, second), null, true, default);
+        await resources.PutAsync(Profile("shared", second), null, true, default);
 
-        Assert.IsNull(await resources.GetAsync<RuntimeProfileResource>(firstId, default));
-        Assert.IsNotNull(await resources.GetAsync<RuntimeProfileResource>(secondId, default));
+        Assert.IsNotNull(await resources.GetAsync<RuntimeProfileResource>(key, default));
 
         var otherTenant = new Tenant(Guid.NewGuid(), "other", "Other", TenantStatus.Active, now);
         await identity.AddTenantAsync(otherTenant, default);
         var otherWorkspace = new Workspace(Guid.NewGuid(), otherTenant.Id, "default", "Default", WorkspaceStatus.Active, now);
         await identity.AddWorkspaceAsync(otherWorkspace, default);
         fixture.Context.Initialize(second with { TenantId = otherTenant.Id, WorkspaceId = otherWorkspace.Id });
-        Assert.IsNull(await resources.GetAsync<RuntimeProfileResource>(secondId, default));
+        Assert.IsNull(await resources.GetAsync<RuntimeProfileResource>(key, default));
     }
 
     [TestMethod]
@@ -126,7 +123,7 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
-    public async Task WorkspaceCreationAlsoCreatesTheDefaultResourceGroup()
+    public async Task WorkspaceCreationDoesNotRequireAResourceGroup()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
         var administration = fixture.Services.GetRequiredService<IdentityAdministrationService>();
@@ -135,7 +132,7 @@ public sealed class IdentityFoundationTests
         var workspace = await administration.CreateWorkspaceAsync("support", "Customer support", default);
 
         Assert.AreEqual(fixture.Context.Current.TenantId, workspace.TenantId);
-        Assert.IsNotNull(await store.FindResourceGroupAsync(workspace.TenantId, workspace.Id, "default", default));
+        Assert.AreEqual("support", workspace.Name);
     }
 
     [TestMethod]
@@ -161,8 +158,8 @@ public sealed class IdentityFoundationTests
     {
         Id = id,
         Name = "shared",
-        Type = AgentstrationResourceTypes.RuntimeProfiles,
-        ApiVersion = ManagementApiVersions.V20260801,
+        Kind = ResourceKinds.RuntimeProfile,
+        ApiVersion = ManagementApiVersions.CoreV1,
         ResourceGroup = "default",
         TenantId = context.TenantId,
         WorkspaceId = context.WorkspaceId,

@@ -7,18 +7,13 @@ public static class ManagementEndpoints
 {
     public static IEndpointRouteBuilder MapAgentstrationManagementApi(this IEndpointRouteBuilder endpoints)
     {
-        MapRoutes(endpoints.MapGroup("/resourceGroups/{resourceGroup}/providers/Agentstration.Agents")
-            .AddEndpointFilter<ManagementAuthorizationFilter>());
-        MapRoutes(endpoints.MapGroup("/workspaces/{workspaceId:guid}/resourceGroups/{resourceGroup}/providers/Agentstration.Agents")
+        MapRoutes(endpoints.MapGroup("/api")
             .AddEndpointFilter<ManagementAuthorizationFilter>());
         return endpoints;
     }
 
     private static void MapRoutes(RouteGroupBuilder group)
     {
-        PutAgentTypeEndpoint.Map(group);
-        ListAgentTypesEndpoint.Map(group);
-        GetAgentTypeEndpoint.Map(group);
         PutAgentEndpoint.Map(group);
         ListAgentsEndpoint.Map(group);
         GetAgentEndpoint.Map(group);

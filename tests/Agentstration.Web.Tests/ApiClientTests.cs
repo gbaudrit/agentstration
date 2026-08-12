@@ -95,7 +95,7 @@ public sealed class ApiClientTests
         using var flowCatalog = new HttpClient(new StubHandler(request =>
         {
             Assert.AreEqual("/api/resources", request.RequestUri!.AbsolutePath);
-            Assert.AreEqual("Agentstration.Flows/flows", Uri.UnescapeDataString(request.RequestUri.Query.Replace("?type=", "", StringComparison.Ordinal)));
+            Assert.AreEqual(ResourceKinds.Flow, Uri.UnescapeDataString(request.RequestUri.Query.Replace("?kind=", "", StringComparison.Ordinal)));
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = JsonContent.Create(new[]
@@ -271,13 +271,13 @@ public sealed class ApiClientTests
     {
         var editor = new ModelProfileEditorModel
         {
-            Name = "reasoning-default", DisplayName = "Default reasoning", ProviderResourceId = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.ModelProviders, "modelProviders", "ollama-local").Value,
+            Name = "reasoning-default", DisplayName = "Default reasoning", ProviderName = "ollama-local",
             ModelName = "qwen3:4b", Temperature = 0.2, MaxOutputTokens = 1000
         };
 
         var request = editor.ToCreateRequest();
 
-        Assert.AreEqual("ollama-local", ResourceIdentifier.Parse(request.Properties.Provider.ResourceId).Name);
+        Assert.AreEqual("ollama-local", request.Properties.Provider.Name);
         Assert.AreEqual("qwen3:4b", request.Properties.Model.Name);
         Assert.AreEqual(0.2, request.Properties.Generation.Temperature);
     }
@@ -304,21 +304,18 @@ public sealed class ApiClientTests
         var model = new AgentEditorModel
         {
             Name = "web-agent",
-            ResourceGroup = "default",
-            Location = "local",
             DisplayName = "Web Agent",
-            AgentTypeResourceId = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Agents, "agentTypes", "readonly-expert").Value,
-            AgentTypeVersion = 2,
-            ModelProfileResourceId = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Models, "modelProfiles", "reasoning-default").Value,
-            ToolResourceIds = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Tools, "tools", "search").Value,
+            Instructions = "Help with web development.",
+            ModelProfileName = "reasoning-default",
+            ToolNames = "search",
             Tags = "domain=web\nowner=platform"
         };
 
         var request = model.ToRequest();
 
-        Assert.AreEqual(2, request.Properties.AgentType.Version);
-        Assert.HasCount(1, request.Properties.Tools);
-        Assert.AreEqual("web", request.Tags!["domain"]);
+        Assert.AreEqual("reasoning-default", request.Definition.ModelProfile.Name);
+        Assert.HasCount(1, request.Definition.Tools);
+        Assert.AreEqual("web", request.Metadata.Tags["domain"]);
     }
 
     [TestMethod]
@@ -426,11 +423,11 @@ public sealed class ApiClientTests
             Generation = 1,
             ETag = etag,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Accepted, ResourceVersion = etag },
-            Properties = new AgentProperties
+            Definition = new AgentProperties
             {
                 DisplayName = name,
-                AgentType = new AgentTypeReference(ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Agents, "agentTypes", "readonly-expert").Value, 1),
-                ModelProfile = new ResourceReference(ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Models, "modelProfiles", "reasoning-default").Value)
+                Instructions = "Help the user.",
+                ModelProfile = new ResourceReference("reasoning-default")
             }
         };
     }
@@ -455,13 +452,10 @@ public sealed class ApiClientTests
 
     private static AgentResourceRequest ToRequest(AgentResource resource) => new()
     {
-        Type = resource.Type,
         ApiVersion = resource.ApiVersion,
-        Name = resource.Name,
-        ResourceGroup = resource.ResourceGroup!,
-        Location = resource.Location!,
-        Tags = resource.Tags,
-        Properties = resource.Properties
+        Kind = resource.Kind,
+        Metadata = resource.Metadata,
+        Definition = resource.Definition
     };
 
     private static RuntimeRun CreateRun(string id) => new()

@@ -361,11 +361,15 @@ public static class WorkplaceValidation
     public static void ValidateBinding(EntryBinding binding)
     {
         ArgumentNullException.ThrowIfNull(binding);
+        if (binding.Kind == EntryBindingKind.Agent)
+        {
+            if (string.IsNullOrWhiteSpace(binding.ResourceId) || binding.ResourceId.Contains('/', StringComparison.Ordinal))
+                throw new WorkValidationException("entry_binding_invalid", "The Agent binding name is invalid.");
+            return;
+        }
         var segments = binding.ResourceId.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var expectedProvider = binding.Kind == EntryBindingKind.Agent ? "Agentstration.Agents" : "Agentstration.Flows";
-        var expectedType = binding.Kind == EntryBindingKind.Agent ? "agents" : "flows";
-        if (segments.Length != 6 || !string.Equals(segments[3], expectedProvider, StringComparison.Ordinal)
-            || !string.Equals(segments[4], expectedType, StringComparison.Ordinal))
+        if (segments.Length != 6 || !string.Equals(segments[3], "Agentstration.Flows", StringComparison.Ordinal)
+            || !string.Equals(segments[4], "flows", StringComparison.Ordinal))
             throw new WorkValidationException("entry_binding_invalid", $"The {binding.Kind} binding resource identifier is invalid.");
     }
 

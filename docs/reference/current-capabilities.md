@@ -44,31 +44,29 @@ Agent declaration belongs to the Management Plane. It owns the desired state, ge
 
 The module is physically isolated: `Agentstration.Management.Abstractions` contains its canonical resources, ports, and published events, while `Agentstration.Management.Core` contains validation and use cases. No Management model or service remains in the general Domain or Application projects.
 
-Agents use the existing Microsoft-like resource format; no parallel manifest format is introduced:
+Agents use the Agentstration-native resource envelope in both JSON and YAML:
 
 ```yaml
-type: Agentstration.Agents/agents
-apiVersion: 2026-08-01
-name: sql-expert
-resourceGroup: default
-location: local
-tags:
-  domain: database
-properties:
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: sql-expert
+  tags:
+    domain: database
+  annotations: {}
+definition:
   displayName: SQL Expert
   description: Specialized agent for database questions.
-  agentType:
-    resourceId: /resourceGroups/default/providers/Agentstration.Agents/agentTypes/readonly-expert
-    version: 1
-  additionalInstructions: |
+  handler: prompt-agent
+  instructions: |
     Focus on SQL Server.
   modelProfile:
-    resourceId: /resourceGroups/default/providers/Agentstration.Models/modelProfiles/reasoning-default
+    name: reasoning-default
   tools:
-    - resourceId: /resourceGroups/default/providers/Agentstration.Tools/tools/sql-readonly
+    - name: sql-readonly
 ```
 
-The agent resource ID is `/resourceGroups/{resourceGroup}/providers/Agentstration.Agents/agents/{agentName}`. `PUT` is idempotent: an identical declaration preserves its generation and resource version, while a functional change increments the generation and publishes an independent `AgentCreated`, `AgentUpdated`, or `AgentDeleted` event.
+The server generates an immutable UID; logical identity is `(Workspace, Agent, metadata.name)`. `PUT` is idempotent and conditional writes use ETags.
 
 ## Tool Providers and discovery
 
@@ -232,18 +230,18 @@ The Blazor console exposes this vertical through `/modelproviders`, `/modelprofi
 
 ### Management plane
 
-The API follows a Microsoft-like resource shape and requires `api-version=2026-08-01`. After startup, inspect a seeded deployment:
+After startup, inspect a seeded deployment:
 
 ```powershell
-$base = "http://localhost:5080/resourceGroups/default/providers/Agentstration.Agents"
-Invoke-RestMethod "$base/deployments/sql-expert?api-version=2026-08-01"
+$base = "http://localhost:5080/api"
+Invoke-RestMethod "$base/deployments/sql-expert"
 ```
 
 Route a request to exactly one ready agent and execute it:
 
 ```powershell
 $body = @{ input = "How can I optimize this SQL query?" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -ContentType application/json -Body $body "$base/routing/invoke?api-version=2026-08-01"
+Invoke-RestMethod -Method Post -ContentType application/json -Body $body "$base/routing/invoke"
 ```
 
 Management endpoints support ETag, `If-Match`, `If-None-Match`, Problem Details, pagination, and `202 Accepted` for deployment actions. SQLite data is stored in `.agentstration/control-plane.db` by default.

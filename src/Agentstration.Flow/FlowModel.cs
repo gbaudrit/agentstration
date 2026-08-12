@@ -11,7 +11,7 @@ public readonly record struct FlowId(string Value)
 public sealed record FlowReference(FlowId FlowId, string? Version = null, bool UseActiveVersion = true);
 
 public enum FlowKind { Direct, Routing, Workflow, Orchestration, Composite }
-public enum FlowTargetKind { Agent, AgentType, Flow }
+public enum FlowTargetKind { Agent, Flow }
 public enum FlowRoutingStrategy { Deterministic, Capabilities, Semantic, Llm, Hybrid, Custom }
 public enum FlowNodeKind { Input, Agent, Router, Condition, Transform, Output, Failure, Flow, Function, ExternalCall, HumanApproval, Custom }
 public enum FlowOrchestrationStrategy { Sequential, Concurrent, Handoff, GroupChat, Magentic, Custom }
@@ -202,7 +202,7 @@ public static class FlowValidator
         {
             case DirectFlowSpec direct:
                 ValidateTarget(direct.Target);
-                if (direct.Target?.Kind == FlowTargetKind.Flow) throw new FlowValidationException("direct_target_invalid", "A Direct Flow must target an Agent or AgentType.");
+                if (direct.Target?.Kind == FlowTargetKind.Flow) throw new FlowValidationException("direct_target_invalid", "A Direct Flow must target an Agent.");
                 break;
             case RoutingFlowSpec routing:
                 if (routing.Destinations is null || routing.Destinations.Count == 0) throw new FlowValidationException("routing_destinations_required", "A Routing Flow requires at least one destination.");
@@ -217,7 +217,7 @@ public static class FlowValidator
                 foreach (var participant in orchestration.Participants)
                 {
                     ValidateTarget(participant);
-                    if (participant.Kind == FlowTargetKind.Flow) throw new FlowValidationException("orchestration_participant_invalid", "Orchestration participants must be Agents or AgentTypes.");
+                    if (participant.Kind == FlowTargetKind.Flow) throw new FlowValidationException("orchestration_participant_invalid", "Orchestration participants must be Agents.");
                 }
                 if (orchestration.MaximumIterations is < 1) throw new FlowValidationException("orchestration_iterations_invalid", "Maximum iterations must be positive.");
                 break;

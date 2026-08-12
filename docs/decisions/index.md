@@ -1,5 +1,7 @@
 # Architecture Decision Records
 
+- [ADR-0031: Agentstration-native declarative resource envelope](0031-agentstration-native-resource-envelope.md)
+
 ADRs record durable architectural choices and their consequences. Existing decisions are numbered in chronological order and remain in Git when superseded.
 
 ## Format

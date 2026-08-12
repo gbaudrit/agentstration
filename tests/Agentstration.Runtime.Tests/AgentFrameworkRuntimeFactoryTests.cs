@@ -29,7 +29,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         var runtime = await factory.CreateAsync(definition, "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
         var result = await runtime.ExecuteAsync(new AgentExecutionRequest("What is HAVING?", "run-1", new ModelExecutionOptions(0.7f, 1500)), default);
 
-        Assert.AreEqual(definition.ModelProfileId, resolver.RequestedProfile);
+        Assert.AreEqual(definition.ModelProfileName, resolver.RequestedProfile);
         Assert.AreEqual("sql-expert", runtime.AgentId);
         Assert.AreEqual("OK", result.Output);
         Assert.IsTrue(chatClient.Options?.Instructions?.Contains(definition.EffectiveInstructions, StringComparison.Ordinal) == true);
@@ -143,9 +143,9 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         Description = "SQL specialist",
         AgentVersion = 1,
         EffectiveInstructions = "Focus on SQL Server.",
-        ModelProfileId = "/resourceGroups/default/providers/Agentstration.Models/modelProfiles/reasoning-default",
-        RuntimeProfileId = "/resourceGroups/default/providers/Agentstration.Runtime/runtimeProfiles/maf-default",
-        EffectiveToolIds = [],
+        ModelProfileName = "reasoning-default",
+        RuntimeProfileName = "maf-default",
+        EffectiveToolNames = [],
         MiddlewareIds = [],
         ContextProviderIds = [],
         Capabilities = [],

@@ -6,10 +6,8 @@ namespace Agentstration.ModelProviders;
 
 public sealed record ModelProviderConfiguration
 {
-    public required string ResourceId { get; init; }
+    public required Guid Uid { get; init; }
     public required string Name { get; init; }
-    public string ResourceGroup { get; init; } = "default";
-    public string Location { get; init; } = "local";
     public required string ProviderType { get; init; }
     public required Uri Endpoint { get; init; }
     public string? DisplayName { get; init; }
@@ -77,7 +75,7 @@ public interface IModelProviderResolver
 
 public interface IModelProfileStore
 {
-    ValueTask<ModelProfileConfiguration> GetRequiredAsync(string resourceId, CancellationToken cancellationToken = default);
+    ValueTask<ModelProfileConfiguration> GetRequiredAsync(string name, CancellationToken cancellationToken = default);
 }
 
 public interface IModelDeploymentStore
@@ -101,7 +99,7 @@ public interface IModelProviderDiscovery
 
 public interface IChatClientResolver
 {
-    ValueTask<IChatClient> ResolveAsync(string modelProfileResourceId, CancellationToken cancellationToken = default);
+    ValueTask<IChatClient> ResolveAsync(string modelProfileName, CancellationToken cancellationToken = default);
 }
 
 public sealed class ModelProviderResolver(IEnumerable<IModelProvider> providers) : IModelProviderResolver
@@ -120,7 +118,7 @@ public sealed class ModelProviderResolver(IEnumerable<IModelProvider> providers)
 }
 
 public abstract class ModelProviderResolutionException(string message) : Exception(message);
-public sealed class ModelProfileNotFoundException(string resourceId) : ModelProviderResolutionException($"Model profile '{resourceId}' was not found.");
+public sealed class ModelProfileNotFoundException(string name) : ModelProviderResolutionException($"Model profile '{name}' was not found.");
 public sealed class ModelDeploymentNotFoundException(string name) : ModelProviderResolutionException($"Model deployment '{name}' was not found.");
 public sealed class ModelProviderConfigurationNotFoundException(string name) : ModelProviderResolutionException($"Model provider configuration '{name}' was not found.");
 public sealed class ModelProviderNotFoundException(string providerType) : ModelProviderResolutionException($"Model provider implementation '{providerType}' is not registered.");

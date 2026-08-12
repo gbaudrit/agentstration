@@ -228,7 +228,7 @@ Console save-and-apply / explicit Runtime reconcile
   -> on failure, keep the previous healthy generation running
 ```
 
-Management never constructs an `AIAgent`, resolves credentials, injects a model client, instantiates tools, or executes an agent. `ResolvedAgentSpec` is the provider-neutral boundary prepared for future resolution of `AgentType`, model profile, and tools; concrete MAF materialization remains in `Agentstration.Runtime.AgentFramework`.
+Management never constructs an `AIAgent`, resolves credentials, injects a model client, instantiates tools, or executes an agent. `ResolvedAgentSpec` is the provider-neutral boundary for the direct Agent definition, model profile, and tools; concrete MAF materialization remains in `Agentstration.Runtime.AgentFramework`.
 
 Local activation is idempotent. During the short overlap needed for a safe replacement, routing selects the highest ready `AgentVersion` for each logical agent, so an older ready deployment cannot win because of storage enumeration order.
 
@@ -310,14 +310,14 @@ MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and i
 
 ## Identity, tenancy, and local bootstrap
 
-The Management boundary now persists a `Tenant -> Workspace -> ResourceGroup` hierarchy and a global `User -> TenantMembership -> RoleAssignment -> RoleDefinition` authorization model in the SQLite control-plane database. Management resource rows carry explicit tenant, workspace, and resource-group scope columns in addition to their preserved JSON payload. Store reads, writes, lists, and deletes are filtered by the initialized request context.
+The Management boundary persists a `Tenant -> Workspace` hierarchy and a global `User -> TenantMembership -> RoleAssignment -> RoleDefinition` authorization model in the SQLite control-plane database. Management resource rows carry explicit tenant and workspace scope columns in addition to their JSON payload. Store reads, writes, lists, and deletes are filtered by the initialized request context.
 
-Standalone startup creates or repairs `local / default / default`, the local user, active tenant membership, and a tenant-level Owner assignment before management demo data is seeded. Parent tenant assignments inherit into every accessible workspace. The request pipeline validates the workspace selection stored in an HTTP-only cookie, installs it as an ambient request context, and restores the standalone fallback after the request. The Console exposes a dynamic workspace selector plus General, Workspaces, Members, and Access Control views; authorized users can create a workspace and its default resource group. Management HTTP routes accept both the compatibility resource-group form and the workspace-prefixed canonical form. See ADR-0025 for migration and bounded-context limitations.
+Standalone startup creates or repairs `local / default`, the local user, active tenant membership, and a tenant-level Owner assignment before management demo data is seeded. Parent tenant assignments inherit into every accessible workspace. The request pipeline validates the workspace selection stored in an HTTP-only cookie, installs it as an ambient request context, and restores the standalone fallback after the request. The Console exposes a dynamic workspace selector plus General, Workspaces, Members, and Access Control views. Management HTTP routes use `/api/...`; workspace scope comes from the authorized context. See ADR-0031.
 
 ## Implementation plan
 
 1. **Delivered foundation:** solution conventions, domain/application boundaries, local content store, API/UI/MCP, OTel, Aspire, and tests.
-2. **Delivered management vertical:** agent types, policy-aware deterministic compilation, immutable revisions, SQLite control-plane storage, deployments, ETags, Microsoft-like REST API, and pagination.
+2. **Delivered management vertical:** direct agent definitions, deterministic compilation, immutable revisions, SQLite control-plane storage, deployments, ETags, concise REST API, and pagination.
 3. **Delivered runtime vertical:** isolated Microsoft Agent Framework adapter, in-process/shared-host provisioners, runtime registry, periodic reconciliation, single-agent routing, execution, and standalone sample data.
 4. **Delivered content and monitoring verticals:** ingestion, memory/search, deterministic/OpenAI-compatible AI, missions, change detection, and internal notifications.
 5. **Delivered Work vertical:** domain-controlled lifecycle, typed identifiers, interactions, idempotent Runtime events, independent SQLite persistence, local execution gateway, canonical REST API, metrics, traces, and tests.

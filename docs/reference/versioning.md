@@ -5,8 +5,8 @@ Several independent versions coexist in Agentstration. They must not be substitu
 | Version | Example | What changes it |
 | --- | --- | --- |
 | Product version | `0.7.0` | A product release under Semantic Versioning. |
-| HTTP API version | Future `v1`; current dated `api-version` on some surfaces | A breaking HTTP contract change, not every product release. |
-| Resource `apiVersion` | `2026-08-01` | The schema of a declarative resource. |
+| HTTP API version | Current unversioned `/api` routes | A breaking HTTP contract change, not every product release. |
+| Resource `apiVersion` | `agentstration.io/v1` | The schema of a declarative Management resource. |
 | Resource revision/generation | Agent generation `3` | A change to one resource instance or immutable snapshot. |
 | Documentation version | `Next`, later `1.x` | A supported major documentation line. |
 
@@ -20,15 +20,15 @@ The repository currently has no central product version property and no Git rele
 
 An HTTP API version represents a compatibility boundary. Product `1.0`, `1.5`, and even `2.0` could continue to expose the same API version if the contract remains compatible.
 
-The current API is not uniformly path-versioned. Management endpoints require the dated query parameter `api-version=2026-08-01`; Workplace resources use `2026-08-05` in their contracts; several `/api/...` routes are currently unversioned. Introducing `/api/v1` is **planned policy**, not an implemented migration.
+The current API is not uniformly path-versioned. Management uses short `/api/...` routes and carries its schema version in the resource document. Workplace retains its own contract versioning. Introducing `/api/v1` remains a separate future HTTP decision.
 
 ## Resource apiVersion
 
-`apiVersion` identifies a resource schema, not the Agentstration release and not an instance revision. Stable resource schemas use a date such as `2026-08-01`. A future experimental schema may use `YYYY-MM-DD-preview`; no preview resource schema is currently implemented.
+`apiVersion` identifies a resource schema, not the Agentstration release and not an instance revision. The Management schema is `agentstration.io/v1`.
 
 ## Resource revision and generation
 
-An Agent's `generation` changes when its functional declaration changes. Immutable Agent revisions refer to a particular Agent generation and Agent Type version. Other aggregates also use versions or ETags for concurrency. These instance-level values do not replace `apiVersion`.
+An Agent's internal generation changes when its functional declaration changes. Immutable Agent revisions capture the directly declared definition. Other aggregates also use versions or ETags for concurrency. These instance-level values do not replace `apiVersion` or the immutable resource UID.
 
 ## Flow versions
 

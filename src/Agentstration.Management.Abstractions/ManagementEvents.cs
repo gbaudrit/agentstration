@@ -5,9 +5,9 @@ public interface IManagementEvent
     DateTimeOffset OccurredAt { get; }
 }
 
-public sealed record AgentCreated(string ResourceId, long Generation, DateTimeOffset OccurredAt) : IManagementEvent;
-public sealed record AgentUpdated(string ResourceId, long Generation, DateTimeOffset OccurredAt) : IManagementEvent;
-public sealed record AgentDeleted(string ResourceId, DateTimeOffset OccurredAt) : IManagementEvent;
+public sealed record AgentCreated(Guid Uid, string Name, long Generation, DateTimeOffset OccurredAt) : IManagementEvent;
+public sealed record AgentUpdated(Guid Uid, string Name, long Generation, DateTimeOffset OccurredAt) : IManagementEvent;
+public sealed record AgentDeleted(Guid Uid, string Name, DateTimeOffset OccurredAt) : IManagementEvent;
 
 public interface IManagementEventPublisher
 {

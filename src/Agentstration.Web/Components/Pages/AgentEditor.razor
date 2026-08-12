@@ -26,7 +26,7 @@ else
     @if (!IsNew)
     {
         <ResourceHeader ResourceType="Agent" Domain="agent" Icon="◎" Name="@model.DisplayName" Description="@model.Description" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
-            <Metadata><span><code>@model.Name</code></span><span>Generation @generation</span><span>@model.Location</span></Metadata>
+            <Metadata><span><code>@model.Name</code></span><span>Generation @generation</span></Metadata>
             <Actions><a class="button-primary" href="@RunUrl">Run</a><button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">Reconcile deployment</button></Actions>
         </ResourceHeader>
         <ResourceTabs Label="Agent sections"><a class="active" href="@OverviewUrl">Overview</a><a href="#definition">Definition</a><span>Deployments</span><a href="@RunUrl">Runs</a><span>Metrics</span><span>Events</span><span>Source</span></ResourceTabs>
@@ -52,27 +52,18 @@ else
             <div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Resource coordinates</h2></div>@if (!IsNew) { <StatusBadge Text="@($"Generation {generation}")" Status="UiStatus.Info" /> }</div>
             <div class="form-grid">
                 <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
-                <label><span>Resource group</span><InputText @bind-Value="model.ResourceGroup" disabled="@(!IsNew)" /><ValidationMessage For="() => model.ResourceGroup" /></label>
-                <label><span>Location</span><InputText @bind-Value="model.Location" /><ValidationMessage For="() => model.Location" /></label>
+                <label><span>Handler</span><InputText @bind-Value="model.Handler" /><ValidationMessage For="() => model.Handler" /></label>
                 <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
             </div>
-            @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">Resource ID: <code>@resourceId</code></p> }
+            @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">UID: <code>@resourceId</code></p> }
         </section>
 
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Behavior and model</h2></div></div>
             <div class="form-grid">
                 <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
-                <label><span>Agent type</span>
-                    <select value="@model.AgentTypeResourceId" @onchange="AgentTypeChanged">
-                        <option value="">Select an agent type</option>
-                        @foreach (var type in agentTypes) { <option value="@type.Id">@type.Name · v@type.Properties.Version</option> }
-                    </select>
-                    <ValidationMessage For="() => model.AgentTypeResourceId" />
-                </label>
-                <label><span>Agent type version</span><InputNumber @bind-Value="model.AgentTypeVersion" /><ValidationMessage For="() => model.AgentTypeVersion" /></label>
-                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileResourceId" ValueChanged="ModelProfileChanged" /><ValidationMessage For="() => model.ModelProfileResourceId" /></div>
-                <label class="form-span-2"><span>Additional instructions</span><InputTextArea @bind-Value="model.AdditionalInstructions" rows="6" /></label>
+                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" ValueChanged="ModelProfileChanged" /><ValidationMessage For="() => model.ModelProfileName" /></div>
+                <label class="form-span-2"><span>Instructions</span><InputTextArea @bind-Value="model.Instructions" rows="6" /><ValidationMessage For="() => model.Instructions" /></label>
             </div>
         </section>
 
@@ -81,7 +72,7 @@ else
             <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">Model configuration</p><h2>Declared and resolved</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelManagementUi.Label(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
                 <div class="declaration-resolution-grid">
-                    <article><h3>Declared configuration</h3><dl class="resource-details"><dt>Model profile</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? ResourceName(model.ModelProfileResourceId))</dd><dt>Resource ID</dt><dd><code>@model.ModelProfileResourceId</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">Open model profile →</a> }</article>
+                    <article><h3>Declared configuration</h3><dl class="resource-details"><dt>Model profile</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? model.ModelProfileName)</dd><dt>Name</dt><dd><code>@model.ModelProfileName</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">Open model profile →</a> }</article>
                     <article><h3>Resolved configuration</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>Provider</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? "Not resolved")</dd><dt>Provider type</dt><dd>@(agentModel.Resolved.Provider?.ProviderType ?? "Not resolved")</dd><dt>Model</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>Status</dt><dd>@ModelManagementUi.Label(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">Open provider →</a> }}</article>
                 </div>
             </section>
@@ -94,8 +85,8 @@ else
                     @if (catalogTools.Count == 0) { <small>No discovered tools are available. Configure them under Tools.</small> }
                     @foreach (var tool in catalogTools)
                     {
-                        var assigned = IsToolAssigned(tool.Id); var usable = tool.Properties.Enabled && tool.Properties.Discovery?.Available == true;
-                        <label><input type="checkbox" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => ToggleTool(tool.Id, (bool)args.Value!)" /> <span>@tool.Properties.DisplayName</span><small>@ResourceName(tool.Properties.Provider?.ResourceId ?? "") · @(usable ? "Available" : assigned ? "Assigned but unavailable or disabled" : "Not usable")</small></label>
+                        var assigned = IsToolAssigned(tool.Metadata.Name); var usable = tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
+                        <label><input type="checkbox" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => ToggleTool(tool.Metadata.Name, (bool)args.Value!)" /> <span>@tool.Definition.DisplayName</span><small>@(tool.Definition.Provider?.Name ?? "—") · @(usable ? "Available" : assigned ? "Assigned but unavailable or disabled" : "Not usable")</small></label>
                     }
                 </div>
                 <label><span>Tags</span><InputTextArea @bind-Value="model.Tags" rows="7" /><small>One key=value pair per line.</small></label>
@@ -121,7 +112,6 @@ else
 
     private readonly CancellationTokenSource cancellation = new();
     private AgentEditorModel? model;
-    private IReadOnlyList<AgentTypeResource> agentTypes = [];
     private IReadOnlyList<ToolResource> catalogTools = [];
     private string? etag;
     private string? resourceId;
@@ -155,19 +145,17 @@ else
         try
         {
             var group = string.IsNullOrWhiteSpace(ResourceGroup) ? "default" : ResourceGroup;
-            agentTypes = await Client.GetAgentTypesAsync(group, cancellation.Token);
             catalogTools = await ToolsClient.GetToolsAsync(group, cancellationToken: cancellation.Token);
             if (IsNew)
             {
-                model = new AgentEditorModel { ResourceGroup = group };
-                if (agentTypes.Count > 0) ApplyAgentType(agentTypes[0]);
+                model = new AgentEditorModel();
             }
             else
             {
                 var snapshot = await Client.GetAgentAsync(group, Name!, cancellation.Token);
                 model = AgentEditorModel.FromResource(snapshot.Value);
                 etag = snapshot.ETag;
-                resourceId = snapshot.Value.Id;
+                resourceId = snapshot.Value.Uid.ToString("D");
                 generation = snapshot.Value.Generation;
                 provisioningStatus = snapshot.Value.Status.ProvisioningState.ToString();
                 await LoadAgentModelAsync(group, Name!);
@@ -184,33 +172,24 @@ else
         finally { loading = false; }
     }
 
-    private void AgentTypeChanged(ChangeEventArgs args)
-    {
-        if (model is null) return;
-        var id = args.Value?.ToString() ?? string.Empty;
-        var selected = agentTypes.FirstOrDefault(type => string.Equals(type.Id, id, StringComparison.Ordinal));
-        if (selected is null) model.AgentTypeResourceId = id;
-        else ApplyAgentType(selected);
-    }
-
     private Task ModelProfileChanged(string value)
     {
-        if (model is not null) { model.ModelProfileResourceId = value; isDirty = true; }
+        if (model is not null) { model.ModelProfileName = value; isDirty = true; }
         return Task.CompletedTask;
     }
 
     private void MarkDirty(EventArgs _) => isDirty = true;
-    private bool IsToolAssigned(string id) => model?.ToolResourceIds.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Contains(id, StringComparer.Ordinal) == true;
+    private bool IsToolAssigned(string id) => model?.ToolNames.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Contains(id, StringComparer.Ordinal) == true;
     private void ToggleTool(string id, bool selected)
     {
         if (model is null) return;
-        var values = model.ToolResourceIds.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        var values = model.ToolNames.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         if (selected && !values.Contains(id, StringComparer.Ordinal)) values.Add(id); else if (!selected) values.RemoveAll(value => value == id);
-        model.ToolResourceIds = string.Join(Environment.NewLine, values); isDirty = true;
+        model.ToolNames = string.Join(Environment.NewLine, values); isDirty = true;
     }
     private Task DiscardAsync() => OnParametersSetAsync();
 
-    private static string ResourceName(string resourceId) => ResourceIdentifier.TryParse(resourceId, out var parsed) ? parsed.Name : resourceId;
+    private static string ResourceName(string name) => name;
     private static string ProfileUrl(AgentModelResponse value)
     {
         var id = ResourceIdentifier.Parse(value.Declared.ModelProfile.ResourceId);
@@ -237,19 +216,6 @@ else
         catch (AgentstrationApiException) { }
     }
 
-    private void ApplyAgentType(AgentTypeResource type)
-    {
-        if (model is null) return;
-        model.AgentTypeResourceId = type.Id;
-        model.AgentTypeVersion = type.Properties.Version;
-        if (string.IsNullOrWhiteSpace(model.ModelProfileResourceId))
-        {
-            model.ModelProfileResourceId = ResourceIdentifier.TryParse(type.Properties.DefaultModelProfileId, out var parsed)
-                ? parsed.Value
-                : ResourceIdentifier.Create(model.ResourceGroup, AgentstrationProviderNamespaces.Models, "modelProfiles", type.Properties.DefaultModelProfileId).Value;
-        }
-    }
-
     private async Task SaveAsync(bool applyRuntime)
     {
         if (model is null) return;
@@ -263,20 +229,20 @@ else
             var request = model.ToRequest();
             var snapshot = await Client.PutAgentAsync(request, etag, wasNew, cancellation.Token);
             etag = snapshot.ETag;
-            resourceId = snapshot.Value.Id;
+            resourceId = snapshot.Value.Uid.ToString("D");
             generation = snapshot.Value.Generation;
             provisioningStatus = snapshot.Value.Status.ProvisioningState.ToString();
             model = AgentEditorModel.FromResource(snapshot.Value);
             isDirty = false;
             if (applyRuntime)
             {
-                var activation = await RuntimeClient.PrepareAgentAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name, snapshot.Value.Generation, cancellation.Token);
+                var activation = await RuntimeClient.PrepareAgentAsync("default", snapshot.Value.Name, snapshot.Value.Generation, cancellation.Token);
                 if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 {
                     var message = $"The agent definition was saved, but generation {snapshot.Value.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";
                     Notifications.Add(new NotificationItem(Guid.NewGuid(), "Runtime activation failed", message, DateTimeOffset.Now, UiStatus.Warning));
-                    if (wasNew) Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.ResourceGroup!)}/{Uri.EscapeDataString(snapshot.Value.Name)}");
-                    else { errorMessage = message; await LoadAgentModelAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name); await LoadReadinessAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name, snapshot.Value.Generation); }
+                    if (wasNew) Navigation.NavigateTo($"/agents/default/{Uri.EscapeDataString(snapshot.Value.Name)}");
+                    else { errorMessage = message; await LoadAgentModelAsync("default", snapshot.Value.Name); await LoadReadinessAsync("default", snapshot.Value.Name, snapshot.Value.Generation); }
                     return;
                 }
             }
@@ -284,11 +250,11 @@ else
             successMessage = wasNew ? (applyRuntime ? "Agent created and deployed." : "Agent draft created.") : applyRuntime ? $"Agent updated and generation {snapshot.Value.Generation} activated." : $"Desired generation {snapshot.Value.Generation} saved without changing the active deployment.";
             Notifications.Add(new NotificationItem(Guid.NewGuid(), successMessage, snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
             if (wasNew)
-                Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.ResourceGroup!)}/{Uri.EscapeDataString(snapshot.Value.Name)}");
+                Navigation.NavigateTo($"/agents/default/{Uri.EscapeDataString(snapshot.Value.Name)}");
             else
             {
-                await LoadAgentModelAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name);
-                await LoadReadinessAsync(snapshot.Value.ResourceGroup!, snapshot.Value.Name, snapshot.Value.Generation);
+                await LoadAgentModelAsync("default", snapshot.Value.Name);
+                await LoadReadinessAsync("default", snapshot.Value.Name, snapshot.Value.Generation);
             }
         }
         catch (ArgumentException exception) { errorMessage = exception.Message; }
@@ -307,8 +273,8 @@ else
         errorMessage = null;
         try
         {
-            var activation = await RuntimeClient.PrepareAgentAsync(model.ResourceGroup, model.Name, generation, cancellation.Token);
-            await LoadReadinessAsync(model.ResourceGroup, model.Name, generation);
+            var activation = await RuntimeClient.PrepareAgentAsync("default", model.Name, generation, cancellation.Token);
+            await LoadReadinessAsync("default", model.Name, generation);
             successMessage = string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal) ? $"Generation {generation} is active." : $"Reconciliation completed with state {activation.State}.";
         }
         catch (AgentstrationApiException exception) { errorMessage = exception.Message; errorId = exception.ErrorId; }

@@ -17,14 +17,12 @@ internal sealed class PrepareAgentRuntimeEndpoint
         CancellationToken cancellationToken) => RuntimeHttp.ExecuteAsync(async () =>
         {
             if (generation < 1) throw new RuntimeRunValidationException("agent_version_invalid", "Agent generation must be positive.");
-            var groupName = string.IsNullOrWhiteSpace(resourceGroup) ? "default" : resourceGroup;
-            var agentId = ResourceIdentifier.Create(groupName, AgentstrationProviderNamespaces.Agents, "agents", agentName).Value;
-            var deployment = await service.PrepareLocalRuntimeAsync(agentId, generation, cancellationToken);
+            var deployment = await service.PrepareLocalRuntimeAsync(agentName, generation, cancellationToken);
             return Results.Ok(new PrepareAgentRuntimeResponse(
-                agentId,
+                agentName,
                 generation,
-                deployment.Value.Id,
-                deployment.Value.RevisionId,
+                deployment.Value.Metadata.Name,
+                deployment.Value.RevisionName,
                 deployment.Value.OperationalState.ToString()));
         });
 }

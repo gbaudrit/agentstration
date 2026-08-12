@@ -39,9 +39,9 @@ public sealed class RuntimeRunService(
         AgentRevision? selectedRevision = null;
         if (agent.Value.Generation != agentReference.Version)
         {
-            var revisions = await management.ListAsync<AgentRevision>(AgentstrationResourceTypes.AgentRevisions, agent.Value.ResourceGroup, 0, 1000, cancellationToken);
+            var revisions = await management.ListAsync<AgentRevision>(ResourceKinds.AgentRevision, 0, 1000, cancellationToken);
             selectedRevision = revisions.Select(item => item.Value).FirstOrDefault(revision =>
-                string.Equals(revision.AgentResourceId, agentReference.ResourceId, StringComparison.Ordinal) && revision.AgentVersion == agentReference.Version);
+                string.Equals(revision.AgentName, agentReference.ResourceId, StringComparison.Ordinal) && revision.AgentVersion == agentReference.Version);
             if (selectedRevision is null)
                 throw new RuntimeRunValidationException("agent_version_not_found", $"Agent version '{agentReference.Version}' does not exist.");
         }
@@ -52,7 +52,7 @@ public sealed class RuntimeRunService(
         {
             Id = name,
             Name = name,
-            ResourceGroup = agent.Value.ResourceGroup!,
+            ResourceGroup = "default",
             Properties = new RuntimeRunProperties
             {
                 Agent = agentReference,
@@ -65,7 +65,7 @@ public sealed class RuntimeRunService(
             {
                 State = RuntimeRunState.Pending,
                 CreatedAt = now,
-                ModelProfile = selectedRevision?.Definition.ModelProfileId ?? ResourceIdentifier.Parse(agent.Value.Properties.ModelProfile.ResourceId).Name
+                ModelProfile = selectedRevision?.Definition.ModelProfileName ?? agent.Value.Definition.ModelProfile.Name
             }
         };
         var stored = await runs.CreateAsync(run, cancellationToken);
@@ -97,16 +97,17 @@ public sealed class RuntimeRunService(
         if (agent is null)
             return new AgentRuntimeReadiness(agentResourceId, generation, false, "AgentNotFound", null, null, $"Agent '{agentResourceId}' was not found.");
 
-        var deployments = await management.ListAsync<AgentDeployment>(AgentstrationResourceTypes.Deployments, agent.Value.ResourceGroup, 0, 1000, cancellationToken);
+        var deployments = await management.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken);
         foreach (var deployment in deployments)
         {
-            var revision = await management.GetAsync<AgentRevision>(deployment.Value.RevisionId, cancellationToken);
+            var revision = await management.GetAsync<AgentRevision>(deployment.Value.RevisionName, cancellationToken);
             if (revision is null
-                || !string.Equals(revision.Value.AgentResourceId, agentResourceId, StringComparison.Ordinal)
+                || !string.Equals(revision.Value.AgentName, agentResourceId, StringComparison.Ordinal)
                 || revision.Value.AgentVersion != generation)
                 continue;
 
-            var registered = runtimes.TryGet(deployment.Value.Id, out _);
+            var deploymentId = deployment.Value.Uid.ToString("N");
+            var registered = runtimes.TryGet(deploymentId, out _);
             var ready = deployment.Value.DesiredState == DesiredAgentState.Running
                 && deployment.Value.OperationalState == OperationalState.Ready
                 && registered;
@@ -117,11 +118,11 @@ public sealed class RuntimeRunService(
                 generation,
                 ready,
                 ready ? "Ready" : deployment.Value.OperationalState.ToString(),
-                deployment.Value.Id,
-                revision.Value.Id,
+                deploymentId,
+                revision.Value.Metadata.Name,
                 error,
-                deployment.Value.RuntimeProfileId,
-                deployment.Value.ModelProfileId ?? revision.Value.Definition.ModelProfileId);
+                deployment.Value.RuntimeProfileName,
+                deployment.Value.ModelProfileName ?? revision.Value.Definition.ModelProfileName);
         }
 
         return new AgentRuntimeReadiness(agentResourceId, generation, false, "DeploymentNotFound", null, null, $"Agent generation '{generation}' has no deployment.");
@@ -170,7 +171,7 @@ public sealed class RuntimeRunService(
             await TraceStepAsync(runId, "Model profile resolved", timeout.Token);
 
             var deployment = await ResolveDeploymentAsync(agent.Value, stored.Value.Properties.Agent.Version, timeout.Token);
-            activity?.SetTag("agentstration.deployment.id", deployment.Id);
+            activity?.SetTag("agentstration.deployment.uid", deployment.Uid);
             activity?.SetTag("agentstration.model.profile", stored.Value.Status.ModelProfile);
             await TraceStepAsync(runId, "Prompt composed", timeout.Token);
             await AppendEventAsync(runId, RuntimeRunEventKind.StepStarted, "Model invocation started", "Model invoked", cancellationToken: timeout.Token);
@@ -178,7 +179,7 @@ public sealed class RuntimeRunService(
             var executionOptions = ParseExecutionOptions(stored.Value.Properties.Execution);
             AgentExecutionResult? execution = null;
             await foreach (var executionEvent in runtimes.ExecuteEventsAsync(
-                deployment.Id,
+                deployment.Uid.ToString("N"),
                 new AgentExecutionRequest(
                     prompt,
                     runId,
@@ -267,12 +268,12 @@ public sealed class RuntimeRunService(
 
     private async Task<AgentDeployment> ResolveDeploymentAsync(AgentResource agent, long version, CancellationToken cancellationToken)
     {
-        var deployments = await management.ListAsync<AgentDeployment>(AgentstrationResourceTypes.Deployments, agent.ResourceGroup, 0, 1000, cancellationToken);
+        var deployments = await management.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken);
         foreach (var deployment in deployments.Where(item => item.Value.DesiredState == DesiredAgentState.Running && item.Value.OperationalState == OperationalState.Ready))
         {
-            var revision = await management.GetAsync<AgentRevision>(deployment.Value.RevisionId, cancellationToken);
+            var revision = await management.GetAsync<AgentRevision>(deployment.Value.RevisionName, cancellationToken);
             if (revision is not null
-                && string.Equals(revision.Value.AgentResourceId, agent.Id, StringComparison.Ordinal)
+                && revision.Value.AgentUid == agent.Uid
                 && revision.Value.AgentVersion == version)
                 return deployment.Value;
         }
@@ -351,10 +352,8 @@ public sealed class RuntimeRunService(
 
     private static void Validate(RuntimeAgentReference agent, RuntimeRunInput input, RuntimeExecutionOptions execution, string initiator)
     {
-        if (!ResourceIdentifier.TryParse(agent.ResourceId, out var identifier)
-            || !string.Equals(identifier.ProviderNamespace, AgentstrationProviderNamespaces.Agents, StringComparison.Ordinal)
-            || !string.Equals(identifier.ResourceType, "agents", StringComparison.Ordinal))
-            throw new RuntimeRunValidationException("agent_reference_invalid", "The run must reference an Agentstration.Agents/agents resource.");
+        if (string.IsNullOrWhiteSpace(agent.ResourceId))
+            throw new RuntimeRunValidationException("agent_reference_invalid", "The run must reference an Agent by name.");
         if (agent.Version < 1) throw new RuntimeRunValidationException("agent_version_invalid", "Agent version must be positive.");
         if (input.Messages.Count == 0 || !input.Messages.Any(message => message.Role == RuntimeMessageRole.User && !string.IsNullOrWhiteSpace(message.Content)))
             throw new RuntimeRunValidationException("input_required", "At least one non-empty user message is required.");

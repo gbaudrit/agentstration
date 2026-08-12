@@ -10,7 +10,6 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     internal DbSet<ControlPlaneDocument> Documents => Set<ControlPlaneDocument>();
     internal DbSet<TenantRow> Tenants => Set<TenantRow>();
     internal DbSet<WorkspaceRow> Workspaces => Set<WorkspaceRow>();
-    internal DbSet<ResourceGroupRow> ResourceGroups => Set<ResourceGroupRow>();
     internal DbSet<UserRow> Users => Set<UserRow>();
     internal DbSet<TenantMembershipRow> TenantMemberships => Set<TenantMembershipRow>();
     internal DbSet<RoleDefinitionRow> RoleDefinitions => Set<RoleDefinitionRow>();
@@ -20,27 +19,28 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     {
         var document = modelBuilder.Entity<ControlPlaneDocument>();
         document.ToTable("ControlPlaneResources");
-        document.HasKey(value => value.ResourceId);
-        document.Property(value => value.ResourceId).HasMaxLength(1024);
-        document.Property(value => value.ResourceType).HasMaxLength(256);
-        document.Property(value => value.ResourceGroup).HasMaxLength(256);
+        document.HasKey(value => value.StorageKey);
+        document.Property(value => value.StorageKey).HasColumnName("ResourceId").HasMaxLength(1024);
+        document.Property(value => value.LegacyResourceType).HasColumnName("ResourceType").HasMaxLength(256);
+        document.Property(value => value.Kind).HasMaxLength(256);
+        document.Property(value => value.Name).HasMaxLength(256);
         document.Property(value => value.TenantId);
         document.Property(value => value.WorkspaceId);
-        document.Property(value => value.ResourceGroupId);
         document.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
-        document.HasIndex(value => new { value.TenantId, value.WorkspaceId, value.ResourceType, value.ResourceGroup, value.ResourceId });
+        document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.Name }).IsUnique();
         modelBuilder.ConfigureIdentityModel();
     }
 }
 
 internal sealed class ControlPlaneDocument
 {
-    public required string ResourceId { get; set; }
-    public required string ResourceType { get; set; }
-    public string? ResourceGroup { get; set; }
+    public required string StorageKey { get; set; }
+    public required string LegacyResourceType { get; set; }
+    public Guid? Uid { get; set; }
+    public string? Kind { get; set; }
+    public string? Name { get; set; }
     public Guid? TenantId { get; set; }
     public Guid? WorkspaceId { get; set; }
-    public Guid? ResourceGroupId { get; set; }
     public required string Payload { get; set; }
     public required string ETag { get; set; }
     public required DateTimeOffset UpdatedAt { get; set; }
@@ -60,23 +60,22 @@ public sealed class SqliteControlPlaneStore(
         await SqliteIdentitySchema.EnsureAsync(context, cancellationToken);
     }
 
-    public async Task<StoredResource<T>?> GetAsync<T>(string resourceId, CancellationToken cancellationToken) where T : Resource
+    public async Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var query = Scoped(context.Documents.AsNoTracking());
-        var document = await query.SingleOrDefaultAsync(value => value.ResourceId == resourceId, cancellationToken);
+        var document = await query.SingleOrDefaultAsync(value => value.Kind == key.Kind && value.Name == key.Name, cancellationToken);
         return document is null ? null : Deserialize<T>(document);
     }
 
-    public async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string resourceType, string? resourceGroup, int skip, int take, CancellationToken cancellationToken) where T : Resource
+    public async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         take = Math.Min(take, 1000);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var query = Scoped(context.Documents.AsNoTracking()).Where(value => value.ResourceType == resourceType);
-        if (!string.IsNullOrWhiteSpace(resourceGroup)) query = query.Where(value => value.ResourceGroup == resourceGroup);
-        var documents = await query.OrderBy(value => value.ResourceId).Skip(skip).Take(take).ToArrayAsync(cancellationToken);
+        var query = Scoped(context.Documents.AsNoTracking()).Where(value => value.Kind == kind);
+        var documents = await query.OrderBy(value => value.Name).Skip(skip).Take(take).ToArrayAsync(cancellationToken);
         return documents.Select(Deserialize<T>).ToArray();
     }
 
@@ -84,7 +83,8 @@ public sealed class SqliteControlPlaneStore(
     {
         if (resource is AgentRevision) throw new InvalidOperationException("Published agent revisions are immutable and must be created through CreateImmutableAsync.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var existing = await Scoped(context.Documents).SingleOrDefaultAsync(value => value.ResourceId == resource.Id, cancellationToken);
+        var existing = await Scoped(context.Documents).SingleOrDefaultAsync(
+            value => value.Kind == resource.Kind && value.Name == resource.Metadata.Name, cancellationToken);
         if (existing is null && ifMatch is not null) throw new ControlPlaneConcurrencyException("If-Match cannot update a resource that does not exist.");
         if (existing is not null && ifNoneMatch) throw new ControlPlaneConcurrencyException("If-None-Match prevented replacement of an existing resource.");
         if (existing is not null && ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
@@ -92,17 +92,21 @@ public sealed class SqliteControlPlaneStore(
 
         var etag = NewETag();
         var now = timeProvider.GetUtcNow();
-        var versioned = WithETag(resource, etag);
+        var uid = existing?.Uid ?? Guid.NewGuid();
+        if (existing is not null && resource.Uid != Guid.Empty && resource.Uid != uid)
+            throw new ControlPlaneConcurrencyException("The UID of an existing resource is immutable.");
+        var versioned = WithETag(WithUid(resource, uid), etag);
         if (existing is null)
         {
             context.Documents.Add(new ControlPlaneDocument
             {
-                ResourceId = resource.Id,
-                ResourceType = resource.Type,
-                ResourceGroup = resource.ResourceGroup,
+                StorageKey = uid.ToString("N"),
+                LegacyResourceType = resource.Kind,
+                Uid = uid,
+                Kind = resource.Kind,
+                Name = resource.Metadata.Name,
                 TenantId = Scope(resource.TenantId, requestContext.IsInitialized ? requestContext.Current.TenantId : Guid.Empty),
                 WorkspaceId = Scope(resource.WorkspaceId, requestContext.IsInitialized ? requestContext.Current.WorkspaceId : Guid.Empty),
-                ResourceGroupId = resource.ResourceGroupId == Guid.Empty ? null : resource.ResourceGroupId,
                 Payload = JsonSerializer.Serialize(versioned, JsonOptions),
                 ETag = etag,
                 UpdatedAt = now
@@ -110,11 +114,11 @@ public sealed class SqliteControlPlaneStore(
         }
         else
         {
-            existing.ResourceType = resource.Type;
-            existing.ResourceGroup = resource.ResourceGroup;
+            existing.LegacyResourceType = resource.Kind;
+            existing.Kind = resource.Kind;
+            existing.Name = resource.Metadata.Name;
             existing.TenantId = Scope(resource.TenantId, requestContext.IsInitialized ? requestContext.Current.TenantId : Guid.Empty);
             existing.WorkspaceId = Scope(resource.WorkspaceId, requestContext.IsInitialized ? requestContext.Current.WorkspaceId : Guid.Empty);
-            existing.ResourceGroupId = resource.ResourceGroupId == Guid.Empty ? existing.ResourceGroupId : resource.ResourceGroupId;
             existing.Payload = JsonSerializer.Serialize(versioned, JsonOptions);
             existing.ETag = etag;
             existing.UpdatedAt = now;
@@ -128,29 +132,31 @@ public sealed class SqliteControlPlaneStore(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var etag = NewETag();
         var now = timeProvider.GetUtcNow();
-        var versioned = WithETag(resource, etag);
+        var uid = Guid.NewGuid();
+        var versioned = WithETag(WithUid(resource, uid), etag);
         context.Documents.Add(new ControlPlaneDocument
         {
-            ResourceId = resource.Id,
-            ResourceType = resource.Type,
-            ResourceGroup = resource.ResourceGroup,
+            StorageKey = uid.ToString("N"),
+            LegacyResourceType = resource.Kind,
+            Uid = uid,
+            Kind = resource.Kind,
+            Name = resource.Metadata.Name,
             TenantId = Scope(resource.TenantId, requestContext.IsInitialized ? requestContext.Current.TenantId : Guid.Empty),
             WorkspaceId = Scope(resource.WorkspaceId, requestContext.IsInitialized ? requestContext.Current.WorkspaceId : Guid.Empty),
-            ResourceGroupId = resource.ResourceGroupId == Guid.Empty ? null : resource.ResourceGroupId,
             Payload = JsonSerializer.Serialize(versioned, JsonOptions),
             ETag = etag,
             UpdatedAt = now
         });
         try { await SaveAsync(context, cancellationToken); }
-        catch (ControlPlaneConcurrencyException exception) { throw new ControlPlaneConcurrencyException($"Immutable resource '{resource.Id}' already exists: {exception.Message}"); }
+        catch (ControlPlaneConcurrencyException exception) { throw new ControlPlaneConcurrencyException($"Immutable resource '{resource.Kind}/{resource.Metadata.Name}' already exists: {exception.Message}"); }
         return new StoredResource<T>(versioned, etag, now);
     }
 
-    public async Task DeleteAsync(string resourceId, string? ifMatch, CancellationToken cancellationToken)
+    public async Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var existing = await Scoped(context.Documents).SingleOrDefaultAsync(value => value.ResourceId == resourceId, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(resourceId);
+        var existing = await Scoped(context.Documents).SingleOrDefaultAsync(value => value.Kind == key.Kind && value.Name == key.Name, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(key);
         if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ControlPlaneConcurrencyException("The supplied ETag does not match the current resource version.");
         context.Documents.Remove(existing);
@@ -160,20 +166,19 @@ public sealed class SqliteControlPlaneStore(
     private static StoredResource<T> Deserialize<T>(ControlPlaneDocument document) where T : Resource
     {
         var value = JsonSerializer.Deserialize<T>(document.Payload, JsonOptions)
-            ?? throw new InvalidOperationException($"Stored resource '{document.ResourceId}' is invalid.");
+            ?? throw new InvalidOperationException($"Stored resource '{document.Kind}/{document.Name}' is invalid.");
         value = WithScope(value, document);
         return new StoredResource<T>(WithETag(value, document.ETag), document.ETag, document.UpdatedAt);
     }
 
-    public async Task BackfillUnscopedResourcesAsync(Guid tenantId, Guid workspaceId, Guid resourceGroupId, CancellationToken cancellationToken)
+    public async Task BackfillUnscopedResourcesAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Documents
             .Where(value => value.TenantId == null || value.WorkspaceId == null)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(value => value.TenantId, tenantId)
-                .SetProperty(value => value.WorkspaceId, workspaceId)
-                .SetProperty(value => value.ResourceGroupId, resourceGroupId), cancellationToken);
+                .SetProperty(value => value.WorkspaceId, workspaceId), cancellationToken);
     }
 
     private IQueryable<ControlPlaneDocument> Scoped(IQueryable<ControlPlaneDocument> query)
@@ -189,14 +194,16 @@ public sealed class SqliteControlPlaneStore(
     private static T WithScope<T>(T resource, ControlPlaneDocument document) where T : Resource =>
         (T)(Resource)(resource switch
         {
-            AgentTypeResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty, ResourceGroupId = document.ResourceGroupId ?? Guid.Empty },
-            AgentResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty, ResourceGroupId = document.ResourceGroupId ?? Guid.Empty },
-            AgentRevision value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty, ResourceGroupId = document.ResourceGroupId ?? Guid.Empty },
-            AgentDeployment value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty, ResourceGroupId = document.ResourceGroupId ?? Guid.Empty },
-            ManagementOperation value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty, ResourceGroupId = document.ResourceGroupId ?? Guid.Empty },
-            ModelProviderResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty, ResourceGroupId = document.ResourceGroupId ?? Guid.Empty },
-            ModelProfileResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty, ResourceGroupId = document.ResourceGroupId ?? Guid.Empty },
-            RuntimeProfileResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty, ResourceGroupId = document.ResourceGroupId ?? Guid.Empty },
+            AgentResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty },
+            AgentRevision value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty },
+            AgentDeployment value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty },
+            ManagementOperation value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty },
+            ModelProviderResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty },
+            ModelProfileResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty },
+            RuntimeProfileResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty },
+            ToolProviderResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty },
+            ToolResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty },
+            McpServerResource value => value with { TenantId = document.TenantId ?? Guid.Empty, WorkspaceId = document.WorkspaceId ?? Guid.Empty },
             _ => throw new NotSupportedException($"Resource type '{resource.GetType().Name}' is not supported by the control plane store.")
         });
 
@@ -211,7 +218,6 @@ public sealed class SqliteControlPlaneStore(
         var status = resource.Status with { ResourceVersion = etag };
         return (T)(Resource)(resource switch
     {
-        AgentTypeResource value => value with { ETag = etag, Status = status },
         AgentResource value => value with { ETag = etag, Status = status },
         AgentRevision value => value with { ETag = etag, Status = status },
         AgentDeployment value => value with { ETag = etag, Status = status },
@@ -219,9 +225,28 @@ public sealed class SqliteControlPlaneStore(
         ModelProviderResource value => value with { ETag = etag, Status = status },
         ModelProfileResource value => value with { ETag = etag, Status = status },
         RuntimeProfileResource value => value with { ETag = etag, Status = status },
+        ToolProviderResource value => value with { ETag = etag, Status = status },
+        ToolResource value => value with { ETag = etag, Status = status },
+        McpServerResource value => value with { ETag = etag, Status = status },
         _ => throw new NotSupportedException($"Resource type '{resource.GetType().Name}' is not supported by the control plane store.")
     });
     }
+
+    private static T WithUid<T>(T resource, Guid uid) where T : Resource =>
+        (T)(Resource)(resource switch
+        {
+            AgentResource value => value with { Uid = uid },
+            AgentRevision value => value with { Uid = uid },
+            AgentDeployment value => value with { Uid = uid },
+            ManagementOperation value => value with { Uid = uid },
+            ModelProviderResource value => value with { Uid = uid },
+            ModelProfileResource value => value with { Uid = uid },
+            RuntimeProfileResource value => value with { Uid = uid },
+            ToolProviderResource value => value with { Uid = uid },
+            ToolResource value => value with { Uid = uid },
+            McpServerResource value => value with { Uid = uid },
+            _ => throw new NotSupportedException($"Resource type '{resource.GetType().Name}' is not supported by the control plane store.")
+        });
 
     private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
 }

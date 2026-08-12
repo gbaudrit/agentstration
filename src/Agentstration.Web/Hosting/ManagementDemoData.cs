@@ -1,6 +1,6 @@
+using System.Data.Common;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
-using System.Data.Common;
 
 namespace Agentstration.Web.Hosting;
 
@@ -8,53 +8,41 @@ public static class ManagementDemoData
 {
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
-        var management = services.GetRequiredService<AgentManagementService>();
-        var modelProviders = services.GetRequiredService<ModelProviderManagementService>();
-        var modelProfiles = services.GetRequiredService<ModelProfileManagementService>();
-        var runtimeProfiles = services.GetRequiredService<RuntimeProfileManagementService>();
+        var agents = services.GetRequiredService<AgentManagementService>();
+        var providers = services.GetRequiredService<ModelProviderManagementService>();
+        var profiles = services.GetRequiredService<ModelProfileManagementService>();
+        var runtimes = services.GetRequiredService<RuntimeProfileManagementService>();
         var store = services.GetRequiredService<IControlPlaneStore>();
-        const string resourceGroup = "default";
         var configuration = services.GetRequiredService<IConfiguration>();
-        var providerId = ModelProviderManagementService.ModelProviderId("ollama-local", resourceGroup);
-        if (await store.GetAsync<ModelProviderResource>(providerId, cancellationToken) is null)
+
+        if (await providers.GetAsync("ollama-local", cancellationToken) is null)
         {
             var connectionString = configuration.GetConnectionString("ollama-extension");
-            var configuredExtensionEndpoint = configuration["Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint"];
-            var endpoint = ResolveEndpoint(connectionString)
-                ?? (Uri.TryCreate(configuredExtensionEndpoint, UriKind.Absolute, out var extensionEndpoint)
-                    ? extensionEndpoint
-                    : new Uri("http://localhost:5260"));
-            await modelProviders.CreateAsync(new ModelProviderResource
+            var configuredEndpoint = configuration["Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint"];
+            var endpoint = ResolveEndpoint(connectionString) ?? (Uri.TryCreate(configuredEndpoint, UriKind.Absolute, out var value) ? value : new Uri("http://localhost:5260"));
+            await providers.CreateAsync(new ModelProviderResource
             {
-                Id = providerId,
-                Name = "ollama-local",
-                Type = AgentstrationResourceTypes.ModelProviders,
-                ApiVersion = ManagementApiVersions.V20260801,
-                ResourceGroup = resourceGroup,
-                Location = "local",
-                Properties = new ModelProviderProperties
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.ModelProvider,
+                Metadata = new ResourceMetadata { Name = "ollama-local", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
+                Definition = new ModelProviderProperties
                 {
                     DisplayName = "Ollama via AEP",
                     ProviderType = "ollama",
                     Endpoint = endpoint,
-                    ManagementMode = string.IsNullOrWhiteSpace(connectionString)
-                        ? ModelProviderManagementMode.External
-                        : ModelProviderManagementMode.Aspire
+                    ManagementMode = string.IsNullOrWhiteSpace(connectionString) ? ModelProviderManagementMode.External : ModelProviderManagementMode.Aspire
                 }
             }, cancellationToken);
         }
-        var runtimeProfileId = RuntimeProfileManagementService.ProfileId(resourceGroup, "maf-default");
-        if (await store.GetAsync<RuntimeProfileResource>(runtimeProfileId, cancellationToken) is null)
+
+        if (await runtimes.GetAsync("maf-default", cancellationToken) is null)
         {
-            await runtimeProfiles.CreateAsync(new RuntimeProfileResource
+            await runtimes.CreateAsync(new RuntimeProfileResource
             {
-                Id = runtimeProfileId,
-                Name = "maf-default",
-                Type = AgentstrationResourceTypes.RuntimeProfiles,
-                ApiVersion = ManagementApiVersions.V20260801,
-                ResourceGroup = resourceGroup,
-                Location = "local",
-                Properties = new RuntimeProfileProperties
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.RuntimeProfile,
+                Metadata = new ResourceMetadata { Name = "maf-default" },
+                Definition = new RuntimeProfileProperties
                 {
                     DisplayName = "Microsoft Agent Framework",
                     RuntimeType = "microsoft-agent-framework",
@@ -67,80 +55,62 @@ public static class ManagementDemoData
                 }
             }, cancellationToken);
         }
-        var profileId = ModelProfileManagementService.ProfileId(resourceGroup, "reasoning-default");
-        if (await store.GetAsync<ModelProfileResource>(profileId, cancellationToken) is null)
+
+        if (await profiles.GetAsync("reasoning-default", cancellationToken) is null)
         {
-            var modelName = configuration["Agentstration:Seed:OllamaModel"] ?? configuration["AI:Model"] ?? "qwen3:1.7b";
-            await modelProfiles.CreateAsync(new ModelProfileResource
+            await profiles.CreateAsync(new ModelProfileResource
             {
-                Id = profileId,
-                Name = "reasoning-default",
-                Type = AgentstrationResourceTypes.ModelProfiles,
-                ApiVersion = ManagementApiVersions.V20260801,
-                ResourceGroup = resourceGroup,
-                Location = "local",
-                Properties = new ModelProfileProperties
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.ModelProfile,
+                Metadata = new ResourceMetadata { Name = "reasoning-default" },
+                Definition = new ModelProfileProperties
                 {
                     DisplayName = "Default reasoning",
                     Description = "General-purpose local reasoning profile.",
-                    Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local", resourceGroup)),
-                    Model = new ModelSelection { Name = modelName },
+                    Provider = new ResourceReference("ollama-local"),
+                    Model = new ModelSelection { Name = configuration["Agentstration:Seed:OllamaModel"] ?? configuration["AI:Model"] ?? "qwen3:1.7b" },
                     Generation = new ModelGenerationOptions { Temperature = 0.2 }
                 }
             }, cancellationToken);
         }
-        var existingTypes = await store.ListAsync<AgentTypeResource>(AgentstrationResourceTypes.AgentTypes, null, 0, 1, cancellationToken);
-        var existingAgents = await store.ListAsync<AgentResource>(AgentstrationResourceTypes.Agents, null, 0, 1, cancellationToken);
-        if (existingTypes.Count > 0 || existingAgents.Count > 0) return;
-        var typeId = ResourceIdentifier.Create(resourceGroup, AgentstrationProviderNamespaces.Agents, "agentTypes", "readonly-expert").Value;
-        var type = await management.GetAgentTypeAsync(typeId, cancellationToken);
-        if (type is null)
+
+        await EnsureAgentAsync(agents, store, "dotnet-expert", "Specialized agent for .NET, C#, ASP.NET Core, and runtime diagnostics.", "Focus on .NET and C#. Provide safe, practical guidance.", ["dotnet", "csharp", "aspnet"], cancellationToken);
+        await EnsureAgentAsync(agents, store, "sql-expert", "Specialized agent for SQL query performance and database diagnostics.", "Focus on SQL performance and read-only diagnostics.", ["sql", "database", "query-performance"], cancellationToken);
+    }
+
+    private static async Task EnsureAgentAsync(AgentManagementService management, IControlPlaneStore store, string name, string description, string instructions, IReadOnlyCollection<string> capabilities, CancellationToken cancellationToken)
+    {
+        var agent = await management.GetAgentAsync(name, cancellationToken);
+        if (agent is null)
         {
-            var definition = new AgentTypeDefinition
+            agent = await management.PutAgentAsync(new AgentResource
             {
-                Key = "readonly-expert",
-                Version = 1,
-                Handler = "prompt-agent",
-                BaseInstructions = "You are a specialized read-only expert. Never perform write operations. Clearly indicate when information is missing.",
-                DefaultModelProfileId = "reasoning-default",
-                Policy = new AgentTypePolicy
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.Agent,
+                Metadata = new ResourceMetadata
                 {
-                    AllowAdditionalInstructions = true,
-                    AllowModelOverride = true,
-                    MaximumAdditionalInstructionsLength = 10_000
+                    Name = name,
+                    Tags = capabilities.ToDictionary(value => "capability-" + value, _ => "true", StringComparer.Ordinal),
+                    Annotations = new Dictionary<string, string> { ["agentstration.io/sample"] = "standalone" }
+                },
+                Definition = new AgentProperties
+                {
+                    DisplayName = name,
+                    Description = description,
+                    Instructions = instructions,
+                    ModelProfile = new ResourceReference("reasoning-default"),
+                    Behaviors = capabilities.ToArray()
                 }
-            };
-            type = await management.PutAgentTypeAsync(new AgentTypeResource
-            {
-                Id = typeId,
-                Name = definition.Key,
-                Type = AgentstrationResourceTypes.AgentTypes,
-                ApiVersion = ManagementApiVersions.V20260801,
-                ResourceGroup = resourceGroup,
-                Location = "local",
-                Tags = new Dictionary<string, string> { ["sample"] = "standalone" },
-                Properties = definition
             }, null, true, cancellationToken);
         }
 
-        await EnsureAgentAsync(
-            management,
-            store,
-            type.Value,
-            "dotnet-expert",
-            "Specialized agent for .NET, C#, ASP.NET Core, and runtime diagnostics.",
-            "Focus on .NET and C#. Provide safe, practical guidance.",
-            ["dotnet", "csharp", "aspnet"],
-            cancellationToken);
-        await EnsureAgentAsync(
-            management,
-            store,
-            type.Value,
-            "sql-expert",
-            "Specialized agent for SQL query performance and database diagnostics.",
-            "Focus on SQL performance and read-only diagnostics.",
-            ["sql", "database", "query-performance"],
-            cancellationToken);
+        var revisions = await store.ListAsync<AgentRevision>(ResourceKinds.AgentRevision, 0, 1000, cancellationToken);
+        var revision = revisions.Where(value => value.Value.AgentUid == agent.Value.Uid).OrderByDescending(value => value.Value.CreatedAt).FirstOrDefault();
+        var spec = new AgentDeploymentSpec { Environment = "local", RuntimeProfileName = "maf-default", HostingMode = AgentHostingMode.InProcess };
+        revision ??= await management.CreateRevisionAsync(name, spec, cancellationToken);
+        var deployment = await management.GetDeploymentAsync(name, cancellationToken)
+            ?? await management.CreateDeploymentAsync(name, revision.Value.Metadata.Name, spec, cancellationToken);
+        if (deployment.Value.OperationalState != OperationalState.Ready) await management.ReconcileAsync(deployment, cancellationToken);
     }
 
     private static Uri? ResolveEndpoint(string? connectionString)
@@ -150,62 +120,8 @@ public static class ManagementDemoData
         try
         {
             var values = new DbConnectionStringBuilder { ConnectionString = connectionString };
-            return values.TryGetValue("Endpoint", out var value) && Uri.TryCreate(value?.ToString(), UriKind.Absolute, out endpoint)
-                ? endpoint
-                : null;
+            return values.TryGetValue("Endpoint", out var value) && Uri.TryCreate(value?.ToString(), UriKind.Absolute, out endpoint) ? endpoint : null;
         }
         catch (ArgumentException) { return null; }
-    }
-
-    private static async Task EnsureAgentAsync(
-        AgentManagementService management,
-        IControlPlaneStore store,
-        AgentTypeResource type,
-        string key,
-        string description,
-        string additionalInstructions,
-        IReadOnlyCollection<string> capabilities,
-        CancellationToken cancellationToken)
-    {
-        var resourceGroup = type.ResourceGroup!;
-        var agentId = ResourceIdentifier.Create(resourceGroup, AgentstrationProviderNamespaces.Agents, "agents", key).Value;
-        var agent = await management.GetAgentAsync(agentId, cancellationToken);
-        if (agent is null)
-        {
-            agent = await management.PutAgentAsync(new AgentResource
-            {
-                Id = agentId,
-                Name = key,
-                Type = AgentstrationResourceTypes.Agents,
-                ApiVersion = ManagementApiVersions.V20260801,
-                ResourceGroup = resourceGroup,
-                Location = "local",
-                Tags = capabilities.ToDictionary(value => $"capability-{value}", _ => "true", StringComparer.Ordinal),
-                Properties = new AgentProperties
-                {
-                    DisplayName = key,
-                    Description = description,
-                    AgentType = new AgentTypeReference(type.Id, type.Properties.Version),
-                    AdditionalInstructions = additionalInstructions,
-                    ModelProfile = new ResourceReference(ResourceIdentifier.Create(resourceGroup, AgentstrationProviderNamespaces.Models, "modelProfiles", type.Properties.DefaultModelProfileId).Value)
-                }
-            }, null, true, cancellationToken);
-        }
-
-        var revisions = await store.ListAsync<AgentRevision>(AgentstrationResourceTypes.AgentRevisions, resourceGroup, 0, 1000, cancellationToken);
-        var revision = revisions.Where(value => string.Equals(value.Value.AgentResourceId, agentId, StringComparison.Ordinal)).OrderByDescending(value => value.Value.CreatedAt).FirstOrDefault();
-        var spec = new AgentDeploymentSpec
-        {
-            Environment = "local",
-            RuntimeProfileId = RuntimeProfileManagementService.ProfileId(resourceGroup, "maf-default"),
-            HostingMode = AgentHostingMode.InProcess
-        };
-        revision ??= await management.CreateRevisionAsync(agentId, spec, cancellationToken);
-
-        var deploymentId = ResourceIdentifier.Create(resourceGroup, AgentstrationProviderNamespaces.Agents, "deployments", key).Value;
-        var deployment = await management.GetDeploymentAsync(deploymentId, cancellationToken)
-            ?? await management.CreateDeploymentAsync(resourceGroup, key, "local", revision.Value.Id, spec, cancellationToken);
-        if (deployment.Value.OperationalState != OperationalState.Ready)
-            await management.ReconcileAsync(deployment, cancellationToken);
     }
 }

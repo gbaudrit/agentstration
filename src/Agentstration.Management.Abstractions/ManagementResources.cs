@@ -1,32 +1,66 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Agentstration.Management.Abstractions;
 
-public static class AgentstrationProviderNamespaces
+public static class ManagementApiVersions
 {
-    public const string Agents = "Agentstration.Agents";
-    public const string Models = "Agentstration.Models";
-    public const string ModelProviders = "Agentstration.ModelProviders";
-    public const string Tools = "Agentstration.Tools";
-    public const string Runtime = "Agentstration.Runtime";
-    public const string Memory = "Agentstration.Memory";
-    public const string Identity = "Agentstration.Identity";
-    public const string Integrations = "Agentstration.Integrations";
+    public const string CoreV1 = "agentstration.io/v1";
+    public const string V20260801 = CoreV1;
+}
+
+public static class ResourceKinds
+{
+    public const string Agent = "Agent";
+    public const string AgentRevision = "AgentRevision";
+    public const string AgentDeployment = "AgentDeployment";
+    public const string Flow = "Flow";
+    public const string ManagementOperation = "ManagementOperation";
+    public const string ModelProvider = "ModelProvider";
+    public const string ModelProfile = "ModelProfile";
+    public const string RuntimeProfile = "RuntimeProfile";
+    public const string Tool = "Tool";
+    public const string ToolProvider = "ToolProvider";
+    public const string McpServer = "McpServer";
+
+    public static string For<T>() where T : Resource => typeof(T) switch
+    {
+        var type when type == typeof(AgentResource) => Agent,
+        var type when type == typeof(AgentRevision) => AgentRevision,
+        var type when type == typeof(AgentDeployment) => AgentDeployment,
+        var type when type == typeof(ManagementOperation) => ManagementOperation,
+        var type when type == typeof(ModelProviderResource) => ModelProvider,
+        var type when type == typeof(ModelProfileResource) => ModelProfile,
+        var type when type == typeof(RuntimeProfileResource) => RuntimeProfile,
+        var type when type == typeof(ToolResource) => Tool,
+        var type when type == typeof(ToolProviderResource) => ToolProvider,
+        var type when type == typeof(McpServerResource) => McpServer,
+        _ => throw new NotSupportedException($"Resource type '{typeof(T).Name}' has no registered Kind.")
+    };
 }
 
 public static class AgentstrationResourceTypes
 {
-    public const string AgentTypes = AgentstrationProviderNamespaces.Agents + "/agentTypes";
-    public const string Agents = AgentstrationProviderNamespaces.Agents + "/agents";
-    public const string AgentRevisions = AgentstrationProviderNamespaces.Agents + "/agentRevisions";
-    public const string Deployments = AgentstrationProviderNamespaces.Agents + "/deployments";
-    public const string Operations = AgentstrationProviderNamespaces.Agents + "/operations";
-    public const string ModelProviders = AgentstrationProviderNamespaces.ModelProviders + "/modelProviders";
-    public const string ModelProfiles = AgentstrationProviderNamespaces.Models + "/modelProfiles";
-    public const string RuntimeProfiles = AgentstrationProviderNamespaces.Runtime + "/runtimeProfiles";
-    public const string Tools = AgentstrationProviderNamespaces.Tools + "/tools";
-    public const string ToolProviders = AgentstrationProviderNamespaces.Tools + "/toolProviders";
-    public const string McpServers = AgentstrationProviderNamespaces.Integrations + "/mcpServers";
+    public const string Agents = ResourceKinds.Agent;
+    public const string AgentRevisions = ResourceKinds.AgentRevision;
+    public const string Deployments = ResourceKinds.AgentDeployment;
+    public const string Operations = ResourceKinds.ManagementOperation;
+    public const string ModelProviders = ResourceKinds.ModelProvider;
+    public const string ModelProfiles = ResourceKinds.ModelProfile;
+    public const string RuntimeProfiles = ResourceKinds.RuntimeProfile;
+    public const string Tools = ResourceKinds.Tool;
+    public const string ToolProviders = ResourceKinds.ToolProvider;
+    public const string McpServers = ResourceKinds.McpServer;
+}
+
+public static class AgentstrationProviderNamespaces
+{
+    public const string Agents = "agentstration.io";
+    public const string Models = "agentstration.io";
+    public const string ModelProviders = "agentstration.io";
+    public const string Tools = "agentstration.io";
+    public const string Runtime = "agentstration.io";
+    public const string Integrations = "agentstration.io";
 }
 
 public sealed record ToolTypeReference(string Extension, string Id);
@@ -73,7 +107,8 @@ public sealed record ToolProviderProperties
 
 public sealed record ToolProviderResource : Resource
 {
-    public required ToolProviderProperties Properties { get; init; }
+    public ToolProviderProperties Definition { get; init; } = null!;
+    [JsonIgnore] public ToolProviderProperties Properties { get => Definition; init => Definition = value; }
 }
 
 public sealed record ToolDiscoveryState
@@ -106,7 +141,8 @@ public sealed record ToolResourceProperties
 
 public sealed record ToolResource : Resource
 {
-    public required ToolResourceProperties Properties { get; init; }
+    public ToolResourceProperties Definition { get; init; } = null!;
+    [JsonIgnore] public ToolResourceProperties Properties { get => Definition; init => Definition = value; }
 }
 
 public sealed record McpServerProperties
@@ -117,7 +153,8 @@ public sealed record McpServerProperties
 
 public sealed record McpServerResource : Resource
 {
-    public required McpServerProperties Properties { get; init; }
+    public McpServerProperties Definition { get; init; } = null!;
+    [JsonIgnore] public McpServerProperties Properties { get => Definition; init => Definition = value; }
 }
 
 public sealed record DiscoveredToolDescriptor(
@@ -139,91 +176,64 @@ public interface IToolProviderDiscovery
     Task<ToolProviderDiscoveryResult> DiscoverAsync(ToolProviderResource provider, CancellationToken cancellationToken);
 }
 
-public static class ManagementApiVersions
+public sealed record ResourceMetadata
 {
-    public const string V20260801 = "2026-08-01";
+    public string Name { get; init; } = string.Empty;
+    public IReadOnlyDictionary<string, string> Tags { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyDictionary<string, string> Annotations { get; init; } = new Dictionary<string, string>();
+}
+
+public readonly record struct ResourceKey(string Kind, string Name)
+{
+    public static ResourceKey Create(string kind, string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return new(kind, name);
+    }
+
+    public override string ToString() => $"{Kind}/{Name}";
 }
 
 public readonly record struct ResourceIdentifier(string Value)
 {
-    public static ResourceIdentifier Create(Guid workspaceId, string resourceGroup, string providerNamespace, string resourceType, string name)
+    public static ResourceIdentifier Create(string resourceGroup, string providerNamespace, string resourceType, string name) => new(name);
+    public static ResourceIdentifier Create(Guid workspaceId, string resourceGroup, string providerNamespace, string resourceType, string name) => new(name);
+    public static ResourceIdentifier Parse(string value) => TryParse(value, out var result) ? result : throw new ArgumentException("A resource name is required.", nameof(value));
+    public static bool TryParse(string? value, out ResourceIdentifier result)
     {
-        if (workspaceId == Guid.Empty) throw new ArgumentException("Workspace ID cannot be empty.", nameof(workspaceId));
-        var legacy = Create(resourceGroup, providerNamespace, resourceType, name);
-        return new($"/workspaces/{workspaceId:D}{legacy.Value}");
+        result = default;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        result = new(value[(value.LastIndexOf('/') + 1)..]);
+        return true;
     }
-
-    public static ResourceIdentifier Create(string resourceGroup, string providerNamespace, string resourceType, string name)
-    {
-        ValidateSegment(resourceGroup, nameof(resourceGroup));
-        ValidateSegment(providerNamespace, nameof(providerNamespace));
-        ValidateSegment(resourceType, nameof(resourceType));
-        ValidateSegment(name, nameof(name));
-        return new($"/resourceGroups/{resourceGroup}/providers/{providerNamespace}/{resourceType}/{name}");
-    }
-
-    public static ResourceIdentifier Parse(string value)
-    {
-        if (!TryParse(value, out var identifier))
-            throw new ArgumentException("The resource identifier must use '/resourceGroups/{group}/providers/{provider}/{type}/{name}'.", nameof(value));
-        return identifier;
-    }
-
-    public static bool TryParse(string? value, out ResourceIdentifier identifier)
-    {
-        identifier = default;
-        if (string.IsNullOrWhiteSpace(value) || value[0] != '/') return false;
-        var canonicalSegments = value.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var offset = 0;
-        if (canonicalSegments.Length == 8
-            && string.Equals(canonicalSegments[0], "workspaces", StringComparison.Ordinal)
-            && Guid.TryParse(canonicalSegments[1], out _)) offset = 2;
-        if (canonicalSegments.Length != offset + 6
-            || !string.Equals(canonicalSegments[offset], "resourceGroups", StringComparison.Ordinal)
-            || !string.Equals(canonicalSegments[offset + 2], "providers", StringComparison.Ordinal)) return false;
-        try
-        {
-            identifier = offset == 0
-                ? Create(canonicalSegments[1], canonicalSegments[3], canonicalSegments[4], canonicalSegments[5])
-                : Create(Guid.Parse(canonicalSegments[1]), canonicalSegments[3], canonicalSegments[5], canonicalSegments[6], canonicalSegments[7]);
-            return string.Equals(identifier.Value, value, StringComparison.Ordinal);
-        }
-        catch (ArgumentException)
-        {
-            identifier = default;
-            return false;
-        }
-    }
-
-    public Guid? WorkspaceId => Segments().Length == 8 ? Guid.Parse(Segments()[1]) : null;
-    public string ResourceGroup => Segments()[Segments().Length == 8 ? 3 : 1];
-    public string ProviderNamespace => Segments()[Segments().Length == 8 ? 5 : 3];
-    public string ResourceType => Segments()[Segments().Length == 8 ? 6 : 4];
-    public string Name => Segments()[Segments().Length == 8 ? 7 : 5];
-
-    public override string ToString() => Value;
-
-    private static void ValidateSegment(string value, string parameterName)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
-        if (value.Contains('/', StringComparison.Ordinal)) throw new ArgumentException("Resource identifier segments cannot contain '/'.", parameterName);
-    }
-
-    private string[] Segments() => Value.Split('/', StringSplitOptions.RemoveEmptyEntries);
+    public string Name => Value;
+    public string ResourceGroup => "default";
+    public string ProviderNamespace => "agentstration.io";
+    public string ResourceType => string.Empty;
+    public Guid? WorkspaceId => null;
 }
 
 public abstract record Resource
 {
-    public string Id { get; init; } = string.Empty;
-    public required string Name { get; init; }
-    public required string Type { get; init; }
+    public Guid Uid { get; init; }
     public required string ApiVersion { get; init; }
-    public string? ResourceGroup { get; init; }
+    public string Kind { get; init; } = string.Empty;
+    public ResourceMetadata Metadata { get; init; } = new();
+    [JsonIgnore]
+    public string Name { get => Metadata.Name; init => Metadata = Metadata with { Name = value }; }
+    [JsonIgnore]
+    public string Type { get => Kind; init => Kind = value; }
+    [JsonIgnore]
+    public string? ResourceGroup { get => "default"; init { } }
+    [JsonIgnore]
+    public string? Location { get => null; init { } }
+    [JsonIgnore]
+    public IReadOnlyDictionary<string, string> Tags { get => Metadata.Tags; init => Metadata = Metadata with { Tags = value }; }
+    [JsonIgnore]
+    public string Id { get => Metadata.Name; init { } }
     public Guid TenantId { get; init; }
     public Guid WorkspaceId { get; init; }
-    public Guid ResourceGroupId { get; init; }
-    public string? Location { get; init; }
-    public IReadOnlyDictionary<string, string> Tags { get; init; } = new Dictionary<string, string>();
     public long Generation { get; init; }
     public ResourceStatus Status { get; init; } = new() { ProvisioningState = ProvisioningState.Accepted };
     public string? ETag { get; init; }
@@ -245,61 +255,39 @@ public sealed record ResourceStatus
     public IReadOnlyList<ResourceCondition> Conditions { get; init; } = [];
 }
 
-public sealed record AgentTypePolicy
+public sealed record ResourceReference
 {
-    public bool AllowAdditionalInstructions { get; init; }
-    public bool AllowModelOverride { get; init; }
-    public bool AllowAdditionalTools { get; init; }
-    public bool AllowToolRemoval { get; init; }
-    public bool AllowMemoryOverride { get; init; }
-    public bool AllowParameterOverrides { get; init; }
-    public int MaximumAdditionalInstructionsLength { get; init; }
+    public ResourceReference(string name, string? workspaceRef = null) { Name = name; WorkspaceRef = workspaceRef; }
+    public string Name { get; init; }
+    public string? WorkspaceRef { get; init; }
+    [JsonIgnore]
+    public string ResourceId { get => Name; init => Name = value; }
 }
-
-public sealed record AgentTypeDefinition
-{
-    public required string Key { get; init; }
-    public required int Version { get; init; }
-    public required string Handler { get; init; }
-    public required string BaseInstructions { get; init; }
-    public IReadOnlyCollection<string> RequiredToolIds { get; init; } = [];
-    public IReadOnlyCollection<string> AllowedToolIds { get; init; } = [];
-    public IReadOnlyCollection<string> BehaviorIds { get; init; } = [];
-    public IReadOnlyCollection<string> MiddlewareIds { get; init; } = [];
-    public IReadOnlyCollection<string> ContextProviderIds { get; init; } = [];
-    public required string DefaultModelProfileId { get; init; }
-    public required AgentTypePolicy Policy { get; init; }
-}
-
-public sealed record AgentTypeResource : Resource
-{
-    public required AgentTypeDefinition Properties { get; init; }
-}
-
-public sealed record AgentTypeReference(string ResourceId, int? Version = null);
-
-public sealed record ResourceReference(string ResourceId);
 
 public record AgentProperties
 {
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
-    public required AgentTypeReference AgentType { get; init; }
-    public string? AdditionalInstructions { get; init; }
+    public string Handler { get; init; } = "prompt-agent";
+    public required string Instructions { get; init; }
     public required ResourceReference ModelProfile { get; init; }
     public IReadOnlyList<ResourceReference> Tools { get; init; } = [];
+    public IReadOnlyList<string> Behaviors { get; init; } = [];
+    public IReadOnlyList<string> Middleware { get; init; } = [];
+    public IReadOnlyList<string> ContextProviders { get; init; } = [];
     public IReadOnlyDictionary<string, JsonElement> Settings { get; init; } = new Dictionary<string, JsonElement>();
 }
 
 public sealed record AgentResource : Resource
 {
-    public required AgentProperties Properties { get; init; }
+    public AgentProperties Definition { get; init; } = null!;
+    [JsonIgnore] public AgentProperties Properties { get => Definition; init => Definition = value; }
 }
 
 public sealed record AgentDeploymentSpec
 {
     public required string Environment { get; init; }
-    public required string RuntimeProfileId { get; init; }
+    public required string RuntimeProfileName { get; init; }
     public required AgentHostingMode HostingMode { get; init; }
 }
 
@@ -311,9 +299,9 @@ public sealed record ResolvedAgentDefinition
     public required string Description { get; init; }
     public required long AgentVersion { get; init; }
     public required string EffectiveInstructions { get; init; }
-    public required string ModelProfileId { get; init; }
-    public required string RuntimeProfileId { get; init; }
-    public required IReadOnlyCollection<string> EffectiveToolIds { get; init; }
+    public required string ModelProfileName { get; init; }
+    public required string RuntimeProfileName { get; init; }
+    public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
     public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
     public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
     public required IReadOnlyCollection<string> Capabilities { get; init; }
@@ -323,14 +311,14 @@ public sealed record ResolvedAgentDefinition
 
 public sealed record ResolvedAgentSpec
 {
-    public required string AgentResourceId { get; init; }
+    public required Guid AgentUid { get; init; }
+    public required string AgentName { get; init; }
     public required long Generation { get; init; }
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required string Instructions { get; init; }
-    public required string AgentTypeResourceId { get; init; }
-    public required string ModelProfileResourceId { get; init; }
-    public required IReadOnlyList<string> ToolResourceIds { get; init; }
+    public required ResourceReference ModelProfileRef { get; init; }
+    public required IReadOnlyList<ResourceReference> ToolRefs { get; init; }
 }
 
 public enum AgentHostingMode { InProcess, SharedHost, DedicatedProcess, DedicatedContainer, RemoteEndpoint, FoundryHosted }
@@ -342,9 +330,9 @@ public enum AgentIdentityType { None, SystemAssigned, UserAssigned, External }
 
 public sealed record AgentRevision : Resource
 {
-    public required string AgentResourceId { get; init; }
+    public required Guid AgentUid { get; init; }
+    public required string AgentName { get; init; }
     public required long AgentVersion { get; init; }
-    public required int AgentTypeVersion { get; init; }
     public required ResolvedAgentDefinition Definition { get; init; }
     public required string DefinitionHash { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
@@ -353,16 +341,16 @@ public sealed record AgentRevision : Resource
 
 public sealed record AgentDeployment : Resource
 {
-    public required string RevisionId { get; init; }
-    public string? AgentResourceId { get; init; }
-    public string? ModelProfileId { get; init; }
+    public required string RevisionName { get; init; }
+    public string? AgentName { get; init; }
+    public string? ModelProfileName { get; init; }
     public required string Environment { get; init; }
-    public required string RuntimeProfileId { get; init; }
+    public required string RuntimeProfileName { get; init; }
     public required AgentHostingMode HostingMode { get; init; }
     public required DesiredAgentState DesiredState { get; init; }
     public required ProvisioningState ProvisioningState { get; init; }
     public required OperationalState OperationalState { get; init; }
-    public string? ObservedRevisionId { get; init; }
+    public string? ObservedRevisionName { get; init; }
     public IReadOnlyDictionary<string, int> TrafficWeights { get; init; } = new Dictionary<string, int>();
     public string? LastError { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
@@ -370,7 +358,7 @@ public sealed record AgentDeployment : Resource
 
 public sealed record ManagementOperation : Resource
 {
-    public required string ResourceId { get; init; }
+    public required ResourceKey Target { get; init; }
     public required string OperationType { get; init; }
     public required OperationStatus OperationStatus { get; init; }
     public int? PercentComplete { get; init; }
@@ -396,7 +384,8 @@ public sealed record ModelProviderProperties
 
 public sealed record ModelProviderResource : Resource
 {
-    public required ModelProviderProperties Properties { get; init; }
+    public ModelProviderProperties Definition { get; init; } = null!;
+    [JsonIgnore] public ModelProviderProperties Properties { get => Definition; init => Definition = value; }
 }
 
 public sealed record ModelGenerationOptions
@@ -441,7 +430,8 @@ public sealed record ModelProfileProperties
 
 public sealed record ModelProfileResource : Resource
 {
-    public required ModelProfileProperties Properties { get; init; }
+    public ModelProfileProperties Definition { get; init; } = null!;
+    [JsonIgnore] public ModelProfileProperties Properties { get => Definition; init => Definition = value; }
 }
 
 public enum RuntimeSessionMode { Transient, Persistent }
@@ -465,7 +455,8 @@ public sealed record RuntimeProfileProperties
 
 public sealed record RuntimeProfileResource : Resource
 {
-    public required RuntimeProfileProperties Properties { get; init; }
+    public RuntimeProfileProperties Definition { get; init; } = null!;
+    [JsonIgnore] public RuntimeProfileProperties Properties { get => Definition; init => Definition = value; }
 }
 
 public sealed record ExternalBinding

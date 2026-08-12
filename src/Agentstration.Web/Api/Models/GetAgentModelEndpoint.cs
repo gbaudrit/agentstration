@@ -15,13 +15,11 @@ internal sealed class GetAgentModelEndpoint : IModelManagementEndpoint
         ModelProfileManagementService profiles,
         CancellationToken cancellationToken) => ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var groupName = ModelManagementHttp.ResourceGroup(resourceGroup);
-            var agentId = ResourceIdentifier.Create(groupName, AgentstrationProviderNamespaces.Agents, "agents", agentName).Value;
-            var agent = await agents.GetAgentAsync(agentId, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(agentId);
-            var profileId = agent.Value.Properties.ModelProfile.ResourceId;
-            var profileIdentifier = ResourceIdentifier.Parse(profileId);
-            var profile = await profiles.GetAsync(profileIdentifier.ResourceGroup, profileIdentifier.Name, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(profileId);
+            var agent = await agents.GetAgentAsync(agentName, cancellationToken)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, agentName));
+            var profileName = agent.Value.Definition.ModelProfile.Name;
+            var profile = await profiles.GetAsync(profileName, cancellationToken)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName));
             var resolution = await profiles.ResolveAsync(profile.Value, cancellationToken);
             var mapped = ModelManagementHttp.Resolution(resolution);
             return Results.Ok(new AgentModelResponse(

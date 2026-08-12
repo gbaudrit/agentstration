@@ -1,6 +1,6 @@
 # Resource model
 
-The Management Plane uses Azure-inspired declarative resources. Desired configuration (`properties`) is separate from observed state (`status`), and the canonical identifier is derived from resource group, provider namespace, resource type, and name.
+The Management Plane uses a small Agentstration-native declarative envelope: `uid`, `apiVersion`, `kind`, `metadata`, and a kind-specific `definition`. The logical identity is `(Workspace, Kind, metadata.name)`; the server generates the immutable UID.
 
 ```mermaid
 flowchart LR
@@ -13,4 +13,4 @@ flowchart LR
     Runtime --> Status[Observed status]
 ```
 
-`apiVersion` selects the schema. `generation` tracks functional changes to a resource. ETags/resource versions protect concurrent mutations. See the [resource reference](../reference/resources/overview.md) and [versioning strategy](../reference/versioning.md).
+`apiVersion` selects the schema and currently equals `agentstration.io/v1`. References use `{ name, workspaceRef? }`; an omitted `workspaceRef` means the current workspace. ETags protect concurrent mutations. See the [resource reference](../reference/resources/overview.md) and [versioning strategy](../reference/versioning.md).

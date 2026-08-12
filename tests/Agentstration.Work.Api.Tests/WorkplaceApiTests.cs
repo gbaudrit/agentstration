@@ -45,7 +45,7 @@ public sealed class WorkplaceApiTests
                 true,
                 new Agentstration.Flow.DirectFlowSpec(new Agentstration.Flow.FlowTargetReference(
                     Agentstration.Flow.FlowTargetKind.Agent,
-                    "/resourceGroups/default/providers/Agentstration.Agents/agents/dotnet-expert")))))
+                    "dotnet-expert")))))
             {
                 Assert.AreEqual(HttpStatusCode.Created, createdFlow.StatusCode);
             }
@@ -134,7 +134,7 @@ public sealed class WorkplaceApiTests
             {
                 Id = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/missing-target"),
                 Name = "missing-target",
-                Binding = new EntryBinding(EntryBindingKind.Agent, "/resourceGroups/default/providers/Agentstration.Agents/agents/missing")
+                Binding = new EntryBinding(EntryBindingKind.Agent, "missing")
             };
             using var missingSaved = await client.PutAsJsonAsync("/api/management/entries/missing-target", missingTarget);
             missingSaved.EnsureSuccessStatusCode();

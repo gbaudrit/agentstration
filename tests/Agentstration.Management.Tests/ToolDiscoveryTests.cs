@@ -50,9 +50,10 @@ public sealed class ToolDiscoveryTests
 
     private static ToolProviderResource Provider() => new()
     {
-        Id = ToolManagementService.ToolProviderId("default", "test"), Name = "test", Type = AgentstrationResourceTypes.ToolProviders,
-        ApiVersion = ManagementApiVersions.V20260801, ResourceGroup = "default",
-        Properties = new ToolProviderProperties { DisplayName = "Test", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration { Command = "test-mcp", EnvironmentReferences = new Dictionary<string, string> { ["TOKEN"] = "Secrets:Mcp:Token" } } }
+        ApiVersion = ManagementApiVersions.CoreV1,
+        Kind = ResourceKinds.ToolProvider,
+        Metadata = new ResourceMetadata { Name = "test" },
+        Definition = new ToolProviderProperties { DisplayName = "Test", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration { Command = "test-mcp", EnvironmentReferences = new Dictionary<string, string> { ["TOKEN"] = "Secrets:Mcp:Token" } } }
     };
 
     private static DiscoveredToolDescriptor Descriptor(string id, string display) => new(id, display, $"{display} description", JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = new { type = "string" } } }), null, new Dictionary<string, JsonElement>());
@@ -76,16 +77,16 @@ public sealed class ToolDiscoveryTests
 
     private sealed class MemoryStore : IControlPlaneStore
     {
-        private readonly Dictionary<string, (Resource Value, string ETag, DateTimeOffset At)> values = new(StringComparer.Ordinal);
+        private readonly Dictionary<ResourceKey, (Resource Value, string ETag, DateTimeOffset At)> values = [];
         private long version;
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<StoredResource<T>?> GetAsync<T>(string resourceId, CancellationToken cancellationToken) where T : Resource => Task.FromResult(values.TryGetValue(resourceId, out var entry) && entry.Value is T typed ? new StoredResource<T>(typed, entry.ETag, entry.At) : null);
-        public Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string resourceType, string? resourceGroup, int skip, int take, CancellationToken cancellationToken) where T : Resource => Task.FromResult<IReadOnlyList<StoredResource<T>>>(values.Values.Where(entry => entry.Value is T && entry.Value.Type == resourceType && (resourceGroup is null || entry.Value.ResourceGroup == resourceGroup)).Select(entry => new StoredResource<T>((T)entry.Value, entry.ETag, entry.At)).Skip(skip).Take(take).ToArray());
+        public Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource => Task.FromResult(values.TryGetValue(key, out var entry) && entry.Value is T typed ? new StoredResource<T>(typed, entry.ETag, entry.At) : null);
+        public Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource => Task.FromResult<IReadOnlyList<StoredResource<T>>>(values.Values.Where(entry => entry.Value is T && entry.Value.Kind == kind).Select(entry => new StoredResource<T>((T)entry.Value, entry.ETag, entry.At)).Skip(skip).Take(take).ToArray());
         public Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
         {
-            var etag = $"\"{Interlocked.Increment(ref version)}\""; var at = DateTimeOffset.UtcNow; values[resource.Id] = (resource, etag, at); return Task.FromResult(new StoredResource<T>(resource, etag, at));
+            var etag = $"\"{Interlocked.Increment(ref version)}\""; var at = DateTimeOffset.UtcNow; values[new(resource.Kind, resource.Metadata.Name)] = (resource, etag, at); return Task.FromResult(new StoredResource<T>(resource, etag, at));
         }
         public Task<StoredResource<T>> CreateImmutableAsync<T>(T resource, CancellationToken cancellationToken) where T : Resource => PutAsync(resource, null, true, cancellationToken);
-        public Task DeleteAsync(string resourceId, string? ifMatch, CancellationToken cancellationToken) { values.Remove(resourceId); return Task.CompletedTask; }
+        public Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken) { values.Remove(key); return Task.CompletedTask; }
     }
 }

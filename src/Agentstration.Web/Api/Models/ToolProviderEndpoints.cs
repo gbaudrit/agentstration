@@ -30,7 +30,7 @@ internal static class ToolProviderEndpoints
         ModelManagementHttp.ExecuteAsync(async () =>
         {
             var id = ToolManagementService.ToolProviderId(ModelManagementHttp.ResourceGroup(resourceGroup), providerName);
-            var stored = await service.GetProviderAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(id);
+            var stored = await service.GetProviderAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ToolProvider, providerName));
             return ModelManagementHttp.ResourceResult(stored, response, 200);
         });
 
@@ -48,7 +48,8 @@ internal static class ToolProviderEndpoints
         ModelManagementHttp.ExecuteAsync(async () =>
         {
             var group = ModelManagementHttp.ResourceGroup(resourceGroup);
-            var existing = await service.GetProviderAsync(ToolManagementService.ToolProviderId(group, providerName), cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(providerName);
+            var existing = await service.GetProviderAsync(ToolManagementService.ToolProviderId(group, providerName), cancellationToken)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ToolProvider, providerName));
             var stored = await service.PutProviderAsync(existing.Value with { Properties = body.Properties }, ModelManagementHttp.IfMatch(request), false, cancellationToken);
             try { _ = await service.RefreshDiscoveryAsync(stored.Value.Id, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
             stored = await service.GetProviderAsync(stored.Value.Id, cancellationToken) ?? stored;
@@ -59,7 +60,7 @@ internal static class ToolProviderEndpoints
         ModelManagementHttp.ExecuteAsync(async () =>
         {
             var id = ToolManagementService.ToolProviderId(ModelManagementHttp.ResourceGroup(resourceGroup), providerName);
-            var stored = await service.GetProviderAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(id);
+            var stored = await service.GetProviderAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ToolProvider, providerName));
             var result = await service.TestConnectionAsync(stored.Value, cancellationToken);
             return Results.Ok(new ToolConnectionTestResponse("connected", result.Tools.Count, result.Capabilities, result.ServerMetadata));
         });
@@ -92,7 +93,7 @@ internal static class ToolProviderEndpoints
         ModelManagementHttp.ExecuteAsync(async () =>
         {
             var id = ToolManagementService.ToolId(ModelManagementHttp.ResourceGroup(resourceGroup), toolName);
-            var stored = await service.GetToolAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(id);
+            var stored = await service.GetToolAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Tool, toolName));
             return ModelManagementHttp.ResourceResult(stored, response, 200);
         });
 
@@ -102,7 +103,9 @@ internal static class ToolProviderEndpoints
 
     private static ToolProviderResource Resource(string name, string group, string location, ToolProviderProperties properties) => new()
     {
-        Id = ToolManagementService.ToolProviderId(group, name), Name = name, Type = AgentstrationResourceTypes.ToolProviders,
-        ApiVersion = ManagementApiVersions.V20260801, ResourceGroup = group, Location = location, Properties = properties
+        ApiVersion = ManagementApiVersions.CoreV1,
+        Kind = ResourceKinds.ToolProvider,
+        Metadata = new ResourceMetadata { Name = name },
+        Definition = properties
     };
 }

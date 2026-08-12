@@ -12,7 +12,7 @@ The current repository does not include Scalar or another OpenAPI UI. Adding a U
 
 Current API families include:
 
-- Microsoft-like Management routes under `/resourceGroups/{resourceGroup}/providers/...`;
+- Management resources under `/api/agents`, `/api/deployments`, and related short routes;
 - Runtime Runs under `/api/runtime/runs`;
 - Work Items under `/api/work/workitems`;
 - Workplace routes under `/api/workspaces/{workspaceName}`;

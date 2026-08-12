@@ -50,7 +50,7 @@ public sealed class ToolProviderAdapter(
 
     public async Task<ToolProviderDiscoveryResult> DiscoverAsync(ToolProviderResource provider, CancellationToken cancellationToken)
     {
-        if (provider.Properties.ProviderType == ToolProviderType.Mcp)
+        if (provider.Definition.ProviderType == ToolProviderType.Mcp)
         {
             await using var client = await ConnectMcpAsync(provider, cancellationToken);
             return Result(await client.ListToolsAsync(cancellationToken: cancellationToken), client);
@@ -78,24 +78,24 @@ public sealed class ToolProviderAdapter(
 
     public async Task<IReadOnlyCollection<IAgentTool>> ResolveAsync(ToolProviderResource provider, IReadOnlyCollection<ToolResource> tools, CancellationToken cancellationToken)
     {
-        if (provider.Properties.ProviderType == ToolProviderType.Mcp)
+        if (provider.Definition.ProviderType == ToolProviderType.Mcp)
         {
             var client = await ConnectMcpAsync(provider, cancellationToken);
             var native = await client.ListToolsAsync(cancellationToken: cancellationToken);
-            return tools.Select(tool => Wrap(tool, native.FirstOrDefault(value => value.ProtocolTool.Name == tool.Properties.ExternalId)
-                ?? throw new ToolResolutionException("mcp_tool_not_found", $"Provider '{provider.Name}' no longer exposes tool '{tool.Properties.ExternalId}'."))).ToArray();
+            return tools.Select(tool => Wrap(tool, native.FirstOrDefault(value => value.ProtocolTool.Name == tool.Definition.ExternalId)
+                ?? throw new ToolResolutionException("mcp_tool_not_found", $"Provider '{provider.Name}' no longer exposes tool '{tool.Definition.ExternalId}'."))).ToArray();
         }
 
         var (descriptor, extensionEndpoint) = await DiscoverAepAsync(provider, cancellationToken);
         var result = new List<IAgentTool>();
-        foreach (var group in tools.GroupBy(tool => (descriptor.Contributions.Tools ?? []).First(value => value.Id == tool.Properties.ExternalId).Mcp.Server, StringComparer.Ordinal))
+        foreach (var group in tools.GroupBy(tool => (descriptor.Contributions.Tools ?? []).First(value => value.Id == tool.Definition.ExternalId).Mcp.Server, StringComparer.Ordinal))
         {
             var server = descriptor.Mcp!.Servers.First(value => value.Id == group.Key);
             var client = await ConnectHttpAsync(AepDescriptorValidator.ResolveMcpEndpoint(extensionEndpoint, server), server.Id, cancellationToken);
             var native = await client.ListToolsAsync(cancellationToken: cancellationToken);
             foreach (var tool in group)
             {
-                var mapping = descriptor.Contributions.Tools!.First(value => value.Id == tool.Properties.ExternalId);
+                var mapping = descriptor.Contributions.Tools!.First(value => value.Id == tool.Definition.ExternalId);
                 result.Add(Wrap(tool, native.FirstOrDefault(value => value.ProtocolTool.Name == mapping.Mcp.Tool)
                     ?? throw new ToolResolutionException("mcp_tool_not_found", $"AEP contribution '{mapping.Id}' maps to missing MCP tool '{mapping.Mcp.Tool}'.")));
             }
@@ -105,7 +105,7 @@ public sealed class ToolProviderAdapter(
 
     private async Task<(AepManifest Descriptor, Uri Endpoint)> DiscoverAepAsync(ToolProviderResource provider, CancellationToken cancellationToken)
     {
-        var extensionId = provider.Properties.Aep!.ExtensionId;
+        var extensionId = provider.Definition.Aep!.ExtensionId;
         var endpoint = extensionEndpoints.Resolve(extensionId);
         var http = httpClientFactory.CreateClient(McpToolServiceCollectionExtensions.AepClientName);
         http.BaseAddress = endpoint;
@@ -118,7 +118,7 @@ public sealed class ToolProviderAdapter(
 
     private Task<McpClient> ConnectMcpAsync(ToolProviderResource provider, CancellationToken cancellationToken)
     {
-        var mcp = provider.Properties.Mcp!;
+        var mcp = provider.Definition.Mcp!;
         if (mcp.Transport == McpToolProviderTransport.StreamableHttp)
             return ConnectHttpAsync(mcp.Endpoint!, provider.Name, cancellationToken);
         var transport = new StdioClientTransport(new StdioClientTransportOptions
@@ -160,8 +160,8 @@ public sealed class ToolProviderAdapter(
 
     private static IAgentTool Wrap(ToolResource resource, McpClientTool native)
     {
-        if (!string.IsNullOrWhiteSpace(resource.Properties.Description)) native = native.WithDescription(resource.Properties.Description);
-        return new McpAgentTool(resource.Id, resource.Properties.Description ?? native.Description, native);
+        if (!string.IsNullOrWhiteSpace(resource.Definition.Description)) native = native.WithDescription(resource.Definition.Description);
+        return new McpAgentTool(resource.Metadata.Name, resource.Definition.Description ?? native.Description, native);
     }
 }
 
@@ -173,17 +173,17 @@ public sealed class McpToolCatalog(IControlPlaneStore store, ToolProviderAdapter
         foreach (var id in toolIds.Distinct(StringComparer.Ordinal))
         {
             var tool = await store.GetAsync<ToolResource>(id, cancellationToken) ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{id}' was not found.");
-            if (!tool.Value.Properties.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{id}' is disabled.");
-            if (tool.Value.Properties.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{id}' is no longer available from its provider.");
-            if (tool.Value.Properties.Provider is null) throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{id}' has no ToolProvider mapping.");
+            if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{id}' is disabled.");
+            if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{id}' is no longer available from its provider.");
+            if (tool.Value.Definition.Provider is null) throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{id}' has no ToolProvider mapping.");
             resources.Add(tool.Value);
         }
 
         var resolved = new List<IAgentTool>();
-        foreach (var group in resources.GroupBy(value => value.Properties.Provider!.ResourceId, StringComparer.Ordinal))
+        foreach (var group in resources.GroupBy(value => value.Definition.Provider!.Name, StringComparer.Ordinal))
         {
             var provider = await store.GetAsync<ToolProviderResource>(group.Key, cancellationToken) ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{group.Key}' was not found.");
-            if (!provider.Value.Properties.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{provider.Value.Name}' is disabled.");
+            if (!provider.Value.Definition.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{provider.Value.Name}' is disabled.");
             resolved.AddRange(await providers.ResolveAsync(provider.Value, group.ToArray(), cancellationToken));
         }
         return resolved;

@@ -160,8 +160,8 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
 
 public static class FlowDraftTemplates
 {
-    private const string SqlAgent = "/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert";
-    private const string DotNetAgent = "/resourceGroups/default/providers/Agentstration.Agents/agents/dotnet-expert";
+    private const string SqlAgent = "sql-expert";
+    private const string DotNetAgent = "dotnet-expert";
 
     public static FlowGraphDefinition Create(string template) => template.ToLowerInvariant() switch
     {

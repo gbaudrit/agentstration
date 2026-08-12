@@ -60,16 +60,18 @@ public sealed class McpToolCatalogTests
 
     private static ToolProviderResource Provider() => new()
     {
-        Id = "/resourceGroups/default/providers/Agentstration.Tools/toolProviders/local", Name = "local", Type = AgentstrationResourceTypes.ToolProviders,
-        ApiVersion = ManagementApiVersions.V20260801, ResourceGroup = "default",
-        Properties = new ToolProviderProperties { DisplayName = "Local MCP", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration { Transport = McpToolProviderTransport.StreamableHttp, Endpoint = new Uri("http://localhost/mcp") } }
+        ApiVersion = ManagementApiVersions.CoreV1,
+        Kind = ResourceKinds.ToolProvider,
+        Metadata = new ResourceMetadata { Name = "local" },
+        Definition = new ToolProviderProperties { DisplayName = "Local MCP", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration { Transport = McpToolProviderTransport.StreamableHttp, Endpoint = new Uri("http://localhost/mcp") } }
     };
 
     private static ToolResource Tool(string providerId) => new()
     {
-        Id = "/resourceGroups/default/providers/Agentstration.Tools/tools/local.list_workspaces", Name = "local.list_workspaces", Type = AgentstrationResourceTypes.Tools,
-        ApiVersion = ManagementApiVersions.V20260801, ResourceGroup = "default",
-        Properties = new ToolResourceProperties
+        ApiVersion = ManagementApiVersions.CoreV1,
+        Kind = ResourceKinds.Tool,
+        Metadata = new ResourceMetadata { Name = "local.list_workspaces" },
+        Definition = new ToolResourceProperties
         {
             DisplayName = "List workspaces", Provider = new ResourceReference(providerId), ExternalId = "list_workspaces", Enabled = true,
             Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch },
@@ -84,12 +86,12 @@ public sealed class McpToolCatalogTests
 
     private sealed class FakeStore(params Resource[] resources) : IControlPlaneStore
     {
-        private readonly Dictionary<string, Resource> values = resources.ToDictionary(value => value.Id);
+        private readonly Dictionary<ResourceKey, Resource> values = resources.ToDictionary(value => new ResourceKey(value.Kind, value.Metadata.Name));
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<StoredResource<T>?> GetAsync<T>(string resourceId, CancellationToken cancellationToken) where T : Resource => Task.FromResult(values.TryGetValue(resourceId, out var value) && value is T typed ? new StoredResource<T>(typed, "test", DateTimeOffset.UnixEpoch) : null);
-        public Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string resourceType, string? resourceGroup, int skip, int take, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();
+        public Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource => Task.FromResult(values.TryGetValue(key, out var value) && value is T typed ? new StoredResource<T>(typed, "test", DateTimeOffset.UnixEpoch) : null);
+        public Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();
         public Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();
         public Task<StoredResource<T>> CreateImmutableAsync<T>(T resource, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();
-        public Task DeleteAsync(string resourceId, string? ifMatch, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

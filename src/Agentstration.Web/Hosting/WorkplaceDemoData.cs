@@ -22,7 +22,7 @@ public static class WorkplaceDemoData
                 true,
                 new DirectFlowSpec(new FlowTargetReference(
                     FlowTargetKind.Agent,
-                    "/resourceGroups/default/providers/Agentstration.Agents/agents/dotnet-expert"))), cancellationToken);
+                    "dotnet-expert"))), cancellationToken);
             await flows.PublishVersionAsync(flowId, "1.0.0", true, cancellationToken);
         }
         else if (flow.Value.ActiveVersion is null)
@@ -53,7 +53,7 @@ public static class WorkplaceDemoData
                     }
                 ]
             },
-            Binding = new EntryBinding(EntryBindingKind.Agent, "/resourceGroups/default/providers/Agentstration.Agents/agents/dotnet-expert"),
+            Binding = new EntryBinding(EntryBindingKind.Agent, "dotnet-expert"),
             Behavior = new EntryBehavior(TaskCreationMode.Automatic, AllowConversation: true, StreamResponse: true)
         }, cancellationToken);
 
@@ -102,7 +102,7 @@ public static class WorkplaceDemoData
                 Suggestions = [new("Try a quick answer", "Acknowledge that the Workplace UX iteration is ready for review."), new("Save an idea", "Remember this idea for my next request.")],
                 Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }]
             },
-            Binding = new EntryBinding(EntryBindingKind.Agent, "/resourceGroups/default/providers/Agentstration.Agents/agents/dotnet-expert"), Behavior = new EntryBehavior(TaskCreationMode.Never)
+            Binding = new EntryBinding(EntryBindingKind.Agent, "dotnet-expert"), Behavior = new EntryBehavior(TaskCreationMode.Never)
         }, cancellationToken);
 
         var workspaceAdministration = services.GetRequiredService<WorkspaceAdministrationService>();
@@ -129,7 +129,8 @@ public static class WorkplaceDemoData
     private static async Task SaveAndPublishAsync(EntryAdministrationService service, WorkplaceService workplace, EntryDraft draft, CancellationToken cancellationToken)
     {
         var existing = await service.ListAsync(cancellationToken);
-        if (!existing.Any(value => value.Id == draft.Id)) await service.SaveAsync(draft, cancellationToken);
+        var current = existing.SingleOrDefault(value => value.Id == draft.Id);
+        if (current is null || current.Binding != draft.Binding) await service.SaveAsync(draft, cancellationToken);
         if (!(await workplace.ListEntriesAsync(cancellationToken)).Any(value => value.Id == draft.Id && value.ResolvedTarget is not null)) await service.PublishAsync(draft.Id, cancellationToken);
     }
 }

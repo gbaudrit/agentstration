@@ -2,7 +2,7 @@ namespace Agentstration.Management.Abstractions;
 
 public interface IManagementResourceDeletionGuard
 {
-    Task ValidateDeleteAsync(string resourceId, CancellationToken cancellationToken);
+    Task ValidateDeleteAsync(ResourceKey key, CancellationToken cancellationToken);
 }
 
 public sealed record StoredResource<T>(T Value, string ETag, DateTimeOffset UpdatedAt) where T : Resource;
@@ -10,17 +10,24 @@ public sealed record StoredResource<T>(T Value, string ETag, DateTimeOffset Upda
 public interface IControlPlaneStore
 {
     Task InitializeAsync(CancellationToken cancellationToken);
-    Task<StoredResource<T>?> GetAsync<T>(string resourceId, CancellationToken cancellationToken) where T : Resource;
-    Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string resourceType, string? resourceGroup, int skip, int take, CancellationToken cancellationToken) where T : Resource;
+    Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource;
+    Task<StoredResource<T>?> GetAsync<T>(string name, CancellationToken cancellationToken) where T : Resource =>
+        GetAsync<T>(new ResourceKey(ResourceKinds.For<T>(), name), cancellationToken);
+    Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource;
+    Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, string? ignoredResourceGroup, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
+        ListAsync<T>(kind, skip, take, cancellationToken);
     Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource;
     Task<StoredResource<T>> CreateImmutableAsync<T>(T resource, CancellationToken cancellationToken) where T : Resource;
-    Task DeleteAsync(string resourceId, string? ifMatch, CancellationToken cancellationToken);
+    Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken);
 }
 
 public interface IModelProfileReferenceValidator
 {
-    Task ValidateAsync(string profileResourceId, CancellationToken cancellationToken);
+    Task ValidateAsync(ResourceReference profileReference, CancellationToken cancellationToken);
 }
 
 public sealed class ControlPlaneConcurrencyException(string message) : Exception(message);
-public sealed class ControlPlaneResourceNotFoundException(string resourceId) : Exception($"Resource '{resourceId}' was not found.");
+public sealed class ControlPlaneResourceNotFoundException : Exception
+{
+    public ControlPlaneResourceNotFoundException(ResourceKey key) : base($"Resource '{key}' was not found.") { }
+}

@@ -8,6 +8,6 @@ public sealed record RuntimeInstanceSummary(string Id, string Agent, string Stat
 public sealed record WorkSummary(Guid Id, string Title, string Type, string Status, string Priority, string Owner, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 public sealed record FlowSummary(string Id, string Name, string Kind, string Version, string Status, int Steps, int ActiveExecutions, DateTimeOffset UpdatedAt);
 public sealed record ExecutionSummary(string Id, string Agent, string? Flow, Guid? WorkItemId, string Status, DateTimeOffset StartedAt, TimeSpan? Duration, string? Result, string? Error);
-public sealed record ManagementSummary(int AgentTypes, int Configurations, int Revisions, int Policies, string DesiredState);
+public sealed record ManagementSummary(int Agents, int Configurations, int Revisions, int Policies, string DesiredState);
 public sealed record PlatformSnapshot(string Status, int KnownAgents, int ActiveAgents, int RunningExecutions, int OpenWorkItems, int ActiveFlows, IReadOnlyList<ComponentHealth> Components);
 public sealed record ComponentHealth(string Name, string Status, string Detail, UiStatus Severity);

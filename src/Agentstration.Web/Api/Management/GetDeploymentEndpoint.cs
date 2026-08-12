@@ -8,7 +8,6 @@ internal sealed class GetDeploymentEndpoint : IManagementEndpoint
     public static void Map(RouteGroupBuilder group) => group.MapGet("/deployments/{name}", HandleAsync);
 
     private static Task<IResult> HandleAsync(
-        string resourceGroup,
         string name,
         HttpRequest request,
         HttpResponse response,
@@ -17,8 +16,8 @@ internal sealed class GetDeploymentEndpoint : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () =>
         {
             ManagementHttp.RequireApiVersion(request);
-            var id = ManagementHttp.DeploymentId(resourceGroup, name);
-            var stored = await service.GetDeploymentAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(id);
+            var stored = await service.GetDeploymentAsync(name, cancellationToken)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.AgentDeployment, name));
             return ManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 }

@@ -15,7 +15,7 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
         ModelProfileManagementService service,
         CancellationToken cancellationToken) => ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var profiles = await service.ListAsync(provider, model, status, search, cancellationToken);
+            var profiles = await service.ListAsync(cancellationToken);
             var responses = new List<ModelProfileSummaryResponse>(profiles.Count);
             foreach (var profile in profiles)
             {
@@ -30,8 +30,8 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
                         profile.Value.Properties.DisplayName,
                         profile.Value.Properties.Description,
                         new ModelProviderReferenceResponse(
-                            profile.Value.Properties.Provider.ResourceId,
-                            ResourceIdentifier.Parse(profile.Value.Properties.Provider.ResourceId).Name,
+                            profile.Value.Definition.Provider.Name,
+                            profile.Value.Definition.Provider.Name,
                             resolution.Provider?.DisplayName),
                         new ModelReferenceResponse(profile.Value.Properties.Model.Name),
                         profile.Value.Properties.Generation,
@@ -52,7 +52,7 @@ internal sealed class GetModelProfileEndpoint : IModelManagementEndpoint
         {
             var groupName = ModelManagementHttp.ResourceGroup(resourceGroup);
             var stored = await service.GetAsync(groupName, profileName, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(ModelProfileManagementService.ProfileId(groupName, profileName));
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName));
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 }
@@ -67,8 +67,8 @@ internal sealed class CreateModelProfileEndpoint : IModelManagementEndpoint
             {
                 Id = ModelProfileManagementService.ProfileId(body.ResourceGroup, body.Name),
                 Name = body.Name,
-                Type = AgentstrationResourceTypes.ModelProfiles,
-                ApiVersion = ManagementApiVersions.V20260801,
+                Kind = ResourceKinds.ModelProfile,
+                ApiVersion = ManagementApiVersions.CoreV1,
                 ResourceGroup = body.ResourceGroup,
                 Location = body.Location,
                 Properties = body.Properties
@@ -108,7 +108,7 @@ internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
             var id = ModelProfileManagementService.ProfileId(ModelManagementHttp.ResourceGroup(resourceGroup), profileName);
             _ = await service.GetRequiredAsync(id, cancellationToken);
             var usages = await service.GetUsagesAsync(id, cancellationToken);
-            var values = usages.Select(value => new ModelProfileUsageResponse(value.ResourceType, value.ResourceId, value.Name, value.DisplayName)).ToArray();
+            var values = usages.Select(value => new ModelProfileUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName)).ToArray();
             return Results.Ok(new ModelProfileUsagesResponse(values, values.Length));
         });
 }
@@ -121,7 +121,7 @@ internal sealed class ResolveModelProfileEndpoint : IModelManagementEndpoint
         {
             var groupName = ModelManagementHttp.ResourceGroup(resourceGroup);
             var profile = await service.GetAsync(groupName, profileName, cancellationToken)
-                ?? throw new ControlPlaneResourceNotFoundException(ModelProfileManagementService.ProfileId(groupName, profileName));
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName));
             return Results.Ok(ModelManagementHttp.Resolution(await service.ResolveAsync(profile.Value, cancellationToken)));
         });
 }

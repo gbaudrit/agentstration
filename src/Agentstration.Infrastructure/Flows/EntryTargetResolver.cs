@@ -75,12 +75,12 @@ public sealed class EntryTargetResolver(
         var current = await flows.GetAsync(flowId, cancellationToken);
         if (current is null)
         {
-            await flows.CreateAsync(new CreateFlowCommand(flowId.Value, $"System-managed direct invocation for {agent.Value.Properties.DisplayName}.", FlowKind.Direct, version, true, spec, metadata), cancellationToken);
+            await flows.CreateAsync(new CreateFlowCommand(flowId.Value, $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", FlowKind.Direct, version, true, spec, metadata), cancellationToken);
         }
         else if (!string.Equals(current.Value.Version, version, StringComparison.Ordinal))
         {
             await flows.UpdateAsync(flowId, new UpdateFlowCommand(
-                $"System-managed direct invocation for {agent.Value.Properties.DisplayName}.", FlowKind.Direct, version, true, spec, metadata), current.ETag, cancellationToken);
+                $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", FlowKind.Direct, version, true, spec, metadata), current.ETag, cancellationToken);
         }
 
         if (await flows.GetVersionAsync(flowId, version, cancellationToken) is null)

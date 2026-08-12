@@ -148,7 +148,7 @@ public sealed class ChatClientResolverTests
     {
         private static readonly ModelProviderConfiguration Provider = new()
         {
-            ResourceId = ProviderId,
+            Uid = Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Name = "ollama-local",
             ProviderType = "ollama",
             Endpoint = new Uri("http://localhost:11434/")
