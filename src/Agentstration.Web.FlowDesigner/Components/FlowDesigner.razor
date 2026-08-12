@@ -281,7 +281,7 @@ else
     private static string Text(ChangeEventArgs e) => e.Value?.ToString()?.Trim() ?? string.Empty;
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
     private static string NextVersion(string value) { var parts = value.Split('.'); return parts.Length == 3 && int.TryParse(parts[2], out var patch) ? $"{parts[0]}.{parts[1]}.{patch + 1}" : "1.0.0"; }
-    private const string UnconfiguredAgent = "/resourceGroups/default/providers/Agentstration.Agents/agents/unconfigured";
+    private const string UnconfiguredAgent = "unconfigured";
 
     public ValueTask DisposeAsync()
     {

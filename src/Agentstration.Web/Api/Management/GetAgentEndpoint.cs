@@ -8,7 +8,6 @@ internal sealed class GetAgentEndpoint : IManagementEndpoint
     public static void Map(RouteGroupBuilder group) => group.MapGet("/agents/{name}", HandleAsync);
 
     private static Task<IResult> HandleAsync(
-        string resourceGroup,
         string name,
         HttpRequest request,
         HttpResponse response,
@@ -17,8 +16,8 @@ internal sealed class GetAgentEndpoint : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () =>
         {
             ManagementHttp.RequireApiVersion(request);
-            var id = ManagementHttp.AgentId(resourceGroup, name);
-            var stored = await service.GetAgentAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(id);
+            var stored = await service.GetAgentAsync(name, cancellationToken)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, name));
             return ManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 }

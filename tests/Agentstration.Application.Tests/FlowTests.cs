@@ -51,7 +51,7 @@ public sealed class FlowTests
         FlowSpec[] specs =
         [
             new DirectFlowSpec(new FlowTargetReference(FlowTargetKind.Agent, "agent-a")),
-            new RoutingFlowSpec(FlowRoutingStrategy.Capabilities, [new FlowTargetReference(FlowTargetKind.AgentType, "expert")]),
+            new RoutingFlowSpec(FlowRoutingStrategy.Capabilities, [new FlowTargetReference(FlowTargetKind.Agent, "expert")]),
             new WorkflowFlowSpec("start", [new FlowNode("start", FlowNodeKind.Function)], []),
             new OrchestrationFlowSpec(FlowOrchestrationStrategy.Concurrent, [new FlowTargetReference(FlowTargetKind.Agent, "agent-a")], 3),
             new CompositeFlowSpec(FlowCompositionMode.Sequential, [new FlowReference(new FlowId("child"), "1.0.0", false)])
@@ -71,7 +71,7 @@ public sealed class FlowTests
     {
         await using var fixture = await FlowFixture.CreateAsync();
         var created = await fixture.Service.CreateAsync(new CreateFlowCommand("technical-router", "Routes work", FlowKind.Routing, "1.0.0", true,
-            new RoutingFlowSpec(FlowRoutingStrategy.Capabilities, [new FlowTargetReference(FlowTargetKind.AgentType, "technical-expert")])), default);
+            new RoutingFlowSpec(FlowRoutingStrategy.Capabilities, [new FlowTargetReference(FlowTargetKind.Agent, "technical-expert")])), default);
         var published = await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
         var precise = await fixture.Service.GetVersionAsync(created.Value.Id, "1.0.0", default);
         var resolved = await fixture.Service.ResolveAsync(new FlowReference(created.Value.Id), default);
@@ -306,7 +306,7 @@ public sealed class FlowTests
                 new InputFlowStepDefinition { Name = "input" },
                 new TransformFlowStepDefinition { Name = "transform", Mapping = JsonSerializer.SerializeToElement(new { prompt = "${input.prompt}", eligible = true }) },
                 new ConditionFlowStepDefinition { Name = "condition", Left = "${steps.transform.output.eligible}", Operator = "equals", Right = "true" },
-                new RouterFlowStepDefinition { Name = "router", Candidates = [new("sql", new("/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert"), Examples: ["query"])], Fallback = new("/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert") },
+                new RouterFlowStepDefinition { Name = "router", Candidates = [new("sql", new("sql-expert"), Examples: ["query"])], Fallback = new("sql-expert") },
                 new AgentFlowStepDefinition { Name = "agent", Agent = new("${steps.router.output.selectedAgent}"), InputMapping = JsonSerializer.SerializeToElement(new { prompt = "${steps.transform.output.prompt}" }) },
                 new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement(new { result = "${steps.agent.output}" }) },
                 new FailureFlowStepDefinition { Name = "failure" }

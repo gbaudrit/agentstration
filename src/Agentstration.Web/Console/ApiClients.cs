@@ -19,7 +19,6 @@ public interface IManagementApiClient
 {
     Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(string resourceGroup, CancellationToken cancellationToken);
-    Task<IReadOnlyList<AgentTypeResource>> GetAgentTypesAsync(string resourceGroup, CancellationToken cancellationToken);
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string resourceGroup, string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken);
     Task DeleteAgentAsync(string resourceGroup, string name, string etag, CancellationToken cancellationToken);
@@ -113,16 +112,9 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
 
     public async Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(string resourceGroup, CancellationToken cancellationToken)
     {
-        var path = $"resourceGroups/{Uri.EscapeDataString(resourceGroup)}/providers/{AgentstrationProviderNamespaces.Agents}/agents?api-version={ManagementApiVersions.V20260801}";
+        var path = "agents";
         var page = await ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, path, cancellationToken);
-        return page.Value.Select(agent => new AgentSummary(agent.Id, agent.Properties.DisplayName, agent.Properties.AgentType.ResourceId, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Properties.Tools.Select(tool => tool.ResourceId).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Properties.ModelProfile.ResourceId)).ToArray();
-    }
-
-    public async Task<IReadOnlyList<AgentTypeResource>> GetAgentTypesAsync(string resourceGroup, CancellationToken cancellationToken)
-    {
-        var path = $"resourceGroups/{Uri.EscapeDataString(resourceGroup)}/providers/{AgentstrationProviderNamespaces.Agents}/agentTypes?api-version={ManagementApiVersions.V20260801}";
-        var page = await ApiResponse.ReadAsync<PagedResponse<AgentTypeResource>>(httpClient, path, cancellationToken);
-        return page.Value;
+        return page.Value.Select(agent => new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Definition.ModelProfile.Name)).ToArray();
     }
 
     public async Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string resourceGroup, string name, CancellationToken cancellationToken)
@@ -134,7 +126,7 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
 
     public async Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Put, AgentPath(request.ResourceGroup, request.Name))
+        using var message = new HttpRequestMessage(HttpMethod.Put, AgentPath("default", request.Metadata.Name))
         {
             Content = JsonContent.Create(request)
         };
@@ -155,14 +147,12 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
     public async Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken)
     {
         var agentsTask = GetAgentsAsync(cancellationToken);
-        var typesTask = GetAgentTypesAsync("default", cancellationToken);
-        await Task.WhenAll(agentsTask, typesTask);
         var agents = await agentsTask;
-        return new((await typesTask).Count, agents.Count, agents.Sum(item => int.TryParse(item.Version, out var version) ? version : 0), 0, "Managed");
+        return new(0, agents.Count, agents.Sum(item => int.TryParse(item.Version, out var version) ? version : 0), 0, "Managed");
     }
 
     private static string AgentPath(string resourceGroup, string name) =>
-        $"resourceGroups/{Uri.EscapeDataString(resourceGroup)}/providers/{AgentstrationProviderNamespaces.Agents}/agents/{Uri.EscapeDataString(name)}?api-version={ManagementApiVersions.V20260801}";
+        $"agents/{Uri.EscapeDataString(name)}";
 
     private static async Task<ResourceSnapshot<T>> ReadResourceAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
@@ -248,9 +238,9 @@ public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpCli
 
     public async Task<IReadOnlyList<ResourcePickerItem>> GetResourcesAsync(EntryBindingKind kind, CancellationToken cancellationToken)
     {
-        var type = kind == EntryBindingKind.Agent ? "Agentstration.Agents/agents" : "Agentstration.Flows/flows";
+        var resourceKind = kind == EntryBindingKind.Agent ? ResourceKinds.Agent : ResourceKinds.Flow;
         var catalogClient = httpClientFactory.CreateClient(kind == EntryBindingKind.Agent ? AgentResourceCatalogClient : FlowResourceCatalogClient);
-        return await ApiResponse.ReadAsync<ResourcePickerItem[]>(catalogClient, $"api/resources?type={Uri.EscapeDataString(type)}", cancellationToken);
+        return await ApiResponse.ReadAsync<ResourcePickerItem[]>(catalogClient, $"api/resources?kind={Uri.EscapeDataString(resourceKind)}", cancellationToken);
     }
 
     public async Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken) =>

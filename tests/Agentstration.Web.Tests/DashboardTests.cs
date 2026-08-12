@@ -29,16 +29,14 @@ public sealed class DashboardTests
         var fake = new MockApiClient(new FixedTimeProvider(new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero)));
         var request = new AgentResourceRequest
         {
-            Type = AgentstrationResourceTypes.Agents,
-            ApiVersion = ManagementApiVersions.V20260801,
-            Name = "new-agent",
-            ResourceGroup = "default",
-            Location = "local",
-            Properties = new AgentProperties
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = "new-agent" },
+            Definition = new AgentProperties
             {
                 DisplayName = "New agent",
-                AgentType = new AgentTypeReference(ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Agents, "agentTypes", "readonly-expert").Value, 1),
-                ModelProfile = new ResourceReference(ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Models, "modelProfiles", "reasoning-default").Value)
+                Instructions = "Help the user.",
+                ModelProfile = new ResourceReference("reasoning-default")
             }
         };
 

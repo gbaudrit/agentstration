@@ -167,7 +167,7 @@ public sealed class RuntimeRunTests
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
-        var agentPath = $"/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert?api-version={ManagementApiVersions.V20260801}";
+        const string agentPath = "/api/agents/sql-expert";
         var agent = await client.GetFromJsonAsync<AgentResource>(agentPath);
         Assert.IsNotNull(agent);
         var workBefore = await client.GetFromJsonAsync<WorkItemPageResponse>("/api/work/workitems?top=100");
@@ -282,10 +282,10 @@ public sealed class RuntimeRunTests
             await management.InitializeAsync(default);
             await store.InitializeAsync(default);
 
-            var agentId = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Agents, "agents", "sql-expert").Value;
-            var revisionId = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Agents, "agentRevisions", "sql-expert--000001").Value;
-            await management.PutAsync(Agent(agentId), null, true, default);
-            await management.CreateImmutableAsync(Revision(revisionId, agentId), default);
+            const string agentId = "sql-expert";
+            const string revisionId = "sql-expert--000001";
+            var agent = await management.PutAsync(Agent(agentId), null, true, default);
+            await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid), default);
             await management.PutAsync(Deployment(revisionId), null, true, default);
             return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, registry, agentId);
         }
@@ -301,53 +301,45 @@ public sealed class RuntimeRunTests
 
         private static AgentResource Agent(string id) => new()
         {
-            Id = id,
-            Name = "sql-expert",
-            Type = AgentstrationResourceTypes.Agents,
-            ApiVersion = ManagementApiVersions.V20260801,
-            ResourceGroup = "default",
-            Location = "local",
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = "sql-expert" },
             Generation = 3,
-            Properties = new AgentProperties
+            Definition = new AgentProperties
             {
                 DisplayName = "SQL Expert",
-                AgentType = new AgentTypeReference(ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Agents, "agentTypes", "readonly-expert").Value, 1),
-                ModelProfile = new ResourceReference(ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Models, "modelProfiles", "reasoning-default").Value)
+                Instructions = "Test",
+                ModelProfile = new ResourceReference("reasoning-default")
             }
         };
 
-        private static AgentRevision Revision(string id, string agentId) => new()
+        private static AgentRevision Revision(string id, string agentId, Guid agentUid) => new()
         {
-            Id = id,
-            Name = "sql-expert--000001",
-            Type = AgentstrationResourceTypes.AgentRevisions,
-            ApiVersion = ManagementApiVersions.V20260801,
-            ResourceGroup = "default",
-            Location = "local",
-            AgentResourceId = agentId,
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.AgentRevision,
+            Metadata = new ResourceMetadata { Name = "sql-expert--000001" },
+            AgentUid = agentUid,
+            AgentName = agentId,
             AgentVersion = 3,
-            AgentTypeVersion = 1,
             DefinitionHash = "hash",
             CreatedAt = DateTimeOffset.UtcNow,
             ProvisioningState = ProvisioningState.Succeeded,
             Definition = new ResolvedAgentDefinition
             {
-                AgentId = Guid.NewGuid(), AgentKey = "sql-expert", DisplayName = "SQL Expert", Description = "Test", AgentVersion = 3,
-                EffectiveInstructions = "Test", ModelProfileId = "reasoning-default", RuntimeProfileId = "/resourceGroups/default/providers/Agentstration.Runtime/runtimeProfiles/maf-default", EffectiveToolIds = [], MiddlewareIds = [], ContextProviderIds = [], Capabilities = [], Handler = "prompt-agent", DefinitionHash = "hash"
+                AgentId = agentUid, AgentKey = "sql-expert", DisplayName = "SQL Expert", Description = "Test", AgentVersion = 3,
+                EffectiveInstructions = "Test", ModelProfileName = "reasoning-default", RuntimeProfileName = "maf-default", EffectiveToolNames = [], MiddlewareIds = [], ContextProviderIds = [], Capabilities = [], Handler = "prompt-agent", DefinitionHash = "hash"
             }
         };
 
         private static AgentDeployment Deployment(string revisionId) => new()
         {
-            Id = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Agents, "deployments", "sql-expert").Value,
-            Name = "sql-expert",
-            Type = AgentstrationResourceTypes.Deployments,
-            ApiVersion = ManagementApiVersions.V20260801,
-            ResourceGroup = "default",
-            Location = "local",
-            RevisionId = revisionId,
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.AgentDeployment,
+            Metadata = new ResourceMetadata { Name = "sql-expert" },
+            RevisionName = revisionId,
+            AgentName = "sql-expert",
             Environment = "local",
-            RuntimeProfileId = "/resourceGroups/default/providers/Agentstration.Runtime/runtimeProfiles/maf-default",
+            RuntimeProfileName = "maf-default",
             HostingMode = AgentHostingMode.InProcess,
             DesiredState = DesiredAgentState.Running,
             ProvisioningState = ProvisioningState.Succeeded,

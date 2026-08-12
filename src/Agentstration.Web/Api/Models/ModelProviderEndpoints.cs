@@ -38,8 +38,8 @@ internal sealed class CreateModelProviderEndpoint : IModelManagementEndpoint
             {
                 Id = ModelProviderManagementService.ModelProviderId(body.Name, body.ResourceGroup),
                 Name = body.Name,
-                Type = AgentstrationResourceTypes.ModelProviders,
-                ApiVersion = ManagementApiVersions.V20260801,
+                Kind = ResourceKinds.ModelProvider,
+                ApiVersion = ManagementApiVersions.CoreV1,
                 ResourceGroup = body.ResourceGroup,
                 Location = body.Location,
                 Properties = body.Properties
@@ -79,7 +79,7 @@ internal sealed class GetModelProviderUsagesEndpoint : IModelManagementEndpoint
             var group = ModelManagementHttp.ResourceGroup(resourceGroup);
             _ = await service.GetAsync(group, providerName, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(providerName);
             var usages = await service.GetUsagesAsync(ModelProviderManagementService.ModelProviderId(providerName, group), cancellationToken);
-            var values = usages.Select(value => new ModelProviderUsageResponse(value.ResourceType, value.ResourceId, value.Name, value.DisplayName)).ToArray();
+            var values = usages.Select(value => new ModelProviderUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName)).ToArray();
             return Results.Ok(new ModelProviderUsagesResponse(values, values.Length));
         });
 }
@@ -121,10 +121,10 @@ internal sealed class GetModelProviderStatusEndpoint : IModelManagementEndpoint
 internal static class ModelProviderMappings
 {
     public static ModelProviderResponse Response(ModelProviderView provider, bool includeEndpoint = false) => new(
-        provider.Configuration.ResourceId,
+        provider.Configuration.Uid.ToString("D"),
         provider.Configuration.Name,
-        provider.Configuration.ResourceGroup,
-        provider.Configuration.Location,
+        "default",
+        "local",
         new ModelProviderPropertiesResponse(
             provider.Configuration.DisplayName ?? provider.Configuration.Name,
             provider.Configuration.ProviderType,

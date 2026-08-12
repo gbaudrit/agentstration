@@ -19,7 +19,7 @@ public sealed class ModelProfileEditorModel
 
     [Required] public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
-    [Required] public string ProviderResourceId { get; set; } = string.Empty;
+    [Required] public string ProviderName { get; set; } = string.Empty;
     [Required] public string ModelName { get; set; } = string.Empty;
     [Range(0d, 2d)] public double? Temperature { get; set; }
     [Range(0d, 1d)] public double? TopP { get; set; }
@@ -39,16 +39,13 @@ public sealed class ModelProfileEditorModel
 
     public ModelProfileProperties ToProperties()
     {
-        var provider = ResourceIdentifier.Parse(ProviderResourceId.Trim());
-        if (!string.Equals(provider.ProviderNamespace, AgentstrationProviderNamespaces.ModelProviders, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(provider.ResourceType, "modelProviders", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("The selected model provider reference is invalid.");
+        if (string.IsNullOrWhiteSpace(ProviderName)) throw new ArgumentException("A model provider name is required.");
         if (string.IsNullOrWhiteSpace(ModelName)) throw new ArgumentException("A model must be selected.");
         return new ModelProfileProperties
         {
             DisplayName = DisplayName.Trim(),
             Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
-            Provider = new ResourceReference(provider.Value),
+            Provider = new ResourceReference(ProviderName.Trim()),
             Model = new ModelSelection { Name = ModelName.Trim() },
             Generation = new ModelGenerationOptions
             {
@@ -77,7 +74,7 @@ public sealed class ModelProfileEditorModel
         Location = resource.Location ?? "local",
         DisplayName = resource.Properties.DisplayName,
         Description = resource.Properties.Description,
-        ProviderResourceId = resource.Properties.Provider.ResourceId,
+        ProviderName = resource.Definition.Provider.Name,
         ModelName = resource.Properties.Model.Name,
         Temperature = resource.Properties.Generation.Temperature,
         TopP = resource.Properties.Generation.TopP,

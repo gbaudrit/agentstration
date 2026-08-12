@@ -64,8 +64,8 @@ public abstract class LocalAgentProvisioner(
         if (factory is null) return new ProvisioningResult(false, null, $"No runtime factory is registered for handler '{revision.Definition.Handler}'.");
         try
         {
-            var runtime = await factory.CreateAsync(revision.Definition, revision.Id, context, cancellationToken);
-            registry.Set(deployment.Id, runtime);
+            var runtime = await factory.CreateAsync(revision.Definition, revision.Metadata.Name, context, cancellationToken);
+            registry.Set(deployment.Uid.ToString("N"), runtime);
             return new ProvisioningResult(true, $"inprocess://{deployment.Name}", null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -77,14 +77,14 @@ public abstract class LocalAgentProvisioner(
     public Task<ProvisioningResult> DeprovisionAsync(AgentDeployment deployment, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        registry.Remove(deployment.Id);
+        registry.Remove(deployment.Uid.ToString("N"));
         return Task.FromResult(new ProvisioningResult(true, null, null));
     }
 
     public Task<RuntimeObservation> ObserveAsync(AgentDeployment deployment, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(registry.TryGet(deployment.Id, out var runtime)
+        return Task.FromResult(registry.TryGet(deployment.Uid.ToString("N"), out var runtime)
             ? new RuntimeObservation(OperationalState.Ready, runtime!.RevisionId, null)
             : new RuntimeObservation(OperationalState.Unavailable, null, "Runtime instance is missing."));
     }
@@ -122,35 +122,35 @@ public sealed class LocalAgentDeploymentReconciler(
             {
                 ProvisioningState = ProvisioningState.Succeeded,
                 OperationalState = OperationalState.Stopped,
-                ObservedRevisionId = null,
+                ObservedRevisionName = null,
                 LastError = null
             };
             return new ReconciliationResult(stopped, stopped != deployment, "Deployment is stopped.");
         }
 
-        if (registry.TryGet(deployment.Id, out var current) && string.Equals(current!.RevisionId, deployment.RevisionId, StringComparison.Ordinal))
+        if (registry.TryGet(deployment.Uid.ToString("N"), out var current) && string.Equals(current!.RevisionId, deployment.RevisionName, StringComparison.Ordinal))
         {
             var observation = await provisioner.ObserveAsync(deployment, cancellationToken);
             var observed = deployment with
             {
                 ProvisioningState = ProvisioningState.Succeeded,
                 OperationalState = observation.State,
-                ObservedRevisionId = observation.RevisionId,
+                ObservedRevisionName = observation.RevisionId,
                 LastError = observation.Error
             };
             return new ReconciliationResult(observed, observed != deployment, "Existing runtime observed.");
         }
 
         if (current is not null) await provisioner.DeprovisionAsync(deployment, cancellationToken);
-        var revision = await store.GetAsync<AgentRevision>(deployment.RevisionId, cancellationToken);
-        if (revision is null) return Failed(deployment, $"Revision '{deployment.RevisionId}' does not exist.");
+        var revision = await store.GetAsync<AgentRevision>(deployment.RevisionName, cancellationToken);
+        if (revision is null) return Failed(deployment, $"Revision '{deployment.RevisionName}' does not exist.");
         var result = await provisioner.ProvisionAsync(revision.Value, deployment, cancellationToken);
         if (!result.Succeeded) return Failed(deployment, result.Error ?? "Provisioning failed.");
         var ready = deployment with
         {
             ProvisioningState = ProvisioningState.Succeeded,
             OperationalState = OperationalState.Ready,
-            ObservedRevisionId = deployment.RevisionId,
+            ObservedRevisionName = deployment.RevisionName,
             LastError = null
         };
         return new ReconciliationResult(ready, true, "Runtime provisioned.");

@@ -4,7 +4,7 @@ namespace Agentstration.Infrastructure.Agents;
 
 public sealed class DeferredModelProfileReferenceValidator : IModelProfileReferenceValidator
 {
-    public Task ValidateAsync(string profileResourceId, CancellationToken cancellationToken)
+    public Task ValidateAsync(ResourceReference profileReference, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.CompletedTask;

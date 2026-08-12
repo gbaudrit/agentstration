@@ -27,8 +27,8 @@ Open `http://localhost:5100`. Port `5080` belongs to Work API. The console provi
 
 The Management area provides declarative CRUD workflows for agents and logical model profiles:
 
-- list, filter, create, edit, and delete canonical `Agentstration.Agents/agents` resources;
-- select an available AgentType and retain its explicit version;
+- list, filter, create, edit, and delete canonical `Agent` resources;
+- select an available Agent by logical name;
 - select a model profile through a reusable picker that persists only its canonical resource ID;
 - edit tags as `key=value` pairs;
 - preserve ETags and send `If-None-Match` for creation and `If-Match` for updates/deletion;

@@ -3,6 +3,7 @@ using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Flow.Application;
+using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 
 namespace Agentstration.Web;
@@ -133,21 +134,21 @@ public static class WorkplaceEndpoints
     private static Task<IResult> GetEntryDependenciesAsync(string entryName, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
         Results.Ok((await service.GetDependenciesAsync(EntryResourceId(entryName), token)).Select(value => new EntryDependencyResponse(value.ResourceId, value.ResourceType, value.Relationship))));
 
-    private static async Task<IResult> ListResourcesAsync(string type, AgentManagementService agents, FlowService flows, CancellationToken token)
+    private static async Task<IResult> ListResourcesAsync(string kind, AgentManagementService agents, FlowService flows, CancellationToken token)
     {
-        if (string.Equals(type, "Agentstration.Agents/agents", StringComparison.Ordinal))
+        if (string.Equals(kind, ResourceKinds.Agent, StringComparison.Ordinal))
         {
             var values = await agents.ListAgentsAsync(ResourceGroup, 0, 500, token);
-            return Results.Ok(values.Select(value => new ResourcePickerItem(value.Value.Id, value.Value.Properties.DisplayName, value.Value.Properties.Description, value.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), value.Value.Status.ProvisioningState.ToString(), type,
+            return Results.Ok(values.Select(value => new ResourcePickerItem(value.Value.Id, value.Value.Properties.DisplayName, value.Value.Properties.Description, value.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), value.Value.Status.ProvisioningState.ToString(), kind,
                 new Dictionary<string, string> { ["modelProfile"] = value.Value.Properties.ModelProfile.ResourceId })));
         }
-        if (string.Equals(type, "Agentstration.Flows/flows", StringComparison.Ordinal))
+        if (string.Equals(kind, ResourceKinds.Flow, StringComparison.Ordinal))
         {
             var page = await flows.ListAsync(0, 500, token);
             return Results.Ok(page.Items.Where(value => !value.Value.Metadata.TryGetValue("systemManaged", out var system) || !bool.TryParse(system, out var hidden) || !hidden)
-                .Select(value => new ResourcePickerItem($"/resourceGroups/{value.Value.ResourceGroup}/providers/Agentstration.Flows/flows/{value.Value.Id.Value}", value.Value.DisplayName ?? value.Value.Name, value.Value.Description, value.Value.ActiveVersion ?? value.Value.Version, value.Value.Enabled ? "Active" : "Disabled", type)));
+                .Select(value => new ResourcePickerItem($"/resourceGroups/{value.Value.ResourceGroup}/providers/Agentstration.Flows/flows/{value.Value.Id.Value}", value.Value.DisplayName ?? value.Value.Name, value.Value.Description, value.Value.ActiveVersion ?? value.Value.Version, value.Value.Enabled ? "Active" : "Disabled", kind)));
         }
-        return Results.Problem(statusCode: 400, title: "resource_type_not_supported", detail: "Only Agent and Flow resources can be selected for an Entry.");
+        return Results.Problem(statusCode: 400, title: "resource_kind_not_supported", detail: "Only Agent and Flow resources can be selected for an Entry.");
     }
 
     private static async Task<IResult> ListWorkspaceDraftsAsync(WorkspaceAdministrationService service, WorkplaceService workplace, CancellationToken token)

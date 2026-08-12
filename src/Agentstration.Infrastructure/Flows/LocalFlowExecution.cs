@@ -66,20 +66,21 @@ public sealed class ManagedFlowAgentExecutor(AgentManagementService management, 
             ? promptProperty.GetString()!
             : input.GetRawText();
         var selected = await management.SelectAgentAsync(prompt, ResourceName(target.Id), cancellationToken);
-        var deployment = await store.GetAsync<AgentDeployment>(selected.DeploymentId, cancellationToken)
+        var deployment = (await store.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken))
+            .SingleOrDefault(value => value.Value.Uid.ToString("N") == selected.DeploymentId)
             ?? throw new InvalidOperationException("The selected agent deployment no longer exists.");
-        var revision = await store.GetAsync<AgentRevision>(deployment.Value.RevisionId, cancellationToken)
+        var revision = await store.GetAsync<AgentRevision>(deployment.Value.RevisionName, cancellationToken)
             ?? throw new InvalidOperationException("The selected agent revision no longer exists.");
         var result = await management.ExecuteSelectedAsync(selected, prompt, cancellationToken);
         return new FlowAgentExecutionResult(
             JsonSerializer.SerializeToElement(result.Output),
-            revision.Value.AgentResourceId,
+            revision.Value.AgentName,
             revision.Value.AgentVersion,
-            deployment.Value.ModelProfileId ?? revision.Value.Definition.ModelProfileId,
+            deployment.Value.ModelProfileName ?? revision.Value.Definition.ModelProfileName,
             result.ProviderType,
             result.Usage is null ? null : new FlowStepRunUsage(result.Usage.InputTokens, result.Usage.OutputTokens),
-            revision.Value.Definition.EffectiveToolIds.ToArray(),
-            [$"Runtime deployment {deployment.Value.Id} executed for correlation {correlationId}.", $"Model: {result.ModelName ?? "unspecified"}."]);
+            revision.Value.Definition.EffectiveToolNames.ToArray(),
+            [$"Runtime deployment {deployment.Value.Uid} executed for correlation {correlationId}.", $"Model: {result.ModelName ?? "unspecified"}."]);
     }
 
     private static string ResourceName(string id)

@@ -1,15 +1,16 @@
 # Resource identifiers
 
-Canonical Management resource identifiers follow this implemented shape:
+Management resources have two distinct identities:
 
 ```text
-/resourceGroups/{resourceGroup}/providers/{providerNamespace}/{resourceType}/{name}
+stable identity: uid (server-generated GUID)
+logical identity: Workspace + Kind + metadata.name
 ```
 
-For example:
+References are readable and structured:
 
-```text
-/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert
+```yaml
+modelProfile:
+  name: reasoning-default
+# workspaceRef is optional; omission means the current workspace.
 ```
-
-Identifiers are stable references. The resource schema version (`apiVersion`) and the revision/generation of a particular resource instance are separate concepts.

@@ -35,10 +35,10 @@ else
 
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Model selection</p><h2>Provider and model</h2></div></div>
             <div class="form-grid">
-                <label><span>Provider</span><select value="@model.ProviderResourceId" @onchange="ProviderChangedAsync"><option value="">Select a provider</option>@foreach (var provider in providers) { <option value="@provider.Id">@provider.Properties.DisplayName — @provider.Name</option> }</select><ValidationMessage For="() => model.ProviderResourceId" /></label>
+                <label><span>Provider</span><select value="@model.ProviderName" @onchange="ProviderChangedAsync"><option value="">Select a provider</option>@foreach (var provider in providers) { <option value="@provider.Name">@provider.Properties.DisplayName — @provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
                 <label><span>Model</span><select @bind="model.ModelName" disabled="@loadingModels"><option value="">@(loadingModels ? "Loading models…" : "Select a model")</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — not currently discovered</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @ModelManagementUi.Label(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
             </div>
-            @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderResourceId)) { <p class="inline-warning">No model is currently reported by this provider. An existing model name may remain configured while the provider is unavailable.</p> }
+            @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderName)) { <p class="inline-warning">No model is currently reported by this provider. An existing model name may remain configured while the provider is unavailable.</p> }
         </section>
 
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Defaults</p><h2>Generation</h2></div><span>Canonical</span></div>
@@ -123,21 +123,21 @@ else
                 usages = (await Client.GetModelProfileUsagesAsync(group, Name!, cancellation.Token)).Value;
                 resolution = await Client.GetModelProfileResolutionAsync(group, Name!, cancellation.Token);
             }
-            if (!string.IsNullOrWhiteSpace(model.ProviderResourceId)) await LoadModelsAsync(clearSelection: false);
+            if (!string.IsNullOrWhiteSpace(model.ProviderName)) await LoadModelsAsync(clearSelection: false);
         }
         catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProfileEditorModel(); }
         finally { loading = false; }
     }
     private async Task ProviderChangedAsync(ChangeEventArgs args)
     {
-        if (model is null) return; model.ProviderResourceId = args.Value?.ToString() ?? string.Empty; await LoadModelsAsync(clearSelection: true);
+        if (model is null) return; model.ProviderName = args.Value?.ToString() ?? string.Empty; await LoadModelsAsync(clearSelection: true);
     }
     private async Task LoadModelsAsync(bool clearSelection)
     {
         if (model is null) return; if (clearSelection) model.ModelName = string.Empty; models = []; warning = null;
-        if (!ResourceIdentifier.TryParse(model.ProviderResourceId, out var id)) return;
+        if (string.IsNullOrWhiteSpace(model.ProviderName)) return;
         loadingModels = true;
-        try { models = await ProvidersClient.GetProviderModelsAsync(id.ResourceGroup, id.Name, cancellation.Token); }
+        try { models = await ProvidersClient.GetProviderModelsAsync("default", model.ProviderName, cancellation.Token); }
         catch (AgentstrationApiException exception) { warning = $"Models cannot currently be discovered: {exception.Message}"; }
         finally { loadingModels = false; }
     }

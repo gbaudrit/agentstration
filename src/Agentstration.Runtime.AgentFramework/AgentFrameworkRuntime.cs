@@ -21,13 +21,13 @@ public sealed class AgentFrameworkRuntimeFactory(
     public async Task<IAgentRuntime> CreateAsync(ResolvedAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var tools = (await context.Tools.ResolveAsync(definition.EffectiveToolIds, cancellationToken))
+        var tools = (await context.Tools.ResolveAsync(definition.EffectiveToolNames, cancellationToken))
             .Select(MapTool)
             .ToList();
         return new AgentFrameworkRuntime(
             definition.AgentKey,
             revisionId,
-            definition.ModelProfileId,
+            definition.ModelProfileName,
             definition.EffectiveInstructions,
             definition.Description,
             tools,
@@ -181,17 +181,13 @@ public sealed class AgentFrameworkRuntimeFactory(
 public sealed class AgentFrameworkAgentRouter(IChatClientResolver chatClients, GenAiObservabilityOptions observability) : IAgentRouter
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly string RouterModelProfileId = ResourceIdentifier.Create(
-        "default",
-        AgentstrationProviderNamespaces.Models,
-        "modelProfiles",
-        "reasoning-default").Value;
+    private const string RouterModelProfileName = "reasoning-default";
 
     public async Task<AgentRouteResult> SelectAsync(AgentRouteRequest request, IReadOnlyCollection<RoutableAgent> candidates, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Input);
         if (candidates.Count == 0) throw new ArgumentException("At least one routing candidate is required.", nameof(candidates));
-        var client = await chatClients.ResolveAsync(RouterModelProfileId, cancellationToken);
+        var client = await chatClients.ResolveAsync(RouterModelProfileName, cancellationToken);
         AIAgent router = new ChatClientAgent(
             client,
             instructions: "AGENTSTRATION_ROUTER: Select exactly one candidate for the request. Return only JSON with agentId, confidence, and reason. Never execute the selected agent.",

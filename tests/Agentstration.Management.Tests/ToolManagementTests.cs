@@ -17,7 +17,7 @@ public sealed class ToolManagementTests
 
         ToolManagementService.ValidateTool(resource);
 
-        Assert.AreEqual("search", ResourceIdentifier.Parse(resource.Id).Name);
+        Assert.AreEqual("search", resource.Metadata.Name);
         Assert.AreEqual("document-search", resource.Properties.ToolType!.Id);
     }
 
@@ -48,7 +48,7 @@ public sealed class ToolManagementTests
         {
             Properties = valid.Properties with
             {
-                Mcp = new DirectMcpToolReference(new ResourceReference(ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Models, "modelProfiles", "wrong").Value), "search")
+                Mcp = new DirectMcpToolReference(new ResourceReference(""), "search")
             }
         };
 
@@ -63,8 +63,8 @@ public sealed class ToolManagementTests
         {
             Id = ServerId(),
             Name = "local",
-            Type = AgentstrationResourceTypes.McpServers,
-            ApiVersion = ManagementApiVersions.V20260801,
+            Kind = ResourceKinds.McpServer,
+            ApiVersion = ManagementApiVersions.CoreV1,
             ResourceGroup = "default",
             Properties = new McpServerProperties { Endpoint = new Uri("file:///tmp/mcp") }
         };
@@ -74,13 +74,12 @@ public sealed class ToolManagementTests
 
     private static ToolResource Tool(ToolResourceProperties properties) => new()
     {
-        Id = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Tools, "tools", "search").Value,
         Name = "search",
-        Type = AgentstrationResourceTypes.Tools,
-        ApiVersion = ManagementApiVersions.V20260801,
+        Kind = ResourceKinds.Tool,
+        ApiVersion = ManagementApiVersions.CoreV1,
         ResourceGroup = "default",
         Properties = properties
     };
 
-    private static string ServerId() => ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Integrations, "mcpServers", "local").Value;
+    private static string ServerId() => "local";
 }

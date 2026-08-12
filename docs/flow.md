@@ -10,13 +10,13 @@ The Flow module is composed of independent Core, Contracts, Application, Storage
 
 ## Kinds
 
-- `Direct` selects one typed Agent or AgentType target.
+- `Direct` selects one Agent target.
 - `Routing` configures a strategy, candidate targets, optional fallback, and extensible settings.
 - `Workflow` defines a simple graph of unique nodes, edges, one entry point, and optional outputs.
 - `Orchestration` declares participants and a provider-neutral Sequential, Concurrent, Handoff, GroupChat, Magentic, or Custom strategy.
 - `Composite` references child Flows without copying their definitions.
 
-Each `spec` is polymorphic and carries the OpenAPI/JSON discriminator `specKind`. References distinguish Agent, AgentType, and Flow targets. A `FlowReference` selects either an immutable semantic version or the active version.
+Each `spec` is polymorphic and carries the OpenAPI/JSON discriminator `specKind`. References distinguish Agent and Flow targets. A `FlowReference` selects either an immutable semantic version or the active version.
 
 ## Versioning and API
 

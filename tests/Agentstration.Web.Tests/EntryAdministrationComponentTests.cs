@@ -1,5 +1,6 @@
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
+using Agentstration.Management.Abstractions;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Bunit;
@@ -92,7 +93,7 @@ public sealed class EntryAdministrationComponentTests
 
     private sealed class FakeEntryAdministrationApiClient : IEntryAdministrationApiClient
     {
-        internal const string AgentResourceId = "/resourceGroups/default/providers/Agentstration.Agents/agents/deterministic";
+        internal const string AgentResourceId = "deterministic";
         internal const string FlowResourceId = "/resourceGroups/default/providers/Agentstration.Flows/flows/router";
         private const string WorkspaceResourceId = "/resourceGroups/default/providers/Agentstration.Work/workspaces/personal";
         private static readonly DateTimeOffset Now = new(2026, 8, 6, 12, 0, 0, TimeSpan.Zero);
@@ -122,8 +123,8 @@ public sealed class EntryAdministrationComponentTests
         {
             RequestedKinds.Add(kind);
             var item = kind == EntryBindingKind.Agent
-                ? new ResourcePickerItem(AgentResourceId, "Deterministic agent", "Local agent", "1", "Succeeded", "Agentstration.Agents/agents", new Dictionary<string, string> { ["modelProfile"] = "deterministic" })
-                : new ResourcePickerItem(FlowResourceId, "Router", "Published router", "1.0.0", "Active", "Agentstration.Flows/flows");
+                ? new ResourcePickerItem(AgentResourceId, "Deterministic agent", "Local agent", "1", "Succeeded", ResourceKinds.Agent, new Dictionary<string, string> { ["modelProfile"] = "deterministic" })
+                : new ResourcePickerItem(FlowResourceId, "Router", "Published router", "1.0.0", "Active", ResourceKinds.Flow);
             return Task.FromResult<IReadOnlyList<ResourcePickerItem>>([item]);
         }
 

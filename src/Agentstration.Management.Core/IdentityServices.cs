@@ -8,7 +8,6 @@ public sealed class LocalBootstrapOptions
     public string TenantDisplayName { get; set; } = "Local organization";
     public string WorkspaceName { get; set; } = "default";
     public string WorkspaceDisplayName { get; set; } = "Default workspace";
-    public string ResourceGroupName { get; set; } = "default";
     public string UserDisplayName { get; set; } = "Local User";
 }
 
@@ -69,13 +68,6 @@ public sealed class LocalEnvironmentBootstrapper(
             await store.AddWorkspaceAsync(workspace, cancellationToken);
         }
 
-        var resourceGroup = await store.FindResourceGroupAsync(tenant.Id, workspace.Id, options.ResourceGroupName, cancellationToken);
-        if (resourceGroup is null)
-        {
-            resourceGroup = new ResourceGroup(Guid.NewGuid(), tenant.Id, workspace.Id, options.ResourceGroupName, now);
-            await store.AddResourceGroupAsync(resourceGroup, cancellationToken);
-        }
-
         var user = await store.FindUserByExternalSubjectAsync(LocalIdentityProvider.LocalSubject, cancellationToken);
         if (user is null)
         {
@@ -100,7 +92,7 @@ public sealed class LocalEnvironmentBootstrapper(
 
         var resolvedUser = await identityProvider.ResolveCurrentUserAsync(cancellationToken);
         contextInitializer.Initialize(new RequestContext(resolvedUser.Id, tenant.Id, workspace.Id));
-        await resourceMigrator.BackfillUnscopedResourcesAsync(tenant.Id, workspace.Id, resourceGroup.Id, cancellationToken);
+        await resourceMigrator.BackfillUnscopedResourcesAsync(tenant.Id, workspace.Id, cancellationToken);
     }
 }
 
@@ -199,7 +191,6 @@ public sealed class IdentityAdministrationService(
         var now = timeProvider.GetUtcNow();
         var workspace = new Workspace(Guid.NewGuid(), context.TenantId, name, displayName, WorkspaceStatus.Active, now);
         await store.AddWorkspaceAsync(workspace, cancellationToken);
-        await store.AddResourceGroupAsync(new ResourceGroup(Guid.NewGuid(), context.TenantId, workspace.Id, "default", now), cancellationToken);
         return workspace;
     }
 }

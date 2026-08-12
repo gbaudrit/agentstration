@@ -9,7 +9,6 @@ internal sealed class CreateAgentRevisionEndpoint : IManagementEndpoint
     public static void Map(RouteGroupBuilder group) => group.MapPost("/agents/{name}/revisions", HandleAsync);
 
     private static Task<IResult> HandleAsync(
-        string resourceGroup,
         string name,
         CreateRevisionRequest body,
         HttpRequest request,
@@ -20,8 +19,8 @@ internal sealed class CreateAgentRevisionEndpoint : IManagementEndpoint
         {
             ManagementHttp.RequireApiVersion(request);
             var stored = await service.CreateRevisionAsync(
-                ManagementHttp.AgentId(resourceGroup, name),
-                new AgentDeploymentSpec { Environment = body.Environment, RuntimeProfileId = body.RuntimeProfileId, HostingMode = body.HostingMode },
+                name,
+                new AgentDeploymentSpec { Environment = body.Environment, RuntimeProfileName = body.RuntimeProfileName, HostingMode = body.HostingMode },
                 cancellationToken);
             return ManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);
         });

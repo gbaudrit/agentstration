@@ -131,7 +131,7 @@ public sealed class ModelManagementApiTests
 
         Assert.IsTrue(usages!.Count >= 1);
         Assert.IsTrue(usages.Value.Any(usage => usage.Name == "sql-expert"));
-        Assert.AreEqual("providerUnavailable", resolution!.Status);
+        Assert.AreEqual("unavailable", resolution!.Status);
         Assert.AreEqual("reasoning-default", agentModel!.Declared.ModelProfile.Name);
         Assert.AreEqual(HttpStatusCode.Conflict, deleted.StatusCode);
         Assert.AreEqual("application/problem+json", deleted.Content.Headers.ContentType?.MediaType);
@@ -142,18 +142,15 @@ public sealed class ModelManagementApiTests
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
-        const string path = "/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert?api-version=2026-08-01";
+        const string path = "/api/agents/sql-expert";
         var agent = await client.GetFromJsonAsync<AgentResource>(path);
         Assert.IsNotNull(agent);
         var request = new AgentResourceRequest
         {
-            Type = agent.Type,
             ApiVersion = agent.ApiVersion,
-            Name = agent.Name,
-            ResourceGroup = agent.ResourceGroup!,
-            Location = agent.Location!,
-            Tags = agent.Tags,
-            Properties = agent.Properties with
+            Kind = agent.Kind,
+            Metadata = agent.Metadata,
+            Definition = agent.Definition with
             {
                 ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId("default", "missing-profile"))
             }
@@ -170,7 +167,7 @@ public sealed class ModelManagementApiTests
     {
         await using var factory = Factory();
         using var client = factory.CreateClient();
-        const string agentPath = "/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert?api-version=2026-08-01";
+        const string agentPath = "/api/agents/sql-expert";
         const string profileName = "deep-reasoning";
         var profileRequest = Request(profileName, "qwen3.6:latest") with
         {
@@ -186,13 +183,10 @@ public sealed class ModelManagementApiTests
         Assert.IsNotNull(current);
         var updateRequest = new AgentResourceRequest
         {
-            Type = current.Type,
             ApiVersion = current.ApiVersion,
-            Name = current.Name,
-            ResourceGroup = current.ResourceGroup!,
-            Location = current.Location!,
-            Tags = current.Tags,
-            Properties = current.Properties with
+            Kind = current.Kind,
+            Metadata = current.Metadata,
+            Definition = current.Definition with
             {
                 ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId("default", profileName))
             }
@@ -308,7 +302,7 @@ public sealed class ModelManagementApiTests
 
         var usages = await client.GetFromJsonAsync<ModelProviderUsagesResponse>("/api/modelproviders/ollama-local/usages");
         Assert.IsTrue(usages!.Count >= 1);
-        Assert.IsTrue(usages.Value.Any(usage => usage.ResourceType == AgentstrationResourceTypes.ModelProfiles));
+        Assert.IsTrue(usages.Value.Any(usage => usage.ResourceType == ResourceKinds.ModelProfile));
         using var deleted = await client.DeleteAsync("/api/modelproviders/ollama-local");
         Assert.AreEqual(HttpStatusCode.Conflict, deleted.StatusCode);
         Assert.AreEqual("application/problem+json", deleted.Content.Headers.ContentType?.MediaType);
@@ -323,8 +317,8 @@ public sealed class ModelManagementApiTests
         {
             Id = ModelProfileManagementService.ProfileId("default", "canonical-profile"),
             Name = "canonical-profile",
-            Type = AgentstrationResourceTypes.ModelProfiles,
-            ApiVersion = ManagementApiVersions.V20260801,
+            Kind = ResourceKinds.ModelProfile,
+            ApiVersion = ManagementApiVersions.CoreV1,
             ResourceGroup = "default",
             Location = "local",
             Properties = new ModelProfileProperties
@@ -362,8 +356,8 @@ public sealed class ModelManagementApiTests
         {
             Id = id,
             Name = "maf-persistent-test",
-            Type = AgentstrationResourceTypes.RuntimeProfiles,
-            ApiVersion = ManagementApiVersions.V20260801,
+            Kind = ResourceKinds.RuntimeProfile,
+            ApiVersion = ManagementApiVersions.CoreV1,
             ResourceGroup = "default",
             Location = "local",
             Properties = new RuntimeProfileProperties

@@ -8,7 +8,6 @@ internal sealed class RouteAndExecuteEndpoint : IManagementEndpoint
     public static void Map(RouteGroupBuilder group) => group.MapPost("/routing/invoke", HandleAsync);
 
     private static Task<IResult> HandleAsync(
-        string resourceGroup,
         RouteAndExecuteRequest body,
         HttpRequest request,
         AgentManagementService service,

@@ -16,10 +16,8 @@ internal sealed class GetAgentRuntimeReadinessEndpoint
         RuntimeRunService service,
         CancellationToken cancellationToken) => RuntimeHttp.ExecuteAsync(async () =>
         {
-            var groupName = string.IsNullOrWhiteSpace(resourceGroup) ? "default" : resourceGroup;
             if (generation < 1) throw new RuntimeRunValidationException("agent_version_invalid", "Agent generation must be positive.");
-            var id = ResourceIdentifier.Create(groupName, AgentstrationProviderNamespaces.Agents, "agents", agentName).Value;
-            var readiness = await service.GetReadinessAsync(id, generation, cancellationToken);
+            var readiness = await service.GetReadinessAsync(agentName, generation, cancellationToken);
             return Results.Ok(new AgentRuntimeReadinessResponse(
                 readiness.AgentResourceId,
                 readiness.Generation,

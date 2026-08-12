@@ -100,9 +100,9 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             ValidateExpression(resourceId, issues, step, property: property);
             return;
         }
-        if (!resourceId.StartsWith("/resourceGroups/", StringComparison.Ordinal) || !resourceId.Contains("/providers/Agentstration.Agents/agents/", StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(resourceId) || resourceId.Contains('/', StringComparison.Ordinal))
         {
-            issues.Add(Error("agent_resource_id_invalid", "Agent references must use an Agentstration Agent Resource ID.", step, property: property));
+            issues.Add(Error("agent_reference_invalid", "Agent references must use a logical Agent name.", step, property: property));
             return;
         }
         if (context.ResolveResources && !await resources.ExistsAsync(resourceId, token)) issues.Add(Error("agent_resource_not_found", $"Agent '{resourceId}' was not found.", step, property: property));
