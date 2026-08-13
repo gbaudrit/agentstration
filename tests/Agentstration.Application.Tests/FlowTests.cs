@@ -199,6 +199,8 @@ public sealed class FlowTests
         Assert.IsTrue(global!.Value.Any(item => item.Id == run.Id));
         var scoped = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flows/api-run-flow/runs", JsonOptions);
         Assert.IsTrue(scoped!.Value.Any(item => item.Id == run.Id));
+        using var consolePage = await client.GetAsync("/flowruns");
+        Assert.AreEqual(HttpStatusCode.OK, consolePage.StatusCode);
     }
 
     [TestMethod]

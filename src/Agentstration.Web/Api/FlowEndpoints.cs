@@ -38,9 +38,6 @@ public static class FlowEndpoints
         runs.MapGet("/{runId}/events", ObserveRunAsync);
         runs.MapGet("/{runId}/eventHistory", ListRunEventsAsync);
         runs.MapPost("/{runId}/cancel", CancelRunAsync);
-        var publicRuns = endpoints.MapGroup("/flowRuns");
-        publicRuns.MapGet("/", ListRunsAsync);
-        publicRuns.MapGet("/{runId}", GetRunAsync);
         return endpoints;
     }
 
