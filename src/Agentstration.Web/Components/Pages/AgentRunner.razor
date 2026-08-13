@@ -184,8 +184,7 @@ else
             {
                 var run = await RuntimeClient.GetRunAsync(RunId, cancellation.Token);
                 state.Reset(run);
-                var id = ResourceIdentifier.Parse(run.Properties.Agent.ResourceId);
-                agent = (await ManagementClient.GetAgentAsync(id.Name, cancellation.Token)).Value;
+                agent = (await ManagementClient.GetAgentAsync(run.Properties.Agent.ResourceId, cancellation.Token)).Value;
                 await LoadExecutionContextAsync(run.Properties.Agent.Version);
                 rawRequest = JsonSerializer.Serialize(ToRequest(run), new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
                 await LoadHistoryAsync();
@@ -318,7 +317,7 @@ else
     }
 
     private ValueTask CopyAsync(string value) => JavaScript.InvokeVoidAsync("navigator.clipboard.writeText", value);
-    private static string ResourceName(string id) => ResourceIdentifier.TryParse(id, out var parsed) ? parsed.Name : id;
+    private static string ResourceName(string id) => id;
     private static string ShortId(string id) => id.Length > 13 ? id[..13] : id;
     private static string PromptPreview(RuntimeRun run) { var value = run.Properties.Input.Messages.LastOrDefault(message => message.Role == RuntimeMessageRole.User)?.Content ?? "—"; return value.Length > 60 ? $"{value[..60]}…" : value; }
     private static string Duration(RuntimeRun run) { var start = run.Status.StartedAt ?? run.Status.CreatedAt; var end = run.Status.CompletedAt; return end is null ? "Live" : (end.Value - start).ToString("g"); }

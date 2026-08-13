@@ -367,7 +367,7 @@ public sealed class ApiClientTests
             Prompt = "Optimize this query",
             Context = "{\"engine\":\"sqlserver\"}",
             RuntimeParameters = "{\"temperature\":0.2}",
-            Streaming = StreamingMode.Enabled,
+            Streaming = RuntimeStreamingMode.Enabled,
             TimeoutSeconds = 90
         };
 
@@ -377,7 +377,7 @@ public sealed class ApiClientTests
         Assert.AreEqual(7L, request.Agent.Version);
         Assert.AreEqual(RuntimeRunOrigin.Console, request.Origin);
         Assert.AreEqual(90, request.Execution.TimeoutSeconds);
-        Assert.AreEqual(StreamingMode.Enabled, request.Execution.Streaming);
+        Assert.AreEqual(RuntimeStreamingMode.Enabled, request.Execution.Streaming);
         Assert.AreEqual(0.2, request.Execution.Parameters["temperature"].GetDouble());
     }
 
@@ -454,9 +454,8 @@ public sealed class ApiClientTests
         var etag = "\"stored\"";
         return new AgentResource
         {
-            Id = ResourceIdentifier.Create(name).Value,
-            Name = name,
-            Type = AgentstrationResourceTypes.Agents,
+            Metadata = new ResourceMetadata { Name = name },
+            Kind = ResourceKinds.Agent,
             ApiVersion = ManagementApiVersions.V20260801,
             Generation = 1,
             ETag = etag,
@@ -472,20 +471,20 @@ public sealed class ApiClientTests
 
     private static ModelProfileResource CreateModelProfile(string name) => new()
     {
-        Id = ResourceIdentifier.Create(name).Value,
-        Name = name, Type = AgentstrationResourceTypes.ModelProfiles, ApiVersion = ManagementApiVersions.V20260801,
-        Properties = new ModelProfileProperties
+        Metadata = new ResourceMetadata { Name = name },
+        Kind = ResourceKinds.ModelProfile, ApiVersion = ManagementApiVersions.V20260801,
+        Definition = new ModelProfileProperties
         {
             DisplayName = "Default reasoning",
-            Provider = new ResourceReference(ResourceIdentifier.Create("ollama-local").Value),
+            Provider = new ResourceReference("ollama-local"),
             Model = new ModelSelection { Name = "qwen3:4b" }, Generation = new ModelGenerationOptions { Temperature = 0.2 }
         }
     };
 
     private static ModelProfileSummaryResponse Summary(string name, string provider, string model, string status) => new(
-        ResourceIdentifier.Create(name).Value, name,
+        name, name,
         new ModelProfileSummaryPropertiesResponse(name, null,
-            new ModelProviderReferenceResponse(ResourceIdentifier.Create(provider).Value, provider),
+            new ModelProviderReferenceResponse(provider, provider),
             new ModelReferenceResponse(model), new ModelGenerationOptions(), new ModelReasoningOptions(), new ModelOutputOptions(), status, 0));
 
     private static AgentResourceRequest ToRequest(AgentResource resource) => new()

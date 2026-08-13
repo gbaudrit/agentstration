@@ -1,7 +1,8 @@
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.Runtime.Abstractions;
 
-namespace Agentstration.Runtime.Abstractions;
+namespace Agentstration.ModelProviders;
 
 public sealed record CanonicalOptionLayer
 {
@@ -23,7 +24,6 @@ public sealed record ResolvedCanonicalOptions(
 
 public static class CanonicalOptionResolver
 {
-    // Layers must be supplied from the least to the most specific source. Categories are merged independently.
     public static ResolvedCanonicalOptions Resolve(params CanonicalOptionLayer[] layers)
     {
         ArgumentNullException.ThrowIfNull(layers);
@@ -46,10 +46,17 @@ public static class CanonicalOptionResolver
             generation,
             reasoning,
             output,
-            new AgentExecutionOptions { Streaming = streaming },
+            new AgentExecutionOptions { Streaming = Map(streaming) },
             providerOptions,
             runtimeOptions);
     }
+
+    private static RuntimeStreamingMode Map(StreamingMode mode) => mode switch
+    {
+        StreamingMode.Enabled => RuntimeStreamingMode.Enabled,
+        StreamingMode.Disabled => RuntimeStreamingMode.Disabled,
+        _ => RuntimeStreamingMode.Automatic
+    };
 
     private static ModelGenerationOptions Merge(ModelGenerationOptions current, ModelGenerationOptions next) => new()
     {

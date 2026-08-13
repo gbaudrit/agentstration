@@ -22,3 +22,5 @@ ADR-0027 established AEP-to-MCP mappings and direct MCP support, but treating a 
 ## Consequences
 
 External MCP servers remain native MCP integrations and AEP remains an integration descriptor rather than a competing tool protocol. Tool identity and authorization survive provider outages and schema changes. Discovery requires executing an administrator-configured STDIO command or contacting an HTTP endpoint, so it is explicit, bounded by cancellation/timeouts, and disabled tools never become usable automatically. The earlier standalone `McpServerResource` shape remains readable for compatibility but ToolProvider is the primary management model and supersedes direct server resources for new configuration.
+
+The compatibility retention described above was subsequently removed by [ADR 0034](0034-runtime-resolution-and-control-plane-hardening.md): MCP configuration now has a single source of truth in `ToolProvider`.

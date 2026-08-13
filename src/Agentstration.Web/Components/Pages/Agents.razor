@@ -98,9 +98,8 @@ else
         pendingDelete = null;
         try
         {
-            var id = ResourceIdentifier.Parse(deleted.Id);
-            var snapshot = await Client.GetAgentAsync(id.Name, cancellation.Token);
-            await Client.DeleteAgentAsync(id.Name, snapshot.ETag, cancellation.Token);
+            var snapshot = await Client.GetAgentAsync(deleted.Id, cancellation.Token);
+            await Client.DeleteAgentAsync(deleted.Id, snapshot.ETag, cancellation.Token);
             Notifications.Add(new NotificationItem(Guid.NewGuid(), "Agent deleted", deleted.Name, DateTimeOffset.Now, UiStatus.Success));
             await LoadAsync();
         }
@@ -111,11 +110,11 @@ else
         }
     }
 
-    private static string EditUrl(AgentSummary item) { var id = ResourceIdentifier.Parse(item.Id); return $"/agents/{Uri.EscapeDataString(id.Name)}"; }
+    private static string EditUrl(AgentSummary item) => $"/agents/{Uri.EscapeDataString(item.Id)}";
     private static string RunUrl(AgentSummary item) => $"{EditUrl(item)}/run";
-    private static string ModelProfileUrl(AgentSummary item) { if (!ResourceIdentifier.TryParse(item.ModelProfile, out var id)) return "/modelprofiles"; return $"/modelprofiles/{Uri.EscapeDataString(id.Name)}"; }
-    private static string TechnicalName(AgentSummary item) => ResourceIdentifier.TryParse(item.Id, out var id) ? id.Name : item.Id;
-    private static string ResourceName(string resourceId) => ResourceIdentifier.TryParse(resourceId, out var parsed) ? parsed.Name : resourceId;
+    private static string ModelProfileUrl(AgentSummary item) => $"/modelprofiles/{Uri.EscapeDataString(item.ModelProfile)}";
+    private static string TechnicalName(AgentSummary item) => item.Id;
+    private static string ResourceName(string resourceId) => resourceId;
     private static string LastActivity(DateTimeOffset value) => value == DateTimeOffset.MinValue ? "No activity reported" : value.LocalDateTime.ToString("g");
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

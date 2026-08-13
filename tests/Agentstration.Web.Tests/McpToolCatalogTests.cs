@@ -40,9 +40,9 @@ public sealed class McpToolCatalogTests
         var provider = Provider();
         var tool = Tool(provider.Id);
 
-        await AssertCodeAsync("tool_provider_disabled", provider with { Properties = provider.Properties with { Enabled = false } }, tool);
-        await AssertCodeAsync("tool_disabled", provider, tool with { Properties = tool.Properties with { Enabled = false } });
-        await AssertCodeAsync("tool_unavailable", provider, tool with { Properties = tool.Properties with { Discovery = tool.Properties.Discovery! with { Available = false } } });
+        await AssertCodeAsync("tool_provider_disabled", provider with { Definition = provider.Definition with { Enabled = false } }, tool);
+        await AssertCodeAsync("tool_disabled", provider, tool with { Definition = tool.Definition with { Enabled = false } });
+        await AssertCodeAsync("tool_unavailable", provider, tool with { Definition = tool.Definition with { Discovery = tool.Definition.Discovery! with { Available = false } } });
 
         async Task AssertCodeAsync(string code, ToolProviderResource currentProvider, ToolResource currentTool)
         {

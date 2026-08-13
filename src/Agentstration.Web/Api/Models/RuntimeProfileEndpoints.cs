@@ -46,11 +46,10 @@ internal static class RuntimeProfileEndpoints
         {
             var stored = await service.CreateAsync(new RuntimeProfileResource
             {
-                Id = RuntimeProfileManagementService.ProfileId(body.Name),
-                Name = body.Name,
+                Metadata = new ResourceMetadata { Name = body.Name },
                 Kind = ResourceKinds.RuntimeProfile,
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Properties = body.Properties
+                Definition = body.Properties
             }, cancellationToken);
             response.Headers.Location = $"/api/runtimeprofiles/{Uri.EscapeDataString(stored.Value.Name)}";
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);

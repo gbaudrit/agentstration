@@ -87,7 +87,7 @@ public sealed class EntryTargetResolver(
     }
 
     private static FlowId FlowIdFrom(string resourceId) => new(ResourceName(resourceId));
-    private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
+    private static string ResourceName(string resourceId) => resourceId;
 
     private static void ValidateFlowInputs(EntryDraft draft, FlowVersion flow)
     {

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
@@ -62,7 +63,7 @@ public sealed class RuntimeRunTests
         var stopped = new ConcurrentQueue<Activity>();
         using var listener = new ActivityListener
         {
-            ShouldListenTo = source => source.Name == RuntimeRunService.ActivitySource.Name,
+            ShouldListenTo = source => source.Name == "Agentstration.Runtime",
             Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
             ActivityStopped = stopped.Enqueue
         };
@@ -333,12 +334,14 @@ public sealed class RuntimeRunTests
             services.AddLogging();
             services.AddSingleton(TimeProvider.System);
             services.AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")}");
+            services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();
             services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")}");
             services.AddSingleton<IRuntimeRunQueue, LocalRuntimeRunQueue>();
             services.AddSingleton<IRuntimeRunCancellationRegistry, LocalRuntimeRunCancellationRegistry>();
             var registry = new FakeRuntimeRegistry();
             services.AddSingleton(registry);
             services.AddSingleton<IRuntimeRegistry>(registry);
+            services.AddSingleton<RuntimeRunStateManager>();
             services.AddSingleton<RuntimeRunService>();
             var provider = services.BuildServiceProvider();
             var management = provider.GetRequiredService<IControlPlaneStore>();

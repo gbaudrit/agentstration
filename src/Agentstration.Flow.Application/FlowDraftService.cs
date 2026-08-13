@@ -132,7 +132,7 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
         return new RoutingFlowSpec(FlowRoutingStrategy.Deterministic, targets, fallback);
     }
 
-    private static string ResourceName(string id) => id[(id.LastIndexOf('/') + 1)..];
+    private static string ResourceName(string id) => id;
     private static object? NormalizeYaml(object? value) => value switch
     {
         IDictionary<object, object> dictionary => dictionary.ToDictionary(item => item.Key.ToString()!, item => NormalizeYaml(item.Value), StringComparer.Ordinal),

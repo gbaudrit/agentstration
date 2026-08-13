@@ -156,13 +156,12 @@ public sealed class IdentityFoundationTests
 
     private static RuntimeProfileResource Profile(string id, RequestContext context) => new()
     {
-        Id = id,
-        Name = "shared",
+        Metadata = new ResourceMetadata { Name = id },
         Kind = ResourceKinds.RuntimeProfile,
         ApiVersion = ManagementApiVersions.CoreV1,
         TenantId = context.TenantId,
         WorkspaceId = context.WorkspaceId,
-        Properties = new RuntimeProfileProperties { DisplayName = "Shared", RuntimeType = "Local" }
+        Definition = new RuntimeProfileProperties { DisplayName = "Shared", RuntimeType = "Local" }
     };
 
     private sealed class IdentityFixture : IAsyncDisposable

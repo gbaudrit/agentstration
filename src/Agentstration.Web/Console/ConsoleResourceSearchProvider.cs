@@ -88,8 +88,7 @@ public sealed class ConsoleResourceSearchProvider(
 
     private static ResourceSearchResult ToResult(AgentSummary item)
     {
-        var identifier = ResourceIdentifier.Parse(item.Id);
-        return new ResourceSearchResult(item.Name, "Agent", item.Id, $"/agents/{Escape(identifier.Name)}", StatusPresentation.Label(item.Status), "◎", $"{identifier.Name} {item.ModelProfile}");
+        return new ResourceSearchResult(item.Name, "Agent", item.Id, $"/agents/{Escape(item.Id)}", StatusPresentation.Label(item.Status), "◎", $"{item.Id} {item.ModelProfile}");
     }
 
     private static bool Matches(ResourceSearchResult item, string query) =>

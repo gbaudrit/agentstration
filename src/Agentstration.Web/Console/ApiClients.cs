@@ -402,7 +402,7 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
         var runs = await GetRunsAsync(null, cancellationToken);
         return runs.Select(run => new ExecutionSummary(
             run.Id,
-            ResourceIdentifier.TryParse(run.Properties.Agent.ResourceId, out var id) ? id.Name : run.Properties.Agent.ResourceId,
+            run.Properties.Agent.ResourceId,
             null,
             null,
             run.Status.State.ToString(),

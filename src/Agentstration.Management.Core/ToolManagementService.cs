@@ -13,12 +13,10 @@ public sealed class ToolManagementService(IControlPlaneStore store, IEnumerable<
 {
     public static string ToolProviderId(string name) => name;
     public static string ToolId(string name) => name;
-    public Task<StoredResource<ToolResource>?> GetToolAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ToolResource>(name, cancellationToken);
-    public Task<StoredResource<ToolProviderResource>?> GetProviderAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ToolProviderResource>(name, cancellationToken);
-    public Task<StoredResource<McpServerResource>?> GetMcpServerAsync(string name, CancellationToken cancellationToken) => store.GetAsync<McpServerResource>(name, cancellationToken);
-    public Task<IReadOnlyList<StoredResource<ToolResource>>> ListToolsAsync(CancellationToken cancellationToken) => store.ListAsync<ToolResource>(ResourceKinds.Tool, 0, 1000, cancellationToken);
-    public Task<IReadOnlyList<StoredResource<ToolProviderResource>>> ListProvidersAsync(CancellationToken cancellationToken) => store.ListAsync<ToolProviderResource>(ResourceKinds.ToolProvider, 0, 1000, cancellationToken);
-    public Task<IReadOnlyList<StoredResource<McpServerResource>>> ListMcpServersAsync(CancellationToken cancellationToken) => store.ListAsync<McpServerResource>(ResourceKinds.McpServer, 0, 1000, cancellationToken);
+    public Task<StoredResource<ToolResource>?> GetToolAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ToolResource>(new ResourceKey(ResourceKinds.Tool, name), cancellationToken);
+    public Task<StoredResource<ToolProviderResource>?> GetProviderAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ToolProviderResource>(new ResourceKey(ResourceKinds.ToolProvider, name), cancellationToken);
+    public Task<IReadOnlyList<StoredResource<ToolResource>>> ListToolsAsync(CancellationToken cancellationToken) => store.ListAllAsync<ToolResource>(ResourceKinds.Tool, cancellationToken);
+    public Task<IReadOnlyList<StoredResource<ToolProviderResource>>> ListProvidersAsync(CancellationToken cancellationToken) => store.ListAllAsync<ToolProviderResource>(ResourceKinds.ToolProvider, cancellationToken);
 
     public async Task<StoredResource<ToolProviderResource>> PutProviderAsync(ToolProviderResource resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken)
     {
@@ -155,12 +153,6 @@ public sealed class ToolManagementService(IControlPlaneStore store, IEnumerable<
         return await store.PutAsync(resource with { Generation = Math.Max(1, resource.Generation), Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, ifMatch, ifNoneMatch, cancellationToken);
     }
 
-    public async Task<StoredResource<McpServerResource>> PutMcpServerAsync(McpServerResource resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken)
-    {
-        ValidateMcpServer(resource);
-        return await store.PutAsync(resource with { Generation = Math.Max(1, resource.Generation), Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, ifMatch, ifNoneMatch, cancellationToken);
-    }
-
     public static void ValidateProvider(ToolProviderResource resource)
     {
         ValidateIdentity(resource, ResourceKinds.ToolProvider);
@@ -190,15 +182,7 @@ public sealed class ToolManagementService(IControlPlaneStore store, IEnumerable<
                 throw new ToolResourceValidationException("A discovered tool requires a ToolProvider reference, externalId, discovery state and schema.");
             return;
         }
-        if ((resource.Definition.ToolType is null) == (resource.Definition.Mcp is null)) throw new ToolResourceValidationException("A tool must define exactly one source.");
-        if (resource.Definition.Mcp is { } mcp && (string.IsNullOrWhiteSpace(mcp.Tool) || string.IsNullOrWhiteSpace(mcp.Server.Name)))
-            throw new ToolResourceValidationException("MCP server and tool names are required.");
-    }
-
-    public static void ValidateMcpServer(McpServerResource resource)
-    {
-        ValidateIdentity(resource, ResourceKinds.McpServer);
-        if (!resource.Definition.Endpoint.IsAbsoluteUri || resource.Definition.Endpoint.Scheme is not ("http" or "https")) throw new ToolResourceValidationException("MCP server endpoint must be an absolute HTTP(S) URI.");
+        if (resource.Definition.ToolType is null) throw new ToolResourceValidationException("A manually configured tool requires a toolType source.");
     }
 
     private IToolProviderDiscovery DiscoveryFor(ToolProviderResource provider) => discoveries.FirstOrDefault(value => value.Supports(provider.Definition.ProviderType))

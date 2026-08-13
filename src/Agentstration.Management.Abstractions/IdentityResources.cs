@@ -81,11 +81,13 @@ public static class AuthorizationScopes
 }
 
 public sealed record RequestContext(Guid UserId, Guid TenantId, Guid WorkspaceId);
+public enum ControlPlaneAccessMode { Unavailable, Workspace, System }
 
 public interface ICurrentRequestContext
 {
     bool IsInitialized { get; }
     RequestContext Current { get; }
+    ControlPlaneAccessMode AccessMode => IsInitialized ? ControlPlaneAccessMode.Workspace : ControlPlaneAccessMode.Unavailable;
 }
 
 public interface IRequestContextInitializer

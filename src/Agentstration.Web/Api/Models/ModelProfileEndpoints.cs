@@ -20,21 +20,21 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
             foreach (var profile in profiles)
             {
                 var resolution = await service.ResolveAsync(profile.Value, cancellationToken);
-                var usages = await service.GetUsagesAsync(profile.Value.Id, cancellationToken);
+                var usages = await service.GetUsagesAsync(profile.Value.Metadata.Name, cancellationToken);
                 responses.Add(new ModelProfileSummaryResponse(
-                    profile.Value.Id,
-                    profile.Value.Name,
+                    profile.Value.Metadata.Name,
+                    profile.Value.Metadata.Name,
                     new ModelProfileSummaryPropertiesResponse(
-                        profile.Value.Properties.DisplayName,
-                        profile.Value.Properties.Description,
+                        profile.Value.Definition.DisplayName,
+                        profile.Value.Definition.Description,
                         new ModelProviderReferenceResponse(
                             profile.Value.Definition.Provider.Name,
                             profile.Value.Definition.Provider.Name,
                             resolution.Provider?.DisplayName),
-                        new ModelReferenceResponse(profile.Value.Properties.Model.Name),
-                        profile.Value.Properties.Generation,
-                        profile.Value.Properties.Reasoning,
-                        profile.Value.Properties.Output,
+                        new ModelReferenceResponse(profile.Value.Definition.Model.Name),
+                        profile.Value.Definition.Generation,
+                        profile.Value.Definition.Reasoning,
+                        profile.Value.Definition.Output,
                         resolution.Status,
                         usages.Count)));
             }
@@ -62,13 +62,12 @@ internal sealed class CreateModelProfileEndpoint : IModelManagementEndpoint
         {
             var stored = await service.CreateAsync(new ModelProfileResource
             {
-                Id = ModelProfileManagementService.ProfileId(body.Name),
-                Name = body.Name,
+                Metadata = new ResourceMetadata { Name = body.Name },
                 Kind = ResourceKinds.ModelProfile,
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Properties = body.Properties
+                Definition = body.Properties
             }, cancellationToken);
-            response.Headers.Location = $"/api/modelprofiles/{stored.Value.Name}";
+            response.Headers.Location = $"/api/modelprofiles/{stored.Value.Metadata.Name}";
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);
         });
 }

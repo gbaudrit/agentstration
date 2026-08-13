@@ -1,18 +1,12 @@
 using Agentstration.Management.Abstractions;
-using Agentstration.Runtime.Abstractions;
-using RuntimeExecutionRequest = Agentstration.Runtime.Abstractions.AgentExecutionRequest;
-using RuntimeExecutionResult = Agentstration.Runtime.Abstractions.AgentExecutionResult;
 
 namespace Agentstration.Management.Core;
 
-public sealed record SelectedAgentRoute(AgentRouteResult Route, string DeploymentId);
-
 public sealed class AgentManagementService(
     IControlPlaneStore store,
+    IAgentResourceQueries agentQueries,
     IAgentDefinitionCompiler compiler,
     IAgentDeploymentReconciler reconciler,
-    IAgentRouter router,
-    IRuntimeRegistry runtimes,
     IManagementEventPublisher eventBus,
     IModelProfileReferenceValidator modelProfiles,
     TimeProvider timeProvider,
@@ -68,8 +62,7 @@ public sealed class AgentManagementService(
         await ValidateRuntimeProfileAsync(spec.RuntimeProfileName, cancellationToken);
         var agent = await GetAgentAsync(agentName, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, agentName));
         var resolved = compiler.Compile(agent.Value, spec);
-        var revisions = await store.ListAsync<AgentRevision>(ResourceKinds.AgentRevision, 0, 1000, cancellationToken);
-        var number = revisions.Count(revision => revision.Value.AgentUid == agent.Value.Uid) + 1;
+        var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
         return await store.CreateImmutableAsync(new AgentRevision
         {
@@ -133,11 +126,9 @@ public sealed class AgentManagementService(
         var agent = await GetAgentAsync(agentName, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, agentName));
         if (agent.Value.Generation != generation) throw new ArgumentException($"Only current agent generation '{agent.Value.Generation}' can be prepared.", nameof(generation));
         var spec = new AgentDeploymentSpec { Environment = "local", RuntimeProfileName = "maf-default", HostingMode = AgentHostingMode.InProcess };
-        var revisions = await store.ListAsync<AgentRevision>(ResourceKinds.AgentRevision, 0, 1000, cancellationToken);
-        var revision = revisions.FirstOrDefault(item => item.Value.AgentUid == agent.Value.Uid && item.Value.AgentVersion == generation)
+        var revision = await agentQueries.FindRevisionAsync(agent.Value.Uid, generation, cancellationToken)
             ?? await CreateRevisionAsync(agentName, spec, cancellationToken);
-        var deployments = await store.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken);
-        var deployment = deployments.FirstOrDefault(item => string.Equals(item.Value.RevisionName, revision.Value.Metadata.Name, StringComparison.Ordinal))
+        var deployment = await agentQueries.FindDeploymentByRevisionAsync(revision.Value.Metadata.Name, cancellationToken)
             ?? await CreateDeploymentAsync($"{agentName}--g{generation:000000}", revision.Value.Metadata.Name, spec, cancellationToken);
         if (deployment.Value.DesiredState != DesiredAgentState.Running) deployment = await StartAsync(deployment, cancellationToken);
         var activated = await ReconcileAsync(deployment, cancellationToken);
@@ -145,7 +136,7 @@ public sealed class AgentManagementService(
 
         var current = await GetAgentAsync(agentName, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, agentName));
         if (current.Value.Generation != generation) throw new ControlPlaneConcurrencyException($"Agent '{agentName}' changed while generation '{generation}' was being activated.");
-        deployments = await store.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken);
+        var deployments = await agentQueries.ListDeploymentsForAgentAsync(agentName, cancellationToken);
         foreach (var previous in deployments.Where(item => item.Value.Uid != activated.Value.Uid && item.Value.AgentName == agentName && item.Value.DesiredState != DesiredAgentState.Stopped))
             _ = await ReconcileAsync(await StopAsync(previous, cancellationToken), cancellationToken);
         return activated;
@@ -153,43 +144,12 @@ public sealed class AgentManagementService(
 
     public async Task ReconcileAllAsync(CancellationToken cancellationToken)
     {
-        foreach (var deployment in await store.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken))
+        foreach (var deployment in await agentQueries.ListDeploymentsAsync(cancellationToken))
         {
             try { await ReconcileAsync(deployment, cancellationToken); }
             catch (ControlPlaneConcurrencyException) { }
         }
     }
-
-    public async Task<(AgentRouteResult Route, RuntimeExecutionResult Execution)> RouteAndExecuteAsync(string input, CancellationToken cancellationToken)
-    {
-        var selected = await SelectAgentAsync(input, null, cancellationToken);
-        return (selected.Route, await ExecuteSelectedAsync(selected, input, cancellationToken));
-    }
-
-    public async Task<SelectedAgentRoute> SelectAgentAsync(string input, string? requestedAgentName, CancellationToken cancellationToken)
-    {
-        var ready = (await store.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken))
-            .Where(item => item.Value.DesiredState == DesiredAgentState.Running && item.Value.OperationalState == OperationalState.Ready);
-        var pairs = new List<(AgentDeployment Deployment, AgentRevision Revision)>();
-        foreach (var item in ready)
-        {
-            var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, item.Value.RevisionName), cancellationToken);
-            if (revision is not null) pairs.Add((item.Value, revision.Value));
-        }
-        var newest = pairs.GroupBy(item => item.Revision.AgentUid).Select(group => group.OrderByDescending(item => item.Revision.AgentVersion).First()).ToArray();
-        var candidates = newest.Select(item => new RoutableAgent(item.Revision.Definition.AgentKey, item.Revision.Definition.Description, item.Revision.Definition.Capabilities)).ToArray();
-        if (candidates.Length == 0) throw new InvalidOperationException("No ready and routable agent deployment is available.");
-        var route = string.IsNullOrWhiteSpace(requestedAgentName)
-            ? await router.SelectAsync(new AgentRouteRequest(input), candidates, cancellationToken)
-            : candidates.Any(candidate => candidate.AgentId == requestedAgentName)
-                ? new AgentRouteResult(requestedAgentName, 1, "The caller explicitly requested this agent.")
-                : throw new InvalidOperationException($"Requested agent '{requestedAgentName}' is not ready or does not exist.");
-        var deployment = newest.Single(item => item.Revision.Definition.AgentKey == route.AgentId).Deployment;
-        return new SelectedAgentRoute(route, deployment.Uid.ToString("N"));
-    }
-
-    public Task<RuntimeExecutionResult> ExecuteSelectedAsync(SelectedAgentRoute selected, string input, CancellationToken cancellationToken) =>
-        runtimes.ExecuteAsync(selected.DeploymentId, new RuntimeExecutionRequest(input), cancellationToken);
 
     private async Task ValidateRuntimeProfileAsync(string name, CancellationToken cancellationToken) =>
         _ = await store.GetAsync<RuntimeProfileResource>(new ResourceKey(ResourceKinds.RuntimeProfile, name), cancellationToken)

@@ -190,13 +190,11 @@ else
     private static string ResourceName(string name) => name;
     private static string ProfileUrl(AgentModelResponse value)
     {
-        var id = ResourceIdentifier.Parse(value.Declared.ModelProfile.ResourceId);
-        return $"/modelprofiles/{Uri.EscapeDataString(id.Name)}";
+        return $"/modelprofiles/{Uri.EscapeDataString(value.Declared.ModelProfile.ResourceId)}";
     }
     private static string ProviderUrl(AgentModelResponse value)
     {
-        var id = ResourceIdentifier.Parse(value.Resolved.Provider!.ResourceId);
-        return $"/modelproviders/{Uri.EscapeDataString(id.Name)}";
+        return $"/modelproviders/{Uri.EscapeDataString(value.Resolved.Provider!.ResourceId)}";
     }
 
     private async Task LoadAgentModelAsync(string name)

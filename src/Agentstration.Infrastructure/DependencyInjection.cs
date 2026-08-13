@@ -96,6 +96,7 @@ public static class DependencyInjection
         services.AddSingleton<IdentityAdministrationService>();
         services.AddSingleton<IdentityExperienceService>();
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
+        services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();
         services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();
         if (!useManagedProfileResolver)
             services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();
@@ -110,10 +111,12 @@ public static class DependencyInjection
         services.AddSingleton<IAgentDeploymentReconciler, LocalAgentDeploymentReconciler>();
         services.AddSingleton<IAgentRouter, AgentFrameworkAgentRouter>();
         services.AddSingleton<AgentManagementService>();
+        services.AddSingleton<AgentExecutionCoordinator>();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
         runtimeConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "runtime-plane.db")}";
         services.AddSqliteRuntimeRuns(runtimeConnectionString);
+        services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
         workPlaneConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "work-plane.db")}";
         services.AddSqliteWorkPlane(workPlaneConnectionString);

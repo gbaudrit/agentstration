@@ -313,11 +313,10 @@ public sealed class ModelManagementApiTests
         var service = factory.Services.GetRequiredService<ModelProfileManagementService>();
         var profile = new ModelProfileResource
         {
-            Id = ModelProfileManagementService.ProfileId("canonical-profile"),
-            Name = "canonical-profile",
+            Metadata = new ResourceMetadata { Name = "canonical-profile" },
             Kind = ResourceKinds.ModelProfile,
             ApiVersion = ManagementApiVersions.CoreV1,
-            Properties = new ModelProfileProperties
+            Definition = new ModelProfileProperties
             {
                 DisplayName = "Canonical profile",
                 Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local")),
@@ -350,11 +349,10 @@ public sealed class ModelManagementApiTests
         var id = RuntimeProfileManagementService.ProfileId("maf-persistent-test");
         var stored = await service.CreateAsync(new RuntimeProfileResource
         {
-            Id = id,
-            Name = "maf-persistent-test",
+            Metadata = new ResourceMetadata { Name = id },
             Kind = ResourceKinds.RuntimeProfile,
             ApiVersion = ManagementApiVersions.CoreV1,
-            Properties = new RuntimeProfileProperties
+            Definition = new RuntimeProfileProperties
             {
                 DisplayName = "MAF default",
                 RuntimeType = "microsoft-agent-framework",

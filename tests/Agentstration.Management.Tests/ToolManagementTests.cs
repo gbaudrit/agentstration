@@ -22,62 +22,63 @@ public sealed class ToolManagementTests
     }
 
     [TestMethod]
-    public void ToolResourceRequiresExactlyOneValidMapping()
+    public void ManuallyConfiguredToolRequiresToolType()
     {
         var missing = Tool(new ToolResourceProperties { DisplayName = "Search" });
-        var both = Tool(new ToolResourceProperties
-        {
-            DisplayName = "Search",
-            ToolType = new ToolTypeReference("extension.search", "search"),
-            Mcp = new DirectMcpToolReference(new ResourceReference(ServerId()), "search")
-        });
-
         Assert.Throws<ToolResourceValidationException>(() => ToolManagementService.ValidateTool(missing));
-        Assert.Throws<ToolResourceValidationException>(() => ToolManagementService.ValidateTool(both));
     }
 
     [TestMethod]
-    public void DirectMcpMappingRequiresCanonicalMcpServerResource()
+    public void McpConfigurationBelongsToToolProvider()
     {
-        var valid = Tool(new ToolResourceProperties
+        var valid = new ToolProviderResource
         {
-            DisplayName = "Search",
-            Mcp = new DirectMcpToolReference(new ResourceReference(ServerId()), "search")
-        });
-        var invalid = valid with
-        {
-            Properties = valid.Properties with
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.ToolProvider,
+            Metadata = new ResourceMetadata { Name = "local" },
+            Definition = new ToolProviderProperties
             {
-                Mcp = new DirectMcpToolReference(new ResourceReference(""), "search")
+                DisplayName = "Local MCP",
+                ProviderType = ToolProviderType.Mcp,
+                Mcp = new McpToolProviderConfiguration
+                {
+                    Transport = McpToolProviderTransport.StreamableHttp,
+                    Endpoint = new Uri("https://example.test/mcp")
+                }
             }
         };
 
-        ToolManagementService.ValidateTool(valid);
-        Assert.Throws<ToolResourceValidationException>(() => ToolManagementService.ValidateTool(invalid));
+        ToolManagementService.ValidateProvider(valid);
     }
 
     [TestMethod]
-    public void McpServerRequiresAbsoluteHttpEndpoint()
+    public void McpProviderRequiresAbsoluteHttpEndpoint()
     {
-        var resource = new McpServerResource
+        var resource = new ToolProviderResource
         {
-            Id = ServerId(),
-            Name = "local",
-            Kind = ResourceKinds.McpServer,
+            Metadata = new ResourceMetadata { Name = "local" },
+            Kind = ResourceKinds.ToolProvider,
             ApiVersion = ManagementApiVersions.CoreV1,
-            Properties = new McpServerProperties { Endpoint = new Uri("file:///tmp/mcp") }
+            Definition = new ToolProviderProperties
+            {
+                DisplayName = "Local MCP",
+                ProviderType = ToolProviderType.Mcp,
+                Mcp = new McpToolProviderConfiguration
+                {
+                    Transport = McpToolProviderTransport.StreamableHttp,
+                    Endpoint = new Uri("file:///tmp/mcp")
+                }
+            }
         };
 
-        Assert.Throws<ToolResourceValidationException>(() => ToolManagementService.ValidateMcpServer(resource));
+        Assert.Throws<ToolResourceValidationException>(() => ToolManagementService.ValidateProvider(resource));
     }
 
     private static ToolResource Tool(ToolResourceProperties properties) => new()
     {
-        Name = "search",
+        Metadata = new ResourceMetadata { Name = "search" },
         Kind = ResourceKinds.Tool,
         ApiVersion = ManagementApiVersions.CoreV1,
-        Properties = properties
+        Definition = properties
     };
-
-    private static string ServerId() => "local";
 }

@@ -38,8 +38,8 @@ internal static class ToolProviderEndpoints
         ModelManagementHttp.ExecuteAsync(async () =>
         {
             var stored = await service.PutProviderAsync(Resource(body.Name, body.Properties), null, true, cancellationToken);
-            try { _ = await service.RefreshDiscoveryAsync(stored.Value.Id, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
-            stored = await service.GetProviderAsync(stored.Value.Id, cancellationToken) ?? stored;
+            try { _ = await service.RefreshDiscoveryAsync(stored.Value.Metadata.Name, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
+            stored = await service.GetProviderAsync(stored.Value.Metadata.Name, cancellationToken) ?? stored;
             response.Headers.Location = $"/api/toolproviders/{Uri.EscapeDataString(body.Name)}";
             return ModelManagementHttp.ResourceResult(stored, response, 201);
         });
@@ -49,9 +49,9 @@ internal static class ToolProviderEndpoints
         {
             var existing = await service.GetProviderAsync(ToolManagementService.ToolProviderId(providerName), cancellationToken)
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ToolProvider, providerName));
-            var stored = await service.PutProviderAsync(existing.Value with { Properties = body.Properties }, ModelManagementHttp.IfMatch(request), false, cancellationToken);
-            try { _ = await service.RefreshDiscoveryAsync(stored.Value.Id, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
-            stored = await service.GetProviderAsync(stored.Value.Id, cancellationToken) ?? stored;
+            var stored = await service.PutProviderAsync(existing.Value with { Definition = body.Properties }, ModelManagementHttp.IfMatch(request), false, cancellationToken);
+            try { _ = await service.RefreshDiscoveryAsync(stored.Value.Metadata.Name, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
+            stored = await service.GetProviderAsync(stored.Value.Metadata.Name, cancellationToken) ?? stored;
             return ModelManagementHttp.ResourceResult(stored, response, 200);
         });
 
@@ -76,15 +76,15 @@ internal static class ToolProviderEndpoints
         {
             var providerId = ToolManagementService.ToolProviderId(providerName);
             var tools = await service.ListToolsAsync(cancellationToken);
-            return Results.Ok(new ValueResponse<ToolResource>(tools.Where(value => value.Value.Properties.Provider?.ResourceId == providerId).Select(value => value.Value).ToArray()));
+            return Results.Ok(new ValueResponse<ToolResource>(tools.Where(value => value.Value.Definition.Provider?.Name == providerId).Select(value => value.Value).ToArray()));
         });
 
     private static Task<IResult> ListToolsAsync(bool? enabled, bool? available, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
             var values = (await service.ListToolsAsync(cancellationToken)).Select(value => value.Value);
-            if (enabled.HasValue) values = values.Where(value => value.Properties.Enabled == enabled.Value);
-            if (available.HasValue) values = values.Where(value => value.Properties.Discovery?.Available == available.Value);
+            if (enabled.HasValue) values = values.Where(value => value.Definition.Enabled == enabled.Value);
+            if (available.HasValue) values = values.Where(value => value.Definition.Discovery?.Available == available.Value);
             return Results.Ok(new ValueResponse<ToolResource>(values.ToArray()));
         });
 

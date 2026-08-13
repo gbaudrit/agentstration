@@ -57,11 +57,11 @@ public sealed class ModelProviderManagementService(
         }, ifMatch, false, cancellationToken);
     }
 
-    public Task<StoredResource<ModelProviderResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(name, cancellationToken);
+    public Task<StoredResource<ModelProviderResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(new ResourceKey(ResourceKinds.ModelProvider, name), cancellationToken);
 
     public async Task<IReadOnlyList<ModelProviderView>> ListAsync(CancellationToken cancellationToken)
     {
-        var resources = await store.ListAsync<ModelProviderResource>(ResourceKinds.ModelProvider, 0, 1000, cancellationToken);
+        var resources = await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken);
         return await Task.WhenAll(resources.Select(resource => InspectAsync(ToConfiguration(resource.Value), true, cancellationToken)));
     }
 
@@ -84,7 +84,7 @@ public sealed class ModelProviderManagementService(
     public Task<ModelProviderView> GetStatusAsync(string name, CancellationToken cancellationToken) => GetViewRequiredAsync(name, cancellationToken);
 
     public async Task<IReadOnlyList<ModelProviderUsage>> GetUsagesAsync(string providerName, CancellationToken cancellationToken) =>
-        (await store.ListAsync<ModelProfileResource>(ResourceKinds.ModelProfile, 0, 1000, cancellationToken))
+        (await store.ListAllAsync<ModelProfileResource>(ResourceKinds.ModelProfile, cancellationToken))
             .Where(profile => profile.Value.Definition.Provider.Name == providerName)
             .Select(profile => new ModelProviderUsage(profile.Value.Kind, profile.Value.Metadata.Name, profile.Value.Definition.DisplayName))
             .ToArray();
@@ -120,7 +120,7 @@ public sealed class ModelProviderManagementService(
     ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredAsync(string name, CancellationToken cancellationToken) => new(GetConfigurationRequiredAsync(name, cancellationToken));
 
     async ValueTask<IReadOnlyList<ModelProviderConfiguration>> IModelProviderConfigurationStore.ListAsync(CancellationToken cancellationToken) =>
-        (await store.ListAsync<ModelProviderResource>(ResourceKinds.ModelProvider, 0, 1000, cancellationToken)).Select(resource => ToConfiguration(resource.Value)).ToArray();
+        (await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken)).Select(resource => ToConfiguration(resource.Value)).ToArray();
 
     private ModelProviderProperties ValidateAndNormalize(ModelProviderProperties definition)
     {
@@ -192,8 +192,8 @@ public sealed class ModelProfileManagementService(
         }, ifMatch, false, cancellationToken);
     }
 
-    public Task<StoredResource<ModelProfileResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProfileResource>(name, cancellationToken);
-    public Task<IReadOnlyList<StoredResource<ModelProfileResource>>> ListAsync(CancellationToken cancellationToken) => store.ListAsync<ModelProfileResource>(ResourceKinds.ModelProfile, 0, 1000, cancellationToken);
+    public Task<StoredResource<ModelProfileResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProfileResource>(new ResourceKey(ResourceKinds.ModelProfile, name), cancellationToken);
+    public Task<IReadOnlyList<StoredResource<ModelProfileResource>>> ListAsync(CancellationToken cancellationToken) => store.ListAllAsync<ModelProfileResource>(ResourceKinds.ModelProfile, cancellationToken);
 
     public async Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken)
     {
@@ -204,7 +204,7 @@ public sealed class ModelProfileManagementService(
     }
 
     public async Task<IReadOnlyList<ModelProfileUsage>> GetUsagesAsync(string profileName, CancellationToken cancellationToken) =>
-        (await store.ListAsync<AgentResource>(ResourceKinds.Agent, 0, 1000, cancellationToken))
+        (await store.ListAllAsync<AgentResource>(ResourceKinds.Agent, cancellationToken))
             .Where(agent => agent.Value.Definition.ModelProfile.Name == profileName)
             .Select(agent => new ModelProfileUsage(agent.Value.Kind, agent.Value.Metadata.Name, agent.Value.Definition.DisplayName))
             .ToArray();

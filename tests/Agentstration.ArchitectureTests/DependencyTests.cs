@@ -112,10 +112,11 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void RuntimeCoreDoesNotReferenceWebWorkConcreteStorageOrAgentFramework()
+    public void RuntimeCoreDoesNotReferenceManagementWebWorkConcreteStorageOrAgentFramework()
     {
         var references = typeof(RuntimeRunService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
-        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Web", StringComparison.Ordinal)
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Web", StringComparison.Ordinal)
             || name.Contains("Agentstration.Work", StringComparison.Ordinal)
             || name.Contains("Storage.Sqlite", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
@@ -260,6 +261,21 @@ public sealed class DependencyTests
         }
 
         Assert.IsEmpty(violations, $"Projects must not compile source files owned by another project:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    [TestMethod]
+    public void RuntimeAbstractionsDoNotReferenceManagementAndRuntimeCoreUsesOnlyRuntimeResolver()
+    {
+        var references = typeof(IRuntimeAgentResolver).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management", StringComparison.Ordinal)));
+
+        var dependencies = typeof(RuntimeRunService).GetConstructors()
+            .SelectMany(constructor => constructor.GetParameters())
+            .Select(parameter => parameter.ParameterType)
+            .ToArray();
+        Assert.IsTrue(dependencies.Contains(typeof(IRuntimeAgentResolver)));
+        Assert.IsFalse(dependencies.Any(type => type.Name == "IControlPlaneStore"
+            || type.Name is "AgentResource" or "AgentRevision" or "AgentDeployment"));
     }
 
     [TestMethod]

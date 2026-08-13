@@ -13,7 +13,7 @@ public sealed class AgentRunnerModel
 
     public string? Context { get; set; }
     public string? RuntimeParameters { get; set; }
-    public StreamingMode Streaming { get; set; } = StreamingMode.Automatic;
+    public RuntimeStreamingMode Streaming { get; set; } = RuntimeStreamingMode.Automatic;
     [Range(1, 600)] public int TimeoutSeconds { get; set; } = 120;
 
     public CreateRuntimeRunRequest ToRequest(AgentResource agent)

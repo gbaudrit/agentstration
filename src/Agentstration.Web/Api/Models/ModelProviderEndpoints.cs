@@ -35,11 +35,10 @@ internal sealed class CreateModelProviderEndpoint : IModelManagementEndpoint
         {
             var stored = await service.CreateAsync(new ModelProviderResource
             {
-                Id = ModelProviderManagementService.ModelProviderId(body.Name),
-                Name = body.Name,
+                Metadata = new ResourceMetadata { Name = body.Name },
                 Kind = ResourceKinds.ModelProvider,
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Properties = body.Properties
+                Definition = body.Properties
             }, cancellationToken);
             response.Headers.Location = $"/api/modelproviders/{Uri.EscapeDataString(stored.Value.Name)}";
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);

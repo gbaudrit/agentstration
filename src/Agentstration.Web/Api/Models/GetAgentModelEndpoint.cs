@@ -22,7 +22,7 @@ internal sealed class GetAgentModelEndpoint : IModelManagementEndpoint
             var resolution = await profiles.ResolveAsync(profile.Value, cancellationToken);
             var mapped = ModelManagementHttp.Resolution(resolution);
             return Results.Ok(new AgentModelResponse(
-                new DeclaredAgentModelResponse(new ModelProfileIdentityResponse(profile.Value.Id, profile.Value.Name, profile.Value.Properties.DisplayName)),
+                new DeclaredAgentModelResponse(new ModelProfileIdentityResponse(profile.Value.Metadata.Name, profile.Value.Metadata.Name, profile.Value.Definition.DisplayName)),
                 new ResolvedAgentModelResponse(mapped.Provider, mapped.Model, mapped.EffectiveOptions),
                 mapped.Status,
                 mapped.Warnings));

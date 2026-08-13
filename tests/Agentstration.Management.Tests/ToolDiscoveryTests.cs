@@ -43,9 +43,9 @@ public sealed class ToolDiscoveryTests
     public void ProviderValidationSupportsStdioHttpAndAepWithoutPlaintextEnvironmentValues()
     {
         ToolManagementService.ValidateProvider(Provider());
-        ToolManagementService.ValidateProvider(Provider() with { Properties = new ToolProviderProperties { DisplayName = "HTTP", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration { Transport = McpToolProviderTransport.StreamableHttp, Endpoint = new Uri("https://example.test/mcp") } } });
-        ToolManagementService.ValidateProvider(Provider() with { Properties = new ToolProviderProperties { DisplayName = "AEP", ProviderType = ToolProviderType.Aep, Aep = new AepToolProviderConfiguration { ExtensionId = "extension.test" } } });
-        Assert.Throws<ToolResourceValidationException>(() => ToolManagementService.ValidateProvider(Provider() with { Properties = new ToolProviderProperties { DisplayName = "Bad", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration() } }));
+        ToolManagementService.ValidateProvider(Provider() with { Definition = new ToolProviderProperties { DisplayName = "HTTP", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration { Transport = McpToolProviderTransport.StreamableHttp, Endpoint = new Uri("https://example.test/mcp") } } });
+        ToolManagementService.ValidateProvider(Provider() with { Definition = new ToolProviderProperties { DisplayName = "AEP", ProviderType = ToolProviderType.Aep, Aep = new AepToolProviderConfiguration { ExtensionId = "extension.test" } } });
+        Assert.Throws<ToolResourceValidationException>(() => ToolManagementService.ValidateProvider(Provider() with { Definition = new ToolProviderProperties { DisplayName = "Bad", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration() } }));
     }
 
     private static ToolProviderResource Provider() => new()

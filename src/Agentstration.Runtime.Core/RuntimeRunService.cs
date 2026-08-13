@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using Agentstration.Management.Abstractions;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
 
@@ -10,8 +9,9 @@ public sealed class RuntimeRunService(
     IRuntimeRunStore runs,
     IRuntimeRunQueue queue,
     IRuntimeRunCancellationRegistry cancellations,
-    IControlPlaneStore management,
+    IRuntimeAgentResolver agents,
     IRuntimeRegistry runtimes,
+    RuntimeRunStateManager stateManager,
     TimeProvider timeProvider,
     ILogger<RuntimeRunService> logger)
 {
@@ -34,17 +34,9 @@ public sealed class RuntimeRunService(
         CancellationToken cancellationToken)
     {
         Validate(agentReference, input, execution, initiator);
-        var agent = await management.GetAsync<AgentResource>(agentReference.ResourceId, cancellationToken)
-            ?? throw new RuntimeRunValidationException("agent_not_found", $"Agent '{agentReference.ResourceId}' was not found.");
-        AgentRevision? selectedRevision = null;
-        if (agent.Value.Generation != agentReference.Version)
-        {
-            var revisions = await management.ListAsync<AgentRevision>(ResourceKinds.AgentRevision, 0, 1000, cancellationToken);
-            selectedRevision = revisions.Select(item => item.Value).FirstOrDefault(revision =>
-                string.Equals(revision.AgentName, agentReference.ResourceId, StringComparison.Ordinal) && revision.AgentVersion == agentReference.Version);
-            if (selectedRevision is null)
-                throw new RuntimeRunValidationException("agent_version_not_found", $"Agent version '{agentReference.Version}' does not exist.");
-        }
+        ResolvedRuntimeAgent resolved;
+        try { resolved = await agents.ResolveAsync(agentReference, cancellationToken); }
+        catch (RuntimeAgentResolutionException exception) { throw new RuntimeRunValidationException(exception.Code, exception.Message); }
 
         var name = $"run-{Guid.NewGuid():N}";
         var now = timeProvider.GetUtcNow();
@@ -64,11 +56,11 @@ public sealed class RuntimeRunService(
             {
                 State = RuntimeRunState.Pending,
                 CreatedAt = now,
-                ModelProfile = selectedRevision?.Definition.ModelProfileName ?? agent.Value.Definition.ModelProfile.Name
+                ModelProfile = resolved.ModelProfileName
             }
         };
         var stored = await runs.CreateAsync(run, cancellationToken);
-        await AppendEventAsync(stored.Value.Id, RuntimeRunEventKind.RunCreated, "Run created", state: RuntimeRunState.Pending, cancellationToken: cancellationToken);
+        await stateManager.AppendEventAsync(stored.Value.Id, RuntimeRunEventKind.RunCreated, "Run created", state: RuntimeRunState.Pending, cancellationToken: cancellationToken);
         await queue.EnqueueAsync(stored.Value.Id, cancellationToken);
         return stored;
     }
@@ -92,39 +84,26 @@ public sealed class RuntimeRunService(
 
     public async Task<AgentRuntimeReadiness> GetReadinessAsync(string agentResourceId, long generation, CancellationToken cancellationToken)
     {
-        var agent = await management.GetAsync<AgentResource>(agentResourceId, cancellationToken);
-        if (agent is null)
-            return new AgentRuntimeReadiness(agentResourceId, generation, false, "AgentNotFound", null, null, $"Agent '{agentResourceId}' was not found.");
-
-        var deployments = await management.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken);
-        foreach (var deployment in deployments)
+        try
         {
-            var revision = await management.GetAsync<AgentRevision>(deployment.Value.RevisionName, cancellationToken);
-            if (revision is null
-                || !string.Equals(revision.Value.AgentName, agentResourceId, StringComparison.Ordinal)
-                || revision.Value.AgentVersion != generation)
-                continue;
-
-            var deploymentId = deployment.Value.Uid.ToString("N");
-            var registered = runtimes.TryGet(deploymentId, out _);
-            var ready = deployment.Value.DesiredState == DesiredAgentState.Running
-                && deployment.Value.OperationalState == OperationalState.Ready
-                && registered;
-            var error = ready ? null : deployment.Value.LastError
-                ?? (registered ? $"Deployment is {deployment.Value.OperationalState}." : "Runtime instance is not provisioned yet.");
+            var resolved = await agents.ResolveAsync(new RuntimeAgentReference(agentResourceId, generation), cancellationToken);
+            var registered = runtimes.TryGet(resolved.DeploymentId, out _);
+            var ready = resolved.Ready && registered;
             return new AgentRuntimeReadiness(
                 agentResourceId,
                 generation,
                 ready,
-                ready ? "Ready" : deployment.Value.OperationalState.ToString(),
-                deploymentId,
-                revision.Value.Metadata.Name,
-                error,
-                deployment.Value.RuntimeProfileName,
-                deployment.Value.ModelProfileName ?? revision.Value.Definition.ModelProfileName);
+                ready ? "Ready" : resolved.State,
+                resolved.DeploymentId,
+                resolved.RevisionId,
+                ready ? null : resolved.Error ?? (registered ? $"Deployment is {resolved.State}." : "Runtime instance is not provisioned yet."),
+                resolved.RuntimeProfileName,
+                resolved.ModelProfileName);
         }
-
-        return new AgentRuntimeReadiness(agentResourceId, generation, false, "DeploymentNotFound", null, null, $"Agent generation '{generation}' has no deployment.");
+        catch (RuntimeAgentResolutionException exception)
+        {
+            return new AgentRuntimeReadiness(agentResourceId, generation, false, exception.Code, null, null, exception.Message);
+        }
     }
 
     public async Task<StoredRuntimeRun> CancelAsync(string runId, CancellationToken cancellationToken)
@@ -132,9 +111,9 @@ public sealed class RuntimeRunService(
         var stored = await GetRequiredAsync(runId, cancellationToken);
         if (stored.Value.Status.State.IsTerminal()) return stored;
         cancellations.Cancel(runId);
-        var cancelled = await TransitionAsync(stored, RuntimeRunState.Cancelled, null, "Cancelled by the caller.", cancellationToken);
-        await AppendEventAsync(runId, RuntimeRunEventKind.StatusChanged, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
-        await AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
+        var cancelled = await stateManager.TransitionAsync(stored, RuntimeRunState.Cancelled, null, "Cancelled by the caller.", cancellationToken);
+        await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.StatusChanged, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
+        await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
         return cancelled;
     }
 
@@ -160,25 +139,24 @@ public sealed class RuntimeRunService(
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(runToken, timeoutTimer.Token);
         try
         {
-            stored = await TransitionAsync(stored, RuntimeRunState.Running, null, null, stoppingToken);
-            await AppendEventAsync(runId, RuntimeRunEventKind.StatusChanged, "Run started", state: RuntimeRunState.Running, cancellationToken: stoppingToken);
+            stored = await stateManager.TransitionAsync(stored, RuntimeRunState.Running, null, null, stoppingToken);
+            await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.StatusChanged, "Run started", state: RuntimeRunState.Running, cancellationToken: stoppingToken);
 
-            var agent = await management.GetAsync<AgentResource>(stored.Value.Properties.Agent.ResourceId, timeout.Token)
-                ?? throw new RuntimeRunValidationException("agent_not_found", $"Agent '{stored.Value.Properties.Agent.ResourceId}' was not found.");
-            await TraceStepAsync(runId, "Agent definition resolved", timeout.Token);
-            await TraceStepAsync(runId, "Agent type resolved", timeout.Token);
-            await TraceStepAsync(runId, "Model profile resolved", timeout.Token);
+            var resolved = await agents.ResolveAsync(stored.Value.Properties.Agent, timeout.Token);
+            await stateManager.TraceStepAsync(runId, "Agent definition resolved", timeout.Token);
+            await stateManager.TraceStepAsync(runId, "Agent type resolved", timeout.Token);
+            await stateManager.TraceStepAsync(runId, "Model profile resolved", timeout.Token);
 
-            var deployment = await ResolveDeploymentAsync(agent.Value, stored.Value.Properties.Agent.Version, timeout.Token);
-            activity?.SetTag("agentstration.deployment.uid", deployment.Uid);
+            if (!resolved.Ready) throw new InvalidOperationException(resolved.Error ?? $"Deployment is {resolved.State}.");
+            activity?.SetTag("agentstration.deployment.uid", resolved.DeploymentId);
             activity?.SetTag("agentstration.model.profile", stored.Value.Status.ModelProfile);
-            await TraceStepAsync(runId, "Prompt composed", timeout.Token);
-            await AppendEventAsync(runId, RuntimeRunEventKind.StepStarted, "Model invocation started", "Model invoked", cancellationToken: timeout.Token);
+            await stateManager.TraceStepAsync(runId, "Prompt composed", timeout.Token);
+            await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.StepStarted, "Model invocation started", "Model invoked", cancellationToken: timeout.Token);
             var prompt = ComposePrompt(stored.Value.Properties.Input);
             var executionOptions = ParseExecutionOptions(stored.Value.Properties.Execution);
             AgentExecutionResult? execution = null;
             await foreach (var executionEvent in runtimes.ExecuteEventsAsync(
-                deployment.Uid.ToString("N"),
+                resolved.DeploymentId,
                 new AgentExecutionRequest(
                     prompt,
                     runId,
@@ -189,7 +167,7 @@ public sealed class RuntimeRunService(
                 switch (executionEvent)
                 {
                     case ContentDelta delta:
-                        await AppendEventAsync(runId, RuntimeRunEventKind.ResponseDelta, content: delta.Content, cancellationToken: timeout.Token);
+                        await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.ResponseDelta, content: delta.Content, cancellationToken: timeout.Token);
                         break;
                     case ExecutionCompleted completed:
                         execution = completed.Result;
@@ -203,10 +181,10 @@ public sealed class RuntimeRunService(
             activity?.SetTag("agentstration.model.name", execution.ModelName);
             activity?.SetTag("agentstration.model.temperature", execution.EffectiveOptions?.Temperature);
             activity?.SetTag("agentstration.model.max_output_tokens", execution.EffectiveOptions?.MaxOutputTokens);
-            await AppendEventAsync(runId, RuntimeRunEventKind.StepCompleted, "Model invocation completed", "Model invoked", cancellationToken: timeout.Token);
+            await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.StepCompleted, "Model invocation completed", "Model invoked", cancellationToken: timeout.Token);
             stored = await GetRequiredAsync(runId, stoppingToken);
             if (stored.Value.Status.State == RuntimeRunState.Cancelled) return;
-            await TransitionAsync(
+            await stateManager.TransitionAsync(
                 stored,
                 RuntimeRunState.Succeeded,
                 execution.Output,
@@ -215,8 +193,8 @@ public sealed class RuntimeRunService(
                 execution.ProviderType,
                 execution.ModelName,
                 execution.EffectiveOptions);
-            await AppendEventAsync(runId, RuntimeRunEventKind.StatusChanged, "Run succeeded", state: RuntimeRunState.Succeeded, cancellationToken: stoppingToken);
-            await AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, "Response completed", state: RuntimeRunState.Succeeded, cancellationToken: stoppingToken);
+            await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.StatusChanged, "Run succeeded", state: RuntimeRunState.Succeeded, cancellationToken: stoppingToken);
+            await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, "Response completed", state: RuntimeRunState.Succeeded, cancellationToken: stoppingToken);
             activity?.SetStatus(ActivityStatusCode.Ok);
             if (logger.IsEnabled(LogLevel.Information))
                 logger.LogInformation("Runtime run execution succeeded in {DurationMs} ms", Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
@@ -228,7 +206,7 @@ public sealed class RuntimeRunService(
             activity?.SetTag("error.type", state.ToString());
             if (logger.IsEnabled(LogLevel.Warning))
                 logger.LogWarning("Runtime run execution ended as {RunState} after {DurationMs} ms", state, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
-            await CompleteFailureAsync(runId, state, state == RuntimeRunState.Cancelled ? "Run cancelled." : "Run timed out.", stoppingToken);
+            await stateManager.CompleteFailureAsync(runId, state, state == RuntimeRunState.Cancelled ? "Run cancelled." : "Run timed out.", stoppingToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -236,7 +214,7 @@ public sealed class RuntimeRunService(
             activity?.SetTag("error.type", exception.GetType().FullName);
             if (logger.IsEnabled(LogLevel.Error))
                 logger.LogError(exception, "Runtime run execution failed after {DurationMs} ms", Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
-            await CompleteFailureAsync(runId, RuntimeRunState.Failed, exception.Message, stoppingToken);
+            await stateManager.CompleteFailureAsync(runId, RuntimeRunState.Failed, exception.Message, stoppingToken);
         }
         finally
         {
@@ -264,81 +242,6 @@ public sealed class RuntimeRunService(
             await Task.Delay(TimeSpan.FromMilliseconds(200), timeProvider, cancellationToken);
         }
     }
-
-    private async Task<AgentDeployment> ResolveDeploymentAsync(AgentResource agent, long version, CancellationToken cancellationToken)
-    {
-        var deployments = await management.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken);
-        foreach (var deployment in deployments.Where(item => item.Value.DesiredState == DesiredAgentState.Running && item.Value.OperationalState == OperationalState.Ready))
-        {
-            var revision = await management.GetAsync<AgentRevision>(deployment.Value.RevisionName, cancellationToken);
-            if (revision is not null
-                && revision.Value.AgentUid == agent.Uid
-                && revision.Value.AgentVersion == version)
-                return deployment.Value;
-        }
-        throw new InvalidOperationException($"Agent '{agent.Name}' version '{version}' has no ready deployment.");
-    }
-
-    private async Task CompleteFailureAsync(string runId, RuntimeRunState state, string error, CancellationToken cancellationToken)
-    {
-        var current = await GetRequiredAsync(runId, cancellationToken);
-        if (current.Value.Status.State == RuntimeRunState.Cancelled && state == RuntimeRunState.Cancelled) return;
-        await TransitionAsync(current, state, null, error, cancellationToken);
-        await AppendEventAsync(runId, RuntimeRunEventKind.Error, error, state: state, cancellationToken: cancellationToken);
-        await AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, error, state: state, cancellationToken: cancellationToken);
-    }
-
-    private async Task<StoredRuntimeRun> TransitionAsync(
-        StoredRuntimeRun stored,
-        RuntimeRunState state,
-        string? response,
-        string? error,
-        CancellationToken cancellationToken,
-        string? modelProvider = null,
-        string? resolvedModel = null,
-        ModelExecutionOptions? effectiveOptions = null)
-    {
-        var now = timeProvider.GetUtcNow();
-        var status = stored.Value.Status with
-        {
-            State = state,
-            StartedAt = state == RuntimeRunState.Running ? now : stored.Value.Status.StartedAt,
-            CompletedAt = state.IsTerminal() ? now : null,
-            Response = response ?? stored.Value.Status.Response,
-            Error = error,
-            ModelProvider = modelProvider ?? stored.Value.Status.ModelProvider,
-            ResolvedModel = resolvedModel ?? stored.Value.Status.ResolvedModel,
-            EffectiveTemperature = effectiveOptions?.Temperature ?? stored.Value.Status.EffectiveTemperature,
-            EffectiveMaxOutputTokens = effectiveOptions?.MaxOutputTokens ?? stored.Value.Status.EffectiveMaxOutputTokens
-        };
-        return await runs.UpdateAsync(stored.Value with { Status = status }, stored.ETag, cancellationToken);
-    }
-
-    private async Task TraceStepAsync(string runId, string step, CancellationToken cancellationToken)
-    {
-        await AppendEventAsync(runId, RuntimeRunEventKind.StepStarted, step, step, cancellationToken: cancellationToken);
-        await AppendEventAsync(runId, RuntimeRunEventKind.StepCompleted, step, step, cancellationToken: cancellationToken);
-    }
-
-    private Task<RuntimeRunEvent> AppendEventAsync(
-        string runId,
-        RuntimeRunEventKind kind,
-        string? message = null,
-        string? step = null,
-        string? content = null,
-        RuntimeRunState? state = null,
-        CancellationToken cancellationToken = default) =>
-        runs.AppendEventAsync(new RuntimeRunEvent
-        {
-            EventId = Guid.NewGuid(),
-            RunId = runId,
-            Kind = kind,
-            Timestamp = timeProvider.GetUtcNow(),
-            Message = message,
-            Step = step,
-            Content = content,
-            State = state
-        }, cancellationToken);
 
     private async Task<StoredRuntimeRun> GetRequiredAsync(string runId, CancellationToken cancellationToken) =>
         await runs.GetAsync(runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);

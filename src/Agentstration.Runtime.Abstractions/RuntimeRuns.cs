@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Runtime.Abstractions;
 
@@ -38,7 +37,7 @@ public sealed record RuntimeExecutionOptions
 {
     public RuntimeExecutionMode Mode { get; init; } = RuntimeExecutionMode.Interactive;
     public int TimeoutSeconds { get; init; } = 120;
-    public StreamingMode Streaming { get; init; } = StreamingMode.Automatic;
+    public RuntimeStreamingMode Streaming { get; init; } = RuntimeStreamingMode.Automatic;
     public IReadOnlyDictionary<string, JsonElement> Parameters { get; init; } = new Dictionary<string, JsonElement>();
 }
 

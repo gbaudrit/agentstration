@@ -18,7 +18,7 @@ internal sealed class GetAgentRuntimeReadinessEndpoint
             if (generation < 1) throw new RuntimeRunValidationException("agent_version_invalid", "Agent generation must be positive.");
             var readiness = await service.GetReadinessAsync(agentName, generation, cancellationToken);
             return Results.Ok(new AgentRuntimeReadinessResponse(
-                readiness.AgentResourceId,
+                readiness.AgentId,
                 readiness.Generation,
                 readiness.Ready,
                 readiness.State,

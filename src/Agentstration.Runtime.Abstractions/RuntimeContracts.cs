@@ -1,8 +1,9 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Runtime.Abstractions;
+
+public enum RuntimeStreamingMode { Automatic, Enabled, Disabled }
 
 public sealed record ModelExecutionOptions(
     float? Temperature = null,
@@ -11,10 +12,10 @@ public sealed record ModelExecutionOptions(
     int? TopK = null,
     int? Seed = null,
     IReadOnlyList<string>? StopSequences = null,
-    StreamingMode Streaming = StreamingMode.Automatic);
+    RuntimeStreamingMode Streaming = RuntimeStreamingMode.Automatic);
 public sealed record AgentExecutionOptions
 {
-    public StreamingMode Streaming { get; init; } = StreamingMode.Automatic;
+    public RuntimeStreamingMode Streaming { get; init; } = RuntimeStreamingMode.Automatic;
 }
 public sealed record AgentExecutionRequest(
     string Input,
@@ -49,7 +50,7 @@ public sealed record FeatureCapability(CapabilitySupport Support = CapabilitySup
 public sealed record ReasoningCapability
 {
     public CapabilitySupport Support { get; init; }
-    public IReadOnlySet<ReasoningEffort> SupportedEfforts { get; init; } = new HashSet<ReasoningEffort>();
+    public IReadOnlySet<string> SupportedEfforts { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed record AgentRuntimeCapabilities
@@ -97,8 +98,8 @@ public static class EffectiveCapabilityResolver
         var feature = IntersectFeature(values.Select(value => new FeatureCapability(value.Support)));
         if (feature.Support == CapabilitySupport.Unsupported) return new();
         var efforts = values.Select(value => value.SupportedEfforts)
-            .Aggregate((IEnumerable<ReasoningEffort>?)null, (current, next) => current is null ? next : current.Intersect(next))
-            ?.ToHashSet() ?? [];
+            .Aggregate((IEnumerable<string>?)null, (current, next) => current is null ? next : current.Intersect(next, StringComparer.OrdinalIgnoreCase))
+            ?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
         var support = values.Any(value => value.SupportedEfforts.Count > 0) && efforts.Count == 0
             ? CapabilitySupport.Partial
             : feature.Support;
@@ -106,14 +107,51 @@ public static class EffectiveCapabilityResolver
     }
 }
 public sealed record AgentRuntimeContext(IToolCatalog Tools);
-public sealed record ProvisioningResult(bool Succeeded, string? Endpoint, string? Error);
-public sealed record RuntimeObservation(OperationalState State, string? RevisionId, string? Error);
-public sealed record ReconciliationResult(AgentDeployment Deployment, bool Changed, string Reason);
+public sealed record ExecutableAgentDefinition
+{
+    public required Guid AgentId { get; init; }
+    public required string AgentKey { get; init; }
+    public required string DisplayName { get; init; }
+    public required string Description { get; init; }
+    public required long AgentVersion { get; init; }
+    public required string EffectiveInstructions { get; init; }
+    public required string ModelProfileName { get; init; }
+    public required string RuntimeProfileName { get; init; }
+    public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
+    public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
+    public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
+    public required IReadOnlyCollection<string> Capabilities { get; init; }
+    public required string Handler { get; init; }
+    public required string DefinitionHash { get; init; }
+}
+
+public sealed record ResolvedRuntimeAgent(
+    Guid AgentId,
+    string AgentName,
+    long Generation,
+    string DeploymentId,
+    string RevisionId,
+    string RuntimeProfileName,
+    string ModelProfileName,
+    ExecutableAgentDefinition Definition,
+    bool Ready,
+    string State,
+    string? Error);
+
+public interface IRuntimeAgentResolver
+{
+    Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken);
+}
+
+public sealed class RuntimeAgentResolutionException(string code, string message) : Exception(message)
+{
+    public string Code { get; } = code;
+}
 public sealed record AgentRouteRequest(string Input);
 public sealed record RoutableAgent(string AgentId, string Description, IReadOnlyCollection<string> Capabilities);
 public sealed record AgentRouteResult(string AgentId, double Confidence, string Reason);
 public sealed record AgentRuntimeReadiness(
-    string AgentResourceId,
+    string AgentId,
     long Generation,
     bool Ready,
     string State,
@@ -162,7 +200,7 @@ public interface IAgentRuntime
 public interface IAgentRuntimeFactory
 {
     string Handler { get; }
-    Task<IAgentRuntime> CreateAsync(ResolvedAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken);
+    Task<IAgentRuntime> CreateAsync(ExecutableAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken);
 }
 
 public interface IAgentTool
@@ -177,19 +215,6 @@ public interface IAgentTool
 public interface IToolCatalog
 {
     ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default);
-}
-
-public interface IAgentDeploymentProvisioner
-{
-    AgentHostingMode HostingMode { get; }
-    Task<ProvisioningResult> ProvisionAsync(AgentRevision revision, AgentDeployment deployment, CancellationToken cancellationToken);
-    Task<ProvisioningResult> DeprovisionAsync(AgentDeployment deployment, CancellationToken cancellationToken);
-    Task<RuntimeObservation> ObserveAsync(AgentDeployment deployment, CancellationToken cancellationToken);
-}
-
-public interface IAgentDeploymentReconciler
-{
-    Task<ReconciliationResult> ReconcileAsync(AgentDeployment deployment, CancellationToken cancellationToken);
 }
 
 public interface IRuntimeRegistry
