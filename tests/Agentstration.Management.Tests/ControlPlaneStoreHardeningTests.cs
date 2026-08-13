@@ -123,9 +123,29 @@ public sealed class ControlPlaneStoreHardeningTests
         Assert.AreEqual(deployment.Value.Uid.ToString("N"), resolved.DeploymentId);
         Assert.AreEqual("reasoning-default", resolved.ModelProfileName);
         Assert.IsTrue(resolved.Ready);
+        var missingAgent = await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(() =>
+            resolver.ResolveAsync(new RuntimeAgentReference("missing-agent", 1), default));
+        Assert.AreEqual("agent_not_found", missingAgent.Code);
         var exception = await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(() =>
             resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 2), default));
         Assert.AreEqual("agent_version_not_found", exception.Code);
+
+        await fixture.Store.CreateImmutableAsync(new AgentRevision
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.AgentRevision,
+            Metadata = new ResourceMetadata { Name = "sql-expert--000004" },
+            AgentUid = agent.Value.Uid,
+            AgentName = "sql-expert",
+            AgentVersion = 4,
+            DefinitionHash = "hash-4",
+            CreatedAt = DateTimeOffset.UtcNow,
+            ProvisioningState = ProvisioningState.Succeeded,
+            Definition = Definition(agent.Value.Uid) with { AgentVersion = 4 }
+        }, default);
+        var missingDeployment = await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(() =>
+            resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 4), default));
+        Assert.AreEqual("deployment_not_found", missingDeployment.Code);
     }
 
     [TestMethod]

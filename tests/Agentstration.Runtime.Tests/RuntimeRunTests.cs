@@ -35,7 +35,12 @@ public sealed class RuntimeRunTests
         Assert.AreEqual(3L, created.Value.Properties.Agent.Version);
         Assert.AreEqual("Optimize this query.", created.Value.Properties.Input.Messages[0].Content);
         Assert.AreEqual(RuntimeRunOrigin.Console, created.Value.Properties.Origin);
-        await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 2), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        var missingVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 2), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        Assert.AreEqual("agent_version_not_found", missingVersion.Code);
+        var invalidReference = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference("", 1), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        Assert.AreEqual("agent_reference_invalid", invalidReference.Code);
+        var invalidVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 0), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        Assert.AreEqual("agent_version_invalid", invalidVersion.Code);
     }
 
     [TestMethod]
@@ -138,6 +143,55 @@ public sealed class RuntimeRunTests
         await execution;
 
         Assert.AreEqual(RuntimeRunState.Cancelled, (await fixture.Service.GetAsync(running.Value.Id, default))!.Value.Status.State);
+    }
+
+    [TestMethod]
+    public async Task TimeoutReachesExplicitTerminalState()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        fixture.Registry.Behavior = RuntimeBehavior.Block;
+        var run = await fixture.Service.CreateAsync(
+            new RuntimeAgentReference(fixture.AgentId, 3),
+            Input("timeout"),
+            new RuntimeExecutionOptions { TimeoutSeconds = 1 },
+            RuntimeRunOrigin.Api,
+            "test",
+            default);
+
+        await fixture.Service.ExecuteAsync(run.Value.Id, default);
+
+        Assert.AreEqual(RuntimeRunState.TimedOut, (await fixture.Service.GetAsync(run.Value.Id, default))!.Value.Status.State);
+    }
+
+    [TestMethod]
+    public async Task InitializationReenqueuesPendingAndRunningButNotTerminalRuns()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var pending = await fixture.CreateRunAsync();
+        var running = await fixture.CreateRunAsync();
+        var succeeded = await fixture.CreateRunAsync();
+        var failed = await fixture.CreateRunAsync();
+        var cancelled = await fixture.CreateRunAsync();
+        var timedOut = await fixture.CreateRunAsync();
+        var startedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+        running = await fixture.Store.UpdateAsync(running.Value with { Status = running.Value.Status with { State = RuntimeRunState.Running, StartedAt = startedAt } }, running.ETag, default);
+        _ = await SetStateAsync(succeeded, RuntimeRunState.Succeeded);
+        _ = await SetStateAsync(failed, RuntimeRunState.Failed);
+        _ = await SetStateAsync(cancelled, RuntimeRunState.Cancelled);
+        _ = await SetStateAsync(timedOut, RuntimeRunState.TimedOut);
+        fixture.Queue.Enqueued.Clear();
+
+        await fixture.Service.InitializeAsync(default);
+
+        CollectionAssert.AreEquivalent(new[] { pending.Value.Id, running.Value.Id }, fixture.Queue.Enqueued.ToArray());
+
+        await fixture.Service.ExecuteAsync(running.Value.Id, default);
+        var recovered = await fixture.Service.GetAsync(running.Value.Id, default);
+        Assert.AreEqual(RuntimeRunState.Succeeded, recovered!.Value.Status.State);
+        Assert.AreEqual(startedAt, recovered.Value.Status.StartedAt);
+
+        Task<StoredRuntimeRun> SetStateAsync(StoredRuntimeRun stored, RuntimeRunState state) =>
+            fixture.Store.UpdateAsync(stored.Value with { Status = stored.Value.Status with { State = state } }, stored.ETag, default);
     }
 
     [TestMethod]
@@ -352,15 +406,17 @@ public sealed class RuntimeRunTests
         public RuntimeRunService Service { get; }
         public IRuntimeRunStore Store { get; }
         public FakeRuntimeRegistry Registry { get; }
+        public TestRuntimeRunQueue Queue { get; }
         public string AgentId { get; }
 
-        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store, FakeRuntimeRegistry registry, string agentId)
+        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store, FakeRuntimeRegistry registry, TestRuntimeRunQueue queue, string agentId)
         {
             this.directory = directory;
             this.provider = provider;
             Service = service;
             Store = store;
             Registry = registry;
+            Queue = queue;
             AgentId = agentId;
         }
 
@@ -375,7 +431,9 @@ public sealed class RuntimeRunTests
             services.AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")}");
             services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();
             services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")}");
-            services.AddSingleton<IRuntimeRunQueue, LocalRuntimeRunQueue>();
+            var queue = new TestRuntimeRunQueue();
+            services.AddSingleton(queue);
+            services.AddSingleton<IRuntimeRunQueue>(queue);
             services.AddSingleton<IRuntimeRunCancellationRegistry, LocalRuntimeRunCancellationRegistry>();
             var registry = new FakeRuntimeRegistry();
             services.AddSingleton(registry);
@@ -393,7 +451,7 @@ public sealed class RuntimeRunTests
             var agent = await management.PutAsync(Agent(agentId), null, true, default);
             await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid), default);
             await management.PutAsync(Deployment(revisionId), null, true, default);
-            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, registry, agentId);
+            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, registry, queue, agentId);
         }
 
         public Task<StoredRuntimeRun> CreateRunAsync() => Service.CreateAsync(new RuntimeAgentReference(AgentId, 3), Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", default);
@@ -452,5 +510,21 @@ public sealed class RuntimeRunTests
             OperationalState = OperationalState.Ready,
             UpdatedAt = DateTimeOffset.UtcNow
         };
+    }
+
+    private sealed class TestRuntimeRunQueue : IRuntimeRunQueue
+    {
+        public List<string> Enqueued { get; } = [];
+        public ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken)
+        {
+            Enqueued.Add(runId);
+            return ValueTask.CompletedTask;
+        }
+
+        public async IAsyncEnumerable<string> ReadAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
     }
 }

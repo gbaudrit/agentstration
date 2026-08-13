@@ -27,7 +27,7 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         var status = stored.Value.Status with
         {
             State = state,
-            StartedAt = state == RuntimeRunState.Running ? now : stored.Value.Status.StartedAt,
+            StartedAt = state == RuntimeRunState.Running ? stored.Value.Status.StartedAt ?? now : stored.Value.Status.StartedAt,
             CompletedAt = state.IsTerminal() ? now : null,
             Response = response ?? stored.Value.Status.Response,
             Error = error,

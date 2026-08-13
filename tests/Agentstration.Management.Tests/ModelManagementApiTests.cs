@@ -163,6 +163,31 @@ public sealed class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task AgentUpdateRejectsCrossWorkspaceResourceReference()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        const string path = "/api/agents/sql-expert";
+        var agent = await client.GetFromJsonAsync<AgentResource>(path);
+        Assert.IsNotNull(agent);
+        var request = new AgentResourceRequest
+        {
+            ApiVersion = agent.ApiVersion,
+            Kind = agent.Kind,
+            Metadata = agent.Metadata,
+            Definition = agent.Definition with
+            {
+                ModelProfile = new ResourceReference(agent.Definition.ModelProfile.Name, "another-workspace")
+            }
+        };
+
+        using var response = await client.PutAsJsonAsync(path, request);
+
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.AreEqual("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [TestMethod]
     public async Task AgentModelExpansionUsesTheNewProfileImmediatelyAfterUpdate()
     {
         await using var factory = Factory();

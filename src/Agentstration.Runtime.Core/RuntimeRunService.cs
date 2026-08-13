@@ -20,9 +20,14 @@ public sealed class RuntimeRunService(
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         await runs.InitializeAsync(cancellationToken);
-        var recoverable = await runs.ListAsync(null, 0, 1000, cancellationToken);
-        foreach (var run in recoverable.Where(item => item.Value.Status.State is RuntimeRunState.Pending or RuntimeRunState.Running))
-            await queue.EnqueueAsync(run.Value.Id, cancellationToken);
+        const int pageSize = 200;
+        for (var skip = 0; ; skip += pageSize)
+        {
+            var page = await runs.ListAsync(null, skip, pageSize, cancellationToken);
+            foreach (var run in page.Where(item => item.Value.Status.State is RuntimeRunState.Pending or RuntimeRunState.Running))
+                await queue.EnqueueAsync(run.Value.Id, cancellationToken);
+            if (page.Count < pageSize) break;
+        }
     }
 
     public async Task<StoredRuntimeRun> CreateAsync(

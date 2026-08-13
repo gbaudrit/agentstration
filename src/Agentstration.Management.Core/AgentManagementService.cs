@@ -187,7 +187,8 @@ public sealed class AgentManagementService(
     private static void ValidateReference(ResourceReference reference, string errorCode)
     {
         ValidateName(reference.Name, "reference.name");
-        if (reference.WorkspaceRef is not null) ValidateName(reference.WorkspaceRef, "reference.workspaceRef");
+        if (reference.WorkspaceRef is not null)
+            throw new AgentDefinitionValidationException("cross_workspace_reference_not_supported", "Cross-workspace resource references are not enabled in this installation.");
         if (string.IsNullOrWhiteSpace(reference.Name)) throw new AgentDefinitionValidationException(errorCode, "A resource reference name is required.");
     }
 

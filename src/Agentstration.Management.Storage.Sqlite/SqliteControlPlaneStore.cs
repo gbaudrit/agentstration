@@ -204,24 +204,57 @@ public sealed class SqliteControlPlaneStore(
               AND json_extract(Payload, '$.agentVersion') = {generation}
             """, cancellationToken)).SingleOrDefault();
 
-    public async Task<StoredResource<AgentRevision>?> FindLatestRevisionAsync(Guid agentUid, CancellationToken cancellationToken) =>
-        (await LoadFilteredAsync<AgentRevision>($"""
-            SELECT * FROM ControlPlaneResources
-            WHERE Kind = {ResourceKinds.AgentRevision}
-              AND json_extract(Payload, '$.agentUid') = {agentUid.ToString()}
-            """, cancellationToken))
-        .OrderByDescending(value => value.Value.AgentVersion)
-        .ThenByDescending(value => value.Value.CreatedAt)
-        .FirstOrDefault();
+    public async Task<StoredResource<AgentRevision>?> FindLatestRevisionAsync(Guid agentUid, CancellationToken cancellationToken)
+    {
+        var results = requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.System => await LoadFilteredAsync<AgentRevision>($"""
+                SELECT * FROM ControlPlaneResources
+                WHERE Kind = {ResourceKinds.AgentRevision}
+                  AND json_extract(Payload, '$.agentUid') = {agentUid.ToString()}
+                ORDER BY json_extract(Payload, '$.agentVersion') DESC,
+                         json_extract(Payload, '$.createdAt') DESC
+                LIMIT 1
+                """, cancellationToken),
+            ControlPlaneAccessMode.Workspace => await LoadFilteredAsync<AgentRevision>($"""
+                SELECT * FROM ControlPlaneResources
+                WHERE TenantId = {requestContext.Current.TenantId}
+                  AND WorkspaceId = {requestContext.Current.WorkspaceId}
+                  AND Kind = {ResourceKinds.AgentRevision}
+                  AND json_extract(Payload, '$.agentUid') = {agentUid.ToString()}
+                ORDER BY json_extract(Payload, '$.agentVersion') DESC,
+                         json_extract(Payload, '$.createdAt') DESC
+                LIMIT 1
+                """, cancellationToken),
+            _ => throw new InvalidOperationException("Control Plane access requires an explicit workspace or system context.")
+        };
+        return results.SingleOrDefault();
+    }
 
-    public async Task<StoredResource<AgentDeployment>?> FindDeploymentByRevisionAsync(string revisionName, CancellationToken cancellationToken) =>
-        (await LoadFilteredAsync<AgentDeployment>($"""
-            SELECT * FROM ControlPlaneResources
-            WHERE Kind = {ResourceKinds.AgentDeployment}
-              AND json_extract(Payload, '$.revisionName') = {revisionName}
-            """, cancellationToken))
-        .OrderByDescending(value => value.Value.UpdatedAt)
-        .FirstOrDefault();
+    public async Task<StoredResource<AgentDeployment>?> FindDeploymentByRevisionAsync(string revisionName, CancellationToken cancellationToken)
+    {
+        var results = requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.System => await LoadFilteredAsync<AgentDeployment>($"""
+                SELECT * FROM ControlPlaneResources
+                WHERE Kind = {ResourceKinds.AgentDeployment}
+                  AND json_extract(Payload, '$.revisionName') = {revisionName}
+                ORDER BY json_extract(Payload, '$.updatedAt') DESC
+                LIMIT 1
+                """, cancellationToken),
+            ControlPlaneAccessMode.Workspace => await LoadFilteredAsync<AgentDeployment>($"""
+                SELECT * FROM ControlPlaneResources
+                WHERE TenantId = {requestContext.Current.TenantId}
+                  AND WorkspaceId = {requestContext.Current.WorkspaceId}
+                  AND Kind = {ResourceKinds.AgentDeployment}
+                  AND json_extract(Payload, '$.revisionName') = {revisionName}
+                ORDER BY json_extract(Payload, '$.updatedAt') DESC
+                LIMIT 1
+                """, cancellationToken),
+            _ => throw new InvalidOperationException("Control Plane access requires an explicit workspace or system context.")
+        };
+        return results.SingleOrDefault();
+    }
 
     public async Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsForAgentAsync(string agentName, CancellationToken cancellationToken) =>
         (await LoadFilteredAsync<AgentDeployment>($"""
