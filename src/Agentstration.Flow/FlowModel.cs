@@ -19,7 +19,7 @@ public enum FlowCompositionMode { Sequential, Concurrent, Custom }
 public enum FlowRunStatus { Pending, Running, Succeeded, Failed, Cancelled, TimedOut }
 public enum FlowRunTrigger { Manual, Api, WorkItem, Flow, Schedule, Event }
 public enum FlowStepRunStatus { NotStarted, Running, Succeeded, Failed, Skipped, Cancelled }
-public enum FlowRunEventType { FlowRunCreated, FlowRunStarted, StepRunStarted, StepRunCompleted, StepRunFailed, FlowRunCompleted, FlowRunFailed, FlowRunCancelled }
+public enum FlowRunEventType { FlowRunCreated, FlowRunStarted, StepRunStarted, StepRunCompleted, StepRunFailed, FlowRunCompleted, FlowRunFailed, FlowRunCancelled, StepOutputDelta }
 
 public sealed record FlowTargetReference(FlowTargetKind Kind, string Id, string? Version = null);
 

@@ -9,6 +9,7 @@ using Agentstration.Flow.Storage.Sqlite;
 using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Application.Tests;
@@ -199,6 +200,12 @@ public sealed class FlowTests
         Assert.IsTrue(global!.Value.Any(item => item.Id == run.Id));
         var scoped = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flows/api-run-flow/runs", JsonOptions);
         Assert.IsTrue(scoped!.Value.Any(item => item.Id == run.Id));
+        var routes = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .ToArray();
+        Assert.Contains("/api/flowRuns/{runId}", routes);
+        Assert.DoesNotContain("/flowRuns/{runId}", routes);
     }
 
     [TestMethod]
