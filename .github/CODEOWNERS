@@ -1,0 +1,5 @@
+# Default ownership. Add narrower entries here as the maintainer team grows.
+* @gbaudrit
+
+/.github/ @gbaudrit
+/docs/ @gbaudrit

@@ -1,18 +1,34 @@
 # Contributing
 
-Thank you for contributing to Agentstration. Open an issue before a large change, keep branches and pull requests focused, and inspect the affected vertical before introducing a new abstraction.
+Thank you for contributing to Agentstration. Open an issue before a substantial change, keep branches and pull requests focused, and extend the existing verticals before introducing new abstractions.
+
+## Prerequisites and local start
+
+Install Git and the .NET SDK selected by [`global.json`](global.json) (currently .NET 10.0.300 or a compatible feature band).
+
+```powershell
+git clone https://github.com/gbaudrit/agentstration.git
+cd agentstration
+$env:AI__Provider = "Deterministic"
+dotnet run --project src/Agentstration.Web
+```
+
+The local Console is available at `http://localhost:5100` by default and requires no remote model or API key.
 
 ## Development checks
 
-Use MSTest for behavior changes and keep tests deterministic and offline. Before submitting a pull request, run:
+Use MSTest for behavior changes and keep the default test suite deterministic and offline. Before submitting a pull request, run:
 
 ```powershell
 dotnet restore Agentstration.slnx
 dotnet build Agentstration.slnx --configuration Release --no-restore
 dotnet test Agentstration.slnx --configuration Release --no-build
+./scripts/ci/verify-dotnet-format.ps1 -BaseRevision "origin/main"
 ```
 
-If documentation changed, also run:
+The format script checks changed C# and Razor files in both solutions. The autonomous AEP subtree has a larger standalone solution; when it changes, also restore, build, and test `aep/Aep.slnx`.
+
+If documentation changed, run:
 
 ```powershell
 cd docs/site
@@ -22,22 +38,35 @@ npm run build
 
 Never commit secrets, personal data, generated data stores, or real document contents used for testing.
 
-## Documentation policy
+## Branches and commits
 
-Every change that introduces or modifies a public concept, resource, API, configuration setting, or architecture decision must include the corresponding documentation update. Documentation is reviewed and versioned with the code it describes.
+Development follows trunk-based development with short-lived branches and pull requests into `main`. Useful prefixes include `feature/`, `fix/`, `docs/`, `refactor/`, and `codex/`. GitFlow and long-lived integration branches are not used.
 
-Keep the root README concise. Put durable product documentation under `docs/`; `docs/site` contains only the Docusaurus renderer and must not contain a second copy of the content. See [Working on the documentation](docs/contributing/documentation.md).
+Use [Conventional Commits](https://www.conventionalcommits.org/) with one of these primary types:
 
-Use explicit labels such as **Planned**, **Experimental**, **Preview**, or **Not implemented yet**. Do not describe a roadmap item as an available capability.
+```text
+feat fix refactor docs test build ci chore perf
+```
 
-## Pull request checklist
+Add a concise scope when it improves clarity, for example:
 
-### Documentation
+```text
+feat(aep): add tool discovery
+fix(runtime): handle cancelled flow
+docs(architecture): document resource identity
+ci(github): add pull request validation
+```
 
-- [ ] No documentation change is required
-- [ ] User documentation updated
-- [ ] API documentation updated
-- [ ] Architecture documentation updated
-- [ ] ADR added or updated
+Keep the subject imperative and describe breaking changes explicitly in the commit footer and pull request. No Node.js commit-linting tool is required.
 
-Select every applicable item and explain why no documentation change is required when choosing the first item.
+## Pull requests
+
+Open a focused pull request into `main`, complete the short template, and keep it current with the target branch. CI must pass, review conversations must be resolved, and the final merge should use squash merge. Delete the source branch after merge.
+
+When behavior changes, add or update tests in the same pull request. Update public contracts, OpenAPI-facing behavior, MCP descriptions, UI behavior, and documentation where applicable.
+
+## Architecture and documentation
+
+Inspect the complete affected path—transport, application, domain, infrastructure, and tests—and preserve the dependency rules in [`docs/architecture.md`](docs/architecture.md). Significant architectural choices require a new ADR under [`docs/decisions/`](docs/decisions/); do not rewrite an accepted ADR to hide a later decision.
+
+Every change to a public concept, resource, API, configuration setting, or architecture decision must update the corresponding documentation. Keep the root README concise and put durable product documentation under `docs/`. See [Working on the documentation](docs/contributing/documentation.md) and [GitHub governance](docs/contributing/github-governance.md).

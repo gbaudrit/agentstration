@@ -76,7 +76,11 @@ const sidebars = {
     {
       type: 'category',
       label: 'Contributing',
-      items: ['contributing/overview', 'contributing/documentation'],
+      items: [
+        'contributing/overview',
+        'contributing/documentation',
+        'contributing/github-governance',
+      ],
     },
   ],
 };

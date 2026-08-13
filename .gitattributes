@@ -1,0 +1,27 @@
+* text=auto
+
+.editorconfig text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+*.cs text eol=crlf
+*.razor text eol=crlf
+*.ps1 text eol=crlf
+
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.csproj text eol=lf
+*.slnx text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
