@@ -41,10 +41,9 @@ public sealed class WorkplaceApiTests
             using (var createdFlow = await client.PostAsJsonAsync("/api/flows/", new CreateFlowRequest(
                 apiFlowName,
                 "Created through the canonical Flow API.",
-                Agentstration.Flow.FlowKind.Direct,
                 "1.0.0",
                 true,
-                new Agentstration.Flow.DirectFlowSpec(new Agentstration.Flow.FlowTargetReference(
+                new Agentstration.Flow.DirectFlowDefinition(new Agentstration.Flow.FlowTargetReference(
                     Agentstration.Flow.FlowTargetKind.Agent,
                     "dotnet-expert")))))
             {
@@ -100,8 +99,8 @@ public sealed class WorkplaceApiTests
                 var referencedDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(referencedFlow.Value.Id, referencedFlow.ETag, default));
                 Assert.AreEqual("flow_in_use", referencedDelete.Code);
                 var schemaFlow = await flows.CreateAsync(new CreateFlowCommand(
-                    "schema-flow", null, Agentstration.Flow.FlowKind.Direct, "1.0.0", true,
-                    new Agentstration.Flow.DirectFlowSpec(new Agentstration.Flow.FlowTargetReference(Agentstration.Flow.FlowTargetKind.Agent, administered.Value.Binding.ResourceId))), default);
+                    "schema-flow", null, "1.0.0", true,
+                    new Agentstration.Flow.DirectFlowDefinition(new Agentstration.Flow.FlowTargetReference(Agentstration.Flow.FlowTargetKind.Agent, administered.Value.Binding.ResourceId))), default);
                 var graph = new Agentstration.Flow.FlowGraphDefinition
                 {
                     EntryStep = "input",
@@ -109,7 +108,7 @@ public sealed class WorkplaceApiTests
                     Steps = [new Agentstration.Flow.InputFlowStepDefinition { Name = "input" }, new Agentstration.Flow.OutputFlowStepDefinition { Name = "output" }],
                     Transitions = [new("complete", "input", "completed", "output")]
                 };
-                await flows.UpdateAsync(new("schema-flow"), new UpdateFlowCommand(null, Agentstration.Flow.FlowKind.Direct, "1.0.0", true, schemaFlow.Value.Spec, Graph: graph), schemaFlow.ETag, default);
+                await flows.UpdateAsync(new("schema-flow"), new UpdateFlowCommand(null, "1.0.0", true, schemaFlow.Value.Definition, Graph: graph), schemaFlow.ETag, default);
                 await flows.PublishVersionAsync(new("schema-flow"), "1.0.0", activate: true, default);
             }
 

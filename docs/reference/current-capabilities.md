@@ -322,7 +322,7 @@ $flow = @{
   kind = "Direct"
   version = "1.0.0"
   enabled = $true
-  spec = @{ specKind = "direct"; target = @{ kind = "Agent"; id = "sql-expert" } }
+  definition = @{ flowKind = "direct"; target = @{ kind = "Agent"; id = "sql-expert" } }
 } | ConvertTo-Json -Depth 8
 Invoke-RestMethod -Method Post -ContentType application/json -Body $flow "http://localhost:5100/api/flows"
 Invoke-RestMethod -Method Post -ContentType application/json -Body (@{ version="1.0.0"; activate=$true } | ConvertTo-Json) "http://localhost:5100/api/flows/sql-direct/versions"

@@ -14,60 +14,134 @@ public enum FlowKind { Direct, Routing, Workflow, Orchestration, Composite }
 public enum FlowTargetKind { Agent, Flow }
 public enum FlowRoutingStrategy { Deterministic, Capabilities, Semantic, Llm, Hybrid, Custom }
 public enum FlowNodeKind { Input, Agent, Router, Condition, Transform, Output, Failure, Flow, Function, ExternalCall, HumanApproval, Custom }
-public enum FlowOrchestrationStrategy { Sequential, Concurrent, Handoff, GroupChat, Magentic, Custom }
+public enum FlowOrchestrationStrategy { Sequential, Concurrent, Handoff, GroupChat, Magentic }
 public enum FlowCompositionMode { Sequential, Concurrent, Custom }
 public enum FlowRunStatus { Pending, Running, Succeeded, Failed, Cancelled, TimedOut }
 public enum FlowRunTrigger { Manual, Api, WorkItem, Flow, Schedule, Event }
 public enum FlowStepRunStatus { NotStarted, Running, Succeeded, Failed, Skipped, Cancelled }
-public enum FlowRunEventType { FlowRunCreated, FlowRunStarted, StepRunStarted, StepRunCompleted, StepRunFailed, FlowRunCompleted, FlowRunFailed, FlowRunCancelled }
+public enum FlowRunEventType { FlowRunCreated, FlowRunStarted, StepRunStarted, StepOutputDelta, StepRunCompleted, StepRunFailed, FlowRunCompleted, FlowRunFailed, FlowRunCancelled }
 
 public sealed record FlowTargetReference(FlowTargetKind Kind, string Id, string? Version = null);
 
-[JsonPolymorphic(TypeDiscriminatorPropertyName = "specKind")]
-[JsonDerivedType(typeof(DirectFlowSpec), "direct")]
-[JsonDerivedType(typeof(RoutingFlowSpec), "routing")]
-[JsonDerivedType(typeof(WorkflowFlowSpec), "workflow")]
-[JsonDerivedType(typeof(OrchestrationFlowSpec), "orchestration")]
-[JsonDerivedType(typeof(CompositeFlowSpec), "composite")]
-public abstract record FlowSpec;
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "flowKind")]
+[JsonDerivedType(typeof(DirectFlowDefinition), "direct")]
+[JsonDerivedType(typeof(RoutingFlowDefinition), "routing")]
+[JsonDerivedType(typeof(WorkflowFlowDefinition), "workflow")]
+[JsonDerivedType(typeof(OrchestrationFlowDefinition), "orchestration")]
+[JsonDerivedType(typeof(CompositeFlowDefinition), "composite")]
+public abstract record FlowDefinition
+{
+    [JsonIgnore]
+    public abstract FlowKind Kind { get; }
+}
 
-public sealed record DirectFlowSpec(FlowTargetReference Target) : FlowSpec;
-public sealed record RoutingFlowSpec(
+public sealed record DirectFlowDefinition(FlowTargetReference Target) : FlowDefinition
+{
+    public override FlowKind Kind => FlowKind.Direct;
+}
+
+public sealed record RoutingFlowDefinition(
     FlowRoutingStrategy Strategy,
     IReadOnlyList<FlowTargetReference> Destinations,
-    FlowTargetReference? Fallback = null,
-    IReadOnlyDictionary<string, JsonElement>? Configuration = null) : FlowSpec;
+    FlowTargetReference? Fallback = null) : FlowDefinition
+{
+    public override FlowKind Kind => FlowKind.Routing;
+}
+
 public sealed record FlowNode(
     string Id,
     FlowNodeKind Kind,
     FlowTargetReference? Target = null,
     IReadOnlyDictionary<string, JsonElement>? Configuration = null);
 public sealed record FlowEdge(string Source, string Destination, string? Condition = null);
-public sealed record WorkflowFlowSpec(
+public sealed record WorkflowFlowDefinition(
     string EntryNodeId,
     IReadOnlyList<FlowNode> Nodes,
     IReadOnlyList<FlowEdge> Edges,
-    IReadOnlyList<string>? OutputNodeIds = null) : FlowSpec;
-public sealed record OrchestrationFlowSpec(
-    FlowOrchestrationStrategy Strategy,
-    IReadOnlyList<FlowTargetReference> Participants,
-    int? MaximumIterations = null,
-    string? TerminationStrategy = null,
-    IReadOnlyDictionary<string, JsonElement>? Configuration = null) : FlowSpec;
-public sealed record CompositeFlowSpec(
-    FlowCompositionMode Mode,
-    IReadOnlyList<FlowReference> Flows,
-    IReadOnlyDictionary<string, JsonElement>? Configuration = null) : FlowSpec;
+    IReadOnlyList<string>? OutputNodeIds = null) : FlowDefinition
+{
+    public override FlowKind Kind => FlowKind.Workflow;
+}
 
-public sealed record FlowDefinition(
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "strategy")]
+[JsonDerivedType(typeof(SequentialOrchestrationPattern), "sequential")]
+[JsonDerivedType(typeof(ConcurrentOrchestrationPattern), "concurrent")]
+[JsonDerivedType(typeof(HandoffOrchestrationPattern), "handoff")]
+[JsonDerivedType(typeof(GroupChatOrchestrationPattern), "groupChat")]
+[JsonDerivedType(typeof(MagenticOrchestrationPattern), "magentic")]
+public abstract record FlowOrchestrationPattern
+{
+    [JsonIgnore]
+    public abstract FlowOrchestrationStrategy Strategy { get; }
+}
+
+public sealed record SequentialOrchestrationPattern(bool IncludeFullHistory = true) : FlowOrchestrationPattern
+{
+    [JsonIgnore]
+    public override FlowOrchestrationStrategy Strategy => FlowOrchestrationStrategy.Sequential;
+}
+
+public sealed record ConcurrentOrchestrationPattern : FlowOrchestrationPattern
+{
+    [JsonIgnore]
+    public override FlowOrchestrationStrategy Strategy => FlowOrchestrationStrategy.Concurrent;
+}
+
+public sealed record FlowHandoff(string From, string To);
+
+public sealed record HandoffOrchestrationPattern(
+    string InitialParticipant,
+    IReadOnlyList<FlowHandoff> Handoffs,
+    bool Autonomous = false,
+    int MaximumTurnsPerParticipant = 10,
+    string? TerminationPhrase = null) : FlowOrchestrationPattern
+{
+    [JsonIgnore]
+    public override FlowOrchestrationStrategy Strategy => FlowOrchestrationStrategy.Handoff;
+}
+
+public sealed record GroupChatOrchestrationPattern(
+    int MaximumIterations = 5) : FlowOrchestrationPattern
+{
+    [JsonIgnore]
+    public override FlowOrchestrationStrategy Strategy => FlowOrchestrationStrategy.GroupChat;
+}
+
+public sealed record MagenticOrchestrationPattern(
+    FlowTargetReference Manager,
+    int MaximumRounds = 10,
+    int MaximumStalls = 3,
+    int MaximumResets = 2) : FlowOrchestrationPattern
+{
+    [JsonIgnore]
+    public override FlowOrchestrationStrategy Strategy => FlowOrchestrationStrategy.Magentic;
+}
+
+public sealed record OrchestrationFlowDefinition(
+    IReadOnlyList<FlowTargetReference> Participants,
+    FlowOrchestrationPattern Pattern) : FlowDefinition
+{
+    public override FlowKind Kind => FlowKind.Orchestration;
+
+    [JsonIgnore]
+    public FlowOrchestrationStrategy Strategy => Pattern.Strategy;
+}
+
+public sealed record CompositeFlowDefinition(
+    FlowCompositionMode Mode,
+    IReadOnlyList<FlowReference> Flows) : FlowDefinition
+{
+    public override FlowKind Kind => FlowKind.Composite;
+}
+
+public sealed record FlowResource(
     FlowId Id,
     string Name,
     string? Description,
-    FlowKind Kind,
     string Version,
     bool Enabled,
     string? ActiveVersion,
-    FlowSpec Spec,
+    FlowDefinition Definition,
     IReadOnlyDictionary<string, string> Metadata,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
@@ -78,8 +152,7 @@ public sealed record FlowVersion(
     FlowId FlowId,
     string Version,
     string? Description,
-    FlowKind Kind,
-    FlowSpec Spec,
+    FlowDefinition Definition,
     IReadOnlyDictionary<string, string> Metadata,
     DateTimeOffset PublishedAt,
     FlowGraphDefinition? Graph = null,
@@ -152,16 +225,16 @@ public sealed class FlowValidationException(string code, string message) : Argum
 
 public static class FlowValidator
 {
-    public static void Validate(FlowDefinition definition)
+    public static void Validate(FlowResource resource)
     {
-        ArgumentNullException.ThrowIfNull(definition);
-        ValidateName(definition.Id.Value, "flow_id_invalid");
-        ValidateName(definition.Name, "flow_name_invalid");
-        if (!string.Equals(definition.Id.Value, definition.Name, StringComparison.Ordinal))
+        ArgumentNullException.ThrowIfNull(resource);
+        ValidateName(resource.Id.Value, "flow_id_invalid");
+        ValidateName(resource.Name, "flow_name_invalid");
+        if (!string.Equals(resource.Id.Value, resource.Name, StringComparison.Ordinal))
             throw new FlowValidationException("flow_identity_mismatch", "Flow id and name must match.");
-        ValidateVersion(definition.Version);
-        if (definition.ActiveVersion is not null) ValidateVersion(definition.ActiveVersion);
-        ValidateSpec(definition.Id, definition.Kind, definition.Spec);
+        ValidateVersion(resource.Version);
+        if (resource.ActiveVersion is not null) ValidateVersion(resource.ActiveVersion);
+        ValidateDefinition(resource.Id, resource.Definition);
     }
 
     public static void ValidateVersion(FlowVersion version)
@@ -169,7 +242,7 @@ public static class FlowValidator
         ArgumentNullException.ThrowIfNull(version);
         ValidateName(version.FlowId.Value, "flow_id_invalid");
         ValidateVersion(version.Version);
-        ValidateSpec(version.FlowId, version.Kind, version.Spec);
+        ValidateDefinition(version.FlowId, version.Definition);
     }
 
     public static void ValidateReference(FlowReference reference)
@@ -182,44 +255,37 @@ public static class FlowValidator
             throw new FlowValidationException("flow_reference_ambiguous", "A Flow reference cannot select both an exact and active version.");
     }
 
-    private static void ValidateSpec(FlowId flowId, FlowKind kind, FlowSpec spec)
+    private static void ValidateDefinition(FlowId flowId, FlowDefinition definition)
     {
-        ArgumentNullException.ThrowIfNull(spec);
-        var actualKind = spec switch
+        ArgumentNullException.ThrowIfNull(definition);
+        switch (definition)
         {
-            DirectFlowSpec => FlowKind.Direct,
-            RoutingFlowSpec => FlowKind.Routing,
-            WorkflowFlowSpec => FlowKind.Workflow,
-            OrchestrationFlowSpec => FlowKind.Orchestration,
-            CompositeFlowSpec => FlowKind.Composite,
-            _ => throw new FlowValidationException("flow_spec_unknown", "The Flow specification type is not supported.")
-        };
-        if (kind != actualKind) throw new FlowValidationException("flow_spec_kind_mismatch", $"Flow kind '{kind}' does not match specification '{actualKind}'.");
-
-        switch (spec)
-        {
-            case DirectFlowSpec direct:
+            case DirectFlowDefinition direct:
                 ValidateTarget(direct.Target);
                 if (direct.Target?.Kind == FlowTargetKind.Flow) throw new FlowValidationException("direct_target_invalid", "A Direct Flow must target an Agent.");
                 break;
-            case RoutingFlowSpec routing:
+            case RoutingFlowDefinition routing:
                 if (routing.Destinations is null || routing.Destinations.Count == 0) throw new FlowValidationException("routing_destinations_required", "A Routing Flow requires at least one destination.");
                 foreach (var target in routing.Destinations) ValidateTarget(target);
                 if (routing.Fallback is not null) ValidateTarget(routing.Fallback);
                 break;
-            case WorkflowFlowSpec workflow:
+            case WorkflowFlowDefinition workflow:
                 ValidateWorkflow(workflow);
                 break;
-            case OrchestrationFlowSpec orchestration:
+            case OrchestrationFlowDefinition orchestration:
                 if (orchestration.Participants is null || orchestration.Participants.Count == 0) throw new FlowValidationException("orchestration_participants_required", "An Orchestration Flow requires at least one participant.");
                 foreach (var participant in orchestration.Participants)
                 {
                     ValidateTarget(participant);
                     if (participant.Kind == FlowTargetKind.Flow) throw new FlowValidationException("orchestration_participant_invalid", "Orchestration participants must be Agents.");
                 }
-                if (orchestration.MaximumIterations is < 1) throw new FlowValidationException("orchestration_iterations_invalid", "Maximum iterations must be positive.");
+                if (orchestration.Participants.Select(participant => participant.Id).Distinct(StringComparer.Ordinal).Count() != orchestration.Participants.Count)
+                    throw new FlowValidationException("orchestration_participant_duplicate", "Orchestration participant identifiers must be unique.");
+                if (orchestration.Participants.Count < 2)
+                    throw new FlowValidationException("orchestration_participants_insufficient", "A built-in orchestration requires at least two participants.");
+                ValidateOrchestration(orchestration);
                 break;
-            case CompositeFlowSpec composite:
+            case CompositeFlowDefinition composite:
                 if (composite.Flows is null || composite.Flows.Count == 0) throw new FlowValidationException("composite_flows_required", "A Composite Flow requires at least one child Flow.");
                 foreach (var child in composite.Flows)
                 {
@@ -227,10 +293,49 @@ public static class FlowValidator
                     if (child.FlowId == flowId) throw new FlowValidationException("composite_self_reference", "A Composite Flow cannot directly reference itself.");
                 }
                 break;
+            default:
+                throw new FlowValidationException("flow_definition_unknown", "The Flow definition type is not supported.");
         }
     }
 
-    private static void ValidateWorkflow(WorkflowFlowSpec workflow)
+    private static void ValidateOrchestration(OrchestrationFlowDefinition orchestration)
+    {
+        ArgumentNullException.ThrowIfNull(orchestration.Pattern);
+        var participantIds = orchestration.Participants.Select(participant => participant.Id).ToHashSet(StringComparer.Ordinal);
+        switch (orchestration.Pattern)
+        {
+            case SequentialOrchestrationPattern:
+            case ConcurrentOrchestrationPattern:
+                break;
+            case HandoffOrchestrationPattern handoff:
+                if (!participantIds.Contains(handoff.InitialParticipant))
+                    throw new FlowValidationException("handoff_initial_participant_unknown", "The initial Handoff participant must belong to the orchestration.");
+                if (handoff.MaximumTurnsPerParticipant < 1)
+                    throw new FlowValidationException("handoff_turn_limit_invalid", "The Handoff turn limit must be positive.");
+                if (handoff.Handoffs.Count == 0)
+                    throw new FlowValidationException("handoff_routes_required", "A Handoff orchestration requires at least one route.");
+                if (handoff.Handoffs.Any(route => !participantIds.Contains(route.From) || !participantIds.Contains(route.To) || route.From == route.To))
+                    throw new FlowValidationException("handoff_route_invalid", "Handoff routes must connect two distinct orchestration participants.");
+                break;
+            case GroupChatOrchestrationPattern groupChat when groupChat.MaximumIterations < 1:
+                throw new FlowValidationException("group_chat_iterations_invalid", "The Group Chat iteration limit must be positive.");
+            case GroupChatOrchestrationPattern:
+                break;
+            case MagenticOrchestrationPattern magentic:
+                ValidateTarget(magentic.Manager);
+                if (magentic.Manager.Kind != FlowTargetKind.Agent)
+                    throw new FlowValidationException("magentic_manager_invalid", "The Magentic manager must reference an Agent.");
+                if (participantIds.Contains(magentic.Manager.Id))
+                    throw new FlowValidationException("magentic_manager_participant", "The Magentic manager must be distinct from its participants.");
+                if (magentic.MaximumRounds < 1 || magentic.MaximumStalls < 1 || magentic.MaximumResets < 0)
+                    throw new FlowValidationException("magentic_limits_invalid", "Magentic limits must be positive, except maximum resets which may be zero.");
+                break;
+            default:
+                throw new FlowValidationException("orchestration_pattern_unknown", "The orchestration pattern is not supported.");
+        }
+    }
+
+    private static void ValidateWorkflow(WorkflowFlowDefinition workflow)
     {
         if (workflow.Nodes is null || workflow.Nodes.Count == 0) throw new FlowValidationException("workflow_nodes_required", "A Workflow requires at least one node.");
         var ids = new HashSet<string>(StringComparer.Ordinal);

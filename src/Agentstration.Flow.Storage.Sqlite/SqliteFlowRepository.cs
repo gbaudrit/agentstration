@@ -50,7 +50,7 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         await context.Database.EnsureCreatedAsync(cancellationToken);
     }
 
-    public async Task<StoredFlow> CreateAsync(FlowDefinition definition, CancellationToken cancellationToken)
+    public async Task<StoredFlow> CreateAsync(FlowResource definition, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
@@ -78,7 +78,7 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         return new FlowPage(documents.Take(take).Select(ToFlow).ToArray(), documents.Length > take);
     }
 
-    public async Task<StoredFlow> UpdateAsync(FlowDefinition definition, string expectedETag, CancellationToken cancellationToken)
+    public async Task<StoredFlow> UpdateAsync(FlowResource definition, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == DefinitionKey(definition.Id), cancellationToken)
@@ -228,7 +228,7 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         Key = key, Kind = kind, FlowId = id.Value, Version = version,
         Payload = JsonSerializer.Serialize(value, JsonOptions), ETag = NewETag(), UpdatedAt = now
     };
-    private static StoredFlow ToFlow(FlowDocument document) => new(Deserialize<FlowDefinition>(document), document.ETag, document.UpdatedAt);
+    private static StoredFlow ToFlow(FlowDocument document) => new(Deserialize<FlowResource>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowVersion ToVersion(FlowDocument document) => new(Deserialize<FlowVersion>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowRun ToRun(FlowDocument document) => new(Deserialize<FlowRun>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowDraft ToDraft(FlowDocument document) => new(Deserialize<FlowDraft>(document), document.ETag, document.UpdatedAt);

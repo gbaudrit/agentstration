@@ -125,8 +125,8 @@ public sealed class ApiClientTests
     {
         var now = new DateTimeOffset(2026, 8, 6, 12, 0, 0, TimeSpan.Zero);
         var flowId = new FlowId("universal-router");
-        var spec = new DirectFlowSpec(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
-        var flow = new FlowResponse(flowId.Value, flowId.Value, null, FlowKind.Direct, "1.0.0", true, "1.0.0", spec, new Dictionary<string, string>(), now, now);
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
+        var flow = new FlowResponse(flowId.Value, flowId.Value, null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), now, now);
         var draft = new FlowDraftResponse(new FlowDraft
         {
             Id = "draft-universal-router", FlowId = flowId, DisplayName = "Universal router",

@@ -17,10 +17,9 @@ public static class WorkplaceDemoData
             flow = await flows.CreateAsync(new CreateFlowCommand(
                 flowId.Value,
                 "Routes the Workplace primary Entry through the local managed-agent runtime.",
-                FlowKind.Direct,
                 "1.0.0",
                 true,
-                new DirectFlowSpec(new FlowTargetReference(
+                new DirectFlowDefinition(new FlowTargetReference(
                     FlowTargetKind.Agent,
                     "dotnet-expert"))), cancellationToken);
             await flows.PublishVersionAsync(flowId, "1.0.0", true, cancellationToken);

@@ -15,7 +15,7 @@ else
     @if (activeTab == "Overview")
     {
         <section class="metric-grid flow-metrics"><MetricCard Label="Current version" Value="@flow.Version" Detail="@(flow.ActiveVersion is null ? "Not published" : $"Active {flow.ActiveVersion}")" Status="UiStatus.Info" /><MetricCard Label="Status" Value="@Status" Detail="Immutable versions" Status="@(flow.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="Steps" Value="@GraphNodes.Count.ToString()" Detail="Entry: Input" Status="UiStatus.Neutral" /><MetricCard Label="Recent runs" Value="@runs.Count.ToString()" Detail="@($"{runs.Count(x => x.Status == FlowRunStatus.Succeeded)} succeeded")" Status="UiStatus.Success" /></section>
-        <article class="panel definition-grid"><div><span class="field-label">Display name</span><strong>@flow.Name</strong></div><div><span class="field-label">Resource name</span><code>@flow.Id</code></div><div><span class="field-label">Kind</span><strong>@flow.Kind</strong></div><div><span class="field-label">Execution profile</span><strong>local</strong></div><div><span class="field-label">Last publication</span><strong>@(versions.FirstOrDefault()?.PublishedAt.LocalDateTime.ToString("g") ?? "—")</strong></div></article>
+        <article class="panel definition-grid"><div><span class="field-label">Display name</span><strong>@flow.Name</strong></div><div><span class="field-label">Resource name</span><code>@flow.Id</code></div><div><span class="field-label">Kind</span><strong>@flow.Definition.Kind</strong></div><div><span class="field-label">Execution profile</span><strong>local</strong></div><div><span class="field-label">Last publication</span><strong>@(versions.FirstOrDefault()?.PublishedAt.LocalDateTime.ToString("g") ?? "—")</strong></div></article>
     }
     else if (activeTab == "Designer")
     {
@@ -42,7 +42,7 @@ else
     private FlowResponse? flow; private IReadOnlyList<FlowVersionResponse> versions=[]; private IReadOnlyList<FlowRun> runs=[];
     private string activeTab="Overview", inputJson="{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}", deployment="local", runVersion=""; private string? selectedNode,error; private bool showRun,submitting;
     private string Status => flow?.ActiveVersion is not null ? "Published" : "Draft";
-    private IReadOnlyList<FlowGraphNode> GraphNodes => flow is null ? [] : FlowGraphNode.From(flow.Spec);
+    private IReadOnlyList<FlowGraphNode> GraphNodes => flow is null ? [] : FlowGraphNode.From(flow.Definition);
     protected override async Task OnParametersSetAsync(){flow=await Client.GetFlowAsync(FlowId,cancellation.Token);versions=await Client.GetFlowVersionsAsync(FlowId,cancellation.Token);runs=await Client.GetFlowRunsAsync(FlowId,cancellation.Token);runVersion=flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";}
     private void SelectNode(string name)=>selectedNode=name;
     private void OpenRun(){activeTab="Runs";showRun=true;error=null;}

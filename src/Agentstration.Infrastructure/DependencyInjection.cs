@@ -102,7 +102,9 @@ public static class DependencyInjection
             services.AddSingleton<IChatClientResolver, SingleChatClientResolver>();
         services.AddAgentstrationMcpTools();
         services.AddSingleton<AgentRuntimeContext>();
-        services.AddSingleton<Agentstration.Runtime.Abstractions.IAgentRuntimeFactory, AgentFrameworkRuntimeFactory>();
+        services.AddSingleton<AgentFrameworkRuntimeFactory>();
+        services.AddSingleton<Agentstration.Runtime.Abstractions.IAgentRuntimeFactory>(services =>
+            services.GetRequiredService<AgentFrameworkRuntimeFactory>());
         services.AddSingleton<IRuntimeRegistry, RuntimeRegistry>();
         services.AddSingleton<IRuntimeRunQueue, LocalRuntimeRunQueue>();
         services.AddSingleton<IRuntimeRunCancellationRegistry, LocalRuntimeRunCancellationRegistry>();
@@ -140,6 +142,7 @@ public static class DependencyInjection
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();
         services.AddSingleton<IFlowAgentExecutor, ManagedFlowAgentExecutor>();
+        services.AddSingleton<IFlowOrchestrationEngine, AgentFrameworkFlowOrchestrationEngine>();
         services.AddSingleton<IFlowResourceReferenceResolver, ManagementFlowResourceReferenceResolver>();
         services.AddSingleton<FlowExpressionParser>();
         services.AddSingleton<IExpressionParser>(provider => provider.GetRequiredService<FlowExpressionParser>());

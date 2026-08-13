@@ -62,7 +62,7 @@ public sealed class EntryTargetResolver(
         var name = ResourceName(resourceId);
         var flowId = new FlowId($"system-direct-agent-{name}");
         var version = $"1.0.{agent.Value.Generation - 1}";
-        var spec = new DirectFlowSpec(new FlowTargetReference(FlowTargetKind.Agent, resourceId));
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, resourceId));
         var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["systemManaged"] = bool.TrueString,
@@ -73,12 +73,12 @@ public sealed class EntryTargetResolver(
         var current = await flows.GetAsync(flowId, cancellationToken);
         if (current is null)
         {
-            await flows.CreateAsync(new CreateFlowCommand(flowId.Value, $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", FlowKind.Direct, version, true, spec, metadata), cancellationToken);
+            await flows.CreateAsync(new CreateFlowCommand(flowId.Value, $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", version, true, definition, metadata), cancellationToken);
         }
         else if (!string.Equals(current.Value.Version, version, StringComparison.Ordinal))
         {
             await flows.UpdateAsync(flowId, new UpdateFlowCommand(
-                $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", FlowKind.Direct, version, true, spec, metadata), current.ETag, cancellationToken);
+                $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", version, true, definition, metadata), current.ETag, cancellationToken);
         }
 
         if (await flows.GetVersionAsync(flowId, version, cancellationToken) is null)

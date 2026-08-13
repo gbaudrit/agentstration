@@ -35,9 +35,9 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
             UpdatedAt = now,
             UpdatedBy = command.UpdatedBy
         };
-        FlowValidator.Validate(new FlowDefinition(id, command.Name, command.Description, FlowKind.Routing, "0.1.0", true, null,
-            FlowDraftSnapshotAdapter.ToRoutingSpec(graph), Copy(command.Tags), now, now, command.DisplayName, graph));
-        await flows.CreateAsync(new CreateFlowCommand(command.Name, command.Description, FlowKind.Routing, "0.1.0", true, FlowDraftSnapshotAdapter.ToRoutingSpec(graph), command.Tags), cancellationToken);
+        FlowValidator.Validate(new FlowResource(id, command.Name, command.Description, "0.1.0", true, null,
+            FlowDraftSnapshotAdapter.ToRoutingDefinition(graph), Copy(command.Tags), now, now, command.DisplayName, graph));
+        await flows.CreateAsync(new CreateFlowCommand(command.Name, command.Description, "0.1.0", true, FlowDraftSnapshotAdapter.ToRoutingDefinition(graph), command.Tags), cancellationToken);
         return await repository.CreateDraftAsync(draft, cancellationToken);
     }
 
@@ -71,7 +71,7 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
         var validation = await validator.ValidateAsync(draft.Value.Definition, new FlowValidationContext(), cancellationToken);
         if (!validation.IsValid) throw new FlowValidationException("flow_validation_failed", "The Flow Draft contains validation errors and cannot be published.");
         var definition = await repository.GetAsync(flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
-        await flows.UpdateAsync(flowId, new UpdateFlowCommand(draft.Value.Description, FlowKind.Routing, version, true, FlowDraftSnapshotAdapter.ToRoutingSpec(draft.Value.Definition), draft.Value.Tags,
+        await flows.UpdateAsync(flowId, new UpdateFlowCommand(draft.Value.Description, version, true, FlowDraftSnapshotAdapter.ToRoutingDefinition(draft.Value.Definition), draft.Value.Tags,
             draft.Value.Definition, draft.Value.DisplayName), definition.ETag, cancellationToken);
         return await flows.PublishVersionAsync(flowId, version, activate, cancellationToken, releaseNotes);
     }

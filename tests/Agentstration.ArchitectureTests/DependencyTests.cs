@@ -345,7 +345,8 @@ public sealed class DependencyTests
         var references = typeof(FlowService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Storage.Sqlite", StringComparison.Ordinal)
             || name.Contains("Agentstration.Web", StringComparison.Ordinal)
-            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)));
+            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
     }
 
     [TestMethod]

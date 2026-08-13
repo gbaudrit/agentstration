@@ -266,7 +266,7 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     public async Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken)
     {
         var page = await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?top=100", cancellationToken);
-        return page.Value.Select(item => new FlowSummary(item.Id, item.Name, item.Kind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt)).ToArray();
+        return page.Value.Select(item => new FlowSummary(item.Id, item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt)).ToArray();
     }
 
     public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>

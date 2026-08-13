@@ -16,7 +16,9 @@ The Flow module is composed of independent Core, Contracts, Application, Storage
 - `Orchestration` declares participants and a provider-neutral Sequential, Concurrent, Handoff, GroupChat, Magentic, or Custom strategy.
 - `Composite` references child Flows without copying their definitions.
 
-Each `spec` is polymorphic and carries the OpenAPI/JSON discriminator `specKind`. References distinguish Agent and Flow targets. A `FlowReference` selects either an immutable semantic version or the active version.
+Each Flow resource exposes one polymorphic `definition` carrying the OpenAPI/JSON discriminator `flowKind`. References distinguish Agent and Flow targets. A `FlowReference` selects either an immutable semantic version or the active version.
+
+Orchestration definitions remain provider-neutral. They describe the participants and one typed strategy (`sequential`, `concurrent`, `handoff`, `groupChat`, or `magentic`). The Microsoft Agent Framework workflow objects are created only inside the runtime adapter and never cross the Flow, API, persistence, or Work Plane boundaries.
 
 ## Versioning and API
 

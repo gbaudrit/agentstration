@@ -18,6 +18,24 @@ public sealed class AgentFrameworkRuntimeFactory(
 
     public string Handler => "prompt-agent";
 
+    internal async Task<AIAgent> CreateAgentAsync(
+        ExecutableAgentDefinition definition,
+        AgentRuntimeContext context,
+        CancellationToken cancellationToken)
+    {
+        var tools = (await context.Tools.ResolveAsync(definition.EffectiveToolNames, cancellationToken))
+            .Select(MapTool)
+            .ToList();
+        var chatClient = await chatClients.ResolveAsync(definition.ModelProfileName, cancellationToken);
+        AIAgent agent = new ChatClientAgent(
+            chatClient,
+            instructions: definition.EffectiveInstructions,
+            name: definition.AgentKey,
+            description: definition.Description,
+            tools: tools);
+        return Observe(agent, observability.Enabled);
+    }
+
     public async Task<IAgentRuntime> CreateAsync(ExecutableAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -42,6 +60,12 @@ public sealed class AgentFrameworkRuntimeFactory(
             (JsonElement? arguments, CancellationToken cancellationToken) => tool.InvokeAsync(arguments, cancellationToken),
             tool.Name,
             tool.Description);
+
+    private static AIAgent Observe(AIAgent agent, bool enabled) => enabled
+        ? agent.AsBuilder()
+            .UseOpenTelemetry(TelemetrySourceName, telemetry => telemetry.EnableSensitiveData = false)
+            .Build()
+        : agent;
 
     private sealed class AgentFrameworkRuntime(
         string agentId,
@@ -75,7 +99,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             ArgumentException.ThrowIfNullOrWhiteSpace(request.Input);
             var chatClient = await chatClients.ResolveAsync(modelProfileId, cancellationToken);
             var model = chatClient.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
-            AIAgent agent = Observe(new ChatClientAgent(
+            AIAgent agent = AgentFrameworkRuntimeFactory.Observe(new ChatClientAgent(
                 chatClient,
                 instructions: instructions,
                 name: AgentId,
@@ -119,7 +143,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             yield return new ExecutionStarted(executionId);
             var chatClient = await chatClients.ResolveAsync(modelProfileId, cancellationToken);
             var model = chatClient.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
-            var agent = Observe(new ChatClientAgent(chatClient, instructions: instructions, name: AgentId, description: description, tools: tools), observabilityEnabled);
+            var agent = AgentFrameworkRuntimeFactory.Observe(new ChatClientAgent(chatClient, instructions: instructions, name: AgentId, description: description, tools: tools), observabilityEnabled);
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
             var effective = new ModelExecutionOptions(
                 chatOptions.Temperature,
@@ -170,11 +194,6 @@ public sealed class AgentFrameworkRuntimeFactory(
             yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ProviderType, model?.ModelName, effective));
         }
 
-        private static AIAgent Observe(AIAgent agent, bool enabled) => enabled
-            ? agent.AsBuilder()
-                .UseOpenTelemetry(TelemetrySourceName, telemetry => telemetry.EnableSensitiveData = false)
-                .Build()
-            : agent;
     }
 }
 

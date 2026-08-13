@@ -4,7 +4,7 @@ namespace Agentstration.Flow.Application;
 
 internal static class FlowDraftSnapshotAdapter
 {
-    public static RoutingFlowSpec ToRoutingSpec(FlowGraphDefinition graph)
+    public static RoutingFlowDefinition ToRoutingDefinition(FlowGraphDefinition graph)
     {
         var router = graph.Steps.OfType<RouterFlowStepDefinition>().FirstOrDefault();
         var destinations = router?.Candidates
@@ -19,6 +19,6 @@ internal static class FlowDraftSnapshotAdapter
         var fallback = router?.Fallback is null
             ? null
             : new FlowTargetReference(FlowTargetKind.Agent, router.Fallback.ResourceId);
-        return new RoutingFlowSpec(FlowRoutingStrategy.Deterministic, destinations, fallback);
+        return new RoutingFlowDefinition(FlowRoutingStrategy.Deterministic, destinations, fallback);
     }
 }
