@@ -6,6 +6,7 @@ using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
+using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -53,7 +54,7 @@ public sealed class WorkplaceApiTests
             {
                 publishedFlow.EnsureSuccessStatusCode();
             }
-            var availableFlows = await client.GetFromJsonAsync<ResourcePickerItem[]>("/api/resources?type=Agentstration.Flows%2Fflows") ?? [];
+            var availableFlows = await client.GetFromJsonAsync<ResourcePickerItem[]>($"/api/resources?kind={ResourceKinds.Flow}") ?? [];
             Assert.IsTrue(availableFlows.Any(value => value.Name == apiFlowName));
 
             var administered = await client.GetFromJsonAsync<EntryDraftResponse>("/api/management/entries/universal-request");
@@ -64,9 +65,9 @@ public sealed class WorkplaceApiTests
             Assert.AreEqual(EntryVersionStrategy.Pinned, administered.Published.ResolvedTarget.VersionStrategy);
             var apiFlowEntry = administered.Value with
             {
-                Id = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/specialized-request"),
+                Id = new EntryId("specialized-request"),
                 Name = "specialized-request",
-                Binding = new EntryBinding(EntryBindingKind.Flow, $"/resourceGroups/default/providers/Agentstration.Flows/flows/{apiFlowName}")
+                Binding = new EntryBinding(EntryBindingKind.Flow, apiFlowName)
             };
             using (var savedApiFlowEntry = await client.PutAsJsonAsync("/api/management/entries/specialized-request", apiFlowEntry))
             {
@@ -76,7 +77,7 @@ public sealed class WorkplaceApiTests
             {
                 publishedApiFlowEntry.EnsureSuccessStatusCode();
                 var value = await publishedApiFlowEntry.Content.ReadFromJsonAsync<EntryResource>();
-                Assert.AreEqual(apiFlowName, value?.ResolvedTarget.FlowResourceId.Split('/').Last());
+                Assert.AreEqual(apiFlowName, value?.ResolvedTarget.FlowResourceId);
                 Assert.AreEqual("1.0.0", value?.ResolvedTarget.Version);
             }
             using (var dependencyScope = factory.Services.CreateScope())
@@ -114,9 +115,9 @@ public sealed class WorkplaceApiTests
 
             var incompatibleInput = administered.Value with
             {
-                Id = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/incompatible-input"),
+                Id = new EntryId("incompatible-input"),
                 Name = "incompatible-input",
-                Binding = new EntryBinding(EntryBindingKind.Flow, "/resourceGroups/default/providers/Agentstration.Flows/flows/schema-flow"),
+                Binding = new EntryBinding(EntryBindingKind.Flow, "schema-flow"),
                 Presentation = administered.Value.Presentation with
                 {
                     Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Number, Required = true, Role = EntryFieldRole.PrimaryInput }]
@@ -132,7 +133,7 @@ public sealed class WorkplaceApiTests
 
             var missingTarget = administered.Value with
             {
-                Id = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/missing-target"),
+                Id = new EntryId("missing-target"),
                 Name = "missing-target",
                 Binding = new EntryBinding(EntryBindingKind.Agent, "missing")
             };
@@ -305,7 +306,7 @@ public sealed class WorkplaceApiTests
             var history = await client.GetFromJsonAsync<InteractionPageResponse>("/api/workspaces/personal/interactions?take=10");
             Assert.IsTrue(history!.Value.Any(value => value.Id == submitted.Interaction.Id));
 
-            var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workspaces");
+            var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
             Assert.IsTrue(workspaces?.Any(value => value.Name == "personal"));
             var operationalPage = await client.GetFromJsonAsync<WorkTaskOperationsPageResponse>("/api/tasks?page=1&pageSize=1&sort=updatedAt&direction=desc&status=Completed&search=report");
             Assert.IsNotNull(operationalPage); Assert.HasCount(1, operationalPage.Items); Assert.AreEqual(1, operationalPage.TotalCount);
@@ -363,7 +364,7 @@ public sealed class WorkplaceApiTests
             connection.On<TaskArtifactAddedEvent>("TaskArtifactAdded", value => artifactAdded.TrySetResult(value));
             connection.On<PendingActionResolvedEvent>("PendingActionResolved", value => pendingResolved.TrySetResult(value));
             await connection.StartAsync();
-            await connection.InvokeAsync("SubscribeAsync", "/resourceGroups/default/providers/Agentstration.Work/workspaces/personal", 0L);
+            await connection.InvokeAsync("SubscribeAsync", "personal", 0L);
 
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/personal/entries/guided-request/interactions",

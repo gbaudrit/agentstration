@@ -52,7 +52,6 @@ public sealed class RuntimeRunService(
         {
             Id = name,
             Name = name,
-            ResourceGroup = "default",
             Properties = new RuntimeRunProperties
             {
                 Agent = agentReference,

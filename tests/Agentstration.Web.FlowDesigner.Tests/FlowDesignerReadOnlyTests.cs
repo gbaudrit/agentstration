@@ -41,7 +41,7 @@ public sealed class FlowDesignerReadOnlyTests
 
     private sealed class ResourceProviderStub : IFlowDesignerResourceProvider
     {
-        public Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(string resourceGroup, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FlowDesignerAgent>>([]);
     }
 

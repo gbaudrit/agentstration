@@ -35,7 +35,7 @@ public interface IWorkplaceApiClient
 
 public sealed class WorkplaceApiClient(HttpClient httpClient) : IWorkplaceApiClient
 {
-    public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> ListWorkspacesAsync(CancellationToken token) => await httpClient.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>($"api/workspaces?api-version={WorkplaceApiVersions.V20260805}", token) ?? [];
+    public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> ListWorkspacesAsync(CancellationToken token) => await httpClient.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>($"api/workplace/workspaces?api-version={WorkplaceApiVersions.V20260805}", token) ?? [];
     public Task<WorkplaceWorkspaceResponse> GetWorkspaceAsync(string workspaceName, CancellationToken token) => GetAsync<WorkplaceWorkspaceResponse>($"api/workspaces/{E(workspaceName)}", token);
     public Task<EntryResponse> GetEntryAsync(string entryName, CancellationToken token) => GetAsync<EntryResponse>($"api/entries/{E(entryName)}", token);
     public async Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, string entryName, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token) => await PostAsync<CreateInteractionRequest, EntrySubmissionResponse>($"api/workspaces/{E(workspaceName)}/entries/{E(entryName)}/interactions", new CreateInteractionRequest(workspaceName, values), token);

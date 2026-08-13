@@ -154,7 +154,7 @@ public static class FlowEndpoints
 
     private static Task<IResult> CreateDraftAsync(CreateFlowDraftRequest body, HttpResponse response, FlowDraftService service, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var stored = await service.CreateAsync(new CreateFlowDraftCommand(body.Name, body.DisplayName, body.Description, body.ResourceGroup, body.Location, body.Tags, body.Template), token);
+        var stored = await service.CreateAsync(new CreateFlowDraftCommand(body.Name, body.DisplayName, body.Description, body.Tags, body.Template), token);
         response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/flows/{stored.Value.FlowId.Value}/draft";
         return Results.Json(new FlowDraftResponse(stored.Value, stored.ETag), statusCode: StatusCodes.Status201Created);
@@ -170,7 +170,7 @@ public static class FlowEndpoints
     private static Task<IResult> SaveDraftAsync(string id, UpdateFlowDraftRequest body, HttpRequest request, HttpResponse response, FlowDraftService service, CancellationToken token) => ExecuteAsync(async () =>
     {
         var etag = RequiredIfMatch(request);
-        var stored = await service.SaveAsync(new FlowId(id), new UpdateFlowDraftCommand(body.DisplayName, body.Description, body.ResourceGroup, body.Location, body.Tags, body.Definition, body.UpdatedBy), etag, token);
+        var stored = await service.SaveAsync(new FlowId(id), new UpdateFlowDraftCommand(body.DisplayName, body.Description, body.Tags, body.Definition, body.UpdatedBy), etag, token);
         response.Headers.ETag = stored.ETag;
         return Results.Ok(new FlowDraftResponse(stored.Value, stored.ETag));
     });
@@ -192,7 +192,7 @@ public static class FlowEndpoints
     {
         var current = await service.GetAsync(new FlowId(id), token) ?? throw new FlowNotFoundException(new FlowId(id));
         var definition = service.ParseSource(body.Source, body.Format);
-        var stored = await service.SaveAsync(new FlowId(id), new UpdateFlowDraftCommand(current.Value.DisplayName, current.Value.Description, current.Value.ResourceGroup, current.Value.Location, current.Value.Tags, definition, body.UpdatedBy), RequiredIfMatch(request), token);
+        var stored = await service.SaveAsync(new FlowId(id), new UpdateFlowDraftCommand(current.Value.DisplayName, current.Value.Description, current.Value.Tags, definition, body.UpdatedBy), RequiredIfMatch(request), token);
         response.Headers.ETag = stored.ETag;
         return Results.Ok(new FlowDraftResponse(stored.Value, stored.ETag));
     });

@@ -11,12 +11,6 @@ public sealed class ModelProfileEditorModel
     [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
     public string Name { get; set; } = string.Empty;
 
-    [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
-    public string ResourceGroup { get; set; } = "default";
-
-    [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
-    public string Location { get; set; } = "local";
-
     [Required] public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
     [Required] public string ProviderName { get; set; } = string.Empty;
@@ -34,7 +28,7 @@ public sealed class ModelProfileEditorModel
     public bool StrictOutput { get; set; }
     public string? ProviderOptionsJson { get; set; }
 
-    public CreateModelProfileRequest ToCreateRequest() => new(Name.Trim(), ResourceGroup.Trim(), Location.Trim(), ToProperties());
+    public CreateModelProfileRequest ToCreateRequest() => new(Name.Trim(), ToProperties());
     public PutModelProfileRequest ToPutRequest() => new(ToProperties());
 
     public ModelProfileProperties ToProperties()
@@ -70,8 +64,6 @@ public sealed class ModelProfileEditorModel
     public static ModelProfileEditorModel FromResource(ModelProfileResource resource) => new()
     {
         Name = resource.Name,
-        ResourceGroup = resource.ResourceGroup ?? "default",
-        Location = resource.Location ?? "local",
         DisplayName = resource.Properties.DisplayName,
         Description = resource.Properties.Description,
         ProviderName = resource.Definition.Provider.Name,

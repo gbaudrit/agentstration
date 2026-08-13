@@ -62,8 +62,6 @@ public sealed class AgentManagementService(
 
     public Task<IReadOnlyList<StoredResource<AgentResource>>> ListAgentsAsync(int skip, int take, CancellationToken cancellationToken) =>
         store.ListAsync<AgentResource>(ResourceKinds.Agent, skip, take, cancellationToken);
-    public Task<IReadOnlyList<StoredResource<AgentResource>>> ListAgentsAsync(string resourceGroup, int skip, int take, CancellationToken cancellationToken) =>
-        ListAgentsAsync(skip, take, cancellationToken);
 
     public async Task<StoredResource<AgentRevision>> CreateRevisionAsync(string agentName, AgentDeploymentSpec spec, CancellationToken cancellationToken)
     {

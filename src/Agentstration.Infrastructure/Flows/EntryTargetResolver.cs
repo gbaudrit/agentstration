@@ -12,8 +12,6 @@ public sealed class EntryTargetResolver(
     AgentManagementService agents,
     IWorkplaceRepository workplace) : IEntryTargetResolver
 {
-    private const string FlowPrefix = "/resourceGroups/default/providers/Agentstration.Flows/flows/";
-
     public async Task<EntryResolvedTarget> ResolveAsync(EntryDraft draft, CancellationToken cancellationToken)
     {
         WorkplaceValidation.Validate(draft);
@@ -85,7 +83,7 @@ public sealed class EntryTargetResolver(
 
         if (await flows.GetVersionAsync(flowId, version, cancellationToken) is null)
             await flows.PublishVersionAsync(flowId, version, activate: true, cancellationToken);
-        return new EntryResolvedTarget(FlowPrefix + flowId.Value, version);
+        return new EntryResolvedTarget(flowId.Value, version);
     }
 
     private static FlowId FlowIdFrom(string resourceId) => new(ResourceName(resourceId));

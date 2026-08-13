@@ -89,8 +89,6 @@ public sealed record RuntimeRun
     public required string Name { get; init; }
     public string Type { get; init; } = RuntimeResourceTypes.Runs;
     public string ApiVersion { get; init; } = RuntimeApiVersions.V20260801;
-    public required string ResourceGroup { get; init; }
-    public string Location { get; init; } = "local";
     public required RuntimeRunProperties Properties { get; init; }
     public required RuntimeRunStatus Status { get; init; }
     public string? ETag { get; init; }

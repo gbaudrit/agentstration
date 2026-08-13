@@ -85,7 +85,7 @@ public sealed class ExecutionCapabilityTests
     private static ModelProfileProperties Profile() => new()
     {
         DisplayName = "Qwen",
-        Provider = new ResourceReference("/resourceGroups/default/providers/Agentstration.ModelProviders/modelProviders/ollama-local"),
+        Provider = new ResourceReference("ollama-local"),
         Model = new ModelSelection { Name = "qwen3:8b" }
     };
 }

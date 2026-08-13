@@ -1,5 +1,5 @@
 @page "/runtimeprofiles/new"
-@page "/runtimeprofiles/{ResourceGroup}/{Name}"
+@page "/runtimeprofiles/{Name}"
 @implements IDisposable
 @inject IRuntimeProfilesClient Client
 @inject NavigationManager Navigation
@@ -19,7 +19,6 @@ else
         <DataAnnotationsValidator /><ValidationSummary />
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Runtime resource</h2></div></div><div class="form-grid">
             <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /></label><label><span>Display name</span><InputText @bind-Value="model.DisplayName" /></label>
-            <label><span>Resource group</span><InputText @bind-Value="model.ResourceGroup" disabled="@(!IsNew)" /></label><label><span>Location</span><InputText @bind-Value="model.Location" disabled="@(!IsNew)" /></label>
             <label class="form-span-2"><span>Runtime type</span><InputText @bind-Value="model.RuntimeType" /><small>Use <code>microsoft-agent-framework</code> for the standalone runtime.</small></label>
         </div></section>
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Defaults</p><h2>Execution policy</h2></div></div><div class="form-grid">
@@ -36,15 +35,14 @@ else
 <ConfirmationDialog IsOpen="@confirmDelete" Title="Delete runtime profile" Message="@($"Delete runtime profile '{Name}'?")" ConfirmLabel="Delete runtime profile" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {
-    [Parameter] public string? ResourceGroup { get; set; }
     [Parameter] public string? Name { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private RuntimeProfileEditorModel? model; private IReadOnlyList<RuntimeProfileUsageResponse> usages = []; private string? etag; private AgentstrationApiException? error; private bool saving; private bool confirmDelete;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     protected override Task OnParametersSetAsync() => LoadAsync();
-    private async Task LoadAsync() { error = null; if (IsNew) { model = new RuntimeProfileEditorModel(); return; } try { var snapshot = await Client.GetRuntimeProfileAsync(ResourceGroup ?? "default", Name!, cancellation.Token); model = RuntimeProfileEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; usages = (await Client.GetRuntimeProfileUsagesAsync(model.ResourceGroup, model.Name, cancellation.Token)).Value; } catch (AgentstrationApiException exception) { error = exception; model ??= new RuntimeProfileEditorModel(); } }
-    private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var snapshot = IsNew ? await Client.CreateRuntimeProfileAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateRuntimeProfileAsync(model.ResourceGroup, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? "Runtime profile created" : "Runtime profile updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo($"/runtimeprofiles/{Uri.EscapeDataString(snapshot.Value.ResourceGroup ?? "default")}/{Uri.EscapeDataString(snapshot.Value.Name)}"); } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
+    private async Task LoadAsync() { error = null; if (IsNew) { model = new RuntimeProfileEditorModel(); return; } try { var snapshot = await Client.GetRuntimeProfileAsync(Name!, cancellation.Token); model = RuntimeProfileEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; usages = (await Client.GetRuntimeProfileUsagesAsync(model.Name, cancellation.Token)).Value; } catch (AgentstrationApiException exception) { error = exception; model ??= new RuntimeProfileEditorModel(); } }
+    private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var snapshot = IsNew ? await Client.CreateRuntimeProfileAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateRuntimeProfileAsync(model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? "Runtime profile created" : "Runtime profile updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo($"/runtimeprofiles/{Uri.EscapeDataString(snapshot.Value.Name)}"); } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
     private void RequestDelete() { if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException($"This profile is used by {usages.Count} deployment(s).", Guid.NewGuid().ToString("N")); }
-    private async Task DeleteAsync() { if (model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteRuntimeProfileAsync(model.ResourceGroup, model.Name, etag, cancellation.Token); Navigation.NavigateTo("/runtimeprofiles"); } catch (AgentstrationApiException exception) { error = exception; } }
+    private async Task DeleteAsync() { if (model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteRuntimeProfileAsync(model.Name, etag, cancellation.Token); Navigation.NavigateTo("/runtimeprofiles"); } catch (AgentstrationApiException exception) { error = exception; } }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

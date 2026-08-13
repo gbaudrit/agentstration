@@ -1,4 +1,4 @@
-@page "/agents/{ResourceGroup}/{Name}/run"
+@page "/agents/{Name}/run"
 @page "/runs/{RunId}"
 @implements IDisposable
 @inject IAgentRunnerManagementClient ManagementClient
@@ -147,7 +147,6 @@ else
 }
 
 @code {
-    [Parameter] public string? ResourceGroup { get; set; }
     [Parameter] public string? Name { get; set; }
     [Parameter] public string? RunId { get; set; }
 
@@ -172,7 +171,7 @@ else
     private bool CanRun => readiness is { Ready: true }
         && modelResolution?.Status is not ("providerUnavailable" or "modelUnavailable" or "invalidConfiguration");
     private bool CanCancel => state.Run is not null && state.State is RuntimeRunState.Pending or RuntimeRunState.Running;
-    private string BackUrl => agent is null ? "/agents" : $"/agents/{Uri.EscapeDataString(agent.ResourceGroup!)}/{Uri.EscapeDataString(agent.Name)}";
+    private string BackUrl => agent is null ? "/agents" : $"/agents/{Uri.EscapeDataString(agent.Name)}";
     private string RawResponse => JsonSerializer.Serialize(new { run = state.Run, events = state.Events }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
 
     protected override async Task OnParametersSetAsync()
@@ -186,7 +185,7 @@ else
                 var run = await RuntimeClient.GetRunAsync(RunId, cancellation.Token);
                 state.Reset(run);
                 var id = ResourceIdentifier.Parse(run.Properties.Agent.ResourceId);
-                agent = (await ManagementClient.GetAgentAsync(id.ResourceGroup, id.Name, cancellation.Token)).Value;
+                agent = (await ManagementClient.GetAgentAsync(id.Name, cancellation.Token)).Value;
                 await LoadExecutionContextAsync(run.Properties.Agent.Version);
                 rawRequest = JsonSerializer.Serialize(ToRequest(run), new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
                 await LoadHistoryAsync();
@@ -194,8 +193,7 @@ else
             }
             else
             {
-                var group = string.IsNullOrWhiteSpace(ResourceGroup) ? "default" : ResourceGroup;
-                agent = (await ManagementClient.GetAgentAsync(group, Name!, cancellation.Token)).Value;
+                agent = (await ManagementClient.GetAgentAsync(Name!, cancellation.Token)).Value;
                 await LoadExecutionContextAsync();
                 await LoadHistoryAsync();
             }
@@ -294,12 +292,12 @@ else
         modelWarning = null;
         try
         {
-            modelResolution = await ModelsClient.GetAgentModelResolutionAsync(agent.ResourceGroup ?? "default", agent.Name, cancellation.Token);
+            modelResolution = await ModelsClient.GetAgentModelResolutionAsync(agent.Name, cancellation.Token);
             if (modelResolution.Status is "providerUnavailable" or "modelUnavailable" or "invalidConfiguration")
                 modelWarning = string.Join(" ", modelResolution.Warnings.DefaultIfEmpty($"Model resolution state is {ModelManagementUi.Label(modelResolution.Status)}."));
         }
         catch (AgentstrationApiException exception) { modelWarning = $"Model resolution is unavailable: {exception.Message}"; }
-        try { readiness = await RuntimeClient.GetAgentReadinessAsync(agent.ResourceGroup ?? "default", agent.Name, generation.Value, cancellation.Token); }
+        try { readiness = await RuntimeClient.GetAgentReadinessAsync(agent.Name, generation.Value, cancellation.Token); }
         catch (AgentstrationApiException exception) { readiness = null; modelWarning = $"Runtime readiness is unavailable: {exception.Message}"; }
     }
 
@@ -310,7 +308,7 @@ else
         errorMessage = null;
         try
         {
-            var activation = await RuntimeClient.PrepareAgentAsync(agent.ResourceGroup ?? "default", agent.Name, agent.Generation, cancellation.Token);
+            var activation = await RuntimeClient.PrepareAgentAsync(agent.Name, agent.Generation, cancellation.Token);
             await LoadExecutionContextAsync();
             if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 errorMessage = $"Generation {agent.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";

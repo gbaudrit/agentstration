@@ -33,7 +33,7 @@ public sealed class ModelProviderManagementService(
     IEnumerable<IModelProviderOptionsValidator> optionsValidators,
     TimeProvider timeProvider) : IModelProviderConfigurationStore
 {
-    public static string ModelProviderId(string name, string resourceGroup = "default") => name;
+    public static string ModelProviderId(string name) => name;
     public async Task<StoredResource<ModelProviderResource>> CreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
@@ -56,24 +56,20 @@ public sealed class ModelProviderManagementService(
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
         }, ifMatch, false, cancellationToken);
     }
-    public Task<StoredResource<ModelProviderResource>> PutAsync(string resourceGroup, string name, ModelProviderProperties definition, string? ifMatch, CancellationToken cancellationToken) => PutAsync(name, definition, ifMatch, cancellationToken);
 
     public Task<StoredResource<ModelProviderResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(name, cancellationToken);
-    public Task<StoredResource<ModelProviderResource>?> GetAsync(string resourceGroup, string name, CancellationToken cancellationToken) => GetAsync(name, cancellationToken);
 
     public async Task<IReadOnlyList<ModelProviderView>> ListAsync(CancellationToken cancellationToken)
     {
         var resources = await store.ListAsync<ModelProviderResource>(ResourceKinds.ModelProvider, 0, 1000, cancellationToken);
         return await Task.WhenAll(resources.Select(resource => InspectAsync(ToConfiguration(resource.Value), true, cancellationToken)));
     }
-    public Task<IReadOnlyList<ModelProviderView>> ListAsync(string? resourceGroup, CancellationToken cancellationToken) => ListAsync(cancellationToken);
 
     public async Task<ModelProviderView> GetViewRequiredAsync(string name, CancellationToken cancellationToken)
     {
         var stored = await GetAsync(name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
         return await InspectAsync(ToConfiguration(stored.Value), false, cancellationToken);
     }
-    public Task<ModelProviderView> GetViewRequiredAsync(string resourceGroup, string name, CancellationToken cancellationToken) => GetViewRequiredAsync(name, cancellationToken);
 
     public async Task<IReadOnlyList<DiscoveredModel>> ListModelsAsync(string name, CancellationToken cancellationToken)
     {
@@ -84,10 +80,8 @@ public sealed class ModelProviderManagementService(
         try { return await discovery.ListModelsAsync(provider, cancellationToken); }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { throw new ModelProviderUnavailableException(name, exception.Message); }
     }
-    public Task<IReadOnlyList<DiscoveredModel>> ListModelsAsync(string resourceGroup, string name, CancellationToken cancellationToken) => ListModelsAsync(name, cancellationToken);
 
     public Task<ModelProviderView> GetStatusAsync(string name, CancellationToken cancellationToken) => GetViewRequiredAsync(name, cancellationToken);
-    public Task<ModelProviderView> GetStatusAsync(string resourceGroup, string name, CancellationToken cancellationToken) => GetStatusAsync(name, cancellationToken);
 
     public async Task<IReadOnlyList<ModelProviderUsage>> GetUsagesAsync(string providerName, CancellationToken cancellationToken) =>
         (await store.ListAsync<ModelProfileResource>(ResourceKinds.ModelProfile, 0, 1000, cancellationToken))
@@ -102,7 +96,6 @@ public sealed class ModelProviderManagementService(
         if (usages.Count > 0) throw new ModelProviderInUseException(name, usages);
         await store.DeleteAsync(new(ResourceKinds.ModelProvider, name), ifMatch, cancellationToken);
     }
-    public Task DeleteAsync(string resourceGroup, string name, string? ifMatch, CancellationToken cancellationToken) => DeleteAsync(name, ifMatch, cancellationToken);
 
     private async Task<ModelProviderView> InspectAsync(ModelProviderConfiguration provider, bool includeModels, CancellationToken cancellationToken)
     {
@@ -178,7 +171,7 @@ public sealed class ModelProfileManagementService(
     IEnumerable<IModelProviderDiscovery> discoveries,
     IEnumerable<IModelProviderOptionsValidator> optionsValidators) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
 {
-    public static string ProfileId(string resourceGroup, string name) => name;
+    public static string ProfileId(string name) => name;
     public async Task<StoredResource<ModelProfileResource>> CreateAsync(ModelProfileResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
@@ -198,12 +191,9 @@ public sealed class ModelProfileManagementService(
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
         }, ifMatch, false, cancellationToken);
     }
-    public Task<StoredResource<ModelProfileResource>> PutAsync(string resourceGroup, string name, ModelProfileProperties definition, string? ifMatch, CancellationToken cancellationToken) => PutAsync(name, definition, ifMatch, cancellationToken);
 
     public Task<StoredResource<ModelProfileResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProfileResource>(name, cancellationToken);
-    public Task<StoredResource<ModelProfileResource>?> GetAsync(string resourceGroup, string name, CancellationToken cancellationToken) => GetAsync(name, cancellationToken);
     public Task<IReadOnlyList<StoredResource<ModelProfileResource>>> ListAsync(CancellationToken cancellationToken) => store.ListAsync<ModelProfileResource>(ResourceKinds.ModelProfile, 0, 1000, cancellationToken);
-    public Task<IReadOnlyList<StoredResource<ModelProfileResource>>> ListAsync(string? resourceGroup, CancellationToken cancellationToken) => ListAsync(cancellationToken);
 
     public async Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken)
     {
@@ -212,7 +202,6 @@ public sealed class ModelProfileManagementService(
         if (usages.Count > 0) throw new ModelProfileInUseException(name, usages);
         await store.DeleteAsync(new(ResourceKinds.ModelProfile, name), ifMatch, cancellationToken);
     }
-    public Task DeleteAsync(string resourceGroup, string name, string? ifMatch, CancellationToken cancellationToken) => DeleteAsync(name, ifMatch, cancellationToken);
 
     public async Task<IReadOnlyList<ModelProfileUsage>> GetUsagesAsync(string profileName, CancellationToken cancellationToken) =>
         (await store.ListAsync<AgentResource>(ResourceKinds.Agent, 0, 1000, cancellationToken))

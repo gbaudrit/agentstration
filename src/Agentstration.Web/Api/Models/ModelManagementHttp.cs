@@ -77,7 +77,6 @@ internal static class ModelManagementHttp
         return Results.Json(stored.Value, statusCode: statusCode);
     }
 
-    public static string ResourceGroup(string? resourceGroup) => string.IsNullOrWhiteSpace(resourceGroup) ? "default" : resourceGroup;
     public static string? IfMatch(HttpRequest request) => request.Headers.IfMatch.FirstOrDefault();
 
     public static ModelProfileResolutionResponse Resolution(ModelProfileResolution resolution) => new(

@@ -40,7 +40,7 @@ Agent and model management always delegate to the canonical Management HTTP API,
 
 ## Agent Runner
 
-Each persisted agent exposes a **Run** action leading to `/agents/{resourceGroup}/{agentName}/run`. Quick Run sends an exact agent generation to `POST /api/runtime/runs`, then consumes `/events` as Server-Sent Events. The page keeps response, execution metadata, messages, tool calls, trace, raw JSON and recent per-agent history together.
+Each persisted agent exposes a **Run** action leading to `/agents/{agentName}/run`. Quick Run sends an exact agent generation to `POST /api/runtime/runs`, then consumes `/events` as Server-Sent Events. The page keeps response, execution metadata, messages, tool calls, trace, raw JSON and recent per-agent history together.
 
 Stopping a run calls the Runtime cancellation endpoint. Retry creates a new Run from the original payload. Direct console Runs never create Work Items. Advanced context, JSON runtime parameters and timeout are accepted now; final policy resolution remains the Runtime and Model Profile responsibility.
 
@@ -55,7 +55,7 @@ The development default may use simulated data for legacy dashboard, Flow, and g
 ```json
 {
   "Agentstration": {
-    "WorkApi": { "BaseAddress": "http://localhost:5080/" },
+    "WorkApi": { "BaseAddress": "http://localhost:5100/" },
     "WorkplaceBaseUrl": "http://localhost:5180/"
   }
 }
@@ -67,10 +67,10 @@ Work API may be unavailable at Console startup. The rest of the Console remains 
 {
   "Agentstration": {
     "UseSimulatedData": true,
-    "ManagementApi": { "BaseAddress": "http://localhost:5080/", "TimeoutSeconds": 15 },
-    "RuntimeApi": { "BaseAddress": "http://localhost:5080/", "TimeoutSeconds": 15 },
-    "WorkApi": { "BaseAddress": "http://localhost:5080/", "TimeoutSeconds": 15 },
-    "FlowApi": { "BaseAddress": "http://localhost:5080/", "TimeoutSeconds": 15 }
+    "ManagementApi": { "BaseAddress": "http://localhost:5100/", "TimeoutSeconds": 15 },
+    "RuntimeApi": { "BaseAddress": "http://localhost:5100/", "TimeoutSeconds": 15 },
+    "WorkApi": { "BaseAddress": "http://localhost:5100/", "TimeoutSeconds": 15 },
+    "FlowApi": { "BaseAddress": "http://localhost:5100/", "TimeoutSeconds": 15 }
   }
 }
 ```

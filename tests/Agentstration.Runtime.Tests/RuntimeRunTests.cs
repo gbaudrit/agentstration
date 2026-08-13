@@ -156,6 +156,70 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
+    public async Task InitializationMigratesLegacyRuntimeRunSchemaWithoutLosingRows()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-migration-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var databasePath = Path.Combine(directory, "runtime.db");
+        try
+        {
+            await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+            {
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                var legacyColumn = "Resource" + "Group";
+                command.CommandText =
+                    $$"""
+                    CREATE TABLE RuntimeRuns (
+                        RunId TEXT NOT NULL PRIMARY KEY,
+                        AgentResourceId TEXT NOT NULL,
+                        {{legacyColumn}} TEXT NOT NULL,
+                        State TEXT NOT NULL,
+                        Payload TEXT NOT NULL,
+                        ETag TEXT NOT NULL,
+                        CreatedAt INTEGER NOT NULL,
+                        UpdatedAt INTEGER NOT NULL
+                    );
+                    CREATE TABLE RuntimeRunEvents (
+                        RunId TEXT NOT NULL,
+                        Sequence INTEGER NOT NULL,
+                        Payload TEXT NOT NULL,
+                        Timestamp TEXT NOT NULL,
+                        PRIMARY KEY (RunId, Sequence)
+                    );
+                    INSERT INTO RuntimeRuns VALUES ('existing', 'sql-expert', 'default', 'Pending', '{}', 'etag', 1, 1);
+                    """;
+                await command.ExecuteNonQueryAsync();
+            }
+
+            var services = new ServiceCollection();
+            services.AddSingleton(TimeProvider.System);
+            services.AddSqliteRuntimeRuns($"Data Source={databasePath}");
+            await using var provider = services.BuildServiceProvider();
+            var store = provider.GetRequiredService<IRuntimeRunStore>();
+
+            await store.InitializeAsync(default);
+
+            await using var verification = new SqliteConnection($"Data Source={databasePath}");
+            await verification.OpenAsync();
+            await using var schema = verification.CreateCommand();
+            schema.CommandText = "PRAGMA table_info('RuntimeRuns');";
+            await using var reader = await schema.ExecuteReaderAsync();
+            var columns = new List<string>();
+            while (await reader.ReadAsync()) columns.Add(reader.GetString(1));
+            Assert.IsFalse(columns.Contains("Resource" + "Group", StringComparer.OrdinalIgnoreCase));
+            await reader.DisposeAsync();
+            schema.CommandText = "SELECT COUNT(*) FROM RuntimeRuns WHERE RunId = 'existing';";
+            Assert.AreEqual(1L, (long)(await schema.ExecuteScalarAsync())!);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public void RuntimeCoreDoesNotReferenceWorkPlaneOrWeb()
     {
         var references = typeof(RuntimeRunService).Assembly.GetReferencedAssemblies().Select(item => item.Name).ToArray();
@@ -178,7 +242,7 @@ public sealed class RuntimeRunTests
             Origin = RuntimeRunOrigin.Api
         };
 
-        var readiness = await client.GetFromJsonAsync<AgentRuntimeReadinessResponse>($"/api/runtime/agents/sql-expert/readiness?resourceGroup=default&generation={agent.Generation}");
+        var readiness = await client.GetFromJsonAsync<AgentRuntimeReadinessResponse>($"/api/runtime/agents/sql-expert/readiness?generation={agent.Generation}");
 
         using var createdResponse = await client.PostAsJsonAsync("/api/runtime/runs", request);
         Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);

@@ -233,7 +233,7 @@ else
     private IReadOnlyList<WorkplaceWorkspaceDraftResponse> PrimaryUsages => PublishedUsages.Where(value => UsageReference(value)?.Role == WorkspaceEntryRole.Primary).ToArray();
     private string UsageSummary => PublishedUsages.Count == 0 ? "Not used" : string.Join(", ", PublishedUsages.Take(3).Select(value => value.Published!.DisplayName));
     private string PublishedBindingSummary => publishedBinding is null ? "Not retained" : $"{publishedBinding.Kind} · {FriendlyResourceName(publishedBinding.ResourceId)}";
-    private EntryResource PreviewDefinition => new() { Id = new($"/resourceGroups/default/providers/Agentstration.Work/entries/{(string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName)}"), Name = string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName, DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Entry preview" : displayName, Description = description, Presentation = Presentation(), ResolvedTarget = published?.ResolvedTarget ?? new("/resourceGroups/default/providers/Agentstration.Flows/flows/preview", "1.0.0"), Behavior = Behavior() };
+    private EntryResource PreviewDefinition => new() { Id = new(string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName), Name = string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName, DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Entry preview" : displayName, Description = description, Presentation = Presentation(), ResolvedTarget = published?.ResolvedTarget ?? new("preview", "1.0.0"), Behavior = Behavior() };
 
     protected override async Task OnInitializedAsync()
     {
@@ -253,7 +253,7 @@ else
     private static string TabId(EntryTab tab) => $"entry-tab-{tab.ToString().ToLowerInvariant()}";
     private static string TabLabel(EntryTab tab) => tab.ToString();
     private WorkspaceEntryReference? UsageReference(WorkplaceWorkspaceDraftResponse workspace) => workspace.Published?.Entries.FirstOrDefault(value => string.Equals(value.EntryResourceId.Value, EntryIdValue, StringComparison.Ordinal));
-    private string EntryIdValue => $"/resourceGroups/default/providers/Agentstration.Work/entries/{resourceName}";
+    private string EntryIdValue => resourceName;
     private static string FormatDate(DateTimeOffset? value) => value is null || value == default ? "Not published" : value.Value.LocalDateTime.ToString("g");
     private static string FriendlyResourceName(string value) => value[(value.LastIndexOf('/') + 1)..];
     private static string FriendlyRelationship(string value) => value == "ResolvedTarget" ? "Resolved target" : value;

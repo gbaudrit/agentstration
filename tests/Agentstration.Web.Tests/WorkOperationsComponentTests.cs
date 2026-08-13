@@ -37,7 +37,7 @@ public sealed class WorkOperationsComponentTests
     public void TableRendersApiDtoAndOperationalRelations()
     {
         using var context = new BunitContext(); var now = DateTimeOffset.UtcNow;
-        var item = new WorkTaskOperationsSummary(Guid.Parse("11111111-1111-1111-1111-111111111111"), "/resourceGroups/default/providers/Agentstration.Work/workspaces/personal", "/resourceGroups/default/providers/Agentstration.Work/entries/prepare-report", Guid.Parse("22222222-2222-2222-2222-222222222222"), "Monthly report", "Executive version", WorkTaskStatus.Completed, now.AddMinutes(-2), now.AddMinutes(-2), now, now, "flowrun-1", Guid.NewGuid(), 0, 2, 2, 2, "New version generated", null);
+        var item = new WorkTaskOperationsSummary(Guid.Parse("11111111-1111-1111-1111-111111111111"), "personal", "prepare-report", Guid.Parse("22222222-2222-2222-2222-222222222222"), "Monthly report", "Executive version", WorkTaskStatus.Completed, now.AddMinutes(-2), now.AddMinutes(-2), now, now, "flowrun-1", Guid.NewGuid(), 0, 2, 2, 2, "New version generated", null);
         var rendered = context.Render<TaskOperationsTable>(parameters => parameters.Add(value => value.Items, new[] { item }));
         Assert.IsTrue(rendered.Markup.Contains("Monthly report", StringComparison.Ordinal)); Assert.IsTrue(rendered.Markup.Contains("New version generated", StringComparison.Ordinal));
         Assert.AreEqual("/tasks/11111111-1111-1111-1111-111111111111", rendered.Find("a.text-button").GetAttribute("href"));

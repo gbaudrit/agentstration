@@ -10,7 +10,6 @@ internal sealed class GetAgentModelEndpoint : IModelManagementEndpoint
 
     private static Task<IResult> HandleAsync(
         string agentName,
-        string? resourceGroup,
         AgentManagementService agents,
         ModelProfileManagementService profiles,
         CancellationToken cancellationToken) => ModelManagementHttp.ExecuteAsync(async () =>

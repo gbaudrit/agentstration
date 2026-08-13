@@ -1,5 +1,5 @@
 @page "/modelproviders/new"
-@page "/modelproviders/{ResourceGroup}/{Name}"
+@page "/modelproviders/{Name}"
 @implements IDisposable
 @inject IModelProvidersClient Client
 @inject NavigationManager Navigation
@@ -20,8 +20,6 @@ else
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Provider resource</h2></div>@if (status is not null) { <StatusBadge Text="@ModelManagementUi.Label(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</div><div class="form-grid">
             <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
             <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
-            <label><span>Resource group</span><InputText @bind-Value="model.ResourceGroup" disabled="@(!IsNew)" /></label>
-            <label><span>Location</span><InputText @bind-Value="model.Location" disabled="@(!IsNew)" /></label>
             <label><span>Provider type</span><InputSelect @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="ollama">Ollama</option></InputSelect></label>
             <label><span>Management mode</span><InputSelect @bind-Value="model.ManagementMode">@foreach (var value in Enum.GetValues<ModelProviderManagementMode>()) { <option value="@value">@value</option> }</InputSelect></label>
         </div></section>
@@ -46,20 +44,19 @@ else
 <ConfirmationDialog IsOpen="@confirmDelete" Title="Delete model provider" Message="@($"Delete model provider '{Name}'?")" ConfirmLabel="Delete model provider" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {
-    [Parameter] public string? ResourceGroup { get; set; }
     [Parameter] public string? Name { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private ModelProviderEditorModel? model; private IReadOnlyList<ModelProviderUsageResponse> usages = []; private IReadOnlyList<AvailableModelResponse> models = [];
     private ModelProviderStatusResponse? status; private AgentstrationApiException? error; private string? modelsError; private string? etag; private bool saving; private bool testing; private bool confirmDelete;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     protected override Task OnParametersSetAsync() => LoadAsync();
-    private async Task LoadAsync() { error = null; modelsError = null; if (IsNew) { model = new ModelProviderEditorModel(); return; } try { var group = ResourceGroup ?? "default"; var snapshot = await Client.GetModelProviderAsync(group, Name!, cancellation.Token); model = ModelProviderEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; usages = (await Client.GetModelProviderUsagesAsync(group, Name!, cancellation.Token)).Value; await LoadObservedAsync(group); } catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProviderEditorModel(); } }
-    private async Task LoadObservedAsync(string group) { try { status = await Client.GetProviderStatusAsync(group, Name!, cancellation.Token); if (status.Status == "available") models = await Client.GetProviderModelsAsync(group, Name!, cancellation.Token); else models = []; } catch (AgentstrationApiException exception) { modelsError = exception.Message; models = []; } }
-    private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var wasNew = IsNew; var snapshot = wasNew ? await Client.CreateModelProviderAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateModelProviderAsync(model.ResourceGroup, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), wasNew ? "Model provider created" : "Model provider updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); if (wasNew) { Navigation.NavigateTo($"/modelproviders/{Uri.EscapeDataString(snapshot.Value.ResourceGroup ?? "default")}/{Uri.EscapeDataString(snapshot.Value.Name)}"); } else { model = ModelProviderEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; await LoadObservedAsync(model.ResourceGroup); } } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
-    private async Task TestAsync() { if (model is null || testing) return; testing = true; error = null; try { status = await Client.TestProviderAsync(model.ResourceGroup, model.Name, cancellation.Token); await LoadObservedAsync(model.ResourceGroup); } catch (AgentstrationApiException exception) { error = exception; } finally { testing = false; } }
+    private async Task LoadAsync() { error = null; modelsError = null; if (IsNew) { model = new ModelProviderEditorModel(); return; } try { var snapshot = await Client.GetModelProviderAsync(Name!, cancellation.Token); model = ModelProviderEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; usages = (await Client.GetModelProviderUsagesAsync(Name!, cancellation.Token)).Value; await LoadObservedAsync(); } catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProviderEditorModel(); } }
+    private async Task LoadObservedAsync() { try { status = await Client.GetProviderStatusAsync(Name!, cancellation.Token); if (status.Status == "available") models = await Client.GetProviderModelsAsync(Name!, cancellation.Token); else models = []; } catch (AgentstrationApiException exception) { modelsError = exception.Message; models = []; } }
+    private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var wasNew = IsNew; var snapshot = wasNew ? await Client.CreateModelProviderAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateModelProviderAsync(model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), wasNew ? "Model provider created" : "Model provider updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); if (wasNew) { Navigation.NavigateTo($"/modelproviders/{Uri.EscapeDataString(snapshot.Value.Name)}"); } else { model = ModelProviderEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; await LoadObservedAsync(); } } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
+    private async Task TestAsync() { if (model is null || testing) return; testing = true; error = null; try { status = await Client.TestProviderAsync(model.Name, cancellation.Token); await LoadObservedAsync(); } catch (AgentstrationApiException exception) { error = exception; } finally { testing = false; } }
     private void RequestDelete() { if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException($"This provider is used by {usages.Count} model profile(s).", Guid.NewGuid().ToString("N")); }
-    private async Task DeleteAsync() { if (model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteModelProviderAsync(model.ResourceGroup, model.Name, etag, cancellation.Token); Navigation.NavigateTo("/modelproviders"); } catch (AgentstrationApiException exception) { error = exception; } }
+    private async Task DeleteAsync() { if (model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteModelProviderAsync(model.Name, etag, cancellation.Token); Navigation.NavigateTo("/modelproviders"); } catch (AgentstrationApiException exception) { error = exception; } }
     private static string Metadata(AvailableModelResponse item, string key) => item.Metadata.TryGetValue(key, out var value) ? value : "Not reported";
-    private static string ProfileUrl(ModelProviderUsageResponse usage) { var id = ResourceIdentifier.Parse(usage.ResourceId); return $"/modelprofiles/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}"; }
+    private static string ProfileUrl(ModelProviderUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.Name)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

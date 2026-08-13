@@ -160,7 +160,6 @@ public sealed class IdentityFoundationTests
         Name = "shared",
         Kind = ResourceKinds.RuntimeProfile,
         ApiVersion = ManagementApiVersions.CoreV1,
-        ResourceGroup = "default",
         TenantId = context.TenantId,
         WorkspaceId = context.WorkspaceId,
         Properties = new RuntimeProfileProperties { DisplayName = "Shared", RuntimeType = "Local" }

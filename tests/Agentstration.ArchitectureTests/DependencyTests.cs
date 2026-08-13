@@ -22,7 +22,6 @@ using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Components;
-using Agentstration.Work.Api;
 using Agentstration.Workplace.Web;
 using Agentstration.Web.Console;
 
@@ -234,10 +233,73 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void WorkApiDoesNotReferenceTheConsoleAssembly()
+    public void ProjectsDoNotCompileSourcesOwnedByOtherProjects()
     {
-        var references = typeof(WorkApiAssemblyMarker).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
-        Assert.IsFalse(references.Any(name => name!.Equals("Agentstration.Web", StringComparison.Ordinal)));
+        var repositoryRoot = FindRepositoryRoot();
+        var violations = new List<string>();
+
+        foreach (var projectPath in Directory.EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories)
+                     .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                         && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)))
+        {
+            var projectDirectory = Path.GetDirectoryName(projectPath)!;
+            var document = System.Xml.Linq.XDocument.Load(projectPath);
+            foreach (var compile in document.Descendants().Where(element => element.Name.LocalName == "Compile"))
+            {
+                var include = compile.Attribute("Include")?.Value;
+                if (string.IsNullOrWhiteSpace(include) || include.Contains("$(", StringComparison.Ordinal)) continue;
+
+                var normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
+                var sourcePath = Path.GetFullPath(Path.Combine(projectDirectory, normalized));
+                var relativePath = Path.GetRelativePath(projectDirectory, sourcePath);
+                if (relativePath == ".." || relativePath.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                {
+                    violations.Add($"{Path.GetRelativePath(repositoryRoot, projectPath)} -> {include}");
+                }
+            }
+        }
+
+        Assert.IsEmpty(violations, $"Projects must not compile source files owned by another project:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    [TestMethod]
+    public void AspireDoesNotOverrideTheManagedAiProvider()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var appHost = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Agentstration.AppHost", "Program.cs"));
+        Assert.DoesNotContain("AI__Provider", appHost, StringComparison.Ordinal);
+
+        using var settings = System.Text.Json.JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(repositoryRoot, "src", "Agentstration.Web", "appsettings.json")));
+        Assert.AreEqual("Managed", settings.RootElement.GetProperty("AI").GetProperty("Provider").GetString());
+    }
+
+    [TestMethod]
+    public void ProductionSourcesDoNotReintroduceHierarchicalResourcePaths()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var sourceRoot = Path.Combine(repositoryRoot, "src");
+        var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".cs", ".razor", ".json" };
+        var forbidden = new[] { "resource" + "Groups", "resource" + "Group" };
+        var violations = Directory.EnumerateFiles(sourceRoot, "*", SearchOption.AllDirectories)
+            .Where(path => extensions.Contains(Path.GetExtension(path))
+                && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                && !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => forbidden.Any(value => File.ReadAllText(path).Contains(value, StringComparison.OrdinalIgnoreCase)))
+            .Select(path => Path.GetRelativePath(repositoryRoot, path))
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"Production sources must use canonical resource names:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Agentstration.slnx"))) return directory.FullName;
+        }
+
+        throw new InvalidOperationException("Could not locate the Agentstration repository root.");
     }
 
     [TestMethod]

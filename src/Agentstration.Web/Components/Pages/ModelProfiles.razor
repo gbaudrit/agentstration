@@ -69,7 +69,7 @@ else
         deleteConflictUsages = [];
         try
         {
-            var usages = await Client.GetModelProfileUsagesAsync(profile.ResourceGroup, profile.Name, cancellation.Token);
+            var usages = await Client.GetModelProfileUsagesAsync(profile.Name, cancellation.Token);
             if (usages.Count > 0) { deleteConflictUsages = usages.Value; return; }
             pendingDelete = profile;
         }
@@ -82,8 +82,8 @@ else
         var selected = pendingDelete; pendingDelete = null;
         try
         {
-            var snapshot = await Client.GetModelProfileAsync(selected.ResourceGroup, selected.Name, cancellation.Token);
-            await Client.DeleteModelProfileAsync(selected.ResourceGroup, selected.Name, snapshot.ETag, cancellation.Token);
+            var snapshot = await Client.GetModelProfileAsync(selected.Name, cancellation.Token);
+            await Client.DeleteModelProfileAsync(selected.Name, snapshot.ETag, cancellation.Token);
             Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", selected.Name, DateTimeOffset.Now, UiStatus.Success));
             await LoadAsync();
         }
@@ -92,11 +92,11 @@ else
             error = exception;
             if (exception.StatusCode == System.Net.HttpStatusCode.Conflict)
             {
-                try { deleteConflictUsages = (await Client.GetModelProfileUsagesAsync(selected.ResourceGroup, selected.Name, cancellation.Token)).Value; } catch (AgentstrationApiException) { }
+                try { deleteConflictUsages = (await Client.GetModelProfileUsagesAsync(selected.Name, cancellation.Token)).Value; } catch (AgentstrationApiException) { }
             }
         }
     }
-    private static string DetailsUrl(ModelProfileSummaryResponse profile) => $"/modelprofiles/{Uri.EscapeDataString(profile.ResourceGroup)}/{Uri.EscapeDataString(profile.Name)}";
-    private static string AgentUrl(ModelProfileUsageResponse usage) { var id = ResourceIdentifier.Parse(usage.ResourceId); return $"/agents/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}"; }
+    private static string DetailsUrl(ModelProfileSummaryResponse profile) => $"/modelprofiles/{Uri.EscapeDataString(profile.Name)}";
+    private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

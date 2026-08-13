@@ -24,8 +24,6 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
                 responses.Add(new ModelProfileSummaryResponse(
                     profile.Value.Id,
                     profile.Value.Name,
-                    profile.Value.ResourceGroup!,
-                    profile.Value.Location ?? "local",
                     new ModelProfileSummaryPropertiesResponse(
                         profile.Value.Properties.DisplayName,
                         profile.Value.Properties.Description,
@@ -47,11 +45,10 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
 internal sealed class GetModelProfileEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}", HandleAsync);
-    private static Task<IResult> HandleAsync(string profileName, string? resourceGroup, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string profileName, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var groupName = ModelManagementHttp.ResourceGroup(resourceGroup);
-            var stored = await service.GetAsync(groupName, profileName, cancellationToken)
+            var stored = await service.GetAsync(profileName, cancellationToken)
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName));
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
@@ -65,12 +62,10 @@ internal sealed class CreateModelProfileEndpoint : IModelManagementEndpoint
         {
             var stored = await service.CreateAsync(new ModelProfileResource
             {
-                Id = ModelProfileManagementService.ProfileId(body.ResourceGroup, body.Name),
+                Id = ModelProfileManagementService.ProfileId(body.Name),
                 Name = body.Name,
                 Kind = ResourceKinds.ModelProfile,
                 ApiVersion = ManagementApiVersions.CoreV1,
-                ResourceGroup = body.ResourceGroup,
-                Location = body.Location,
                 Properties = body.Properties
             }, cancellationToken);
             response.Headers.Location = $"/api/modelprofiles/{stored.Value.Name}";
@@ -81,9 +76,9 @@ internal sealed class CreateModelProfileEndpoint : IModelManagementEndpoint
 internal sealed class PutModelProfileEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapPut("/{profileName}", HandleAsync);
-    private static Task<IResult> HandleAsync(string profileName, string? resourceGroup, PutModelProfileRequest body, HttpRequest request, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string profileName, PutModelProfileRequest body, HttpRequest request, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () => ModelManagementHttp.ResourceResult(
-            await service.PutAsync(ModelManagementHttp.ResourceGroup(resourceGroup), profileName, body.Properties, ModelManagementHttp.IfMatch(request), cancellationToken),
+            await service.PutAsync(profileName, body.Properties, ModelManagementHttp.IfMatch(request), cancellationToken),
             response,
             StatusCodes.Status200OK));
 }
@@ -91,10 +86,10 @@ internal sealed class PutModelProfileEndpoint : IModelManagementEndpoint
 internal sealed class DeleteModelProfileEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapDelete("/{profileName}", HandleAsync);
-    private static Task<IResult> HandleAsync(string profileName, string? resourceGroup, HttpRequest request, ModelProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string profileName, HttpRequest request, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            await service.DeleteAsync(ModelManagementHttp.ResourceGroup(resourceGroup), profileName, ModelManagementHttp.IfMatch(request), cancellationToken);
+            await service.DeleteAsync(profileName, ModelManagementHttp.IfMatch(request), cancellationToken);
             return Results.NoContent();
         });
 }
@@ -102,10 +97,10 @@ internal sealed class DeleteModelProfileEndpoint : IModelManagementEndpoint
 internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}/usages", HandleAsync);
-    private static Task<IResult> HandleAsync(string profileName, string? resourceGroup, ModelProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string profileName, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var id = ModelProfileManagementService.ProfileId(ModelManagementHttp.ResourceGroup(resourceGroup), profileName);
+            var id = ModelProfileManagementService.ProfileId(profileName);
             _ = await service.GetRequiredAsync(id, cancellationToken);
             var usages = await service.GetUsagesAsync(id, cancellationToken);
             var values = usages.Select(value => new ModelProfileUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName)).ToArray();
@@ -116,11 +111,10 @@ internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
 internal sealed class ResolveModelProfileEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}/resolution", HandleAsync);
-    private static Task<IResult> HandleAsync(string profileName, string? resourceGroup, ModelProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string profileName, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var groupName = ModelManagementHttp.ResourceGroup(resourceGroup);
-            var profile = await service.GetAsync(groupName, profileName, cancellationToken)
+            var profile = await service.GetAsync(profileName, cancellationToken)
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName));
             return Results.Ok(ModelManagementHttp.Resolution(await service.ResolveAsync(profile.Value, cancellationToken)));
         });

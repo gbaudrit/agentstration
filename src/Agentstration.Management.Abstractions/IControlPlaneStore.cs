@@ -14,8 +14,6 @@ public interface IControlPlaneStore
     Task<StoredResource<T>?> GetAsync<T>(string name, CancellationToken cancellationToken) where T : Resource =>
         GetAsync<T>(new ResourceKey(ResourceKinds.For<T>(), name), cancellationToken);
     Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource;
-    Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, string? ignoredResourceGroup, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
-        ListAsync<T>(kind, skip, take, cancellationToken);
     Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource;
     Task<StoredResource<T>> CreateImmutableAsync<T>(T resource, CancellationToken cancellationToken) where T : Resource;
     Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken);

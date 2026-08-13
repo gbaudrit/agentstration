@@ -17,8 +17,6 @@ public sealed record ModelProviderPropertiesResponse(
 public sealed record ModelProviderResponse(
     string Id,
     string Name,
-    string ResourceGroup,
-    string Location,
     ModelProviderPropertiesResponse Properties);
 
 public sealed record AvailableModelResponse(
@@ -31,8 +29,6 @@ public sealed record AvailableModelResponse(
 public sealed record ModelProviderStatusResponse(string Provider, string Status, DateTimeOffset CheckedAt, string? Details);
 public sealed record CreateModelProviderRequest(
     string Name,
-    string ResourceGroup,
-    string Location,
     ModelProviderProperties Properties);
 public sealed record PutModelProviderRequest(ModelProviderProperties Properties);
 public sealed record ModelProviderUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
@@ -40,8 +36,6 @@ public sealed record ModelProviderUsagesResponse(IReadOnlyList<ModelProviderUsag
 
 public sealed record CreateModelProfileRequest(
     string Name,
-    string ResourceGroup,
-    string Location,
     ModelProfileProperties Properties);
 
 public sealed record PutModelProfileRequest(ModelProfileProperties Properties);
@@ -63,8 +57,6 @@ public sealed record ModelProfileSummaryPropertiesResponse(
 public sealed record ModelProfileSummaryResponse(
     string Id,
     string Name,
-    string ResourceGroup,
-    string Location,
     ModelProfileSummaryPropertiesResponse Properties);
 
 public sealed record ModelProfileUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
@@ -97,15 +89,11 @@ public sealed record AgentModelResponse(
 
 public sealed record CreateRuntimeProfileRequest(
     string Name,
-    string ResourceGroup,
-    string Location,
     RuntimeProfileProperties Properties);
 public sealed record PutRuntimeProfileRequest(RuntimeProfileProperties Properties);
 public sealed record RuntimeProfileSummaryResponse(
     string Id,
     string Name,
-    string ResourceGroup,
-    string Location,
     RuntimeProfileProperties Properties,
     int UsageCount);
 public sealed record RuntimeProfileUsageResponse(

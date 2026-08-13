@@ -20,10 +20,11 @@ For the end-user Workplace, use two terminals:
 
 ```powershell
 # Terminal 1
-dotnet run --project src/Agentstration.Work.Api
+$env:AI__Provider = "Deterministic"
+dotnet run --project src/Agentstration.Web
 
 # Terminal 2
 dotnet run --project src/Agentstration.Workplace.Web
 ```
 
-The Work API defaults to deterministic AI. The direct Console defaults to the persisted managed provider configuration, which is why the explicit environment override is used in the offline command above.
+The same `Agentstration.Web` process is the authoritative server for Console and Workplace APIs. The direct server defaults to the persisted managed provider configuration, which is why the explicit environment override is used in the offline commands above.

@@ -65,7 +65,6 @@ public sealed class ToolManagementTests
             Name = "local",
             Kind = ResourceKinds.McpServer,
             ApiVersion = ManagementApiVersions.CoreV1,
-            ResourceGroup = "default",
             Properties = new McpServerProperties { Endpoint = new Uri("file:///tmp/mcp") }
         };
 
@@ -77,7 +76,6 @@ public sealed class ToolManagementTests
         Name = "search",
         Kind = ResourceKinds.Tool,
         ApiVersion = ManagementApiVersions.CoreV1,
-        ResourceGroup = "default",
         Properties = properties
     };
 

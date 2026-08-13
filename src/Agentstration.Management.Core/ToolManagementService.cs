@@ -11,17 +11,14 @@ public sealed record ToolDiscoveryDiff(int New, int Changed, int Unchanged, int 
 
 public sealed class ToolManagementService(IControlPlaneStore store, IEnumerable<IToolProviderDiscovery> discoveries, TimeProvider timeProvider)
 {
-    public static string ToolProviderId(string resourceGroup, string name) => name;
-    public static string ToolId(string resourceGroup, string name) => name;
+    public static string ToolProviderId(string name) => name;
+    public static string ToolId(string name) => name;
     public Task<StoredResource<ToolResource>?> GetToolAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ToolResource>(name, cancellationToken);
     public Task<StoredResource<ToolProviderResource>?> GetProviderAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ToolProviderResource>(name, cancellationToken);
     public Task<StoredResource<McpServerResource>?> GetMcpServerAsync(string name, CancellationToken cancellationToken) => store.GetAsync<McpServerResource>(name, cancellationToken);
     public Task<IReadOnlyList<StoredResource<ToolResource>>> ListToolsAsync(CancellationToken cancellationToken) => store.ListAsync<ToolResource>(ResourceKinds.Tool, 0, 1000, cancellationToken);
     public Task<IReadOnlyList<StoredResource<ToolProviderResource>>> ListProvidersAsync(CancellationToken cancellationToken) => store.ListAsync<ToolProviderResource>(ResourceKinds.ToolProvider, 0, 1000, cancellationToken);
     public Task<IReadOnlyList<StoredResource<McpServerResource>>> ListMcpServersAsync(CancellationToken cancellationToken) => store.ListAsync<McpServerResource>(ResourceKinds.McpServer, 0, 1000, cancellationToken);
-    public Task<IReadOnlyList<StoredResource<ToolResource>>> ListToolsAsync(string? resourceGroup, CancellationToken cancellationToken) => ListToolsAsync(cancellationToken);
-    public Task<IReadOnlyList<StoredResource<ToolProviderResource>>> ListProvidersAsync(string? resourceGroup, CancellationToken cancellationToken) => ListProvidersAsync(cancellationToken);
-    public Task<IReadOnlyList<StoredResource<McpServerResource>>> ListMcpServersAsync(string? resourceGroup, CancellationToken cancellationToken) => ListMcpServersAsync(cancellationToken);
 
     public async Task<StoredResource<ToolProviderResource>> PutProviderAsync(ToolProviderResource resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken)
     {

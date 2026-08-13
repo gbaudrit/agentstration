@@ -24,6 +24,6 @@ else
     private AgentstrationApiException? error;
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync() { error = null; try { profiles = await Client.GetRuntimeProfilesAsync(cancellation.Token); } catch (AgentstrationApiException exception) { error = exception; } }
-    private static string Url(RuntimeProfileSummaryResponse profile) => $"/runtimeprofiles/{Uri.EscapeDataString(profile.ResourceGroup)}/{Uri.EscapeDataString(profile.Name)}";
+    private static string Url(RuntimeProfileSummaryResponse profile) => $"/runtimeprofiles/{Uri.EscapeDataString(profile.Name)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

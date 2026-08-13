@@ -38,7 +38,6 @@
     <Project Path="src/Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
     <Project Path="src/Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
     <Project Path="src/Agentstration.Work.Storage.Sqlite/Agentstration.Work.Storage.Sqlite.csproj" />
-    <Project Path="src/Agentstration.Work.Api/Agentstration.Work.Api.csproj" />
     <Project Path="src/Agentstration.Workplace.Client/Agentstration.Workplace.Client.csproj" />
     <Project Path="src/Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
     <Project Path="src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />

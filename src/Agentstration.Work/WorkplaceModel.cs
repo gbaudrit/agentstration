@@ -74,8 +74,6 @@ public sealed record WorkplaceWorkspace
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Workspaces;
     public string ApiVersion { get; init; } = WorkplaceApiVersions.V20260805;
-    public string ResourceGroup { get; init; } = "default";
-    public string Location { get; init; } = "local";
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public IReadOnlyList<WorkspaceEntryReference> Entries { get; init; } = [];
@@ -87,8 +85,6 @@ public sealed record WorkplaceWorkspaceDraft
 {
     public required WorkplaceWorkspaceId Id { get; init; }
     public required string Name { get; init; }
-    public string ResourceGroup { get; init; } = "default";
-    public string Location { get; init; } = "local";
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public IReadOnlyList<WorkspaceEntryReference> Entries { get; init; } = [];
@@ -137,8 +133,6 @@ public sealed record EntryDraft
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Entries;
     public string ApiVersion { get; init; } = WorkplaceApiVersions.V20260805;
-    public string ResourceGroup { get; init; } = "default";
-    public string Location { get; init; } = "local";
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required EntryPresentation Presentation { get; init; }
@@ -155,8 +149,6 @@ public sealed record EntryResource
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Entries;
     public string ApiVersion { get; init; } = WorkplaceApiVersions.V20260805;
-    public string ResourceGroup { get; init; } = "default";
-    public string Location { get; init; } = "local";
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required EntryPresentation Presentation { get; init; }
@@ -287,7 +279,9 @@ public static class WorkplaceValidation
     public static void Validate(WorkplaceWorkspace workspace)
     {
         ArgumentNullException.ThrowIfNull(workspace);
-        ValidateResourceId(workspace.Id.Value, "Agentstration.Work", "workspaces", "workspace_id_invalid");
+        ValidateName(workspace.Id.Value, "workspace_id_invalid");
+        if (!string.Equals(workspace.Id.Value, workspace.Name, StringComparison.Ordinal))
+            throw new WorkValidationException("workspace_identity_mismatch", "Workspace id and name must match.");
         if (string.IsNullOrWhiteSpace(workspace.DisplayName)) throw new WorkValidationException("workspace_display_name_required", "A Workspace display name is required.");
         if (workspace.Entries.Count(reference => reference.Role == WorkspaceEntryRole.Primary) > 1)
             throw new WorkValidationException("workspace_primary_entry_conflict", "A Workspace can expose at most one Primary Entry.");
@@ -298,7 +292,9 @@ public static class WorkplaceValidation
     public static void Validate(WorkplaceWorkspaceDraft workspace)
     {
         ArgumentNullException.ThrowIfNull(workspace);
-        ValidateResourceId(workspace.Id.Value, "Agentstration.Work", "workspaces", "workspace_id_invalid");
+        ValidateName(workspace.Id.Value, "workspace_id_invalid");
+        if (!string.Equals(workspace.Id.Value, workspace.Name, StringComparison.Ordinal))
+            throw new WorkValidationException("workspace_identity_mismatch", "Workspace id and name must match.");
         if (string.IsNullOrWhiteSpace(workspace.DisplayName)) throw new WorkValidationException("workspace_display_name_required", "A Workspace display name is required.");
         if (workspace.Entries.Count(reference => reference.Role == WorkspaceEntryRole.Primary) > 1)
             throw new WorkValidationException("workspace_primary_entry_conflict", "A Workspace can expose at most one Primary Entry.");
@@ -309,7 +305,9 @@ public static class WorkplaceValidation
     public static void Validate(EntryResource entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        ValidateResourceId(entry.Id.Value, "Agentstration.Work", "entries", "entry_id_invalid");
+        ValidateName(entry.Id.Value, "entry_id_invalid");
+        if (!string.Equals(entry.Id.Value, entry.Name, StringComparison.Ordinal))
+            throw new WorkValidationException("entry_identity_mismatch", "Entry id and name must match.");
         if (string.IsNullOrWhiteSpace(entry.DisplayName)) throw new WorkValidationException("entry_display_name_required", "An Entry display name is required.");
         if (string.IsNullOrWhiteSpace(entry.ResolvedTarget.FlowResourceId)) throw new WorkValidationException("entry_target_required", "A published Entry requires a resolved Flow target.");
         _ = FlowReferenceFrom(entry.ResolvedTarget);
@@ -319,7 +317,9 @@ public static class WorkplaceValidation
     public static void Validate(EntryDraft entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        ValidateResourceId(entry.Id.Value, "Agentstration.Work", "entries", "entry_id_invalid");
+        ValidateName(entry.Id.Value, "entry_id_invalid");
+        if (!string.Equals(entry.Id.Value, entry.Name, StringComparison.Ordinal))
+            throw new WorkValidationException("entry_identity_mismatch", "Entry id and name must match.");
         if (string.IsNullOrWhiteSpace(entry.DisplayName)) throw new WorkValidationException("entry_display_name_required", "An Entry display name is required.");
         ValidateBinding(entry.Binding);
         ValidatePresentation(entry.Presentation);
@@ -361,16 +361,8 @@ public static class WorkplaceValidation
     public static void ValidateBinding(EntryBinding binding)
     {
         ArgumentNullException.ThrowIfNull(binding);
-        if (binding.Kind == EntryBindingKind.Agent)
-        {
-            if (string.IsNullOrWhiteSpace(binding.ResourceId) || binding.ResourceId.Contains('/', StringComparison.Ordinal))
-                throw new WorkValidationException("entry_binding_invalid", "The Agent binding name is invalid.");
-            return;
-        }
-        var segments = binding.ResourceId.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length != 6 || !string.Equals(segments[3], "Agentstration.Flows", StringComparison.Ordinal)
-            || !string.Equals(segments[4], "flows", StringComparison.Ordinal))
-            throw new WorkValidationException("entry_binding_invalid", $"The {binding.Kind} binding resource identifier is invalid.");
+        if (string.IsNullOrWhiteSpace(binding.ResourceId) || binding.ResourceId.Contains('/', StringComparison.Ordinal))
+            throw new WorkValidationException("entry_binding_invalid", $"The {binding.Kind} binding name is invalid.");
     }
 
     public static void ValidateSubmission(EntryResource entry, IReadOnlyDictionary<string, JsonElement> values)
@@ -409,23 +401,17 @@ public static class WorkplaceValidation
 
     public static FlowReference FlowReferenceFrom(EntryResolvedTarget target)
     {
-        var resourceId = target.FlowResourceId;
-        var segments = resourceId.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length != 6 || !string.Equals(segments[3], "Agentstration.Flows", StringComparison.Ordinal)
-            || !string.Equals(segments[4], "flows", StringComparison.Ordinal))
-            throw new WorkValidationException("entry_target_not_supported", "The MVP Entry target must reference an Agentstration Flow resource.");
+        var flowName = target.FlowResourceId;
+        if (string.IsNullOrWhiteSpace(flowName) || flowName.Contains('/', StringComparison.Ordinal))
+            throw new WorkValidationException("entry_target_not_supported", "The Entry target must reference a Flow name.");
         if (string.IsNullOrWhiteSpace(target.Version)) throw new WorkValidationException("entry_target_version_required", "A published Entry target version is required.");
-        return new FlowReference(new FlowId(segments[5]), target.Version, UseActiveVersion: false);
+        return new FlowReference(new FlowId(flowName), target.Version, UseActiveVersion: false);
     }
 
-    private static void ValidateResourceId(string value, string provider, string type, string code)
+    private static void ValidateName(string value, string code)
     {
-        var segments = value?.Split('/', StringSplitOptions.RemoveEmptyEntries) ?? [];
-        if (segments.Length != 6 || !string.Equals(segments[0], "resourceGroups", StringComparison.Ordinal)
-            || !string.Equals(segments[2], "providers", StringComparison.Ordinal)
-            || !string.Equals(segments[3], provider, StringComparison.Ordinal)
-            || !string.Equals(segments[4], type, StringComparison.Ordinal)
-            || segments.Any(string.IsNullOrWhiteSpace))
-            throw new WorkValidationException(code, $"The resource identifier must target Agentstration.Work/{type}.");
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 128 || !char.IsLetterOrDigit(value[0])
+            || value.Any(character => !char.IsLetterOrDigit(character) && character is not '-' and not '_'))
+            throw new WorkValidationException(code, "Identifiers must contain 1 to 128 letters, digits, '-' or '_' and start with a letter or digit.");
     }
 }

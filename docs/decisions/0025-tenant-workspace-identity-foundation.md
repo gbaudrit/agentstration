@@ -1,6 +1,8 @@
 # ADR-0025: Tenant, workspace, identity, and local authorization foundation
 
-Status: Accepted — 2026-08-11
+Status: Partially superseded by ADR-0031 and ADR-0033 — 2026-08-12
+
+The tenant, workspace, identity, and authorization decisions remain accepted. The additional resource-scope level and hierarchical resource paths below are historical and are not part of the current model.
 
 ## Context
 

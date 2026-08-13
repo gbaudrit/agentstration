@@ -14,7 +14,7 @@ else
 {
     <DataGrid TItem="ToolResource" Items="tools">
         <Header><tr><th>Tool</th><th>Provider</th><th>Availability</th><th>Enabled</th><th></th></tr></Header>
-        <Row Context="tool"><tr><td><strong>@tool.Properties.DisplayName</strong><br /><code>@tool.Properties.ExternalId</code></td><td>@ResourceName(tool.Properties.Provider?.ResourceId)</td><td><StatusBadge Text="@(tool.Properties.Discovery?.Available == true ? "Available" : "Unavailable")" Status="@(tool.Properties.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@(tool.Properties.Enabled ? "Yes" : "No")</td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.ResourceGroup!)}/{Uri.EscapeDataString(tool.Name)}")">Details →</a></td></tr></Row>
+        <Row Context="tool"><tr><td><strong>@tool.Properties.DisplayName</strong><br /><code>@tool.Properties.ExternalId</code></td><td>@ResourceName(tool.Properties.Provider?.ResourceId)</td><td><StatusBadge Text="@(tool.Properties.Discovery?.Available == true ? "Available" : "Unavailable")" Status="@(tool.Properties.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@(tool.Properties.Enabled ? "Yes" : "No")</td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.Name)}")">Details →</a></td></tr></Row>
     </DataGrid>
 }
 

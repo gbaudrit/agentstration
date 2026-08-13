@@ -4,7 +4,7 @@ using Agentstration.Flow.Storage.Abstractions;
 namespace Agentstration.Flow.Application;
 
 public sealed record CreateFlowCommand(string Name, string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null);
-public sealed record UpdateFlowCommand(string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null, FlowGraphDefinition? Graph = null, string? DisplayName = null, string ResourceGroup = "default", string Location = "local");
+public sealed record UpdateFlowCommand(string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null, FlowGraphDefinition? Graph = null, string? DisplayName = null);
 
 public interface IFlowDeletionGuard
 {
@@ -48,8 +48,6 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
             Metadata = Copy(command.Metadata),
             Graph = command.Graph,
             DisplayName = command.DisplayName ?? current.Value.DisplayName,
-            ResourceGroup = command.ResourceGroup,
-            Location = command.Location,
             UpdatedAt = timeProvider.GetUtcNow()
         };
         FlowValidator.Validate(updated);

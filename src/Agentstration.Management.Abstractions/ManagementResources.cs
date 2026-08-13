@@ -197,8 +197,7 @@ public readonly record struct ResourceKey(string Kind, string Name)
 
 public readonly record struct ResourceIdentifier(string Value)
 {
-    public static ResourceIdentifier Create(string resourceGroup, string providerNamespace, string resourceType, string name) => new(name);
-    public static ResourceIdentifier Create(Guid workspaceId, string resourceGroup, string providerNamespace, string resourceType, string name) => new(name);
+    public static ResourceIdentifier Create(string name) => new(name);
     public static ResourceIdentifier Parse(string value) => TryParse(value, out var result) ? result : throw new ArgumentException("A resource name is required.", nameof(value));
     public static bool TryParse(string? value, out ResourceIdentifier result)
     {
@@ -208,10 +207,6 @@ public readonly record struct ResourceIdentifier(string Value)
         return true;
     }
     public string Name => Value;
-    public string ResourceGroup => "default";
-    public string ProviderNamespace => "agentstration.io";
-    public string ResourceType => string.Empty;
-    public Guid? WorkspaceId => null;
 }
 
 public abstract record Resource
@@ -224,10 +219,6 @@ public abstract record Resource
     public string Name { get => Metadata.Name; init => Metadata = Metadata with { Name = value }; }
     [JsonIgnore]
     public string Type { get => Kind; init => Kind = value; }
-    [JsonIgnore]
-    public string? ResourceGroup { get => "default"; init { } }
-    [JsonIgnore]
-    public string? Location { get => null; init { } }
     [JsonIgnore]
     public IReadOnlyDictionary<string, string> Tags { get => Metadata.Tags; init => Metadata = Metadata with { Tags = value }; }
     [JsonIgnore]

@@ -1,6 +1,6 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
-    <ProjectReference Include="../../src/Agentstration.Work.Api/Agentstration.Work.Api.csproj" Aliases="workapi" />
+    <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" Aliases="workapi" />
     <ProjectReference Include="../../src/Agentstration.Work.Contracts/Agentstration.Work.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>

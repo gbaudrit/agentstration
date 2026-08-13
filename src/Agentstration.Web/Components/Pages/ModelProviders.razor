@@ -22,10 +22,10 @@ else if (providers?.Count == 0)
 else
 {
     <DataGrid TItem="ModelProviderResponse" Items="providers ?? []">
-        <Header><tr><th>Provider</th><th>Type</th><th>Location</th><th>Management</th><th>Status</th><th>Models</th><th></th></tr></Header>
+        <Header><tr><th>Provider</th><th>Type</th><th>Management</th><th>Status</th><th>Models</th><th></th></tr></Header>
         <Row Context="provider"><tr>
             <td><strong>@provider.Properties.DisplayName</strong><br /><code>@provider.Name</code></td>
-            <td>@provider.Properties.ProviderType</td><td>@provider.Location</td><td>@provider.Properties.ManagementMode</td>
+            <td>@provider.Properties.ProviderType</td><td>@provider.Properties.ManagementMode</td>
             <td><StatusBadge Text="@ModelManagementUi.Label(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></td>
             <td>@provider.Properties.ModelCount</td>
             <td><a class="text-button" href="@DetailsUrl(provider)">View details →</a></td>
@@ -46,7 +46,6 @@ else
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
     }
-    private static string DetailsUrl(ModelProviderResponse provider) =>
-        $"/modelproviders/{Uri.EscapeDataString(provider.ResourceGroup)}/{Uri.EscapeDataString(provider.Name)}";
+    private static string DetailsUrl(ModelProviderResponse provider) => $"/modelproviders/{Uri.EscapeDataString(provider.Name)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

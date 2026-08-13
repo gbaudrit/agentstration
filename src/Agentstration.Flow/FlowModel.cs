@@ -72,8 +72,6 @@ public sealed record FlowDefinition(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     string? DisplayName = null,
-    string ResourceGroup = "default",
-    string Location = "local",
     FlowGraphDefinition? Graph = null);
 
 public sealed record FlowVersion(

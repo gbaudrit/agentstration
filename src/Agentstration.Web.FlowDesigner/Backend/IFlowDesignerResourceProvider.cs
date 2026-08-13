@@ -1,8 +1,8 @@
 namespace Agentstration.Web.FlowDesigner.Backend;
 
-public sealed record FlowDesignerAgent(string ResourceId, string DisplayName, string ResourceGroup);
+public sealed record FlowDesignerAgent(string Name, string DisplayName);
 
 public interface IFlowDesignerResourceProvider
 {
-    Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(string resourceGroup, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken);
 }

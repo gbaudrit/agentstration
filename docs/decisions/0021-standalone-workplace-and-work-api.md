@@ -1,6 +1,6 @@
 # ADR-0021: Standalone Workplace and Work API hosts
 
-Status: Accepted — 2026-08-06
+Status: Superseded by ADR-0032 — 2026-08-12
 
 ## Context
 

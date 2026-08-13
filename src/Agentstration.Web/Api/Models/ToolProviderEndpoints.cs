@@ -23,13 +23,13 @@ internal static class ToolProviderEndpoints
         tools.MapPut("/{toolName}/enabled", SetEnabledAsync);
     }
 
-    private static Task<IResult> ListProvidersAsync(string? resourceGroup, ToolManagementService service, CancellationToken cancellationToken) =>
-        ModelManagementHttp.ExecuteAsync(async () => Results.Ok(new ValueResponse<ToolProviderResource>((await service.ListProvidersAsync(resourceGroup, cancellationToken)).Select(value => value.Value).ToArray())));
+    private static Task<IResult> ListProvidersAsync(ToolManagementService service, CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () => Results.Ok(new ValueResponse<ToolProviderResource>((await service.ListProvidersAsync(cancellationToken)).Select(value => value.Value).ToArray())));
 
-    private static Task<IResult> GetProviderAsync(string providerName, string? resourceGroup, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> GetProviderAsync(string providerName, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var id = ToolManagementService.ToolProviderId(ModelManagementHttp.ResourceGroup(resourceGroup), providerName);
+            var id = ToolManagementService.ToolProviderId(providerName);
             var stored = await service.GetProviderAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ToolProvider, providerName));
             return ModelManagementHttp.ResourceResult(stored, response, 200);
         });
@@ -37,18 +37,17 @@ internal static class ToolProviderEndpoints
     private static Task<IResult> CreateProviderAsync(CreateToolProviderRequest body, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var stored = await service.PutProviderAsync(Resource(body.Name, body.ResourceGroup, body.Location, body.Properties), null, true, cancellationToken);
+            var stored = await service.PutProviderAsync(Resource(body.Name, body.Properties), null, true, cancellationToken);
             try { _ = await service.RefreshDiscoveryAsync(stored.Value.Id, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
             stored = await service.GetProviderAsync(stored.Value.Id, cancellationToken) ?? stored;
             response.Headers.Location = $"/api/toolproviders/{Uri.EscapeDataString(body.Name)}";
             return ModelManagementHttp.ResourceResult(stored, response, 201);
         });
 
-    private static Task<IResult> PutProviderAsync(string providerName, string? resourceGroup, PutToolProviderRequest body, HttpRequest request, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> PutProviderAsync(string providerName, PutToolProviderRequest body, HttpRequest request, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var group = ModelManagementHttp.ResourceGroup(resourceGroup);
-            var existing = await service.GetProviderAsync(ToolManagementService.ToolProviderId(group, providerName), cancellationToken)
+            var existing = await service.GetProviderAsync(ToolManagementService.ToolProviderId(providerName), cancellationToken)
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ToolProvider, providerName));
             var stored = await service.PutProviderAsync(existing.Value with { Properties = body.Properties }, ModelManagementHttp.IfMatch(request), false, cancellationToken);
             try { _ = await service.RefreshDiscoveryAsync(stored.Value.Id, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
@@ -56,52 +55,52 @@ internal static class ToolProviderEndpoints
             return ModelManagementHttp.ResourceResult(stored, response, 200);
         });
 
-    private static Task<IResult> TestAsync(string providerName, string? resourceGroup, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> TestAsync(string providerName, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var id = ToolManagementService.ToolProviderId(ModelManagementHttp.ResourceGroup(resourceGroup), providerName);
+            var id = ToolManagementService.ToolProviderId(providerName);
             var stored = await service.GetProviderAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ToolProvider, providerName));
             var result = await service.TestConnectionAsync(stored.Value, cancellationToken);
             return Results.Ok(new ToolConnectionTestResponse("connected", result.Tools.Count, result.Capabilities, result.ServerMetadata));
         });
 
-    private static Task<IResult> RefreshAsync(string providerName, string? resourceGroup, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> RefreshAsync(string providerName, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var diff = await service.RefreshDiscoveryAsync(ToolManagementService.ToolProviderId(ModelManagementHttp.ResourceGroup(resourceGroup), providerName), cancellationToken);
+            var diff = await service.RefreshDiscoveryAsync(ToolManagementService.ToolProviderId(providerName), cancellationToken);
             return Results.Ok(new ToolDiscoveryDiffResponse(diff.New, diff.Changed, diff.Unchanged, diff.Unavailable, diff.Total));
         });
 
-    private static Task<IResult> ListProviderToolsAsync(string providerName, string? resourceGroup, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> ListProviderToolsAsync(string providerName, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var providerId = ToolManagementService.ToolProviderId(ModelManagementHttp.ResourceGroup(resourceGroup), providerName);
-            var tools = await service.ListToolsAsync(ModelManagementHttp.ResourceGroup(resourceGroup), cancellationToken);
+            var providerId = ToolManagementService.ToolProviderId(providerName);
+            var tools = await service.ListToolsAsync(cancellationToken);
             return Results.Ok(new ValueResponse<ToolResource>(tools.Where(value => value.Value.Properties.Provider?.ResourceId == providerId).Select(value => value.Value).ToArray()));
         });
 
-    private static Task<IResult> ListToolsAsync(string? resourceGroup, bool? enabled, bool? available, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> ListToolsAsync(bool? enabled, bool? available, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var values = (await service.ListToolsAsync(resourceGroup, cancellationToken)).Select(value => value.Value);
+            var values = (await service.ListToolsAsync(cancellationToken)).Select(value => value.Value);
             if (enabled.HasValue) values = values.Where(value => value.Properties.Enabled == enabled.Value);
             if (available.HasValue) values = values.Where(value => value.Properties.Discovery?.Available == available.Value);
             return Results.Ok(new ValueResponse<ToolResource>(values.ToArray()));
         });
 
-    private static Task<IResult> GetToolAsync(string toolName, string? resourceGroup, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> GetToolAsync(string toolName, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var id = ToolManagementService.ToolId(ModelManagementHttp.ResourceGroup(resourceGroup), toolName);
+            var id = ToolManagementService.ToolId(toolName);
             var stored = await service.GetToolAsync(id, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Tool, toolName));
             return ModelManagementHttp.ResourceResult(stored, response, 200);
         });
 
-    private static Task<IResult> SetEnabledAsync(string toolName, string? resourceGroup, SetToolEnabledRequest body, HttpRequest request, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> SetEnabledAsync(string toolName, SetToolEnabledRequest body, HttpRequest request, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () => ModelManagementHttp.ResourceResult(
-            await service.SetToolEnabledAsync(ToolManagementService.ToolId(ModelManagementHttp.ResourceGroup(resourceGroup), toolName), body.Enabled, ModelManagementHttp.IfMatch(request), cancellationToken), response, 200));
+            await service.SetToolEnabledAsync(ToolManagementService.ToolId(toolName), body.Enabled, ModelManagementHttp.IfMatch(request), cancellationToken), response, 200));
 
-    private static ToolProviderResource Resource(string name, string group, string location, ToolProviderProperties properties) => new()
+    private static ToolProviderResource Resource(string name, ToolProviderProperties properties) => new()
     {
         ApiVersion = ManagementApiVersions.CoreV1,
         Kind = ResourceKinds.ToolProvider,

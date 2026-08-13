@@ -34,10 +34,10 @@ public sealed class WorkPlaneTests
     [TestMethod]
     public void WorkplaceResourcesEnforcePrimaryEntryAndDeterministicFieldRules()
     {
-        var entryId = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/request");
+        var entryId = new EntryId("request");
         var duplicatePrimary = new WorkplaceWorkspace
         {
-            Id = new WorkplaceWorkspaceId("/resourceGroups/default/providers/Agentstration.Work/workspaces/personal"),
+            Id = new WorkplaceWorkspaceId("personal"),
             Name = "personal",
             DisplayName = "Personal",
             Entries =
@@ -62,7 +62,7 @@ public sealed class WorkPlaneTests
                     new EntryFieldDefinition { Name = "detail", Type = EntryFieldType.Choice, Options = [new EntryFieldOption("standard", "Standard")] }
                 ]
             },
-            ResolvedTarget = new EntryResolvedTarget("/resourceGroups/default/providers/Agentstration.Flows/flows/router", "1.0.0")
+            ResolvedTarget = new EntryResolvedTarget("router", "1.0.0")
         };
         WorkplaceValidation.Validate(entry);
         Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateSubmission(entry, new Dictionary<string, System.Text.Json.JsonElement>()));
@@ -74,7 +74,7 @@ public sealed class WorkPlaneTests
 
         var draft = new EntryDraft
         {
-            Id = entryId, Name = "request", DisplayName = "Request", Binding = new EntryBinding(EntryBindingKind.Flow, "/resourceGroups/default/providers/Agentstration.Flows/flows/router"),
+            Id = entryId, Name = "request", DisplayName = "Request", Binding = new EntryBinding(EntryBindingKind.Flow, "router"),
             Presentation = entry.Presentation with
             {
                 Fields =
@@ -98,6 +98,9 @@ public sealed class WorkPlaneTests
             }
         }));
         Assert.AreEqual("entry_primary_input_required", primaryError.Code);
+        var legacyBindingError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateBinding(
+            new EntryBinding(EntryBindingKind.Flow, "legacy/router")));
+        Assert.AreEqual("entry_binding_invalid", legacyBindingError.Code);
     }
 
     [TestMethod]
@@ -298,7 +301,7 @@ public sealed class WorkPlaneTests
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
-        var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>($"/api/workspaces?api-version={WorkplaceApiVersions.V20260805}");
+        var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>($"/api/workplace/workspaces?api-version={WorkplaceApiVersions.V20260805}");
         var workspace = workspaces!.Single(value => value.Name == "personal");
         Assert.AreEqual(WorkspaceEntryRole.Primary, workspace.Entries.Single(value => value.Role == WorkspaceEntryRole.Primary).Role);
 

@@ -3,10 +3,10 @@ using Agentstration.Work;
 
 namespace Agentstration.Work.Contracts;
 
-public sealed record WorkplaceWorkspaceResponse(string Id, string Name, string Type, string ApiVersion, string ResourceGroup, string Location, string DisplayName, string? Description, IReadOnlyList<WorkspaceEntryReferenceResponse> Entries, int Version, DateTimeOffset PublishedAt);
+public sealed record WorkplaceWorkspaceResponse(string Id, string Name, string Type, string ApiVersion, string DisplayName, string? Description, IReadOnlyList<WorkspaceEntryReferenceResponse> Entries, int Version, DateTimeOffset PublishedAt);
 public sealed record WorkplaceWorkspaceDraftResponse(WorkplaceWorkspaceDraft Value, WorkplaceWorkspace? Published);
 public sealed record WorkspaceEntryReferenceResponse(string EntryResourceId, WorkspaceEntryRole Role, int Order);
-public sealed record EntryResponse(string Id, string Name, string Type, string ApiVersion, string ResourceGroup, string Location, string DisplayName, string? Description, EntryPresentation Presentation, EntryResolvedTarget ResolvedTarget, EntryBehavior Behavior, int Version, DateTimeOffset PublishedAt);
+public sealed record EntryResponse(string Id, string Name, string Type, string ApiVersion, string DisplayName, string? Description, EntryPresentation Presentation, EntryResolvedTarget ResolvedTarget, EntryBehavior Behavior, int Version, DateTimeOffset PublishedAt);
 public sealed record EntryDraftResponse(EntryDraft Value, EntryResource? Published);
 public sealed record EntryValidationResponse(bool IsValid, IReadOnlyList<EntryValidationIssueContract> Issues);
 public sealed record EntryValidationIssueContract(string Code, string Message);

@@ -29,7 +29,7 @@ public sealed class WorkspaceAdministrationService(IWorkplaceRepository reposito
         var previous = await repository.GetWorkspaceAsync(id, cancellationToken);
         var published = new WorkplaceWorkspace
         {
-            Id = draft.Id, Name = draft.Name, ResourceGroup = draft.ResourceGroup, Location = draft.Location,
+            Id = draft.Id, Name = draft.Name,
             DisplayName = draft.DisplayName, Description = draft.Description, Entries = draft.Entries,
             Version = previous is null ? 1 : checked(previous.Version + 1), PublishedAt = timeProvider.GetUtcNow()
         };

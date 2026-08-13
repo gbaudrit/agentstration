@@ -20,14 +20,14 @@ public sealed class ToolDiscoveryTests
         var service = new ToolManagementService(store, [discovery], new FixedTimeProvider());
 
         var first = await service.RefreshDiscoveryAsync(provider.Id, default);
-        var tools = await service.ListToolsAsync("default", default);
+        var tools = await service.ListToolsAsync(default);
         Assert.AreEqual(3, first.New);
         Assert.IsTrue(tools.All(value => !value.Value.Properties.Enabled && value.Value.Properties.Discovery?.Available == true));
 
         var b = tools.Single(value => value.Value.Properties.ExternalId == "b");
         await service.SetToolEnabledAsync(b.Value.Id, true, b.ETag, default);
         var second = await service.RefreshDiscoveryAsync(provider.Id, default);
-        tools = await service.ListToolsAsync("default", default);
+        tools = await service.ListToolsAsync(default);
 
         Assert.AreEqual(new ToolDiscoveryDiff(1, 1, 1, 1, 3), second);
         Assert.IsTrue(tools.Single(value => value.Value.Properties.ExternalId == "b").Value.Properties.Enabled);
@@ -35,7 +35,7 @@ public sealed class ToolDiscoveryTests
         Assert.AreEqual("A changed", tools.Single(value => value.Value.Properties.ExternalId == "a").Value.Properties.DisplayName);
 
         _ = await service.RefreshDiscoveryAsync(provider.Id, default);
-        tools = await service.ListToolsAsync("default", default);
+        tools = await service.ListToolsAsync(default);
         Assert.IsTrue(tools.Single(value => value.Value.Properties.ExternalId == "c").Value.Properties.Discovery!.Available);
     }
 

@@ -2,17 +2,16 @@
 
 ## Outcome and constraints
 
-Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase. The operations Console remains an independent ASP.NET Core application; the end-user Workplace is deployed with its standalone Work API so it can run and publish without the Console. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire can orchestrate the three local resources.
+Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase and one authoritative standalone server. `Agentstration.Web` hosts the operations Console and all server-side API surfaces; the end-user Workplace remains a separate HTTP/SignalR client UI. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire orchestrates the server, Workplace, and optional extensions.
 
 ## Solution tree
 
 ```text
 src/
   Agentstration.AppHost/          Aspire orchestration and dashboard
-  Agentstration.Web/              independent operations Console, management REST and MCP
+  Agentstration.Web/              authoritative server, operations Console, REST, MCP, workers and hubs
   Agentstration.Web.Components/   reusable Razor components and console design system
   Agentstration.Web.FlowDesigner/ Flow-specific Razor UI, editor state, Z diagrams, Monaco
-  Agentstration.Work.Api/         standalone Work HTTP, SignalR and local execution host
   Agentstration.Workplace.Client/ typed HTTP and reconnecting SignalR client
   Agentstration.Workplace.Components/ reusable Workplace business components
   Agentstration.Workplace.Web/    standalone end-user Blazor host
@@ -212,6 +211,19 @@ Console / API / future Work adapter
 
 Flow Runs and direct agent Runtime Runs remain distinct resources and stores. A Flow Run may use an agent internally, while its public trace and lifecycle stay owned by Flow.
 
+### Execution identities and ownership
+
+The execution identifiers are intentionally not interchangeable:
+
+| Identity | Owner | Lifetime | Relationship |
+|---|---|---|---|
+| `InteractionId` | Work | Durable user conversation | May create an initial task and later continuation executions. |
+| `WorkTaskId` | Work | Durable functional task | Is the public identity of the anchor `WorkItem`; retries/continuations remain attached to it. |
+| `FlowRunId` | Flow | One technical graph traversal | May be correlated to a Work task, but Flow owns its status, events, and trace. |
+| Runtime Run ID | Runtime | One exact agent invocation | A direct Console/API invocation creates only this Run; a Flow may create one internally. |
+
+Correlation never transfers ownership. Work stores functional history and results, Flow stores orchestration history, and Runtime stores agent-invocation telemetry. A retry creates a new technical Run while preserving the functional task or conversation correlation when one exists.
+
 ### Declarative agent vertical
 
 ```text
@@ -325,7 +337,7 @@ Standalone startup creates or repairs `local / default`, the local user, active 
 7. **Delivered Flow Runtime vertical:** durable FlowRun contracts and event history, immutable draft/published snapshots, bounded sequential typed-graph execution, input validation, cancellation, SignalR replay, telemetry, and the Flow-centered console.
 8. **Next Work increment:** durable execution dispatch/recovery, requester authorization, external artifact storage, cancel propagation, and retry/relaunch operations.
 9. **Delivered Runtime Run increment:** durable Run resources, local queue, exact agent-generation resolution, SQLite history, SSE observation, cancellation, retry, and Agent Runner console.
-10. **Next management increment:** durable long-running operations, manifest importer, resource groups, model/tool/connection/identity providers, and management authentication.
+10. **Next management increment:** durable long-running operations, manifest importer, model/tool/connection/identity providers, and management authentication.
 11. **Next runtime increment:** provider-native streaming and tool telemetry, session storage, tool catalog policies, revision traffic splitting, dedicated process/container and remote endpoint adapters.
 12. **Delivered local model-provider increment:** provider-neutral resolver, the former in-process OllamaSharp adapter, Aspire-provisioned Ollama/model volume, Runner integration, development diagnostic, and offline tests; its adapter placement is superseded by AEP V1.
 13. **Delivered declared model resolution increment:** agent profile reference to profile/deployment/provider resolution, async `IChatClient` resolution, MAF materialization, resolved model Run metadata, and boundary tests.
@@ -364,3 +376,6 @@ Standalone startup creates or repairs `local / default`, the local user, active 
 - ADR-0028: Tool Providers materialize a governed catalog
 - ADR-0029: Aspire consumes an existing local Ollama installation
 - ADR-0030: AEP is an autonomous SDK and Inspector repository
+- ADR-0031: Agentstration-native declarative resource envelope
+- ADR-0032: one authoritative standalone server
+- ADR-0033: canonical names and explicit execution identities

@@ -152,7 +152,7 @@ public sealed class ModelManagementApiTests
             Metadata = agent.Metadata,
             Definition = agent.Definition with
             {
-                ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId("default", "missing-profile"))
+                ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId("missing-profile"))
             }
         };
 
@@ -188,7 +188,7 @@ public sealed class ModelManagementApiTests
             Metadata = current.Metadata,
             Definition = current.Definition with
             {
-                ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId("default", profileName))
+                ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId(profileName))
             }
         };
         using var update = new HttpRequestMessage(HttpMethod.Put, agentPath) { Content = JsonContent.Create(updateRequest) };
@@ -237,7 +237,7 @@ public sealed class ModelManagementApiTests
 
         using var createdResponse = await client.PostAsJsonAsync(
             "/api/modelproviders",
-            new CreateModelProviderRequest("ollama-lab", "default", "local", properties));
+            new CreateModelProviderRequest("ollama-lab", properties));
         Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
         Assert.IsNotNull(createdResponse.Headers.ETag);
         var created = await createdResponse.Content.ReadFromJsonAsync<ModelProviderResource>();
@@ -287,8 +287,6 @@ public sealed class ModelManagementApiTests
         using var client = factory.CreateClient();
         var invalid = new CreateModelProviderRequest(
             "invalid-provider",
-            "default",
-            "local",
             new ModelProviderProperties
             {
                 DisplayName = "Invalid",
@@ -315,12 +313,10 @@ public sealed class ModelManagementApiTests
         var service = factory.Services.GetRequiredService<ModelProfileManagementService>();
         var profile = new ModelProfileResource
         {
-            Id = ModelProfileManagementService.ProfileId("default", "canonical-profile"),
+            Id = ModelProfileManagementService.ProfileId("canonical-profile"),
             Name = "canonical-profile",
             Kind = ResourceKinds.ModelProfile,
             ApiVersion = ManagementApiVersions.CoreV1,
-            ResourceGroup = "default",
-            Location = "local",
             Properties = new ModelProfileProperties
             {
                 DisplayName = "Canonical profile",
@@ -351,15 +347,13 @@ public sealed class ModelManagementApiTests
     {
         await using var factory = Factory();
         var service = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
-        var id = RuntimeProfileManagementService.ProfileId("default", "maf-persistent-test");
+        var id = RuntimeProfileManagementService.ProfileId("maf-persistent-test");
         var stored = await service.CreateAsync(new RuntimeProfileResource
         {
             Id = id,
             Name = "maf-persistent-test",
             Kind = ResourceKinds.RuntimeProfile,
             ApiVersion = ManagementApiVersions.CoreV1,
-            ResourceGroup = "default",
-            Location = "local",
             Properties = new RuntimeProfileProperties
             {
                 DisplayName = "MAF default",
@@ -379,9 +373,9 @@ public sealed class ModelManagementApiTests
 
         Assert.AreEqual(1, stored.Value.Generation);
         Assert.AreEqual("microsoft-agent-framework", stored.Value.Properties.RuntimeType);
-        Assert.IsNotNull(await service.GetAsync("default", "maf-persistent-test", default));
+        Assert.IsNotNull(await service.GetAsync("maf-persistent-test", default));
 
-        var updated = await service.PutAsync("default", "maf-persistent-test", stored.Value.Properties with
+        var updated = await service.PutAsync("maf-persistent-test", stored.Value.Properties with
         {
             Execution = stored.Value.Properties.Execution with { Streaming = StreamingMode.Enabled }
         }, stored.ETag, default);
@@ -389,8 +383,8 @@ public sealed class ModelManagementApiTests
         Assert.AreEqual(StreamingMode.Enabled, updated.Value.Properties.Execution.Streaming);
         Assert.IsEmpty(await service.GetUsagesAsync(id, default));
 
-        await service.DeleteAsync("default", "maf-persistent-test", updated.ETag, default);
-        Assert.IsNull(await service.GetAsync("default", "maf-persistent-test", default));
+        await service.DeleteAsync("maf-persistent-test", updated.ETag, default);
+        Assert.IsNull(await service.GetAsync("maf-persistent-test", default));
     }
 
     private static WebApplicationFactory<Program> Factory() =>
@@ -403,8 +397,6 @@ public sealed class ModelManagementApiTests
 
     private static CreateModelProfileRequest Request(string name, string model) => new(
         name,
-        "default",
-        "local",
         new ModelProfileProperties
         {
             DisplayName = name,
