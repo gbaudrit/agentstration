@@ -116,7 +116,17 @@ public sealed class RuntimeRunService(
         var stored = await GetRequiredAsync(runId, cancellationToken);
         if (stored.Value.Status.State.IsTerminal()) return stored;
         cancellations.Cancel(runId);
-        var cancelled = await stateManager.TransitionAsync(stored, RuntimeRunState.Cancelled, null, "Cancelled by the caller.", cancellationToken);
+        StoredRuntimeRun cancelled;
+        try
+        {
+            cancelled = await stateManager.TransitionAsync(stored, RuntimeRunState.Cancelled, null, "Cancelled by the caller.", cancellationToken);
+        }
+        catch (RuntimeRunConcurrencyException)
+        {
+            var current = await GetRequiredAsync(runId, cancellationToken);
+            if (!current.Value.Status.State.IsTerminal()) throw;
+            return current;
+        }
         await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.StatusChanged, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
         await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, "Run cancelled", state: RuntimeRunState.Cancelled, cancellationToken: cancellationToken);
         return cancelled;
@@ -211,7 +221,8 @@ public sealed class RuntimeRunService(
             activity?.SetTag("error.type", state.ToString());
             if (logger.IsEnabled(LogLevel.Warning))
                 logger.LogWarning("Runtime run execution ended as {RunState} after {DurationMs} ms", state, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
-            await stateManager.CompleteFailureAsync(runId, state, state == RuntimeRunState.Cancelled ? "Run cancelled." : "Run timed out.", stoppingToken);
+            if (state == RuntimeRunState.TimedOut)
+                await stateManager.CompleteFailureAsync(runId, state, "Run timed out.", stoppingToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

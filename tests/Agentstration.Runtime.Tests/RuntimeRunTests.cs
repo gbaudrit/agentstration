@@ -164,6 +164,31 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
+    public async Task ConcurrentTerminalTransitionAcceptsTheWinningStateWithoutDuplicateEvents()
+    {
+        var run = new RuntimeRun
+        {
+            Id = "concurrent-terminal",
+            Name = "concurrent-terminal",
+            Properties = new RuntimeRunProperties
+            {
+                Agent = new RuntimeAgentReference("sql-expert", 3),
+                Input = Input("test"),
+                Execution = new RuntimeExecutionOptions()
+            },
+            Status = new RuntimeRunStatus { State = RuntimeRunState.Running, CreatedAt = DateTimeOffset.UtcNow }
+        };
+        var store = new ConcurrentTerminalRunStore(run);
+        var manager = new RuntimeRunStateManager(store, TimeProvider.System);
+
+        await manager.CompleteFailureAsync(run.Id, RuntimeRunState.TimedOut, "Run timed out.", default);
+
+        Assert.AreEqual(RuntimeRunState.Cancelled, store.Current.Value.Status.State);
+        Assert.AreEqual(1, store.UpdateAttempts);
+        Assert.HasCount(0, store.Events);
+    }
+
+    [TestMethod]
     public async Task InitializationReenqueuesPendingAndRunningButNotTerminalRuns()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
@@ -526,5 +551,35 @@ public sealed class RuntimeRunTests
             await Task.CompletedTask;
             yield break;
         }
+    }
+
+    private sealed class ConcurrentTerminalRunStore(RuntimeRun run) : IRuntimeRunStore
+    {
+        public StoredRuntimeRun Current { get; private set; } = new(run, "etag-1", DateTimeOffset.UtcNow);
+        public int UpdateAttempts { get; private set; }
+        public List<RuntimeRunEvent> Events { get; } = [];
+
+        public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<StoredRuntimeRun> CreateAsync(RuntimeRun value, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<StoredRuntimeRun?> GetAsync(string runId, CancellationToken cancellationToken) => Task.FromResult<StoredRuntimeRun?>(Current);
+        public Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(string? agentResourceId, int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<StoredRuntimeRun> UpdateAsync(RuntimeRun value, string expectedETag, CancellationToken cancellationToken)
+        {
+            UpdateAttempts++;
+            Current = new StoredRuntimeRun(
+                Current.Value with { Status = Current.Value.Status with { State = RuntimeRunState.Cancelled } },
+                "etag-2",
+                DateTimeOffset.UtcNow);
+            throw new RuntimeRunConcurrencyException("Concurrent terminal transition won.");
+        }
+
+        public Task<RuntimeRunEvent> AppendEventAsync(RuntimeRunEvent runEvent, CancellationToken cancellationToken)
+        {
+            Events.Add(runEvent);
+            return Task.FromResult(runEvent);
+        }
+
+        public Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<RuntimeRunEvent>>(Events);
     }
 }

@@ -6,11 +6,22 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
 {
     public async Task CompleteFailureAsync(string runId, RuntimeRunState state, string error, CancellationToken cancellationToken)
     {
-        var current = await RequiredAsync(runId, cancellationToken);
-        if (current.Value.Status.State == RuntimeRunState.Cancelled && state == RuntimeRunState.Cancelled) return;
-        await TransitionAsync(current, state, null, error, cancellationToken);
-        await AppendEventAsync(runId, RuntimeRunEventKind.Error, error, state: state, cancellationToken: cancellationToken);
-        await AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, error, state: state, cancellationToken: cancellationToken);
+        for (var attempt = 0; ; attempt++)
+        {
+            var current = await RequiredAsync(runId, cancellationToken);
+            if (current.Value.Status.State.IsTerminal()) return;
+            try
+            {
+                await TransitionAsync(current, state, null, error, cancellationToken);
+                await AppendEventAsync(runId, RuntimeRunEventKind.Error, error, state: state, cancellationToken: cancellationToken);
+                await AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, error, state: state, cancellationToken: cancellationToken);
+                return;
+            }
+            catch (RuntimeRunConcurrencyException) when (attempt < 2)
+            {
+                // A concurrent cancellation or completion may already have made the run terminal.
+            }
+        }
     }
 
     public Task<StoredRuntimeRun> TransitionAsync(
