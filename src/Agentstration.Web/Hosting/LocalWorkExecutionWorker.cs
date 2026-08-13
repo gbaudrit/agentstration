@@ -1,4 +1,4 @@
-using Agentstration.Management.Core;
+using Agentstration.Infrastructure;
 using Agentstration.Application.Work;
 using Agentstration.Runtime.Local;
 using Agentstration.Work;
@@ -11,7 +11,7 @@ namespace Agentstration.Web.Hosting;
 public sealed class LocalWorkExecutionWorker(
     ILocalWorkExecutionQueue queue,
     WorkItemService workItems,
-    AgentManagementService management,
+    AgentExecutionCoordinator agentExecution,
     FlowRunService flowRuns,
     TimeProvider timeProvider,
     ILogger<LocalWorkExecutionWorker> logger) : BackgroundService
@@ -27,12 +27,12 @@ public sealed class LocalWorkExecutionWorker(
                     await ExecuteFlowAsync(execution, stoppingToken);
                     continue;
                 }
-                var selected = await management.SelectAgentAsync(execution.Request.Instruction, execution.Request.RequestedAgentId, stoppingToken);
+                var selected = await agentExecution.SelectAgentAsync(execution.Request.Instruction, execution.Request.RequestedAgentId, stoppingToken);
                 var started = new WorkExecutionStarted(
                     Guid.NewGuid(), execution.Request.WorkItemId, execution.Accepted.ExecutionId,
                     timeProvider.GetUtcNow(), selected.Route.AgentId);
                 await workItems.ApplyExecutionEventAsync(started, stoppingToken);
-                var runtimeResult = await management.ExecuteSelectedAsync(selected, execution.Request.Instruction, stoppingToken);
+                var runtimeResult = await agentExecution.ExecuteSelectedAsync(selected, execution.Request.Instruction, stoppingToken);
                 var result = new WorkResult(
                     [new WorkResultContent(runtimeResult.Output)],
                     [],

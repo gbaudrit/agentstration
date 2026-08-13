@@ -106,8 +106,6 @@ public sealed record FlowDraft
     public required FlowId FlowId { get; init; }
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
-    public string ResourceGroup { get; init; } = "default";
-    public string Location { get; init; } = "local";
     public IReadOnlyDictionary<string, string> Tags { get; init; } = new Dictionary<string, string>();
     public required FlowGraphDefinition Definition { get; init; }
     public long Revision { get; init; } = 1;

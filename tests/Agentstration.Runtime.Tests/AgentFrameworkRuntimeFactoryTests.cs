@@ -86,7 +86,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
 
         var events = new List<AgentExecutionEvent>();
         await foreach (var item in runtime.ExecuteEventsAsync(
-            new AgentExecutionRequest("stream", Execution: new AgentExecutionOptions { Streaming = StreamingMode.Enabled })))
+            new AgentExecutionRequest("stream", Execution: new AgentExecutionOptions { Streaming = RuntimeStreamingMode.Enabled })))
             events.Add(item);
 
         Assert.AreEqual("microsoft-agent-framework", runtime.RuntimeType);
@@ -135,7 +135,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         activity.TagObjects.Select(tag => $"{tag.Key}={tag.Value}")
             .Concat(activity.Events.SelectMany(activityEvent => activityEvent.Tags.Select(tag => $"{tag.Key}={tag.Value}")));
 
-    private static ResolvedAgentDefinition Definition() => new()
+    private static ExecutableAgentDefinition Definition() => new()
     {
         AgentId = Guid.NewGuid(),
         AgentKey = "sql-expert",

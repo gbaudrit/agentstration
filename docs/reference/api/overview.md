@@ -6,7 +6,7 @@ Both ASP.NET Core API hosts register `AddOpenApi()` and expose the generated doc
 GET /openapi/v1.json
 ```
 
-Use `http://localhost:5100/openapi/v1.json` for the combined Console host or `http://localhost:5080/openapi/v1.json` for Work API. OpenAPI is the source of truth for complete route and schema enumeration.
+Use `http://localhost:5100/openapi/v1.json` for the combined authoritative server. OpenAPI is the source of truth for complete route and schema enumeration.
 
 The current repository does not include Scalar or another OpenAPI UI. Adding a UI or generating reference pages from the document is **planned**; this iteration does not duplicate all endpoint schemas in Markdown.
 

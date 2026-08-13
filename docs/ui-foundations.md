@@ -24,7 +24,7 @@ This document records the first incremental UX/UI refactor. It is intentionally 
 - Use `PageHeader` for collections and task pages. Put counts or scope in `Metadata`; keep the primary action in `Actions`.
 - Use `ResourceHeader` for a named Agent, Flow, model, Runtime, Work Item, Execution, or Run. Supply a stable `Domain` so the icon and accent use the correct token.
 - Use `StatusIndicator` for operational state. Map transport terms to an explicit user-facing label at the UI boundary; never rely on color alone.
-- Use `ResourceToolbar` around search, named scope filters, and refresh/view actions. A scope value must always include its label (for example, `Resource group: default`).
+- Use `ResourceToolbar` around search, named workspace filters, and refresh/view actions. A scope value must always include its label (for example, `Workspace: default`).
 - Use `StateComparison` wherever desired state and active Runtime state can diverge. Do not infer an active generation when the API does not report one.
 - Use `UnsavedChangesBar` only after a form changes. Saving the desired definition and applying it to Runtime must remain visibly distinct actions.
 - Add new colors, spacing, radii, shadows, dimensions, or transitions only as semantic variables in `design-tokens.css`. Existing `--bg`, `--surface`, `--text`, and related aliases bridge older components during progressive migration.

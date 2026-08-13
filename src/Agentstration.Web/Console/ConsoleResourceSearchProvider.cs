@@ -58,9 +58,9 @@ public sealed class ConsoleResourceSearchProvider(
             cache =
             [
                 .. agentsTask.Result.Select(ToResult),
-                .. profilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model profile", item.Id, $"/modelprofiles/{Escape(item.ResourceGroup)}/{Escape(item.Name)}", item.Properties.Status, "◇", $"{item.Name} {item.Properties.Model.Name}")),
-                .. providersTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model provider", item.Id, $"/modelproviders/{Escape(item.ResourceGroup)}/{Escape(item.Name)}", item.Properties.Status, "⬡", $"{item.Name} {item.Properties.ProviderType}")),
-                .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, $"/runtimeprofiles/{Escape(item.ResourceGroup)}/{Escape(item.Name)}", "Configured", "◈", $"{item.Name} {item.Properties.RuntimeType}")),
+                .. profilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model profile", item.Id, $"/modelprofiles/{Escape(item.Name)}", item.Properties.Status, "◇", $"{item.Name} {item.Properties.Model.Name}")),
+                .. providersTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model provider", item.Id, $"/modelproviders/{Escape(item.Name)}", item.Properties.Status, "⬡", $"{item.Name} {item.Properties.ProviderType}")),
+                .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, $"/runtimeprofiles/{Escape(item.Name)}", "Configured", "◈", $"{item.Name} {item.Properties.RuntimeType}")),
                 .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, $"/flows/{Escape(item.Id)}", item.Status, "⌘", $"{item.Kind} {item.Version}")),
                 .. runtimesTask.Result.Select(item => new ResourceSearchResult(item.Id, "Runtime", item.Id, "/runtime", item.Status, "◉", $"{item.Agent} {item.Location}")),
                 .. executionsTask.Result.Select(item => new ResourceSearchResult(item.Id, "Execution", item.Id, $"/runs/{Escape(item.Id)}", item.Status, "▶", $"{item.Agent} {item.Flow}")),
@@ -88,8 +88,7 @@ public sealed class ConsoleResourceSearchProvider(
 
     private static ResourceSearchResult ToResult(AgentSummary item)
     {
-        var identifier = ResourceIdentifier.Parse(item.Id);
-        return new ResourceSearchResult(item.Name, "Agent", item.Id, $"/agents/{Escape(identifier.ResourceGroup)}/{Escape(identifier.Name)}", StatusPresentation.Label(item.Status), "◎", $"{identifier.Name} {item.ModelProfile}");
+        return new ResourceSearchResult(item.Name, "Agent", item.Id, $"/agents/{Escape(item.Id)}", StatusPresentation.Label(item.Status), "◎", $"{item.Id} {item.ModelProfile}");
     }
 
     private static bool Matches(ResourceSearchResult item, string query) =>

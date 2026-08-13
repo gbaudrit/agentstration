@@ -287,6 +287,9 @@ public sealed class FlowTests
         Assert.AreEqual("Initial designer release", version!.ReleaseNotes);
         Assert.IsNotNull(version.Graph);
         Assert.AreEqual(replaced.Value.DefinitionHash, version.DefinitionHash);
+        var routing = Assert.IsInstanceOfType<RoutingFlowSpec>(version.Spec);
+        CollectionAssert.AreEqual(new[] { "sql-expert", "dotnet-expert" }, routing.Destinations.Select(target => target.Id).ToArray());
+        Assert.AreEqual("dotnet-expert", routing.Fallback?.Id);
 
         using var recreateResponse = await client.PostAsync("/api/flows/designer-api-flow/versions/1.0.0/draft", null);
         Assert.AreEqual(HttpStatusCode.OK, recreateResponse.StatusCode);
@@ -343,6 +346,58 @@ public sealed class FlowTests
         Assert.AreEqual(FlowRunEventType.FlowRunCreated, events[0].Type);
         Assert.AreEqual(FlowRunEventType.FlowRunCompleted, events[^1].Type);
         CollectionAssert.AreEqual(events.Select(item => item.Sequence).Order().ToArray(), events.Select(item => item.Sequence).ToArray());
+    }
+
+    [TestMethod]
+    public async Task DraftSnapshotsPreserveRouterAndStaticAgentTargetsWithoutTreatingExpressionsAsAgents()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var queue = new TestFlowRunQueue();
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(fixture.Repository, queue, new TestCancellationRegistry(), new TestAgentExecutor(), expressions, expressions, new NullFlowRunEventSink(), TimeProvider.System);
+
+        var routed = await SnapshotAsync("routed", new FlowGraphDefinition
+        {
+            EntryStep = "router",
+            Steps = [new RouterFlowStepDefinition
+            {
+                Name = "router",
+                Candidates = [new("sql", new("sql-expert")), new("dotnet", new("dotnet-expert"))],
+                Fallback = new("fallback-agent")
+            }]
+        });
+        CollectionAssert.AreEqual(new[] { "sql-expert", "dotnet-expert" }, routed.Destinations.Select(target => target.Id).ToArray());
+        Assert.AreEqual("fallback-agent", routed.Fallback?.Id);
+
+        var staticAgent = await SnapshotAsync("static", new FlowGraphDefinition
+        {
+            EntryStep = "agent",
+            Steps = [new AgentFlowStepDefinition { Name = "agent", Agent = new("sql-expert") }]
+        });
+        CollectionAssert.AreEqual(new[] { "sql-expert" }, staticAgent.Destinations.Select(target => target.Id).ToArray());
+
+        var dynamicAgent = await SnapshotAsync("dynamic", new FlowGraphDefinition
+        {
+            EntryStep = "agent",
+            Steps = [new AgentFlowStepDefinition { Name = "agent", Agent = new("${steps.router.output.selectedAgent}") }]
+        });
+        CollectionAssert.AreEqual(new[] { "unconfigured-agent" }, dynamicAgent.Destinations.Select(target => target.Id).ToArray());
+
+        var noTarget = await SnapshotAsync("no-target", new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" }]
+        });
+        CollectionAssert.AreEqual(new[] { "unconfigured-agent" }, noTarget.Destinations.Select(target => target.Id).ToArray());
+
+        async Task<RoutingFlowSpec> SnapshotAsync(string id, FlowGraphDefinition graph)
+        {
+            var now = TimeProvider.System.GetUtcNow();
+            var draft = new FlowDraft { Id = $"{id}-draft", FlowId = new(id), DisplayName = id, Definition = graph, CreatedAt = now, UpdatedAt = now };
+            using var input = JsonDocument.Parse("{}");
+            var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", id, input.RootElement, default);
+            return Assert.IsInstanceOfType<RoutingFlowSpec>(pending.Value.DefinitionSnapshot.Spec);
+        }
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);

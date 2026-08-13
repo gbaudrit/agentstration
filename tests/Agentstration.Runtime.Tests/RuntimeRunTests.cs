@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
@@ -21,6 +22,7 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class RuntimeRunTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     [TestMethod]
     public async Task CreatePreservesPayloadAndRequiresExactAgentVersion()
     {
@@ -33,7 +35,12 @@ public sealed class RuntimeRunTests
         Assert.AreEqual(3L, created.Value.Properties.Agent.Version);
         Assert.AreEqual("Optimize this query.", created.Value.Properties.Input.Messages[0].Content);
         Assert.AreEqual(RuntimeRunOrigin.Console, created.Value.Properties.Origin);
-        await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 2), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        var missingVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 2), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        Assert.AreEqual("agent_version_not_found", missingVersion.Code);
+        var invalidReference = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference("", 1), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        Assert.AreEqual("agent_reference_invalid", invalidReference.Code);
+        var invalidVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 0), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
+        Assert.AreEqual("agent_version_invalid", invalidVersion.Code);
     }
 
     [TestMethod]
@@ -62,7 +69,7 @@ public sealed class RuntimeRunTests
         var stopped = new ConcurrentQueue<Activity>();
         using var listener = new ActivityListener
         {
-            ShouldListenTo = source => source.Name == RuntimeRunService.ActivitySource.Name,
+            ShouldListenTo = source => source.Name == "Agentstration.Runtime",
             Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
             ActivityStopped = stopped.Enqueue
         };
@@ -139,6 +146,80 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
+    public async Task TimeoutReachesExplicitTerminalState()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        fixture.Registry.Behavior = RuntimeBehavior.Block;
+        var run = await fixture.Service.CreateAsync(
+            new RuntimeAgentReference(fixture.AgentId, 3),
+            Input("timeout"),
+            new RuntimeExecutionOptions { TimeoutSeconds = 1 },
+            RuntimeRunOrigin.Api,
+            "test",
+            default);
+
+        await fixture.Service.ExecuteAsync(run.Value.Id, default);
+
+        Assert.AreEqual(RuntimeRunState.TimedOut, (await fixture.Service.GetAsync(run.Value.Id, default))!.Value.Status.State);
+    }
+
+    [TestMethod]
+    public async Task ConcurrentTerminalTransitionAcceptsTheWinningStateWithoutDuplicateEvents()
+    {
+        var run = new RuntimeRun
+        {
+            Id = "concurrent-terminal",
+            Name = "concurrent-terminal",
+            Properties = new RuntimeRunProperties
+            {
+                Agent = new RuntimeAgentReference("sql-expert", 3),
+                Input = Input("test"),
+                Execution = new RuntimeExecutionOptions()
+            },
+            Status = new RuntimeRunStatus { State = RuntimeRunState.Running, CreatedAt = DateTimeOffset.UtcNow }
+        };
+        var store = new ConcurrentTerminalRunStore(run);
+        var manager = new RuntimeRunStateManager(store, TimeProvider.System);
+
+        await manager.CompleteFailureAsync(run.Id, RuntimeRunState.TimedOut, "Run timed out.", default);
+
+        Assert.AreEqual(RuntimeRunState.Cancelled, store.Current.Value.Status.State);
+        Assert.AreEqual(1, store.UpdateAttempts);
+        Assert.HasCount(0, store.Events);
+    }
+
+    [TestMethod]
+    public async Task InitializationReenqueuesPendingAndRunningButNotTerminalRuns()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var pending = await fixture.CreateRunAsync();
+        var running = await fixture.CreateRunAsync();
+        var succeeded = await fixture.CreateRunAsync();
+        var failed = await fixture.CreateRunAsync();
+        var cancelled = await fixture.CreateRunAsync();
+        var timedOut = await fixture.CreateRunAsync();
+        var startedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+        running = await fixture.Store.UpdateAsync(running.Value with { Status = running.Value.Status with { State = RuntimeRunState.Running, StartedAt = startedAt } }, running.ETag, default);
+        _ = await SetStateAsync(succeeded, RuntimeRunState.Succeeded);
+        _ = await SetStateAsync(failed, RuntimeRunState.Failed);
+        _ = await SetStateAsync(cancelled, RuntimeRunState.Cancelled);
+        _ = await SetStateAsync(timedOut, RuntimeRunState.TimedOut);
+        fixture.Queue.Enqueued.Clear();
+
+        await fixture.Service.InitializeAsync(default);
+
+        CollectionAssert.AreEquivalent(new[] { pending.Value.Id, running.Value.Id }, fixture.Queue.Enqueued.ToArray());
+
+        await fixture.Service.ExecuteAsync(running.Value.Id, default);
+        var recovered = await fixture.Service.GetAsync(running.Value.Id, default);
+        Assert.AreEqual(RuntimeRunState.Succeeded, recovered!.Value.Status.State);
+        Assert.AreEqual(startedAt, recovered.Value.Status.StartedAt);
+
+        Task<StoredRuntimeRun> SetStateAsync(StoredRuntimeRun stored, RuntimeRunState state) =>
+            fixture.Store.UpdateAsync(stored.Value with { Status = stored.Value.Status with { State = state } }, stored.ETag, default);
+    }
+
+    [TestMethod]
     public async Task RetryCreatesNewRunAndTerminalEventStreamCloses()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
@@ -153,6 +234,107 @@ public sealed class RuntimeRunTests
         CollectionAssert.AreEqual(original.Value.Properties.Input.Messages.ToArray(), retry.Value.Properties.Input.Messages.ToArray());
         Assert.AreEqual(original.Value.Properties.Input.Context, retry.Value.Properties.Input.Context);
         Assert.AreEqual(RuntimeRunEventKind.RunCompleted, observed[^1].Kind);
+    }
+
+    [TestMethod]
+    public async Task InitializationMigratesLegacyRuntimeRunSchemaWithoutLosingRows()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-migration-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var databasePath = Path.Combine(directory, "runtime.db");
+        try
+        {
+            var timestamp = new DateTimeOffset(2026, 8, 12, 10, 0, 0, TimeSpan.Zero);
+            var legacyRun = new RuntimeRun
+            {
+                Id = "existing",
+                Name = "existing",
+                Properties = new RuntimeRunProperties
+                {
+                    Agent = new RuntimeAgentReference("sql-expert", 1),
+                    Input = new RuntimeRunInput { Messages = [new(RuntimeMessageRole.User, "legacy")] },
+                    Execution = new RuntimeExecutionOptions()
+                },
+                Status = new RuntimeRunStatus { State = RuntimeRunState.Pending, CreatedAt = timestamp }
+            };
+            var legacyEvent = new RuntimeRunEvent
+            {
+                Sequence = 1,
+                EventId = Guid.NewGuid(),
+                RunId = legacyRun.Id,
+                Kind = RuntimeRunEventKind.RunCreated,
+                Timestamp = timestamp,
+                State = RuntimeRunState.Pending
+            };
+            await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+            {
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                var legacyColumn = "Resource" + "Group";
+                command.CommandText =
+                    $$"""
+                    CREATE TABLE RuntimeRuns (
+                        RunId TEXT NOT NULL PRIMARY KEY,
+                        AgentResourceId TEXT NOT NULL,
+                        {{legacyColumn}} TEXT NOT NULL,
+                        State TEXT NOT NULL,
+                        Payload TEXT NOT NULL,
+                        ETag TEXT NOT NULL,
+                        CreatedAt INTEGER NOT NULL,
+                        UpdatedAt INTEGER NOT NULL
+                    );
+                    CREATE TABLE RuntimeRunEvents (
+                        RunId TEXT NOT NULL,
+                        Sequence INTEGER NOT NULL,
+                        Payload TEXT NOT NULL,
+                        Timestamp TEXT NOT NULL,
+                        PRIMARY KEY (RunId, Sequence)
+                    );
+                    INSERT INTO RuntimeRuns VALUES ('existing', 'sql-expert', 'default', 'Pending', $runPayload, 'etag', $ticks, $ticks);
+                    INSERT INTO RuntimeRunEvents VALUES ('existing', 1, $eventPayload, $timestamp);
+                    """;
+                command.Parameters.AddWithValue("$runPayload", JsonSerializer.Serialize(legacyRun, JsonOptions));
+                command.Parameters.AddWithValue("$eventPayload", JsonSerializer.Serialize(legacyEvent, JsonOptions));
+                command.Parameters.AddWithValue("$ticks", timestamp.UtcTicks);
+                command.Parameters.AddWithValue("$timestamp", timestamp.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+                await command.ExecuteNonQueryAsync();
+            }
+
+            var services = new ServiceCollection();
+            services.AddSingleton(TimeProvider.System);
+            services.AddSqliteRuntimeRuns($"Data Source={databasePath}");
+            await using var provider = services.BuildServiceProvider();
+            var store = provider.GetRequiredService<IRuntimeRunStore>();
+
+            await store.InitializeAsync(default);
+            await store.InitializeAsync(default);
+
+            var restored = await store.GetAsync("existing", default);
+            Assert.IsNotNull(restored);
+            Assert.AreEqual("legacy", restored.Value.Properties.Input.Messages.Single().Content);
+            var restoredEvents = await store.ListEventsAsync("existing", 0, default);
+            Assert.HasCount(1, restoredEvents);
+            Assert.AreEqual(RuntimeRunEventKind.RunCreated, restoredEvents[0].Kind);
+
+            await using var verification = new SqliteConnection($"Data Source={databasePath}");
+            await verification.OpenAsync();
+            await using var schema = verification.CreateCommand();
+            schema.CommandText = "PRAGMA table_info('RuntimeRuns');";
+            await using var reader = await schema.ExecuteReaderAsync();
+            var columns = new List<string>();
+            while (await reader.ReadAsync()) columns.Add(reader.GetString(1));
+            Assert.IsFalse(columns.Contains("Resource" + "Group", StringComparer.OrdinalIgnoreCase));
+            await reader.DisposeAsync();
+            schema.CommandText = "SELECT COUNT(*) FROM RuntimeRuns WHERE RunId = 'existing';";
+            Assert.AreEqual(1L, (long)(await schema.ExecuteScalarAsync())!);
+            schema.CommandText = "SELECT COUNT(*) FROM RuntimeRunEvents WHERE RunId = 'existing';";
+            Assert.AreEqual(1L, (long)(await schema.ExecuteScalarAsync())!);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
     }
 
     [TestMethod]
@@ -173,12 +355,12 @@ public sealed class RuntimeRunTests
         var workBefore = await client.GetFromJsonAsync<WorkItemPageResponse>("/api/work/workitems?top=100");
         var request = new CreateRuntimeRunRequest
         {
-            Agent = new RuntimeAgentReference(agent.Id, agent.Generation),
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation),
             Input = Input("integration prompt"),
             Origin = RuntimeRunOrigin.Api
         };
 
-        var readiness = await client.GetFromJsonAsync<AgentRuntimeReadinessResponse>($"/api/runtime/agents/sql-expert/readiness?resourceGroup=default&generation={agent.Generation}");
+        var readiness = await client.GetFromJsonAsync<AgentRuntimeReadinessResponse>($"/api/runtime/agents/sql-expert/readiness?generation={agent.Generation}");
 
         using var createdResponse = await client.PostAsJsonAsync("/api/runtime/runs", request);
         Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);
@@ -249,15 +431,17 @@ public sealed class RuntimeRunTests
         public RuntimeRunService Service { get; }
         public IRuntimeRunStore Store { get; }
         public FakeRuntimeRegistry Registry { get; }
+        public TestRuntimeRunQueue Queue { get; }
         public string AgentId { get; }
 
-        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store, FakeRuntimeRegistry registry, string agentId)
+        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store, FakeRuntimeRegistry registry, TestRuntimeRunQueue queue, string agentId)
         {
             this.directory = directory;
             this.provider = provider;
             Service = service;
             Store = store;
             Registry = registry;
+            Queue = queue;
             AgentId = agentId;
         }
 
@@ -268,13 +452,18 @@ public sealed class RuntimeRunTests
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddSingleton(TimeProvider.System);
+            services.AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>();
             services.AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")}");
+            services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();
             services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")}");
-            services.AddSingleton<IRuntimeRunQueue, LocalRuntimeRunQueue>();
+            var queue = new TestRuntimeRunQueue();
+            services.AddSingleton(queue);
+            services.AddSingleton<IRuntimeRunQueue>(queue);
             services.AddSingleton<IRuntimeRunCancellationRegistry, LocalRuntimeRunCancellationRegistry>();
             var registry = new FakeRuntimeRegistry();
             services.AddSingleton(registry);
             services.AddSingleton<IRuntimeRegistry>(registry);
+            services.AddSingleton<RuntimeRunStateManager>();
             services.AddSingleton<RuntimeRunService>();
             var provider = services.BuildServiceProvider();
             var management = provider.GetRequiredService<IControlPlaneStore>();
@@ -287,7 +476,7 @@ public sealed class RuntimeRunTests
             var agent = await management.PutAsync(Agent(agentId), null, true, default);
             await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid), default);
             await management.PutAsync(Deployment(revisionId), null, true, default);
-            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, registry, agentId);
+            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, registry, queue, agentId);
         }
 
         public Task<StoredRuntimeRun> CreateRunAsync() => Service.CreateAsync(new RuntimeAgentReference(AgentId, 3), Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", default);
@@ -346,5 +535,51 @@ public sealed class RuntimeRunTests
             OperationalState = OperationalState.Ready,
             UpdatedAt = DateTimeOffset.UtcNow
         };
+    }
+
+    private sealed class TestRuntimeRunQueue : IRuntimeRunQueue
+    {
+        public List<string> Enqueued { get; } = [];
+        public ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken)
+        {
+            Enqueued.Add(runId);
+            return ValueTask.CompletedTask;
+        }
+
+        public async IAsyncEnumerable<string> ReadAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+
+    private sealed class ConcurrentTerminalRunStore(RuntimeRun run) : IRuntimeRunStore
+    {
+        public StoredRuntimeRun Current { get; private set; } = new(run, "etag-1", DateTimeOffset.UtcNow);
+        public int UpdateAttempts { get; private set; }
+        public List<RuntimeRunEvent> Events { get; } = [];
+
+        public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<StoredRuntimeRun> CreateAsync(RuntimeRun value, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<StoredRuntimeRun?> GetAsync(string runId, CancellationToken cancellationToken) => Task.FromResult<StoredRuntimeRun?>(Current);
+        public Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(string? agentResourceId, int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<StoredRuntimeRun> UpdateAsync(RuntimeRun value, string expectedETag, CancellationToken cancellationToken)
+        {
+            UpdateAttempts++;
+            Current = new StoredRuntimeRun(
+                Current.Value with { Status = Current.Value.Status with { State = RuntimeRunState.Cancelled } },
+                "etag-2",
+                DateTimeOffset.UtcNow);
+            throw new RuntimeRunConcurrencyException("Concurrent terminal transition won.");
+        }
+
+        public Task<RuntimeRunEvent> AppendEventAsync(RuntimeRunEvent runEvent, CancellationToken cancellationToken)
+        {
+            Events.Add(runEvent);
+            return Task.FromResult(runEvent);
+        }
+
+        public Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<RuntimeRunEvent>>(Events);
     }
 }

@@ -50,8 +50,8 @@ public sealed class ModelManagementApiTests
         var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/ollama-local");
 
         Assert.IsNotNull(provider);
-        Assert.AreEqual(new Uri("http://localhost:5265"), provider.Properties.Endpoint);
-        Assert.AreNotEqual(new Uri("http://localhost:11434"), provider.Properties.Endpoint);
+        Assert.AreEqual(new Uri("http://localhost:5265"), provider.Definition.Endpoint);
+        Assert.AreNotEqual(new Uri("http://localhost:11434"), provider.Definition.Endpoint);
     }
 
     [TestMethod]
@@ -85,12 +85,12 @@ public sealed class ModelManagementApiTests
         Assert.IsNotNull(created);
         var profileStore = factory.Services.GetRequiredService<IModelProfileStore>();
         var deploymentStore = factory.Services.GetRequiredService<IModelDeploymentStore>();
-        var runtimeProfile = await profileStore.GetRequiredAsync(created.Id);
+        var runtimeProfile = await profileStore.GetRequiredAsync(created.Metadata.Name);
         var runtimeDeployment = await deploymentStore.GetRequiredAsync(runtimeProfile.DeploymentName);
         Assert.AreEqual(ModelProviderManagementService.ModelProviderId("ollama-local"), runtimeDeployment.ProviderName);
         Assert.AreEqual("model-not-downloaded", runtimeDeployment.ModelName);
 
-        var updatedProperties = created.Properties with { Description = "Updated profile" };
+        var updatedProperties = created.Definition with { Description = "Updated profile" };
         using var update = new HttpRequestMessage(HttpMethod.Put, "/api/modelprofiles/api-test-profile")
         {
             Content = JsonContent.Create(new PutModelProfileRequest(updatedProperties))
@@ -152,13 +152,38 @@ public sealed class ModelManagementApiTests
             Metadata = agent.Metadata,
             Definition = agent.Definition with
             {
-                ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId("default", "missing-profile"))
+                ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId("missing-profile"))
             }
         };
 
         using var response = await client.PutAsJsonAsync(path, request);
 
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.AreEqual("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [TestMethod]
+    public async Task AgentUpdateRejectsCrossWorkspaceResourceReference()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        const string path = "/api/agents/sql-expert";
+        var agent = await client.GetFromJsonAsync<AgentResource>(path);
+        Assert.IsNotNull(agent);
+        var request = new AgentResourceRequest
+        {
+            ApiVersion = agent.ApiVersion,
+            Kind = agent.Kind,
+            Metadata = agent.Metadata,
+            Definition = agent.Definition with
+            {
+                ModelProfile = new ResourceReference(agent.Definition.ModelProfile.Name, "another-workspace")
+            }
+        };
+
+        using var response = await client.PutAsJsonAsync(path, request);
+
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.AreEqual("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
@@ -188,7 +213,7 @@ public sealed class ModelManagementApiTests
             Metadata = current.Metadata,
             Definition = current.Definition with
             {
-                ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId("default", profileName))
+                ModelProfile = new ResourceReference(ModelProfileManagementService.ProfileId(profileName))
             }
         };
         using var update = new HttpRequestMessage(HttpMethod.Put, agentPath) { Content = JsonContent.Create(updateRequest) };
@@ -237,18 +262,18 @@ public sealed class ModelManagementApiTests
 
         using var createdResponse = await client.PostAsJsonAsync(
             "/api/modelproviders",
-            new CreateModelProviderRequest("ollama-lab", "default", "local", properties));
+            new CreateModelProviderRequest("ollama-lab", properties));
         Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
         Assert.IsNotNull(createdResponse.Headers.ETag);
         var created = await createdResponse.Content.ReadFromJsonAsync<ModelProviderResource>();
         Assert.IsNotNull(created);
-        Assert.AreEqual(new Uri("http://127.0.0.1:11435/"), created.Properties.Endpoint);
+        Assert.AreEqual(new Uri("http://127.0.0.1:11435/"), created.Definition.Endpoint);
 
         using var getResponse = await client.GetAsync("/api/modelproviders/ollama-lab");
         Assert.AreEqual(HttpStatusCode.OK, getResponse.StatusCode);
         Assert.AreEqual(createdResponse.Headers.ETag, getResponse.Headers.ETag);
 
-        var updatedProperties = created.Properties with
+        var updatedProperties = created.Definition with
         {
             DisplayName = "Ollama workstation",
             Endpoint = new Uri("http://127.0.0.1:11436")
@@ -287,8 +312,6 @@ public sealed class ModelManagementApiTests
         using var client = factory.CreateClient();
         var invalid = new CreateModelProviderRequest(
             "invalid-provider",
-            "default",
-            "local",
             new ModelProviderProperties
             {
                 DisplayName = "Invalid",
@@ -315,13 +338,10 @@ public sealed class ModelManagementApiTests
         var service = factory.Services.GetRequiredService<ModelProfileManagementService>();
         var profile = new ModelProfileResource
         {
-            Id = ModelProfileManagementService.ProfileId("default", "canonical-profile"),
-            Name = "canonical-profile",
+            Metadata = new ResourceMetadata { Name = "canonical-profile" },
             Kind = ResourceKinds.ModelProfile,
             ApiVersion = ManagementApiVersions.CoreV1,
-            ResourceGroup = "default",
-            Location = "local",
-            Properties = new ModelProfileProperties
+            Definition = new ModelProfileProperties
             {
                 DisplayName = "Canonical profile",
                 Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local")),
@@ -337,7 +357,7 @@ public sealed class ModelManagementApiTests
         };
 
         var stored = await service.CreateAsync(profile, default);
-        var resolved = await ((IModelProfileStore)service).GetRequiredAsync(stored.Value.Id);
+        var resolved = await ((IModelProfileStore)service).GetRequiredAsync(stored.Value.Metadata.Name);
         var deployment = await ((IModelDeploymentStore)service).GetRequiredAsync(resolved.DeploymentName);
 
         Assert.AreEqual(0.2, resolved.Generation.Temperature);
@@ -351,16 +371,13 @@ public sealed class ModelManagementApiTests
     {
         await using var factory = Factory();
         var service = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
-        var id = RuntimeProfileManagementService.ProfileId("default", "maf-persistent-test");
+        var id = RuntimeProfileManagementService.ProfileId("maf-persistent-test");
         var stored = await service.CreateAsync(new RuntimeProfileResource
         {
-            Id = id,
-            Name = "maf-persistent-test",
+            Metadata = new ResourceMetadata { Name = id },
             Kind = ResourceKinds.RuntimeProfile,
             ApiVersion = ManagementApiVersions.CoreV1,
-            ResourceGroup = "default",
-            Location = "local",
-            Properties = new RuntimeProfileProperties
+            Definition = new RuntimeProfileProperties
             {
                 DisplayName = "MAF default",
                 RuntimeType = "microsoft-agent-framework",
@@ -378,19 +395,19 @@ public sealed class ModelManagementApiTests
         }, default);
 
         Assert.AreEqual(1, stored.Value.Generation);
-        Assert.AreEqual("microsoft-agent-framework", stored.Value.Properties.RuntimeType);
-        Assert.IsNotNull(await service.GetAsync("default", "maf-persistent-test", default));
+        Assert.AreEqual("microsoft-agent-framework", stored.Value.Definition.RuntimeType);
+        Assert.IsNotNull(await service.GetAsync("maf-persistent-test", default));
 
-        var updated = await service.PutAsync("default", "maf-persistent-test", stored.Value.Properties with
+        var updated = await service.PutAsync("maf-persistent-test", stored.Value.Definition with
         {
-            Execution = stored.Value.Properties.Execution with { Streaming = StreamingMode.Enabled }
+            Execution = stored.Value.Definition.Execution with { Streaming = StreamingMode.Enabled }
         }, stored.ETag, default);
         Assert.AreEqual(2, updated.Value.Generation);
-        Assert.AreEqual(StreamingMode.Enabled, updated.Value.Properties.Execution.Streaming);
+        Assert.AreEqual(StreamingMode.Enabled, updated.Value.Definition.Execution.Streaming);
         Assert.IsEmpty(await service.GetUsagesAsync(id, default));
 
-        await service.DeleteAsync("default", "maf-persistent-test", updated.ETag, default);
-        Assert.IsNull(await service.GetAsync("default", "maf-persistent-test", default));
+        await service.DeleteAsync("maf-persistent-test", updated.ETag, default);
+        Assert.IsNull(await service.GetAsync("maf-persistent-test", default));
     }
 
     private static WebApplicationFactory<Program> Factory() =>
@@ -403,8 +420,6 @@ public sealed class ModelManagementApiTests
 
     private static CreateModelProfileRequest Request(string name, string model) => new(
         name,
-        "default",
-        "local",
         new ModelProfileProperties
         {
             DisplayName = name,

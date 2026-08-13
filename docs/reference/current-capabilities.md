@@ -122,17 +122,17 @@ The most direct route is:
 dotnet run --project src/Agentstration.Web
 ```
 
-Open the Console at `http://localhost:5100`. Port `5080` is reserved for Work API and its root path intentionally has no UI. Data is persisted to `src/Agentstration.Web/.agentstration/data.json` and is intentionally ignored by Git.
+Open the Console at `http://localhost:5100`. The same process hosts all Management, Runtime, Flow, Work, Workplace, content, MCP, and SignalR surfaces. Data is persisted to `src/Agentstration.Web/.agentstration/data.json` and is intentionally ignored by Git.
 
-The end-user Workplace is now an autonomous host. Start its offline Work API and UI in separate terminals:
+The end-user Workplace remains an autonomous UI host. Start the authoritative server and UI in separate terminals:
 
 ```powershell
 $env:AI__Provider = "Deterministic"
-dotnet run --project src/Agentstration.Work.Api
+dotnet run --project src/Agentstration.Web
 dotnet run --project src/Agentstration.Workplace.Web
 ```
 
-Open `http://localhost:5180`; its API defaults to `http://localhost:5080`. The responsive UX uses the same design system and visual language as the Console while retaining end-user vocabulary. See [the Workplace guide](../workplace.md).
+Open `http://localhost:5180`; its API defaults to `http://localhost:5100`. The responsive UX uses the same design system and visual language as the Console while retaining end-user vocabulary. See [the Workplace guide](../workplace.md).
 
 The Console Tasks section at `/tasks` supervises the real WorkTasks exposed by Work API. It uses server-side pagination and SignalR updates, remains readable when Workplace is stopped, and never substitutes fictitious Tasks when Work API is unavailable.
 
@@ -144,7 +144,7 @@ For the Aspire dashboard and orchestration experience:
 dotnet run --project src/Agentstration.AppHost
 ```
 
-The AppHost exposes the Console, Work API, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to the existing local Ollama installation configured by `Ollama:Endpoint` (default `http://localhost:11434`); it does not provision an Ollama server or model. The default Work API remains deterministic and offline.
+The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to the existing local Ollama installation configured by `Ollama:Endpoint` (default `http://localhost:11434`); it does not provision an Ollama server or model. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
 
 Or with containers:
 
@@ -176,21 +176,21 @@ The seeded `reasoning-default` profile resolves to the persisted `ollama-local` 
 The Agent Runner uses this resolver through Microsoft Agent Framework, so no Ollama-specific execution path exists in the Runtime Plane. Create a normal durable Runtime Run to exercise the entire declared-agent path:
 
 ```powershell
-$agentId = "/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert"
+$agentId = "sql-expert"
 $body = @{
   agent = @{ resourceId = $agentId; version = 1 }
   input = @{ messages = @(@{ role = "User"; content = "Quelle est la différence entre WHERE et HAVING ?" }) }
   execution = @{ mode = "Interactive"; timeoutSeconds = 120 }
   origin = "Api"
 } | ConvertTo-Json -Depth 8
-Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5080/api/runtime/runs
+Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5100/api/runtime/runs
 ```
 
 The returned Run is processed asynchronously and exposes `status.modelProvider`, `status.resolvedModel`, and the final response when complete. In Development, the smaller connectivity diagnostic remains available:
 
 ```powershell
 $body = @{ prompt = "Reply with one short sentence." } | ConvertTo-Json
-Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5080/api/diagnostics/models/ollama/chat
+Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5100/api/diagnostics/models/ollama/chat
 ```
 
 `Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. The autonomous `Agentstration.Extensions.Ollama` service alone owns OllamaSharp, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no AEP or Ollama dependency.
@@ -202,11 +202,11 @@ Current limitations are deliberate: Ollama is the only mutable provider type, cr
 Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Aspire starts the AEP extension and supplies its initial seed URL, but relies on the configured local Ollama installation and remains outside the provider source of truth:
 
 ```powershell
-Invoke-RestMethod http://localhost:5080/api/modelproviders
-Invoke-RestMethod http://localhost:5080/api/modelproviders/ollama-local/status
-Invoke-RestMethod http://localhost:5080/api/modelproviders/ollama-local/models
-Invoke-RestMethod -Method Post http://localhost:5080/api/modelproviders/ollama-local/test
-Invoke-RestMethod http://localhost:5080/api/modelproviders/ollama-local/usages
+Invoke-RestMethod http://localhost:5100/api/modelproviders
+Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/status
+Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/models
+Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/test
+Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/usages
 ```
 
 Create or edit a local Ollama declaration from the Blazor console at `/modelproviders`. Provider URLs must be absolute HTTP(S) URLs without embedded credentials, query strings, or fragments. Saving a provider does not require Ollama to be online; health and installed models remain observed state. Deleting a provider is rejected while a model profile references its exact resource ID.
@@ -214,10 +214,10 @@ Create or edit a local Ollama declaration from the Blazor console at `/modelprov
 Model profiles are durable Management Plane resources with ETag concurrency and usage protection:
 
 ```powershell
-Invoke-RestMethod http://localhost:5080/api/modelprofiles
-Invoke-RestMethod http://localhost:5080/api/modelprofiles/reasoning-default/resolution
-Invoke-RestMethod http://localhost:5080/api/modelprofiles/reasoning-default/usages
-Invoke-RestMethod http://localhost:5080/api/agents/sql-expert/model
+Invoke-RestMethod http://localhost:5100/api/modelprofiles
+Invoke-RestMethod http://localhost:5100/api/modelprofiles/reasoning-default/resolution
+Invoke-RestMethod http://localhost:5100/api/modelprofiles/reasoning-default/usages
+Invoke-RestMethod http://localhost:5100/api/agents/sql-expert/model
 ```
 
 Model profiles separate portable `generation`, `reasoning`, and `output` intent from provider-keyed `providerOptions`. V1 has no legacy `options` shape: reset/reseed the local control-plane database after upgrading from an earlier development snapshot. Runtime behavior is represented independently by `RuntimeProfileResource`; streaming is an execution/runtime option, not a model-profile property. The MAF adapter maps these canonical values to `ChatOptions` and normalized Agentstration execution events, while the Ollama adapter owns `think`, `keepAlive`, engine options, and the chat-versus-generate compatibility check.
@@ -233,7 +233,7 @@ The Blazor console exposes this vertical through `/modelproviders`, `/modelprofi
 After startup, inspect a seeded deployment:
 
 ```powershell
-$base = "http://localhost:5080/api"
+$base = "http://localhost:5100/api"
 Invoke-RestMethod "$base/deployments/sql-expert"
 ```
 
@@ -252,13 +252,13 @@ The Agent Runner and Runtime API create durable executions without creating Work
 
 ```powershell
 $runBody = @{
-  agent = @{ resourceId = "/resourceGroups/default/providers/Agentstration.Agents/agents/sql-expert"; version = 1 }
+  agent = @{ resourceId = "sql-expert"; version = 1 }
   input = @{ messages = @(@{ role = "User"; content = "Analyze this SQL query." }) }
   execution = @{ mode = "Interactive"; timeoutSeconds = 120 }
   origin = "Api"
 } | ConvertTo-Json -Depth 8
-$run = Invoke-RestMethod -Method Post -ContentType application/json -Body $runBody http://localhost:5080/api/runtime/runs
-Invoke-RestMethod "http://localhost:5080/api/runtime/runs/$($run.id)"
+$run = Invoke-RestMethod -Method Post -ContentType application/json -Body $runBody http://localhost:5100/api/runtime/runs
+Invoke-RestMethod "http://localhost:5100/api/runtime/runs/$($run.id)"
 ```
 
 Run history and ordered events are stored independently in `.agentstration/runtime-plane.db`. The console exposes Quick Run, advanced context/parameters, SSE progress, cancellation, retry, trace and raw inspection from each agent page.
@@ -270,32 +270,32 @@ Agent management and Agent Runner always call the canonical Management and Runti
 List the seeded workspace and inbox:
 
 ```powershell
-$workspace = Invoke-RestMethod http://localhost:5080/api/workspaces | Select-Object -First 1
-$inbox = Invoke-RestMethod "http://localhost:5080/api/workspaces/$($workspace.id.value)/inboxes" | Select-Object -First 1
+$workspace = Invoke-RestMethod http://localhost:5100/api/workspaces | Select-Object -First 1
+$inbox = Invoke-RestMethod "http://localhost:5100/api/workspaces/$($workspace.id.value)/inboxes" | Select-Object -First 1
 ```
 
 Ingest text and inspect the asynchronous result:
 
 ```powershell
 $body = @{ text = "Microsoft Agent Framework enables provider-neutral agent workflows." } | ConvertTo-Json
-$accepted = Invoke-RestMethod -Method Post -ContentType application/json -Body $body "http://localhost:5080/api/workspaces/$($workspace.id.value)/inboxes/$($inbox.id.value)/items"
+$accepted = Invoke-RestMethod -Method Post -ContentType application/json -Body $body "http://localhost:5100/api/workspaces/$($workspace.id.value)/inboxes/$($inbox.id.value)/items"
 Start-Sleep -Seconds 1
-Invoke-RestMethod "http://localhost:5080/api/workspaces/$($workspace.id.value)/items/$($accepted.itemId.value)"
+Invoke-RestMethod "http://localhost:5100/api/workspaces/$($workspace.id.value)/items/$($accepted.itemId.value)"
 ```
 
 Search memory:
 
 ```powershell
 $search = @{ query = "agent"; limit = 20 } | ConvertTo-Json
-Invoke-RestMethod -Method Post -ContentType application/json -Body $search "http://localhost:5080/api/workspaces/$($workspace.id.value)/memory/search"
+Invoke-RestMethod -Method Post -ContentType application/json -Body $search "http://localhost:5100/api/workspaces/$($workspace.id.value)/memory/search"
 ```
 
 Create and run a deterministic monitoring mission:
 
 ```powershell
 $missionBody = @{ name="Price watch"; objective="Notify below 300"; sourceUrl="demo://product/coffee-machine"; frequencyMinutes=360; threshold=300 } | ConvertTo-Json
-$mission = Invoke-RestMethod -Method Post -ContentType application/json -Body $missionBody "http://localhost:5080/api/workspaces/$($workspace.id.value)/missions"
-Invoke-RestMethod -Method Post "http://localhost:5080/api/workspaces/$($workspace.id.value)/missions/$($mission.id.value)/run"
+$mission = Invoke-RestMethod -Method Post -ContentType application/json -Body $missionBody "http://localhost:5100/api/workspaces/$($workspace.id.value)/missions"
+Invoke-RestMethod -Method Post "http://localhost:5100/api/workspaces/$($workspace.id.value)/missions/$($mission.id.value)/run"
 ```
 
 ### Work plane
@@ -304,9 +304,9 @@ Submit work through the canonical Work Plane API:
 
 ```powershell
 $body = @{ type = "question"; title = "SQL review"; instruction = "How can I optimize this SQL query?" } | ConvertTo-Json
-$work = Invoke-RestMethod -Method Post -ContentType application/json -Body $body "http://localhost:5080/api/work/workitems"
-Invoke-RestMethod "http://localhost:5080/api/work/workitems/$($work.id)"
-Invoke-RestMethod "http://localhost:5080/api/work/workitems/$($work.id)/result"
+$work = Invoke-RestMethod -Method Post -ContentType application/json -Body $body "http://localhost:5100/api/work/workitems"
+Invoke-RestMethod "http://localhost:5100/api/work/workitems/$($work.id)"
+Invoke-RestMethod "http://localhost:5100/api/work/workitems/$($work.id)/result"
 ```
 
 The local adapter queues the request, executes it through the existing Runtime Plane, and applies stable execution events to the persisted `WorkItem`. Work data is stored independently in `.agentstration/work-plane.db`.
@@ -324,8 +324,8 @@ $flow = @{
   enabled = $true
   spec = @{ specKind = "direct"; target = @{ kind = "Agent"; id = "sql-expert" } }
 } | ConvertTo-Json -Depth 8
-Invoke-RestMethod -Method Post -ContentType application/json -Body $flow "http://localhost:5080/api/flows"
-Invoke-RestMethod -Method Post -ContentType application/json -Body (@{ version="1.0.0"; activate=$true } | ConvertTo-Json) "http://localhost:5080/api/flows/sql-direct/versions"
+Invoke-RestMethod -Method Post -ContentType application/json -Body $flow "http://localhost:5100/api/flows"
+Invoke-RestMethod -Method Post -ContentType application/json -Body (@{ version="1.0.0"; activate=$true } | ConvertTo-Json) "http://localhost:5100/api/flows/sql-direct/versions"
 ```
 
 Flow definitions are stored in `.agentstration/flow-plane.db`. Published versions are immutable; a `WorkItem` may carry a lightweight exact or active `FlowReference` without embedding the definition.
@@ -334,14 +334,14 @@ The Flow console at `/flows` provides creation templates, a four-zone visual des
 
 ## MCP
 
-The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5080/mcp`. Example VS Code `.vscode/mcp.json`:
+The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5100/mcp`. Example VS Code `.vscode/mcp.json`:
 
 ```json
 {
   "servers": {
     "agentstration": {
       "type": "http",
-      "url": "http://localhost:5080/mcp"
+      "url": "http://localhost:5100/mcp"
     }
   }
 }

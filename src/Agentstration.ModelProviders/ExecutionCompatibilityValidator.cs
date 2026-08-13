@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Runtime.Abstractions;
 
-namespace Agentstration.Runtime.Abstractions;
+namespace Agentstration.ModelProviders;
 
 public sealed record ExecutionCapabilityIssue(
     string Capability,
@@ -37,7 +38,7 @@ public static class ExecutionCompatibilityValidator
             Require("reasoning", capabilities.Reasoning.Support, "Reasoning was requested but is not supported by the effective execution chain.", issues);
             if (profile.Reasoning.Effort is { } effort
                 && capabilities.Reasoning.SupportedEfforts.Count > 0
-                && !capabilities.Reasoning.SupportedEfforts.Contains(effort))
+                && !capabilities.Reasoning.SupportedEfforts.Contains(effort.ToString()))
                 Add("reasoning.effort", capabilities.Reasoning.Support, $"Reasoning effort '{effort}' is not supported by the effective execution chain.", issues);
         }
         if (profile.Output.Format != ModelOutputFormat.Text)
@@ -45,7 +46,7 @@ public static class ExecutionCompatibilityValidator
         if (profile.Output.Strict && capabilities.StructuredOutput.Support is CapabilitySupport.Unsupported or CapabilitySupport.Partial)
             Add("structuredOutput.strict", capabilities.StructuredOutput.Support, "Strict structured output requires full effective support.", issues);
         if (toolsRequested) Require("tools", capabilities.Tools.Support, "Tool calling was requested but is not supported by the effective execution chain.", issues);
-        if (execution.Streaming == StreamingMode.Enabled)
+        if (execution.Streaming == RuntimeStreamingMode.Enabled)
             Require("streaming", capabilities.Streaming.Support, "Streaming was requested but is not supported by the effective execution chain.", issues);
         if (string.Equals(runtime, "microsoft-agent-framework", StringComparison.OrdinalIgnoreCase)
             && string.Equals(endpointMode, "generate", StringComparison.OrdinalIgnoreCase))

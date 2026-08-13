@@ -1,10 +1,22 @@
 using System.Collections.Concurrent;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.AI;
 
 namespace Agentstration.Runtime.Local;
+
+public sealed record ProvisioningResult(bool Succeeded, string? Endpoint, string? Error);
+public sealed record RuntimeObservation(OperationalState State, string? RevisionId, string? Error);
+
+public interface IAgentDeploymentProvisioner
+{
+    AgentHostingMode HostingMode { get; }
+    Task<ProvisioningResult> ProvisionAsync(AgentRevision revision, AgentDeployment deployment, CancellationToken cancellationToken);
+    Task<ProvisioningResult> DeprovisionAsync(AgentDeployment deployment, CancellationToken cancellationToken);
+    Task<RuntimeObservation> ObserveAsync(AgentDeployment deployment, CancellationToken cancellationToken);
+}
 
 public sealed class RuntimeRegistry : IRuntimeRegistry
 {
@@ -64,9 +76,9 @@ public abstract class LocalAgentProvisioner(
         if (factory is null) return new ProvisioningResult(false, null, $"No runtime factory is registered for handler '{revision.Definition.Handler}'.");
         try
         {
-            var runtime = await factory.CreateAsync(revision.Definition, revision.Metadata.Name, context, cancellationToken);
+            var runtime = await factory.CreateAsync(RuntimeAgentDefinitionMapper.ToExecutable(revision.Definition), revision.Metadata.Name, context, cancellationToken);
             registry.Set(deployment.Uid.ToString("N"), runtime);
-            return new ProvisioningResult(true, $"inprocess://{deployment.Name}", null);
+            return new ProvisioningResult(true, $"inprocess://{deployment.Metadata.Name}", null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -107,7 +119,7 @@ public sealed class LocalAgentDeploymentReconciler(
     IControlPlaneStore store,
     IRuntimeRegistry registry) : IAgentDeploymentReconciler
 {
-    public async Task<ReconciliationResult> ReconcileAsync(AgentDeployment deployment, CancellationToken cancellationToken)
+    public async Task<AgentDeploymentReconciliationResult> ReconcileAsync(AgentDeployment deployment, CancellationToken cancellationToken)
     {
         var provisioner = provisioners.SingleOrDefault(value => value.HostingMode == deployment.HostingMode);
         if (provisioner is null)
@@ -125,7 +137,7 @@ public sealed class LocalAgentDeploymentReconciler(
                 ObservedRevisionName = null,
                 LastError = null
             };
-            return new ReconciliationResult(stopped, stopped != deployment, "Deployment is stopped.");
+            return new AgentDeploymentReconciliationResult(stopped, stopped != deployment, "Deployment is stopped.");
         }
 
         if (registry.TryGet(deployment.Uid.ToString("N"), out var current) && string.Equals(current!.RevisionId, deployment.RevisionName, StringComparison.Ordinal))
@@ -138,11 +150,11 @@ public sealed class LocalAgentDeploymentReconciler(
                 ObservedRevisionName = observation.RevisionId,
                 LastError = observation.Error
             };
-            return new ReconciliationResult(observed, observed != deployment, "Existing runtime observed.");
+            return new AgentDeploymentReconciliationResult(observed, observed != deployment, "Existing runtime observed.");
         }
 
         if (current is not null) await provisioner.DeprovisionAsync(deployment, cancellationToken);
-        var revision = await store.GetAsync<AgentRevision>(deployment.RevisionName, cancellationToken);
+        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, deployment.RevisionName), cancellationToken);
         if (revision is null) return Failed(deployment, $"Revision '{deployment.RevisionName}' does not exist.");
         var result = await provisioner.ProvisionAsync(revision.Value, deployment, cancellationToken);
         if (!result.Succeeded) return Failed(deployment, result.Error ?? "Provisioning failed.");
@@ -153,10 +165,10 @@ public sealed class LocalAgentDeploymentReconciler(
             ObservedRevisionName = deployment.RevisionName,
             LastError = null
         };
-        return new ReconciliationResult(ready, true, "Runtime provisioned.");
+        return new AgentDeploymentReconciliationResult(ready, true, "Runtime provisioned.");
     }
 
-    private static ReconciliationResult Failed(AgentDeployment deployment, string error) => new(
+    private static AgentDeploymentReconciliationResult Failed(AgentDeployment deployment, string error) => new(
         deployment with { ProvisioningState = ProvisioningState.Failed, OperationalState = OperationalState.Degraded, LastError = error },
         true,
         error);

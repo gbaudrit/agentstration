@@ -19,33 +19,33 @@ public sealed class ToolDiscoveryTests
             [Descriptor("a", "A changed"), Descriptor("b", "B"), Descriptor("c", "C"), Descriptor("d", "D")]);
         var service = new ToolManagementService(store, [discovery], new FixedTimeProvider());
 
-        var first = await service.RefreshDiscoveryAsync(provider.Id, default);
-        var tools = await service.ListToolsAsync("default", default);
+        var first = await service.RefreshDiscoveryAsync(provider.Metadata.Name, default);
+        var tools = await service.ListToolsAsync(default);
         Assert.AreEqual(3, first.New);
-        Assert.IsTrue(tools.All(value => !value.Value.Properties.Enabled && value.Value.Properties.Discovery?.Available == true));
+        Assert.IsTrue(tools.All(value => !value.Value.Definition.Enabled && value.Value.Definition.Discovery?.Available == true));
 
-        var b = tools.Single(value => value.Value.Properties.ExternalId == "b");
-        await service.SetToolEnabledAsync(b.Value.Id, true, b.ETag, default);
-        var second = await service.RefreshDiscoveryAsync(provider.Id, default);
-        tools = await service.ListToolsAsync("default", default);
+        var b = tools.Single(value => value.Value.Definition.ExternalId == "b");
+        await service.SetToolEnabledAsync(b.Value.Metadata.Name, true, b.ETag, default);
+        var second = await service.RefreshDiscoveryAsync(provider.Metadata.Name, default);
+        tools = await service.ListToolsAsync(default);
 
         Assert.AreEqual(new ToolDiscoveryDiff(1, 1, 1, 1, 3), second);
-        Assert.IsTrue(tools.Single(value => value.Value.Properties.ExternalId == "b").Value.Properties.Enabled);
-        Assert.IsFalse(tools.Single(value => value.Value.Properties.ExternalId == "c").Value.Properties.Discovery!.Available);
-        Assert.AreEqual("A changed", tools.Single(value => value.Value.Properties.ExternalId == "a").Value.Properties.DisplayName);
+        Assert.IsTrue(tools.Single(value => value.Value.Definition.ExternalId == "b").Value.Definition.Enabled);
+        Assert.IsFalse(tools.Single(value => value.Value.Definition.ExternalId == "c").Value.Definition.Discovery!.Available);
+        Assert.AreEqual("A changed", tools.Single(value => value.Value.Definition.ExternalId == "a").Value.Definition.DisplayName);
 
-        _ = await service.RefreshDiscoveryAsync(provider.Id, default);
-        tools = await service.ListToolsAsync("default", default);
-        Assert.IsTrue(tools.Single(value => value.Value.Properties.ExternalId == "c").Value.Properties.Discovery!.Available);
+        _ = await service.RefreshDiscoveryAsync(provider.Metadata.Name, default);
+        tools = await service.ListToolsAsync(default);
+        Assert.IsTrue(tools.Single(value => value.Value.Definition.ExternalId == "c").Value.Definition.Discovery!.Available);
     }
 
     [TestMethod]
     public void ProviderValidationSupportsStdioHttpAndAepWithoutPlaintextEnvironmentValues()
     {
         ToolManagementService.ValidateProvider(Provider());
-        ToolManagementService.ValidateProvider(Provider() with { Properties = new ToolProviderProperties { DisplayName = "HTTP", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration { Transport = McpToolProviderTransport.StreamableHttp, Endpoint = new Uri("https://example.test/mcp") } } });
-        ToolManagementService.ValidateProvider(Provider() with { Properties = new ToolProviderProperties { DisplayName = "AEP", ProviderType = ToolProviderType.Aep, Aep = new AepToolProviderConfiguration { ExtensionId = "extension.test" } } });
-        Assert.Throws<ToolResourceValidationException>(() => ToolManagementService.ValidateProvider(Provider() with { Properties = new ToolProviderProperties { DisplayName = "Bad", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration() } }));
+        ToolManagementService.ValidateProvider(Provider() with { Definition = new ToolProviderProperties { DisplayName = "HTTP", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration { Transport = McpToolProviderTransport.StreamableHttp, Endpoint = new Uri("https://example.test/mcp") } } });
+        ToolManagementService.ValidateProvider(Provider() with { Definition = new ToolProviderProperties { DisplayName = "AEP", ProviderType = ToolProviderType.Aep, Aep = new AepToolProviderConfiguration { ExtensionId = "extension.test" } } });
+        Assert.Throws<ToolResourceValidationException>(() => ToolManagementService.ValidateProvider(Provider() with { Definition = new ToolProviderProperties { DisplayName = "Bad", ProviderType = ToolProviderType.Mcp, Mcp = new McpToolProviderConfiguration() } }));
     }
 
     private static ToolProviderResource Provider() => new()

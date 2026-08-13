@@ -104,7 +104,7 @@ public static class ManagementDemoData
             }, null, true, cancellationToken);
         }
 
-        var revisions = await store.ListAsync<AgentRevision>(ResourceKinds.AgentRevision, 0, 1000, cancellationToken);
+        var revisions = await store.ListAllAsync<AgentRevision>(ResourceKinds.AgentRevision, cancellationToken);
         var revision = revisions.Where(value => value.Value.AgentUid == agent.Value.Uid).OrderByDescending(value => value.Value.CreatedAt).FirstOrDefault();
         var spec = new AgentDeploymentSpec { Environment = "local", RuntimeProfileName = "maf-default", HostingMode = AgentHostingMode.InProcess };
         revision ??= await management.CreateRevisionAsync(name, spec, cancellationToken);

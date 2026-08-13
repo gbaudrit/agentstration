@@ -127,7 +127,7 @@ public sealed class FlowRunService(
     {
         ValidateInput(draft.Definition.InputSchema, input);
         var validationVersion = $"0.0.0-draft.{draft.Revision}";
-        var snapshot = new FlowVersion(draft.FlowId, validationVersion, draft.Description, FlowKind.Routing, DraftLegacySpec(draft.Definition), draft.Tags,
+        var snapshot = new FlowVersion(draft.FlowId, validationVersion, draft.Description, FlowKind.Routing, FlowDraftSnapshotAdapter.ToRoutingSpec(draft.Definition), draft.Tags,
             timeProvider.GetUtcNow(), draft.Definition, draft.DefinitionHash);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
@@ -438,14 +438,6 @@ public sealed class FlowRunService(
     }
 
     private static JsonElement? StepDeclaredInput(FlowStepDefinition step) => step switch { AgentFlowStepDefinition agent => agent.InputMapping?.Clone(), TransformFlowStepDefinition transform => transform.Mapping?.Clone(), OutputFlowStepDefinition output => output.OutputMapping?.Clone(), _ => null };
-    private static RoutingFlowSpec DraftLegacySpec(FlowGraphDefinition graph)
-    {
-        var router = graph.Steps.OfType<RouterFlowStepDefinition>().FirstOrDefault();
-        var destinations = router?.Candidates.Select(candidate => new FlowTargetReference(FlowTargetKind.Agent, candidate.Agent.ResourceId[(candidate.Agent.ResourceId.LastIndexOf('/') + 1)..])).ToArray() ?? [];
-        if (destinations.Length == 0) destinations = [new FlowTargetReference(FlowTargetKind.Agent, "unconfigured-agent")];
-        return new RoutingFlowSpec(FlowRoutingStrategy.Deterministic, destinations);
-    }
-
     private static void ValidateInput(JsonElement? schema, JsonElement input)
     {
         if (schema is null || schema.Value.ValueKind != JsonValueKind.Object) return;

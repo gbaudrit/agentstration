@@ -10,10 +10,9 @@ namespace Agentstration.Web;
 
 public static class WorkplaceEndpoints
 {
-    private const string ResourceGroup = "default";
-
     public static IEndpointRouteBuilder MapAgentstrationWorkplaceApi(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/api/workplace/workspaces", ListWorkspacesAsync);
         endpoints.MapGet("/api/workspaces/{workspaceName}", GetWorkspaceAsync);
         endpoints.MapGet("/api/entries", ListEntriesAsync);
         endpoints.MapGet("/api/entries/{entryName}", GetEntryAsync);
@@ -92,8 +91,8 @@ public static class WorkplaceEndpoints
     private static Task<IResult> MarkReadAsync(string workspaceName, Guid notificationId, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(await service.MarkNotificationReadAsync(WorkspaceId(workspaceName), new(notificationId), token)));
     private static Task<IResult> MarkAllReadAsync(string workspaceName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => { await service.MarkAllNotificationsReadAsync(WorkspaceId(workspaceName), token); return Results.NoContent(); });
 
-    private static WorkplaceWorkspaceResponse ToResponse(WorkplaceWorkspace value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.ResourceGroup, value.Location, value.DisplayName, value.Description, value.Entries.Select(reference => new WorkspaceEntryReferenceResponse(reference.EntryResourceId.Value, reference.Role, reference.Order)).ToArray(), value.Version, value.PublishedAt);
-    private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.ResourceGroup, value.Location, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt);
+    private static WorkplaceWorkspaceResponse ToResponse(WorkplaceWorkspace value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Entries.Select(reference => new WorkspaceEntryReferenceResponse(reference.EntryResourceId.Value, reference.Role, reference.Order)).ToArray(), value.Version, value.PublishedAt);
+    private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt);
 
     private static async Task<IResult> ListEntryDraftsAsync(EntryAdministrationService service, WorkplaceService workplace, CancellationToken token)
     {
@@ -138,15 +137,15 @@ public static class WorkplaceEndpoints
     {
         if (string.Equals(kind, ResourceKinds.Agent, StringComparison.Ordinal))
         {
-            var values = await agents.ListAgentsAsync(ResourceGroup, 0, 500, token);
-            return Results.Ok(values.Select(value => new ResourcePickerItem(value.Value.Id, value.Value.Properties.DisplayName, value.Value.Properties.Description, value.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), value.Value.Status.ProvisioningState.ToString(), kind,
-                new Dictionary<string, string> { ["modelProfile"] = value.Value.Properties.ModelProfile.ResourceId })));
+            var values = await agents.ListAgentsAsync(0, 500, token);
+            return Results.Ok(values.Select(value => new ResourcePickerItem(value.Value.Metadata.Name, value.Value.Definition.DisplayName, value.Value.Definition.Description, value.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), value.Value.Status.ProvisioningState.ToString(), kind,
+                new Dictionary<string, string> { ["modelProfile"] = value.Value.Definition.ModelProfile.ResourceId })));
         }
         if (string.Equals(kind, ResourceKinds.Flow, StringComparison.Ordinal))
         {
             var page = await flows.ListAsync(0, 500, token);
             return Results.Ok(page.Items.Where(value => !value.Value.Metadata.TryGetValue("systemManaged", out var system) || !bool.TryParse(system, out var hidden) || !hidden)
-                .Select(value => new ResourcePickerItem($"/resourceGroups/{value.Value.ResourceGroup}/providers/Agentstration.Flows/flows/{value.Value.Id.Value}", value.Value.DisplayName ?? value.Value.Name, value.Value.Description, value.Value.ActiveVersion ?? value.Value.Version, value.Value.Enabled ? "Active" : "Disabled", kind)));
+                .Select(value => new ResourcePickerItem(value.Value.Id.Value, value.Value.DisplayName ?? value.Value.Name, value.Value.Description, value.Value.ActiveVersion ?? value.Value.Version, value.Value.Enabled ? "Active" : "Disabled", kind)));
         }
         return Results.Problem(statusCode: 400, title: "resource_kind_not_supported", detail: "Only Agent and Flow resources can be selected for an Entry.");
     }
@@ -182,9 +181,9 @@ public static class WorkplaceEndpoints
         ExecuteAsync(async () => Results.Ok(await service.PublishAsync(WorkspaceId(workspaceName), token)));
     private static InteractionResponse ToResponse(WorkplaceInteraction value) => new(value.Id.Value, value.WorkspaceId.Value, value.EntryId.Value, value.Status, value.StartedAt, value.LastActivityAt, value.InputValues, value.Attachments, value.Messages, value.PendingActionId?.Value, value.TaskId?.Value, value.ImmediateResult, value.Version, value.LastFlowRunId, value.LastTriggerMessageId);
     private static WorkTaskResponse ToResponse(WorkTask value) => new(value.Id.Value, value.WorkspaceId.Value, value.EntryId.Value, value.InteractionId.Value, value.Title, value.Description, value.Status, value.CreatedAt, value.UpdatedAt, value.FlowRunId, value.Conversation, value.Activities, value.Artifacts, value.Result, value.Error, WorkplaceService.CurrentAction(value), value.Version);
-    private static WorkplaceWorkspaceId ParseWorkspaceId(string value) => value.Length > 0 && value[0] == '/' ? new(value) : WorkspaceId(value);
-    private static WorkplaceWorkspaceId WorkspaceId(string name) => new($"/resourceGroups/{ResourceGroup}/providers/Agentstration.Work/workspaces/{name}");
-    private static EntryId EntryResourceId(string name) => new($"/resourceGroups/{ResourceGroup}/providers/Agentstration.Work/entries/{name}");
-    private static string WorkspaceName(WorkplaceWorkspaceId id) => id.Value[(id.Value.LastIndexOf('/') + 1)..];
+    private static WorkplaceWorkspaceId ParseWorkspaceId(string value) => WorkspaceId(value);
+    private static WorkplaceWorkspaceId WorkspaceId(string name) => new(name);
+    private static EntryId EntryResourceId(string name) => new(name);
+    private static string WorkspaceName(WorkplaceWorkspaceId id) => id.Value;
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action) { try { return await action(); } catch (KeyNotFoundException exception) { return Results.Problem(statusCode: 404, title: "workplace_resource_not_found", detail: exception.Message); } catch (WorkValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); } catch (WorkTransitionException exception) { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); } catch (WorkplaceConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); } }
 }

@@ -52,7 +52,7 @@ public sealed class ApiClientTests
     {
         var timestamp = new DateTimeOffset(2026, 8, 1, 10, 0, 0, TimeSpan.Zero);
         var response = new WorkTaskOperationsPageResponse(
-            [new WorkTaskOperationsSummary(Guid.NewGuid(), "/resourceGroups/default/providers/Agentstration.Work/workspaces/personal", "/resourceGroups/default/providers/Agentstration.Work/entries/review", Guid.NewGuid(), "Review API", null, WorkTaskStatus.Running, timestamp, timestamp, timestamp, null, "flowrun-1", null, 0, 0, 0, 1, "Work started", null)],
+            [new WorkTaskOperationsSummary(Guid.NewGuid(), "personal", "review", Guid.NewGuid(), "Review API", null, WorkTaskStatus.Running, timestamp, timestamp, timestamp, null, "flowrun-1", null, 0, 0, 0, 1, "Work started", null)],
             1, 100, 1);
         using var httpClient = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) }))
         {
@@ -100,8 +100,8 @@ public sealed class ApiClientTests
             {
                 Content = JsonContent.Create(new[]
                 {
-                    new ResourcePickerItem("/resourceGroups/default/providers/Agentstration.Flows/flows/universal-router", "Universal router", null, "1.0.0", "Active", "Agentstration.Flows/flows"),
-                    new ResourcePickerItem("/resourceGroups/default/providers/Agentstration.Flows/flows/my-flow", "My flow", null, "1.0.0", "Active", "Agentstration.Flows/flows")
+                    new ResourcePickerItem("universal-router", "Universal router", null, "1.0.0", "Active", ResourceKinds.Flow),
+                    new ResourcePickerItem("my-flow", "My flow", null, "1.0.0", "Active", ResourceKinds.Flow)
                 })
             };
         })) { BaseAddress = new Uri("http://flow-api/") };
@@ -160,8 +160,10 @@ public sealed class ApiClientTests
     {
         var resource = CreateAgentResource("web-agent");
         var sawCreatePrecondition = false;
+        string? requestPath = null;
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
+            requestPath = request.RequestUri?.AbsolutePath;
             sawCreatePrecondition = request.Headers.IfNoneMatch.Any(value => value == EntityTagHeaderValue.Any);
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
             response.Headers.ETag = new EntityTagHeaderValue("\"v1\"");
@@ -172,8 +174,46 @@ public sealed class ApiClientTests
         var snapshot = await client.PutAgentAsync(ToRequest(resource), null, createOnly: true, CancellationToken.None);
 
         Assert.IsTrue(sawCreatePrecondition);
+        Assert.AreEqual("/api/agents/web-agent", requestPath);
         Assert.AreEqual("\"v1\"", snapshot.ETag);
         Assert.AreEqual("web-agent", snapshot.Value.Name);
+    }
+
+    [TestMethod]
+    public async Task ManagementClientListsAgentsThroughApiInsteadOfRazorPage()
+    {
+        var resource = CreateAgentResource("web-agent");
+        string? requestPath = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requestPath = request.RequestUri?.AbsolutePath;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new PagedResponse<AgentResource>([resource], null))
+            };
+        })) { BaseAddress = new Uri("http://localhost/") };
+        var client = new ManagementApiClient(httpClient);
+
+        var agents = await client.GetAgentsAsync(CancellationToken.None);
+
+        Assert.AreEqual("/api/agents", requestPath);
+        Assert.HasCount(1, agents);
+    }
+
+    [TestMethod]
+    public async Task WorkClientListsWorkplaceWorkspacesThroughUnambiguousApiRoute()
+    {
+        string? requestPath = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requestPath = request.RequestUri?.AbsolutePath;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Array.Empty<WorkplaceWorkspaceResponse>()) };
+        })) { BaseAddress = new Uri("http://localhost/") };
+        var client = new WorkApiClient(httpClient);
+
+        _ = await client.GetWorkspacesAsync(CancellationToken.None);
+
+        Assert.AreEqual("/api/workplace/workspaces", requestPath);
     }
 
     [TestMethod]
@@ -195,7 +235,7 @@ public sealed class ApiClientTests
         var client = new ManagementApiClient(httpClient);
 
         _ = await client.PutAgentAsync(ToRequest(resource), "\"v1\"", createOnly: false, CancellationToken.None);
-        await client.DeleteAgentAsync("default", "web-agent", "\"v2\"", CancellationToken.None);
+        await client.DeleteAgentAsync("web-agent", "\"v2\"", CancellationToken.None);
 
         CollectionAssert.AreEqual(new[] { (HttpMethod.Put, "\"v1\""), (HttpMethod.Delete, "\"v2\"") }, methods);
     }
@@ -209,7 +249,7 @@ public sealed class ApiClientTests
         })) { BaseAddress = new Uri("http://localhost/") };
         var client = new ManagementApiClient(httpClient);
 
-        var exception = await Assert.ThrowsAsync<AgentstrationApiException>(() => client.GetAgentAsync("default", "web-agent", CancellationToken.None));
+        var exception = await Assert.ThrowsAsync<AgentstrationApiException>(() => client.GetAgentAsync("web-agent", CancellationToken.None));
 
         Assert.IsTrue(exception.IsConcurrencyConflict);
         Assert.AreEqual("precondition_failed", exception.ProblemTitle);
@@ -219,7 +259,7 @@ public sealed class ApiClientTests
     [TestMethod]
     public async Task ModelProvidersClientMapsProviderAndDynamicModels()
     {
-        var provider = new ModelProviderResponse("provider-id", "ollama-local", "default", "local", new ModelProviderPropertiesResponse("Ollama local", "ollama", "aspire", "available", "ollama", 1));
+        var provider = new ModelProviderResponse("provider-id", "ollama-local", new ModelProviderPropertiesResponse("Ollama local", "ollama", "aspire", "available", "ollama", 1));
         var model = new AvailableModelResponse("qwen3:4b", "Qwen 3 4B", "available", ["chat"], new Dictionary<string, string> { ["parameterSize"] = "4B" });
         using var httpClient = new HttpClient(new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/models", StringComparison.Ordinal)
             ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ValueResponse<AvailableModelResponse>([model])) }
@@ -227,7 +267,7 @@ public sealed class ApiClientTests
         var client = new ModelProvidersApiClient(httpClient);
 
         var providers = await client.GetModelProvidersAsync(default);
-        var models = await client.GetProviderModelsAsync("default", "ollama-local", default);
+        var models = await client.GetProviderModelsAsync("ollama-local", default);
 
         Assert.AreEqual("aspire", providers[0].Properties.ManagementMode);
         Assert.AreEqual("qwen3:4b", models[0].Name);
@@ -248,8 +288,8 @@ public sealed class ApiClientTests
         })) { BaseAddress = new Uri("http://localhost/") };
         var client = new ModelProfilesApiClient(httpClient);
 
-        _ = await client.UpdateModelProfileAsync("default", profile.Name, new PutModelProfileRequest(profile.Properties), "\"v1\"", default);
-        await client.DeleteModelProfileAsync("default", profile.Name, "\"v2\"", default);
+        _ = await client.UpdateModelProfileAsync(profile.Name, new PutModelProfileRequest(profile.Definition), "\"v1\"", default);
+        await client.DeleteModelProfileAsync(profile.Name, "\"v2\"", default);
 
         CollectionAssert.AreEqual(new[] { (HttpMethod.Put, "\"v1\""), (HttpMethod.Delete, "\"v2\"") }, requests);
     }
@@ -292,10 +332,10 @@ public sealed class ApiClientTests
             "ready", []);
         using var httpClient = new HttpClient(new StubHandler(request => { requested = request.RequestUri; return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) }; })) { BaseAddress = new Uri("http://localhost/") };
 
-        var actual = await new AgentsModelApiClient(httpClient).GetAgentModelResolutionAsync("default", "sql-expert", default);
+        var actual = await new AgentsModelApiClient(httpClient).GetAgentModelResolutionAsync("sql-expert", default);
 
         Assert.AreEqual("qwen3:4b", actual.Resolved.Model.Name);
-        StringAssert.Contains(requested!.PathAndQuery, "/api/agents/sql-expert/model?resourceGroup=default");
+        Assert.AreEqual("/api/agents/sql-expert/model", requested!.PathAndQuery);
     }
 
     [TestMethod]
@@ -327,17 +367,17 @@ public sealed class ApiClientTests
             Prompt = "Optimize this query",
             Context = "{\"engine\":\"sqlserver\"}",
             RuntimeParameters = "{\"temperature\":0.2}",
-            Streaming = StreamingMode.Enabled,
+            Streaming = RuntimeStreamingMode.Enabled,
             TimeoutSeconds = 90
         };
 
         var request = model.ToRequest(agent);
 
-        Assert.AreEqual(agent.Id, request.Agent.ResourceId);
+        Assert.AreEqual(agent.Metadata.Name, request.Agent.ResourceId);
         Assert.AreEqual(7L, request.Agent.Version);
         Assert.AreEqual(RuntimeRunOrigin.Console, request.Origin);
         Assert.AreEqual(90, request.Execution.TimeoutSeconds);
-        Assert.AreEqual(StreamingMode.Enabled, request.Execution.Streaming);
+        Assert.AreEqual(RuntimeStreamingMode.Enabled, request.Execution.Streaming);
         Assert.AreEqual(0.2, request.Execution.Parameters["temperature"].GetDouble());
     }
 
@@ -373,13 +413,13 @@ public sealed class ApiClientTests
         })) { BaseAddress = new Uri("http://localhost/") };
         IAgentRunnerRuntimeClient client = new RuntimeApiClient(httpClient);
 
-        var actual = await client.GetAgentReadinessAsync("default", "sql-expert", 4, default);
-        var prepared = await client.PrepareAgentAsync("default", "sql-expert", 4, default);
+        var actual = await client.GetAgentReadinessAsync("sql-expert", 4, default);
+        var prepared = await client.PrepareAgentAsync("sql-expert", 4, default);
 
         Assert.IsTrue(actual.Ready);
         Assert.AreEqual("Ready", prepared.State);
-        StringAssert.Contains(requested[0].PathAndQuery, "/api/runtime/agents/sql-expert/readiness?resourceGroup=default&generation=4");
-        StringAssert.Contains(requested[1].PathAndQuery, "/api/runtime/agents/sql-expert/prepare?resourceGroup=default&generation=4");
+        StringAssert.Contains(requested[0].PathAndQuery, "/api/runtime/agents/sql-expert/readiness?generation=4");
+        StringAssert.Contains(requested[1].PathAndQuery, "/api/runtime/agents/sql-expert/prepare?generation=4");
     }
 
     [TestMethod]
@@ -398,7 +438,7 @@ public sealed class ApiClientTests
         var client = new MockApiClient(TimeProvider.System);
         var request = new CreateRuntimeRunRequest
         {
-            Agent = new RuntimeAgentReference(CreateAgentResource("web-agent").Id, 1),
+            Agent = new RuntimeAgentReference(CreateAgentResource("web-agent").Metadata.Name, 1),
             Input = new RuntimeRunInput { Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, "test")] }
         };
         var original = await client.CreateRunAsync(request, default);
@@ -414,12 +454,9 @@ public sealed class ApiClientTests
         var etag = "\"stored\"";
         return new AgentResource
         {
-            Id = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Agents, "agents", name).Value,
-            Name = name,
-            Type = AgentstrationResourceTypes.Agents,
+            Metadata = new ResourceMetadata { Name = name },
+            Kind = ResourceKinds.Agent,
             ApiVersion = ManagementApiVersions.V20260801,
-            ResourceGroup = "default",
-            Location = "local",
             Generation = 1,
             ETag = etag,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Accepted, ResourceVersion = etag },
@@ -434,20 +471,20 @@ public sealed class ApiClientTests
 
     private static ModelProfileResource CreateModelProfile(string name) => new()
     {
-        Id = ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Models, "modelProfiles", name).Value,
-        Name = name, Type = AgentstrationResourceTypes.ModelProfiles, ApiVersion = ManagementApiVersions.V20260801, ResourceGroup = "default", Location = "local",
-        Properties = new ModelProfileProperties
+        Metadata = new ResourceMetadata { Name = name },
+        Kind = ResourceKinds.ModelProfile, ApiVersion = ManagementApiVersions.V20260801,
+        Definition = new ModelProfileProperties
         {
             DisplayName = "Default reasoning",
-            Provider = new ResourceReference(ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.ModelProviders, "modelProviders", "ollama-local").Value),
+            Provider = new ResourceReference("ollama-local"),
             Model = new ModelSelection { Name = "qwen3:4b" }, Generation = new ModelGenerationOptions { Temperature = 0.2 }
         }
     };
 
     private static ModelProfileSummaryResponse Summary(string name, string provider, string model, string status) => new(
-        ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.Models, "modelProfiles", name).Value, name, "default", "local",
+        name, name,
         new ModelProfileSummaryPropertiesResponse(name, null,
-            new ModelProviderReferenceResponse(ResourceIdentifier.Create("default", AgentstrationProviderNamespaces.ModelProviders, "modelProviders", provider).Value, provider),
+            new ModelProviderReferenceResponse(provider, provider),
             new ModelReferenceResponse(model), new ModelGenerationOptions(), new ModelReasoningOptions(), new ModelOutputOptions(), status, 0));
 
     private static AgentResourceRequest ToRequest(AgentResource resource) => new()
@@ -462,10 +499,9 @@ public sealed class ApiClientTests
     {
         Id = id,
         Name = id,
-        ResourceGroup = "default",
         Properties = new RuntimeRunProperties
         {
-            Agent = new RuntimeAgentReference(CreateAgentResource("web-agent").Id, 1),
+            Agent = new RuntimeAgentReference(CreateAgentResource("web-agent").Metadata.Name, 1),
             Input = new RuntimeRunInput { Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, "test")] },
             Execution = new RuntimeExecutionOptions()
         },

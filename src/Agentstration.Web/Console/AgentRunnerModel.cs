@@ -13,7 +13,7 @@ public sealed class AgentRunnerModel
 
     public string? Context { get; set; }
     public string? RuntimeParameters { get; set; }
-    public StreamingMode Streaming { get; set; } = StreamingMode.Automatic;
+    public RuntimeStreamingMode Streaming { get; set; } = RuntimeStreamingMode.Automatic;
     [Range(1, 600)] public int TimeoutSeconds { get; set; } = 120;
 
     public CreateRuntimeRunRequest ToRequest(AgentResource agent)
@@ -49,7 +49,7 @@ public sealed class AgentRunnerModel
         }
         return new CreateRuntimeRunRequest
         {
-            Agent = new RuntimeAgentReference(agent.Id, agent.Generation),
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation),
             Input = new RuntimeRunInput
             {
                 Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, Prompt)],

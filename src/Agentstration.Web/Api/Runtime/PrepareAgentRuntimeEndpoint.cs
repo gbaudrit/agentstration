@@ -11,7 +11,6 @@ internal sealed class PrepareAgentRuntimeEndpoint
 
     private static Task<IResult> HandleAsync(
         string agentName,
-        string? resourceGroup,
         long generation,
         AgentManagementService service,
         CancellationToken cancellationToken) => RuntimeHttp.ExecuteAsync(async () =>

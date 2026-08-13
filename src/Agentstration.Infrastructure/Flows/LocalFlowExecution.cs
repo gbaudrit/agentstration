@@ -5,7 +5,6 @@ using System.Threading.Channels;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
 
 namespace Agentstration.Infrastructure.Flows;
 
@@ -55,7 +54,10 @@ public sealed class LocalFlowRunCancellationRegistry : IFlowRunCancellationRegis
     }
 }
 
-public sealed class ManagedFlowAgentExecutor(AgentManagementService management, IControlPlaneStore store) : IFlowAgentExecutor
+public sealed class ManagedFlowAgentExecutor(
+    AgentExecutionCoordinator execution,
+    IControlPlaneStore store,
+    IAgentResourceQueries agentQueries) : IFlowAgentExecutor
 {
     public async Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken)
     {
@@ -65,13 +67,13 @@ public sealed class ManagedFlowAgentExecutor(AgentManagementService management, 
         var prompt = input.ValueKind == JsonValueKind.Object && input.TryGetProperty("prompt", out var promptProperty) && promptProperty.ValueKind == JsonValueKind.String
             ? promptProperty.GetString()!
             : input.GetRawText();
-        var selected = await management.SelectAgentAsync(prompt, ResourceName(target.Id), cancellationToken);
-        var deployment = (await store.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken))
+        var selected = await execution.SelectAgentAsync(prompt, ResourceName(target.Id), cancellationToken);
+        var deployment = (await agentQueries.ListDeploymentsAsync(cancellationToken))
             .SingleOrDefault(value => value.Value.Uid.ToString("N") == selected.DeploymentId)
             ?? throw new InvalidOperationException("The selected agent deployment no longer exists.");
-        var revision = await store.GetAsync<AgentRevision>(deployment.Value.RevisionName, cancellationToken)
+        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, deployment.Value.RevisionName), cancellationToken)
             ?? throw new InvalidOperationException("The selected agent revision no longer exists.");
-        var result = await management.ExecuteSelectedAsync(selected, prompt, cancellationToken);
+        var result = await execution.ExecuteSelectedAsync(selected, prompt, cancellationToken);
         return new FlowAgentExecutionResult(
             JsonSerializer.SerializeToElement(result.Output),
             revision.Value.AgentName,
@@ -83,15 +85,11 @@ public sealed class ManagedFlowAgentExecutor(AgentManagementService management, 
             [$"Runtime deployment {deployment.Value.Uid} executed for correlation {correlationId}.", $"Model: {result.ModelName ?? "unspecified"}."]);
     }
 
-    private static string ResourceName(string id)
-    {
-        var slash = id.LastIndexOf('/');
-        return slash < 0 ? id : id[(slash + 1)..];
-    }
+    private static string ResourceName(string id) => id;
 }
 
 public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore store) : IFlowResourceReferenceResolver
 {
     public async Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) =>
-        await store.GetAsync<AgentResource>(resourceId, cancellationToken) is not null;
+        await store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, resourceId), cancellationToken) is not null;
 }

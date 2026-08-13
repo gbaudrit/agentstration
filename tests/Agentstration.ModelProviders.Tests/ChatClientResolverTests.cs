@@ -11,8 +11,8 @@ namespace Agentstration.ModelProviders.Tests;
 [TestClass]
 public sealed class ChatClientResolverTests
 {
-    private const string ProfileId = "/resourceGroups/default/providers/Agentstration.Models/modelProfiles/reasoning-default";
-    private const string ProviderId = "/resourceGroups/default/providers/Agentstration.ModelProviders/modelProviders/ollama-local";
+    private const string ProfileId = "reasoning-default";
+    private const string ProviderId = "ollama-local";
 
     [TestMethod]
     public async Task ResolverTraversesProfileDeploymentProviderAndTechnicalImplementation()

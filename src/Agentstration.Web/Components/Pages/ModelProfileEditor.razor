@@ -1,5 +1,5 @@
 @page "/modelprofiles/new"
-@page "/modelprofiles/{ResourceGroup}/{Name}"
+@page "/modelprofiles/{Name}"
 @implements IDisposable
 @inject IModelProfilesClient Client
 @inject IModelProvidersClient ProvidersClient
@@ -27,8 +27,6 @@ else
             <div class="form-grid">
                 <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
                 <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
-                <label><span>Resource group</span><InputText @bind-Value="model.ResourceGroup" disabled="@(!IsNew)" /><ValidationMessage For="() => model.ResourceGroup" /></label>
-                <label><span>Location</span><InputText @bind-Value="model.Location" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Location" /></label>
                 <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>
         </section>
@@ -91,7 +89,6 @@ else
 <ConfirmationDialog IsOpen="@confirmDelete" Title="Delete model profile" Message="@($"Delete model profile '{Name}'?")" ConfirmLabel="Delete model profile" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {
-    [Parameter] public string? ResourceGroup { get; set; }
     [Parameter] public string? Name { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = [];
@@ -103,7 +100,7 @@ else
         get
         {
             if (model is null) return string.Empty;
-            try { return JsonSerializer.Serialize(new { type = AgentstrationResourceTypes.ModelProfiles, apiVersion = ManagementApiVersions.V20260801, name = model.Name, resourceGroup = model.ResourceGroup, location = model.Location, properties = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
+            try { return JsonSerializer.Serialize(new { apiVersion = ManagementApiVersions.CoreV1, kind = ResourceKinds.ModelProfile, metadata = new { name = model.Name }, definition = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
             catch (ArgumentException) { return "The declarative definition is unavailable until the configuration is structurally valid."; }
         }
     }
@@ -117,11 +114,10 @@ else
             if (IsNew) model = new ModelProfileEditorModel();
             else
             {
-                var group = string.IsNullOrWhiteSpace(ResourceGroup) ? "default" : ResourceGroup;
-                var snapshot = await Client.GetModelProfileAsync(group, Name!, cancellation.Token);
+                var snapshot = await Client.GetModelProfileAsync(Name!, cancellation.Token);
                 model = ModelProfileEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag;
-                usages = (await Client.GetModelProfileUsagesAsync(group, Name!, cancellation.Token)).Value;
-                resolution = await Client.GetModelProfileResolutionAsync(group, Name!, cancellation.Token);
+                usages = (await Client.GetModelProfileUsagesAsync(Name!, cancellation.Token)).Value;
+                resolution = await Client.GetModelProfileResolutionAsync(Name!, cancellation.Token);
             }
             if (!string.IsNullOrWhiteSpace(model.ProviderName)) await LoadModelsAsync(clearSelection: false);
         }
@@ -137,7 +133,7 @@ else
         if (model is null) return; if (clearSelection) model.ModelName = string.Empty; models = []; warning = null;
         if (string.IsNullOrWhiteSpace(model.ProviderName)) return;
         loadingModels = true;
-        try { models = await ProvidersClient.GetProviderModelsAsync("default", model.ProviderName, cancellation.Token); }
+        try { models = await ProvidersClient.GetProviderModelsAsync(model.ProviderName, cancellation.Token); }
         catch (AgentstrationApiException exception) { warning = $"Models cannot currently be discovered: {exception.Message}"; }
         finally { loadingModels = false; }
     }
@@ -148,9 +144,9 @@ else
         {
             ResourceSnapshot<ModelProfileResource> snapshot = IsNew
                 ? await Client.CreateModelProfileAsync(model.ToCreateRequest(), cancellation.Token)
-                : await Client.UpdateModelProfileAsync(model.ResourceGroup, model.Name, model.ToPutRequest(), etag!, cancellation.Token);
+                : await Client.UpdateModelProfileAsync(model.Name, model.ToPutRequest(), etag!, cancellation.Token);
             etag = snapshot.ETag; Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? "Model profile created" : "Model profile updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
-            Navigation.NavigateTo($"/modelprofiles/{Uri.EscapeDataString(snapshot.Value.ResourceGroup ?? "default")}/{Uri.EscapeDataString(snapshot.Value.Name)}");
+            Navigation.NavigateTo($"/modelprofiles/{Uri.EscapeDataString(snapshot.Value.Name)}");
         }
         catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); }
         catch (AgentstrationApiException exception) { error = exception; }
@@ -160,10 +156,10 @@ else
     private async Task DeleteAsync()
     {
         if (model is null || etag is null) return; confirmDelete = false;
-        try { await Client.DeleteModelProfileAsync(model.ResourceGroup, model.Name, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
+        try { await Client.DeleteModelProfileAsync(model.Name, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
         catch (AgentstrationApiException exception) { error = exception; }
     }
     private static bool IsUnavailable(AvailableModelResponse model) => string.Equals(model.Status, "unavailable", StringComparison.OrdinalIgnoreCase);
-    private static string AgentUrl(ModelProfileUsageResponse usage) { var id = ResourceIdentifier.Parse(usage.ResourceId); return $"/agents/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}"; }
+    private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

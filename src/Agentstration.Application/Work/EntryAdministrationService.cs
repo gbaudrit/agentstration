@@ -72,8 +72,6 @@ public sealed class EntryAdministrationService(
             Name = draft.Name,
             Type = draft.Type,
             ApiVersion = draft.ApiVersion,
-            ResourceGroup = draft.ResourceGroup,
-            Location = draft.Location,
             DisplayName = draft.DisplayName,
             Description = draft.Description,
             Presentation = draft.Presentation,

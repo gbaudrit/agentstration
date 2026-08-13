@@ -87,7 +87,7 @@ public sealed class WorkplaceUxTests
     public void ResolvedPendingAnswerAndSuccessiveOutputsRemainReadableInTheThread()
     {
         using var context = new BunitContext();
-        var workspaceId = new WorkplaceWorkspaceId("/resourceGroups/default/providers/Agentstration.Work/workspaces/personal");
+        var workspaceId = new WorkplaceWorkspaceId("personal");
         var interactionId = InteractionId.New();
         var taskId = new WorkTaskId(Guid.NewGuid());
         var answer = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.User, "style: concise", DateTimeOffset.UtcNow, PendingActionId: PendingActionId.New());
@@ -118,7 +118,7 @@ public sealed class WorkplaceUxTests
     public void ProgressAndArtifactsExposeFunctionalInformationWithoutStorageDetails()
     {
         using var context = new BunitContext();
-        var workspaceId = new WorkplaceWorkspaceId("/resourceGroups/default/providers/Agentstration.Work/workspaces/personal");
+        var workspaceId = new WorkplaceWorkspaceId("personal");
         var taskId = new WorkTaskId(Guid.NewGuid());
         var activity = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.TaskStarted, "Generating report", "Building the requested content.", DateTimeOffset.UtcNow, WorkActorKind.System);
         var progress = context.Render<TaskProgressTimeline>(parameters => parameters.Add(value => value.Activities, [activity]).Add(value => value.Status, WorkTaskStatus.Running));
@@ -133,7 +133,7 @@ public sealed class WorkplaceUxTests
 
     private static EntryResource PromptDefinition() => new()
     {
-        Id = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/prepare-report"),
+        Id = new EntryId("prepare-report"),
         Name = "prepare-report",
         DisplayName = "Prepare a report",
         Description = "Describe the expected outcome.",
@@ -144,10 +144,8 @@ public sealed class WorkplaceUxTests
             Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Textarea, Required = true }],
             Suggestions = [new("Monthly report", "Prepare my monthly report")]
         },
-        ResolvedTarget = new EntryResolvedTarget("/resourceGroups/default/providers/Agentstration.Flows/flows/report", "1.0.0"),
+        ResolvedTarget = new EntryResolvedTarget("report", "1.0.0"),
         Behavior = new EntryBehavior(),
-        ResourceGroup = "default",
-        Location = "local",
         ApiVersion = WorkplaceApiVersions.V20260805,
         Type = WorkResourceTypes.Entries
     };

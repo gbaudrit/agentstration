@@ -42,7 +42,7 @@ public sealed class DashboardTests
 
         var created = await fake.PutAgentAsync(request, null, createOnly: true, CancellationToken.None);
         var stale = await Assert.ThrowsAsync<AgentstrationApiException>(() => fake.PutAgentAsync(request, "\"stale\"", createOnly: false, CancellationToken.None));
-        await fake.DeleteAgentAsync("default", "new-agent", created.ETag, CancellationToken.None);
+        await fake.DeleteAgentAsync("new-agent", created.ETag, CancellationToken.None);
 
         Assert.AreEqual(1L, created.Value.Generation);
         Assert.IsTrue(stale.IsConcurrencyConflict);

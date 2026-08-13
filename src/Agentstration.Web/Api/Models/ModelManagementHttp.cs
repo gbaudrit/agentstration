@@ -77,25 +77,24 @@ internal static class ModelManagementHttp
         return Results.Json(stored.Value, statusCode: statusCode);
     }
 
-    public static string ResourceGroup(string? resourceGroup) => string.IsNullOrWhiteSpace(resourceGroup) ? "default" : resourceGroup;
     public static string? IfMatch(HttpRequest request) => request.Headers.IfMatch.FirstOrDefault();
 
     public static ModelProfileResolutionResponse Resolution(ModelProfileResolution resolution) => new(
-        new ModelProfileIdentityResponse(resolution.Profile.Id, resolution.Profile.Name, resolution.Profile.Properties.DisplayName),
+        new ModelProfileIdentityResponse(resolution.Profile.Metadata.Name, resolution.Profile.Metadata.Name, resolution.Profile.Definition.DisplayName),
         resolution.Provider is null ? null : new ModelProviderReferenceResponse(
-            resolution.Profile.Properties.Provider.ResourceId,
+            resolution.Profile.Definition.Provider.Name,
             resolution.Provider.Name,
             resolution.Provider.DisplayName,
             resolution.Provider.ProviderType,
             resolution.ProviderHealth.Status),
         new ModelReferenceResponse(
-            resolution.Profile.Properties.Model.Name,
+            resolution.Profile.Definition.Model.Name,
             resolution.Model?.Status ?? (resolution.Status == "modelUnavailable" ? "unavailable" : "unknown"),
             resolution.Model?.Capabilities),
         new EffectiveModelOptionsResponse(
-            resolution.Profile.Properties.Generation,
-            resolution.Profile.Properties.Reasoning,
-            resolution.Profile.Properties.Output),
+            resolution.Profile.Definition.Generation,
+            resolution.Profile.Definition.Reasoning,
+            resolution.Profile.Definition.Output),
         resolution.Status,
         resolution.Warnings);
 

@@ -18,7 +18,7 @@ public sealed class AgentFrameworkRuntimeFactory(
 
     public string Handler => "prompt-agent";
 
-    public async Task<IAgentRuntime> CreateAsync(ResolvedAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken)
+    public async Task<IAgentRuntime> CreateAsync(ExecutableAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var tools = (await context.Tools.ResolveAsync(definition.EffectiveToolNames, cancellationToken))
@@ -66,7 +66,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             Reasoning = new ReasoningCapability
             {
                 Support = CapabilitySupport.Partial,
-                SupportedEfforts = new HashSet<ReasoningEffort> { ReasoningEffort.Low, ReasoningEffort.Medium, ReasoningEffort.High }
+                SupportedEfforts = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "low", "medium", "high" }
             }
         };
 
@@ -128,9 +128,9 @@ public sealed class AgentFrameworkRuntimeFactory(
                 chatOptions.TopK,
                 checked((int?)chatOptions.Seed),
                 chatOptions.StopSequences?.ToArray(),
-                request.Execution?.Streaming ?? request.Options?.Streaming ?? StreamingMode.Automatic);
+                request.Execution?.Streaming ?? request.Options?.Streaming ?? RuntimeStreamingMode.Automatic);
             var output = new StringBuilder();
-            if (effective.Streaming == StreamingMode.Disabled)
+            if (effective.Streaming == RuntimeStreamingMode.Disabled)
             {
                 var response = await agent.RunAsync(
                     request.Input,

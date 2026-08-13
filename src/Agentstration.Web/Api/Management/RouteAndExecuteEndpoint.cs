@@ -1,4 +1,4 @@
-using Agentstration.Management.Core;
+using Agentstration.Infrastructure;
 using Agentstration.Management.Contracts;
 
 namespace Agentstration.Web.Api.Management;
@@ -10,7 +10,7 @@ internal sealed class RouteAndExecuteEndpoint : IManagementEndpoint
     private static Task<IResult> HandleAsync(
         RouteAndExecuteRequest body,
         HttpRequest request,
-        AgentManagementService service,
+        AgentExecutionCoordinator service,
         CancellationToken cancellationToken) =>
         ManagementHttp.ExecuteAsync(async () =>
         {

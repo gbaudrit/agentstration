@@ -32,7 +32,7 @@ public static class WorkplaceDemoData
 
         var workplace = services.GetRequiredService<WorkplaceService>();
         var entries = services.GetRequiredService<EntryAdministrationService>();
-        var entryId = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/universal-request");
+        var entryId = new EntryId("universal-request");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
             Id = entryId,
@@ -57,7 +57,7 @@ public static class WorkplaceDemoData
             Behavior = new EntryBehavior(TaskCreationMode.Automatic, AllowConversation: true, StreamResponse: true)
         }, cancellationToken);
 
-        var reportEntryId = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/prepare-report");
+        var reportEntryId = new EntryId("prepare-report");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
             Id = reportEntryId, Name = "prepare-report", DisplayName = "Prepare a report",
@@ -74,10 +74,10 @@ public static class WorkplaceDemoData
                 ],
                 Fields = [new EntryFieldDefinition { Name = "request", Label = "Report request", Type = EntryFieldType.Prompt, Required = true, Validation = new EntryFieldValidation(3, 10_000), Role = EntryFieldRole.PrimaryInput }]
             },
-            Binding = new EntryBinding(EntryBindingKind.Flow, "/resourceGroups/default/providers/Agentstration.Flows/flows/universal-router"),
+            Binding = new EntryBinding(EntryBindingKind.Flow, "universal-router"),
             Behavior = new EntryBehavior(TaskCreationMode.Automatic, true, true, new EntryConversationBehavior())
         }, cancellationToken);
-        var guidedEntryId = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/guided-request");
+        var guidedEntryId = new EntryId("guided-request");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
             Id = guidedEntryId, Name = "guided-request", DisplayName = "Guided request", Description = "Demonstrates a one-click clarification inside the conversation.",
@@ -88,10 +88,10 @@ public static class WorkplaceDemoData
                 Suggestions = [new("Draft a summary", "Draft a summary of the latest project update.")],
                 Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }]
             },
-            Binding = new EntryBinding(EntryBindingKind.Flow, "/resourceGroups/default/providers/Agentstration.Flows/flows/universal-router"),
+            Binding = new EntryBinding(EntryBindingKind.Flow, "universal-router"),
             Behavior = new EntryBehavior(TaskCreationMode.Automatic, true, true, new EntryConversationBehavior())
         }, cancellationToken);
-        var immediateEntryId = new EntryId("/resourceGroups/default/providers/Agentstration.Work/entries/quick-answer");
+        var immediateEntryId = new EntryId("quick-answer");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
             Id = immediateEntryId, Name = "quick-answer", DisplayName = "Quick acknowledgement", Description = "Demonstrates an Interaction that completes without a Task.",
@@ -108,7 +108,7 @@ public static class WorkplaceDemoData
         var workspaceAdministration = services.GetRequiredService<WorkspaceAdministrationService>();
         var workspaceDraft = new WorkplaceWorkspaceDraft
         {
-            Id = new WorkplaceWorkspaceId("/resourceGroups/default/providers/Agentstration.Work/workspaces/personal"),
+            Id = new WorkplaceWorkspaceId("personal"),
             Name = "personal",
             DisplayName = "Personal workspace",
             Description = "Your local place to delegate and follow work.",
@@ -131,6 +131,8 @@ public static class WorkplaceDemoData
         var existing = await service.ListAsync(cancellationToken);
         var current = existing.SingleOrDefault(value => value.Id == draft.Id);
         if (current is null || current.Binding != draft.Binding) await service.SaveAsync(draft, cancellationToken);
-        if (!(await workplace.ListEntriesAsync(cancellationToken)).Any(value => value.Id == draft.Id && value.ResolvedTarget is not null)) await service.PublishAsync(draft.Id, cancellationToken);
+        var published = (await workplace.ListEntriesAsync(cancellationToken)).SingleOrDefault(value => value.Id == draft.Id);
+        if (published is null || published.ResolvedTarget.FlowResourceId.Contains('/', StringComparison.Ordinal))
+            await service.PublishAsync(draft.Id, cancellationToken);
     }
 }

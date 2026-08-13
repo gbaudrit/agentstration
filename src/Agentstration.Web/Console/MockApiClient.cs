@@ -17,10 +17,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
     private readonly Dictionary<string, List<RuntimeRunEvent>> runEvents = new(StringComparer.Ordinal);
     private DateTimeOffset Now => timeProvider.GetUtcNow();
 
-    public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken) =>
-        GetAgentsAsync("default", cancellationToken);
-
-    public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(string resourceGroup, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var values = agents.Values.Select(snapshot => snapshot.Value)
@@ -30,10 +27,10 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         return Task.FromResult<IReadOnlyList<AgentSummary>>(values);
     }
 
-    public Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string resourceGroup, string name, CancellationToken cancellationToken)
+    public Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return agents.TryGetValue(Key(resourceGroup, name), out var snapshot)
+        return agents.TryGetValue(name, out var snapshot)
             ? Task.FromResult(snapshot)
             : Task.FromException<ResourceSnapshot<AgentResource>>(Error(HttpStatusCode.NotFound, "resource_not_found", $"Agent '{name}' was not found."));
     }
@@ -41,7 +38,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
     public Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var key = Key("default", request.Metadata.Name);
+        var key = request.Metadata.Name;
         var exists = agents.TryGetValue(key, out var current);
         if (createOnly && exists) return Task.FromException<ResourceSnapshot<AgentResource>>(Error(HttpStatusCode.PreconditionFailed, "precondition_failed", "The agent already exists."));
         if (!createOnly && (!exists || !string.Equals(current!.ETag, etag, StringComparison.Ordinal)))
@@ -65,10 +62,10 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         return Task.FromResult(snapshot);
     }
 
-    public Task DeleteAgentAsync(string resourceGroup, string name, string etag, CancellationToken cancellationToken)
+    public Task DeleteAgentAsync(string name, string etag, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var key = Key(resourceGroup, name);
+        var key = name;
         if (!agents.TryGetValue(key, out var current)) return Task.FromException(Error(HttpStatusCode.NotFound, "resource_not_found", $"Agent '{name}' was not found."));
         if (!string.Equals(current.ETag, etag, StringComparison.Ordinal)) return Task.FromException(Error(HttpStatusCode.PreconditionFailed, "precondition_failed", "The agent was modified by another user."));
         agents.Remove(key);
@@ -91,7 +88,6 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         {
             Id = id,
             Name = id,
-            ResourceGroup = ResourceIdentifier.Parse(request.Agent.ResourceId).ResourceGroup,
             Properties = new RuntimeRunProperties
             {
                 Agent = request.Agent,
@@ -254,7 +250,6 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         return Task.FromResult(value);
     }
 
-    private static string Key(string resourceGroup, string name) => $"{resourceGroup}/{name}";
 
     private static AgentstrationApiException Error(HttpStatusCode statusCode, string title, string message) =>
         new(message, Guid.NewGuid().ToString("N"), statusCode, title);
@@ -285,7 +280,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
             (Name: "dotnet-expert", DisplayName: ".NET Expert", Description: "Specialized in .NET and ASP.NET Core.", Instructions: "Focus on safe, practical .NET guidance."),
             (Name: "sql-expert", DisplayName: "SQL Expert", Description: "Specialized in SQL query performance.", Instructions: "Focus on SQL Server and read-only diagnostics.")
         };
-        return definitions.ToDictionary(item => Key("default", item.Name), item =>
+        return definitions.ToDictionary(item => item.Name, item =>
         {
             var etag = $"\"mock-{item.Name}\"";
             var resource = new AgentResource

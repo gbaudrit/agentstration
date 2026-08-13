@@ -12,7 +12,7 @@ public sealed record RuntimeProfileUsage(Guid DeploymentUid, string Name, string
 
 public sealed class RuntimeProfileManagementService(IControlPlaneStore store)
 {
-    public static string ProfileId(string resourceGroup, string name) => name;
+    public static string ProfileId(string name) => name;
     public async Task<StoredResource<RuntimeProfileResource>> CreateAsync(RuntimeProfileResource resource, CancellationToken cancellationToken)
     {
         Validate(resource);
@@ -23,11 +23,9 @@ public sealed class RuntimeProfileManagementService(IControlPlaneStore store)
 
     public Task<StoredResource<RuntimeProfileResource>?> GetAsync(string name, CancellationToken cancellationToken) =>
         store.GetAsync<RuntimeProfileResource>(new ResourceKey(ResourceKinds.RuntimeProfile, name), cancellationToken);
-    public Task<StoredResource<RuntimeProfileResource>?> GetAsync(string resourceGroup, string name, CancellationToken cancellationToken) => GetAsync(name, cancellationToken);
 
     public Task<IReadOnlyList<StoredResource<RuntimeProfileResource>>> ListAsync(CancellationToken cancellationToken) =>
-        store.ListAsync<RuntimeProfileResource>(ResourceKinds.RuntimeProfile, 0, 1000, cancellationToken);
-    public Task<IReadOnlyList<StoredResource<RuntimeProfileResource>>> ListAsync(string? resourceGroup, CancellationToken cancellationToken) => ListAsync(cancellationToken);
+        store.ListAllAsync<RuntimeProfileResource>(ResourceKinds.RuntimeProfile, cancellationToken);
 
     public async Task<StoredResource<RuntimeProfileResource>> PutAsync(string name, RuntimeProfileProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {
@@ -41,10 +39,9 @@ public sealed class RuntimeProfileManagementService(IControlPlaneStore store)
         Validate(updated);
         return await store.PutAsync(updated, ifMatch, false, cancellationToken);
     }
-    public Task<StoredResource<RuntimeProfileResource>> PutAsync(string resourceGroup, string name, RuntimeProfileProperties definition, string? ifMatch, CancellationToken cancellationToken) => PutAsync(name, definition, ifMatch, cancellationToken);
 
     public async Task<IReadOnlyList<RuntimeProfileUsage>> GetUsagesAsync(string name, CancellationToken cancellationToken) =>
-        (await store.ListAsync<AgentDeployment>(ResourceKinds.AgentDeployment, 0, 1000, cancellationToken))
+        (await store.ListAllAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken))
             .Where(value => value.Value.RuntimeProfileName == name)
             .Select(value => new RuntimeProfileUsage(value.Value.Uid, value.Value.Metadata.Name, value.Value.Environment, value.Value.AgentName ?? string.Empty))
             .ToArray();
@@ -56,7 +53,6 @@ public sealed class RuntimeProfileManagementService(IControlPlaneStore store)
         if (usages.Count > 0) throw new RuntimeProfileInUseException(existing.Value.Metadata.Name, usages);
         await store.DeleteAsync(new(ResourceKinds.RuntimeProfile, name), ifMatch, cancellationToken);
     }
-    public Task DeleteAsync(string resourceGroup, string name, string? ifMatch, CancellationToken cancellationToken) => DeleteAsync(name, ifMatch, cancellationToken);
 
     private static void Validate(RuntimeProfileResource resource)
     {

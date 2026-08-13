@@ -11,15 +11,13 @@ public sealed class ModelProviderEditorModel
 
     [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
     public string Name { get; set; } = string.Empty;
-    [Required] public string ResourceGroup { get; set; } = "default";
-    [Required] public string Location { get; set; } = "local";
     [Required] public string DisplayName { get; set; } = string.Empty;
     [Required] public string ProviderType { get; set; } = "ollama";
     [Required, Url] public string Endpoint { get; set; } = "http://localhost:5260";
     public ModelProviderManagementMode ManagementMode { get; set; } = ModelProviderManagementMode.External;
     public string? ProviderOptionsJson { get; set; }
 
-    public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ResourceGroup.Trim(), Location.Trim(), ToProperties());
+    public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties());
     public PutModelProviderRequest ToPutRequest() => new(ToProperties());
 
     public ModelProviderProperties ToProperties()
@@ -40,15 +38,13 @@ public sealed class ModelProviderEditorModel
     public static ModelProviderEditorModel FromResource(ModelProviderResource resource) => new()
     {
         Name = resource.Name,
-        ResourceGroup = resource.ResourceGroup ?? "default",
-        Location = resource.Location ?? "local",
-        DisplayName = resource.Properties.DisplayName,
-        ProviderType = resource.Properties.ProviderType,
-        Endpoint = resource.Properties.Endpoint.AbsoluteUri.TrimEnd('/'),
-        ManagementMode = resource.Properties.ManagementMode,
-        ProviderOptionsJson = resource.Properties.ProviderOptions.Count == 0
+        DisplayName = resource.Definition.DisplayName,
+        ProviderType = resource.Definition.ProviderType,
+        Endpoint = resource.Definition.Endpoint.AbsoluteUri.TrimEnd('/'),
+        ManagementMode = resource.Definition.ManagementMode,
+        ProviderOptionsJson = resource.Definition.ProviderOptions.Count == 0
             ? null
-            : JsonSerializer.Serialize(resource.Properties.ProviderOptions, IndentedJson)
+            : JsonSerializer.Serialize(resource.Definition.ProviderOptions, IndentedJson)
     };
 
     private static IReadOnlyDictionary<string, JsonElement> ParseOptions(string? value)

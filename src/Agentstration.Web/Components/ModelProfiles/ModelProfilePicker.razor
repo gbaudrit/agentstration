@@ -108,7 +108,7 @@
         $"{item.Properties.DisplayName} — {item.Name} · {item.Properties.Provider.Name} / {item.Properties.Model.Name} · {ModelManagementUi.Label(item.Properties.Status)}";
 
     private static string ProfileUrl(ModelProfileSummaryResponse item) =>
-        $"/modelprofiles/{Uri.EscapeDataString(item.ResourceGroup)}/{Uri.EscapeDataString(item.Name)}";
+        $"/modelprofiles/{Uri.EscapeDataString(item.Name)}";
 
     public void Dispose()
     {

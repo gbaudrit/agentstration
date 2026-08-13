@@ -31,5 +31,5 @@ public sealed class EntryResourceDeletionGuard(IWorkplaceRepository workplace) :
             throw new FlowValidationException("flow_in_use", $"Flow '{flowId}' is referenced by Entry: {string.Join(", ", referenced)}.");
     }
 
-    private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
+    private static string ResourceName(string resourceId) => resourceId;
 }

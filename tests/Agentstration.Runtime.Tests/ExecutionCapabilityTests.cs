@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Runtime.Tests;
@@ -9,15 +10,15 @@ public sealed class ExecutionCapabilityTests
     [TestMethod]
     public void EffectiveCapabilitiesIntersectEveryExecutionLevel()
     {
-        var provider = Capabilities(CapabilitySupport.Native, new HashSet<ReasoningEffort> { ReasoningEffort.Low, ReasoningEffort.Medium, ReasoningEffort.High });
-        var model = Capabilities(CapabilitySupport.Native, new HashSet<ReasoningEffort> { ReasoningEffort.Medium, ReasoningEffort.High });
-        var runtime = Capabilities(CapabilitySupport.Native, new HashSet<ReasoningEffort> { ReasoningEffort.Low, ReasoningEffort.Medium, ReasoningEffort.High });
-        var adapter = Capabilities(CapabilitySupport.Partial, new HashSet<ReasoningEffort> { ReasoningEffort.Medium });
+        var provider = Capabilities(CapabilitySupport.Native, new HashSet<string>(["low", "medium", "high"], StringComparer.OrdinalIgnoreCase));
+        var model = Capabilities(CapabilitySupport.Native, new HashSet<string>(["medium", "high"], StringComparer.OrdinalIgnoreCase));
+        var runtime = Capabilities(CapabilitySupport.Native, new HashSet<string>(["low", "medium", "high"], StringComparer.OrdinalIgnoreCase));
+        var adapter = Capabilities(CapabilitySupport.Partial, new HashSet<string>(["medium"], StringComparer.OrdinalIgnoreCase));
 
         var effective = EffectiveCapabilityResolver.Intersect(provider, model, runtime, adapter);
 
         Assert.AreEqual(CapabilitySupport.Partial, effective.Reasoning.Support);
-        CollectionAssert.AreEquivalent(new[] { ReasoningEffort.Medium }, effective.Reasoning.SupportedEfforts.ToArray());
+        CollectionAssert.AreEquivalent(new[] { "medium" }, effective.Reasoning.SupportedEfforts.ToArray());
         Assert.AreEqual(CapabilitySupport.Native, effective.Streaming.Support);
     }
 
@@ -29,11 +30,11 @@ public sealed class ExecutionCapabilityTests
             Reasoning = new ModelReasoningOptions { Mode = ReasoningMode.Enabled, Effort = ReasoningEffort.High }
         };
         var capabilities = EffectiveCapabilityResolver.Intersect(
-            Capabilities(CapabilitySupport.Unsupported, new HashSet<ReasoningEffort>()) with { Streaming = new() });
+            Capabilities(CapabilitySupport.Unsupported, new HashSet<string>()) with { Streaming = new() });
 
         var exception = Assert.ThrowsExactly<ExecutionCompatibilityException>(() => ExecutionCompatibilityValidator.Validate(
             profile,
-            new ModelExecutionOptions(Streaming: StreamingMode.Enabled),
+            new ModelExecutionOptions(Streaming: RuntimeStreamingMode.Enabled),
             capabilities,
             "ollama",
             "qwen3:8b",
@@ -70,10 +71,10 @@ public sealed class ExecutionCapabilityTests
         Assert.AreEqual(0.9, resolved.Generation.TopP);
         Assert.AreEqual(4096, resolved.Generation.MaxOutputTokens);
         Assert.AreEqual(ReasoningEffort.Medium, resolved.Reasoning.Effort);
-        Assert.AreEqual(StreamingMode.Enabled, resolved.Execution.Streaming);
+        Assert.AreEqual(RuntimeStreamingMode.Enabled, resolved.Execution.Streaming);
     }
 
-    private static AgentRuntimeCapabilities Capabilities(CapabilitySupport reasoning, IReadOnlySet<ReasoningEffort> efforts) => new()
+    private static AgentRuntimeCapabilities Capabilities(CapabilitySupport reasoning, IReadOnlySet<string> efforts) => new()
     {
         Streaming = new(CapabilitySupport.Native),
         Sessions = new(CapabilitySupport.Native),
@@ -85,7 +86,7 @@ public sealed class ExecutionCapabilityTests
     private static ModelProfileProperties Profile() => new()
     {
         DisplayName = "Qwen",
-        Provider = new ResourceReference("/resourceGroups/default/providers/Agentstration.ModelProviders/modelProviders/ollama-local"),
+        Provider = new ResourceReference("ollama-local"),
         Model = new ModelSelection { Name = "qwen3:8b" }
     };
 }

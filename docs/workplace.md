@@ -50,24 +50,23 @@ Agentstration.Work                    Workspace-owned functional model
 Agentstration.Application             orchestration, suspension/resume and projections
 Agentstration.Work.Contracts          stable HTTP and SignalR contracts
 Agentstration.Work.Storage.*          independent SQLite Work persistence
-Agentstration.Work.Api                standalone Work API, hub and local workers
 Agentstration.Workplace.Client        HTTP-only API client and reconnecting SignalR client
 Agentstration.Workplace.Components    reusable Razor business components
 Agentstration.Workplace.Web           standalone end-user Blazor host
-Agentstration.Web                     independent operations Console
+Agentstration.Web                     authoritative server, operations Console, APIs, hub and workers
 ```
 
-`Agentstration.Workplace.Web` references neither the Console host nor application, infrastructure, runtime, provider, or storage implementations. Its only server communication is the configurable Work API base URL and Workplace hub URL. If the hub URL is omitted, it is derived as `hubs/workplace` from the API base URL.
+`Agentstration.Workplace.Web` references neither the server host nor application, infrastructure, runtime, provider, or storage implementations. Its only server communication is the configurable API base URL and Workplace hub URL. If the hub URL is omitted, it is derived as `hubs/workplace` from the API base URL.
 
 Direct local launch uses two processes:
 
 ```powershell
 $env:AI__Provider = "Deterministic"
-dotnet run --project src/Agentstration.Work.Api
+dotnet run --project src/Agentstration.Web
 dotnet run --project src/Agentstration.Workplace.Web
 ```
 
-The defaults are `http://localhost:5080` for Work API, `http://localhost:5100` for the Console, and `http://localhost:5180` for Workplace. Flow authoring and Entry execution both use the Flow API hosted by Work API so that selection, publication, and execution resolve immutable versions from the same Flow store. Aspire starts `agentstration-console`, `agentstration-work-api`, and `agentstration-workplace` as separate resources and injects their endpoints.
+The defaults are `http://localhost:5100` for the authoritative server and Console, and `http://localhost:5180` for Workplace. Flow authoring and Entry execution both use the Flow API hosted by the authoritative server so that selection, publication, and execution resolve immutable versions from the same Flow store. Aspire starts `agentstration-console` and `agentstration-workplace` and injects the server endpoint into Workplace.
 
 ## Isolation and public model
 

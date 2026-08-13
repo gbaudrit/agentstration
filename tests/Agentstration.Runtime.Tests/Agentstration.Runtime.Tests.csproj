@@ -1,6 +1,7 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
     <ProjectReference Include="../../src/Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
     <ProjectReference Include="../../src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />

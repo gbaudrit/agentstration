@@ -60,3 +60,6 @@ Use **Proposed** when implementation or repository evidence does not establish a
 28. [ADR-0028 — Tool Providers materialize a governed catalog](0028-tool-providers-governed-catalog.md)
 29. [ADR-0029 — Aspire consumes an existing local Ollama installation](0029-aspire-consumes-local-ollama.md)
 30. [ADR-0030 — AEP is an autonomous SDK and Inspector repository](0030-autonomous-aep-repository.md)
+31. [ADR-0031 — Agentstration-native declarative resource envelope](0031-agentstration-native-resource-envelope.md)
+32. [ADR-0032 — Use one authoritative standalone server](0032-single-authoritative-standalone-server.md)
+33. [ADR-0033 — Canonical resource names and explicit execution identities](0033-canonical-names-and-execution-identities.md)

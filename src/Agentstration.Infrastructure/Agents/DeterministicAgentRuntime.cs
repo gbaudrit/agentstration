@@ -93,7 +93,7 @@ public sealed partial class DeterministicChatClient : IChatClient
 
 public sealed class MicrosoftExtensionsAiAgentRuntime(IChatClientResolver chatClients) : IAgentRuntime
 {
-    private const string ContentModelProfileId = "/resourceGroups/default/providers/Agentstration.Models/modelProfiles/reasoning-default";
+    private const string ContentModelProfileId = "reasoning-default";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<AgentExecutionResult> RunAsync(AgentExecutionRequest request, CancellationToken cancellationToken)

@@ -17,7 +17,6 @@ public sealed class RuntimeRunDbContext(DbContextOptions<RuntimeRunDbContext> op
         run.HasKey(value => value.RunId);
         run.Property(value => value.RunId).HasMaxLength(64);
         run.Property(value => value.AgentResourceId).HasMaxLength(1024);
-        run.Property(value => value.ResourceGroup).HasMaxLength(256);
         run.Property(value => value.State).HasMaxLength(32);
         run.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
         run.HasIndex(value => new { value.AgentResourceId, value.CreatedAt });
@@ -34,7 +33,6 @@ internal sealed class RuntimeRunDocument
 {
     public required string RunId { get; set; }
     public required string AgentResourceId { get; set; }
-    public required string ResourceGroup { get; set; }
     public required string State { get; set; }
     public required string Payload { get; set; }
     public required string ETag { get; set; }
@@ -58,6 +56,7 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await RemoveLegacyScopeColumnAsync(context, cancellationToken);
     }
 
     public async Task<StoredRuntimeRun> CreateAsync(RuntimeRun run, CancellationToken cancellationToken)
@@ -143,7 +142,6 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
     {
         RunId = run.Id,
         AgentResourceId = run.Properties.Agent.ResourceId,
-        ResourceGroup = run.ResourceGroup,
         State = run.Status.State.ToString(),
         Payload = JsonSerializer.Serialize(run, JsonOptions),
         ETag = etag,
@@ -159,6 +157,52 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
     }
 
     private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
+
+    private static async Task RemoveLegacyScopeColumnAsync(RuntimeRunDbContext context, CancellationToken cancellationToken)
+    {
+        var connection = context.Database.GetDbConnection();
+        await connection.OpenAsync(cancellationToken);
+        var legacyColumn = "Resource" + "Group";
+        var found = false;
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info('RuntimeRuns');";
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (string.Equals(reader.GetString(1), legacyColumn, StringComparison.OrdinalIgnoreCase))
+                {
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!found) return;
+
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var migration = connection.CreateCommand();
+        migration.Transaction = transaction;
+        migration.CommandText =
+            """
+            CREATE TABLE RuntimeRuns_P1 (
+                RunId TEXT NOT NULL CONSTRAINT PK_RuntimeRuns PRIMARY KEY,
+                AgentResourceId TEXT NOT NULL,
+                State TEXT NOT NULL,
+                Payload TEXT NOT NULL,
+                ETag TEXT NOT NULL,
+                CreatedAt INTEGER NOT NULL,
+                UpdatedAt INTEGER NOT NULL
+            );
+            INSERT INTO RuntimeRuns_P1 (RunId, AgentResourceId, State, Payload, ETag, CreatedAt, UpdatedAt)
+                SELECT RunId, AgentResourceId, State, Payload, ETag, CreatedAt, UpdatedAt FROM RuntimeRuns;
+            DROP TABLE RuntimeRuns;
+            ALTER TABLE RuntimeRuns_P1 RENAME TO RuntimeRuns;
+            CREATE INDEX IX_RuntimeRuns_AgentResourceId_CreatedAt ON RuntimeRuns (AgentResourceId, CreatedAt);
+            """;
+        await migration.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
 }
 
 public static class SqliteRuntimeRunServiceCollectionExtensions

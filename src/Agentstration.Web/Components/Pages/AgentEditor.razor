@@ -1,5 +1,5 @@
 @page "/agents/new"
-@page "/agents/{ResourceGroup}/{Name}"
+@page "/agents/{Name}"
 @implements IDisposable
 @inject IManagementApiClient Client
 @inject IAgentsModelClient AgentsModelClient
@@ -107,7 +107,6 @@ else
 }
 
 @code {
-    [Parameter] public string? ResourceGroup { get; set; }
     [Parameter] public string? Name { get; set; }
 
     private readonly CancellationTokenSource cancellation = new();
@@ -128,7 +127,7 @@ else
     private bool isDirty;
     private bool applyRuntimeOnSubmit = true;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private string OverviewUrl => $"/agents/{Uri.EscapeDataString(ResourceGroup ?? "default")}/{Uri.EscapeDataString(Name ?? string.Empty)}";
+    private string OverviewUrl => $"/agents/{Uri.EscapeDataString(Name ?? string.Empty)}";
     private string RunUrl => $"{OverviewUrl}/run";
     private bool IsStateSynchronized => !isDirty && readiness?.Ready == true && readiness.Generation == generation;
     private long? ActiveGeneration => readiness?.Ready == true ? readiness.Generation : null;
@@ -144,22 +143,21 @@ else
         errorMessage = null;
         try
         {
-            var group = string.IsNullOrWhiteSpace(ResourceGroup) ? "default" : ResourceGroup;
-            catalogTools = await ToolsClient.GetToolsAsync(group, cancellationToken: cancellation.Token);
+            catalogTools = await ToolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
             if (IsNew)
             {
                 model = new AgentEditorModel();
             }
             else
             {
-                var snapshot = await Client.GetAgentAsync(group, Name!, cancellation.Token);
+                var snapshot = await Client.GetAgentAsync(Name!, cancellation.Token);
                 model = AgentEditorModel.FromResource(snapshot.Value);
                 etag = snapshot.ETag;
                 resourceId = snapshot.Value.Uid.ToString("D");
                 generation = snapshot.Value.Generation;
                 provisioningStatus = snapshot.Value.Status.ProvisioningState.ToString();
-                await LoadAgentModelAsync(group, Name!);
-                await LoadReadinessAsync(group, Name!, generation);
+                await LoadAgentModelAsync(Name!);
+                await LoadReadinessAsync(Name!, generation);
             }
             isDirty = false;
         }
@@ -192,27 +190,25 @@ else
     private static string ResourceName(string name) => name;
     private static string ProfileUrl(AgentModelResponse value)
     {
-        var id = ResourceIdentifier.Parse(value.Declared.ModelProfile.ResourceId);
-        return $"/modelprofiles/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}";
+        return $"/modelprofiles/{Uri.EscapeDataString(value.Declared.ModelProfile.ResourceId)}";
     }
     private static string ProviderUrl(AgentModelResponse value)
     {
-        var id = ResourceIdentifier.Parse(value.Resolved.Provider!.ResourceId);
-        return $"/modelproviders/{Uri.EscapeDataString(id.ResourceGroup)}/{Uri.EscapeDataString(id.Name)}";
+        return $"/modelproviders/{Uri.EscapeDataString(value.Resolved.Provider!.ResourceId)}";
     }
 
-    private async Task LoadAgentModelAsync(string resourceGroup, string name)
+    private async Task LoadAgentModelAsync(string name)
     {
         agentModel = null;
         modelResolutionWarning = null;
-        try { agentModel = await AgentsModelClient.GetAgentModelResolutionAsync(resourceGroup, name, cancellation.Token); }
+        try { agentModel = await AgentsModelClient.GetAgentModelResolutionAsync(name, cancellation.Token); }
         catch (AgentstrationApiException exception) { modelResolutionWarning = exception.Message; }
     }
 
-    private async Task LoadReadinessAsync(string resourceGroup, string name, long desiredGeneration)
+    private async Task LoadReadinessAsync(string name, long desiredGeneration)
     {
         readiness = null;
-        try { readiness = await RuntimeClient.GetAgentReadinessAsync(resourceGroup, name, desiredGeneration, cancellation.Token); }
+        try { readiness = await RuntimeClient.GetAgentReadinessAsync(name, desiredGeneration, cancellation.Token); }
         catch (AgentstrationApiException) { }
     }
 
@@ -236,13 +232,13 @@ else
             isDirty = false;
             if (applyRuntime)
             {
-                var activation = await RuntimeClient.PrepareAgentAsync("default", snapshot.Value.Name, snapshot.Value.Generation, cancellation.Token);
+                var activation = await RuntimeClient.PrepareAgentAsync(snapshot.Value.Name, snapshot.Value.Generation, cancellation.Token);
                 if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 {
                     var message = $"The agent definition was saved, but generation {snapshot.Value.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";
                     Notifications.Add(new NotificationItem(Guid.NewGuid(), "Runtime activation failed", message, DateTimeOffset.Now, UiStatus.Warning));
-                    if (wasNew) Navigation.NavigateTo($"/agents/default/{Uri.EscapeDataString(snapshot.Value.Name)}");
-                    else { errorMessage = message; await LoadAgentModelAsync("default", snapshot.Value.Name); await LoadReadinessAsync("default", snapshot.Value.Name, snapshot.Value.Generation); }
+                    if (wasNew) Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.Name)}");
+                    else { errorMessage = message; await LoadAgentModelAsync(snapshot.Value.Name); await LoadReadinessAsync(snapshot.Value.Name, snapshot.Value.Generation); }
                     return;
                 }
             }
@@ -250,11 +246,11 @@ else
             successMessage = wasNew ? (applyRuntime ? "Agent created and deployed." : "Agent draft created.") : applyRuntime ? $"Agent updated and generation {snapshot.Value.Generation} activated." : $"Desired generation {snapshot.Value.Generation} saved without changing the active deployment.";
             Notifications.Add(new NotificationItem(Guid.NewGuid(), successMessage, snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
             if (wasNew)
-                Navigation.NavigateTo($"/agents/default/{Uri.EscapeDataString(snapshot.Value.Name)}");
+                Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.Name)}");
             else
             {
-                await LoadAgentModelAsync("default", snapshot.Value.Name);
-                await LoadReadinessAsync("default", snapshot.Value.Name, snapshot.Value.Generation);
+                await LoadAgentModelAsync(snapshot.Value.Name);
+                await LoadReadinessAsync(snapshot.Value.Name, snapshot.Value.Generation);
             }
         }
         catch (ArgumentException exception) { errorMessage = exception.Message; }
@@ -273,8 +269,8 @@ else
         errorMessage = null;
         try
         {
-            var activation = await RuntimeClient.PrepareAgentAsync("default", model.Name, generation, cancellation.Token);
-            await LoadReadinessAsync("default", model.Name, generation);
+            var activation = await RuntimeClient.PrepareAgentAsync(model.Name, generation, cancellation.Token);
+            await LoadReadinessAsync(model.Name, generation);
             successMessage = string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal) ? $"Generation {generation} is active." : $"Reconciliation completed with state {activation.State}.";
         }
         catch (AgentstrationApiException exception) { errorMessage = exception.Message; errorId = exception.ErrorId; }

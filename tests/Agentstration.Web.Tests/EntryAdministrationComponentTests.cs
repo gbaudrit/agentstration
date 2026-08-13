@@ -94,8 +94,8 @@ public sealed class EntryAdministrationComponentTests
     private sealed class FakeEntryAdministrationApiClient : IEntryAdministrationApiClient
     {
         internal const string AgentResourceId = "deterministic";
-        internal const string FlowResourceId = "/resourceGroups/default/providers/Agentstration.Flows/flows/router";
-        private const string WorkspaceResourceId = "/resourceGroups/default/providers/Agentstration.Work/workspaces/personal";
+        internal const string FlowResourceId = "router";
+        private const string WorkspaceResourceId = "personal";
         private static readonly DateTimeOffset Now = new(2026, 8, 6, 12, 0, 0, TimeSpan.Zero);
 
         public List<EntryBindingKind> RequestedKinds { get; } = [];
@@ -145,13 +145,13 @@ public sealed class EntryAdministrationComponentTests
         public Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken) { SavedWorkspace = draft with { Revision = 2, UpdatedAt = Now }; return Task.FromResult(SavedWorkspace); }
         public Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken) => Task.FromResult(new WorkplaceWorkspace { Id = new(WorkspaceResourceId), Name = name, DisplayName = "Personal", Entries = SavedWorkspace?.Entries ?? [], PublishedAt = Now });
 
-        private static EntryId EntryId(string name) => new($"/resourceGroups/default/providers/Agentstration.Work/entries/{name}");
+        private static EntryId EntryId(string name) => new(name);
         private static EntryResource PublishedEntry(string name) => new()
         {
             Id = EntryId(name), Name = name, DisplayName = name, PublishedAt = Now,
             Presentation = new EntryPresentation { Fields = [new EntryFieldDefinition { Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }] },
             ResolvedTarget = new EntryResolvedTarget(FlowResourceId, "1.0.0")
         };
-        private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.ResourceGroup, value.Location, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt);
+        private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt);
     }
 }

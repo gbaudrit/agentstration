@@ -5,7 +5,7 @@ namespace Agentstration.Web.Api.Diagnostics;
 
 internal sealed class OllamaChatDiagnosticEndpoint
 {
-    private const string ProfileResourceId = "/resourceGroups/default/providers/Agentstration.Models/modelProfiles/reasoning-default";
+    private const string ProfileResourceId = "reasoning-default";
 
     public static void Map(IEndpointRouteBuilder endpoints) =>
         endpoints.MapPost("/api/diagnostics/models/ollama/chat", HandleAsync);

@@ -4,9 +4,9 @@ With `Agentstration.Web` running, open `http://localhost:5100` and check `http:/
 
 With the standalone Workplace pair running:
 
-- Work API: `http://localhost:5080` (its root intentionally has no UI)
-- Work API health: `http://localhost:5080/health`
-- Work API OpenAPI: `http://localhost:5080/openapi/v1.json` in Development
+- Authoritative server and Console: `http://localhost:5100`
+- Server health: `http://localhost:5100/health`
+- Combined OpenAPI: `http://localhost:5100/openapi/v1.json` in Development
 - Workplace: `http://localhost:5180`
 
 First start creates local data under `.agentstration/` relative to the running host. These generated files are ignored by Git. The standalone control, work, runtime, and Flow data stores are logically separated.

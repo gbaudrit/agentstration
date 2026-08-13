@@ -18,16 +18,15 @@ namespace Agentstration.Web.Console;
 public interface IManagementApiClient
 {
     Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken);
-    Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(string resourceGroup, CancellationToken cancellationToken);
-    Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string resourceGroup, string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken);
-    Task DeleteAgentAsync(string resourceGroup, string name, string etag, CancellationToken cancellationToken);
+    Task DeleteAgentAsync(string name, string etag, CancellationToken cancellationToken);
     Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken);
 }
 
 public interface IAgentRunnerManagementClient
 {
-    Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string resourceGroup, string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken);
 }
 
 public interface IRuntimeApiClient
@@ -44,8 +43,8 @@ public interface IRuntimeApiClient
 
 public interface IAgentRunnerRuntimeClient : IRuntimeApiClient
 {
-    Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string resourceGroup, string agentName, long generation, CancellationToken cancellationToken);
-    Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string resourceGroup, string agentName, long generation, CancellationToken cancellationToken);
+    Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string agentName, long generation, CancellationToken cancellationToken);
+    Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string agentName, long generation, CancellationToken cancellationToken);
 }
 
 public interface IWorkApiClient
@@ -107,26 +106,23 @@ public interface IAgentstrationEventStream
 
 public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiClient, IAgentRunnerManagementClient
 {
-    public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken) =>
-        GetAgentsAsync("default", cancellationToken);
-
-    public async Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(string resourceGroup, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken)
     {
-        var path = "agents";
+        var path = "api/agents";
         var page = await ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, path, cancellationToken);
         return page.Value.Select(agent => new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Definition.ModelProfile.Name)).ToArray();
     }
 
-    public async Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string resourceGroup, string name, CancellationToken cancellationToken)
+    public async Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken)
     {
-        var path = AgentPath(resourceGroup, name);
+        var path = AgentPath(name);
         using var response = await httpClient.GetAsync(path, cancellationToken);
         return await ReadResourceAsync<AgentResource>(response, cancellationToken);
     }
 
     public async Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Put, AgentPath("default", request.Metadata.Name))
+        using var message = new HttpRequestMessage(HttpMethod.Put, AgentPath(request.Metadata.Name))
         {
             Content = JsonContent.Create(request)
         };
@@ -136,9 +132,9 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         return await ReadResourceAsync<AgentResource>(response, cancellationToken);
     }
 
-    public async Task DeleteAgentAsync(string resourceGroup, string name, string etag, CancellationToken cancellationToken)
+    public async Task DeleteAgentAsync(string name, string etag, CancellationToken cancellationToken)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Delete, AgentPath(resourceGroup, name));
+        using var message = new HttpRequestMessage(HttpMethod.Delete, AgentPath(name));
         message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         using var response = await httpClient.SendAsync(message, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
@@ -151,8 +147,8 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         return new(0, agents.Count, agents.Sum(item => int.TryParse(item.Version, out var version) ? version : 0), 0, "Managed");
     }
 
-    private static string AgentPath(string resourceGroup, string name) =>
-        $"agents/{Uri.EscapeDataString(name)}";
+    private static string AgentPath(string name) =>
+        $"api/agents/{Uri.EscapeDataString(name)}";
 
     private static async Task<ResourceSnapshot<T>> ReadResourceAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
@@ -188,7 +184,7 @@ public sealed class WorkApiClient(HttpClient httpClient) : IWorkApiClient
         ApiResponse.ReadAsync<WorkTaskOperationsCountersResponse>(httpClient, string.IsNullOrWhiteSpace(workspaceId) ? "api/tasks/summary" : $"api/tasks/summary?workspaceId={Uri.EscapeDataString(workspaceId)}", cancellationToken);
     public Task<WorkTaskOperationsDetailResponse> GetTaskAsync(Guid taskId, CancellationToken cancellationToken) => ApiResponse.ReadAsync<WorkTaskOperationsDetailResponse>(httpClient, $"api/tasks/{taskId}", cancellationToken);
     public Task<FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken) => ApiResponse.ReadAsync<FlowRun>(httpClient, $"api/tasks/{taskId}/flow-runs/{Uri.EscapeDataString(runId)}", cancellationToken);
-    public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) => await ApiResponse.ReadAsync<WorkplaceWorkspaceResponse[]>(httpClient, "api/workspaces", cancellationToken);
+    public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) => await ApiResponse.ReadAsync<WorkplaceWorkspaceResponse[]>(httpClient, "api/workplace/workspaces", cancellationToken);
     public Task PauseTaskAsync(Guid taskId, CancellationToken cancellationToken) => CommandAsync(taskId, "pause", cancellationToken);
     public Task ResumeTaskAsync(Guid taskId, CancellationToken cancellationToken) => CommandAsync(taskId, "resume", cancellationToken);
     public Task CancelTaskAsync(Guid taskId, CancellationToken cancellationToken) => CommandAsync(taskId, "cancel", cancellationToken);
@@ -406,7 +402,7 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
         var runs = await GetRunsAsync(null, cancellationToken);
         return runs.Select(run => new ExecutionSummary(
             run.Id,
-            ResourceIdentifier.TryParse(run.Properties.Agent.ResourceId, out var id) ? id.Name : run.Properties.Agent.ResourceId,
+            run.Properties.Agent.ResourceId,
             null,
             null,
             run.Status.State.ToString(),
@@ -469,15 +465,15 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
         return await ReadRunAsync(response, cancellationToken);
     }
 
-    public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string resourceGroup, string agentName, long generation, CancellationToken cancellationToken) =>
+    public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string agentName, long generation, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<AgentRuntimeReadinessResponse>(httpClient,
-            $"api/runtime/agents/{Uri.EscapeDataString(agentName)}/readiness?resourceGroup={Uri.EscapeDataString(resourceGroup)}&generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"api/runtime/agents/{Uri.EscapeDataString(agentName)}/readiness?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
             cancellationToken);
 
-    public async Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string resourceGroup, string agentName, long generation, CancellationToken cancellationToken)
+    public async Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string agentName, long generation, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsync(
-            $"api/runtime/agents/{Uri.EscapeDataString(agentName)}/prepare?resourceGroup={Uri.EscapeDataString(resourceGroup)}&generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"api/runtime/agents/{Uri.EscapeDataString(agentName)}/prepare?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
             null,
             cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);

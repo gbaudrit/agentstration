@@ -16,30 +16,27 @@ internal static class RuntimeProfileEndpoints
         group.MapDelete("/{profileName}", DeleteAsync);
     }
 
-    private static Task<IResult> ListAsync(string? resourceGroup, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> ListAsync(RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var profiles = await service.ListAsync(resourceGroup, cancellationToken);
+            var profiles = await service.ListAsync(cancellationToken);
             var values = new List<RuntimeProfileSummaryResponse>(profiles.Count);
             foreach (var profile in profiles)
             {
-                var usages = await service.GetUsagesAsync(profile.Value.Id, cancellationToken);
+                var usages = await service.GetUsagesAsync(profile.Value.Metadata.Name, cancellationToken);
                 values.Add(new RuntimeProfileSummaryResponse(
-                    profile.Value.Id,
+                    profile.Value.Metadata.Name,
                     profile.Value.Name,
-                    profile.Value.ResourceGroup!,
-                    profile.Value.Location ?? "local",
-                    profile.Value.Properties,
+                    profile.Value.Definition,
                     usages.Count));
             }
             return Results.Ok(new ValueResponse<RuntimeProfileSummaryResponse>(values));
         });
 
-    private static Task<IResult> GetAsync(string profileName, string? resourceGroup, HttpResponse response, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> GetAsync(string profileName, HttpResponse response, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var group = ModelManagementHttp.ResourceGroup(resourceGroup);
-            var stored = await service.GetAsync(group, profileName, cancellationToken)
+            var stored = await service.GetAsync(profileName, cancellationToken)
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, profileName));
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
@@ -49,37 +46,33 @@ internal static class RuntimeProfileEndpoints
         {
             var stored = await service.CreateAsync(new RuntimeProfileResource
             {
-                Id = RuntimeProfileManagementService.ProfileId(body.ResourceGroup, body.Name),
-                Name = body.Name,
+                Metadata = new ResourceMetadata { Name = body.Name },
                 Kind = ResourceKinds.RuntimeProfile,
                 ApiVersion = ManagementApiVersions.CoreV1,
-                ResourceGroup = body.ResourceGroup,
-                Location = body.Location,
-                Properties = body.Properties
+                Definition = body.Properties
             }, cancellationToken);
             response.Headers.Location = $"/api/runtimeprofiles/{Uri.EscapeDataString(stored.Value.Name)}";
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);
         });
 
-    private static Task<IResult> PutAsync(string profileName, string? resourceGroup, PutRuntimeProfileRequest body, HttpRequest request, HttpResponse response, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> PutAsync(string profileName, PutRuntimeProfileRequest body, HttpRequest request, HttpResponse response, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () => ModelManagementHttp.ResourceResult(
-            await service.PutAsync(ModelManagementHttp.ResourceGroup(resourceGroup), profileName, body.Properties, ModelManagementHttp.IfMatch(request), cancellationToken),
+            await service.PutAsync(profileName, body.Properties, ModelManagementHttp.IfMatch(request), cancellationToken),
             response,
             StatusCodes.Status200OK));
 
-    private static Task<IResult> DeleteAsync(string profileName, string? resourceGroup, HttpRequest request, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> DeleteAsync(string profileName, HttpRequest request, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            await service.DeleteAsync(ModelManagementHttp.ResourceGroup(resourceGroup), profileName, ModelManagementHttp.IfMatch(request), cancellationToken);
+            await service.DeleteAsync(profileName, ModelManagementHttp.IfMatch(request), cancellationToken);
             return Results.NoContent();
         });
 
-    private static Task<IResult> UsagesAsync(string profileName, string? resourceGroup, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> UsagesAsync(string profileName, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var group = ModelManagementHttp.ResourceGroup(resourceGroup);
-            var id = RuntimeProfileManagementService.ProfileId(group, profileName);
-            _ = await service.GetAsync(group, profileName, cancellationToken)
+            var id = RuntimeProfileManagementService.ProfileId(profileName);
+            _ = await service.GetAsync(profileName, cancellationToken)
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, profileName));
             var usages = await service.GetUsagesAsync(id, cancellationToken);
             var values = usages.Select(value => new RuntimeProfileUsageResponse(value.DeploymentUid.ToString("D"), value.Name, value.Environment, value.AgentName)).ToArray();
