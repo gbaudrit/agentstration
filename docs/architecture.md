@@ -75,7 +75,7 @@ Flow.Storage.Sqlite -> Flow.Storage.Abstractions + EF Core SQLite
 Web.FlowDesigner -> Web.Components + Flow + Flow.Contracts
 Web -> Web.FlowDesigner (host adapters implement designer backend/resource ports)
 Runtime.Local -> Work execution port
-Runtime.Core -> Runtime.Abstractions + Management.Abstractions
+Runtime.Core -> Runtime.Abstractions
 Runtime.Storage.Sqlite -> Runtime.Abstractions + EF Core SQLite
 Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 ```
@@ -102,7 +102,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
 | Scheduling | standalone polling worker | Quartz persistent scheduler |
-| Tools | persisted Tool/MCP-server resources, AEP contribution resolution, MCP schema catalog and MAF invocation | richer permissions, credentials and connection policies |
+| Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog and MAF invocation | richer permissions, credentials and connection policies |
 | Notifications | internal notification record/event | email, Teams, webhook channels |
 | MCP | nine tools reusing application services | resources and authorization |
 | Evaluation | deterministic `Microsoft.Extensions.AI.Evaluation` metrics and versioned content-workflow dataset | LLM-as-judge quality/safety evaluators and reports |
@@ -345,7 +345,7 @@ Standalone startup creates or repairs `local / default`, the local user, active 
 15. **Delivered model management UI increment:** provider and profile CRUD, connection testing, dynamic model inspection, ETag conflict recovery, usage-aware deletion, reusable agent profile picker, and declared-versus-resolved agent model details.
 16. **Delivered real Agent Runner invocation increment:** canonical Runner clients, exact-generation readiness/preparation, per-run profile resolution, dynamic Ollama model selection, effective generation options, and durable resolved-model metadata.
 17. **Delivered AEP V1 increment:** technology-neutral protocol contracts, reusable client/server framework, Microsoft.Extensions.AI adapter, out-of-process Ollama extension, Aspire orchestration, SSE streaming, discovery/version checks, and offline boundary tests.
-18. **Delivered AEP Tool Contributions increment:** schema-free AEP mappings to one or more MCP servers, persisted Tool/MCP-server resources, an official-SDK Tool Catalog, direct external MCP support, and native MAF tool adaptation.
+18. **Delivered AEP Tool Contributions increment:** schema-free AEP mappings to one or more MCP servers, persisted ToolProvider/Tool resources, an official-SDK Tool Catalog, direct external MCP support, and native MAF tool adaptation.
 19. **Delivered Tool Provider governance increment:** persistent AEP/MCP providers, STDIO and Streamable HTTP, manual discovery with durable diffs, secure-default Tool materialization, Console governance, Agent selection, and deterministic AEP utilities.
 
 ## ADR catalog

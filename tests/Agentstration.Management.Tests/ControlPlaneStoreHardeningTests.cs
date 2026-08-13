@@ -13,7 +13,7 @@ public sealed class ControlPlaneStoreHardeningTests
     [TestMethod]
     public async Task StoreAppliesCommonSystemStateToUnknownResourceKindWithoutAdapterSwitch()
     {
-        await using var fixture = await StoreFixture.CreateAsync();
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
         var stored = await fixture.Store.PutAsync(new ExtensionResource
         {
             ApiVersion = "extensions.agentstration.io/v1",
@@ -35,15 +35,44 @@ public sealed class ControlPlaneStoreHardeningTests
     [TestMethod]
     public async Task MissingRequestContextCannotImplicitlyReadAcrossScopes()
     {
-        await using var fixture = await StoreFixture.CreateAsync(new UnavailableRequestContext());
+        await using var fixture = await StoreFixture.CreateAsync();
+        Assert.IsInstanceOfType<UnavailableRequestContext>(fixture.RequestContext);
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
             fixture.Store.ListAsync<ExtensionResource>("MemoryProvider", 0, 10, default));
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            fixture.Store.PutAsync(Resource("blocked"), null, true, default));
+    }
+
+    [TestMethod]
+    public async Task WorkspaceContextScopesReadsAndWritesWhileExplicitSystemContextIsGlobal()
+    {
+        var tenantId = Guid.NewGuid();
+        var firstWorkspaceId = Guid.NewGuid();
+        var secondWorkspaceId = Guid.NewGuid();
+        var context = new TestRequestContext();
+        context.UseSystem();
+        await using var fixture = await StoreFixture.CreateAsync(context);
+        await fixture.Store.PutAsync(Resource("first", tenantId, firstWorkspaceId), null, true, default);
+        await fixture.Store.PutAsync(Resource("second", tenantId, secondWorkspaceId), null, true, default);
+
+        context.UseWorkspace(new RequestContext(Guid.NewGuid(), tenantId, firstWorkspaceId));
+        var scoped = await fixture.Store.ListAllAsync<ExtensionResource>("MemoryProvider", default);
+        CollectionAssert.AreEqual(new[] { "first" }, scoped.Select(value => value.Value.Metadata.Name).ToArray());
+        Assert.IsNull(await fixture.Store.GetAsync<ExtensionResource>(new ResourceKey("MemoryProvider", "second"), default));
+        var workspaceOwned = await fixture.Store.PutAsync(Resource("workspace-owned"), null, true, default);
+        Assert.AreEqual(tenantId, workspaceOwned.Value.TenantId);
+        Assert.AreEqual(firstWorkspaceId, workspaceOwned.Value.WorkspaceId);
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            fixture.Store.PutAsync(Resource("cross-scope", tenantId, secondWorkspaceId), null, true, default));
+
+        context.UseSystem();
+        Assert.HasCount(3, await fixture.Store.ListAllAsync<ExtensionResource>("MemoryProvider", default));
     }
 
     [TestMethod]
     public async Task RuntimeResolverReturnsOnlyExecutableRuntimeViewForExactGeneration()
     {
-        await using var fixture = await StoreFixture.CreateAsync();
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
         var agent = await fixture.Store.PutAsync(new AgentResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
@@ -102,7 +131,7 @@ public sealed class ControlPlaneStoreHardeningTests
     [TestMethod]
     public async Task ConcurrentCreationCannotAllocateTheSameAgentRevisionTwice()
     {
-        await using var fixture = await StoreFixture.CreateAsync();
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
         var agentId = Guid.NewGuid();
         var revision = new AgentRevision
         {
@@ -162,10 +191,24 @@ public sealed class ControlPlaneStoreHardeningTests
         public ExtensionDefinition Definition { get; init; } = null!;
     }
 
-    private sealed class UnavailableRequestContext : ICurrentRequestContext
+    private static ExtensionResource Resource(string name, Guid tenantId = default, Guid workspaceId = default) => new()
     {
-        public bool IsInitialized => false;
-        public RequestContext Current => throw new InvalidOperationException("No request context is available.");
+        ApiVersion = "extensions.agentstration.io/v1",
+        Kind = "MemoryProvider",
+        Metadata = new ResourceMetadata { Name = name },
+        TenantId = tenantId,
+        WorkspaceId = workspaceId,
+        Definition = new ExtensionDefinition("sqlite")
+    };
+
+    private sealed class TestRequestContext : ICurrentRequestContext
+    {
+        private RequestContext? current;
+        public bool IsInitialized => AccessMode == ControlPlaneAccessMode.Workspace;
+        public ControlPlaneAccessMode AccessMode { get; private set; } = ControlPlaneAccessMode.Unavailable;
+        public RequestContext Current => current ?? throw new InvalidOperationException("No workspace context is active.");
+        public void UseSystem() { current = null; AccessMode = ControlPlaneAccessMode.System; }
+        public void UseWorkspace(RequestContext value) { current = value; AccessMode = ControlPlaneAccessMode.Workspace; }
     }
 
     private sealed class StoreFixture(
@@ -176,6 +219,7 @@ public sealed class ControlPlaneStoreHardeningTests
     {
         public IControlPlaneStore Store { get; } = store;
         public IAgentResourceQueries Queries { get; } = queries;
+        public ICurrentRequestContext RequestContext => Provider.GetRequiredService<ICurrentRequestContext>();
 
         public static async Task<StoreFixture> CreateAsync(ICurrentRequestContext? context = null)
         {

@@ -64,23 +64,23 @@ public sealed class ModelProfileEditorModel
     public static ModelProfileEditorModel FromResource(ModelProfileResource resource) => new()
     {
         Name = resource.Name,
-        DisplayName = resource.Properties.DisplayName,
-        Description = resource.Properties.Description,
+        DisplayName = resource.Definition.DisplayName,
+        Description = resource.Definition.Description,
         ProviderName = resource.Definition.Provider.Name,
-        ModelName = resource.Properties.Model.Name,
-        Temperature = resource.Properties.Generation.Temperature,
-        TopP = resource.Properties.Generation.TopP,
-        TopK = resource.Properties.Generation.TopK,
-        MaxOutputTokens = resource.Properties.Generation.MaxOutputTokens,
-        Seed = resource.Properties.Generation.Seed,
-        StopSequences = resource.Properties.Generation.StopSequences is { Count: > 0 } stops ? string.Join(Environment.NewLine, stops) : null,
-        ReasoningMode = resource.Properties.Reasoning.Mode,
-        ReasoningEffort = resource.Properties.Reasoning.Effort,
-        OutputFormat = resource.Properties.Output.Format,
-        JsonSchema = resource.Properties.Output.JsonSchema is { } schema ? JsonSerializer.Serialize(schema, IndentedJson) : null,
-        StrictOutput = resource.Properties.Output.Strict,
-        ProviderOptionsJson = resource.Properties.ProviderOptions.Count > 0
-            ? JsonSerializer.Serialize(resource.Properties.ProviderOptions, IndentedJson)
+        ModelName = resource.Definition.Model.Name,
+        Temperature = resource.Definition.Generation.Temperature,
+        TopP = resource.Definition.Generation.TopP,
+        TopK = resource.Definition.Generation.TopK,
+        MaxOutputTokens = resource.Definition.Generation.MaxOutputTokens,
+        Seed = resource.Definition.Generation.Seed,
+        StopSequences = resource.Definition.Generation.StopSequences is { Count: > 0 } stops ? string.Join(Environment.NewLine, stops) : null,
+        ReasoningMode = resource.Definition.Reasoning.Mode,
+        ReasoningEffort = resource.Definition.Reasoning.Effort,
+        OutputFormat = resource.Definition.Output.Format,
+        JsonSchema = resource.Definition.Output.JsonSchema is { } schema ? JsonSerializer.Serialize(schema, IndentedJson) : null,
+        StrictOutput = resource.Definition.Output.Strict,
+        ProviderOptionsJson = resource.Definition.ProviderOptions.Count > 0
+            ? JsonSerializer.Serialize(resource.Definition.ProviderOptions, IndentedJson)
             : null
     };
 

@@ -18,12 +18,12 @@ public sealed class McpToolCatalogTests
     {
         await using var host = new WebApplicationFactory<global::Program>();
         var provider = Provider();
-        var tool = Tool(provider.Id);
+        var tool = Tool(provider.Metadata.Name);
         var adapter = Adapter(host);
         var catalog = new McpToolCatalog(new FakeStore(provider, tool), adapter);
 
         var discovery = await adapter.DiscoverAsync(provider, default);
-        var runtime = (await catalog.ResolveAsync([tool.Id])).Single();
+        var runtime = (await catalog.ResolveAsync([tool.Metadata.Name])).Single();
         var result = await runtime.InvokeAsync(null);
 
         Assert.IsTrue(discovery.Tools.Any(value => value.ExternalId == "list_workspaces"));
@@ -38,7 +38,7 @@ public sealed class McpToolCatalogTests
         await using var host = new WebApplicationFactory<global::Program>();
         var adapter = Adapter(host);
         var provider = Provider();
-        var tool = Tool(provider.Id);
+        var tool = Tool(provider.Metadata.Name);
 
         await AssertCodeAsync("tool_provider_disabled", provider with { Definition = provider.Definition with { Enabled = false } }, tool);
         await AssertCodeAsync("tool_disabled", provider, tool with { Definition = tool.Definition with { Enabled = false } });
@@ -47,7 +47,7 @@ public sealed class McpToolCatalogTests
         async Task AssertCodeAsync(string code, ToolProviderResource currentProvider, ToolResource currentTool)
         {
             var catalog = new McpToolCatalog(new FakeStore(currentProvider, currentTool), adapter);
-            var error = await Assert.ThrowsAsync<ToolResolutionException>(async () => await catalog.ResolveAsync([currentTool.Id]));
+            var error = await Assert.ThrowsAsync<ToolResolutionException>(async () => await catalog.ResolveAsync([currentTool.Metadata.Name]));
             Assert.AreEqual(code, error.Code);
         }
     }

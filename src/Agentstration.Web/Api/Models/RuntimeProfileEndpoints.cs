@@ -23,11 +23,11 @@ internal static class RuntimeProfileEndpoints
             var values = new List<RuntimeProfileSummaryResponse>(profiles.Count);
             foreach (var profile in profiles)
             {
-                var usages = await service.GetUsagesAsync(profile.Value.Id, cancellationToken);
+                var usages = await service.GetUsagesAsync(profile.Value.Metadata.Name, cancellationToken);
                 values.Add(new RuntimeProfileSummaryResponse(
-                    profile.Value.Id,
+                    profile.Value.Metadata.Name,
                     profile.Value.Name,
-                    profile.Value.Properties,
+                    profile.Value.Definition,
                     usages.Count));
             }
             return Results.Ok(new ValueResponse<RuntimeProfileSummaryResponse>(values));

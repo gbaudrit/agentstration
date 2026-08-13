@@ -18,7 +18,7 @@ public sealed class ToolManagementTests
         ToolManagementService.ValidateTool(resource);
 
         Assert.AreEqual("search", resource.Metadata.Name);
-        Assert.AreEqual("document-search", resource.Properties.ToolType!.Id);
+        Assert.AreEqual("document-search", resource.Definition.ToolType!.Id);
     }
 
     [TestMethod]

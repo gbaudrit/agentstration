@@ -22,6 +22,7 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class RuntimeRunTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     [TestMethod]
     public async Task CreatePreservesPayloadAndRequiresExactAgentVersion()
     {
@@ -164,6 +165,28 @@ public sealed class RuntimeRunTests
         var databasePath = Path.Combine(directory, "runtime.db");
         try
         {
+            var timestamp = new DateTimeOffset(2026, 8, 12, 10, 0, 0, TimeSpan.Zero);
+            var legacyRun = new RuntimeRun
+            {
+                Id = "existing",
+                Name = "existing",
+                Properties = new RuntimeRunProperties
+                {
+                    Agent = new RuntimeAgentReference("sql-expert", 1),
+                    Input = new RuntimeRunInput { Messages = [new(RuntimeMessageRole.User, "legacy")] },
+                    Execution = new RuntimeExecutionOptions()
+                },
+                Status = new RuntimeRunStatus { State = RuntimeRunState.Pending, CreatedAt = timestamp }
+            };
+            var legacyEvent = new RuntimeRunEvent
+            {
+                Sequence = 1,
+                EventId = Guid.NewGuid(),
+                RunId = legacyRun.Id,
+                Kind = RuntimeRunEventKind.RunCreated,
+                Timestamp = timestamp,
+                State = RuntimeRunState.Pending
+            };
             await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
             {
                 await connection.OpenAsync();
@@ -188,8 +211,13 @@ public sealed class RuntimeRunTests
                         Timestamp TEXT NOT NULL,
                         PRIMARY KEY (RunId, Sequence)
                     );
-                    INSERT INTO RuntimeRuns VALUES ('existing', 'sql-expert', 'default', 'Pending', '{}', 'etag', 1, 1);
+                    INSERT INTO RuntimeRuns VALUES ('existing', 'sql-expert', 'default', 'Pending', $runPayload, 'etag', $ticks, $ticks);
+                    INSERT INTO RuntimeRunEvents VALUES ('existing', 1, $eventPayload, $timestamp);
                     """;
+                command.Parameters.AddWithValue("$runPayload", JsonSerializer.Serialize(legacyRun, JsonOptions));
+                command.Parameters.AddWithValue("$eventPayload", JsonSerializer.Serialize(legacyEvent, JsonOptions));
+                command.Parameters.AddWithValue("$ticks", timestamp.UtcTicks);
+                command.Parameters.AddWithValue("$timestamp", timestamp.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
                 await command.ExecuteNonQueryAsync();
             }
 
@@ -200,6 +228,14 @@ public sealed class RuntimeRunTests
             var store = provider.GetRequiredService<IRuntimeRunStore>();
 
             await store.InitializeAsync(default);
+            await store.InitializeAsync(default);
+
+            var restored = await store.GetAsync("existing", default);
+            Assert.IsNotNull(restored);
+            Assert.AreEqual("legacy", restored.Value.Properties.Input.Messages.Single().Content);
+            var restoredEvents = await store.ListEventsAsync("existing", 0, default);
+            Assert.HasCount(1, restoredEvents);
+            Assert.AreEqual(RuntimeRunEventKind.RunCreated, restoredEvents[0].Kind);
 
             await using var verification = new SqliteConnection($"Data Source={databasePath}");
             await verification.OpenAsync();
@@ -211,6 +247,8 @@ public sealed class RuntimeRunTests
             Assert.IsFalse(columns.Contains("Resource" + "Group", StringComparer.OrdinalIgnoreCase));
             await reader.DisposeAsync();
             schema.CommandText = "SELECT COUNT(*) FROM RuntimeRuns WHERE RunId = 'existing';";
+            Assert.AreEqual(1L, (long)(await schema.ExecuteScalarAsync())!);
+            schema.CommandText = "SELECT COUNT(*) FROM RuntimeRunEvents WHERE RunId = 'existing';";
             Assert.AreEqual(1L, (long)(await schema.ExecuteScalarAsync())!);
         }
         finally
@@ -238,7 +276,7 @@ public sealed class RuntimeRunTests
         var workBefore = await client.GetFromJsonAsync<WorkItemPageResponse>("/api/work/workitems?top=100");
         var request = new CreateRuntimeRunRequest
         {
-            Agent = new RuntimeAgentReference(agent.Id, agent.Generation),
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation),
             Input = Input("integration prompt"),
             Origin = RuntimeRunOrigin.Api
         };
@@ -333,6 +371,7 @@ public sealed class RuntimeRunTests
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddSingleton(TimeProvider.System);
+            services.AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>();
             services.AddSqliteControlPlane($"Data Source={Path.Combine(directory, "management.db")}");
             services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();
             services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")}");

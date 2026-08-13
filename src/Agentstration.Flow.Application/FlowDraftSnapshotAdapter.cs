@@ -9,9 +9,16 @@ internal static class FlowDraftSnapshotAdapter
         var router = graph.Steps.OfType<RouterFlowStepDefinition>().FirstOrDefault();
         var destinations = router?.Candidates
             .Select(candidate => new FlowTargetReference(FlowTargetKind.Agent, candidate.Agent.ResourceId))
-            .ToArray() ?? [];
+            .ToArray()
+            ?? graph.Steps.OfType<AgentFlowStepDefinition>()
+                .Where(step => !step.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal))
+                .Select(step => new FlowTargetReference(FlowTargetKind.Agent, step.Agent.ResourceId))
+                .ToArray();
         if (destinations.Length == 0)
             destinations = [new FlowTargetReference(FlowTargetKind.Agent, "unconfigured-agent")];
-        return new RoutingFlowSpec(FlowRoutingStrategy.Deterministic, destinations);
+        var fallback = router?.Fallback is null
+            ? null
+            : new FlowTargetReference(FlowTargetKind.Agent, router.Fallback.ResourceId);
+        return new RoutingFlowSpec(FlowRoutingStrategy.Deterministic, destinations, fallback);
     }
 }

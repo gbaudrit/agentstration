@@ -30,14 +30,14 @@ public sealed class RuntimeProfileEditorModel
     public static RuntimeProfileEditorModel FromResource(RuntimeProfileResource resource) => new()
     {
         Name = resource.Name,
-        DisplayName = resource.Properties.DisplayName,
-        RuntimeType = resource.Properties.RuntimeType,
-        SessionMode = resource.Properties.Execution.SessionMode,
-        ToolInvocation = resource.Properties.Execution.ToolInvocation,
-        Streaming = resource.Properties.Execution.Streaming,
-        RuntimeOptionsJson = resource.Properties.RuntimeOptions.Count == 0
+        DisplayName = resource.Definition.DisplayName,
+        RuntimeType = resource.Definition.RuntimeType,
+        SessionMode = resource.Definition.Execution.SessionMode,
+        ToolInvocation = resource.Definition.Execution.ToolInvocation,
+        Streaming = resource.Definition.Execution.Streaming,
+        RuntimeOptionsJson = resource.Definition.RuntimeOptions.Count == 0
             ? null
-            : JsonSerializer.Serialize(resource.Properties.RuntimeOptions, IndentedJson)
+            : JsonSerializer.Serialize(resource.Definition.RuntimeOptions, IndentedJson)
     };
 
     private static IReadOnlyDictionary<string, JsonElement> ParseOptions(string? value)

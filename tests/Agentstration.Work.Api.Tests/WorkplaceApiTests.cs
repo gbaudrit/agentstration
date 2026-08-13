@@ -89,7 +89,7 @@ public sealed class WorkplaceApiTests
                 Assert.IsNotNull(directFlow);
                 Assert.AreEqual(agent.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), directFlow.Value.Metadata["sourceAgentGeneration"]);
                 Assert.AreEqual($"1.0.{agent.Value.Generation - 1}", administered.Published.ResolvedTarget.Version);
-                var exception = await Assert.ThrowsAsync<AgentDefinitionValidationException>(() => management.DeleteAgentAsync(agent.Value.Id, agent.ETag, default));
+                var exception = await Assert.ThrowsAsync<AgentDefinitionValidationException>(() => management.DeleteAgentAsync(agent.Value.Metadata.Name, agent.ETag, default));
                 Assert.AreEqual("resource_in_use", exception.Code);
 
                 var flows = dependencyScope.ServiceProvider.GetRequiredService<FlowService>();

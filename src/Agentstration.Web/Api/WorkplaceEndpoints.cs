@@ -138,8 +138,8 @@ public static class WorkplaceEndpoints
         if (string.Equals(kind, ResourceKinds.Agent, StringComparison.Ordinal))
         {
             var values = await agents.ListAgentsAsync(0, 500, token);
-            return Results.Ok(values.Select(value => new ResourcePickerItem(value.Value.Id, value.Value.Properties.DisplayName, value.Value.Properties.Description, value.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), value.Value.Status.ProvisioningState.ToString(), kind,
-                new Dictionary<string, string> { ["modelProfile"] = value.Value.Properties.ModelProfile.ResourceId })));
+            return Results.Ok(values.Select(value => new ResourcePickerItem(value.Value.Metadata.Name, value.Value.Definition.DisplayName, value.Value.Definition.Description, value.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), value.Value.Status.ProvisioningState.ToString(), kind,
+                new Dictionary<string, string> { ["modelProfile"] = value.Value.Definition.ModelProfile.ResourceId })));
         }
         if (string.Equals(kind, ResourceKinds.Flow, StringComparison.Ordinal))
         {

@@ -288,7 +288,7 @@ public sealed class ApiClientTests
         })) { BaseAddress = new Uri("http://localhost/") };
         var client = new ModelProfilesApiClient(httpClient);
 
-        _ = await client.UpdateModelProfileAsync(profile.Name, new PutModelProfileRequest(profile.Properties), "\"v1\"", default);
+        _ = await client.UpdateModelProfileAsync(profile.Name, new PutModelProfileRequest(profile.Definition), "\"v1\"", default);
         await client.DeleteModelProfileAsync(profile.Name, "\"v2\"", default);
 
         CollectionAssert.AreEqual(new[] { (HttpMethod.Put, "\"v1\""), (HttpMethod.Delete, "\"v2\"") }, requests);
@@ -373,7 +373,7 @@ public sealed class ApiClientTests
 
         var request = model.ToRequest(agent);
 
-        Assert.AreEqual(agent.Id, request.Agent.ResourceId);
+        Assert.AreEqual(agent.Metadata.Name, request.Agent.ResourceId);
         Assert.AreEqual(7L, request.Agent.Version);
         Assert.AreEqual(RuntimeRunOrigin.Console, request.Origin);
         Assert.AreEqual(90, request.Execution.TimeoutSeconds);
@@ -438,7 +438,7 @@ public sealed class ApiClientTests
         var client = new MockApiClient(TimeProvider.System);
         var request = new CreateRuntimeRunRequest
         {
-            Agent = new RuntimeAgentReference(CreateAgentResource("web-agent").Id, 1),
+            Agent = new RuntimeAgentReference(CreateAgentResource("web-agent").Metadata.Name, 1),
             Input = new RuntimeRunInput { Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, "test")] }
         };
         var original = await client.CreateRunAsync(request, default);
@@ -501,7 +501,7 @@ public sealed class ApiClientTests
         Name = id,
         Properties = new RuntimeRunProperties
         {
-            Agent = new RuntimeAgentReference(CreateAgentResource("web-agent").Id, 1),
+            Agent = new RuntimeAgentReference(CreateAgentResource("web-agent").Metadata.Name, 1),
             Input = new RuntimeRunInput { Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, "test")] },
             Execution = new RuntimeExecutionOptions()
         },

@@ -287,6 +287,9 @@ public sealed class FlowTests
         Assert.AreEqual("Initial designer release", version!.ReleaseNotes);
         Assert.IsNotNull(version.Graph);
         Assert.AreEqual(replaced.Value.DefinitionHash, version.DefinitionHash);
+        var routing = Assert.IsInstanceOfType<RoutingFlowSpec>(version.Spec);
+        CollectionAssert.AreEqual(new[] { "sql-expert", "dotnet-expert" }, routing.Destinations.Select(target => target.Id).ToArray());
+        Assert.AreEqual("dotnet-expert", routing.Fallback?.Id);
 
         using var recreateResponse = await client.PostAsync("/api/flows/designer-api-flow/versions/1.0.0/draft", null);
         Assert.AreEqual(HttpStatusCode.OK, recreateResponse.StatusCode);

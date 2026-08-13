@@ -189,6 +189,7 @@ public sealed class ManagementPlaneTests
             Directory.CreateDirectory(directory);
             var services = new ServiceCollection()
                 .AddSingleton(TimeProvider.System)
+                .AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>()
                 .AddSqliteControlPlane($"Data Source={Path.Combine(directory, "control-plane.db")};Pooling=False")
                 .BuildServiceProvider();
             var store = services.GetRequiredService<IControlPlaneStore>();

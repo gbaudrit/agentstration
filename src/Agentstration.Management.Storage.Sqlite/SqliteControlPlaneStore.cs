@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Storage.Sqlite;
 
@@ -58,6 +59,15 @@ public sealed class SqliteControlPlaneStore(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
         await SqliteIdentitySchema.EnsureAsync(context, cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_AgentRevisionLookup ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.agentUid'), json_extract(Payload, '$.agentVersion'))",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_DeploymentRevision ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.revisionName'))",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_DeploymentAgent ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.agentName'))",
+            cancellationToken);
     }
 
     public async Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource
@@ -187,25 +197,38 @@ public sealed class SqliteControlPlaneStore(
         LoadKindAsync<T>(kind, cancellationToken);
 
     public async Task<StoredResource<AgentRevision>?> FindRevisionAsync(Guid agentUid, long generation, CancellationToken cancellationToken) =>
-        (await LoadKindAsync<AgentRevision>(ResourceKinds.AgentRevision, cancellationToken))
-        .SingleOrDefault(value => value.Value.AgentUid == agentUid && value.Value.AgentVersion == generation);
+        (await LoadFilteredAsync<AgentRevision>($"""
+            SELECT * FROM ControlPlaneResources
+            WHERE Kind = {ResourceKinds.AgentRevision}
+              AND json_extract(Payload, '$.agentUid') = {agentUid.ToString()}
+              AND json_extract(Payload, '$.agentVersion') = {generation}
+            """, cancellationToken)).SingleOrDefault();
 
     public async Task<StoredResource<AgentRevision>?> FindLatestRevisionAsync(Guid agentUid, CancellationToken cancellationToken) =>
-        (await LoadKindAsync<AgentRevision>(ResourceKinds.AgentRevision, cancellationToken))
-        .Where(value => value.Value.AgentUid == agentUid)
+        (await LoadFilteredAsync<AgentRevision>($"""
+            SELECT * FROM ControlPlaneResources
+            WHERE Kind = {ResourceKinds.AgentRevision}
+              AND json_extract(Payload, '$.agentUid') = {agentUid.ToString()}
+            """, cancellationToken))
         .OrderByDescending(value => value.Value.AgentVersion)
         .ThenByDescending(value => value.Value.CreatedAt)
         .FirstOrDefault();
 
     public async Task<StoredResource<AgentDeployment>?> FindDeploymentByRevisionAsync(string revisionName, CancellationToken cancellationToken) =>
-        (await LoadKindAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken))
-        .Where(value => string.Equals(value.Value.RevisionName, revisionName, StringComparison.Ordinal))
+        (await LoadFilteredAsync<AgentDeployment>($"""
+            SELECT * FROM ControlPlaneResources
+            WHERE Kind = {ResourceKinds.AgentDeployment}
+              AND json_extract(Payload, '$.revisionName') = {revisionName}
+            """, cancellationToken))
         .OrderByDescending(value => value.Value.UpdatedAt)
         .FirstOrDefault();
 
     public async Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsForAgentAsync(string agentName, CancellationToken cancellationToken) =>
-        (await LoadKindAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken))
-        .Where(value => string.Equals(value.Value.AgentName, agentName, StringComparison.Ordinal))
+        (await LoadFilteredAsync<AgentDeployment>($"""
+            SELECT * FROM ControlPlaneResources
+            WHERE Kind = {ResourceKinds.AgentDeployment}
+              AND json_extract(Payload, '$.agentName') = {agentName}
+            """, cancellationToken))
         .OrderByDescending(value => value.Value.UpdatedAt)
         .ToArray();
 
@@ -218,6 +241,14 @@ public sealed class SqliteControlPlaneStore(
         var documents = await Scoped(context.Documents.AsNoTracking())
             .Where(value => value.Kind == kind)
             .OrderBy(value => value.Name)
+            .ToArrayAsync(cancellationToken);
+        return documents.Select(Deserialize<T>).ToArray();
+    }
+
+    private async Task<IReadOnlyList<StoredResource<T>>> LoadFilteredAsync<T>(FormattableString sql, CancellationToken cancellationToken) where T : Resource
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await Scoped(context.Documents.FromSqlInterpolated(sql).AsNoTracking())
             .ToArrayAsync(cancellationToken);
         return documents.Select(Deserialize<T>).ToArray();
     }
@@ -269,20 +300,12 @@ public static class SqliteControlPlaneServiceCollectionExtensions
     public static IServiceCollection AddSqliteControlPlane(this IServiceCollection services, string connectionString)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
-        if (!services.Any(descriptor => descriptor.ServiceType == typeof(ICurrentRequestContext)))
-            services.AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>();
+        services.TryAddSingleton<ICurrentRequestContext, UnavailableRequestContext>();
         services.AddDbContextFactory<ControlPlaneDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IControlPlaneStore, SqliteControlPlaneStore>();
         services.AddSingleton<IAgentResourceQueries>(provider => (SqliteControlPlaneStore)provider.GetRequiredService<IControlPlaneStore>());
         services.AddSingleton<IResourceScopeMigrator>(provider => (SqliteControlPlaneStore)provider.GetRequiredService<IControlPlaneStore>());
         services.AddSingleton<IIdentityStore, SqliteIdentityStore>();
         return services;
-    }
-
-    private sealed class SystemOperationRequestContext : ICurrentRequestContext
-    {
-        public bool IsInitialized => false;
-        public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.System;
-        public RequestContext Current => throw new InvalidOperationException("No request context is configured for this control-plane store.");
     }
 }

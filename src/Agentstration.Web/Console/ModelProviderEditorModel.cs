@@ -38,13 +38,13 @@ public sealed class ModelProviderEditorModel
     public static ModelProviderEditorModel FromResource(ModelProviderResource resource) => new()
     {
         Name = resource.Name,
-        DisplayName = resource.Properties.DisplayName,
-        ProviderType = resource.Properties.ProviderType,
-        Endpoint = resource.Properties.Endpoint.AbsoluteUri.TrimEnd('/'),
-        ManagementMode = resource.Properties.ManagementMode,
-        ProviderOptionsJson = resource.Properties.ProviderOptions.Count == 0
+        DisplayName = resource.Definition.DisplayName,
+        ProviderType = resource.Definition.ProviderType,
+        Endpoint = resource.Definition.Endpoint.AbsoluteUri.TrimEnd('/'),
+        ManagementMode = resource.Definition.ManagementMode,
+        ProviderOptionsJson = resource.Definition.ProviderOptions.Count == 0
             ? null
-            : JsonSerializer.Serialize(resource.Properties.ProviderOptions, IndentedJson)
+            : JsonSerializer.Serialize(resource.Definition.ProviderOptions, IndentedJson)
     };
 
     private static IReadOnlyDictionary<string, JsonElement> ParseOptions(string? value)

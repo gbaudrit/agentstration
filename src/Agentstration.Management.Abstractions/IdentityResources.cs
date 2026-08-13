@@ -90,6 +90,20 @@ public interface ICurrentRequestContext
     ControlPlaneAccessMode AccessMode => IsInitialized ? ControlPlaneAccessMode.Workspace : ControlPlaneAccessMode.Unavailable;
 }
 
+public sealed class UnavailableRequestContext : ICurrentRequestContext
+{
+    public bool IsInitialized => false;
+    public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.Unavailable;
+    public RequestContext Current => throw new InvalidOperationException("No request context is available.");
+}
+
+public sealed class SystemOperationRequestContext : ICurrentRequestContext
+{
+    public bool IsInitialized => false;
+    public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.System;
+    public RequestContext Current => throw new InvalidOperationException("System operations do not have a workspace request context.");
+}
+
 public interface IRequestContextInitializer
 {
     void Initialize(RequestContext context);

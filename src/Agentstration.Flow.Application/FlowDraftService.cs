@@ -36,8 +36,8 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
             UpdatedBy = command.UpdatedBy
         };
         FlowValidator.Validate(new FlowDefinition(id, command.Name, command.Description, FlowKind.Routing, "0.1.0", true, null,
-            LegacySpec(graph), Copy(command.Tags), now, now, command.DisplayName, graph));
-        await flows.CreateAsync(new CreateFlowCommand(command.Name, command.Description, FlowKind.Routing, "0.1.0", true, LegacySpec(graph), command.Tags), cancellationToken);
+            FlowDraftSnapshotAdapter.ToRoutingSpec(graph), Copy(command.Tags), now, now, command.DisplayName, graph));
+        await flows.CreateAsync(new CreateFlowCommand(command.Name, command.Description, FlowKind.Routing, "0.1.0", true, FlowDraftSnapshotAdapter.ToRoutingSpec(graph), command.Tags), cancellationToken);
         return await repository.CreateDraftAsync(draft, cancellationToken);
     }
 
@@ -71,7 +71,7 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
         var validation = await validator.ValidateAsync(draft.Value.Definition, new FlowValidationContext(), cancellationToken);
         if (!validation.IsValid) throw new FlowValidationException("flow_validation_failed", "The Flow Draft contains validation errors and cannot be published.");
         var definition = await repository.GetAsync(flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
-        await flows.UpdateAsync(flowId, new UpdateFlowCommand(draft.Value.Description, FlowKind.Routing, version, true, LegacySpec(draft.Value.Definition), draft.Value.Tags,
+        await flows.UpdateAsync(flowId, new UpdateFlowCommand(draft.Value.Description, FlowKind.Routing, version, true, FlowDraftSnapshotAdapter.ToRoutingSpec(draft.Value.Definition), draft.Value.Tags,
             draft.Value.Definition, draft.Value.DisplayName), definition.ETag, cancellationToken);
         return await flows.PublishVersionAsync(flowId, version, activate, cancellationToken, releaseNotes);
     }
@@ -122,17 +122,6 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
     private async Task<StoredFlowDraft> RequiredAsync(FlowId flowId, CancellationToken token) => await repository.GetDraftAsync(flowId, token) ?? throw new FlowNotFoundException(flowId);
     private static IReadOnlyDictionary<string, string> Copy(IReadOnlyDictionary<string, string>? source) => source is null ? new Dictionary<string, string>() : new Dictionary<string, string>(source, StringComparer.Ordinal);
 
-    private static RoutingFlowSpec LegacySpec(FlowGraphDefinition graph)
-    {
-        var router = graph.Steps.OfType<RouterFlowStepDefinition>().FirstOrDefault();
-        var targets = router?.Candidates.Select(candidate => new FlowTargetReference(FlowTargetKind.Agent, ResourceName(candidate.Agent.ResourceId))).ToArray()
-            ?? graph.Steps.OfType<AgentFlowStepDefinition>().Where(step => !step.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal)).Select(step => new FlowTargetReference(FlowTargetKind.Agent, ResourceName(step.Agent.ResourceId))).ToArray();
-        if (targets.Length == 0) targets = [new FlowTargetReference(FlowTargetKind.Agent, "unconfigured-agent")];
-        var fallback = router?.Fallback is null ? null : new FlowTargetReference(FlowTargetKind.Agent, ResourceName(router.Fallback.ResourceId));
-        return new RoutingFlowSpec(FlowRoutingStrategy.Deterministic, targets, fallback);
-    }
-
-    private static string ResourceName(string id) => id;
     private static object? NormalizeYaml(object? value) => value switch
     {
         IDictionary<object, object> dictionary => dictionary.ToDictionary(item => item.Key.ToString()!, item => NormalizeYaml(item.Value), StringComparer.Ordinal),

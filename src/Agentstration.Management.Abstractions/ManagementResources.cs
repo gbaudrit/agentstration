@@ -67,7 +67,6 @@ public sealed record ToolProviderProperties
 public sealed record ToolProviderResource : Resource
 {
     public ToolProviderProperties Definition { get; init; } = null!;
-    [JsonIgnore] public ToolProviderProperties Properties => Definition;
 }
 
 public sealed record ToolDiscoveryState
@@ -100,7 +99,6 @@ public sealed record ToolResourceProperties
 public sealed record ToolResource : Resource
 {
     public ToolResourceProperties Definition { get; init; } = null!;
-    [JsonIgnore] public ToolResourceProperties Properties => Definition;
 }
 
 public sealed record DiscoveredToolDescriptor(
@@ -148,7 +146,6 @@ public abstract record Resource
     public string Kind { get; init; } = string.Empty;
     public ResourceMetadata Metadata { get; init; } = new();
     [JsonIgnore] public string Name => Metadata.Name;
-    [JsonIgnore] public string Id => Metadata.Name;
     public Guid TenantId { get; init; }
     public Guid WorkspaceId { get; init; }
     public long Generation { get; init; }
@@ -206,7 +203,6 @@ public record AgentProperties
 public sealed record AgentResource : Resource
 {
     public AgentProperties Definition { get; init; } = null!;
-    [JsonIgnore] public AgentProperties Properties => Definition;
 }
 
 public sealed record AgentDeploymentSpec
@@ -310,7 +306,6 @@ public sealed record ModelProviderProperties
 public sealed record ModelProviderResource : Resource
 {
     public ModelProviderProperties Definition { get; init; } = null!;
-    [JsonIgnore] public ModelProviderProperties Properties => Definition;
 }
 
 public sealed record ModelGenerationOptions
@@ -356,7 +351,6 @@ public sealed record ModelProfileProperties
 public sealed record ModelProfileResource : Resource
 {
     public ModelProfileProperties Definition { get; init; } = null!;
-    [JsonIgnore] public ModelProfileProperties Properties => Definition;
 }
 
 public enum RuntimeSessionMode { Transient, Persistent }
@@ -381,7 +375,6 @@ public sealed record RuntimeProfileProperties
 public sealed record RuntimeProfileResource : Resource
 {
     public RuntimeProfileProperties Definition { get; init; } = null!;
-    [JsonIgnore] public RuntimeProfileProperties Properties => Definition;
 }
 
 public sealed record ExternalBinding

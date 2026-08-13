@@ -50,8 +50,8 @@ public sealed class ModelManagementApiTests
         var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/ollama-local");
 
         Assert.IsNotNull(provider);
-        Assert.AreEqual(new Uri("http://localhost:5265"), provider.Properties.Endpoint);
-        Assert.AreNotEqual(new Uri("http://localhost:11434"), provider.Properties.Endpoint);
+        Assert.AreEqual(new Uri("http://localhost:5265"), provider.Definition.Endpoint);
+        Assert.AreNotEqual(new Uri("http://localhost:11434"), provider.Definition.Endpoint);
     }
 
     [TestMethod]
@@ -85,12 +85,12 @@ public sealed class ModelManagementApiTests
         Assert.IsNotNull(created);
         var profileStore = factory.Services.GetRequiredService<IModelProfileStore>();
         var deploymentStore = factory.Services.GetRequiredService<IModelDeploymentStore>();
-        var runtimeProfile = await profileStore.GetRequiredAsync(created.Id);
+        var runtimeProfile = await profileStore.GetRequiredAsync(created.Metadata.Name);
         var runtimeDeployment = await deploymentStore.GetRequiredAsync(runtimeProfile.DeploymentName);
         Assert.AreEqual(ModelProviderManagementService.ModelProviderId("ollama-local"), runtimeDeployment.ProviderName);
         Assert.AreEqual("model-not-downloaded", runtimeDeployment.ModelName);
 
-        var updatedProperties = created.Properties with { Description = "Updated profile" };
+        var updatedProperties = created.Definition with { Description = "Updated profile" };
         using var update = new HttpRequestMessage(HttpMethod.Put, "/api/modelprofiles/api-test-profile")
         {
             Content = JsonContent.Create(new PutModelProfileRequest(updatedProperties))
@@ -242,13 +242,13 @@ public sealed class ModelManagementApiTests
         Assert.IsNotNull(createdResponse.Headers.ETag);
         var created = await createdResponse.Content.ReadFromJsonAsync<ModelProviderResource>();
         Assert.IsNotNull(created);
-        Assert.AreEqual(new Uri("http://127.0.0.1:11435/"), created.Properties.Endpoint);
+        Assert.AreEqual(new Uri("http://127.0.0.1:11435/"), created.Definition.Endpoint);
 
         using var getResponse = await client.GetAsync("/api/modelproviders/ollama-lab");
         Assert.AreEqual(HttpStatusCode.OK, getResponse.StatusCode);
         Assert.AreEqual(createdResponse.Headers.ETag, getResponse.Headers.ETag);
 
-        var updatedProperties = created.Properties with
+        var updatedProperties = created.Definition with
         {
             DisplayName = "Ollama workstation",
             Endpoint = new Uri("http://127.0.0.1:11436")
@@ -332,7 +332,7 @@ public sealed class ModelManagementApiTests
         };
 
         var stored = await service.CreateAsync(profile, default);
-        var resolved = await ((IModelProfileStore)service).GetRequiredAsync(stored.Value.Id);
+        var resolved = await ((IModelProfileStore)service).GetRequiredAsync(stored.Value.Metadata.Name);
         var deployment = await ((IModelDeploymentStore)service).GetRequiredAsync(resolved.DeploymentName);
 
         Assert.AreEqual(0.2, resolved.Generation.Temperature);
@@ -370,15 +370,15 @@ public sealed class ModelManagementApiTests
         }, default);
 
         Assert.AreEqual(1, stored.Value.Generation);
-        Assert.AreEqual("microsoft-agent-framework", stored.Value.Properties.RuntimeType);
+        Assert.AreEqual("microsoft-agent-framework", stored.Value.Definition.RuntimeType);
         Assert.IsNotNull(await service.GetAsync("maf-persistent-test", default));
 
-        var updated = await service.PutAsync("maf-persistent-test", stored.Value.Properties with
+        var updated = await service.PutAsync("maf-persistent-test", stored.Value.Definition with
         {
-            Execution = stored.Value.Properties.Execution with { Streaming = StreamingMode.Enabled }
+            Execution = stored.Value.Definition.Execution with { Streaming = StreamingMode.Enabled }
         }, stored.ETag, default);
         Assert.AreEqual(2, updated.Value.Generation);
-        Assert.AreEqual(StreamingMode.Enabled, updated.Value.Properties.Execution.Streaming);
+        Assert.AreEqual(StreamingMode.Enabled, updated.Value.Definition.Execution.Streaming);
         Assert.IsEmpty(await service.GetUsagesAsync(id, default));
 
         await service.DeleteAsync("maf-persistent-test", updated.ETag, default);

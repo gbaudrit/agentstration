@@ -31,10 +31,10 @@ else
     }
 
     <section class="runner-config panel">
-        <div><span>Agent</span><strong>@agent.Properties.DisplayName</strong></div>
+        <div><span>Agent</span><strong>@agent.Definition.DisplayName</strong></div>
         <div><span>Version</span><strong>@agent.Generation</strong></div>
         <div><span>Runtime</span><strong>@(state.Run?.Status.Runtime ?? "Local")</strong></div>
-        <div><span>Model profile</span><strong>@ResourceName(agent.Properties.ModelProfile.ResourceId)</strong></div>
+        <div><span>Model profile</span><strong>@ResourceName(agent.Definition.ModelProfile.ResourceId)</strong></div>
         <div><span>Provider</span><strong>@(modelResolution?.Resolved.Provider?.Name ?? "Not resolved")</strong></div>
         <div><span>Model</span><strong>@(modelResolution?.Resolved.Model.Name ?? "Not resolved")</strong></div>
         <div><span>Deployment</span><strong><StatusBadge Text="@(readiness?.State ?? "Unknown")" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /></strong></div>
@@ -280,7 +280,7 @@ else
 
     private async Task LoadHistoryAsync()
     {
-        if (agent is not null) history = await RuntimeClient.GetRunsAsync(agent.Id, cancellation.Token);
+        if (agent is not null) history = await RuntimeClient.GetRunsAsync(agent.Metadata.Name, cancellation.Token);
     }
 
     private Task LoadExecutionContextAsync() => LoadExecutionContextAsync(agent?.Generation);
