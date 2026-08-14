@@ -11,6 +11,7 @@ public interface IPacksClient
     Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, CancellationToken cancellationToken);
     Task UninstallAsync(string publisher, string name, string etag, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<InstalledPackResource>> AttachSourceAsync(string publisher, string name, byte[] archive, string fileName, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken);
     Task<IReadOnlyList<PackProjectResource>> GetProjectsAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<PackProjectResource>> GetProjectAsync(Guid projectId, CancellationToken cancellationToken);
@@ -52,6 +53,17 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
         message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         using var response = await httpClient.SendAsync(message, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<ResourceSnapshot<InstalledPackResource>> AttachSourceAsync(string publisher, string name, byte[] archive, string fileName, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"{Path(publisher, name)}/source");
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        message.Headers.Add("X-Pack-File-Name", fileName);
+        message.Content = new ByteArrayContent(archive);
+        message.Content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        return await ReadInstalledAsync(response, cancellationToken);
     }
 
     public async Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken)

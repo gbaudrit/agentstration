@@ -20,8 +20,13 @@
 .pack-preview .panel-header small { display: block; margin-top: 5px; color: var(--muted); }
 .pack-resource-list.compact { grid-template-columns: 1fr; max-height: 250px; overflow: auto; }
 .selected-pack { background: color-mix(in srgb, var(--primary-soft) 55%, transparent); }
-.pack-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 20px 0 14px; }
-.pack-form-grid label, .pack-form-field { display: grid; gap: 6px; color: var(--muted); font-size: .78rem; font-weight: 700; }
-.pack-form-grid input, .pack-form-field textarea { width: 100%; }
+.pack-fork-grid { margin-top: 20px; }
+.pack-source-recovery { display: grid; grid-template-columns: auto 1fr; gap: 12px 14px; margin-top: 20px; padding: 16px; border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--primary-soft) 55%, var(--surface)); }
+.pack-source-recovery h3 { margin: 1px 0 5px; font-size: .92rem; }
+.pack-source-recovery p { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
+.pack-source-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--primary); color: #fff; font-weight: 800; }
+.pack-source-picker { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 14px; border: 1px dashed var(--primary); border-radius: 8px; background: var(--surface); color: var(--primary); font-size: .8rem; font-weight: 700; cursor: pointer; }
+.pack-source-picker input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.pack-success { margin: 16px 0 0; padding: 10px 12px; border-radius: 8px; background: rgba(31,168,104,.12); color: #1b9560; font-size: .8rem; }
 @media (max-width: 820px) { .pack-metrics { grid-template-columns: repeat(3, minmax(140px, 1fr)); } }
-@media (max-width: 620px) { .pack-metrics, .pack-form-grid { grid-template-columns: 1fr; } .pack-detail-actions { align-items: flex-end; flex-direction: column; } .pack-facts { grid-template-columns: 1fr; } .pack-facts dd { margin-bottom: 8px; } }
+@media (max-width: 620px) { .pack-metrics { grid-template-columns: 1fr; } .pack-detail-actions { align-items: flex-end; flex-direction: column; } .pack-facts { grid-template-columns: 1fr; } .pack-facts dd { margin-bottom: 8px; } }

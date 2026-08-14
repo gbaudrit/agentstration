@@ -38,6 +38,22 @@ public sealed class PacksComponentTests
         Assert.AreEqual("dialog", rendered.Find(".pack-dialog").GetAttribute("role"));
     }
 
+    [TestMethod]
+    public async Task LegacyPackForkPromptsForItsOriginalSourceArchive()
+    {
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
+        var rendered = context.Render<Packs>();
+        rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
+
+        await rendered.FindAll("button").Single(button => button.TextContent.Contains("Inspect", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.FindAll("button").Single(button => button.TextContent.Trim().Equals("Fork", StringComparison.Ordinal)).ClickAsync(new());
+
+        Assert.IsTrue(rendered.Markup.Contains("Source archive required", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("Select original Pack ZIP", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.FindAll("button").Any(button => button.TextContent.Contains("Create Pack Project", StringComparison.Ordinal)));
+    }
+
     private sealed class FakePacksClient : IPacksClient
     {
         private readonly InstalledPackResource pack = new()
@@ -67,6 +83,7 @@ public sealed class PacksComponentTests
         public Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task UninstallAsync(string publisher, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<InstalledPackResource>> AttachSourceAsync(string publisher, string name, byte[] archive, string fileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<PackProjectResource>> GetProjectsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PackProjectResource>>([]);
         public Task<ResourceSnapshot<PackProjectResource>> GetProjectAsync(Guid projectId, CancellationToken cancellationToken) => throw new NotSupportedException();

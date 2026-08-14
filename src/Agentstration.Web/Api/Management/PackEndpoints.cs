@@ -13,6 +13,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
         group.MapPost("/packs", InstallAsync);
         group.MapGet("/packs", ListAsync);
         group.MapGet("/packs/{publisher}/{name}", GetAsync);
+        group.MapPost("/packs/{publisher}/{name}/source", AttachSourceAsync);
         group.MapPost("/packs/{publisher}/{name}/fork", ForkAsync);
         group.MapDelete("/packs/{publisher}/{name}", UninstallAsync);
         group.MapGet("/pack-projects", ListProjectsAsync);
@@ -104,6 +105,23 @@ internal sealed class PackEndpoints : IManagementEndpoint
                 throw new ControlPlaneConcurrencyException("The supplied ETag does not match the installed Pack.");
             await service.UninstallAsync(identity, cancellationToken);
             return Results.NoContent();
+        });
+
+    private static Task<IResult> AttachSourceAsync(
+        string publisher,
+        string name,
+        HttpRequest request,
+        HttpResponse response,
+        IPackArchiveReader archiveReader,
+        PackManagementService service,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            ManagementHttp.RequireApiVersion(request);
+            var etag = ManagementHttp.IfMatch(request) ?? throw new ControlPlaneConcurrencyException("Attaching a Pack source requires If-Match.");
+            var archive = await ReadArchiveAsync(request, archiveReader, cancellationToken);
+            var installed = await service.AttachSourceAsync(new(publisher, name), archive, etag, cancellationToken);
+            return ManagementHttp.ResourceResult(installed, response, StatusCodes.Status200OK);
         });
 
     private static Task<IResult> ForkAsync(string publisher, string name, ForkPackCommand command, HttpResponse response, PackAuthoringService service, CancellationToken token) =>

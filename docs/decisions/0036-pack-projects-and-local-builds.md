@@ -10,7 +10,7 @@ An installed Pack is provenance, not an authoring workspace. Mutating it in plac
 
 ## Decision
 
-Every newly installed local Pack retains its validated source archive in a content-addressed artifact store. `InstalledPack` records the source hash, length, storage key, and original file name. Existing installations created before source retention may be inspected and uninstalled but cannot claim an exact fork.
+Every newly installed local Pack retains its validated source archive in a content-addressed artifact store. `InstalledPack` records the source hash, length, storage key, and original file name. For an installation created before source retention, the operator must attach a matching original archive before forking; Agentstration verifies its identity, version, and complete resource inventory without reinstalling resources.
 
 A fork creates a workspace-owned `PackProject`. The project has a new Pack coordinate and editable Pack-level metadata, while its origin and immutable source artifact remain explicit. Forking does not create or mutate contained resources.
 

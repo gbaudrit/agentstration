@@ -130,15 +130,35 @@ else
         <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-fork-title" @onclick:stopPropagation="true">
             <div class="panel-header"><div><p class="eyebrow">Editable copy</p><h2 id="pack-fork-title">Fork @DisplayName(selected.Value)</h2></div><button class="icon-button" @onclick="CloseFork" aria-label="Close">×</button></div>
             <p class="pack-muted">The exact installed archive becomes the immutable source of a local Pack Project. Its resources are not duplicated until you install a build.</p>
-            <div class="pack-form-grid">
-                <label>Publisher<input @bind="forkPublisher" /></label>
-                <label>Name<input @bind="forkName" /></label>
-                <label>Version<input @bind="forkVersion" /></label>
-                <label>Display name<input @bind="forkDisplayName" /></label>
-            </div>
-            <label class="pack-form-field">Description<textarea rows="3" @bind="forkDescription"></textarea></label>
-            @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }
-            <div class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">Cancel</button><button class="button-primary" disabled="@forking" @onclick="ForkAsync">@(forking ? "Creating…" : "Create Pack Project")</button></div>
+            @if (selected.Value.Definition.SourceArtifact is null)
+            {
+                <section class="pack-source-recovery" aria-labelledby="pack-source-title">
+                    <div class="pack-source-icon" aria-hidden="true">↥</div>
+                    <div>
+                        <h3 id="pack-source-title">Source archive required</h3>
+                        <p>This Pack was installed before source retention was enabled. Select its original ZIP once; Agentstration verifies its identity, version, and resource inventory before attaching it.</p>
+                    </div>
+                    <label class="pack-source-picker">
+                        <span>@(sourceAttaching ? "Verifying archive…" : "Select original Pack ZIP")</span>
+                        <InputFile OnChange="AttachSourceAsync" accept=".zip,application/zip" disabled="@sourceAttaching" />
+                    </label>
+                </section>
+                @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }
+                <div class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">Cancel</button></div>
+            }
+            else
+            {
+                @if (forkNotice is not null) { <p class="pack-success" role="status">@forkNotice</p> }
+                <div class="form-grid pack-fork-grid">
+                    <label><span>Publisher</span><input @bind="forkPublisher" autocomplete="off" spellcheck="false" /></label>
+                    <label><span>Name</span><input @bind="forkName" autocomplete="off" spellcheck="false" /></label>
+                    <label><span>Version</span><input @bind="forkVersion" autocomplete="off" spellcheck="false" /></label>
+                    <label><span>Display name</span><input @bind="forkDisplayName" /></label>
+                    <label class="form-span-2"><span>Description</span><textarea rows="3" @bind="forkDescription"></textarea></label>
+                </div>
+                @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }
+                <div class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">Cancel</button><button class="button-primary" disabled="@(!CanSubmitFork)" @onclick="ForkAsync">@(forking ? "Creating…" : "Create Pack Project")</button></div>
+            }
         </section>
     </div>
 }
@@ -163,14 +183,21 @@ else
     private bool confirmUninstall;
     private bool forkOpen;
     private bool forking;
+    private bool sourceAttaching;
     private string forkPublisher = "local";
     private string forkName = string.Empty;
     private string forkVersion = "0.1.0-dev.1";
     private string forkDisplayName = string.Empty;
     private string? forkDescription;
     private string? forkError;
+    private string? forkNotice;
 
     private int AttentionCount => packs?.Count(pack => pack.Definition.State is InstalledPackState.Failed or InstalledPackState.Degraded) ?? 0;
+    private bool CanSubmitFork => !forking
+        && !string.IsNullOrWhiteSpace(forkPublisher)
+        && !string.IsNullOrWhiteSpace(forkName)
+        && !string.IsNullOrWhiteSpace(forkVersion)
+        && !string.IsNullOrWhiteSpace(forkDisplayName);
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -258,6 +285,7 @@ else
         forkDisplayName = $"{DisplayName(selected.Value)} (Fork)";
         forkDescription = selected.Value.Definition.Description;
         forkError = null;
+        forkNotice = null;
         forkOpen = true;
     }
 
@@ -276,6 +304,26 @@ else
         }
         catch (AgentstrationApiException exception) { forkError = exception.Message; }
         finally { forking = false; }
+    }
+
+    private async Task AttachSourceAsync(InputFileChangeEventArgs args)
+    {
+        if (selected is null) return;
+        sourceAttaching = true;
+        forkError = null;
+        forkNotice = null;
+        try
+        {
+            await using var input = args.File.OpenReadStream(MaximumArchiveBytes, cancellation.Token);
+            await using var output = new MemoryStream();
+            await input.CopyToAsync(output, cancellation.Token);
+            selected = await Client.AttachSourceAsync(selected.Value.Definition.Publisher, selected.Value.Definition.PackName,
+                output.ToArray(), args.File.Name, selected.ETag, cancellation.Token);
+            forkNotice = "Source archive verified and attached. You can now create the Pack Project.";
+        }
+        catch (AgentstrationApiException exception) { forkError = exception.Message; }
+        catch (IOException exception) { forkError = exception.Message; }
+        finally { sourceAttaching = false; }
     }
 
     private void OpenProject(Guid projectId) => Navigation.NavigateTo($"/pack-projects/{projectId:D}");

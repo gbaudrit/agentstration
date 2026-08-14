@@ -113,6 +113,43 @@ public sealed partial class PackManagementService
         }
     }
 
+    public async Task<StoredResource<InstalledPackResource>> AttachSourceAsync(PackIdentity identity, PackArchive archive, string etag, CancellationToken cancellationToken)
+    {
+        var installed = await GetAsync(identity, cancellationToken) ?? throw new PackNotFoundException(identity);
+        if (installed.Value.Definition.SourceArtifact is not null)
+            throw new PackValidationException("pack_source_already_retained", "This installed Pack already has an immutable source archive.");
+        if (artifacts is null || archive.Content.IsEmpty)
+            throw new PackValidationException("pack_source_retention_unavailable", "Pack source retention is not available.");
+        if (!string.Equals(archive.Manifest.Metadata.Publisher, identity.Publisher, StringComparison.Ordinal)
+            || !string.Equals(archive.Manifest.Metadata.Name, identity.Name, StringComparison.Ordinal)
+            || !string.Equals(archive.Manifest.Metadata.Version, installed.Value.Definition.Version, StringComparison.Ordinal))
+            throw new PackValidationException("pack_source_identity_mismatch", "The selected archive must have the same publisher, name, and version as the installed Pack.");
+
+        _ = await PrepareAsync(archive, cancellationToken);
+        var expected = installed.Value.Definition.ManagedResources
+            .Select(resource => (resource.Kind, resource.Name, resource.Path))
+            .OrderBy(resource => resource.Kind, StringComparer.Ordinal)
+            .ThenBy(resource => resource.Name, StringComparer.Ordinal)
+            .ThenBy(resource => resource.Path, StringComparer.Ordinal)
+            .ToArray();
+        var supplied = archive.Resources
+            .Select(resource => (resource.Kind, resource.Name, resource.Path))
+            .OrderBy(resource => resource.Kind, StringComparer.Ordinal)
+            .ThenBy(resource => resource.Name, StringComparer.Ordinal)
+            .ThenBy(resource => resource.Path, StringComparer.Ordinal)
+            .ToArray();
+        if (!expected.SequenceEqual(supplied))
+            throw new PackValidationException("pack_source_resources_mismatch", "The selected archive does not contain the same resource inventory as the installed Pack.");
+
+        var sourceArtifact = await artifacts.SaveAsync(archive.Content, archive.Source, cancellationToken);
+        return await store.PutAsync(installed.Value with
+        {
+            Generation = checked(installed.Value.Generation + 1),
+            Definition = installed.Value.Definition with { Source = archive.Source, SourceArtifact = sourceArtifact },
+            Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
+        }, etag, false, cancellationToken);
+    }
+
     private async Task<(PackInstallationPreview Preview, IReadOnlyDictionary<PackResourceDocument, IPackResourceHandler> Handlers)> PrepareAsync(
         PackArchive archive,
         CancellationToken cancellationToken)

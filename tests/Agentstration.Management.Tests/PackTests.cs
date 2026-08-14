@@ -143,6 +143,29 @@ public sealed class PackTests
         using var resource = await client.GetAsync("/api/runtimeprofiles/pack-runtime");
         Assert.AreEqual(HttpStatusCode.OK, resource.StatusCode);
 
+        var packService = factory.Services.GetRequiredService<PackManagementService>();
+        var controlStore = factory.Services.GetRequiredService<IControlPlaneStore>();
+        var retained = await packService.GetAsync(new("agentstration", "test-pack"), default);
+        Assert.IsNotNull(retained);
+        _ = await controlStore.PutAsync(retained.Value with
+        {
+            Generation = retained.Value.Generation + 1,
+            Definition = retained.Value.Definition with { SourceArtifact = null }
+        }, retained.ETag, false, default);
+
+        using var legacy = await client.GetAsync("/api/packs/agentstration/test-pack");
+        Assert.AreEqual(HttpStatusCode.OK, legacy.StatusCode);
+        Assert.IsNotNull(legacy.Headers.ETag);
+        using var attach = new HttpRequestMessage(HttpMethod.Post, "/api/packs/agentstration/test-pack/source");
+        attach.Headers.IfMatch.Add(legacy.Headers.ETag);
+        attach.Headers.Add("X-Pack-File-Name", "recovered-pack.zip");
+        attach.Content = new ByteArrayContent(archiveBytes);
+        attach.Content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        using var attached = await client.SendAsync(attach);
+        Assert.AreEqual(HttpStatusCode.OK, attached.StatusCode, await attached.Content.ReadAsStringAsync());
+        var recovered = await attached.Content.ReadFromJsonAsync<InstalledPackResource>();
+        Assert.IsNotNull(recovered?.Definition.SourceArtifact);
+
         using var removed = await client.DeleteAsync("/api/packs/agentstration/test-pack");
         Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode);
         using var removedResource = await client.GetAsync("/api/runtimeprofiles/pack-runtime");
