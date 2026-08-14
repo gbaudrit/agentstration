@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Resources;
 using System.Text.Json.Serialization;
 
 namespace Agentstration.Runtime.Abstractions;
@@ -24,7 +25,10 @@ public enum RuntimeMessageRole { System, Developer, User, Assistant, Tool }
 [JsonConverter(typeof(JsonStringEnumConverter<RuntimeRunEventKind>))]
 public enum RuntimeRunEventKind { RunCreated, StatusChanged, StepStarted, StepCompleted, ResponseDelta, ToolCallStarted, ToolCallCompleted, Metrics, Error, RunCompleted }
 
-public sealed record RuntimeAgentReference(string ResourceId, long Version);
+public sealed record RuntimeAgentReference(string ResourceId, long Version)
+{
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+}
 public sealed record RuntimeRunMessage(RuntimeMessageRole Role, string Content);
 
 public sealed record RuntimeRunInput

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Flow;
+using Agentstration.Resources;
 
 namespace Agentstration.Work;
 
@@ -15,12 +16,12 @@ public static class WorkResourceTypes
     public const string Entries = "Agentstration.Work/entries";
 }
 
-public readonly record struct WorkplaceWorkspaceId(string Value)
+public readonly record struct WorkplaceWorkspaceId(string Value, ResourceNamespace Namespace = default)
 {
     public override string ToString() => Value;
 }
 
-public readonly record struct EntryId(string Value)
+public readonly record struct EntryId(string Value, ResourceNamespace Namespace = default)
 {
     public override string ToString() => Value;
 }
@@ -122,8 +123,11 @@ public sealed record EntryPresentation
     public IReadOnlyList<EntryFieldDefinition> Fields { get; init; } = [];
 }
 
-public sealed record EntryBinding(EntryBindingKind Kind, string ResourceId);
-public sealed record EntryResolvedTarget(string FlowResourceId, string Version, EntryVersionStrategy VersionStrategy = EntryVersionStrategy.Pinned);
+public sealed record EntryBinding(EntryBindingKind Kind, string ResourceId, ResourceNamespace? Namespace = null);
+public sealed record EntryResolvedTarget(string FlowResourceId, string Version, EntryVersionStrategy VersionStrategy = EntryVersionStrategy.Pinned)
+{
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+}
 public sealed record EntryConversationBehavior(bool Enabled = true, EntryResolvedTarget? ContinuationTarget = null);
 public sealed record EntryBehavior(TaskCreationMode TaskCreationMode = TaskCreationMode.Automatic, bool AllowConversation = true, bool StreamResponse = true, EntryConversationBehavior? Conversation = null);
 
@@ -405,7 +409,7 @@ public static class WorkplaceValidation
         if (string.IsNullOrWhiteSpace(flowName) || flowName.Contains('/', StringComparison.Ordinal))
             throw new WorkValidationException("entry_target_not_supported", "The Entry target must reference a Flow name.");
         if (string.IsNullOrWhiteSpace(target.Version)) throw new WorkValidationException("entry_target_version_required", "A published Entry target version is required.");
-        return new FlowReference(new FlowId(flowName), target.Version, UseActiveVersion: false);
+        return new FlowReference(new FlowId(flowName, target.Namespace), target.Version, UseActiveVersion: false, target.Namespace);
     }
 
     private static void ValidateName(string value, string code)

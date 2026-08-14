@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
+using Agentstration.Resources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -219,6 +220,7 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await WorkNamespaceSchema.EnsureAsync(context, cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             "CREATE TABLE IF NOT EXISTS WorkplaceWorkspaceDrafts (Id TEXT NOT NULL CONSTRAINT PK_WorkplaceWorkspaceDrafts PRIMARY KEY, Name TEXT NOT NULL, Payload TEXT NOT NULL);",
             cancellationToken);
@@ -452,14 +454,16 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await WorkNamespaceSchema.EnsureAsync(context, cancellationToken);
     }
 
     public async Task UpsertWorkspaceAsync(WorkplaceWorkspace workspace, CancellationToken cancellationToken)
     {
         WorkplaceValidation.Validate(workspace);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Workspaces.SingleOrDefaultAsync(value => value.Id == workspace.Id.Value, cancellationToken);
-        if (document is null) context.Workspaces.Add(new WorkplaceWorkspaceDocument { Id = workspace.Id.Value, Name = workspace.Name, Payload = JsonSerializer.Serialize(workspace, JsonOptions) });
+        var key = StorageKey(workspace.Id.Namespace, workspace.Id.Value);
+        var document = await context.Workspaces.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        if (document is null) context.Workspaces.Add(new WorkplaceWorkspaceDocument { Id = key, Name = workspace.Name, Payload = JsonSerializer.Serialize(workspace, JsonOptions) });
         else { document.Name = workspace.Name; document.Payload = JsonSerializer.Serialize(workspace, JsonOptions); }
         await context.SaveChangesAsync(cancellationToken);
     }
@@ -474,7 +478,8 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     public async Task<WorkplaceWorkspace?> GetWorkspaceAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payload = await context.Workspaces.AsNoTracking().Where(value => value.Id == workspaceId.Value).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        var key = StorageKey(workspaceId.Namespace, workspaceId.Value);
+        var payload = await context.Workspaces.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<WorkplaceWorkspace>(payload);
     }
 
@@ -482,8 +487,9 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     {
         WorkplaceValidation.Validate(draft);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.WorkspaceDrafts.SingleOrDefaultAsync(value => value.Id == draft.Id.Value, cancellationToken);
-        if (document is null) context.WorkspaceDrafts.Add(new WorkplaceWorkspaceDraftDocument { Id = draft.Id.Value, Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
+        var key = StorageKey(draft.Id.Namespace, draft.Id.Value);
+        var document = await context.WorkspaceDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        if (document is null) context.WorkspaceDrafts.Add(new WorkplaceWorkspaceDraftDocument { Id = key, Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
         else { document.Name = draft.Name; document.Payload = JsonSerializer.Serialize(draft, JsonOptions); }
         await context.SaveChangesAsync(cancellationToken);
     }
@@ -498,7 +504,8 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     public async Task<WorkplaceWorkspaceDraft?> GetWorkspaceDraftAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payload = await context.WorkspaceDrafts.AsNoTracking().Where(value => value.Id == workspaceId.Value).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        var key = StorageKey(workspaceId.Namespace, workspaceId.Value);
+        var payload = await context.WorkspaceDrafts.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<WorkplaceWorkspaceDraft>(payload);
     }
 
@@ -506,8 +513,9 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     {
         WorkplaceValidation.Validate(entry);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Entries.SingleOrDefaultAsync(value => value.Id == entry.Id.Value, cancellationToken);
-        if (document is null) context.Entries.Add(new EntryDocument { Id = entry.Id.Value, Name = entry.Name, Payload = JsonSerializer.Serialize(entry, JsonOptions) });
+        var key = StorageKey(entry.Id.Namespace, entry.Id.Value);
+        var document = await context.Entries.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        if (document is null) context.Entries.Add(new EntryDocument { Id = key, Name = entry.Name, Payload = JsonSerializer.Serialize(entry, JsonOptions) });
         else { document.Name = entry.Name; document.Payload = JsonSerializer.Serialize(entry, JsonOptions); }
         await context.SaveChangesAsync(cancellationToken);
     }
@@ -522,16 +530,30 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     public async Task<EntryResource?> GetEntryAsync(EntryId entryId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payload = await context.Entries.AsNoTracking().Where(value => value.Id == entryId.Value).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        var key = StorageKey(entryId.Namespace, entryId.Value);
+        var payload = await context.Entries.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<EntryResource>(payload);
+    }
+
+    public async Task DeleteEntryAsync(EntryId entryId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var key = StorageKey(entryId.Namespace, entryId.Value);
+        var document = await context.Entries.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        if (document is not null)
+        {
+            context.Entries.Remove(document);
+            await context.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task UpsertEntryDraftAsync(EntryDraft draft, CancellationToken cancellationToken)
     {
         WorkplaceValidation.Validate(draft);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.EntryDrafts.SingleOrDefaultAsync(value => value.Id == draft.Id.Value, cancellationToken);
-        if (document is null) context.EntryDrafts.Add(new EntryDraftDocument { Id = draft.Id.Value, Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
+        var key = StorageKey(draft.Id.Namespace, draft.Id.Value);
+        var document = await context.EntryDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        if (document is null) context.EntryDrafts.Add(new EntryDraftDocument { Id = key, Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
         else { document.Name = draft.Name; document.Payload = JsonSerializer.Serialize(draft, JsonOptions); }
         await context.SaveChangesAsync(cancellationToken);
     }
@@ -546,8 +568,28 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     public async Task<EntryDraft?> GetEntryDraftAsync(EntryId entryId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payload = await context.EntryDrafts.AsNoTracking().Where(value => value.Id == entryId.Value).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        var key = StorageKey(entryId.Namespace, entryId.Value);
+        var payload = await context.EntryDrafts.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<EntryDraft>(payload);
+    }
+
+    public async Task DeleteEntryDraftAsync(EntryId entryId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var key = StorageKey(entryId.Namespace, entryId.Value);
+        var document = await context.EntryDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        if (document is not null)
+        {
+            context.EntryDrafts.Remove(document);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<bool> HasEntryInteractionsAsync(EntryId entryId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.Interactions.AsNoTracking().Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<WorkplaceInteraction>).Any(value => value.EntryId == entryId);
     }
 
     public async Task CreateInteractionAsync(WorkplaceInteraction interaction, CancellationToken cancellationToken)
@@ -703,6 +745,18 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
 
     private static T Deserialize<T>(string payload) => JsonSerializer.Deserialize<T>(payload, JsonOptions)
         ?? throw new InvalidOperationException($"Stored {typeof(T).Name} document is invalid.");
+    private static string StorageKey(ResourceNamespace @namespace, string name) => $"{@namespace.Value}:{name}";
+}
+
+internal static class WorkNamespaceSchema
+{
+    public static async Task EnsureAsync(WorkDbContext context, CancellationToken cancellationToken)
+    {
+        await context.Database.ExecuteSqlRawAsync("UPDATE WorkplaceWorkspaces SET Id = 'default:' || Id WHERE instr(Id, ':') = 0;", cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("UPDATE WorkplaceWorkspaceDrafts SET Id = 'default:' || Id WHERE instr(Id, ':') = 0;", cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("UPDATE Entries SET Id = 'default:' || Id WHERE instr(Id, ':') = 0;", cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("UPDATE EntryDrafts SET Id = 'default:' || Id WHERE instr(Id, ':') = 0;", cancellationToken);
+    }
 }
 
 public static class SqliteWorkServiceCollectionExtensions

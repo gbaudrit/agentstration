@@ -1,2 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
+  </ItemGroup>
 </Project>
