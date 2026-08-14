@@ -7,7 +7,7 @@
     </div>
     <div class="prompt-composer">
         <textarea @bind="request" @bind:event="oninput" @onkeydown="HandleKeyDown" placeholder="@Definition.Presentation.Placeholder" aria-label="@Definition.DisplayName" aria-describedby="prompt-help prompt-error" disabled="@(Disabled || Busy || submitting)"></textarea>
-        <button class="prompt-submit" type="submit" disabled="@(Disabled || Busy || submitting || string.IsNullOrWhiteSpace(request))">
+        <button class="prompt-submit" type="submit" aria-label="Send request" disabled="@(Disabled || Busy || submitting || string.IsNullOrWhiteSpace(request))">
             <UiIcon Name="send" /><span>@(Busy || submitting ? "Sending…" : "Send request")</span>
         </button>
     </div>
@@ -16,7 +16,7 @@
         <div class="entry-suggestions" aria-label="Suggestions">
             @foreach (var suggestion in Definition.Presentation.Suggestions)
             {
-                <button type="button" disabled="@(Disabled || Busy || submitting)" @onclick="() => request = suggestion.Value">@suggestion.Label</button>
+                <button type="button" disabled="@(Disabled || Busy || submitting)" @onclick="() => request = suggestion.Value"><span class="suggestion-icon"><UiIcon Name="sparkle" /></span><span>@suggestion.Label</span></button>
             }
         </div>
     }

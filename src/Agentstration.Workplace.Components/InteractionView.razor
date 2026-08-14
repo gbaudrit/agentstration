@@ -1,6 +1,6 @@
 <section class="interaction-view" aria-labelledby="interaction-title">
     <header class="interaction-header">
-        <div><p class="eyebrow">Current request</p><h2 id="interaction-title">Conversation</h2></div>
+        <div><p class="eyebrow">Current request</p><h2 id="interaction-title">Conversation</h2><p class="interaction-context">@(Task?.Title ?? "Your current request")</p></div>
         <div class="interaction-actions"><RealtimeStatus Connected="RealtimeConnected" /><button class="button-secondary" type="button" @onclick="OnNewRequest"><UiIcon Name="plus" /> New request</button></div>
     </header>
 
