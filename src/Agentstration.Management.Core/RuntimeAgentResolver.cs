@@ -7,6 +7,13 @@ public sealed class ControlPlaneRuntimeAgentResolver(
     IControlPlaneStore store,
     IAgentResourceQueries queries) : IRuntimeAgentResolver
 {
+    public async Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, CancellationToken cancellationToken)
+    {
+        var agent = await store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, resourceId), cancellationToken)
+            ?? throw new RuntimeAgentResolutionException("agent_not_found", $"Agent '{resourceId}' was not found.");
+        return await ResolveAsync(new RuntimeAgentReference(resourceId, agent.Value.Generation), cancellationToken);
+    }
+
     public async Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken)
     {
         var agent = await store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, reference.ResourceId), cancellationToken)

@@ -33,6 +33,7 @@ const sidebars = {
         'concepts/model-providers',
         'concepts/model-profiles',
         'concepts/flows',
+        'concepts/flow-modes',
         'concepts/interactions',
         'concepts/work-tasks',
         'concepts/flow-runs',

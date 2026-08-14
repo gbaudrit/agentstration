@@ -1,19 +1,19 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
-using Agentstration.Management.Abstractions;
-using Agentstration.Management.Contracts;
-using Agentstration.Web.Console;
-using Agentstration.Work;
-using Agentstration.Work.Contracts;
-using Agentstration.Runtime.Abstractions;
-using Agentstration.Runtime.Contracts;
-using Agentstration.Web.Configuration;
-using Agentstration.Web.Components;
 using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
+using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Contracts;
+using Agentstration.Web.Components;
+using Agentstration.Web.Configuration;
+using Agentstration.Web.Console;
 using Agentstration.Web.Features.Flows.Designer;
+using Agentstration.Work;
+using Agentstration.Work.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -92,7 +92,8 @@ public sealed class ApiClientTests
         {
             workRequests.Add(request.RequestUri!.AbsolutePath);
             return new HttpResponseMessage(HttpStatusCode.InternalServerError);
-        })) { BaseAddress = new Uri("http://work-api/") };
+        }))
+        { BaseAddress = new Uri("http://work-api/") };
         using var flowCatalog = new HttpClient(new StubHandler(request =>
         {
             Assert.AreEqual("/api/resources", request.RequestUri!.AbsolutePath);
@@ -105,7 +106,8 @@ public sealed class ApiClientTests
                     new ResourcePickerItem("my-flow", "My flow", null, "1.0.0", "Active", ResourceKinds.Flow)
                 })
             };
-        })) { BaseAddress = new Uri("http://flow-api/") };
+        }))
+        { BaseAddress = new Uri("http://flow-api/") };
         var factory = new StubHttpClientFactory(name =>
         {
             requestedCatalogs.Add(name);
@@ -126,13 +128,16 @@ public sealed class ApiClientTests
     {
         var now = new DateTimeOffset(2026, 8, 6, 12, 0, 0, TimeSpan.Zero);
         var flowId = new FlowId("universal-router");
-        var spec = new DirectFlowSpec(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
-        var flow = new FlowResponse(flowId.Value, flowId.Value, null, FlowKind.Direct, "1.0.0", true, "1.0.0", spec, new Dictionary<string, string>(), now, now);
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
+        var flow = new FlowResponse(flowId.Value, flowId.Value, null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), now, now);
         var draft = new FlowDraftResponse(new FlowDraft
         {
-            Id = "draft-universal-router", FlowId = flowId, DisplayName = "Universal router",
+            Id = "draft-universal-router",
+            FlowId = flowId,
+            DisplayName = "Universal router",
             Definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] },
-            CreatedAt = now, UpdatedAt = now
+            CreatedAt = now,
+            UpdatedAt = now
         }, "\"draft-etag\"");
         var requests = new List<string>();
         using var httpClient = new HttpClient(new StubHandler(request =>
@@ -143,7 +148,8 @@ public sealed class ApiClientTests
             if (request.Method == HttpMethod.Get)
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) };
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(draft) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var actual = await new FlowDesignerBackend(new FlowApiClient(httpClient)).GetDraftAsync(flowId.Value, default);
 
@@ -153,6 +159,42 @@ public sealed class ApiClientTests
             "GET /api/flows/universal-router/draft",
             "GET /api/flows/universal-router",
             "POST /api/flows/universal-router/versions/1.0.0/draft"
+        }, requests);
+    }
+
+    [TestMethod]
+    public async Task FlowAuthoringClientPreservesETagAndPublishesImmutableVersion()
+    {
+        var now = new DateTimeOffset(2026, 8, 13, 10, 0, 0, TimeSpan.Zero);
+        var definition = new OrchestrationFlowDefinition(
+            [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
+            new SequentialOrchestrationPattern());
+        var flow = new FlowResponse("review", "review", null, "0.1.0", true, null, definition, new Dictionary<string, string>(), now, now);
+        var version = new FlowVersionResponse("review", "0.1.0", null, definition, new Dictionary<string, string>(), now);
+        var requests = new List<(HttpMethod Method, string Path, string? IfMatch)>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.Method, request.RequestUri!.AbsolutePath, request.Headers.IfMatch.FirstOrDefault()?.ToString()));
+            if (request.RequestUri.AbsolutePath.EndsWith("/versions", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(version) };
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) };
+            response.Headers.ETag = new EntityTagHeaderValue(request.Method == HttpMethod.Put ? "\"v2\"" : "\"v1\"");
+            return response;
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new FlowApiClient(httpClient);
+
+        var snapshot = await client.GetFlowSnapshotAsync("review", default);
+        var updated = await client.UpdateFlowAsync("review", new UpdateFlowRequest(null, "0.1.0", true, definition), snapshot.ETag, default);
+        var published = await client.CreateFlowVersionAsync("review", new CreateFlowVersionRequest("0.1.0"), default);
+
+        Assert.AreEqual("\"v2\"", updated.ETag);
+        Assert.AreEqual("0.1.0", published.Version);
+        CollectionAssert.AreEqual(new[]
+        {
+            (HttpMethod.Get, "/api/flows/review", (string?)null),
+            (HttpMethod.Put, "/api/flows/review", "\"v1\""),
+            (HttpMethod.Post, "/api/flows/review/versions", (string?)null)
         }, requests);
     }
 
@@ -169,7 +211,8 @@ public sealed class ApiClientTests
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
             response.Headers.ETag = new EntityTagHeaderValue("\"v1\"");
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ManagementApiClient(httpClient);
 
         var snapshot = await client.PutAgentAsync(ToRequest(resource), null, createOnly: true, CancellationToken.None);
@@ -192,7 +235,8 @@ public sealed class ApiClientTests
             {
                 Content = JsonContent.Create(new PagedResponse<AgentResource>([resource], null))
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ManagementApiClient(httpClient);
 
         var agents = await client.GetAgentsAsync(CancellationToken.None);
@@ -209,7 +253,8 @@ public sealed class ApiClientTests
         {
             requestPath = request.RequestUri?.AbsolutePath;
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Array.Empty<WorkplaceWorkspaceResponse>()) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new WorkApiClient(httpClient);
 
         _ = await client.GetWorkspacesAsync(CancellationToken.None);
@@ -232,7 +277,8 @@ public sealed class ApiClientTests
                 response.Headers.ETag = new EntityTagHeaderValue("\"v2\"");
             }
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ManagementApiClient(httpClient);
 
         _ = await client.PutAgentAsync(ToRequest(resource), "\"v1\"", createOnly: false, CancellationToken.None);
@@ -247,7 +293,8 @@ public sealed class ApiClientTests
         using var httpClient = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.PreconditionFailed)
         {
             Content = JsonContent.Create(new { title = "precondition_failed", detail = "The ETag is stale.", status = 412 })
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ManagementApiClient(httpClient);
 
         var exception = await Assert.ThrowsAsync<AgentstrationApiException>(() => client.GetAgentAsync("web-agent", CancellationToken.None));
@@ -264,7 +311,8 @@ public sealed class ApiClientTests
         var model = new AvailableModelResponse("qwen3:4b", "Qwen 3 4B", "available", ["chat"], new Dictionary<string, string> { ["parameterSize"] = "4B" });
         using var httpClient = new HttpClient(new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/models", StringComparison.Ordinal)
             ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ValueResponse<AvailableModelResponse>([model])) }
-            : new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ValueResponse<ModelProviderResponse>([provider])) })) { BaseAddress = new Uri("http://localhost/") };
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ValueResponse<ModelProviderResponse>([provider])) }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ModelProvidersApiClient(httpClient);
 
         var providers = await client.GetModelProvidersAsync(default);
@@ -286,7 +334,8 @@ public sealed class ApiClientTests
             var response = new HttpResponseMessage(request.Method == HttpMethod.Delete ? HttpStatusCode.NoContent : HttpStatusCode.OK);
             if (request.Method != HttpMethod.Delete) { response.Content = JsonContent.Create(profile); response.Headers.ETag = new EntityTagHeaderValue("\"v2\""); }
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ModelProfilesApiClient(httpClient);
 
         _ = await client.UpdateModelProfileAsync(profile.Name, new PutModelProfileRequest(profile.Definition), "\"v1\"", default);
@@ -312,8 +361,12 @@ public sealed class ApiClientTests
     {
         var editor = new ModelProfileEditorModel
         {
-            Name = "reasoning-default", DisplayName = "Default reasoning", ProviderName = "ollama-local",
-            ModelName = "qwen3:4b", Temperature = 0.2, MaxOutputTokens = 1000
+            Name = "reasoning-default",
+            DisplayName = "Default reasoning",
+            ProviderName = "ollama-local",
+            ModelName = "qwen3:4b",
+            Temperature = 0.2,
+            MaxOutputTokens = 1000
         };
 
         var request = editor.ToCreateRequest();
@@ -411,7 +464,8 @@ public sealed class ApiClientTests
         {
             requested.Add(request.RequestUri!);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create<object>(request.Method == HttpMethod.Post ? preparation : readiness) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         IAgentRunnerRuntimeClient client = new RuntimeApiClient(httpClient);
 
         var actual = await client.GetAgentReadinessAsync("sql-expert", 4, default);
@@ -473,12 +527,14 @@ public sealed class ApiClientTests
     private static ModelProfileResource CreateModelProfile(string name) => new()
     {
         Metadata = new ResourceMetadata { Name = name },
-        Kind = ResourceKinds.ModelProfile, ApiVersion = ManagementApiVersions.V20260801,
+        Kind = ResourceKinds.ModelProfile,
+        ApiVersion = ManagementApiVersions.V20260801,
         Definition = new ModelProfileProperties
         {
             DisplayName = "Default reasoning",
             Provider = new ResourceReference("ollama-local"),
-            Model = new ModelSelection { Name = "qwen3:4b" }, Generation = new ModelGenerationOptions { Temperature = 0.2 }
+            Model = new ModelSelection { Name = "qwen3:4b" },
+            Generation = new ModelGenerationOptions { Temperature = 0.2 }
         }
     };
 

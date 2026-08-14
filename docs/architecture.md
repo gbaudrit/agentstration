@@ -82,6 +82,8 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 
 `Domain` contains no Management types and has no framework dependency. Canonical Management resources and provider-neutral ports live in `Management.Abstractions`; validation and use cases live in `Management.Core`. SQLite and EF Core are confined to `Management.Storage.Sqlite`. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
 
+`Agentstration.Resources` contains the neutral namespace/address value types shared by Management, Flow, Work, and Runtime boundaries. Resource identity is `(workspace, namespace, kind, name)` and existing callers implicitly use `default`. Relative references inherit their owner's namespace; explicit cross-namespace references retain the supplied namespace. See ADR-0035.
+
 ## Module responsibilities
 
 | Module | Current responsibility | Planned extension |
@@ -93,7 +95,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Model providers | SQLite-backed provider declarations with ETag CRUD and usage protection, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | credentials/connections, additional AEP extensions, cached discovery |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
-| Flows | typed graph drafts, validation, YAML/JSON source, immutable versions, durable sequential Runs, visual designer and SignalR replay | checkpoints, parallel and long-running steps |
+| Flows | typed graph drafts, typed orchestration authoring, immutable versions, durable Runs, visual editors and SignalR replay | checkpoints and long-running interactive steps |
 | Flow storage | independent readable JSON documents, ETags, active/current definition separation | migrations, indirect reference projections |
 | Identity | local-user boundary only | OIDC, users, members, workspace authorization |
 | Workspaces | workspace and inbox lifecycle | teams, organizations, policies |
@@ -193,7 +195,7 @@ POST /api/flows/{id}/versions
   -> immutable FlowVersion snapshot
   -> optional active-version pointer update
 WorkItem -> optional FlowReference (exact or active)
-Flow Run -> resolves exact published FlowReference -> sequential local execution
+Flow Run -> resolves exact published FlowReference -> local graph execution or isolated MAF orchestration adapter
 ```
 
 The Flow module is physically independent and owns editable typed graph drafts, immutable published snapshots, constrained expressions, and the provider-neutral Flow Run model. The local executor traverses `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps sequentially without referencing Microsoft Agent Framework; Infrastructure adapts agent steps and Management resource lookups.
@@ -205,7 +207,7 @@ Console / API / future Work adapter
   -> POST published Flow Run returns 202 Accepted
   -> bounded local Flow queue
   -> validate input and persist the exact draft or published definition snapshot
-  -> traverse typed steps and execute selected managed Agents through the Flow agent port
+  -> traverse typed steps or execute a bounded provider-neutral orchestration through the runtime adapter
   -> persist differential events, transitions, diagnostics, usage, and failures
   -> SignalR updates with persisted replay, cancellation, global and per-Flow history
 ```
@@ -382,6 +384,8 @@ Standalone startup creates or repairs `local / default`, the local user, active 
 - ADR-0031: Agentstration-native declarative resource envelope
 - ADR-0032: one authoritative standalone server
 - ADR-0033: canonical names and explicit execution identities
-- ADR-0034: runtime resolution and control-plane hardening
-- ADR-0035: Packs are Management and distribution artifacts
-- ADR-0036: Pack Projects retain sources and produce local immutable builds
+- ADR-0034: MAF Flow orchestration behind the runtime adapter
+- ADR-0035: explicit resource namespaces
+- ADR-0036: runtime resolution and control-plane hardening
+- ADR-0037: Packs are Management and distribution artifacts
+- ADR-0038: Pack Projects retain sources and produce local immutable builds

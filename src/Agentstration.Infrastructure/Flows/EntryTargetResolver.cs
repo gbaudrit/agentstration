@@ -38,31 +38,33 @@ public sealed class EntryTargetResolver(
     private async Task<EntryResolvedTarget> ResolveFlowAsync(EntryDraft draft, CancellationToken cancellationToken)
     {
         var resourceId = draft.Binding.ResourceId;
-        var flowId = FlowIdFrom(resourceId);
+        var targetNamespace = draft.Binding.Namespace ?? draft.Id.Namespace;
+        var flowId = FlowIdFrom(resourceId, targetNamespace);
         var stored = await flows.GetAsync(flowId, cancellationToken)
             ?? throw new KeyNotFoundException($"Flow '{resourceId}' was not found.");
         var version = stored.Value.ActiveVersion
             ?? throw new WorkValidationException("entry_flow_not_published", $"Flow '{resourceId}' has no active published version.");
-        var resolved = await flows.ResolveAsync(new FlowReference(flowId, version, UseActiveVersion: false), cancellationToken);
+        var resolved = await flows.ResolveAsync(new FlowReference(flowId, version, UseActiveVersion: false, targetNamespace), draft.Id.Namespace, cancellationToken);
         ValidateFlowInputs(draft, resolved);
-        return new EntryResolvedTarget(resourceId, version);
+        return new EntryResolvedTarget(resourceId, version) { Namespace = targetNamespace };
     }
 
     private async Task<EntryResolvedTarget> ResolveAgentAsync(EntryDraft draft, CancellationToken cancellationToken)
     {
         var resourceId = draft.Binding.ResourceId;
+        var targetNamespace = draft.Binding.Namespace ?? draft.Id.Namespace;
         var primary = draft.Presentation.Fields.Single(value => value.Role == EntryFieldRole.PrimaryInput);
         if (primary.Type is not EntryFieldType.Prompt and not EntryFieldType.Text and not EntryFieldType.Textarea and not EntryFieldType.Conversation)
             throw new WorkValidationException("entry_agent_input_incompatible", "A Direct Agent Flow primary input must be textual.");
-        var agent = await agents.GetAgentAsync(resourceId, cancellationToken)
+        var agent = await agents.GetAgentAsync(targetNamespace, resourceId, cancellationToken)
             ?? throw new KeyNotFoundException($"Agent '{resourceId}' was not found.");
         if (agent.Value.Generation < 1)
             throw new WorkValidationException("entry_agent_version_unresolved", $"Agent '{resourceId}' has no resolvable generation.");
 
         var name = ResourceName(resourceId);
-        var flowId = new FlowId($"system-direct-agent-{name}");
+        var flowId = new FlowId($"system-direct-agent-{name}", draft.Id.Namespace);
         var version = $"1.0.{agent.Value.Generation - 1}";
-        var spec = new DirectFlowSpec(new FlowTargetReference(FlowTargetKind.Agent, resourceId));
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, resourceId));
         var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["systemManaged"] = bool.TrueString,
@@ -73,20 +75,20 @@ public sealed class EntryTargetResolver(
         var current = await flows.GetAsync(flowId, cancellationToken);
         if (current is null)
         {
-            await flows.CreateAsync(new CreateFlowCommand(flowId.Value, $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", FlowKind.Direct, version, true, spec, metadata), cancellationToken);
+            await flows.CreateAsync(new CreateFlowCommand(flowId.Value, $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", version, true, definition, metadata), draft.Id.Namespace, cancellationToken);
         }
         else if (!string.Equals(current.Value.Version, version, StringComparison.Ordinal))
         {
             await flows.UpdateAsync(flowId, new UpdateFlowCommand(
-                $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", FlowKind.Direct, version, true, spec, metadata), current.ETag, cancellationToken);
+                $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", version, true, definition, metadata), current.ETag, cancellationToken);
         }
 
         if (await flows.GetVersionAsync(flowId, version, cancellationToken) is null)
             await flows.PublishVersionAsync(flowId, version, activate: true, cancellationToken);
-        return new EntryResolvedTarget(flowId.Value, version);
+        return new EntryResolvedTarget(flowId.Value, version) { Namespace = draft.Id.Namespace };
     }
 
-    private static FlowId FlowIdFrom(string resourceId) => new(ResourceName(resourceId));
+    private static FlowId FlowIdFrom(string resourceId, Agentstration.Resources.ResourceNamespace @namespace) => new(ResourceName(resourceId), @namespace);
     private static string ResourceName(string resourceId) => resourceId;
 
     private static void ValidateFlowInputs(EntryDraft draft, FlowVersion flow)

@@ -39,4 +39,4 @@ agentstration/price-watch/1.0.0
 
 Agentstration records an installed Pack separately from the resources it manages. Each installed resource retains provenance so update and uninstall can detect local edits, detached resources, and conflicts instead of silently overwriting or deleting them.
 
-See the [planned Pack format](../reference/packs.md) and [ADR-0035](../decisions/0035-packs-are-management-distribution-artifacts.md).
+See the [planned Pack format](../reference/packs.md) and [ADR-0037](../decisions/0037-packs-are-management-distribution-artifacts.md).

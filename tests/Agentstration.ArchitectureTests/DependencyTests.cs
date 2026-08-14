@@ -4,32 +4,68 @@ using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Application;
 using Agentstration.Domain;
-using Agentstration.Management.Abstractions;
 using Agentstration.Evaluation;
+using Agentstration.Extensions.Ollama;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Storage.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.ModelProviders;
-using Agentstration.Extensions.Ollama;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Components;
 using Agentstration.Workplace.Web;
-using Agentstration.Web.Console;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.ArchitectureTests;
 
 [TestClass]
 public sealed class DependencyTests
 {
+    [TestMethod]
+    public void WorkplaceRealtimeClientIsScopedPerBlazorCircuit()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentstrationWorkplaceClient(new Uri("http://localhost:5100"), new Uri("http://localhost:5100/hubs/workplace"));
+
+        var descriptor = services.Single(value => value.ServiceType == typeof(WorkplaceRealtimeClient));
+
+        Assert.AreEqual(ServiceLifetime.Scoped, descriptor.Lifetime);
+    }
+
+    [TestMethod]
+    public void WorkplacePagesDoNotAddNestedMainLandmarks()
+    {
+        var pages = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Workplace.Web", "Components", "Pages");
+        var violations = Directory.EnumerateFiles(pages, "*.razor")
+            .Where(path => File.ReadAllText(path).Contains("<main", StringComparison.OrdinalIgnoreCase))
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"WorkplaceLayout already owns the main landmark: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void WorkplaceComponentsUseStandaloneHostRoutes()
+    {
+        var components = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Workplace.Components");
+        var violations = Directory.EnumerateFiles(components, "*.razor")
+            .Where(path => File.ReadAllText(path).Contains("/workplace/tasks", StringComparison.OrdinalIgnoreCase))
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"Workplace task links must use /tasks: {string.Join(", ", violations)}");
+    }
+
     [TestMethod]
     public void DomainHasNoInfrastructureOrFrameworkDependencies()
     {
@@ -345,7 +381,8 @@ public sealed class DependencyTests
         var references = typeof(FlowService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Storage.Sqlite", StringComparison.Ordinal)
             || name.Contains("Agentstration.Web", StringComparison.Ordinal)
-            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)));
+            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
     }
 
     [TestMethod]

@@ -1,0 +1,22 @@
+<div class="orchestration-preview @Model.Strategy.ToString().ToLowerInvariant()">
+    @if (Model.Strategy == FlowOrchestrationStrategy.Magentic)
+    {
+        <div class="preview-node manager"><span>M</span><strong>@(string.IsNullOrWhiteSpace(Model.ManagerId) ? "Manager" : Model.ManagerId)</strong></div>
+        <div class="preview-edge vertical">↓</div>
+    }
+    <div class="preview-participants">
+        @for (var index = 0; index < Model.ParticipantIds.Count; index++)
+        {
+            var id = Model.ParticipantIds[index];
+            <div class="preview-node @(Model.Strategy == FlowOrchestrationStrategy.Handoff && id == Model.InitialParticipant ? "initial" : null)"><span>@(index + 1)</span><strong>@id</strong></div>
+            @if (Model.Strategy == FlowOrchestrationStrategy.Sequential && index < Model.ParticipantIds.Count - 1) { <div class="preview-edge">→</div> }
+        }
+    </div>
+    @if (Model.ParticipantIds.Count == 0) { <p class="muted">Select participants to build the preview.</p> }
+    else if (Model.Strategy == FlowOrchestrationStrategy.Handoff && Model.Handoffs.Count > 0)
+    {
+        <ul class="preview-routes">@foreach (var route in Model.Handoffs) { <li><code>@route.From</code> → <code>@route.To</code></li> }</ul>
+    }
+</div>
+
+@code { [Parameter, EditorRequired] public OrchestrationEditorModel Model { get; set; } = null!; }

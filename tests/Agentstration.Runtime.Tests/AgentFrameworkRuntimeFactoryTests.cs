@@ -2,11 +2,14 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Agentstration.Flow;
+using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Local;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -15,6 +18,210 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class AgentFrameworkRuntimeFactoryTests
 {
+    [TestMethod]
+    public void FlowOrchestrationMapsMafExecutorIdentityToInternalParticipantId()
+    {
+        using var chatClient = new RecordingChatClient();
+        AIAgent agent = new ChatClientAgent(chatClient, name: "agent-1");
+        IReadOnlyDictionary<string, AIAgent> participants = new Dictionary<string, AIAgent>
+        {
+            ["agent-1"] = agent
+        };
+
+        Assert.AreEqual(
+            "agent-1",
+            AgentFrameworkFlowOrchestrationEngine.ResolveParticipantId(agent.Id, "generated-executor", participants));
+        var exception = Assert.ThrowsExactly<FlowValidationException>(() =>
+            AgentFrameworkFlowOrchestrationEngine.ResolveParticipantId("unknown-agent", "unknown-maf-executor", participants));
+        Assert.AreEqual("flow_orchestration_participant_unmapped", exception.Code);
+    }
+
+    [TestMethod]
+    public async Task GroupChatWithObservabilityEmitsTurnsWithInternalParticipantIds()
+    {
+        using var chatClient = new RecordingChatClient();
+        var factory = new AgentFrameworkRuntimeFactory(
+            new RecordingResolver(chatClient),
+            NullLoggerFactory.Instance,
+            new GenAiObservabilityOptions { Enabled = true });
+        var engine = new AgentFrameworkFlowOrchestrationEngine(
+            new RecordingAgentResolver(),
+            new EmptyToolCatalog(),
+            factory);
+        var definition = new OrchestrationFlowDefinition(
+            [
+                new FlowTargetReference(FlowTargetKind.Agent, "agent-1"),
+                new FlowTargetReference(FlowTargetKind.Agent, "agent-2")
+            ],
+            new GroupChatOrchestrationPattern(2));
+        var events = new List<FlowExecutionEvent>();
+
+        await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+            "run-1",
+            definition,
+            JsonSerializer.SerializeToElement(new { prompt = "Discuss" }),
+            "correlation-1")))
+            events.Add(item);
+
+        CollectionAssert.AreEqual(
+            new[] { "agent-1", "agent-2" },
+            events.OfType<FlowParticipantTurnStarted>().Select(item => item.ParticipantId).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { 1, 2 },
+            events.OfType<FlowParticipantTurnStarted>().Select(item => item.Turn).ToArray());
+        Assert.AreEqual(2, events.OfType<FlowParticipantTurnCompleted>().Count());
+        var transitions = events.Where(item => item is FlowParticipantTurnStarted or FlowParticipantTurnCompleted)
+            .Select(item => item switch
+            {
+                FlowParticipantTurnStarted started => $"start:{started.ParticipantId}:{started.Turn}",
+                FlowParticipantTurnCompleted completed => $"complete:{completed.ParticipantId}:{completed.Turn}",
+                _ => throw new UnreachableException()
+            }).ToArray();
+        CollectionAssert.AreEqual(
+            new[] { "start:agent-1:1", "complete:agent-1:1", "start:agent-2:2", "complete:agent-2:2" },
+            transitions,
+            string.Join(", ", transitions));
+        Assert.IsTrue(chatClient.Messages.Any(message =>
+            message.Role == ChatRole.User && message.Text.Contains("Discuss", StringComparison.Ordinal)));
+        Assert.HasCount(2, chatClient.Calls);
+        Assert.IsTrue(chatClient.Calls[1].Any(message => message.Text.Contains("OK", StringComparison.Ordinal)),
+            string.Join(" | ", chatClient.Calls[1].Select(message => $"{message.Role}:{message.AuthorName}:{message.Text}")));
+        var result = events.OfType<FlowExecutionCompleted>().Single().Result;
+        Assert.AreEqual(FlowOrchestrationStrategy.GroupChat, result.Strategy);
+        Assert.HasCount(2, result.Participants);
+    }
+
+    [TestMethod]
+    public async Task SequentialPassesThePreviousResponseAndReturnsTheLastParticipant()
+    {
+        using var chatClient = new RecordingChatClient();
+        var events = await ExecuteOrchestrationAsync(new SequentialOrchestrationPattern(), chatClient);
+
+        Assert.HasCount(2, chatClient.Calls);
+        Assert.IsTrue(chatClient.Calls[1].Any(message => message.Text.Contains("OK", StringComparison.Ordinal)));
+        var result = events.OfType<FlowExecutionCompleted>().Single().Result;
+        CollectionAssert.AreEqual(new[] { "agent-1", "agent-2" }, result.Participants.Select(value => value.ParticipantId).ToArray());
+        Assert.AreEqual("OK", result.FinalOutput.GetString());
+    }
+
+    [TestMethod]
+    public async Task ConcurrentRunsEveryParticipantAndKeepsDeclaredResultOrder()
+    {
+        using var chatClient = new RecordingChatClient();
+        var events = await ExecuteOrchestrationAsync(new ConcurrentOrchestrationPattern(), chatClient);
+
+        Assert.HasCount(2, chatClient.Calls);
+        Assert.IsTrue(chatClient.Calls.All(call => call.Any(message => message.Text.Contains("Discuss", StringComparison.Ordinal))));
+        var result = events.OfType<FlowExecutionCompleted>().Single().Result;
+        CollectionAssert.AreEqual(new[] { "agent-1", "agent-2" }, result.Participants.Select(value => value.ParticipantId).ToArray());
+        Assert.AreEqual(JsonValueKind.Array, result.FinalOutput.ValueKind);
+    }
+
+    [TestMethod]
+    public async Task HandoffInvokesTheDeclaredTransferAndRunsTheDestination()
+    {
+        using var chatClient = new RecordingChatClient
+        {
+            ResponseFactory = (call, _, options) =>
+            {
+                if (call == 1)
+                {
+                    var handoff = options?.Tools?.SingleOrDefault(tool => tool.Name.StartsWith("handoff_to_", StringComparison.Ordinal))
+                        ?? throw new InvalidOperationException($"The Handoff workflow did not expose the destination transfer tool: {string.Join(", ", options?.Tools?.Select(tool => tool.Name) ?? [])}.");
+                    return new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                        [new TextContent("Transferring."), new FunctionCallContent("handoff-1", handoff.Name, new Dictionary<string, object?>())]));
+                }
+                return new ChatResponse(new ChatMessage(ChatRole.Assistant, "HANDOFF_OK"));
+            }
+        };
+        var events = await ExecuteOrchestrationAsync(
+            new HandoffOrchestrationPattern("agent-1", [new FlowHandoff("agent-1", "agent-2")], Autonomous: true),
+            chatClient);
+
+        Assert.IsTrue(chatClient.Calls.Count >= 2);
+        CollectionAssert.AreEqual(
+            new[] { "agent-1", "agent-2" },
+            events.OfType<FlowParticipantCompleted>().Select(value => value.Result.ParticipantId).ToArray());
+        Assert.IsFalse(events.OfType<FlowParticipantCompleted>()
+            .SelectMany(value => value.Result.Tools)
+            .Any(tool => tool.StartsWith("handoff_to_", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task MagenticRunsAutonomouslyWithoutExposingTheManagerAsAParticipant()
+    {
+        var ledgerCalls = 0;
+        using var chatClient = new RecordingChatClient
+        {
+            ResponseFactory = (_, messages, _) =>
+            {
+                var prompt = messages.LastOrDefault()?.Text ?? string.Empty;
+                if (prompt.Contains("is_request_satisfied", StringComparison.Ordinal))
+                {
+                    ledgerCalls++;
+                    var satisfied = ledgerCalls > 1;
+                    return new ChatResponse(new ChatMessage(ChatRole.Assistant, $$"""
+                        {
+                          "is_request_satisfied": { "answer": {{satisfied.ToString().ToLowerInvariant()}}, "reason": "{{(satisfied ? "The participant answered." : "A participant must answer.")}}" },
+                          "is_in_loop": { "answer": false, "reason": "No loop." },
+                          "is_progress_being_made": { "answer": true, "reason": "The workflow is progressing." },
+                          "next_speaker": { "answer": "agent-1", "reason": "The first participant owns the task." },
+                          "instruction_or_question": { "answer": "Provide the answer.", "reason": "Complete the request." }
+                        }
+                        """));
+                }
+
+                var response = prompt.Contains("pre-survey", StringComparison.OrdinalIgnoreCase)
+                    ? "No additional facts are required."
+                    : prompt.Contains("devise a short bullet-point plan", StringComparison.OrdinalIgnoreCase)
+                        ? "Ask agent-1 to answer, then return the result."
+                        : ledgerCalls > 1 ? "MAGENTIC_OK" : "PARTICIPANT_OK";
+                return new ChatResponse(new ChatMessage(ChatRole.Assistant, response));
+            }
+        };
+
+        var events = await ExecuteOrchestrationAsync(
+            new MagenticOrchestrationPattern(
+                new FlowTargetReference(FlowTargetKind.Agent, "manager"),
+                MaximumRounds: 3,
+                MaximumStalls: 2,
+                MaximumResets: 1),
+            chatClient);
+
+        var result = events.OfType<FlowExecutionCompleted>().Single().Result;
+        Assert.AreEqual(FlowOrchestrationStrategy.Magentic, result.Strategy);
+        Assert.IsFalse(result.Participants.Any(participant => participant.ParticipantId == "manager"));
+        Assert.IsTrue(
+            result.Participants.Any(participant => participant.ParticipantId == "agent-1"),
+            string.Join("\n--- CALL ---\n", chatClient.Calls.Select(call => string.Join("\n", call.Select(message => message.Text)))));
+        Assert.AreEqual("MAGENTIC_OK", result.FinalOutput.GetString());
+    }
+
+    private static async Task<List<FlowExecutionEvent>> ExecuteOrchestrationAsync(
+        FlowOrchestrationPattern pattern,
+        RecordingChatClient chatClient)
+    {
+        var factory = new AgentFrameworkRuntimeFactory(
+            new RecordingResolver(chatClient),
+            NullLoggerFactory.Instance,
+            new GenAiObservabilityOptions { Enabled = true });
+        var engine = new AgentFrameworkFlowOrchestrationEngine(new RecordingAgentResolver(), new EmptyToolCatalog(), factory);
+        var definition = new OrchestrationFlowDefinition(
+            [
+                new FlowTargetReference(FlowTargetKind.Agent, "agent-1"),
+                new FlowTargetReference(FlowTargetKind.Agent, "agent-2")
+            ],
+            pattern);
+        var events = new List<FlowExecutionEvent>();
+        await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+            "run-pattern",
+            definition,
+            JsonSerializer.SerializeToElement(new { prompt = "Discuss" }),
+            "correlation-pattern")))
+            events.Add(item);
+        return events;
+    }
+
     [TestMethod]
     public async Task FactoryResolvesDeclaredProfileAndPassesAgentInstructionsToMaf()
     {
@@ -135,10 +342,10 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         activity.TagObjects.Select(tag => $"{tag.Key}={tag.Value}")
             .Concat(activity.Events.SelectMany(activityEvent => activityEvent.Tags.Select(tag => $"{tag.Key}={tag.Value}")));
 
-    private static ExecutableAgentDefinition Definition() => new()
+    private static ExecutableAgentDefinition Definition(string agentKey = "sql-expert") => new()
     {
         AgentId = Guid.NewGuid(),
-        AgentKey = "sql-expert",
+        AgentKey = agentKey,
         DisplayName = "SQL Expert",
         Description = "SQL specialist",
         AgentVersion = 1,
@@ -152,6 +359,29 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         Handler = "prompt-agent",
         DefinitionHash = "hash"
     };
+
+    private sealed class RecordingAgentResolver : IRuntimeAgentResolver
+    {
+        public Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken) =>
+            ResolveLatestAsync(reference.ResourceId, cancellationToken);
+
+        public Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, CancellationToken cancellationToken)
+        {
+            var definition = Definition(resourceId);
+            return Task.FromResult(new ResolvedRuntimeAgent(
+                definition.AgentId,
+                resourceId,
+                1,
+                $"deployment-{resourceId}",
+                $"revision-{resourceId}",
+                definition.RuntimeProfileName,
+                definition.ModelProfileName,
+                definition,
+                true,
+                "Ready",
+                null));
+        }
+    }
 
     private sealed class RecordingResolver(IChatClient client) : IChatClientResolver
     {
@@ -169,6 +399,8 @@ public sealed class AgentFrameworkRuntimeFactoryTests
 
     private sealed class RecordingChatClient : IChatClient
     {
+        public Func<int, IReadOnlyList<ChatMessage>, ChatOptions?, ChatResponse>? ResponseFactory { get; init; }
+        public List<IReadOnlyList<ChatMessage>> Calls { get; } = [];
         public IReadOnlyList<ChatMessage> Messages { get; private set; } = [];
         public ChatOptions? Options { get; private set; }
         public ModelChatClientMetadata? Metadata { get; init; }
@@ -177,8 +409,10 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             Messages = messages.ToArray();
+            Calls.Add(Messages);
             Options = options;
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "OK")));
+            return Task.FromResult(ResponseFactory?.Invoke(Calls.Count, Messages, options)
+                ?? new ChatResponse(new ChatMessage(ChatRole.Assistant, "OK")));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(

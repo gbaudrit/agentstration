@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Abstractions;
 
@@ -245,21 +246,23 @@ public interface IToolProviderDiscovery
 
 public sealed record ResourceMetadata
 {
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public string Name { get; init; } = string.Empty;
     public IReadOnlyDictionary<string, string> Tags { get; init; } = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, string> Annotations { get; init; } = new Dictionary<string, string>();
 }
 
-public readonly record struct ResourceKey(string Kind, string Name)
+public readonly record struct ResourceKey(string Kind, string Name, ResourceNamespace Namespace = default)
 {
-    public static ResourceKey Create(string kind, string name)
+    public static ResourceKey Create(string kind, string name, ResourceNamespace @namespace = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return new(kind, name);
+        return new(kind, name, @namespace);
     }
 
-    public override string ToString() => $"{Kind}/{Name}";
+    public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
+    public override string ToString() => Address.ToString();
 }
 
 public abstract record Resource
@@ -269,6 +272,10 @@ public abstract record Resource
     public string Kind { get; init; } = string.Empty;
     public ResourceMetadata Metadata { get; init; } = new();
     [JsonIgnore] public string Name => Metadata.Name;
+    [JsonIgnore]
+    public ResourceNamespace Namespace => Metadata.Namespace;
+    [JsonIgnore]
+    public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
     public Guid TenantId { get; init; }
     public Guid WorkspaceId { get; init; }
     public long Generation { get; init; }
@@ -303,10 +310,13 @@ public sealed record ResourceStatus
 
 public sealed record ResourceReference
 {
-    public ResourceReference(string name, string? workspaceRef = null) { Name = name; WorkspaceRef = workspaceRef; }
+    public ResourceReference(string name, string? workspaceRef = null, ResourceNamespace? @namespace = null) { Name = name; WorkspaceRef = workspaceRef; Namespace = @namespace; }
     public string Name { get; init; }
     public string? WorkspaceRef { get; init; }
     [JsonIgnore] public string ResourceId => Name;
+    public ResourceNamespace? Namespace { get; init; }
+    public ResourceAddress Resolve(ResourceNamespace ownerNamespace, string kind) =>
+        ResourceAddress.Create(Namespace ?? ownerNamespace, kind, Name);
 }
 
 public record AgentProperties
@@ -356,6 +366,7 @@ public enum AgentIdentityType { None, SystemAssigned, UserAssigned, External }
 
 public sealed record AgentRevision : Resource
 {
+    public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
     public required Guid AgentUid { get; init; }
     public required string AgentName { get; init; }
     public required long AgentVersion { get; init; }
@@ -385,6 +396,7 @@ public sealed record ResolvedAgentDefinition
 
 public sealed record AgentDeployment : Resource
 {
+    public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
     public required string RevisionName { get; init; }
     public string? AgentName { get; init; }
     public string? ModelProfileName { get; init; }

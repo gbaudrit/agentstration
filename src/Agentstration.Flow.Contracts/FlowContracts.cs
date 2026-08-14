@@ -1,14 +1,27 @@
 using System.Text.Json;
 using Agentstration.Flow;
+using Agentstration.Resources;
 
 namespace Agentstration.Flow.Contracts;
 
-public sealed record CreateFlowRequest(string Name, string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null);
-public sealed record UpdateFlowRequest(string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null);
+public sealed record CreateFlowRequest(string Name, string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null)
+{
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+}
+public sealed record UpdateFlowRequest(string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null);
 public sealed record CreateFlowVersionRequest(string Version, bool Activate = true);
-public sealed record FlowResponse(string Id, string Name, string? Description, FlowKind Kind, string Version, bool Enabled, string? ActiveVersion, FlowSpec Spec, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
-public sealed record FlowSummaryResponse(string Id, string Name, string? Description, FlowKind Kind, string Version, bool Enabled, string? ActiveVersion, DateTimeOffset UpdatedAt);
-public sealed record FlowVersionResponse(string FlowId, string Version, string? Description, FlowKind Kind, FlowSpec Spec, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset PublishedAt, FlowGraphDefinition? Graph = null, string? DefinitionHash = null, string? ReleaseNotes = null);
+public sealed record FlowResponse(string Id, string Name, string? Description, string Version, bool Enabled, string? ActiveVersion, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)
+{
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+}
+public sealed record FlowSummaryResponse(string Id, string Name, string? Description, FlowKind FlowKind, string Version, bool Enabled, string? ActiveVersion, DateTimeOffset UpdatedAt)
+{
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+}
+public sealed record FlowVersionResponse(string FlowId, string Version, string? Description, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset PublishedAt, FlowGraphDefinition? Graph = null, string? DefinitionHash = null, string? ReleaseNotes = null)
+{
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+}
 public sealed record FlowPageResponse(IReadOnlyList<FlowSummaryResponse> Value, string? NextLink);
 public sealed record CreateFlowRunRequest(JsonElement Input, string? Version = null, string? DeploymentResourceId = "local", FlowRunTrigger Trigger = FlowRunTrigger.Manual, string? StartedBy = null, string? CorrelationId = null, IReadOnlyDictionary<string, JsonElement>? Options = null);
 public sealed record FlowRunPageResponse(IReadOnlyList<FlowRun> Value, string? NextLink);

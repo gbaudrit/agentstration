@@ -141,6 +141,9 @@ public sealed record ResolvedRuntimeAgent(
 public interface IRuntimeAgentResolver
 {
     Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken);
+
+    Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, CancellationToken cancellationToken) =>
+        throw new RuntimeAgentResolutionException("latest_agent_resolution_unsupported", $"Latest-version resolution is not supported for agent '{resourceId}'.");
 }
 
 public sealed class RuntimeAgentResolutionException(string code, string message) : Exception(message)

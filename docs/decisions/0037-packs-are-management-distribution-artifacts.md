@@ -1,4 +1,4 @@
-# ADR-0035: Packs are Management and distribution artifacts
+# ADR-0037: Packs are Management and distribution artifacts
 
 Status: Accepted — 2026-08-13
 

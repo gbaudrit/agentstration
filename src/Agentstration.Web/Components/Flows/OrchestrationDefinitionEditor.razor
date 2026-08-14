@@ -1,0 +1,109 @@
+<div class="orchestration-editor-grid">
+    <section class="panel orchestration-configuration">
+        <div class="panel-header"><h2>Participants</h2><span>@Model.ParticipantIds.Count selected</span></div>
+        @if (Agents.Count == 0)
+        {
+            <p class="muted">No managed agents are available.</p>
+        }
+        else
+        {
+            <div class="agent-picker">
+                @foreach (var agent in Agents)
+                {
+                    var selected = Model.ParticipantIds.Contains(agent.Id, StringComparer.Ordinal);
+                    <label class="agent-option">
+                        <input type="checkbox" checked="@selected" @onchange="eventArgs => ToggleParticipant(agent.Id, eventArgs)" />
+                        <span><strong>@agent.Name</strong><small><code>@agent.Id</code> · @agent.ModelProfile · @agent.Status</small></span>
+                    </label>
+                }
+            </div>
+        }
+
+        @if (Model.ParticipantIds.Count > 0)
+        {
+            <h3>Execution order</h3>
+            <ol class="participant-order">
+                @foreach (var participant in Model.ParticipantIds.ToArray())
+                {
+                    var index = Model.ParticipantIds.IndexOf(participant);
+                    <li><code>@participant</code><span><button type="button" disabled="@(index == 0)" @onclick="() => Move(participant, -1)" aria-label="Move @participant up">↑</button><button type="button" disabled="@(index == Model.ParticipantIds.Count - 1)" @onclick="() => Move(participant, 1)" aria-label="Move @participant down">↓</button></span></li>
+                }
+            </ol>
+        }
+
+        <label>Strategy
+            <InputSelect @bind-Value="Model.Strategy" @bind-Value:after="StrategyChanged">
+                @foreach (var strategy in Enum.GetValues<FlowOrchestrationStrategy>()) { <option value="@strategy">@Label(strategy)</option> }
+            </InputSelect>
+        </label>
+
+        @switch (Model.Strategy)
+        {
+            case FlowOrchestrationStrategy.Sequential:
+                <label class="check-option"><InputCheckbox @bind-Value="Model.IncludeFullHistory" /> Include the complete conversation history at every turn</label>
+                break;
+            case FlowOrchestrationStrategy.Concurrent:
+                <p class="muted">All participants receive the same input and execute concurrently.</p>
+                break;
+            case FlowOrchestrationStrategy.Handoff:
+                <label>Initial participant<InputSelect @bind-Value="Model.InitialParticipant">@foreach (var id in Model.ParticipantIds) { <option value="@id">@id</option> }</InputSelect></label>
+                <div class="panel-header"><h3>Handoff routes</h3><button type="button" class="button-secondary" disabled="@(Model.ParticipantIds.Count < 2)" @onclick="AddRoute">Add route</button></div>
+                @foreach (var route in Model.Handoffs.ToArray())
+                {
+                    <div class="handoff-route">
+                        <InputSelect @bind-Value="route.From">@foreach (var id in Model.ParticipantIds) { <option value="@id">@id</option> }</InputSelect>
+                        <span>→</span>
+                        <InputSelect @bind-Value="route.To">@foreach (var id in Model.ParticipantIds) { <option value="@id">@id</option> }</InputSelect>
+                        <button type="button" class="button-danger" @onclick="() => Model.Handoffs.Remove(route)" aria-label="Delete handoff route">×</button>
+                    </div>
+                }
+                <label class="check-option"><InputCheckbox @bind-Value="Model.Autonomous" /> Continue handoffs autonomously</label>
+                <label>Maximum turns per participant<InputNumber @bind-Value="Model.MaximumTurnsPerParticipant" /></label>
+                <label>Optional termination phrase<InputText @bind-Value="Model.TerminationPhrase" /></label>
+                break;
+            case FlowOrchestrationStrategy.GroupChat:
+                <label>Maximum iterations<InputNumber @bind-Value="Model.MaximumIterations" /></label>
+                break;
+            case FlowOrchestrationStrategy.Magentic:
+                <label>Manager
+                    <InputSelect @bind-Value="Model.ManagerId"><option value="">Select an agent</option>@foreach (var agent in AvailableManagers) { <option value="@agent.Id">@agent.Name (@agent.Id)</option> }</InputSelect>
+                </label>
+                <div class="form-columns"><label>Maximum rounds<InputNumber @bind-Value="Model.MaximumRounds" /></label><label>Maximum stalls<InputNumber @bind-Value="Model.MaximumStalls" /></label><label>Maximum resets<InputNumber @bind-Value="Model.MaximumResets" /></label></div>
+                break;
+        }
+    </section>
+    <section class="panel orchestration-preview-panel">
+        <div class="panel-header"><h2>Execution preview</h2><StatusBadge Text="@Label(Model.Strategy)" Status="UiStatus.Info" /></div>
+        <OrchestrationPreview Model="Model" />
+        <p class="muted">This preview represents the declared strategy. Runtime implementation details remain internal.</p>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public OrchestrationEditorModel Model { get; set; } = null!;
+    [Parameter] public IReadOnlyList<AgentSummary> Agents { get; set; } = [];
+    private IEnumerable<AgentSummary> AvailableManagers => Agents.Where(agent => !Model.ParticipantIds.Contains(agent.Id, StringComparer.Ordinal));
+
+    private void ToggleParticipant(string id, ChangeEventArgs eventArgs)
+    {
+        if (eventArgs.Value is true && !Model.ParticipantIds.Contains(id, StringComparer.Ordinal)) Model.ParticipantIds.Add(id);
+        else if (eventArgs.Value is false) Model.ParticipantIds.Remove(id);
+        Model.Handoffs.RemoveAll(route => !Model.ParticipantIds.Contains(route.From, StringComparer.Ordinal) || !Model.ParticipantIds.Contains(route.To, StringComparer.Ordinal));
+        if (Model.ManagerId == id && Model.ParticipantIds.Contains(id, StringComparer.Ordinal)) Model.ManagerId = string.Empty;
+        Model.EnsureStrategyDefaults();
+    }
+
+    private void Move(string id, int offset)
+    {
+        var index = Model.ParticipantIds.IndexOf(id); var target = index + offset;
+        if (index < 0 || target < 0 || target >= Model.ParticipantIds.Count) return;
+        Model.ParticipantIds.RemoveAt(index); Model.ParticipantIds.Insert(target, id);
+    }
+
+    private void StrategyChanged() => Model.EnsureStrategyDefaults();
+    private void AddRoute()
+    {
+        if (Model.ParticipantIds.Count >= 2) Model.Handoffs.Add(new FlowHandoffEditorRoute(Model.ParticipantIds[0], Model.ParticipantIds[1]));
+    }
+    private static string Label(FlowOrchestrationStrategy strategy) => strategy switch { FlowOrchestrationStrategy.GroupChat => "Group chat", _ => strategy.ToString() };
+}

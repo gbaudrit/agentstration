@@ -10,19 +10,21 @@ else if (task is not null)
 {
     <div class="task-page-heading">
         <div><a class="back-link" href="/tasks">← Tasks</a><p class="eyebrow">Task</p><h1>@task.Title</h1>@if (!string.IsNullOrWhiteSpace(task.Description)){<p>@task.Description</p>}</div>
-        <div class="task-heading-status"><RealtimeStatus Connected="@(Realtime.State.ToString() == "Connected")" /><TaskStatusBadge Value="task.Status" /></div>
+        <div class="task-heading-status"><RealtimeStatus Connected="@(Realtime.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)" /><TaskStatusBadge Value="task.Status" /></div>
     </div>
     <div class="task-actions">
         @if (task.Status == WorkTaskStatus.Running) { <button class="button-secondary" disabled="@busy" @onclick="PauseAsync">Pause</button> }
         @if (task.Status == WorkTaskStatus.Paused) { <button class="button-primary" disabled="@busy" @onclick="ResumeAsync">Resume</button> }
         @if (task.Status is WorkTaskStatus.Pending or WorkTaskStatus.Running or WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused) { <button class="button-danger" disabled="@busy" @onclick="CancelAsync">Cancel</button> }
     </div>
+    <section class="mobile-task-focus" aria-label="Task status"><div class="task-orbit"><span></span><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></div><TaskStatusBadge Value="task.Status" />@if (!string.IsNullOrWhiteSpace(task.Description)) { <p>@task.Description</p> }</section>
+    @if (!string.IsNullOrWhiteSpace(commandError)) { <p class="task-command-error" role="alert">@commandError</p> }
     <div class="task-detail-grid">
-        <main>
+        <div class="task-detail-primary">
             <section class="detail-panel"><div class="detail-heading"><p class="eyebrow">Progress</p><h2>What is happening</h2></div><TaskProgressTimeline Activities="activities" Status="task.Status" /></section>
             @foreach (var result in results.OrderByDescending(value => value.CreatedAt)) { <TaskResultView Result="result" /> }
             <section class="detail-panel"><div class="detail-heading"><p class="eyebrow">Conversation</p><h2>Request context</h2></div>@if(messages.Count==0){<div class="compact-empty"><EmptyState Title="No messages" Message="This task has no conversation context." /></div>}else{<div class="task-messages">@foreach(var message in messages){<ConversationMessageView Message="message" />}</div>}</section>
-        </main>
+        </div>
         <aside><section class="detail-panel"><div class="detail-heading"><p class="eyebrow">Output</p><h2>Deliverables</h2></div><ArtifactList Artifacts="artifacts" ContentUrl="ArtifactUrl" /></section><section class="task-facts"><div><span>Created</span><strong>@task.CreatedAt.LocalDateTime.ToString("g")</strong></div><div><span>Last update</span><strong>@task.UpdatedAt.LocalDateTime.ToString("g")</strong></div></section></aside>
     </div>
     @if (interaction is not null) { <ConversationComposer Busy="busy" DisabledReason="@(interaction.Status == InteractionStatus.WaitingForUser ? "Return to the conversation to answer the pending question." : interaction.Status == InteractionStatus.Closed ? "This conversation is closed." : null)" OnSubmit="ContinueAsync" /> }
@@ -39,13 +41,39 @@ else if (task is not null)
     private IReadOnlyList<WorkTaskResult> results = [];
     private IReadOnlyList<WorkTaskArtifact> artifacts = [];
     private bool loading = true, busy;
-    private string? error;
-    protected override async Task OnInitializedAsync(){realtimeSubscription=Realtime.OnWorkspaceChanged(value=>{if(value is TaskStatusChangedEvent status&&status.TaskId==TaskId||value is TaskActivityAddedEvent activity&&activity.Activity.WorkTaskId.Value==TaskId||value is TaskResultAddedEvent result&&result.Result.WorkTaskId.Value==TaskId||value is TaskArtifactAddedEvent artifact&&artifact.Artifact.WorkTaskId==TaskId)_=InvokeAsync(RefreshAsync);});try{var workspace=await Api.GetWorkspaceAsync("personal",lifetime.Token);await Realtime.StartAsync(workspace.Id,0,lifetime.Token);}catch when(!lifetime.IsCancellationRequested){}await RefreshAsync();}
+    private string? error, commandError;
+    protected override async Task OnInitializedAsync()
+    {
+        realtimeSubscription = Realtime.OnWorkspaceChanged(value =>
+        {
+            if (value is TaskStatusChangedEvent status && status.TaskId == TaskId
+                || value is TaskActivityAddedEvent activity && activity.Activity.WorkTaskId.Value == TaskId
+                || value is TaskResultAddedEvent result && result.Result.WorkTaskId.Value == TaskId
+                || value is TaskArtifactAddedEvent artifact && artifact.Artifact.WorkTaskId == TaskId)
+                _ = InvokeAsync(RefreshAsync);
+        });
+        Realtime.StateChanged += HandleRealtimeStateChanged;
+        try { var workspace = await Api.GetWorkspaceAsync("personal", lifetime.Token); await Realtime.StartAsync(workspace.Id, 0, lifetime.Token); }
+        catch when (!lifetime.IsCancellationRequested) { }
+        await RefreshAsync();
+    }
     private async Task RefreshAsync(){loading=task is null;error=null;try{task=await Api.GetTaskAsync("personal",TaskId,lifetime.Token);interaction=await Api.GetInteractionAsync("personal",task.InteractionId,lifetime.Token);messages=await Api.ListMessagesAsync("personal",task.InteractionId,lifetime.Token);activities=await Api.ListActivitiesAsync("personal",TaskId,lifetime.Token);results=await Api.ListResultsAsync("personal",TaskId,lifetime.Token);artifacts=await Api.ListArtifactsAsync("personal",TaskId,lifetime.Token);}catch when(!lifetime.IsCancellationRequested){error="This task could not be loaded from the local Work API.";}finally{loading=false;}}
-    private async Task ContinueAsync(string content){if(interaction is null)return;busy=true;try{await Api.AddMessageAsync("personal",interaction.Id,content,lifetime.Token);await RefreshAsync();}finally{busy=false;}}
-    private async Task PauseAsync(){busy=true;try{await Api.PauseTaskAsync("personal",TaskId,lifetime.Token);await RefreshAsync();}finally{busy=false;}}
-    private async Task ResumeAsync(){busy=true;try{await Api.ResumeTaskAsync("personal",TaskId,lifetime.Token);await RefreshAsync();}finally{busy=false;}}
-    private async Task CancelAsync(){busy=true;try{await Api.CancelTaskAsync("personal",TaskId,lifetime.Token);await RefreshAsync();}finally{busy=false;}}
+    private Task ContinueAsync(string content) => interaction is null ? Task.CompletedTask : ExecuteCommandAsync(() => Api.AddMessageAsync("personal", interaction.Id, content, lifetime.Token), "Your follow-up could not be sent. Please try again.");
+    private Task PauseAsync() => ExecuteCommandAsync(() => Api.PauseTaskAsync("personal", TaskId, lifetime.Token), "This task could not be paused. Refresh its state and try again.");
+    private Task ResumeAsync() => ExecuteCommandAsync(() => Api.ResumeTaskAsync("personal", TaskId, lifetime.Token), "This task could not be resumed. Refresh its state and try again.");
+    private Task CancelAsync() => ExecuteCommandAsync(() => Api.CancelTaskAsync("personal", TaskId, lifetime.Token), "This task could not be cancelled. Refresh its state and try again.");
+    private async Task ExecuteCommandAsync(Func<Task> command, string failureMessage)
+    {
+        if (busy) return;
+        busy = true; commandError = null;
+        try { await command(); await RefreshAsync(); }
+        catch when (!lifetime.IsCancellationRequested) { commandError = failureMessage; }
+        finally { busy = false; }
+    }
+    private void HandleRealtimeStateChanged(Microsoft.AspNetCore.SignalR.Client.HubConnectionState state)
+    {
+        if (state == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected) _ = InvokeAsync(RefreshAsync);
+    }
     private string ArtifactUrl(WorkTaskArtifact value)=>Api.GetArtifactContentUri("personal",TaskId,value.Id.Value).ToString();
-    public void Dispose(){realtimeSubscription?.Dispose();lifetime.Cancel();lifetime.Dispose();GC.SuppressFinalize(this);}
+    public void Dispose(){Realtime.StateChanged-=HandleRealtimeStateChanged;realtimeSubscription?.Dispose();lifetime.Cancel();lifetime.Dispose();GC.SuppressFinalize(this);}
 }

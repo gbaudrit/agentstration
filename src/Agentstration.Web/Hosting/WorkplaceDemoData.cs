@@ -17,10 +17,9 @@ public static class WorkplaceDemoData
             flow = await flows.CreateAsync(new CreateFlowCommand(
                 flowId.Value,
                 "Routes the Workplace primary Entry through the local managed-agent runtime.",
-                FlowKind.Direct,
                 "1.0.0",
                 true,
-                new DirectFlowSpec(new FlowTargetReference(
+                new DirectFlowDefinition(new FlowTargetReference(
                     FlowTargetKind.Agent,
                     "dotnet-expert"))), cancellationToken);
             await flows.PublishVersionAsync(flowId, "1.0.0", true, cancellationToken);
@@ -60,7 +59,9 @@ public static class WorkplaceDemoData
         var reportEntryId = new EntryId("prepare-report");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
-            Id = reportEntryId, Name = "prepare-report", DisplayName = "Prepare a report",
+            Id = reportEntryId,
+            Name = "prepare-report",
+            DisplayName = "Prepare a report",
             Description = "Starts with a standard version, then lets you request further versions in the same conversation.",
             Presentation = new EntryPresentation
             {
@@ -80,7 +81,10 @@ public static class WorkplaceDemoData
         var guidedEntryId = new EntryId("guided-request");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
-            Id = guidedEntryId, Name = "guided-request", DisplayName = "Guided request", Description = "Demonstrates a one-click clarification inside the conversation.",
+            Id = guidedEntryId,
+            Name = "guided-request",
+            DisplayName = "Guided request",
+            Description = "Demonstrates a one-click clarification inside the conversation.",
             Presentation = new EntryPresentation
             {
                 Kind = EntryPresentationKind.Prompt,
@@ -94,7 +98,10 @@ public static class WorkplaceDemoData
         var immediateEntryId = new EntryId("quick-answer");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
-            Id = immediateEntryId, Name = "quick-answer", DisplayName = "Quick acknowledgement", Description = "Demonstrates an Interaction that completes without a Task.",
+            Id = immediateEntryId,
+            Name = "quick-answer",
+            DisplayName = "Quick acknowledgement",
+            Description = "Demonstrates an Interaction that completes without a Task.",
             Presentation = new EntryPresentation
             {
                 Kind = EntryPresentationKind.Prompt,
@@ -102,7 +109,8 @@ public static class WorkplaceDemoData
                 Suggestions = [new("Try a quick answer", "Acknowledge that the Workplace UX iteration is ready for review."), new("Save an idea", "Remember this idea for my next request.")],
                 Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }]
             },
-            Binding = new EntryBinding(EntryBindingKind.Agent, "dotnet-expert"), Behavior = new EntryBehavior(TaskCreationMode.Never)
+            Binding = new EntryBinding(EntryBindingKind.Agent, "dotnet-expert"),
+            Behavior = new EntryBehavior(TaskCreationMode.Never)
         }, cancellationToken);
 
         var workspaceAdministration = services.GetRequiredService<WorkspaceAdministrationService>();

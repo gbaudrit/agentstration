@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Flow;
 using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Resources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,10 +18,11 @@ public sealed class FlowDbContext(DbContextOptions<FlowDbContext> options) : DbC
         document.HasKey(value => value.Key);
         document.Property(value => value.Key).HasMaxLength(512);
         document.Property(value => value.FlowId).HasMaxLength(128);
+        document.Property(value => value.Namespace).HasMaxLength(128);
         document.Property(value => value.Version).HasMaxLength(128);
         document.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
         document.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
-        document.HasIndex(value => new { value.Kind, value.FlowId, value.Version });
+        document.HasIndex(value => new { value.Namespace, value.Kind, value.FlowId, value.Version });
     }
 }
 
@@ -29,6 +31,7 @@ internal sealed class FlowDocument
     public required string Key { get; set; }
     public required string Kind { get; set; }
     public required string FlowId { get; set; }
+    public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
     public string? Version { get; set; }
     public required string Payload { get; set; }
     public required string ETag { get; set; }
@@ -48,9 +51,10 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureNamespaceSchemaAsync(context, cancellationToken);
     }
 
-    public async Task<StoredFlow> CreateAsync(FlowDefinition definition, CancellationToken cancellationToken)
+    public async Task<StoredFlow> CreateAsync(FlowResource definition, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
@@ -74,11 +78,11 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         take = Math.Min(take, 200);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await context.Documents.AsNoTracking().Where(value => value.Kind == DefinitionKind)
-            .OrderBy(value => value.FlowId).Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
+            .OrderBy(value => value.Namespace).ThenBy(value => value.FlowId).Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
         return new FlowPage(documents.Take(take).Select(ToFlow).ToArray(), documents.Length > take);
     }
 
-    public async Task<StoredFlow> UpdateAsync(FlowDefinition definition, string expectedETag, CancellationToken cancellationToken)
+    public async Task<StoredFlow> UpdateAsync(FlowResource definition, string expectedETag, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == DefinitionKey(definition.Id), cancellationToken)
@@ -99,7 +103,8 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
             ?? throw new FlowNotFoundException(id);
         if (expectedETag is not null && !string.Equals(definition.ETag, expectedETag, StringComparison.Ordinal))
             throw new FlowConcurrencyException("The supplied ETag does not match the current Flow version.");
-        var documents = await context.Documents.Where(value => value.FlowId == id.Value).ToArrayAsync(cancellationToken);
+        var namespaceValue = id.Namespace.Value;
+        var documents = await context.Documents.Where(value => value.Namespace == namespaceValue && value.FlowId == id.Value).ToArrayAsync(cancellationToken);
         context.Documents.RemoveRange(documents);
         await SaveUpdateAsync(context, cancellationToken);
     }
@@ -124,7 +129,8 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     public async Task<IReadOnlyList<StoredFlowVersion>> ListVersionsAsync(FlowId id, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var documents = await context.Documents.AsNoTracking().Where(value => value.Kind == VersionKind && value.FlowId == id.Value)
+        var namespaceValue = id.Namespace.Value;
+        var documents = await context.Documents.AsNoTracking().Where(value => value.Namespace == namespaceValue && value.Kind == VersionKind && value.FlowId == id.Value)
             .OrderBy(value => value.Version).ToArrayAsync(cancellationToken);
         return documents.Select(ToVersion).ToArray();
     }
@@ -153,7 +159,11 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         take = Math.Min(take, 200);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var query = context.Documents.AsNoTracking().Where(value => value.Kind == RunKind);
-        if (flowId is not null) query = query.Where(value => value.FlowId == flowId.Value.Value);
+        if (flowId is not null)
+        {
+            var namespaceValue = flowId.Value.Namespace.Value;
+            query = query.Where(value => value.Namespace == namespaceValue && value.FlowId == flowId.Value.Value);
+        }
         var documents = await query.OrderByDescending(value => value.UpdatedAt).Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
         var runs = documents.Select(ToRun);
         if (status is not null) runs = runs.Where(value => value.Value.Status == status);
@@ -225,20 +235,48 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
 
     private static FlowDocument Document<T>(string key, string kind, FlowId id, string? version, T value, DateTimeOffset now) => new()
     {
-        Key = key, Kind = kind, FlowId = id.Value, Version = version,
-        Payload = JsonSerializer.Serialize(value, JsonOptions), ETag = NewETag(), UpdatedAt = now
+        Key = key,
+        Kind = kind,
+        FlowId = id.Value,
+        Namespace = id.Namespace.Value,
+        Version = version,
+        Payload = JsonSerializer.Serialize(value, JsonOptions),
+        ETag = NewETag(),
+        UpdatedAt = now
     };
-    private static StoredFlow ToFlow(FlowDocument document) => new(Deserialize<FlowDefinition>(document), document.ETag, document.UpdatedAt);
+    private static StoredFlow ToFlow(FlowDocument document) => new(Deserialize<FlowResource>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowVersion ToVersion(FlowDocument document) => new(Deserialize<FlowVersion>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowRun ToRun(FlowDocument document) => new(Deserialize<FlowRun>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowDraft ToDraft(FlowDocument document) => new(Deserialize<FlowDraft>(document), document.ETag, document.UpdatedAt);
     private static T Deserialize<T>(FlowDocument document) => JsonSerializer.Deserialize<T>(document.Payload, JsonOptions) ?? throw new InvalidOperationException($"Stored Flow resource '{document.Key}' is invalid.");
-    private static string DefinitionKey(FlowId id) => $"flow:{id.Value}";
-    private static string VersionKey(FlowId id, string version) => $"flow:{id.Value}:version:{version}";
+    private static string DefinitionKey(FlowId id) => $"flow:{id.Namespace.Value}:{id.Value}";
+    private static string VersionKey(FlowId id, string version) => $"flow:{id.Namespace.Value}:{id.Value}:version:{version}";
     private static string RunKey(string id) => $"run:{id}";
-    private static string DraftKey(FlowId id) => $"flow:{id.Value}:draft";
+    private static string DraftKey(FlowId id) => $"flow:{id.Namespace.Value}:{id.Value}:draft";
     private static string RunEventKey(string runId, long sequence) => $"run:{runId}:event:{sequence:D12}";
     private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
+
+    private static async Task EnsureNamespaceSchemaAsync(FlowDbContext context, CancellationToken cancellationToken)
+    {
+        var connection = context.Database.GetDbConnection();
+        await connection.OpenAsync(cancellationToken);
+        var hasNamespace = false;
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info('FlowResources');";
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                hasNamespace |= string.Equals(reader.GetString(1), "Namespace", StringComparison.OrdinalIgnoreCase);
+        }
+        if (!hasNamespace)
+        {
+            await context.Database.ExecuteSqlRawAsync("ALTER TABLE FlowResources ADD COLUMN Namespace TEXT NOT NULL DEFAULT 'default';", cancellationToken);
+            await context.Database.ExecuteSqlRawAsync("UPDATE FlowResources SET Key = 'flow:default:' || FlowId WHERE Kind = 'definition';", cancellationToken);
+            await context.Database.ExecuteSqlRawAsync("UPDATE FlowResources SET Key = 'flow:default:' || FlowId || ':version:' || Version WHERE Kind = 'version';", cancellationToken);
+            await context.Database.ExecuteSqlRawAsync("UPDATE FlowResources SET Key = 'flow:default:' || FlowId || ':draft' WHERE Kind = 'draft';", cancellationToken);
+        }
+        await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_FlowResources_Namespace_Kind_FlowId_Version ON FlowResources (Namespace, Kind, FlowId, Version);", cancellationToken);
+    }
 
     private static async Task SaveCreateAsync(FlowDbContext context, CancellationToken cancellationToken)
     {

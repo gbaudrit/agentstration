@@ -1,4 +1,4 @@
-# ADR-0036: Pack Projects retain sources and produce local immutable builds
+# ADR-0038: Pack Projects retain sources and produce local immutable builds
 
 Status: Accepted — 2026-08-14
 

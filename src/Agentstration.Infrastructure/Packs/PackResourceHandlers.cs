@@ -105,10 +105,9 @@ public sealed record PackFlowDefinition
 {
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
-    public FlowKind Kind { get; init; }
     public string Version { get; init; } = string.Empty;
     public bool Enabled { get; init; } = true;
-    public FlowSpec Spec { get; init; } = null!;
+    public FlowDefinition Spec { get; init; } = null!;
     public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
     public FlowGraphDefinition? Graph { get; init; }
     public bool Publish { get; init; } = true;
@@ -130,7 +129,7 @@ public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinition
     public async Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
     {
         var value = Parse(resource); var now = timeProvider.GetUtcNow();
-        FlowValidator.Validate(new(new(resource.Name), resource.Name, value.Definition.Description, value.Definition.Kind, value.Definition.Version, value.Definition.Enabled, null, value.Definition.Spec, value.Definition.Metadata, now, now, value.Definition.DisplayName, value.Definition.Graph));
+        FlowValidator.Validate(new(new(resource.Name), resource.Name, value.Definition.Description, value.Definition.Version, value.Definition.Enabled, null, value.Definition.Spec, value.Definition.Metadata, now, now, value.Definition.DisplayName, value.Definition.Graph));
         if (value.Definition.Graph is not null)
         {
             var validation = await graphValidator.ValidateAsync(value.Definition.Graph, new(ResolveResources: false), cancellationToken);
@@ -142,7 +141,7 @@ public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinition
     public async Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
     {
         var value = Parse(resource); var definition = value.Definition;
-        var stored = await service.CreateAsync(new(resource.Name, definition.Description, definition.Kind, definition.Version, definition.Enabled, definition.Spec, PackProvenance.Add(definition.Metadata, pack, packVersion), definition.Graph, definition.DisplayName), cancellationToken);
+        var stored = await service.CreateAsync(new(resource.Name, definition.Description, definition.Version, definition.Enabled, definition.Spec, PackProvenance.Add(definition.Metadata, pack, packVersion), definition.Graph, definition.DisplayName), cancellationToken);
         if (definition.Publish) { _ = await service.PublishVersionAsync(new(resource.Name), definition.Version, definition.Activate, cancellationToken); stored = (await service.GetAsync(new(resource.Name), cancellationToken))!; }
         return new() { Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = stored.ETag };
     }

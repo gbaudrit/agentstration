@@ -1,4 +1,4 @@
-<a class="task-card" href="@($"/workplace/tasks/{Task.Id}")">
+<a class="task-card" href="@($"/tasks/{Task.Id}")">
     <span class="task-status status-@Task.Status.ToString().ToLowerInvariant()">@Label(Task.Status)</span>
     <strong>@Task.Title</strong>
     <small>Updated @Task.UpdatedAt.LocalDateTime.ToString("g")</small>

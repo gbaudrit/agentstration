@@ -5,11 +5,10 @@ metadata:
 definition:
   displayName: Who Am I? Game
   description: Starts the current distribution-only sample through the Judge Agent.
-  kind: direct
   version: 0.1.0
   enabled: true
   spec:
-    specKind: direct
+    flowKind: direct
     target:
       kind: agent
       id: who-am-i-judge
