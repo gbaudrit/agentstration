@@ -44,6 +44,11 @@ public sealed class NullFlowRunEventSink : IFlowRunEventSink
     public Task PublishAsync(FlowRunEvent runEvent, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+public sealed record FlowRunExecutionOptions
+{
+    public TimeSpan OrchestrationTimeout { get; init; } = TimeSpan.FromMinutes(10);
+}
+
 public sealed class FlowRunService(
     IFlowRepository repository,
     IFlowRunQueue queue,
@@ -53,8 +58,15 @@ public sealed class FlowRunService(
     IExpressionParser expressionParser,
     IExpressionEvaluator expressions,
     IFlowRunEventSink eventSink,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    FlowRunExecutionOptions? executionOptions = null)
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly FlowRunExecutionOptions executionOptions = executionOptions is null
+        ? new()
+        : executionOptions.OrchestrationTimeout > TimeSpan.Zero
+            ? executionOptions
+            : throw new ArgumentOutOfRangeException(nameof(executionOptions), "The orchestration timeout must be positive.");
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flow");
     public static readonly Meter Meter = new("Agentstration.Flow");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");
@@ -181,6 +193,13 @@ public sealed class FlowRunService(
         activity?.SetTag("flow.version", stored.Value.FlowVersion);
         activity?.SetTag("flow.definition.state", stored.Value.DefinitionState.ToString());
         var runToken = cancellations.Register(runId, stoppingToken);
+        using var timeout = stored.Value.DefinitionSnapshot.Definition is OrchestrationFlowDefinition
+            ? new CancellationTokenSource(executionOptions.OrchestrationTimeout, timeProvider)
+            : null;
+        using var executionTimeoutLink = timeout is null
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(runToken, timeout.Token);
+        var executionToken = executionTimeoutLink?.Token ?? runToken;
         try
         {
             stored = await SaveAsync(stored, stored.Value with { Status = FlowRunStatus.Running, StartedAt = timeProvider.GetUtcNow() }, stoppingToken);
@@ -192,7 +211,7 @@ public sealed class FlowRunService(
             }
             if (stored.Value.DefinitionSnapshot.Definition is OrchestrationFlowDefinition orchestration)
             {
-                await ExecuteOrchestrationAsync(stored, orchestration, stoppingToken, runToken);
+                await ExecuteOrchestrationAsync(stored, orchestration, stoppingToken, executionToken);
                 return;
             }
             stored = await CompleteSimpleStepAsync(stored, "Input", stored.Value.Input, null, runToken);
@@ -212,9 +231,17 @@ public sealed class FlowRunService(
             RecordCompletion(stored.Value.CreatedAt, completedAt, stored.Value.DefinitionState);
             await EmitAsync(runId, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
         }
+        catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true && !runToken.IsCancellationRequested)
+        {
+            await FailAsync(runId, FlowRunStatus.TimedOut, "flow_run_timed_out", "The Flow Run exceeded its execution timeout.", stoppingToken);
+        }
         catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
         {
             await FailAsync(runId, FlowRunStatus.Cancelled, "flow_run_cancelled", "The Flow Run was cancelled.", stoppingToken);
+        }
+        catch (FlowValidationException exception)
+        {
+            await FailAsync(runId, FlowRunStatus.Failed, exception.Code, exception.Message, stoppingToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -290,7 +317,7 @@ public sealed class FlowRunService(
     {
         var stored = await CompleteSimpleStepAsync(initial, "Input", initial.Value.Input, null, runToken);
         var started = new HashSet<string>(StringComparer.Ordinal);
-        JsonElement? finalOutput = null;
+        FlowOrchestrationResult? result = null;
         var request = new FlowOrchestrationExecutionRequest(
             stored.Value.Id,
             definition,
@@ -318,33 +345,60 @@ public sealed class FlowRunService(
                         JsonSerializer.SerializeToElement(new { turn = turn.Turn }), runToken);
                     break;
                 case FlowParticipantCompleted completed:
-                    if (started.Add(completed.ParticipantId))
-                        stored = await StartStepAsync(stored, completed.ParticipantId, runToken);
-                    stored = await FinishGraphStepAsync(stored, completed.ParticipantId, completed.Output, null, runToken);
+                    if (started.Add(completed.Result.ParticipantId))
+                        stored = await StartStepAsync(stored, completed.Result.ParticipantId, runToken);
+                    stored = await FinishParticipantStepAsync(stored, completed.Result, runToken);
                     break;
                 case FlowExecutionCompleted completed:
-                    finalOutput = completed.Output.Clone();
+                    result = completed.Result;
                     break;
             }
         }
 
-        if (finalOutput is null)
+        if (result is null)
             throw new FlowValidationException("flow_orchestration_output_missing", "The orchestration completed without a final output.");
+        var output = JsonSerializer.SerializeToElement(result, JsonOptions);
 
         var now = timeProvider.GetUtcNow();
         var skipped = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.NotStarted && step.StepType == "agent"
             ? step with { Status = FlowStepRunStatus.Skipped, CompletedAt = now }
             : step).ToArray();
         stored = await SaveAsync(stored, stored.Value with { Steps = skipped }, runToken);
-        stored = await CompleteSimpleStepAsync(stored, "Output", finalOutput.Value, null, runToken);
+        stored = await CompleteSimpleStepAsync(stored, "Output", output, null, runToken);
         await SaveAsync(stored, stored.Value with
         {
             Status = FlowRunStatus.Succeeded,
-            Output = finalOutput.Value.Clone(),
+            Output = output.Clone(),
             CompletedAt = now
         }, stoppingToken);
         RecordCompletion(stored.Value.CreatedAt, now, stored.Value.DefinitionState);
         await EmitAsync(stored.Value.Id, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
+    }
+
+    private async Task<StoredFlowRun> FinishParticipantStepAsync(
+        StoredFlowRun stored,
+        FlowParticipantResult result,
+        CancellationToken token)
+    {
+        var now = timeProvider.GetUtcNow();
+        var steps = stored.Value.Steps.Select(step => step.StepName == result.ParticipantId ? step with
+        {
+            Status = FlowStepRunStatus.Succeeded,
+            ResolvedInput = stored.Value.Input.Clone(),
+            Output = result.Output.Clone(),
+            CompletedAt = now,
+            AgentResourceId = result.AgentResourceId,
+            AgentVersion = result.AgentVersion,
+            ModelProfileResourceId = result.ModelProfileResourceId,
+            Provider = result.Provider,
+            Tools = result.Tools,
+            Usage = result.Usage,
+            Logs = [.. step.Logs, $"{result.ParticipantId} completed after {result.Turns.Count} turn(s)."]
+        } : step).ToArray();
+        var updated = await SaveAsync(stored, stored.Value with { Steps = steps }, token);
+        await EmitAsync(stored.Value.Id, FlowRunEventType.StepRunCompleted, result.ParticipantId,
+            JsonSerializer.SerializeToElement(new { turns = result.Turns.Count }), token);
+        return updated;
     }
 
     private async Task ExecuteGraphAsync(StoredFlowRun initial, CancellationToken stoppingToken, CancellationToken runToken)
@@ -639,10 +693,16 @@ public sealed class FlowRunService(
             ? step with { Status = status == FlowRunStatus.Cancelled ? FlowStepRunStatus.Cancelled : FlowStepRunStatus.Failed, CompletedAt = now, Error = error }
             : step).ToArray();
         await SaveAsync(stored, stored.Value with { Status = status, CompletedAt = now, Error = error, Steps = steps }, token);
-        if (status == FlowRunStatus.Failed)
+        if (status is FlowRunStatus.Failed or FlowRunStatus.TimedOut)
             RunsFailed.Add(1, new KeyValuePair<string, object?>("flow.definition.state", stored.Value.DefinitionState.ToString()));
         RunDuration.Record(Math.Max(0, (now - stored.Value.CreatedAt).TotalSeconds), new KeyValuePair<string, object?>("flow.status", status.ToString()));
-        await EmitAsync(runId, status == FlowRunStatus.Cancelled ? FlowRunEventType.FlowRunCancelled : FlowRunEventType.FlowRunFailed,
+        var eventType = status switch
+        {
+            FlowRunStatus.Cancelled => FlowRunEventType.FlowRunCancelled,
+            FlowRunStatus.TimedOut => FlowRunEventType.FlowRunTimedOut,
+            _ => FlowRunEventType.FlowRunFailed
+        };
+        await EmitAsync(runId, eventType,
             steps.FirstOrDefault(step => step.Status == FlowStepRunStatus.Failed)?.StepName, JsonSerializer.SerializeToElement(error), token);
     }
 

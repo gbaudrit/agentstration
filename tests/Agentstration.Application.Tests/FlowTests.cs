@@ -46,6 +46,42 @@ public sealed class FlowTests
     }
 
     [TestMethod]
+    public void OrchestrationValidationEnforcesBoundsAndHandoffReachability()
+    {
+        var participants = new[] { "agent-a", "agent-b", "agent-c" }
+            .Select(id => new FlowTargetReference(FlowTargetKind.Agent, id))
+            .ToArray();
+
+        AssertValidationCode(
+            "group_chat_iterations_invalid",
+            new OrchestrationFlowDefinition(participants, new GroupChatOrchestrationPattern(FlowValidator.MaximumGroupChatIterations + 1)));
+        AssertValidationCode(
+            "handoff_participant_unreachable",
+            new OrchestrationFlowDefinition(participants, new HandoffOrchestrationPattern(
+                "agent-a",
+                [new FlowHandoff("agent-a", "agent-b")])));
+        AssertValidationCode(
+            "handoff_route_duplicate",
+            new OrchestrationFlowDefinition(participants[..2], new HandoffOrchestrationPattern(
+                "agent-a",
+                [new FlowHandoff("agent-a", "agent-b"), new FlowHandoff("agent-a", "agent-b")])));
+        AssertValidationCode(
+            "magentic_limits_invalid",
+            new OrchestrationFlowDefinition(participants[..2], new MagenticOrchestrationPattern(
+                new FlowTargetReference(FlowTargetKind.Agent, "manager"),
+                MaximumRounds: FlowValidator.MaximumMagenticRounds + 1)));
+        AssertValidationCode(
+            "orchestration_participant_duplicate",
+            new OrchestrationFlowDefinition([participants[0], participants[0]], new SequentialOrchestrationPattern()));
+    }
+
+    private static void AssertValidationCode(string code, FlowDefinition definition)
+    {
+        var exception = Assert.ThrowsExactly<FlowValidationException>(() => FlowValidator.Validate(Definition($"invalid-{code}", definition)));
+        Assert.AreEqual(code, exception.Code);
+    }
+
+    [TestMethod]
     public void EveryFlowDefinitionRoundTripsWithDiscriminator()
     {
         FlowDefinition[] definitions =
@@ -220,11 +256,51 @@ public sealed class FlowTests
             new[] { "Input", "researcher", "reviewer", "Output" },
             completed.Steps.Select(step => step.StepName).ToArray());
         Assert.IsTrue(completed.Steps.All(step => step.Status == FlowStepRunStatus.Succeeded));
-        Assert.AreEqual("reviewed", completed.Output!.Value.GetString());
+        Assert.AreEqual("reviewed", completed.Output!.Value.GetProperty("finalOutput").GetString());
+        Assert.HasCount(2, completed.Output.Value.GetProperty("participants").EnumerateArray().ToArray());
         var events = await runs.ListEventsAsync(completed.Id, 0, default);
         Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.StepOutputDelta));
         Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.ParticipantTurnStarted));
         Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.ParticipantTurnCompleted));
+    }
+
+    [TestMethod]
+    public async Task OrchestrationFlowTimeoutPersistsAnExplicitTerminalState()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+            "orchestration-timeout",
+            "Times out a stalled orchestration",
+            "1.0.0",
+            true,
+            new OrchestrationFlowDefinition(
+                [
+                    new FlowTargetReference(FlowTargetKind.Agent, "agent-a"),
+                    new FlowTargetReference(FlowTargetKind.Agent, "agent-b")
+                ],
+                new SequentialOrchestrationPattern())), default);
+        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(
+            fixture.Repository,
+            new TestFlowRunQueue(),
+            new TestCancellationRegistry(),
+            new TestAgentExecutor(),
+            new StalledOrchestrationEngine(),
+            expressions,
+            expressions,
+            new NullFlowRunEventSink(),
+            TimeProvider.System,
+            new FlowRunExecutionOptions { OrchestrationTimeout = TimeSpan.FromMilliseconds(50) });
+        using var input = JsonDocument.Parse("""{"prompt":"Wait"}""");
+
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "timeout-correlation", input.RootElement, default);
+        await runs.ExecuteAsync(pending.Value.Id, default);
+
+        var timedOut = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.TimedOut, timedOut.Status);
+        Assert.AreEqual("flow_run_timed_out", timedOut.Error!.Code);
+        Assert.IsTrue((await runs.ListEventsAsync(timedOut.Id, 0, default)).Any(item => item.Type == FlowRunEventType.FlowRunTimedOut));
     }
 
     [TestMethod]
@@ -532,13 +608,40 @@ public sealed class FlowTests
             yield return new FlowParticipantTurnStarted("researcher", 1);
             yield return new FlowParticipantDelta("researcher", "draft");
             yield return new FlowParticipantTurnCompleted("researcher", 1);
-            yield return new FlowParticipantCompleted("researcher", JsonSerializer.SerializeToElement("draft"));
+            var researcher = Participant("researcher", 1, "draft");
+            yield return new FlowParticipantCompleted(researcher);
             yield return new FlowParticipantTurnStarted("reviewer", 2);
             yield return new FlowParticipantDelta("reviewer", "reviewed");
             yield return new FlowParticipantTurnCompleted("reviewer", 2);
-            yield return new FlowParticipantCompleted("reviewer", JsonSerializer.SerializeToElement("reviewed"));
-            yield return new FlowExecutionCompleted(JsonSerializer.SerializeToElement("reviewed"));
+            var reviewer = Participant("reviewer", 2, "reviewed");
+            yield return new FlowParticipantCompleted(reviewer);
+            yield return new FlowExecutionCompleted(new FlowOrchestrationResult(
+                FlowOrchestrationStrategy.Sequential,
+                JsonSerializer.SerializeToElement("reviewed"),
+                [researcher, reviewer]));
             await Task.CompletedTask;
+        }
+
+        private static FlowParticipantResult Participant(string id, int turn, string output) => new(
+            id,
+            [new FlowParticipantTurnResult(turn, output)],
+            JsonSerializer.SerializeToElement(output),
+            id,
+            1,
+            "default",
+            "Deterministic",
+            [],
+            null);
+    }
+
+    private sealed class StalledOrchestrationEngine : IFlowOrchestrationEngine
+    {
+        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
+            FlowOrchestrationExecutionRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            yield break;
         }
     }
 

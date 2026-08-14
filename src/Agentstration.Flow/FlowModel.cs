@@ -30,6 +30,7 @@ public enum FlowRunEventType
     FlowRunCompleted,
     FlowRunFailed,
     FlowRunCancelled,
+    FlowRunTimedOut,
     ParticipantTurnStarted,
     ParticipantTurnCompleted
 }
@@ -175,6 +176,21 @@ public sealed record FlowVersion(
 public sealed record FlowRunError(string Code, string Message, string? Details = null);
 public sealed record FlowRunEvent(string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp);
 public sealed record FlowStepRunUsage(int? InputTokens = null, int? OutputTokens = null);
+public sealed record FlowParticipantTurnResult(int Turn, string Content);
+public sealed record FlowParticipantResult(
+    string ParticipantId,
+    IReadOnlyList<FlowParticipantTurnResult> Turns,
+    JsonElement Output,
+    string AgentResourceId,
+    long AgentVersion,
+    string ModelProfileResourceId,
+    string? Provider,
+    IReadOnlyList<string> Tools,
+    FlowStepRunUsage? Usage);
+public sealed record FlowOrchestrationResult(
+    FlowOrchestrationStrategy Strategy,
+    JsonElement FinalOutput,
+    IReadOnlyList<FlowParticipantResult> Participants);
 public sealed record FlowStepRun
 {
     public required string StepName { get; init; }
@@ -238,6 +254,14 @@ public sealed class FlowValidationException(string code, string message) : Argum
 
 public static class FlowValidator
 {
+    public const int MaximumOrchestrationParticipants = 16;
+    public const int MaximumGroupChatIterations = 100;
+    public const int MaximumHandoffTurnsPerParticipant = 50;
+    public const int MaximumMagenticRounds = 50;
+    public const int MaximumMagenticStalls = 10;
+    public const int MaximumMagenticResets = 5;
+    public const int MaximumTerminationPhraseLength = 256;
+
     public static void Validate(FlowResource resource)
     {
         ArgumentNullException.ThrowIfNull(resource);
@@ -296,6 +320,8 @@ public static class FlowValidator
                     throw new FlowValidationException("orchestration_participant_duplicate", "Orchestration participant identifiers must be unique.");
                 if (orchestration.Participants.Count < 2)
                     throw new FlowValidationException("orchestration_participants_insufficient", "A built-in orchestration requires at least two participants.");
+                if (orchestration.Participants.Count > MaximumOrchestrationParticipants)
+                    throw new FlowValidationException("orchestration_participants_limit_exceeded", $"An orchestration supports at most {MaximumOrchestrationParticipants} participants.");
                 ValidateOrchestration(orchestration);
                 break;
             case CompositeFlowDefinition composite:
@@ -323,29 +349,51 @@ public static class FlowValidator
             case HandoffOrchestrationPattern handoff:
                 if (!participantIds.Contains(handoff.InitialParticipant))
                     throw new FlowValidationException("handoff_initial_participant_unknown", "The initial Handoff participant must belong to the orchestration.");
-                if (handoff.MaximumTurnsPerParticipant < 1)
-                    throw new FlowValidationException("handoff_turn_limit_invalid", "The Handoff turn limit must be positive.");
-                if (handoff.Handoffs.Count == 0)
+                if (handoff.MaximumTurnsPerParticipant is < 1 or > MaximumHandoffTurnsPerParticipant)
+                    throw new FlowValidationException("handoff_turn_limit_invalid", $"The Handoff turn limit must be between 1 and {MaximumHandoffTurnsPerParticipant}.");
+                if (handoff.Handoffs is null || handoff.Handoffs.Count == 0)
                     throw new FlowValidationException("handoff_routes_required", "A Handoff orchestration requires at least one route.");
-                if (handoff.Handoffs.Any(route => !participantIds.Contains(route.From) || !participantIds.Contains(route.To) || route.From == route.To))
+                if (handoff.Handoffs.Any(route => route is null || !participantIds.Contains(route.From) || !participantIds.Contains(route.To) || route.From == route.To))
                     throw new FlowValidationException("handoff_route_invalid", "Handoff routes must connect two distinct orchestration participants.");
+                if (handoff.Handoffs.Select(route => (route.From, route.To)).Distinct().Count() != handoff.Handoffs.Count)
+                    throw new FlowValidationException("handoff_route_duplicate", "Handoff routes must be unique.");
+                var reachable = ReachableParticipants(handoff.InitialParticipant, handoff.Handoffs);
+                if (participantIds.Except(reachable, StringComparer.Ordinal).Any())
+                    throw new FlowValidationException("handoff_participant_unreachable", "Every Handoff participant must be reachable from the initial participant.");
+                if (handoff.TerminationPhrase?.Length > MaximumTerminationPhraseLength)
+                    throw new FlowValidationException("handoff_termination_phrase_too_long", $"The Handoff termination phrase cannot exceed {MaximumTerminationPhraseLength} characters.");
                 break;
-            case GroupChatOrchestrationPattern groupChat when groupChat.MaximumIterations < 1:
-                throw new FlowValidationException("group_chat_iterations_invalid", "The Group Chat iteration limit must be positive.");
+            case GroupChatOrchestrationPattern groupChat when groupChat.MaximumIterations is < 1 or > MaximumGroupChatIterations:
+                throw new FlowValidationException("group_chat_iterations_invalid", $"The Group Chat iteration limit must be between 1 and {MaximumGroupChatIterations}.");
             case GroupChatOrchestrationPattern:
                 break;
             case MagenticOrchestrationPattern magentic:
                 ValidateTarget(magentic.Manager);
-                if (magentic.Manager.Kind != FlowTargetKind.Agent)
+                if (magentic.Manager is null || magentic.Manager.Kind != FlowTargetKind.Agent)
                     throw new FlowValidationException("magentic_manager_invalid", "The Magentic manager must reference an Agent.");
                 if (participantIds.Contains(magentic.Manager.Id))
                     throw new FlowValidationException("magentic_manager_participant", "The Magentic manager must be distinct from its participants.");
-                if (magentic.MaximumRounds < 1 || magentic.MaximumStalls < 1 || magentic.MaximumResets < 0)
-                    throw new FlowValidationException("magentic_limits_invalid", "Magentic limits must be positive, except maximum resets which may be zero.");
+                if (magentic.MaximumRounds is < 1 or > MaximumMagenticRounds
+                    || magentic.MaximumStalls is < 1 or > MaximumMagenticStalls
+                    || magentic.MaximumResets is < 0 or > MaximumMagenticResets)
+                    throw new FlowValidationException("magentic_limits_invalid", $"Magentic limits are rounds 1..{MaximumMagenticRounds}, stalls 1..{MaximumMagenticStalls}, and resets 0..{MaximumMagenticResets}.");
                 break;
             default:
                 throw new FlowValidationException("orchestration_pattern_unknown", "The orchestration pattern is not supported.");
         }
+    }
+
+    private static IReadOnlySet<string> ReachableParticipants(string initialParticipant, IReadOnlyList<FlowHandoff> handoffs)
+    {
+        var reachable = new HashSet<string>(StringComparer.Ordinal) { initialParticipant };
+        var pending = new Queue<string>();
+        pending.Enqueue(initialParticipant);
+        while (pending.TryDequeue(out var current))
+        {
+            foreach (var destination in handoffs.Where(route => route.From == current).Select(route => route.To))
+                if (reachable.Add(destination)) pending.Enqueue(destination);
+        }
+        return reachable;
     }
 
     private static void ValidateWorkflow(WorkflowFlowDefinition workflow)

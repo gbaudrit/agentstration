@@ -195,7 +195,7 @@ Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://
 
 `Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. The autonomous `Agentstration.Extensions.Ollama` service alone owns OllamaSharp, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no AEP or Ollama dependency.
 
-Current limitations are deliberate: Ollama is the only mutable provider type, credentials are not stored on provider resources, and there is no parallel Flow execution, conversation persistence, or provider-native streaming yet. Other OpenAI-compatible endpoints still use the legacy host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
+Current limitations are deliberate: Ollama is the only mutable provider type, credentials are not stored on provider resources, separate Flow Runs are not dispatched in parallel, and there is no conversation persistence or provider-native streaming yet. The Concurrent Flow orchestration strategy does execute its participants concurrently inside one bounded Run. Other OpenAI-compatible endpoints still use the legacy host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 
 ### Model provider and profile APIs
 
