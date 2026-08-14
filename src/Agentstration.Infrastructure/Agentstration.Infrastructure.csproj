@@ -6,6 +6,7 @@
     <ProjectReference Include="../Agentstration.Flow.Storage.Sqlite/Agentstration.Flow.Storage.Sqlite.csproj" />
     <ProjectReference Include="../Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
     <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
+    <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />

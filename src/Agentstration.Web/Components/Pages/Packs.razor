@@ -1,0 +1,228 @@
+@page "/packs"
+@implements IDisposable
+@inject IPacksClient Client
+
+<PageTitle>Packs · Agentstration</PageTitle>
+<PageHeader Title="Packs" Description="Install and govern versioned bundles of Agentstration resources. Packs distribute configuration; they are not runtime execution units.">
+    <Actions>
+        <button class="button-secondary" disabled="@loading" @onclick="LoadAsync">Refresh</button>
+        <button class="button-primary" @onclick="OpenInstall">Install local Pack</button>
+    </Actions>
+</PageHeader>
+
+@if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else if (packs is null)
+{
+    <LoadingState Message="Loading installed Packs…" />
+}
+else
+{
+    <section class="metric-grid pack-metrics" aria-label="Pack metrics">
+        <MetricCard Label="Installed Packs" Value="@packs.Count.ToString()" Detail="Current workspace" Status="UiStatus.Info" />
+        <MetricCard Label="Managed resources" Value="@packs.Sum(pack => pack.Definition.ManagedResources.Count).ToString()" Detail="Created from Packs" Status="UiStatus.Success" />
+        <MetricCard Label="Requires attention" Value="@AttentionCount.ToString()" Detail="Failed or degraded" Status="@(AttentionCount == 0 ? UiStatus.Neutral : UiStatus.Warning)" />
+    </section>
+
+    @if (packs.Count == 0)
+    {
+        <EmptyState Title="No Packs installed" Message="Install a local .zip Pack to add a validated set of resources to this workspace.">
+            <button class="button-primary" @onclick="OpenInstall">Install local Pack</button>
+        </EmptyState>
+    }
+    else
+    {
+        <DataGrid TItem="InstalledPackResource" Items="packs">
+            <Header><tr><th>Pack</th><th>Version</th><th>Status</th><th>Resources</th><th>Installed</th><th></th></tr></Header>
+            <Row Context="pack"><tr class="@(IsSelected(pack) ? "selected-pack" : null)">
+                <td><strong>@DisplayName(pack)</strong><br /><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></td>
+                <td><code>@pack.Definition.Version</code></td>
+                <td><StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" /></td>
+                <td>@pack.Definition.ManagedResources.Count</td>
+                <td><time datetime="@pack.Definition.InstalledAt.ToString("O")">@pack.Definition.InstalledAt.ToLocalTime().ToString("g")</time></td>
+                <td><button class="text-button" @onclick="() => SelectAsync(pack)">Inspect</button></td>
+            </tr></Row>
+        </DataGrid>
+    }
+
+    @if (selected is not null)
+    {
+        <section class="panel pack-details" aria-label="Selected Pack details">
+            <div class="panel-header">
+                <div><p class="eyebrow">Installed Pack</p><h2>@DisplayName(selected.Value)</h2></div>
+                <div class="pack-detail-actions"><StatusBadge Text="@StateLabel(selected.Value.Definition.State)" Status="@StateTone(selected.Value.Definition.State)" /><button class="button-danger" @onclick="() => confirmUninstall = true">Uninstall</button></div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.Description)) { <p>@selected.Value.Definition.Description</p> }
+            <dl class="resource-details pack-facts">
+                <dt>Identity</dt><dd><code>@selected.Value.Definition.Publisher/@selected.Value.Definition.PackName</code></dd>
+                <dt>Version</dt><dd>@selected.Value.Definition.Version</dd>
+                <dt>Source</dt><dd>@selected.Value.Definition.Source</dd>
+                <dt>Installed</dt><dd>@selected.Value.Definition.InstalledAt.ToLocalTime().ToString("F")</dd>
+            </dl>
+            <h3>Managed resources</h3>
+            @if (selected.Value.Definition.ManagedResources.Count == 0) { <p class="pack-muted">This Pack does not currently manage any resources.</p> }
+            else
+            {
+                <div class="pack-resource-list">
+                    @foreach (var resource in selected.Value.Definition.ManagedResources)
+                    {
+                        <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div></article>
+                    }
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.ErrorMessage)) { <p class="error-panel">@selected.Value.Definition.ErrorMessage</p> }
+        </section>
+    }
+}
+
+@if (installOpen)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CloseInstall">
+        <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-install-title" @onclick:stopPropagation="true">
+            <div class="panel-header"><div><p class="eyebrow">Local archive</p><h2 id="pack-install-title">Install a Pack</h2></div><button class="icon-button" @onclick="CloseInstall" aria-label="Close">×</button></div>
+            <p class="pack-muted">Choose a Pack .zip. The archive is validated and previewed before any resource is created.</p>
+            <label class="pack-file-picker">
+                <span>Select archive</span>
+                <InputFile OnChange="ReadArchiveAsync" accept=".zip,application/zip" disabled="@(previewing || installing)" />
+                <small>Maximum compressed size: 8 MB.</small>
+            </label>
+            @if (previewing) { <LoadingState Message="Validating archive…" /> }
+            @if (installError is not null) { <p class="error-panel" role="alert">@installError</p> }
+            @if (preview is not null)
+            {
+                <section class="pack-preview">
+                    <div class="panel-header"><div><strong>@(preview.Metadata.DisplayName ?? preview.Metadata.Name)</strong><small><code>@preview.Metadata.Publisher/@preview.Metadata.Name</code> · @preview.Metadata.Version</small></div><StatusBadge Text="@(preview.CanInstall ? "Ready" : "Conflict")" Status="@(preview.CanInstall ? UiStatus.Success : UiStatus.Warning)" /></div>
+                    @if (!string.IsNullOrWhiteSpace(preview.Metadata.Description)) { <p>@preview.Metadata.Description</p> }
+                    <div class="pack-resource-list compact">
+                        @foreach (var resource in preview.Resources)
+                        {
+                            <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div>@if (resource.AlreadyExists) { <StatusBadge Text="Exists" Status="UiStatus.Warning" /> }</article>
+                        }
+                    </div>
+                    @if (preview.AlreadyInstalled) { <p class="error-panel">This Pack identity is already installed in the workspace.</p> }
+                </section>
+            }
+            <div class="dialog-actions"><button class="button-secondary" @onclick="CloseInstall">Cancel</button><button class="button-primary" disabled="@(preview?.CanInstall != true || installing)" @onclick="InstallAsync">@(installing ? "Installing…" : "Install Pack")</button></div>
+        </section>
+    </div>
+}
+
+<ConfirmationDialog IsOpen="@confirmUninstall" Title="Uninstall Pack?" Message="Managed resources are removed only if they have not changed since installation. Modified resources are preserved and the Pack is marked degraded." ConfirmLabel="Uninstall" OnCancel="() => confirmUninstall = false" OnConfirm="UninstallAsync" />
+
+@code {
+    private const long MaximumArchiveBytes = 8 * 1024 * 1024;
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<InstalledPackResource>? packs;
+    private ResourceSnapshot<InstalledPackResource>? selected;
+    private AgentstrationApiException? error;
+    private PackInstallationPreview? preview;
+    private byte[]? archive;
+    private string archiveName = string.Empty;
+    private string? installError;
+    private bool loading;
+    private bool installOpen;
+    private bool previewing;
+    private bool installing;
+    private bool confirmUninstall;
+
+    private int AttentionCount => packs?.Count(pack => pack.Definition.State is InstalledPackState.Failed or InstalledPackState.Degraded) ?? 0;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            packs = await Client.GetPacksAsync(cancellation.Token);
+            if (selected is not null)
+            {
+                var match = packs.FirstOrDefault(pack => SameIdentity(pack, selected.Value));
+                selected = match is null ? null : await Client.GetPackAsync(match.Definition.Publisher, match.Definition.PackName, cancellation.Token);
+            }
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    private void OpenInstall()
+    {
+        preview = null;
+        archive = null;
+        archiveName = string.Empty;
+        installError = null;
+        installOpen = true;
+    }
+
+    private void CloseInstall()
+    {
+        if (installing) return;
+        installOpen = false;
+    }
+
+    private async Task ReadArchiveAsync(InputFileChangeEventArgs args)
+    {
+        previewing = true;
+        preview = null;
+        archive = null;
+        installError = null;
+        archiveName = args.File.Name;
+        try
+        {
+            await using var input = args.File.OpenReadStream(MaximumArchiveBytes, cancellation.Token);
+            await using var output = new MemoryStream();
+            await input.CopyToAsync(output, cancellation.Token);
+            archive = output.ToArray();
+            preview = await Client.PreviewAsync(archive, archiveName, cancellation.Token);
+        }
+        catch (AgentstrationApiException exception) { installError = exception.Message; }
+        catch (IOException exception) { installError = exception.Message; }
+        finally { previewing = false; }
+    }
+
+    private async Task InstallAsync()
+    {
+        if (archive is null || preview?.CanInstall != true) return;
+        installing = true;
+        installError = null;
+        try
+        {
+            selected = await Client.InstallAsync(archive, archiveName, cancellation.Token);
+            installOpen = false;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { installError = exception.Message; }
+        finally { installing = false; }
+    }
+
+    private async Task SelectAsync(InstalledPackResource pack)
+    {
+        error = null;
+        try { selected = await Client.GetPackAsync(pack.Definition.Publisher, pack.Definition.PackName, cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private async Task UninstallAsync()
+    {
+        if (selected is null) return;
+        confirmUninstall = false;
+        try
+        {
+            await Client.UninstallAsync(selected.Value.Definition.Publisher, selected.Value.Definition.PackName, selected.ETag, cancellation.Token);
+            selected = null;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private bool IsSelected(InstalledPackResource pack) => selected is not null && SameIdentity(pack, selected.Value);
+    private static bool SameIdentity(InstalledPackResource left, InstalledPackResource right) => left.Definition.Publisher == right.Definition.Publisher && left.Definition.PackName == right.Definition.PackName;
+    private static string DisplayName(InstalledPackResource pack) => pack.Definition.DisplayName ?? pack.Definition.PackName;
+    private static string StateLabel(InstalledPackState state) => state switch { InstalledPackState.Installing => "Installing", InstalledPackState.Installed => "Installed", InstalledPackState.Uninstalling => "Uninstalling", InstalledPackState.Failed => "Failed", _ => "Degraded" };
+    private static UiStatus StateTone(InstalledPackState state) => state switch { InstalledPackState.Installed => UiStatus.Success, InstalledPackState.Failed => UiStatus.Danger, InstalledPackState.Degraded => UiStatus.Warning, _ => UiStatus.Info };
+
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

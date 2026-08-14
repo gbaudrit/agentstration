@@ -15,12 +15,130 @@ public static class ResourceKinds
     public const string AgentRevision = "AgentRevision";
     public const string AgentDeployment = "AgentDeployment";
     public const string Flow = "Flow";
+    public const string Entry = "Entry";
     public const string ManagementOperation = "ManagementOperation";
+    public const string InstalledPack = "InstalledPack";
     public const string ModelProvider = "ModelProvider";
     public const string ModelProfile = "ModelProfile";
     public const string RuntimeProfile = "RuntimeProfile";
     public const string Tool = "Tool";
     public const string ToolProvider = "ToolProvider";
+}
+
+public static class PackKinds
+{
+    public const string Pack = "Pack";
+}
+
+public sealed record PackManifest
+{
+    public required string ApiVersion { get; init; }
+    public required string Kind { get; init; }
+    public PackMetadata Metadata { get; init; } = new();
+    public PackSpec Spec { get; init; } = new();
+}
+
+public sealed record PackMetadata
+{
+    public string Name { get; init; } = string.Empty;
+    public string Publisher { get; init; } = string.Empty;
+    public string Version { get; init; } = string.Empty;
+    public string? DisplayName { get; init; }
+    public string? Description { get; init; }
+    public IReadOnlyList<string> Categories { get; init; } = [];
+    public IReadOnlyList<string> Tags { get; init; } = [];
+}
+
+public sealed record PackSpec
+{
+    public IReadOnlyList<string> Resources { get; init; } = [];
+    public IReadOnlyList<PackRequirement> Requirements { get; init; } = [];
+}
+
+public sealed record PackRequirement
+{
+    public string? Capability { get; init; }
+    public string? Pack { get; init; }
+    public string? Version { get; init; }
+}
+
+public readonly record struct PackIdentity(string Publisher, string Name)
+{
+    public string ResourceName => $"{Publisher.Length}-{Publisher}-{Name}";
+    public override string ToString() => $"{Publisher}/{Name}";
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<InstalledPackState>))]
+public enum InstalledPackState
+{
+    [JsonStringEnumMemberName("installing")] Installing,
+    [JsonStringEnumMemberName("installed")] Installed,
+    [JsonStringEnumMemberName("uninstalling")] Uninstalling,
+    [JsonStringEnumMemberName("failed")] Failed,
+    [JsonStringEnumMemberName("degraded")] Degraded
+}
+
+public sealed record ManagedPackResource
+{
+    public required string Kind { get; init; }
+    public required string Name { get; init; }
+    public required string Path { get; init; }
+    public required string VersionToken { get; init; }
+}
+
+public sealed record InstalledPackProperties
+{
+    public required string Publisher { get; init; }
+    public required string PackName { get; init; }
+    public required string Version { get; init; }
+    public string? DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required string Source { get; init; }
+    public required DateTimeOffset InstalledAt { get; init; }
+    public InstalledPackState State { get; init; } = InstalledPackState.Installing;
+    public IReadOnlyList<ManagedPackResource> ManagedResources { get; init; } = [];
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+public sealed record InstalledPackResource : Resource
+{
+    public InstalledPackProperties Definition { get; init; } = null!;
+}
+
+public sealed record PackResourceDocument(
+    string Path,
+    string ApiVersion,
+    string Kind,
+    string Name,
+    JsonElement Manifest);
+
+public sealed record PackArchive(PackManifest Manifest, IReadOnlyList<PackResourceDocument> Resources, string Source);
+
+public sealed record PackResourcePreview(string Path, string Kind, string Name, bool AlreadyExists);
+
+public sealed record PackInstallationPreview(
+    PackMetadata Metadata,
+    IReadOnlyList<PackResourcePreview> Resources,
+    bool AlreadyInstalled)
+{
+    public bool CanInstall => !AlreadyInstalled && Resources.All(resource => !resource.AlreadyExists);
+}
+
+public interface IPackArchiveReader
+{
+    Task<PackArchive> ReadAsync(Stream archive, string source, CancellationToken cancellationToken);
+}
+
+public interface IPackResourceHandler
+{
+    string Kind { get; }
+    int InstallOrder { get; }
+    Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken);
+    Task<bool> ExistsAsync(string name, CancellationToken cancellationToken);
+    Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, string packVersion, CancellationToken cancellationToken);
+    Task<string?> GetVersionTokenAsync(string name, CancellationToken cancellationToken);
+    Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken);
 }
 
 public sealed record ToolTypeReference(string Extension, string Id);

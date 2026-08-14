@@ -8,6 +8,7 @@ Agentstration currently provides:
 - durable Work Items, Workplace interactions, tasks, results, and artifacts;
 - editable Flows, immutable published Flow versions, and observable Flow Runs;
 - persisted tenants, workspaces, users, memberships, scoped RBAC, and automatic standalone bootstrap;
+- offline Pack installation with cross-module resource provenance and modification-safe uninstall;
 - REST, Razor/Blazor, MCP, and local runtime surfaces backed by shared application services;
 - SQLite and deterministic local defaults that require no Azure subscription or remote API key.
 

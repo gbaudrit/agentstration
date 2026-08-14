@@ -526,6 +526,17 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         return payload is null ? null : Deserialize<EntryResource>(payload);
     }
 
+    public async Task DeleteEntryAsync(EntryId entryId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Entries.SingleOrDefaultAsync(value => value.Id == entryId.Value, cancellationToken);
+        if (document is not null)
+        {
+            context.Entries.Remove(document);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
     public async Task UpsertEntryDraftAsync(EntryDraft draft, CancellationToken cancellationToken)
     {
         WorkplaceValidation.Validate(draft);
@@ -548,6 +559,24 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payload = await context.EntryDrafts.AsNoTracking().Where(value => value.Id == entryId.Value).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<EntryDraft>(payload);
+    }
+
+    public async Task DeleteEntryDraftAsync(EntryId entryId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.EntryDrafts.SingleOrDefaultAsync(value => value.Id == entryId.Value, cancellationToken);
+        if (document is not null)
+        {
+            context.EntryDrafts.Remove(document);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<bool> HasEntryInteractionsAsync(EntryId entryId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.Interactions.AsNoTracking().Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<WorkplaceInteraction>).Any(value => value.EntryId == entryId);
     }
 
     public async Task CreateInteractionAsync(WorkplaceInteraction interaction, CancellationToken cancellationToken)

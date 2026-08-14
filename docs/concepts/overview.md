@@ -9,11 +9,15 @@ Agentstration separates what is declared, what executes, and what users ask the 
 | Tool Provider ≠ Tool | A Tool Provider is a discoverable source; a Tool is Agentstration's governed identity with independent enablement and availability. |
 | Flow ≠ FlowRun | A Flow is a versioned processing definition; a FlowRun is one durable execution of a resolved definition. |
 | Interaction ≠ WorkTask | An Interaction is the durable user conversation; a WorkTask is the user-facing projection of asynchronous work. |
+| Pack ≠ Resource ≠ Work | A Pack distributes resources; resources declare capability; Work and Runs are functional or technical instances. |
 | Management Plane ≠ Runtime Plane | Management owns desired state; Runtime materializes and executes it. |
 | Tenant ≠ Workspace | Tenant is a planned broader isolation concept; Workspace is the implemented Workplace isolation boundary. |
 
 ```mermaid
 flowchart TD
+    Pack -->|installs| Flow
+    Pack -->|installs| Agent
+    Pack -->|installs| Tool
     Interaction -->|may create| WorkTask
     WorkTask --> WorkItem
     WorkItem -->|references| Flow

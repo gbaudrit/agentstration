@@ -1,0 +1,20 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: who-am-i-game
+definition:
+  displayName: Who Am I? Game
+  description: Starts the current distribution-only sample through the Judge Agent.
+  kind: direct
+  version: 0.1.0
+  enabled: true
+  spec:
+    specKind: direct
+    target:
+      kind: agent
+      id: who-am-i-judge
+  metadata:
+    sample: who-am-i
+    capability: distribution-smoke-test
+  publish: true
+  activate: true

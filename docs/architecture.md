@@ -87,6 +87,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Module | Current responsibility | Planned extension |
 |---|---|---|
 | Management plane | canonical declarative agent and model-profile resources, typed references, desired state, generations, provisioning status, lifecycle events, deterministic revisions, deployments, ETag API | operations, policies, connections, identities, manifest import |
+| Pack distribution | local ZIP importer, coordinated six-kind installation, durable InstalledPack provenance, compensating failure handling, inventory, and modification-safe uninstall; no Runtime primitive | dependency resolution, updates/conflicts, signatures, Gallery, and publisher verification |
 | Control storage | SQLite JSON resources with indexed metadata and optimistic concurrency | richer relational projections and migrations |
 | Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, MAF `ChatClientAgent`, in-process/shared-host provisioning, registry, reconciliation | provider-native token/tool streaming, sessions, dedicated hosts, containers, remote and Foundry adapters |
 | Model providers | SQLite-backed provider declarations with ETag CRUD and usage protection, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | credentials/connections, additional AEP extensions, cached discovery |
@@ -347,6 +348,7 @@ Standalone startup creates or repairs `local / default`, the local user, active 
 17. **Delivered AEP V1 increment:** technology-neutral protocol contracts, reusable client/server framework, Microsoft.Extensions.AI adapter, out-of-process Ollama extension, Aspire orchestration, SSE streaming, discovery/version checks, and offline boundary tests.
 18. **Delivered AEP Tool Contributions increment:** schema-free AEP mappings to one or more MCP servers, persisted ToolProvider/Tool resources, an official-SDK Tool Catalog, direct external MCP support, and native MAF tool adaptation.
 19. **Delivered Tool Provider governance increment:** persistent AEP/MCP providers, STDIO and Streamable HTTP, manual discovery with durable diffs, secure-default Tool materialization, Console governance, Agent selection, and deterministic AEP utilities.
+20. **Delivered Pack distribution increment:** Packs are versioned Management/distribution artifacts above ordinary resources, never execution primitives; local ZIP validation, coordinated installation, provenance, inventory, compensation, and safe uninstall are executable offline.
 
 ## ADR catalog
 
@@ -379,3 +381,5 @@ Standalone startup creates or repairs `local / default`, the local user, active 
 - ADR-0031: Agentstration-native declarative resource envelope
 - ADR-0032: one authoritative standalone server
 - ADR-0033: canonical names and explicit execution identities
+- ADR-0034: runtime resolution and control-plane hardening
+- ADR-0035: Packs are Management and distribution artifacts

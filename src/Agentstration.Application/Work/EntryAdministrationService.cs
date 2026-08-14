@@ -88,4 +88,24 @@ public sealed class EntryAdministrationService(
 
     public Task<IReadOnlyList<EntryDependency>> GetDependenciesAsync(EntryId id, CancellationToken cancellationToken) =>
         targetResolver.GetDependenciesAsync(id, cancellationToken);
+
+    public async Task DeleteAsync(EntryId id, CancellationToken cancellationToken)
+    {
+        _ = await repository.GetEntryDraftAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Entry draft '{id}' was not found.");
+        var exposedBy = (await repository.ListWorkspacesAsync(cancellationToken))
+            .Where(workspace => workspace.Entries.Any(reference => reference.EntryResourceId == id))
+            .Select(workspace => workspace.Name)
+            .ToArray();
+        var draftedBy = (await repository.ListWorkspaceDraftsAsync(cancellationToken))
+            .Where(workspace => workspace.Entries.Any(reference => reference.EntryResourceId == id))
+            .Select(workspace => workspace.Name)
+            .ToArray();
+        if (exposedBy.Length > 0 || draftedBy.Length > 0)
+            throw new WorkValidationException("entry_in_use", $"Entry '{id}' is referenced by Workplace workspace configuration.");
+        if (await repository.HasEntryInteractionsAsync(id, cancellationToken))
+            throw new WorkValidationException("entry_in_use", $"Entry '{id}' has durable interactions and cannot be deleted.");
+        await repository.DeleteEntryAsync(id, cancellationToken);
+        await repository.DeleteEntryDraftAsync(id, cancellationToken);
+    }
 }

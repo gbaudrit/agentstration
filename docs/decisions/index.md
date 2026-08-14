@@ -63,3 +63,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 31. [ADR-0031 — Agentstration-native declarative resource envelope](0031-agentstration-native-resource-envelope.md)
 32. [ADR-0032 — Use one authoritative standalone server](0032-single-authoritative-standalone-server.md)
 33. [ADR-0033 — Canonical resource names and explicit execution identities](0033-canonical-names-and-execution-identities.md)
+34. [ADR-0034 — Runtime resolution and control-plane hardening](0034-runtime-resolution-and-control-plane-hardening.md)
+35. [ADR-0035 — Packs are Management and distribution artifacts](0035-packs-are-management-distribution-artifacts.md)
