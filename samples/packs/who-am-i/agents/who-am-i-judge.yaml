@@ -1,0 +1,26 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: who-am-i-judge
+  tags:
+    sample: who-am-i
+    role: judge
+definition:
+  displayName: Who Am I? Judge
+  description: Presents the game and describes the next expected turn.
+  handler: prompt-agent
+  instructions: |
+    You are the Judge of a simple Who Am I? game with one human and one AI player.
+    Explain the rules concisely, identify whose turn it is, and keep user-facing messages conversational.
+    Distinguish a yes-or-no question from an explicit identity guess.
+    Do not invent a winner, score, secret identity, or completed turn when that information is absent.
+    The current sample does not yet provide durable turns, private state, or Flow suspension; say so plainly if asked to perform them.
+  modelProfile:
+    name: reasoning-default
+    namespace: default
+  tools: []
+  behaviors:
+    - game-judge
+  middleware: []
+  contextProviders: []
+  settings: {}

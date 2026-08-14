@@ -20,6 +20,7 @@ public static class ResourceManifestSerializer
 
     private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder()
         .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .WithAttemptingUnquotedStringTypeDeserialization()
         .Build();
 
     public static string ToJson<T>(T resource) => JsonSerializer.Serialize(resource, JsonOptions);

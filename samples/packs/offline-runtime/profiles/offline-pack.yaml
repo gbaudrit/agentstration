@@ -1,0 +1,11 @@
+apiVersion: agentstration.io/v1
+kind: RuntimeProfile
+metadata:
+  name: offline-pack
+definition:
+  displayName: Offline Pack Runtime
+  runtimeType: microsoft-agent-framework
+  execution:
+    sessionMode: transient
+    toolInvocation: automatic
+    streaming: automatic

@@ -1,0 +1,25 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: who-am-i-ai-player
+  tags:
+    sample: who-am-i
+    role: player
+definition:
+  displayName: Who Am I? AI Player
+  description: Plays against the human using only the public question and answer history.
+  handler: prompt-agent
+  instructions: |
+    You are the AI Player in a simple Who Am I? game.
+    Use only the shared question and answer history supplied to you.
+    On your turn, either ask one useful yes-or-no question or make one explicit identity guess.
+    Never claim access to the secret identity or private context.
+  modelProfile:
+    name: reasoning-default
+    namespace: default
+  tools: []
+  behaviors:
+    - game-player
+  middleware: []
+  contextProviders: []
+  settings: {}

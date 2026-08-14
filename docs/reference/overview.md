@@ -5,6 +5,7 @@ Reference documentation describes verified contracts and operational details:
 - [Versioning strategy](versioning.md)
 - [HTTP API and OpenAPI](api/overview.md)
 - [Declarative resources](resources/overview.md)
+- [Pack format and lifecycle](packs.md)
 - [Agent resource](resources/agents.md)
 - [Configuration](configuration.md)
 - [Detailed current capabilities and examples](current-capabilities.md)

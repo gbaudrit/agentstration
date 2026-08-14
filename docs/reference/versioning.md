@@ -8,6 +8,7 @@ Several independent versions coexist in Agentstration. They must not be substitu
 | HTTP API version | Current unversioned `/api` routes | A breaking HTTP contract change, not every product release. |
 | Resource `apiVersion` | `agentstration.io/v1` | The schema of a declarative Management resource. |
 | Resource revision/generation | Agent generation `3` | A change to one resource instance or immutable snapshot. |
+| Pack version | `agentstration/price-watch/1.2.0` | A release of one coherent distribution bundle. |
 | Documentation version | `Next`, later `1.x` | A supported major documentation line. |
 
 ## Product version
@@ -33,6 +34,10 @@ An Agent's internal generation changes when its functional declaration changes. 
 ## Flow versions
 
 Flow publication uses immutable semantic versions such as `1.0.0`. This is the version of one Flow definition, not the product version.
+
+## Pack versions
+
+A Pack version identifies one release of a coherent resource bundle. Its conceptual coordinate is `publisher/name/version`, and the initial policy is Semantic Versioning. It does not replace the `apiVersion`, generation, ETag, or immutable publication version of any resource contained by the Pack. Local archive installation is implemented; dependency resolution and Pack updates remain planned.
 
 ## Documentation versions
 

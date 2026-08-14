@@ -4,7 +4,7 @@ using Agentstration.Resources;
 
 namespace Agentstration.Flow.Application;
 
-public sealed record CreateFlowCommand(string Name, string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null);
+public sealed record CreateFlowCommand(string Name, string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null, FlowGraphDefinition? Graph = null, string? DisplayName = null);
 public sealed record UpdateFlowCommand(string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null, FlowGraphDefinition? Graph = null, string? DisplayName = null);
 
 public interface IFlowDeletionGuard
@@ -26,7 +26,7 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
         ArgumentNullException.ThrowIfNull(command);
         var now = timeProvider.GetUtcNow();
         var resource = new FlowResource(new FlowId(command.Name, @namespace), command.Name, command.Description, command.Version, command.Enabled, null,
-            command.Definition, Copy(command.Metadata), now, now);
+            command.Definition, Copy(command.Metadata), now, now, command.DisplayName, command.Graph);
         FlowValidator.Validate(resource);
         return await repository.CreateAsync(resource, cancellationToken);
     }

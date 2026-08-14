@@ -1,4 +1,4 @@
-# 0034 — Runtime resolution and control-plane hardening
+# ADR-0036 — Runtime resolution and control-plane hardening
 
 Status: Accepted
 

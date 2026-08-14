@@ -1,0 +1,22 @@
+apiVersion: agentstration.io/v1
+kind: Pack
+metadata:
+  name: who-am-i
+  publisher: agentstration
+  version: 0.1.0
+  displayName: Who Am I?
+  description: Installs the resource skeleton for a conversational multi-agent guessing game.
+  categories:
+    - games
+    - samples
+  tags:
+    - conversation
+    - multi-agent
+    - human-in-the-loop
+spec:
+  resources:
+    - agents/who-am-i-secret.yaml
+    - agents/who-am-i-ai-player.yaml
+    - agents/who-am-i-judge.yaml
+    - flows/who-am-i-game.yaml
+    - entries/who-am-i.yaml
