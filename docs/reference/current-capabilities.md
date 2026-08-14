@@ -38,7 +38,7 @@ flowchart LR
 
 The management plane is the source of truth for agent definitions and desired state; runtime `AIAgent` instances are reconstructible. The Work Plane owns the functional lifecycle, interactions, history, and result of each `WorkItem`. Its architectural principle is **Microsoft-first, provider-neutral, cloud-optional**.
 
-Packs are a Management/distribution concept above these planes: they install ordinary resources and retain provenance, but they are never run. Local ZIP installation, installed-Pack inventory, compensating failure handling, modification-safe uninstall, and six resource handlers are implemented through the Management API. See [Pack format and lifecycle](packs.md).
+Packs are a Management/distribution concept above these planes: they install ordinary resources into deterministic `publisher.name` namespaces and retain provenance, but they are never run. Local ZIP installation, source/fork coexistence, installed-Pack inventory, compensating failure handling, modification-safe uninstall, and six resource handlers are implemented through the Management API. See [Pack format and lifecycle](packs.md).
 
 ## Declarative agent resources
 

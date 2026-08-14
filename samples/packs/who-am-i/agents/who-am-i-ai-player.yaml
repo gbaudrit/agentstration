@@ -16,6 +16,7 @@ definition:
     Never claim access to the secret identity or private context.
   modelProfile:
     name: reasoning-default
+    namespace: default
   tools: []
   behaviors:
     - game-player

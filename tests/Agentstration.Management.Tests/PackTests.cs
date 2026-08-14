@@ -8,6 +8,7 @@ using Agentstration.Infrastructure.Packs;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Resources;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -123,6 +124,7 @@ public sealed class PackTests
         Assert.AreEqual(HttpStatusCode.OK, previewed.StatusCode);
         using var previewBody = JsonDocument.Parse(await previewed.Content.ReadAsStringAsync());
         Assert.IsTrue(previewBody.RootElement.GetProperty("canInstall").GetBoolean());
+        Assert.AreEqual("agentstration.test-pack", previewBody.RootElement.GetProperty("namespace").GetString());
         Assert.AreEqual("pack-runtime", previewBody.RootElement.GetProperty("resources")[0].GetProperty("name").GetString());
         using var absentBeforeInstall = await client.GetAsync("/api/runtimeprofiles/pack-runtime");
         Assert.AreEqual(HttpStatusCode.NotFound, absentBeforeInstall.StatusCode);
@@ -140,10 +142,12 @@ public sealed class PackTests
         var listed = await client.GetFromJsonAsync<JsonElement[]>("/api/packs");
         Assert.IsNotNull(listed);
         Assert.IsTrue(listed.Any(value => value.GetProperty("definition").GetProperty("packName").GetString() == "test-pack"));
-        using var resource = await client.GetAsync("/api/runtimeprofiles/pack-runtime");
-        Assert.AreEqual(HttpStatusCode.OK, resource.StatusCode);
+        using var defaultResource = await client.GetAsync("/api/runtimeprofiles/pack-runtime");
+        Assert.AreEqual(HttpStatusCode.NotFound, defaultResource.StatusCode);
 
         var packService = factory.Services.GetRequiredService<PackManagementService>();
+        var runtimeProfiles = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
+        Assert.IsNotNull(await runtimeProfiles.GetAsync(new ResourceNamespace("agentstration.test-pack"), "pack-runtime", default));
         var controlStore = factory.Services.GetRequiredService<IControlPlaneStore>();
         var retained = await packService.GetAsync(new("agentstration", "test-pack"), default);
         Assert.IsNotNull(retained);
@@ -168,8 +172,7 @@ public sealed class PackTests
 
         using var removed = await client.DeleteAsync("/api/packs/agentstration/test-pack");
         Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode);
-        using var removedResource = await client.GetAsync("/api/runtimeprofiles/pack-runtime");
-        Assert.AreEqual(HttpStatusCode.NotFound, removedResource.StatusCode);
+        Assert.IsNull(await runtimeProfiles.GetAsync(new ResourceNamespace("agentstration.test-pack"), "pack-runtime", default));
         using var missing = await client.GetAsync("/api/packs/agentstration/test-pack");
         Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
     }
@@ -191,6 +194,7 @@ public sealed class PackTests
         var preview = await previewResponse.Content.ReadFromJsonAsync<PackInstallationPreview>();
         Assert.IsNotNull(preview);
         Assert.IsTrue(preview.CanInstall);
+        Assert.AreEqual(new ResourceNamespace("agentstration.who-am-i"), preview.Namespace);
         Assert.HasCount(5, preview.Resources);
         CollectionAssert.AreEquivalent(
             new[] { ResourceKinds.Agent, ResourceKinds.Agent, ResourceKinds.Agent, ResourceKinds.Flow, ResourceKinds.Entry },
@@ -202,10 +206,12 @@ public sealed class PackTests
         var installed = await installResponse.Content.ReadFromJsonAsync<InstalledPackResource>();
         Assert.IsNotNull(installed);
         Assert.AreEqual(InstalledPackState.Installed, installed.Definition.State);
+        Assert.AreEqual(new ResourceNamespace("agentstration.who-am-i"), installed.Definition.Namespace);
         Assert.HasCount(5, installed.Definition.ManagedResources);
+        Assert.IsTrue(installed.Definition.ManagedResources.All(resource => resource.Namespace == installed.Definition.Namespace));
         Assert.IsNotNull(installed.Definition.SourceArtifact);
 
-        using var flowVersionResponse = await client.GetAsync("/api/flows/who-am-i-game/versions/0.1.0");
+        using var flowVersionResponse = await client.GetAsync("/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions/0.1.0");
         Assert.AreEqual(HttpStatusCode.OK, flowVersionResponse.StatusCode, await flowVersionResponse.Content.ReadAsStringAsync());
         using var flowVersion = JsonDocument.Parse(await flowVersionResponse.Content.ReadAsStreamAsync());
         var graph = flowVersion.RootElement.GetProperty("graph");
@@ -232,20 +238,34 @@ public sealed class PackTests
         Assert.IsNotNull(repeatedBuild);
         Assert.AreEqual(build.Definition.Artifact.Sha256, repeatedBuild.Definition.Artifact.Sha256, "The same project revision must produce the same Pack bytes.");
 
-        using var conflictingPreviewResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/preview", null);
-        Assert.AreEqual(HttpStatusCode.OK, conflictingPreviewResponse.StatusCode);
-        var conflictingPreview = await conflictingPreviewResponse.Content.ReadFromJsonAsync<PackInstallationPreview>();
-        Assert.IsNotNull(conflictingPreview);
-        Assert.IsFalse(conflictingPreview.CanInstall, "The fork keeps resource names and must conflict with its installed origin in the same Workspace.");
+        using var forkPreviewResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/preview", null);
+        Assert.AreEqual(HttpStatusCode.OK, forkPreviewResponse.StatusCode);
+        var forkPreview = await forkPreviewResponse.Content.ReadFromJsonAsync<PackInstallationPreview>();
+        Assert.IsNotNull(forkPreview);
+        Assert.IsTrue(forkPreview.CanInstall, "A fork must coexist with its source because its resources use a distinct Pack namespace.");
+        Assert.AreEqual(new ResourceNamespace("local.who-am-i-lab"), forkPreview.Namespace);
+        Assert.IsTrue(forkPreview.Resources.All(resource => !resource.AlreadyExists));
 
-        using var localInstallResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install?replaceOrigin=true", null);
+        using var localInstallResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install", null);
         Assert.AreEqual(HttpStatusCode.Created, localInstallResponse.StatusCode, await localInstallResponse.Content.ReadAsStringAsync());
         var localInstallation = await localInstallResponse.Content.ReadFromJsonAsync<InstalledPackResource>();
         Assert.IsNotNull(localInstallation);
         Assert.AreEqual("local", localInstallation.Definition.Publisher);
         Assert.AreEqual("who-am-i-lab", localInstallation.Definition.PackName);
-        using var removedOriginResponse = await client.GetAsync("/api/packs/agentstration/who-am-i");
-        Assert.AreEqual(HttpStatusCode.NotFound, removedOriginResponse.StatusCode);
+        Assert.AreEqual(new ResourceNamespace("local.who-am-i-lab"), localInstallation.Definition.Namespace);
+        using var retainedOriginResponse = await client.GetAsync("/api/packs/agentstration/who-am-i");
+        Assert.AreEqual(HttpStatusCode.OK, retainedOriginResponse.StatusCode);
+        using var sourceAgentResponse = await client.GetAsync("/api/namespaces/agentstration.who-am-i/agents/who-am-i-judge");
+        using var forkAgentResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/agents/who-am-i-judge");
+        Assert.AreEqual(HttpStatusCode.OK, sourceAgentResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, forkAgentResponse.StatusCode);
+        using var forkFlowResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/flows/who-am-i-game/versions/0.1.0");
+        Assert.AreEqual(HttpStatusCode.OK, forkFlowResponse.StatusCode, await forkFlowResponse.Content.ReadAsStringAsync());
+        using var forkEntryResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/entries/who-am-i");
+        Assert.AreEqual(HttpStatusCode.OK, forkEntryResponse.StatusCode, await forkEntryResponse.Content.ReadAsStringAsync());
+        using var forkEntry = JsonDocument.Parse(await forkEntryResponse.Content.ReadAsStreamAsync());
+        Assert.AreEqual("local.who-am-i-lab", forkEntry.RootElement.GetProperty("namespace").GetString());
+        Assert.AreEqual("local.who-am-i-lab", forkEntry.RootElement.GetProperty("resolvedTarget").GetProperty("namespace").GetString());
 
         using var localReinstallResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install?replaceExisting=true", null);
         Assert.AreEqual(HttpStatusCode.Created, localReinstallResponse.StatusCode, await localReinstallResponse.Content.ReadAsStringAsync());
@@ -257,6 +277,8 @@ public sealed class PackTests
 
         using var removeLocalResponse = await client.DeleteAsync("/api/packs/local/who-am-i-lab");
         Assert.AreEqual(HttpStatusCode.NoContent, removeLocalResponse.StatusCode);
+        using var retainedSourceAgentResponse = await client.GetAsync("/api/namespaces/agentstration.who-am-i/agents/who-am-i-judge");
+        Assert.AreEqual(HttpStatusCode.OK, retainedSourceAgentResponse.StatusCode);
     }
 
     private static PackArchive Archive(params PackResourceDocument[] resources) => new(
@@ -350,15 +372,15 @@ public sealed class PackTests
         public string CurrentToken { get; set; } = "v1";
 
         public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<bool> ExistsAsync(string name, CancellationToken cancellationToken) => Task.FromResult(Exists);
-        public Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
+        public Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => Task.FromResult(Exists);
+        public Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, ResourceNamespace @namespace, string packVersion, CancellationToken cancellationToken)
         {
             events.Add($"install:{resource.Kind}/{resource.Name}");
             if (FailInstallation) throw new InvalidOperationException("simulated failure");
             Exists = true;
-            return Task.FromResult(new ManagedPackResource { Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = CurrentToken });
+            return Task.FromResult(new ManagedPackResource { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = CurrentToken });
         }
-        public Task<string?> GetVersionTokenAsync(string name, CancellationToken cancellationToken) => Task.FromResult(Exists ? CurrentToken : null);
+        public Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => Task.FromResult(Exists ? CurrentToken : null);
         public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken)
         {
             events.Add($"delete:{resource.Kind}/{resource.Name}"); Exists = false; return Task.CompletedTask;

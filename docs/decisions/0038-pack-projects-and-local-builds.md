@@ -4,7 +4,7 @@ Status: Accepted — 2026-08-14
 
 ## Context
 
-ADR-0035 defines Packs as Management and distribution artifacts. Installing an archive alone is insufficient for a local development loop: an operator needs to preserve the exact input, fork it without depending on its original download location, edit Pack-level metadata, build a reproducible archive, inspect conflicts, and reinstall it without manually downloading and uploading the result.
+ADR-0037 defines Packs as Management and distribution artifacts. Installing an archive alone is insufficient for a local development loop: an operator needs to preserve the exact input, fork it without depending on its original download location, edit Pack-level metadata, build a reproducible archive, inspect conflicts, and reinstall it without manually downloading and uploading the result.
 
 An installed Pack is provenance, not an authoring workspace. Mutating it in place would make uninstall evidence ambiguous and erase the distinction between an observed installation and a new authored artifact.
 
@@ -18,7 +18,7 @@ A build snapshots one project revision into an immutable `PackProjectBuild`. Arc
 
 Development replacement is explicit. If the same Pack identity is already installed, the operator must request replacement; Agentstration first uses the existing modification-safe uninstall path and then performs a normal validated installation. It does not overwrite arbitrary conflicting resources.
 
-A fork may also explicitly replace its recorded source Pack. Agentstration permits this only when every conflicting resource is managed by that installed source Pack, then applies the same modification-safe uninstall path before installing the fork. A conflict owned by any unrelated installation is rejected.
+A fork has a distinct Pack identity and therefore a distinct namespace. Its local resource names and relative references remain unchanged, while source and fork can be installed simultaneously. Only a build with the same Pack identity requires explicit development replacement.
 
 This increment installs builds only into the current request Workspace. Selecting a different Workspace is deferred until every participating resource store, including Flow and Entry storage, applies the same tenant/workspace scope. A partially scoped cross-Workspace operation is forbidden.
 
@@ -29,6 +29,7 @@ Flow resources carried by a Pack may include their typed graph definition and de
 - Installed provenance, editable project state, and immutable build history have separate lifecycles.
 - Fork and build continue to work offline after the original archive location disappears.
 - Local install never needs a browser round trip through a downloaded ZIP.
+- Fork installation does not remove or mutate its source Pack.
 - Content-addressed storage deduplicates identical sources and builds.
 - Pack-level edits are available now; contained resource editors remain owned by their existing modules and can be linked into the Pack Studio incrementally.
 - Cross-Workspace build installation requires a prior storage-isolation increment for all contained resource kinds.

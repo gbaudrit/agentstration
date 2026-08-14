@@ -59,6 +59,7 @@ else
             @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.Description)) { <p>@selected.Value.Definition.Description</p> }
             <dl class="resource-details pack-facts">
                 <dt>Identity</dt><dd><code>@selected.Value.Definition.Publisher/@selected.Value.Definition.PackName</code></dd>
+                <dt>Namespace</dt><dd><code>@selected.Value.Definition.Namespace</code></dd>
                 <dt>Version</dt><dd>@selected.Value.Definition.Version</dd>
                 <dt>Source</dt><dd>@selected.Value.Definition.Source</dd>
                 <dt>Installed</dt><dd>@selected.Value.Definition.InstalledAt.ToLocalTime().ToString("F")</dd>

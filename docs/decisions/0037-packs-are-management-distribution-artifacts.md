@@ -14,6 +14,8 @@ An Agentstration **Pack** is a versioned distribution and installation artifact 
 
 A Pack has a stable identity independent of its version. The conceptual coordinate is `publisher/name/version`, with Semantic Versioning as the initial package-version policy. Pack versioning describes a coherent set and does not replace the schema version, generation, ETag, or immutable version owned by a contained resource.
 
+ADR-0035 scopes resource names through generic namespaces. A Pack installation uses the deterministic namespace `publisher.name`; publisher and Pack name therefore use lowercase ASCII letters, digits and `-`. Contained resource names remain unchanged, relative references resolve inside that namespace, and explicitly qualified references may target shared resources such as those in `default`. The namespace is a naming partition, while provenance continues to record Pack ownership independently.
+
 The Pack manifest describes presentation metadata, contained resource paths, and requirements. Each contained file remains a normal resource manifest identified by its own `apiVersion` and `kind`; the Pack importer dispatches it to the owning module rather than interpreting its implementation. The Pack manifest is a distribution envelope, not another runtime-capable Management resource.
 
 An installation records an `InstalledPack` management record and per-resource provenance. Provenance includes, at minimum, Pack identity, installed Pack version, resource kind and canonical name, and the installed content fingerprint or equivalent revision evidence. It must be sufficient to distinguish a still-managed resource from one that was changed or detached locally.
@@ -28,6 +30,7 @@ The initial executable scope is deliberately limited to local/offline archives, 
 
 - No `RunPack`, `PackTask`, `PackInstance`, Pack runtime, or Pack-specific router path is introduced.
 - Routers discover installed Agents, Flows, Entries, Tools, Model Profiles, and other resources without knowing which Pack supplied them.
+- A source Pack and a fork with a different Pack identity can coexist because they install homonymous resources into different namespaces.
 - Pack installation must coordinate resource owners; it cannot bypass their validation or write directly into their stores.
 - Local archives and private sources remain first-class, so a remote Gallery is optional.
 - Publisher trust, signatures, permissions, path traversal, archive expansion, and sensitive dependency configuration are explicit security boundaries.

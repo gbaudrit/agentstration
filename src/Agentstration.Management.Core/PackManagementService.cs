@@ -47,6 +47,7 @@ public sealed partial class PackManagementService
     {
         var prepared = await PrepareAsync(archive, cancellationToken);
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
+        var @namespace = identity.Namespace;
         if (prepared.Preview.AlreadyInstalled) throw new PackAlreadyInstalledException(identity);
         var conflict = prepared.Preview.Resources.FirstOrDefault(resource => resource.AlreadyExists);
         if (conflict is not null) throw new PackResourceConflictException(conflict.Kind, conflict.Name);
@@ -66,6 +67,7 @@ public sealed partial class PackManagementService
             {
                 Publisher = identity.Publisher,
                 PackName = identity.Name,
+                Namespace = @namespace,
                 Version = archive.Manifest.Metadata.Version,
                 DisplayName = archive.Manifest.Metadata.DisplayName,
                 Description = archive.Manifest.Metadata.Description,
@@ -81,7 +83,7 @@ public sealed partial class PackManagementService
         {
             foreach (var pair in prepared.Handlers.OrderBy(value => value.Value.InstallOrder).ThenBy(value => value.Key.Path, StringComparer.Ordinal))
             {
-                var managed = await pair.Value.InstallAsync(pair.Key, identity, archive.Manifest.Metadata.Version, cancellationToken);
+                var managed = await pair.Value.InstallAsync(pair.Key, identity, @namespace, archive.Manifest.Metadata.Version, cancellationToken);
                 applied.Add((managed, pair.Value));
                 installed = await UpdateAsync(installed, installed.Value.Definition with { ManagedResources = applied.Select(value => value.Resource).ToArray() }, ProvisioningState.Creating, cancellationToken);
             }
@@ -157,6 +159,7 @@ public sealed partial class PackManagementService
         ArgumentNullException.ThrowIfNull(archive);
         ValidateManifest(archive);
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
+        var @namespace = identity.Namespace;
         var selectedHandlers = new Dictionary<PackResourceDocument, IPackResourceHandler>();
         var resources = new List<PackResourcePreview>();
         foreach (var resource in archive.Resources)
@@ -166,14 +169,17 @@ public sealed partial class PackManagementService
             if (!handlers.TryGetValue(resource.Kind, out var handler))
                 throw new PackValidationException("pack_resource_kind_unsupported", $"Resource kind '{resource.Kind}' is not supported by this installation.");
             await handler.ValidateAsync(resource, archive.Resources, cancellationToken);
-            resources.Add(new(resource.Path, resource.Kind, resource.Name, await handler.ExistsAsync(resource.Name, cancellationToken)));
+            resources.Add(new(resource.Path, resource.Kind, resource.Name, await handler.ExistsAsync(@namespace, resource.Name, cancellationToken)));
             selectedHandlers.Add(resource, handler);
         }
 
         var preview = new PackInstallationPreview(
             archive.Manifest.Metadata,
             resources,
-            await GetAsync(identity, cancellationToken) is not null);
+            await GetAsync(identity, cancellationToken) is not null)
+        {
+            Namespace = @namespace
+        };
         return (preview, selectedHandlers);
     }
 
@@ -188,7 +194,7 @@ public sealed partial class PackManagementService
             {
                 if (!handlers.TryGetValue(resource.Kind, out var handler))
                     throw new PackValidationException("pack_resource_kind_unsupported", $"Resource kind '{resource.Kind}' has no installed handler.");
-                var currentToken = await handler.GetVersionTokenAsync(resource.Name, cancellationToken);
+                var currentToken = await handler.GetVersionTokenAsync(resource.Namespace, resource.Name, cancellationToken);
                 if (currentToken is not null)
                 {
                     if (!string.Equals(currentToken, resource.VersionToken, StringComparison.Ordinal))
@@ -249,8 +255,8 @@ public sealed partial class PackManagementService
 
     private static void ValidateName(string value, string field)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Length > 60 || !char.IsLetterOrDigit(value[0]) || value.Any(character => !char.IsLetterOrDigit(character) && character is not '-' and not '_'))
-            throw new PackValidationException($"pack_{field}_invalid", $"Pack {field} must contain 1 to 60 letters, digits, '-' or '_' and start with a letter or digit.");
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 60 || !char.IsAsciiLetterOrDigit(value[0]) || value.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-') || value.Any(char.IsUpper))
+            throw new PackValidationException($"pack_{field}_invalid", $"Pack {field} must contain 1 to 60 lowercase ASCII letters, digits or '-' and start with a letter or digit.");
     }
 
     [GeneratedRegex(@"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$", RegexOptions.CultureInvariant)]

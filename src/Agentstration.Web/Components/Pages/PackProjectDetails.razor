@@ -49,6 +49,7 @@ else
         <aside class="panel studio-install">
             <div class="panel-header"><div><p class="eyebrow">Local deployment</p><h2>Current workspace</h2></div></div>
             <strong>@(ContextState.Current?.WorkspaceDisplayName ?? "Current workspace")</strong>
+            @if (preview is not null) { <p class="studio-namespace"><span>Namespace</span><code>@preview.Namespace</code></p> }
             <p class="studio-hint">Preview and installation read the stored build directly. No download or re-upload is required.</p>
             @if (selectedBuild is null)
             {
@@ -65,11 +66,6 @@ else
                 {
                     <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> Reinstall this Pack build</label>
                     <p class="studio-warning">Resources modified since the previous installation are preserved and can still block replacement.</p>
-                }
-                else if (HasResourceConflicts)
-                {
-                    <label class="studio-checkbox"><input type="checkbox" @bind="replaceOrigin" /> Replace source Pack <code>@OriginCoordinate</code></label>
-                    <p class="studio-warning">The source Pack is removed through the modification-safe uninstall path before this fork is installed.</p>
                 }
             }
             <button class="button-primary" disabled="@(selectedBuild is null || busy || !CanInstall)" @onclick="InstallAsync">@(installing ? "Installing…" : "Install locally")</button>
@@ -123,12 +119,8 @@ else
     private bool building;
     private bool installing;
     private bool replaceExisting;
-    private bool replaceOrigin;
-    private bool HasResourceConflicts => preview?.Resources.Any(resource => resource.AlreadyExists) == true;
     private bool CanInstall => preview?.CanInstall == true
-        || (replaceExisting && preview?.AlreadyInstalled == true)
-        || (replaceOrigin && preview?.AlreadyInstalled == false && HasResourceConflicts);
-    private string OriginCoordinate => project is null ? string.Empty : $"{project.Value.Definition.Origin.Publisher}/{project.Value.Definition.Origin.Name}";
+        || (replaceExisting && preview?.AlreadyInstalled == true);
     private UiStatus ProjectTone => project?.Value.Definition.State == PackProjectState.Built ? UiStatus.Success : UiStatus.Info;
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
@@ -179,7 +171,6 @@ else
                 project = await Client.GetProjectAsync(ProjectId, cancellation.Token);
                 preview = await Client.PreviewBuildAsync(ProjectId, selectedBuild.Uid, cancellation.Token);
                 replaceExisting = false;
-                replaceOrigin = false;
                 message = PreviewMessage(selectedBuild.Definition.Version);
             });
         }
@@ -190,7 +181,6 @@ else
     {
         selectedBuild = build;
         replaceExisting = false;
-        replaceOrigin = false;
         await ExecuteAsync(async () =>
         {
             preview = await Client.PreviewBuildAsync(ProjectId, build.Uid, cancellation.Token);
@@ -206,10 +196,9 @@ else
         {
             await ExecuteAsync(async () =>
             {
-                var installed = await Client.InstallBuildAsync(ProjectId, selectedBuild.Uid, replaceExisting, replaceOrigin, cancellation.Token);
+                var installed = await Client.InstallBuildAsync(ProjectId, selectedBuild.Uid, replaceExisting, cancellation.Token);
                 preview = await Client.PreviewBuildAsync(ProjectId, selectedBuild.Uid, cancellation.Token);
                 replaceExisting = false;
-                replaceOrigin = false;
                 message = $"Installed {installed.Value.Definition.Publisher}/{installed.Value.Definition.PackName} in the selected workspace.";
             });
         }
@@ -231,7 +220,7 @@ else
         ? $"Build {buildVersion} is ready for this workspace."
         : preview?.AlreadyInstalled == true
             ? $"Build {buildVersion} is already installed. Enable reinstall to replace it."
-            : $"Build {buildVersion} conflicts with installed resources. Replace the source Pack to continue.";
+            : $"Build {buildVersion} conflicts with resources already installed in namespace '{preview?.Namespace}'.";
     private void BackToPacks() => Navigation.NavigateTo("/packs");
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static IReadOnlyList<string> Split(string value) => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();

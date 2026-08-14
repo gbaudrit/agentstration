@@ -167,9 +167,8 @@ public sealed partial class PackAuthoringService(
         return await installations.PreviewAsync(archive, cancellationToken);
     }
 
-    public async Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, bool replaceOrigin, CancellationToken cancellationToken)
+    public async Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken)
     {
-        var project = await RequiredProjectAsync(projectId, cancellationToken);
         var archive = await ReadBuildArchiveAsync(projectId, buildId, cancellationToken);
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
         var existing = await installations.GetAsync(identity, cancellationToken);
@@ -180,31 +179,11 @@ public sealed partial class PackAuthoringService(
             await installations.UninstallAsync(identity, cancellationToken);
         }
 
-        var origin = new PackIdentity(project.Value.Definition.Origin.Publisher, project.Value.Definition.Origin.Name);
-        if (replaceOrigin && origin != identity)
-        {
-            var installedOrigin = await installations.GetAsync(origin, cancellationToken)
-                ?? throw new PackValidationException("pack_origin_not_installed", $"The source Pack '{origin}' is no longer installed.");
-            var preview = await installations.PreviewAsync(archive, cancellationToken);
-            var conflicts = preview.Resources.Where(resource => resource.AlreadyExists).ToArray();
-            if (conflicts.Length == 0)
-                throw new PackValidationException("pack_origin_replacement_not_required", $"The build has no resource conflict with source Pack '{origin}'.");
-            var managedByOrigin = installedOrigin.Value.Definition.ManagedResources
-                .Select(resource => (resource.Kind, resource.Name))
-                .ToHashSet();
-            var unrelatedConflict = conflicts.FirstOrDefault(resource => !managedByOrigin.Contains((resource.Kind, resource.Name)));
-            if (unrelatedConflict is not null)
-                throw new PackResourceConflictException(unrelatedConflict.Kind, unrelatedConflict.Name);
-            await installations.UninstallAsync(origin, cancellationToken);
-        }
         return await installations.InstallAsync(archive, cancellationToken);
     }
 
-    public Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken) =>
-        InstallBuildAsync(projectId, buildId, replaceExisting, false, cancellationToken);
-
     public Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken) =>
-        InstallBuildAsync(projectId, buildId, false, false, cancellationToken);
+        InstallBuildAsync(projectId, buildId, false, cancellationToken);
 
     private async Task<PackArchive> ReadBuildArchiveAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken)
     {
@@ -262,7 +241,7 @@ public sealed partial class PackAuthoringService(
 
     private static void ValidateCoordinate(string publisher, string name, string version)
     {
-        if (!NameRegex().IsMatch(publisher) || !NameRegex().IsMatch(name)) throw new PackValidationException("pack_project_identity_invalid", "Pack Project publisher and name must use letters, digits, '-' or '_' and start with a letter or digit.");
+        if (!NameRegex().IsMatch(publisher) || !NameRegex().IsMatch(name)) throw new PackValidationException("pack_project_identity_invalid", "Pack Project publisher and name must use lowercase ASCII letters, digits or '-' and start with a letter or digit.");
         if (!VersionRegex().IsMatch(version)) throw new PackValidationException("pack_project_version_invalid", "Pack Project versions must use Semantic Versioning.");
     }
 
@@ -273,6 +252,6 @@ public sealed partial class PackAuthoringService(
         return options;
     }
 
-    [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9_-]{0,59}$", RegexOptions.CultureInvariant)] private static partial Regex NameRegex();
+    [GeneratedRegex("^[a-z0-9][a-z0-9-]{0,59}$", RegexOptions.CultureInvariant)] private static partial Regex NameRegex();
     [GeneratedRegex(@"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$", RegexOptions.CultureInvariant)] private static partial Regex VersionRegex();
 }

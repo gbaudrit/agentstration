@@ -17,6 +17,7 @@ definition:
     The current sample does not yet provide durable turns, private state, or Flow suspension; say so plainly if asked to perform them.
   modelProfile:
     name: reasoning-default
+    namespace: default
   tools: []
   behaviors:
     - game-judge

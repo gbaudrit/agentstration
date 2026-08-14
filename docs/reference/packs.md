@@ -8,6 +8,8 @@ An Agentstration Pack is a versioned, distributable unit that groups a coherent 
 
 The Pack belongs to the Management/distribution plane and is not a Runtime primitive.
 
+Every installation uses the namespace `publisher.name`. For example, `agentstration/who-am-i` installs into `agentstration.who-am-i`. Publisher and Pack names use lowercase ASCII letters, digits and `-`, which makes this mapping direct and collision-free. Resource `metadata.name` values are not prefixed or rewritten.
+
 ## Archive
 
 ```text
@@ -60,6 +62,7 @@ The Pack version initially follows Semantic Versioning. It versions the bundle, 
 The instance records an `InstalledPack` management record containing at least:
 
 - publisher, Pack name, and installed version;
+- the deterministic installation namespace;
 - installation source and timestamp;
 - explicit installation state;
 - the managed resources and their installed fingerprints or revisions.
@@ -78,6 +81,8 @@ Local V1 installs these resource kinds in dependency-safe order:
 6. `Entry`.
 
 Every contained resource uses `apiVersion: agentstration.io/v1`, the declared `kind`, `metadata.name`, and a typed `definition`. Management resources retain their normal definition shape. Pack Flow and Entry definitions use their existing domain properties under the same envelope. Unsupported kinds are rejected before any mutation.
+
+Unqualified references between contained resources resolve relative to the Pack namespace. A dependency outside the Pack must carry an explicit namespace; shared standalone resources normally use `namespace: default`. A fork changes the Pack coordinate and therefore installs the same local resource names into a different namespace without conflicting with its source.
 
 ## Requirements and configuration
 
@@ -136,7 +141,7 @@ Invoke-RestMethod http://localhost:5100/api/packs
 Invoke-RestMethod -Method Delete http://localhost:5100/api/packs/agentstration/offline-runtime
 ```
 
-Installation refuses to replace an existing resource. It records progress after every applied resource and compensates in reverse order on failure. Uninstall compares each current ETag or module version token with its installation evidence; modified resources are preserved and the Pack becomes `degraded`.
+Installation refuses to replace an existing resource in the same namespace. It records progress after every applied resource and compensates in reverse order on failure. Uninstall compares each current ETag or module version token with its installation evidence; modified resources are preserved and the Pack becomes `degraded`.
 
 The repository also contains `samples/packs/who-am-i`, a five-resource distribution smoke test with three role-specific Agents, a Direct Flow, and a conversational Entry. It deliberately documents rather than conceals the current execution gaps: Agent deployment, Workspace exposure, multi-agent turns, private state, and generic human-input suspension are not supplied by Pack V1.
 

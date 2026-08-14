@@ -66,6 +66,7 @@ public sealed record PackRequirement
 public readonly record struct PackIdentity(string Publisher, string Name)
 {
     public string ResourceName => $"{Publisher.Length}-{Publisher}-{Name}";
+    public ResourceNamespace Namespace => new($"{Publisher}.{Name}");
     public override string ToString() => $"{Publisher}/{Name}";
 }
 
@@ -81,6 +82,7 @@ public enum InstalledPackState
 
 public sealed record ManagedPackResource
 {
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public required string Kind { get; init; }
     public required string Name { get; init; }
     public required string Path { get; init; }
@@ -91,6 +93,7 @@ public sealed record InstalledPackProperties
 {
     public required string Publisher { get; init; }
     public required string PackName { get; init; }
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public required string Version { get; init; }
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
@@ -128,6 +131,7 @@ public sealed record PackInstallationPreview(
     IReadOnlyList<PackResourcePreview> Resources,
     bool AlreadyInstalled)
 {
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public bool CanInstall => !AlreadyInstalled && Resources.All(resource => !resource.AlreadyExists);
 }
 
@@ -141,9 +145,9 @@ public interface IPackResourceHandler
     string Kind { get; }
     int InstallOrder { get; }
     Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken);
-    Task<bool> ExistsAsync(string name, CancellationToken cancellationToken);
-    Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, string packVersion, CancellationToken cancellationToken);
-    Task<string?> GetVersionTokenAsync(string name, CancellationToken cancellationToken);
+    Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
+    Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, ResourceNamespace @namespace, string packVersion, CancellationToken cancellationToken);
+    Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
     Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken);
 }
 

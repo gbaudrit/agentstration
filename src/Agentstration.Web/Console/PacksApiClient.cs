@@ -19,7 +19,7 @@ public interface IPacksClient
     Task<PackProjectBuildResource> BuildAsync(Guid projectId, CancellationToken cancellationToken);
     Task<IReadOnlyList<PackProjectBuildResource>> GetBuildsAsync(Guid projectId, CancellationToken cancellationToken);
     Task<PackInstallationPreview> PreviewBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken);
-    Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, bool replaceOrigin, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken);
 }
 
 public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
@@ -109,9 +109,9 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
             ?? throw Empty("Pack build preview");
     }
 
-    public async Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, bool replaceOrigin, CancellationToken cancellationToken)
+    public async Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync(BuildActionPath(projectId, buildId, "install", replaceExisting, replaceOrigin), null, cancellationToken);
+        using var response = await httpClient.PostAsync(BuildActionPath(projectId, buildId, "install", replaceExisting), null, cancellationToken);
         return await ReadInstalledAsync(response, cancellationToken);
     }
 
@@ -142,8 +142,8 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
         $"api/packs/{Uri.EscapeDataString(publisher)}/{Uri.EscapeDataString(name)}";
 
     private static string ProjectPath(Guid projectId) => $"api/pack-projects/{projectId:D}";
-    private static string BuildActionPath(Guid projectId, Guid buildId, string action, bool replaceExisting, bool replaceOrigin = false) =>
-        $"{ProjectPath(projectId)}/builds/{buildId:D}/{action}?replaceExisting={replaceExisting.ToString().ToLowerInvariant()}&replaceOrigin={replaceOrigin.ToString().ToLowerInvariant()}";
+    private static string BuildActionPath(Guid projectId, Guid buildId, string action, bool replaceExisting) =>
+        $"{ProjectPath(projectId)}/builds/{buildId:D}/{action}?replaceExisting={replaceExisting.ToString().ToLowerInvariant()}";
     private static AgentstrationApiException Empty(string resourceName) =>
         new($"Agentstration API returned an empty {resourceName}.", Guid.NewGuid().ToString("N"));
 }
