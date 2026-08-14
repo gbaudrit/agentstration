@@ -80,6 +80,10 @@ public interface IFlowApiClient
 {
     Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken);
     Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken);
+    Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken);
+    Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken);
+    Task<FlowResourceSnapshot> UpdateFlowAsync(string flowId, UpdateFlowRequest request, string etag, CancellationToken cancellationToken);
+    Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken);
     Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken);
@@ -97,6 +101,8 @@ public interface IFlowApiClient
     Task<FlowRun> CreateDraftRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken);
     Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken);
 }
+
+public sealed record FlowResourceSnapshot(FlowResponse Value, string ETag);
 
 public interface IAgentstrationEventStream
 {
@@ -272,6 +278,37 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<FlowResponse>(httpClient, $"api/flows/{Uri.EscapeDataString(flowId)}", cancellationToken);
 
+    public async Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync($"api/flows/{Uri.EscapeDataString(flowId)}", cancellationToken);
+        return await ReadFlowAsync(response, cancellationToken);
+    }
+
+    public async Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync("api/flows", request, JsonOptions, cancellationToken);
+        return await ReadFlowAsync(response, cancellationToken);
+    }
+
+    public async Task<FlowResourceSnapshot> UpdateFlowAsync(string flowId, UpdateFlowRequest request, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Put, $"api/flows/{Uri.EscapeDataString(flowId)}")
+        {
+            Content = JsonContent.Create(request, options: JsonOptions)
+        };
+        message.Headers.TryAddWithoutValidation("If-Match", etag);
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        return await ReadFlowAsync(response, cancellationToken);
+    }
+
+    public async Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync($"api/flows/{Uri.EscapeDataString(flowId)}/versions", request, JsonOptions, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<FlowVersionResponse>(JsonOptions, cancellationToken)
+            ?? throw new AgentstrationApiException("Flow API returned an empty published version.", Guid.NewGuid().ToString("N"));
+    }
+
     public async Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<FlowVersionResponse[]>(httpClient, $"api/flows/{Uri.EscapeDataString(flowId)}/versions", cancellationToken);
 
@@ -384,6 +421,16 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<FlowDraftResponse>(JsonOptions, cancellationToken)
             ?? throw new AgentstrationApiException("Flow API returned an empty Draft.", Guid.NewGuid().ToString("N"));
+    }
+
+    private static async Task<FlowResourceSnapshot> ReadFlowAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        var value = await response.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions, cancellationToken)
+            ?? throw new AgentstrationApiException("Flow API returned an empty definition.", Guid.NewGuid().ToString("N"));
+        var etag = response.Headers.ETag?.Tag
+            ?? throw new AgentstrationApiException("Flow API returned no ETag.", Guid.NewGuid().ToString("N"));
+        return new FlowResourceSnapshot(value, etag);
     }
 }
 

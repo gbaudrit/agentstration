@@ -301,11 +301,21 @@ public sealed class FlowRunService(
         {
             switch (executionEvent)
             {
+                case FlowParticipantTurnStarted turn:
+                    if (started.Add(turn.ParticipantId))
+                        stored = await StartStepAsync(stored, turn.ParticipantId, runToken);
+                    await EmitAsync(stored.Value.Id, FlowRunEventType.ParticipantTurnStarted, turn.ParticipantId,
+                        JsonSerializer.SerializeToElement(new { turn = turn.Turn }), runToken);
+                    break;
                 case FlowParticipantDelta delta:
                     if (started.Add(delta.ParticipantId))
                         stored = await StartStepAsync(stored, delta.ParticipantId, runToken);
                     await EmitAsync(stored.Value.Id, FlowRunEventType.StepOutputDelta, delta.ParticipantId,
                         JsonSerializer.SerializeToElement(new { content = delta.Content }), runToken);
+                    break;
+                case FlowParticipantTurnCompleted turn:
+                    await EmitAsync(stored.Value.Id, FlowRunEventType.ParticipantTurnCompleted, turn.ParticipantId,
+                        JsonSerializer.SerializeToElement(new { turn = turn.Turn }), runToken);
                     break;
                 case FlowParticipantCompleted completed:
                     if (started.Add(completed.ParticipantId))

@@ -1,9 +1,9 @@
-@page "/flowruns"
+@page "/flow-runs"
 @implements IDisposable
 @inject IFlowApiClient Client
 <PageTitle>Flow Runs · Agentstration</PageTitle>
 <PageHeader Title="Flow Runs" Description="Search and diagnose executions across every published Flow version."><Actions><a class="button-secondary" href="/flows">Definitions</a></Actions></PageHeader>
-<nav class="section-tabs"><a href="/flows">Definitions</a><a class="active" href="/flowruns">Runs</a><a href="/flows#deployments">Deployments</a></nav>
+<nav class="section-tabs"><a href="/flows">Definitions</a><a class="active" href="/flow-runs">Runs</a><a href="/flows#deployments">Deployments</a></nav>
 <div class="filter-bar"><SearchBox @bind-Value="search" Placeholder="Search run or Flow" /><select @bind="status"><option value="">All statuses</option>@foreach(var value in Enum.GetNames<FlowRunStatus>()){<option>@value</option>}</select><select @bind="trigger"><option value="">All triggers</option>@foreach(var value in Enum.GetNames<FlowRunTrigger>()){<option>@value</option>}</select><input @bind="version" placeholder="Version" /><input @bind="deployment" placeholder="Deployment" /></div>
 @if(runs is null){<LoadingState/>}else if(Filtered.Count==0){<EmptyState Title="No matching Flow Runs" Message="Adjust filters or start a Flow from its Runs tab."/>}else{<RunGrid Runs="Filtered" />}
 @code {

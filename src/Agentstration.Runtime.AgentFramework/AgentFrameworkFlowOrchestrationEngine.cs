@@ -25,6 +25,9 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         var workflow = await BuildWorkflowAsync(request.Definition, participants, cancellationToken);
         var messages = new List<ChatMessage> { new(ChatRole.User, Prompt(request.Input)) };
         var outputByParticipant = new Dictionary<string, StringBuilder>(StringComparer.Ordinal);
+        var activeTurns = new Dictionary<string, (int Turn, string? ResponseId)>(StringComparer.Ordinal);
+        var serializedTurns = request.Definition.Pattern is not ConcurrentOrchestrationPattern;
+        var nextTurn = 0;
         List<ChatMessage>? finalMessages = null;
 
         await using var run = await InProcessExecution.RunStreamingAsync(
@@ -38,21 +41,61 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         {
             switch (workflowEvent)
             {
-                case AgentResponseUpdateEvent update when !string.IsNullOrEmpty(update.Update.Text):
-                    var participantId = ParticipantId(update.ExecutorId, participants);
-                    if (!outputByParticipant.TryGetValue(participantId, out var output))
+                case AgentResponseUpdateEvent update:
+                    var participantId = ResolveParticipantId(update.Update.AgentId, update.ExecutorId, participants);
+                    if (serializedTurns
+                        && !string.IsNullOrEmpty(update.Update.Text)
+                        && activeTurns.Count > 0
+                        && !activeTurns.ContainsKey(participantId))
                     {
-                        output = new StringBuilder();
-                        outputByParticipant.Add(participantId, output);
+                        foreach (var previousTurn in activeTurns.OrderBy(item => item.Value.Turn))
+                            yield return new FlowParticipantTurnCompleted(previousTurn.Key, previousTurn.Value.Turn);
+                        activeTurns.Clear();
                     }
-                    output.Append(update.Update.Text);
-                    yield return new FlowParticipantDelta(participantId, update.Update.Text);
+                    if (activeTurns.TryGetValue(participantId, out var activeTurn)
+                        && activeTurn.ResponseId is not null
+                        && update.Update.ResponseId is not null
+                        && !string.Equals(activeTurn.ResponseId, update.Update.ResponseId, StringComparison.Ordinal))
+                    {
+                        activeTurns.Remove(participantId);
+                        yield return new FlowParticipantTurnCompleted(participantId, activeTurn.Turn);
+                    }
+                    if (!activeTurns.ContainsKey(participantId) && !string.IsNullOrEmpty(update.Update.Text))
+                    {
+                        activeTurns.Add(participantId, (++nextTurn, update.Update.ResponseId));
+                        yield return new FlowParticipantTurnStarted(participantId, nextTurn);
+                    }
+                    if (!string.IsNullOrEmpty(update.Update.Text))
+                    {
+                        if (!outputByParticipant.TryGetValue(participantId, out var output))
+                        {
+                            output = new StringBuilder();
+                            outputByParticipant.Add(participantId, output);
+                        }
+                        output.Append(update.Update.Text);
+                        yield return new FlowParticipantDelta(participantId, update.Update.Text);
+                    }
+                    if (update.Update.FinishReason is not null
+                        && activeTurns.Remove(participantId, out activeTurn))
+                        yield return new FlowParticipantTurnCompleted(participantId, activeTurn.Turn);
+                    break;
+                case AgentResponseEvent response:
+                    participantId = ResolveParticipantId(response.Response.AgentId, response.ExecutorId, participants);
+                    if (!activeTurns.Remove(participantId, out activeTurn))
+                    {
+                        activeTurn = (++nextTurn, response.Response.ResponseId);
+                        yield return new FlowParticipantTurnStarted(participantId, activeTurn.Turn);
+                    }
+                    yield return new FlowParticipantTurnCompleted(participantId, activeTurn.Turn);
                     break;
                 case WorkflowOutputEvent completed when completed.Is<List<ChatMessage>>():
                     finalMessages = completed.As<List<ChatMessage>>();
                     break;
             }
         }
+
+        foreach (var activeTurn in activeTurns.OrderBy(item => item.Value.Turn))
+            yield return new FlowParticipantTurnCompleted(activeTurn.Key, activeTurn.Value.Turn);
 
         foreach (var participant in outputByParticipant)
             yield return new FlowParticipantCompleted(participant.Key, JsonSerializer.SerializeToElement(participant.Value.ToString()));
@@ -133,8 +176,22 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         IReadOnlyDictionary<string, AIAgent> participants) =>
         definition.Participants.Select(participant => participants[participant.Id]);
 
-    private static string ParticipantId(string executorId, IReadOnlyDictionary<string, AIAgent> participants) =>
-        participants.Keys.FirstOrDefault(id => executorId.Contains(id, StringComparison.Ordinal)) ?? executorId;
+    internal static string ResolveParticipantId(
+        string? agentId,
+        string executorId,
+        IReadOnlyDictionary<string, AIAgent> participants)
+    {
+        foreach (var participant in participants)
+        {
+            if (string.Equals(participant.Value.Id, agentId, StringComparison.Ordinal)
+                || string.Equals(participant.Value.Id, executorId, StringComparison.Ordinal))
+                return participant.Key;
+        }
+
+        throw new FlowValidationException(
+            "flow_orchestration_participant_unmapped",
+            "The orchestration emitted an event for an unknown participant.");
+    }
 
     private static string Prompt(JsonElement input) =>
         input.ValueKind == JsonValueKind.Object

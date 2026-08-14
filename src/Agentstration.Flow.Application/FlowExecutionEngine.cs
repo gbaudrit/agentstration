@@ -11,7 +11,11 @@ public sealed record FlowOrchestrationExecutionRequest(
 
 public abstract record FlowExecutionEvent;
 
+public sealed record FlowParticipantTurnStarted(string ParticipantId, int Turn) : FlowExecutionEvent;
+
 public sealed record FlowParticipantDelta(string ParticipantId, string Content) : FlowExecutionEvent;
+
+public sealed record FlowParticipantTurnCompleted(string ParticipantId, int Turn) : FlowExecutionEvent;
 
 public sealed record FlowParticipantCompleted(string ParticipantId, JsonElement Output) : FlowExecutionEvent;
 

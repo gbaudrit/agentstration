@@ -10,4 +10,7 @@
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
     <PackageReference Include="Microsoft.Extensions.AI" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Agentstration.Runtime.Tests" />
+  </ItemGroup>
 </Project>

@@ -194,6 +194,10 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
 
     public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>
         Task.FromException<FlowResponse>(new KeyNotFoundException($"Simulated Flow '{flowId}' has no definition payload."));
+    public Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken) => UnsupportedFlow<FlowResourceSnapshot>();
+    public Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken) => UnsupportedFlow<FlowResourceSnapshot>();
+    public Task<FlowResourceSnapshot> UpdateFlowAsync(string flowId, UpdateFlowRequest request, string etag, CancellationToken cancellationToken) => UnsupportedFlow<FlowResourceSnapshot>();
+    public Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken) => UnsupportedFlow<FlowVersionResponse>();
     public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) =>
         Result<IReadOnlyList<FlowVersionResponse>>([], cancellationToken);
     public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken) =>
@@ -221,6 +225,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
     public Task<FlowRun> CreateDraftRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) => Task.FromException<FlowRun>(new NotSupportedException("Simulated Flow Drafts are not supported."));
     public Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken) => UnsupportedDraft();
     private static Task<FlowDraftResponse> UnsupportedDraft() => Task.FromException<FlowDraftResponse>(new NotSupportedException("Simulated Flow Drafts are not supported."));
+    private static Task<T> UnsupportedFlow<T>() => Task.FromException<T>(new NotSupportedException("Simulated Flow authoring is not supported."));
 
     public Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken) => Result<IReadOnlyList<ExecutionSummary>>(
     [

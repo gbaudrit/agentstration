@@ -9,6 +9,7 @@ using Agentstration.Flow.Storage.Sqlite;
 using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Application.Tests;
@@ -222,6 +223,8 @@ public sealed class FlowTests
         Assert.AreEqual("reviewed", completed.Output!.Value.GetString());
         var events = await runs.ListEventsAsync(completed.Id, 0, default);
         Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.StepOutputDelta));
+        Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.ParticipantTurnStarted));
+        Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.ParticipantTurnCompleted));
     }
 
     [TestMethod]
@@ -245,6 +248,28 @@ public sealed class FlowTests
         Assert.IsTrue(global!.Value.Any(item => item.Id == run.Id));
         var scoped = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flows/api-run-flow/runs", JsonOptions);
         Assert.IsTrue(scoped!.Value.Any(item => item.Id == run.Id));
+    }
+
+    [TestMethod]
+    public async Task FlowRunConsoleRouteDoesNotCollideWithPublicRunApi()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+
+        using var apiResponse = await client.GetAsync("/flowRuns");
+        using var missingRunResponse = await client.GetAsync("/flowRuns/missing-run");
+        var routes = factory.Services.GetServices<EndpointDataSource>()
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .Where(pattern => pattern is not null)
+            .ToArray();
+
+        Assert.AreEqual(HttpStatusCode.OK, apiResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, missingRunResponse.StatusCode);
+        Assert.Contains("/flow-runs", routes);
+        Assert.Contains("/flow-runs/{RunId}", routes);
+        Assert.Contains("/flowRuns/{runId}", routes);
     }
 
     [TestMethod]
@@ -504,9 +529,13 @@ public sealed class FlowTests
         {
             Assert.AreEqual(FlowOrchestrationStrategy.Sequential, request.Definition.Strategy);
             cancellationToken.ThrowIfCancellationRequested();
+            yield return new FlowParticipantTurnStarted("researcher", 1);
             yield return new FlowParticipantDelta("researcher", "draft");
+            yield return new FlowParticipantTurnCompleted("researcher", 1);
             yield return new FlowParticipantCompleted("researcher", JsonSerializer.SerializeToElement("draft"));
+            yield return new FlowParticipantTurnStarted("reviewer", 2);
             yield return new FlowParticipantDelta("reviewer", "reviewed");
+            yield return new FlowParticipantTurnCompleted("reviewer", 2);
             yield return new FlowParticipantCompleted("reviewer", JsonSerializer.SerializeToElement("reviewed"));
             yield return new FlowExecutionCompleted(JsonSerializer.SerializeToElement("reviewed"));
             await Task.CompletedTask;

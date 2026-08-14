@@ -95,8 +95,10 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
             if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
             var data = line[5..].TrimStart();
             if (data.Length == 0) continue;
-            yield return JsonSerializer.Deserialize<AepChatUpdate>(data, AepProtocol.JsonOptions)
+            var update = JsonSerializer.Deserialize<AepChatUpdate>(data, AepProtocol.JsonOptions)
                 ?? throw new AepProtocolException("invalid_response", "The extension returned an empty streaming update.");
+            yield return update;
+            if (update.FinishReason is not null) yield break;
         }
         }
     }

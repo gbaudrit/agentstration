@@ -2,11 +2,14 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Agentstration.Flow;
+using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Local;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -15,6 +18,71 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class AgentFrameworkRuntimeFactoryTests
 {
+    [TestMethod]
+    public void FlowOrchestrationMapsMafExecutorIdentityToInternalParticipantId()
+    {
+        using var chatClient = new RecordingChatClient();
+        AIAgent agent = new ChatClientAgent(chatClient, name: "agent-1");
+        IReadOnlyDictionary<string, AIAgent> participants = new Dictionary<string, AIAgent>
+        {
+            ["agent-1"] = agent
+        };
+
+        Assert.AreEqual(
+            "agent-1",
+            AgentFrameworkFlowOrchestrationEngine.ResolveParticipantId(agent.Id, "generated-executor", participants));
+        var exception = Assert.ThrowsExactly<FlowValidationException>(() =>
+            AgentFrameworkFlowOrchestrationEngine.ResolveParticipantId("unknown-agent", "unknown-maf-executor", participants));
+        Assert.AreEqual("flow_orchestration_participant_unmapped", exception.Code);
+    }
+
+    [TestMethod]
+    public async Task GroupChatEmitsTurnsWithInternalParticipantIds()
+    {
+        using var chatClient = new RecordingChatClient();
+        var factory = new AgentFrameworkRuntimeFactory(
+            new RecordingResolver(chatClient),
+            NullLoggerFactory.Instance,
+            new GenAiObservabilityOptions { Enabled = false });
+        var engine = new AgentFrameworkFlowOrchestrationEngine(
+            new RecordingAgentResolver(),
+            new EmptyToolCatalog(),
+            factory);
+        var definition = new OrchestrationFlowDefinition(
+            [
+                new FlowTargetReference(FlowTargetKind.Agent, "agent-1"),
+                new FlowTargetReference(FlowTargetKind.Agent, "agent-2")
+            ],
+            new GroupChatOrchestrationPattern(2));
+        var events = new List<FlowExecutionEvent>();
+
+        await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+            "run-1",
+            definition,
+            JsonSerializer.SerializeToElement(new { prompt = "Discuss" }),
+            "correlation-1")))
+            events.Add(item);
+
+        CollectionAssert.AreEqual(
+            new[] { "agent-1", "agent-2" },
+            events.OfType<FlowParticipantTurnStarted>().Select(item => item.ParticipantId).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { 1, 2 },
+            events.OfType<FlowParticipantTurnStarted>().Select(item => item.Turn).ToArray());
+        Assert.AreEqual(2, events.OfType<FlowParticipantTurnCompleted>().Count());
+        var transitions = events.Where(item => item is FlowParticipantTurnStarted or FlowParticipantTurnCompleted)
+            .Select(item => item switch
+            {
+                FlowParticipantTurnStarted started => $"start:{started.ParticipantId}:{started.Turn}",
+                FlowParticipantTurnCompleted completed => $"complete:{completed.ParticipantId}:{completed.Turn}",
+                _ => throw new UnreachableException()
+            }).ToArray();
+        CollectionAssert.AreEqual(
+            new[] { "start:agent-1:1", "complete:agent-1:1", "start:agent-2:2", "complete:agent-2:2" },
+            transitions,
+            string.Join(", ", transitions));
+    }
+
     [TestMethod]
     public async Task FactoryResolvesDeclaredProfileAndPassesAgentInstructionsToMaf()
     {
@@ -135,10 +203,10 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         activity.TagObjects.Select(tag => $"{tag.Key}={tag.Value}")
             .Concat(activity.Events.SelectMany(activityEvent => activityEvent.Tags.Select(tag => $"{tag.Key}={tag.Value}")));
 
-    private static ExecutableAgentDefinition Definition() => new()
+    private static ExecutableAgentDefinition Definition(string agentKey = "sql-expert") => new()
     {
         AgentId = Guid.NewGuid(),
-        AgentKey = "sql-expert",
+        AgentKey = agentKey,
         DisplayName = "SQL Expert",
         Description = "SQL specialist",
         AgentVersion = 1,
@@ -152,6 +220,29 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         Handler = "prompt-agent",
         DefinitionHash = "hash"
     };
+
+    private sealed class RecordingAgentResolver : IRuntimeAgentResolver
+    {
+        public Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken) =>
+            ResolveLatestAsync(reference.ResourceId, cancellationToken);
+
+        public Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, CancellationToken cancellationToken)
+        {
+            var definition = Definition(resourceId);
+            return Task.FromResult(new ResolvedRuntimeAgent(
+                definition.AgentId,
+                resourceId,
+                1,
+                $"deployment-{resourceId}",
+                $"revision-{resourceId}",
+                definition.RuntimeProfileName,
+                definition.ModelProfileName,
+                definition,
+                true,
+                "Ready",
+                null));
+        }
+    }
 
     private sealed class RecordingResolver(IChatClient client) : IChatClientResolver
     {

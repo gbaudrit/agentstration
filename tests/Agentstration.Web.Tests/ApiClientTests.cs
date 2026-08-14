@@ -156,6 +156,41 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public async Task FlowAuthoringClientPreservesETagAndPublishesImmutableVersion()
+    {
+        var now = new DateTimeOffset(2026, 8, 13, 10, 0, 0, TimeSpan.Zero);
+        var definition = new OrchestrationFlowDefinition(
+            [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
+            new SequentialOrchestrationPattern());
+        var flow = new FlowResponse("review", "review", null, "0.1.0", true, null, definition, new Dictionary<string, string>(), now, now);
+        var version = new FlowVersionResponse("review", "0.1.0", null, definition, new Dictionary<string, string>(), now);
+        var requests = new List<(HttpMethod Method, string Path, string? IfMatch)>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.Method, request.RequestUri!.AbsolutePath, request.Headers.IfMatch.FirstOrDefault()?.ToString()));
+            if (request.RequestUri.AbsolutePath.EndsWith("/versions", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(version) };
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) };
+            response.Headers.ETag = new EntityTagHeaderValue(request.Method == HttpMethod.Put ? "\"v2\"" : "\"v1\"");
+            return response;
+        })) { BaseAddress = new Uri("http://localhost/") };
+        var client = new FlowApiClient(httpClient);
+
+        var snapshot = await client.GetFlowSnapshotAsync("review", default);
+        var updated = await client.UpdateFlowAsync("review", new UpdateFlowRequest(null, "0.1.0", true, definition), snapshot.ETag, default);
+        var published = await client.CreateFlowVersionAsync("review", new CreateFlowVersionRequest("0.1.0"), default);
+
+        Assert.AreEqual("\"v2\"", updated.ETag);
+        Assert.AreEqual("0.1.0", published.Version);
+        CollectionAssert.AreEqual(new[]
+        {
+            (HttpMethod.Get, "/api/flows/review", (string?)null),
+            (HttpMethod.Put, "/api/flows/review", "\"v1\""),
+            (HttpMethod.Post, "/api/flows/review/versions", (string?)null)
+        }, requests);
+    }
+
+    [TestMethod]
     public async Task ManagementClientPreservesETagAndSendsCreatePrecondition()
     {
         var resource = CreateAgentResource("web-agent");

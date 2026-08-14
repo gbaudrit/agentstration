@@ -39,4 +39,6 @@ Deletion currently removes the logical Flow and its published versions. Direct s
 
 ## Runtime boundary
 
-No FlowRun engine exists in this increment. The Runtime will later resolve the WorkItem's FlowReference, compile a provider-neutral execution plan, create a FlowRun, and publish state/checkpoint/result events. Mapping Orchestration strategies to Microsoft Agent Framework belongs in a future Runtime adapter.
+Flow Runs resolve immutable published definitions and persist their own steps and event history. Typed graph workflows use the local provider-neutral executor; orchestration definitions use the neutral orchestration execution port whose Microsoft Agent Framework implementation is sealed inside the runtime adapter.
+
+The operations Console keeps those authoring models distinct. Workflow drafts use the graph designer, while orchestration Flows use a typed editor for participants and the sequential, concurrent, handoff, group-chat, and Magentic strategies. Both experiences share the same Flow details, immutable publication, Run history, and real-time diagnostic surfaces.
