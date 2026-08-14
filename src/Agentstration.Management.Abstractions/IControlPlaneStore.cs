@@ -1,4 +1,5 @@
 namespace Agentstration.Management.Abstractions;
+
 using Agentstration.Resources;
 
 public interface IManagementResourceDeletionGuard

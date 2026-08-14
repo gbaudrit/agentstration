@@ -1,7 +1,7 @@
 using System.Text.Json;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
-using Agentstration.Resources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -165,27 +165,45 @@ internal sealed class InteractionDocument
 
 internal sealed class ConversationMessageDocument
 {
-    public required string Id { get; set; } public required string WorkspaceId { get; set; } public required string InteractionId { get; set; }
-    public string? WorkTaskId { get; set; } public DateTimeOffset CreatedAt { get; set; } public required string Payload { get; set; }
+    public required string Id { get; set; }
+    public required string WorkspaceId { get; set; }
+    public required string InteractionId { get; set; }
+    public string? WorkTaskId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public required string Payload { get; set; }
 }
 
 internal sealed class PendingActionDocument
 {
-    public required string Id { get; set; } public required string WorkspaceId { get; set; } public required string InteractionId { get; set; }
-    public string? WorkTaskId { get; set; } public PendingActionStatus Status { get; set; } public required string ResumeTokenHash { get; set; }
-    public DateTimeOffset CreatedAt { get; set; } public long Version { get; set; } public required string Payload { get; set; }
+    public required string Id { get; set; }
+    public required string WorkspaceId { get; set; }
+    public required string InteractionId { get; set; }
+    public string? WorkTaskId { get; set; }
+    public PendingActionStatus Status { get; set; }
+    public required string ResumeTokenHash { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public long Version { get; set; }
+    public required string Payload { get; set; }
 }
 
 internal sealed class WorkNotificationDocument
 {
-    public required string Id { get; set; } public required string WorkspaceId { get; set; } public WorkNotificationKind Kind { get; set; }
-    public DateTimeOffset CreatedAt { get; set; } public DateTimeOffset? ReadAt { get; set; } public long Version { get; set; }
+    public required string Id { get; set; }
+    public required string WorkspaceId { get; set; }
+    public WorkNotificationKind Kind { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? ReadAt { get; set; }
+    public long Version { get; set; }
     public required string Payload { get; set; }
 }
 
 internal interface IWorkTaskEntityDocument
 {
-    string Id { get; set; } string WorkspaceId { get; set; } string WorkTaskId { get; set; } DateTimeOffset CreatedAt { get; set; } string Payload { get; set; }
+    string Id { get; set; }
+    string WorkspaceId { get; set; }
+    string WorkTaskId { get; set; }
+    DateTimeOffset CreatedAt { get; set; }
+    string Payload { get; set; }
 }
 internal sealed class WorkTaskActivityDocument : IWorkTaskEntityDocument { public required string Id { get; set; } public required string WorkspaceId { get; set; } public required string WorkTaskId { get; set; } public DateTimeOffset CreatedAt { get; set; } public required string Payload { get; set; } }
 internal sealed class WorkTaskResultDocument : IWorkTaskEntityDocument { public required string Id { get; set; } public required string WorkspaceId { get; set; } public required string WorkTaskId { get; set; } public DateTimeOffset CreatedAt { get; set; } public required string Payload { get; set; } }
@@ -426,8 +444,13 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         }
         var definitions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["Title"] = "TEXT NULL", ["Description"] = "TEXT NULL", ["WorkspaceId"] = "TEXT NULL",
-            ["InteractionId"] = "TEXT NULL", ["EntryId"] = "TEXT NULL", ["AnchorTaskId"] = "TEXT NULL", ["FlowRunId"] = "TEXT NULL"
+            ["Title"] = "TEXT NULL",
+            ["Description"] = "TEXT NULL",
+            ["WorkspaceId"] = "TEXT NULL",
+            ["InteractionId"] = "TEXT NULL",
+            ["EntryId"] = "TEXT NULL",
+            ["AnchorTaskId"] = "TEXT NULL",
+            ["FlowRunId"] = "TEXT NULL"
         };
         foreach (var definition in definitions.Where(value => !columns.Contains(value.Key)))
         {
@@ -738,8 +761,12 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
 
     private static InteractionDocument ToDocument(WorkplaceInteraction interaction) => new()
     {
-        Id = interaction.Id.ToString(), WorkspaceId = interaction.WorkspaceId.Value, EntryId = interaction.EntryId.Value,
-        Status = interaction.Status, LastActivityAt = interaction.LastActivityAt, Version = interaction.Version,
+        Id = interaction.Id.ToString(),
+        WorkspaceId = interaction.WorkspaceId.Value,
+        EntryId = interaction.EntryId.Value,
+        Status = interaction.Status,
+        LastActivityAt = interaction.LastActivityAt,
+        Version = interaction.Version,
         Payload = JsonSerializer.Serialize(interaction, JsonOptions)
     };
 

@@ -75,7 +75,10 @@ public sealed class WorkPlaneTests
 
         var draft = new EntryDraft
         {
-            Id = entryId, Name = "request", DisplayName = "Request", Binding = new EntryBinding(EntryBindingKind.Flow, "router"),
+            Id = entryId,
+            Name = "request",
+            DisplayName = "Request",
+            Binding = new EntryBinding(EntryBindingKind.Flow, "router"),
             Presentation = entry.Presentation with
             {
                 Fields =

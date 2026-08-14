@@ -1,11 +1,11 @@
 using Agentstration.Application.Work;
-using Agentstration.Work;
-using Agentstration.Work.Contracts;
-using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
+using Agentstration.Work;
+using Agentstration.Work.Contracts;
+using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Web;
 
@@ -164,7 +164,8 @@ public static class WorkplaceEndpoints
         {
             var values = await agents.ListAgentsAsync(0, 500, token);
             return Results.Ok(values.Select(value => new ResourcePickerItem(value.Value.Metadata.Name, value.Value.Definition.DisplayName, value.Value.Definition.Description, value.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), value.Value.Status.ProvisioningState.ToString(), kind,
-                new Dictionary<string, string> { ["modelProfile"] = value.Value.Definition.ModelProfile.ResourceId }) { Namespace = value.Value.Namespace }));
+                new Dictionary<string, string> { ["modelProfile"] = value.Value.Definition.ModelProfile.ResourceId })
+            { Namespace = value.Value.Namespace }));
         }
         if (string.Equals(kind, ResourceKinds.Flow, StringComparison.Ordinal))
         {
