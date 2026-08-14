@@ -260,7 +260,7 @@ public sealed class WorkplaceApiTests
             var firstOutputs = await WaitForOutputsAsync(client, submitted.Task.Id, 1);
             var firstFlowRunId = firstOutputs.Results.Single().FlowRunId;
             Assert.IsFalse(string.IsNullOrWhiteSpace(firstFlowRunId));
-            var idle = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}");
+            var idle = await WaitForInteractionStatusAsync(client, submitted.Interaction.Id, InteractionStatus.Idle);
             Assert.AreEqual(InteractionStatus.Idle, idle?.Status);
 
             using var continuationResponse = await client.PostAsJsonAsync(
@@ -295,7 +295,7 @@ public sealed class WorkplaceApiTests
                 Assert.AreEqual(submitted.Interaction.Id.ToString(), secondRun.Value.InteractionId);
                 Assert.AreEqual(submitted.Task.Id.ToString(), secondRun.Value.WorkTaskId);
             }
-            var continuedInteraction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}");
+            var continuedInteraction = await WaitForInteractionStatusAsync(client, submitted.Interaction.Id, InteractionStatus.Idle);
             Assert.AreEqual(InteractionStatus.Idle, continuedInteraction?.Status);
             Assert.AreEqual(outputs.Results[1].FlowRunId, continuedInteraction?.LastFlowRunId);
             var messages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/messages");
@@ -488,5 +488,20 @@ public sealed class WorkplaceApiTests
             await Task.Delay(25);
         }
         return (results, artifacts);
+    }
+
+    private static async Task<InteractionResponse?> WaitForInteractionStatusAsync(
+        HttpClient client,
+        Guid interactionId,
+        InteractionStatus expectedStatus)
+    {
+        InteractionResponse? interaction = null;
+        for (var attempt = 0; attempt < 150; attempt++)
+        {
+            interaction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{interactionId}");
+            if (interaction?.Status == expectedStatus) return interaction;
+            await Task.Delay(25);
+        }
+        return interaction;
     }
 }
