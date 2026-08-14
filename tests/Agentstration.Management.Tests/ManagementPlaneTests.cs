@@ -3,6 +3,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Resources;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -147,6 +148,29 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual(created.Value.Uid, loaded.Value.Uid);
         Assert.AreEqual("test", loaded.Value.Metadata.Tags["environment"]);
         Assert.AreEqual("preserve-me", loaded.Value.Metadata.Annotations["note"]);
+    }
+
+    [TestMethod]
+    public async Task SqliteStoreIsolatesHomonymousResourcesByNamespace()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var firstNamespace = new ResourceNamespace("team-a");
+        var secondNamespace = new ResourceNamespace("team-b");
+        var first = Agent("assistant") with { Metadata = new ResourceMetadata { Namespace = firstNamespace, Name = "assistant" } };
+        var second = Agent("assistant") with { Metadata = new ResourceMetadata { Namespace = secondNamespace, Name = "assistant" } };
+
+        await fixture.Store.PutAsync(first, null, true, default);
+        await fixture.Store.PutAsync(second, null, true, default);
+
+        var loadedFirst = await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", firstNamespace), default);
+        var loadedSecond = await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", secondNamespace), default);
+        Assert.AreEqual(firstNamespace, loadedFirst?.Value.Namespace);
+        Assert.AreEqual(secondNamespace, loadedSecond?.Value.Namespace);
+        Assert.IsNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant"), default));
+
+        await fixture.Store.DeleteAsync(new ResourceKey(ResourceKinds.Agent, "assistant", firstNamespace), loadedFirst!.ETag, default);
+        Assert.IsNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", firstNamespace), default));
+        Assert.IsNotNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", secondNamespace), default));
     }
 
     private static AgentResource Agent(string name) => new()

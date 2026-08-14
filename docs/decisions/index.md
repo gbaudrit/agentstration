@@ -64,3 +64,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 32. [ADR-0032 — Use one authoritative standalone server](0032-single-authoritative-standalone-server.md)
 33. [ADR-0033 — Canonical resource names and explicit execution identities](0033-canonical-names-and-execution-identities.md)
 34. [ADR-0034 — Seal MAF Flow orchestration behind the runtime adapter](0034-seal-maf-flow-orchestration-behind-runtime-adapter.md)
+35. [ADR-0035 — Resource names are scoped by explicit namespaces](0035-resource-namespaces.md)
