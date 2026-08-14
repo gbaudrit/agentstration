@@ -65,3 +65,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 33. [ADR-0033 — Canonical resource names and explicit execution identities](0033-canonical-names-and-execution-identities.md)
 34. [ADR-0034 — Runtime resolution and control-plane hardening](0034-runtime-resolution-and-control-plane-hardening.md)
 35. [ADR-0035 — Packs are Management and distribution artifacts](0035-packs-are-management-distribution-artifacts.md)
+36. [ADR-0036 — Pack Projects retain sources and produce local immutable builds](0036-pack-projects-and-local-builds.md)
