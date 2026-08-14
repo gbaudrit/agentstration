@@ -51,6 +51,27 @@ public sealed class FlowRunTimelineTests
         Assert.AreEqual(205, rendered.FindAll(".flow-raw-events li").Count);
     }
 
+    [TestMethod]
+    public void ParticipantTurnsAndTimeoutRenderAsSemanticActivity()
+    {
+        using var context = new BunitContext();
+        var now = DateTimeOffset.UtcNow;
+        FlowRunEvent[] events =
+        [
+            Event(1, FlowRunEventType.ParticipantTurnStarted, "researcher", new { turn = 1 }, now),
+            Event(2, FlowRunEventType.ParticipantTurnCompleted, "researcher", new { turn = 1 }, now),
+            Event(3, FlowRunEventType.ParticipantTurnStarted, "reviewer", new { turn = 2 }, now),
+            Event(4, FlowRunEventType.FlowRunTimedOut, null, null, now)
+        ];
+
+        var rendered = context.Render<FlowRunTimeline>(parameters => parameters.Add(value => value.Events, events));
+
+        Assert.Contains("researcher started a turn", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains("researcher completed a turn", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains("reviewer started a turn", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains("Flow run timed out", rendered.Markup, StringComparison.Ordinal);
+    }
+
     private static FlowRunEvent Event(long sequence, FlowRunEventType type, string? stepId, object? payload, DateTimeOffset timestamp) =>
         new("run-1", sequence, type, stepId, payload is null ? null : JsonSerializer.SerializeToElement(payload), timestamp);
 }

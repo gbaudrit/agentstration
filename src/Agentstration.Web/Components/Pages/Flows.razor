@@ -3,9 +3,9 @@
 @inject IFlowApiClient Client
 <PageTitle>Flows · Agentstration</PageTitle>
 <PageHeader Title="Flows" Description="Define orchestrations and inspect every execution from one operational workspace.">
-    <Actions><a class="button-primary" href="/flows/new">New flow</a><a class="button-secondary" href="/flowruns">View all runs</a></Actions>
+    <Actions><a class="button-primary" href="/flows/new">New flow</a><a class="button-secondary" href="/flow-runs">View all runs</a></Actions>
 </PageHeader>
-<nav class="section-tabs" aria-label="Flow sections"><a class="active" href="/flows">Definitions</a><a href="/flowruns">Runs</a><a href="/flows#deployments">Deployments</a></nav>
+<nav class="section-tabs" aria-label="Flow sections"><a class="active" href="/flows">Definitions</a><a href="/flow-runs">Runs</a><a href="/flows#deployments">Deployments</a></nav>
 @if (items is null) { <LoadingState /> }
 else if (items.Count == 0) { <EmptyState Title="No Flow definitions" Message="Create and publish a Flow through the API to begin." /> }
 else

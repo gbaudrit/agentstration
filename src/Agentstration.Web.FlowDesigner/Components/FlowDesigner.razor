@@ -235,7 +235,7 @@ else
     private async Task ValidateAsync() => Editor.SetIssues((await Backend.ValidateAsync(ResourceId, cancellation.Token)).Issues);
     private async Task PublishAsync() { await SaveAsync(); try { var version = await Backend.PublishAsync(ResourceId, new(publishVersion), cancellation.Token); publishVersion = NextVersion(version.Version); await ValidateAsync(); } catch (Exception exception) { error = exception.Message; } }
     private void OpenRun() { showRun = true; error = null; }
-    private async Task RunDraftAsync() { try { await SaveAsync(); using var json = JsonDocument.Parse(runInput); var run = await Backend.RunDraftAsync(ResourceId, new(json.RootElement.Clone(), Trigger: FlowRunTrigger.Manual, StartedBy: "local-user"), cancellation.Token); Navigation.NavigateTo($"/flowruns/{run.Id}"); } catch (Exception exception) { error = exception.Message; } }
+    private async Task RunDraftAsync() { try { await SaveAsync(); using var json = JsonDocument.Parse(runInput); var run = await Backend.RunDraftAsync(ResourceId, new(json.RootElement.Clone(), Trigger: FlowRunTrigger.Manual, StartedBy: "local-user"), cancellation.Token); Navigation.NavigateTo($"/flow-runs/{run.Id}"); } catch (Exception exception) { error = exception.Message; } }
     private async Task ApplySourceAsync(string source) { try { var saved = await Backend.ReplaceSourceAsync(ResourceId, new(source), Editor.State.ETag!, cancellation.Token); var canonical = await Backend.GetSourceAsync(ResourceId, cancellation.Token); sourceText = canonical.Source; Editor.MarkSaved(saved, canonical.Source); } catch (Exception exception) { sourceText = source; Editor.SetSource(source, exception.Message); } }
 
     private async Task AddStepAsync(string type)

@@ -120,13 +120,18 @@ public static class AepServerExtensions
         response.StatusCode = StatusCodes.Status200OK;
         response.ContentType = "text/event-stream";
         response.Headers.CacheControl = "no-cache";
-        await foreach (var update in provider.ChatStreamingAsync(request, cancellationToken).WithCancellation(cancellationToken))
+        try
         {
-            await response.WriteAsync("data: ", cancellationToken);
-            await JsonSerializer.SerializeAsync(response.Body, update, AepProtocol.JsonOptions, cancellationToken);
-            await response.WriteAsync("\n\n", cancellationToken);
-            await response.Body.FlushAsync(cancellationToken);
+            await foreach (var update in provider.ChatStreamingAsync(request, cancellationToken).WithCancellation(cancellationToken))
+            {
+                await response.WriteAsync("data: ", cancellationToken);
+                await JsonSerializer.SerializeAsync(response.Body, update, AepProtocol.JsonOptions, cancellationToken);
+                await response.WriteAsync("\n\n", cancellationToken);
+                await response.Body.FlushAsync(cancellationToken);
+                if (update.FinishReason is not null) break;
+            }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
 
     private static IAepModelProvider? Find(IEnumerable<IAepModelProvider> providers, string id) =>

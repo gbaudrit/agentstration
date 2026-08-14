@@ -98,11 +98,14 @@
         FlowRunEventType.FlowRunCreated => "Flow run created",
         FlowRunEventType.FlowRunStarted => "Flow run started",
         FlowRunEventType.StepRunStarted => $"{item.StepId ?? "Step"} started",
+        FlowRunEventType.ParticipantTurnStarted => $"{item.StepId ?? "Participant"} started a turn",
+        FlowRunEventType.ParticipantTurnCompleted => $"{item.StepId ?? "Participant"} completed a turn",
         FlowRunEventType.StepRunCompleted => $"{item.StepId ?? "Step"} completed",
         FlowRunEventType.StepRunFailed => $"{item.StepId ?? "Step"} failed",
         FlowRunEventType.FlowRunCompleted => "Flow run completed",
         FlowRunEventType.FlowRunFailed => "Flow run failed",
         FlowRunEventType.FlowRunCancelled => "Flow run cancelled",
+        FlowRunEventType.FlowRunTimedOut => "Flow run timed out",
         _ => item.Type.ToString()
     };
 
@@ -110,8 +113,8 @@
     {
         FlowRunEventType.FlowRunCompleted or FlowRunEventType.StepRunCompleted => "flow-timeline-success",
         FlowRunEventType.FlowRunFailed or FlowRunEventType.StepRunFailed => "flow-timeline-danger",
-        FlowRunEventType.FlowRunCancelled => "flow-timeline-warning",
-        FlowRunEventType.FlowRunStarted or FlowRunEventType.StepRunStarted or FlowRunEventType.StepOutputDelta => "flow-timeline-info",
+        FlowRunEventType.FlowRunCancelled or FlowRunEventType.FlowRunTimedOut => "flow-timeline-warning",
+        FlowRunEventType.FlowRunStarted or FlowRunEventType.StepRunStarted or FlowRunEventType.ParticipantTurnStarted or FlowRunEventType.StepOutputDelta => "flow-timeline-info",
         _ => string.Empty
     };
 

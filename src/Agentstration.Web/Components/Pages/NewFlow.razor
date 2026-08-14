@@ -1,13 +1,90 @@
 @page "/flows/new"
 @implements IDisposable
 @inject IFlowApiClient Client
+@inject IManagementApiClient Management
 @inject NavigationManager Navigation
 <PageTitle>New Flow · Agentstration</PageTitle>
-<PageHeader Title="New Flow" Description="Create a mutable Draft from a focused starting template." />
-<EditForm Model="model" OnValidSubmit="CreateAsync"><DataAnnotationsValidator/><article class="panel flow-create-form"><label>Technical name<InputText @bind-Value="model.Name" /></label><label>Display name<InputText @bind-Value="model.DisplayName" /></label><label>Description<InputTextArea @bind-Value="model.Description" /></label><label>Starting template<InputSelect @bind-Value="model.Template"><option value="EmptyFlow">Empty flow</option><option value="AgentRouting">Agent routing</option><option value="SequentialProcessing">Sequential processing</option><option value="ConditionalFlow">Conditional flow</option></InputSelect></label>@if(error is not null){<p class="error-panel">@error</p>}<div class="dialog-actions"><a class="button-secondary" href="/flows">Cancel</a><button class="button-primary" disabled="@submitting">@(submitting?"Creating…":"Create Draft")</button></div></article></EditForm>
-@code{
-    private readonly CancellationTokenSource cancellation=new();private readonly NewFlowModel model=new();private bool submitting;private string? error;
-    private async Task CreateAsync(){try{submitting=true;error=null;var draft=await Client.CreateDraftAsync(new CreateFlowDraftRequest(model.Name,model.DisplayName,model.Description,Template:model.Template),cancellation.Token);Navigation.NavigateTo($"/flows/{draft.Value.FlowId.Value}/designer",forceLoad:true);}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
-    public void Dispose(){cancellation.Cancel();cancellation.Dispose();}
-    private sealed class NewFlowModel{[System.ComponentModel.DataAnnotations.Required]public string Name{get;set;}="specialized-agent-routing";[System.ComponentModel.DataAnnotations.Required]public string DisplayName{get;set;}="Specialized agent routing";public string? Description{get;set;}="Routes a request to the best specialized agent.";public string Template{get;set;}="AgentRouting";}
+<PageHeader Title="New Flow" Description="Choose the execution model, then configure a provider-neutral Flow definition." />
+
+<EditForm Model="model" OnValidSubmit="CreateAsync">
+    <DataAnnotationsValidator />
+    <article class="panel flow-create-form">
+        <div class="form-columns">
+            <label>Technical name<InputText @bind-Value="model.Name" /></label>
+            <label>Flow kind<InputSelect @bind-Value="model.Kind"><option value="Workflow">Workflow</option><option value="Orchestration">Orchestration</option></InputSelect></label>
+        </div>
+        @if (model.Kind == "Workflow")
+        {
+            <label>Display name<InputText @bind-Value="model.DisplayName" /></label>
+        }
+        <label>Description<InputTextArea @bind-Value="model.Description" /></label>
+        @if (model.Kind == "Workflow")
+        {
+            <label>Starting template<InputSelect @bind-Value="model.Template"><option value="EmptyFlow">Empty flow</option><option value="AgentRouting">Agent routing</option><option value="SequentialProcessing">Sequential processing</option><option value="ConditionalFlow">Conditional flow</option></InputSelect></label>
+        }
+        else
+        {
+            <div class="form-columns"><label>Initial version<InputText @bind-Value="orchestration.Version" /></label><label class="check-option"><InputCheckbox @bind-Value="orchestration.Enabled" /> Enabled</label></div>
+        }
+    </article>
+
+    @if (model.Kind == "Orchestration")
+    {
+        <OrchestrationDefinitionEditor Model="orchestration" Agents="agents" />
+    }
+
+    @if (error is not null) { <p class="error-panel">@error</p> }
+    <div class="dialog-actions flow-create-actions"><a class="button-secondary" href="/flows">Cancel</a><button class="button-primary" disabled="@submitting">@(submitting ? "Creating…" : model.Kind == "Workflow" ? "Create Draft" : "Create Orchestration")</button></div>
+</EditForm>
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly NewFlowModel model = new();
+    private readonly OrchestrationEditorModel orchestration = new();
+    private IReadOnlyList<AgentSummary> agents = [];
+    private bool submitting;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { agents = await Management.GetAgentsAsync(cancellation.Token); }
+        catch (Exception exception) { error = exception.Message; }
+    }
+
+    private async Task CreateAsync()
+    {
+        try
+        {
+            submitting = true; error = null;
+            if (model.Kind == "Workflow")
+            {
+                var draft = await Client.CreateDraftAsync(new CreateFlowDraftRequest(model.Name, model.DisplayName, model.Description, Template: model.Template), cancellation.Token);
+                Navigation.NavigateTo($"/flows/{draft.Value.FlowId.Value}/designer", forceLoad: true);
+                return;
+            }
+
+            orchestration.Name = model.Name;
+            orchestration.Description = model.Description;
+            var created = await Client.CreateFlowAsync(new CreateFlowRequest(
+                model.Name,
+                model.Description,
+                orchestration.Version,
+                orchestration.Enabled,
+                orchestration.CreateDefinition()), cancellation.Token);
+            Navigation.NavigateTo($"/flows/{created.Value.Id}/orchestration");
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { submitting = false; }
+    }
+
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+
+    private sealed class NewFlowModel
+    {
+        [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = "multi-agent-review";
+        [System.ComponentModel.DataAnnotations.Required] public string DisplayName { get; set; } = "Multi-agent review";
+        public string? Description { get; set; } = "Coordinates agents to produce a reviewed result.";
+        public string Kind { get; set; } = "Workflow";
+        public string Template { get; set; } = "AgentRouting";
+    }
 }

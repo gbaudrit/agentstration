@@ -43,7 +43,7 @@ public static class FlowEndpoints
 
     private static Task<IResult> CreateAsync(CreateFlowRequest body, HttpResponse response, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var stored = await service.CreateAsync(new CreateFlowCommand(body.Name, body.Description, body.Kind, body.Version, body.Enabled, body.Spec, body.Metadata), token);
+        var stored = await service.CreateAsync(new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata), token);
         response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/flows/{stored.Value.Id}";
         return Results.Json(ToResponse(stored.Value), statusCode: StatusCodes.Status201Created);
@@ -69,7 +69,7 @@ public static class FlowEndpoints
     {
         var current = await RequiredAsync(id, service, token);
         var etag = request.Headers.IfMatch.FirstOrDefault() ?? current.ETag;
-        var stored = await service.UpdateAsync(new FlowId(id), new UpdateFlowCommand(body.Description, body.Kind, body.Version, body.Enabled, body.Spec, body.Metadata), etag, token);
+        var stored = await service.UpdateAsync(new FlowId(id), new UpdateFlowCommand(body.Description, body.Version, body.Enabled, body.Definition, body.Metadata), etag, token);
         response.Headers.ETag = stored.ETag;
         return Results.Ok(ToResponse(stored.Value));
     });
@@ -241,9 +241,9 @@ public static class FlowEndpoints
     private static async Task<StoredFlowRun> RequiredRunAsync(string id, FlowRunService service, CancellationToken token) =>
         await service.GetAsync(id, token) ?? throw new FlowRunNotFoundException(id);
 
-    private static FlowResponse ToResponse(FlowDefinition value) => new(value.Id.Value, value.Name, value.Description, value.Kind, value.Version, value.Enabled, value.ActiveVersion, value.Spec, value.Metadata, value.CreatedAt, value.UpdatedAt);
-    private static FlowSummaryResponse ToSummary(FlowDefinition value) => new(value.Id.Value, value.Name, value.Description, value.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt);
-    private static FlowVersionResponse ToVersion(FlowVersion value) => new(value.FlowId.Value, value.Version, value.Description, value.Kind, value.Spec, value.Metadata, value.PublishedAt, value.Graph, value.DefinitionHash, value.ReleaseNotes);
+    private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt);
+    private static FlowSummaryResponse ToSummary(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Definition.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt);
+    private static FlowVersionResponse ToVersion(FlowVersion value) => new(value.FlowId.Value, value.Version, value.Description, value.Definition, value.Metadata, value.PublishedAt, value.Graph, value.DefinitionHash, value.ReleaseNotes);
 
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {

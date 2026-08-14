@@ -195,7 +195,7 @@ Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://
 
 `Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. The autonomous `Agentstration.Extensions.Ollama` service alone owns OllamaSharp, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no AEP or Ollama dependency.
 
-Current limitations are deliberate: Ollama is the only mutable provider type, credentials are not stored on provider resources, and there is no parallel Flow execution, conversation persistence, or provider-native streaming yet. Other OpenAI-compatible endpoints still use the legacy host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
+Current limitations are deliberate: Ollama is the only mutable provider type, credentials are not stored on provider resources, separate Flow Runs are not dispatched in parallel, and there is no conversation persistence or provider-native streaming yet. The Concurrent Flow orchestration strategy does execute its participants concurrently inside one bounded Run. Other OpenAI-compatible endpoints still use the legacy host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 
 ### Model provider and profile APIs
 
@@ -322,7 +322,7 @@ $flow = @{
   kind = "Direct"
   version = "1.0.0"
   enabled = $true
-  spec = @{ specKind = "direct"; target = @{ kind = "Agent"; id = "sql-expert" } }
+  definition = @{ flowKind = "direct"; target = @{ kind = "Agent"; id = "sql-expert" } }
 } | ConvertTo-Json -Depth 8
 Invoke-RestMethod -Method Post -ContentType application/json -Body $flow "http://localhost:5100/api/flows"
 Invoke-RestMethod -Method Post -ContentType application/json -Body (@{ version="1.0.0"; activate=$true } | ConvertTo-Json) "http://localhost:5100/api/flows/sql-direct/versions"
@@ -330,7 +330,7 @@ Invoke-RestMethod -Method Post -ContentType application/json -Body (@{ version="
 
 Flow definitions are stored in `.agentstration/flow-plane.db`. Published versions are immutable; a `WorkItem` may carry a lightweight exact or active `FlowReference` without embedding the definition.
 
-The Flow console at `/flows` provides creation templates, a four-zone visual designer, Designer/Definition/Split modes, YAML source editing, validation, optimistic draft saving, publication, published versions and per-Flow Runs. The specialized UI lives in the `Agentstration.Web.FlowDesigner` Razor Class Library: Z.Blazor.Diagrams owns canvas interaction and BlazorMonaco provides the locally served Monaco editor, while `Agentstration.Web` supplies backend and resource adapters. A Draft Run validates its JSON input and retains its exact draft revision, hash, and immutable definition snapshot. Run details receive differential SignalR events with replay from persisted history; `/flowruns` provides the global searchable Run history. Flow data remains in the independent `.agentstration/flow-plane.db` store.
+The Flow console at `/flows` provides creation templates, a four-zone visual designer, Designer/Definition/Split modes, YAML source editing, validation, optimistic draft saving, publication, published versions and per-Flow Runs. The specialized UI lives in the `Agentstration.Web.FlowDesigner` Razor Class Library: Z.Blazor.Diagrams owns canvas interaction and BlazorMonaco provides the locally served Monaco editor, while `Agentstration.Web` supplies backend and resource adapters. A Draft Run validates its JSON input and retains its exact draft revision, hash, and immutable definition snapshot. Run details receive differential SignalR events with replay from persisted history; `/flow-runs` provides the global searchable Run history. Flow data remains in the independent `.agentstration/flow-plane.db` store.
 
 ## MCP
 

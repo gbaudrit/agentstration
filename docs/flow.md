@@ -10,13 +10,17 @@ The Flow module is composed of independent Core, Contracts, Application, Storage
 
 ## Kinds
 
+The complete behavioral reference and mode-selection guide is available in [Flow modes](concepts/flow-modes.md).
+
 - `Direct` selects one Agent target.
 - `Routing` configures a strategy, candidate targets, optional fallback, and extensible settings.
 - `Workflow` defines a simple graph of unique nodes, edges, one entry point, and optional outputs.
-- `Orchestration` declares participants and a provider-neutral Sequential, Concurrent, Handoff, GroupChat, Magentic, or Custom strategy.
+- `Orchestration` declares participants and a provider-neutral Sequential, Concurrent, Handoff, GroupChat, or Magentic strategy.
 - `Composite` references child Flows without copying their definitions.
 
-Each `spec` is polymorphic and carries the OpenAPI/JSON discriminator `specKind`. References distinguish Agent and Flow targets. A `FlowReference` selects either an immutable semantic version or the active version.
+Each Flow resource exposes one polymorphic `definition` carrying the OpenAPI/JSON discriminator `flowKind`. References distinguish Agent and Flow targets. A `FlowReference` selects either an immutable semantic version or the active version.
+
+Orchestration definitions remain provider-neutral. They describe the participants and one typed strategy (`sequential`, `concurrent`, `handoff`, `groupChat`, or `magentic`). The Microsoft Agent Framework workflow objects are created only inside the runtime adapter and never cross the Flow, API, persistence, or Work Plane boundaries.
 
 ## Versioning and API
 
@@ -37,4 +41,10 @@ Deletion currently removes the logical Flow and its published versions. Direct s
 
 ## Runtime boundary
 
-No FlowRun engine exists in this increment. The Runtime will later resolve the WorkItem's FlowReference, compile a provider-neutral execution plan, create a FlowRun, and publish state/checkpoint/result events. Mapping Orchestration strategies to Microsoft Agent Framework belongs in a future Runtime adapter.
+Flow Runs resolve immutable published definitions and persist their own steps and event history. Typed graph workflows use the local provider-neutral executor; orchestration definitions use the neutral orchestration execution port whose Microsoft Agent Framework implementation is sealed inside the runtime adapter.
+
+Every orchestration Run persists a normalized result containing its strategy, its final output, and the ordered participant results. Participant results retain their turns, resolved agent/model identity, invoked tools, and usage when the provider supplies it. Sequential and Group Chat preserve shared history, Concurrent retains one result per participant, Handoff follows only declared reachable routes, and Magentic uses a distinct manager that is never exposed as a participant.
+
+Execution is bounded by validated participant/iteration/round limits and a server-side timeout. Magentic currently runs autonomously with plan sign-off disabled. A future interactive mode will require a durable neutral request/response contract and resume semantics; until that contract exists, any MAF interaction request fails explicitly instead of leaving a Run hanging.
+
+The operations Console keeps those authoring models distinct. Workflow drafts use the graph designer, while orchestration Flows use a typed editor for participants and the sequential, concurrent, handoff, group-chat, and Magentic strategies. Both experiences share the same Flow details, immutable publication, Run history, and real-time diagnostic surfaces.

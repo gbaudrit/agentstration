@@ -92,7 +92,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Model providers | SQLite-backed provider declarations with ETag CRUD and usage protection, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | credentials/connections, additional AEP extensions, cached discovery |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
-| Flows | typed graph drafts, validation, YAML/JSON source, immutable versions, durable sequential Runs, visual designer and SignalR replay | checkpoints, parallel and long-running steps |
+| Flows | typed graph drafts, typed orchestration authoring, immutable versions, durable Runs, visual editors and SignalR replay | checkpoints and long-running interactive steps |
 | Flow storage | independent readable JSON documents, ETags, active/current definition separation | migrations, indirect reference projections |
 | Identity | local-user boundary only | OIDC, users, members, workspace authorization |
 | Workspaces | workspace and inbox lifecycle | teams, organizations, policies |
@@ -192,7 +192,7 @@ POST /api/flows/{id}/versions
   -> immutable FlowVersion snapshot
   -> optional active-version pointer update
 WorkItem -> optional FlowReference (exact or active)
-Flow Run -> resolves exact published FlowReference -> sequential local execution
+Flow Run -> resolves exact published FlowReference -> local graph execution or isolated MAF orchestration adapter
 ```
 
 The Flow module is physically independent and owns editable typed graph drafts, immutable published snapshots, constrained expressions, and the provider-neutral Flow Run model. The local executor traverses `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps sequentially without referencing Microsoft Agent Framework; Infrastructure adapts agent steps and Management resource lookups.
@@ -204,7 +204,7 @@ Console / API / future Work adapter
   -> POST published Flow Run returns 202 Accepted
   -> bounded local Flow queue
   -> validate input and persist the exact draft or published definition snapshot
-  -> traverse typed steps and execute selected managed Agents through the Flow agent port
+  -> traverse typed steps or execute a bounded provider-neutral orchestration through the runtime adapter
   -> persist differential events, transitions, diagnostics, usage, and failures
   -> SignalR updates with persisted replay, cancellation, global and per-Flow history
 ```
