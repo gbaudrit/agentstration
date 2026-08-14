@@ -203,6 +203,12 @@ public sealed class PackTests
         Assert.IsNotNull(build);
         Assert.AreEqual("0.1.0-dev.1", build.Definition.Version);
 
+        using var repeatedBuildResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds", null);
+        Assert.AreEqual(HttpStatusCode.Created, repeatedBuildResponse.StatusCode, await repeatedBuildResponse.Content.ReadAsStringAsync());
+        var repeatedBuild = await repeatedBuildResponse.Content.ReadFromJsonAsync<PackProjectBuildResource>();
+        Assert.IsNotNull(repeatedBuild);
+        Assert.AreEqual(build.Definition.Artifact.Sha256, repeatedBuild.Definition.Artifact.Sha256, "The same project revision must produce the same Pack bytes.");
+
         using var conflictingPreviewResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/preview", null);
         Assert.AreEqual(HttpStatusCode.OK, conflictingPreviewResponse.StatusCode);
         var conflictingPreview = await conflictingPreviewResponse.Content.ReadFromJsonAsync<PackInstallationPreview>();
@@ -218,6 +224,9 @@ public sealed class PackTests
         Assert.IsNotNull(localInstallation);
         Assert.AreEqual("local", localInstallation.Definition.Publisher);
         Assert.AreEqual("who-am-i-lab", localInstallation.Definition.PackName);
+
+        using var localReinstallResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install?replaceExisting=true", null);
+        Assert.AreEqual(HttpStatusCode.Created, localReinstallResponse.StatusCode, await localReinstallResponse.Content.ReadAsStringAsync());
 
         using var downloadResponse = await client.GetAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/download");
         Assert.AreEqual(HttpStatusCode.OK, downloadResponse.StatusCode);

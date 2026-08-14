@@ -33,7 +33,9 @@ public sealed partial class PackAuthoringService(
             && string.Equals(value.Value.Definition.PackName, command.Name, StringComparison.Ordinal));
         if (duplicate) throw new PackValidationException("pack_project_identity_conflict", $"Pack Project '{command.Publisher}/{command.Name}' already exists.");
 
-        await VerifyArtifactAsync(sourceArtifact, cancellationToken);
+        var sourceBytes = await ReadArtifactAsync(sourceArtifact, cancellationToken);
+        await using var sourceStream = new MemoryStream(sourceBytes, writable: false);
+        var sourceArchive = await archiveReader.ReadAsync(sourceStream, sourceArtifact.FileName, cancellationToken);
         var now = timeProvider.GetUtcNow();
         var id = Guid.NewGuid();
         return await store.PutAsync(new PackProjectResource
@@ -49,8 +51,10 @@ public sealed partial class PackAuthoringService(
                 Publisher = command.Publisher,
                 PackName = command.Name,
                 Version = command.Version,
-                DisplayName = command.DisplayName ?? installed.Value.Definition.DisplayName ?? command.Name,
-                Description = command.Description ?? installed.Value.Definition.Description,
+                DisplayName = command.DisplayName ?? sourceArchive.Manifest.Metadata.DisplayName ?? command.Name,
+                Description = command.Description ?? sourceArchive.Manifest.Metadata.Description,
+                Categories = sourceArchive.Manifest.Metadata.Categories.ToArray(),
+                Tags = sourceArchive.Manifest.Metadata.Tags.ToArray(),
                 Origin = new(source.Publisher, source.Name, installed.Value.Definition.Version, sourceArtifact.Sha256, installed.Value.Name),
                 SourceArtifact = sourceArtifact,
                 CreatedAt = now,
@@ -163,11 +167,22 @@ public sealed partial class PackAuthoringService(
         return await installations.PreviewAsync(archive, cancellationToken);
     }
 
-    public async Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken)
+    public async Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken)
     {
         var archive = await ReadBuildArchiveAsync(projectId, buildId, cancellationToken);
+        var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
+        var existing = await installations.GetAsync(identity, cancellationToken);
+        if (existing is not null)
+        {
+            if (!replaceExisting)
+                throw new PackValidationException("pack_already_installed", $"Pack '{identity}' is already installed. Enable replacement to reinstall this development build.");
+            await installations.UninstallAsync(identity, cancellationToken);
+        }
         return await installations.InstallAsync(archive, cancellationToken);
     }
+
+    public Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken) =>
+        InstallBuildAsync(projectId, buildId, false, cancellationToken);
 
     private async Task<PackArchive> ReadBuildArchiveAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken)
     {
@@ -179,9 +194,6 @@ public sealed partial class PackAuthoringService(
 
     private async Task<StoredResource<PackProjectResource>> RequiredProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
         await GetProjectAsync(projectId, cancellationToken) ?? throw new KeyNotFoundException($"Pack Project '{projectId}' was not found.");
-
-    private async Task VerifyArtifactAsync(PackArtifactReference reference, CancellationToken cancellationToken) =>
-        _ = await ReadArtifactAsync(reference, cancellationToken);
 
     private async Task<byte[]> ReadArtifactAsync(PackArtifactReference reference, CancellationToken cancellationToken)
     {

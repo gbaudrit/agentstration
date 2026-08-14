@@ -1,0 +1,212 @@
+@page "/pack-projects/{ProjectId:guid}"
+@implements IDisposable
+@inject IPacksClient Client
+@inject ConsoleContextState ContextState
+@inject NavigationManager Navigation
+
+<PageTitle>@(project?.Value.Definition.DisplayName ?? "Pack Project") · Agentstration</PageTitle>
+
+@if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else if (project is null)
+{
+    <LoadingState Message="Loading Pack Project…" />
+}
+else
+{
+    <PageHeader Title="@(project.Value.Definition.DisplayName ?? project.Value.Definition.PackName)" Description="Edit metadata, create immutable builds, then install them directly into an authorized local workspace.">
+        <Actions>
+            <button class="button-secondary" @onclick="BackToPacks">Back to Packs</button>
+            <button class="button-secondary" disabled="@(busy || !dirty)" @onclick="SaveAsync">Save</button>
+            <button class="button-primary" disabled="@busy" @onclick="BuildAsync">@(building ? "Building…" : "Build Pack")</button>
+        </Actions>
+    </PageHeader>
+
+    <section class="studio-layout">
+        <div class="panel studio-editor">
+            <div class="panel-header"><div><p class="eyebrow">Project definition</p><h2>Manifest metadata</h2></div><StatusBadge Text="@project.Value.Definition.State.ToString()" Status="@ProjectTone" /></div>
+            <div class="studio-grid">
+                <label>Publisher<input value="@project.Value.Definition.Publisher" disabled /></label>
+                <label>Name<input value="@project.Value.Definition.PackName" disabled /></label>
+                <label>Version<input @bind="version" @bind:after="MarkDirty" /></label>
+                <label>Display name<input @bind="displayName" @bind:after="MarkDirty" /></label>
+            </div>
+            <label class="studio-field">Description<textarea rows="4" @bind="description" @bind:after="MarkDirty"></textarea></label>
+            <div class="studio-grid">
+                <label>Categories<input @bind="categories" @bind:after="MarkDirty" placeholder="game, sample" /></label>
+                <label>Tags<input @bind="tags" @bind:after="MarkDirty" placeholder="local, experimental" /></label>
+            </div>
+            <dl class="resource-details studio-origin">
+                <dt>Forked from</dt><dd><code>@project.Value.Definition.Origin.Publisher/@project.Value.Definition.Origin.Name</code> · @project.Value.Definition.Origin.Version</dd>
+                <dt>Source hash</dt><dd><code>@ShortHash(project.Value.Definition.SourceArtifact.Sha256)</code></dd>
+                <dt>Revision</dt><dd>@project.Value.Definition.Revision</dd>
+            </dl>
+            @if (message is not null) { <p class="@(hasError ? "error-panel" : "studio-message")" role="status">@message</p> }
+        </div>
+
+        <aside class="panel studio-install">
+            <div class="panel-header"><div><p class="eyebrow">Local deployment</p><h2>Current workspace</h2></div></div>
+            <strong>@(ContextState.Current?.WorkspaceDisplayName ?? "Current workspace")</strong>
+            <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> Replace the same Pack identity if already installed</label>
+            <p class="studio-hint">Preview and installation read the stored build directly. No download or re-upload is required.</p>
+            @if (preview is not null)
+            {
+                <div class="studio-preview">
+                    <StatusBadge Text="@(preview.CanInstall ? "Ready" : preview.AlreadyInstalled ? "Already installed" : "Conflicts")" Status="@(preview.CanInstall ? UiStatus.Success : UiStatus.Warning)" />
+                    <span>@preview.Resources.Count resources · @preview.Resources.Count(resource => resource.AlreadyExists) conflicts</span>
+                </div>
+            }
+            <button class="button-primary" disabled="@(selectedBuild is null || busy || !CanInstall)" @onclick="InstallAsync">@(installing ? "Installing…" : "Install locally")</button>
+        </aside>
+    </section>
+
+    <section class="panel studio-builds">
+        <div class="panel-header"><div><p class="eyebrow">Immutable artifacts</p><h2>Builds</h2></div><span class="studio-hint">Each build is content-addressed and reproducible from its project revision.</span></div>
+        @if (builds is null)
+        {
+            <LoadingState Message="Loading builds…" />
+        }
+        else if (builds.Count == 0)
+        {
+            <EmptyState Title="No build yet" Message="Save the project metadata, then create the first immutable Pack artifact." />
+        }
+        else
+        {
+            <DataGrid TItem="PackProjectBuildResource" Items="builds">
+                <Header><tr><th>Version</th><th>Revision</th><th>Created</th><th>Artifact</th><th></th></tr></Header>
+                <Row Context="build"><tr class="@(selectedBuild?.Uid == build.Uid ? "selected-build" : null)">
+                    <td><strong>@build.Definition.Version</strong></td>
+                    <td>@build.Definition.ProjectRevision</td>
+                    <td>@build.Definition.CreatedAt.ToLocalTime().ToString("g")</td>
+                    <td><code>@ShortHash(build.Definition.Artifact.Sha256)</code><br /><small>@FormatBytes(build.Definition.Artifact.Length)</small></td>
+                    <td class="studio-actions"><button class="text-button" @onclick="() => PreviewAsync(build)">Preview</button><a class="text-button" href="@DownloadPath(build)">Download</a></td>
+                </tr></Row>
+            </DataGrid>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public Guid ProjectId { get; set; }
+
+    private readonly CancellationTokenSource cancellation = new();
+    private ResourceSnapshot<PackProjectResource>? project;
+    private IReadOnlyList<PackProjectBuildResource>? builds;
+    private PackProjectBuildResource? selectedBuild;
+    private PackInstallationPreview? preview;
+    private AgentstrationApiException? error;
+    private string version = string.Empty;
+    private string displayName = string.Empty;
+    private string? description;
+    private string categories = string.Empty;
+    private string tags = string.Empty;
+    private string? message;
+    private bool hasError;
+    private bool dirty;
+    private bool busy;
+    private bool building;
+    private bool installing;
+    private bool replaceExisting;
+    private bool CanInstall => preview?.CanInstall == true || (replaceExisting && preview?.AlreadyInstalled == true);
+    private UiStatus ProjectTone => project?.Value.Definition.State == PackProjectState.Built ? UiStatus.Success : UiStatus.Info;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            if (ContextState.Current is null) await ContextState.LoadAsync(cancellation.Token);
+            project = await Client.GetProjectAsync(ProjectId, cancellation.Token);
+            builds = await Client.GetBuildsAsync(ProjectId, cancellation.Token);
+            var definition = project.Value.Definition;
+            version = definition.Version;
+            displayName = definition.DisplayName ?? string.Empty;
+            description = definition.Description;
+            categories = string.Join(", ", definition.Categories);
+            tags = string.Join(", ", definition.Tags);
+            dirty = false;
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private void MarkDirty() { dirty = true; message = null; preview = null; selectedBuild = null; }
+    private async Task SaveAsync()
+    {
+        if (project is null) return;
+        await ExecuteAsync(async () =>
+        {
+            project = await Client.UpdateProjectAsync(ProjectId,
+                new(version.Trim(), EmptyToNull(displayName), EmptyToNull(description), Split(categories), Split(tags)), project.ETag, cancellation.Token);
+            dirty = false;
+            message = "Project saved.";
+        });
+    }
+
+    private async Task BuildAsync()
+    {
+        building = true;
+        try
+        {
+            if (dirty) await SaveAsync();
+            if (hasError) return;
+            await ExecuteAsync(async () =>
+            {
+                selectedBuild = await Client.BuildAsync(ProjectId, cancellation.Token);
+                builds = await Client.GetBuildsAsync(ProjectId, cancellation.Token);
+                project = await Client.GetProjectAsync(ProjectId, cancellation.Token);
+                preview = null;
+                message = $"Build {selectedBuild.Definition.Version} created. Preview it before local installation.";
+            });
+        }
+        finally { building = false; }
+    }
+
+    private async Task PreviewAsync(PackProjectBuildResource build)
+    {
+        selectedBuild = build;
+        await ExecuteAsync(async () =>
+        {
+            preview = await Client.PreviewBuildAsync(ProjectId, build.Uid, cancellation.Token);
+            message = preview.CanInstall ? "Build is ready for this workspace." : "Review the reported conflicts before installation.";
+        });
+    }
+
+    private async Task InstallAsync()
+    {
+        if (selectedBuild is null || !CanInstall) return;
+        installing = true;
+        try
+        {
+            await ExecuteAsync(async () =>
+            {
+                var installed = await Client.InstallBuildAsync(ProjectId, selectedBuild.Uid, replaceExisting, cancellation.Token);
+                preview = await Client.PreviewBuildAsync(ProjectId, selectedBuild.Uid, cancellation.Token);
+                message = $"Installed {installed.Value.Definition.Publisher}/{installed.Value.Definition.PackName} in the selected workspace.";
+            });
+        }
+        finally { installing = false; }
+    }
+
+    private async Task ExecuteAsync(Func<Task> operation)
+    {
+        busy = true;
+        hasError = false;
+        message = null;
+        try { await operation(); }
+        catch (AgentstrationApiException exception) { hasError = true; message = exception.Message; }
+        finally { busy = false; }
+    }
+
+    private string DownloadPath(PackProjectBuildResource build) => $"/api/pack-projects/{ProjectId:D}/builds/{build.Uid:D}/download";
+    private void BackToPacks() => Navigation.NavigateTo("/packs");
+    private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static IReadOnlyList<string> Split(string value) => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    private static string ShortHash(string hash) => hash.Length <= 16 ? hash : $"{hash[..12]}…{hash[^4..]}";
+    private static string FormatBytes(long bytes) => bytes < 1024 ? $"{bytes} B" : $"{bytes / 1024d:F1} KB";
+
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

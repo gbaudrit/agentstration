@@ -1,0 +1,19 @@
+.studio-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 18px; }
+.studio-editor, .studio-install, .studio-builds { min-width: 0; }
+.studio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+.studio-grid label, .studio-field { display: grid; gap: 6px; color: var(--muted); font-size: .78rem; font-weight: 700; }
+.studio-grid input, .studio-field input, .studio-field textarea, .studio-field select { width: 100%; }
+.studio-origin { display: grid; grid-template-columns: 110px 1fr; gap: 8px 14px; margin-top: 22px; }
+.studio-origin dt { color: var(--muted); }
+.studio-origin dd { margin: 0; overflow-wrap: anywhere; }
+.studio-install { align-self: start; display: grid; gap: 16px; }
+.studio-checkbox { display: flex; align-items: flex-start; gap: 8px; font-size: .82rem; }
+.studio-checkbox input { margin-top: 2px; }
+.studio-hint { color: var(--muted); font-size: .78rem; }
+.studio-preview { display: flex; align-items: center; gap: 10px; font-size: .82rem; }
+.studio-builds { margin-top: 18px; }
+.studio-actions { display: flex; align-items: center; gap: 12px; }
+.studio-message { padding: 10px 12px; border-radius: 7px; background: var(--success-soft); color: var(--success); }
+.selected-build { background: color-mix(in srgb, var(--primary-soft) 55%, transparent); }
+@media (max-width: 900px) { .studio-layout { grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .studio-grid { grid-template-columns: 1fr; } .studio-origin { grid-template-columns: 1fr; } }

@@ -1,6 +1,7 @@
 @page "/packs"
 @implements IDisposable
 @inject IPacksClient Client
+@inject NavigationManager Navigation
 
 <PageTitle>Packs · Agentstration</PageTitle>
 <PageHeader Title="Packs" Description="Install and govern versioned bundles of Agentstration resources. Packs distribute configuration; they are not runtime execution units.">
@@ -24,6 +25,7 @@ else
         <MetricCard Label="Installed Packs" Value="@packs.Count.ToString()" Detail="Current workspace" Status="UiStatus.Info" />
         <MetricCard Label="Managed resources" Value="@packs.Sum(pack => pack.Definition.ManagedResources.Count).ToString()" Detail="Created from Packs" Status="UiStatus.Success" />
         <MetricCard Label="Requires attention" Value="@AttentionCount.ToString()" Detail="Failed or degraded" Status="@(AttentionCount == 0 ? UiStatus.Neutral : UiStatus.Warning)" />
+        <MetricCard Label="Pack Projects" Value="@(projects?.Count.ToString() ?? "—")" Detail="Local authoring" Status="UiStatus.Info" />
     </section>
 
     @if (packs.Count == 0)
@@ -52,7 +54,7 @@ else
         <section class="panel pack-details" aria-label="Selected Pack details">
             <div class="panel-header">
                 <div><p class="eyebrow">Installed Pack</p><h2>@DisplayName(selected.Value)</h2></div>
-                <div class="pack-detail-actions"><StatusBadge Text="@StateLabel(selected.Value.Definition.State)" Status="@StateTone(selected.Value.Definition.State)" /><button class="button-danger" @onclick="() => confirmUninstall = true">Uninstall</button></div>
+                <div class="pack-detail-actions"><StatusBadge Text="@StateLabel(selected.Value.Definition.State)" Status="@StateTone(selected.Value.Definition.State)" /><button class="button-secondary" @onclick="OpenFork">Fork</button><button class="button-danger" @onclick="() => confirmUninstall = true">Uninstall</button></div>
             </div>
             @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.Description)) { <p>@selected.Value.Definition.Description</p> }
             <dl class="resource-details pack-facts">
@@ -73,6 +75,19 @@ else
                 </div>
             }
             @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.ErrorMessage)) { <p class="error-panel">@selected.Value.Definition.ErrorMessage</p> }
+        </section>
+    }
+
+    @if (projects is { Count: > 0 })
+    {
+        <section class="panel pack-details" aria-label="Pack Projects">
+            <div class="panel-header"><div><p class="eyebrow">Local authoring</p><h2>Pack Projects</h2></div></div>
+            <div class="pack-resource-list">
+                @foreach (var project in projects)
+                {
+                    <article><span class="pack-kind">Project</span><div><strong>@project.Definition.DisplayName</strong><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @project.Definition.Version</small></div><button class="text-button" @onclick="() => OpenProject(project.Uid)">Open</button></article>
+                }
+            </div>
         </section>
     }
 }
@@ -109,12 +124,32 @@ else
     </div>
 }
 
+@if (forkOpen && selected is not null)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CloseFork">
+        <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-fork-title" @onclick:stopPropagation="true">
+            <div class="panel-header"><div><p class="eyebrow">Editable copy</p><h2 id="pack-fork-title">Fork @DisplayName(selected.Value)</h2></div><button class="icon-button" @onclick="CloseFork" aria-label="Close">×</button></div>
+            <p class="pack-muted">The exact installed archive becomes the immutable source of a local Pack Project. Its resources are not duplicated until you install a build.</p>
+            <div class="pack-form-grid">
+                <label>Publisher<input @bind="forkPublisher" /></label>
+                <label>Name<input @bind="forkName" /></label>
+                <label>Version<input @bind="forkVersion" /></label>
+                <label>Display name<input @bind="forkDisplayName" /></label>
+            </div>
+            <label class="pack-form-field">Description<textarea rows="3" @bind="forkDescription"></textarea></label>
+            @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }
+            <div class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">Cancel</button><button class="button-primary" disabled="@forking" @onclick="ForkAsync">@(forking ? "Creating…" : "Create Pack Project")</button></div>
+        </section>
+    </div>
+}
+
 <ConfirmationDialog IsOpen="@confirmUninstall" Title="Uninstall Pack?" Message="Managed resources are removed only if they have not changed since installation. Modified resources are preserved and the Pack is marked degraded." ConfirmLabel="Uninstall" OnCancel="() => confirmUninstall = false" OnConfirm="UninstallAsync" />
 
 @code {
     private const long MaximumArchiveBytes = 8 * 1024 * 1024;
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<InstalledPackResource>? packs;
+    private IReadOnlyList<PackProjectResource>? projects;
     private ResourceSnapshot<InstalledPackResource>? selected;
     private AgentstrationApiException? error;
     private PackInstallationPreview? preview;
@@ -126,6 +161,14 @@ else
     private bool previewing;
     private bool installing;
     private bool confirmUninstall;
+    private bool forkOpen;
+    private bool forking;
+    private string forkPublisher = "local";
+    private string forkName = string.Empty;
+    private string forkVersion = "0.1.0-dev.1";
+    private string forkDisplayName = string.Empty;
+    private string? forkDescription;
+    private string? forkError;
 
     private int AttentionCount => packs?.Count(pack => pack.Definition.State is InstalledPackState.Failed or InstalledPackState.Degraded) ?? 0;
 
@@ -138,6 +181,7 @@ else
         try
         {
             packs = await Client.GetPacksAsync(cancellation.Token);
+            projects = await Client.GetProjectsAsync(cancellation.Token);
             if (selected is not null)
             {
                 var match = packs.FirstOrDefault(pack => SameIdentity(pack, selected.Value));
@@ -204,6 +248,37 @@ else
         try { selected = await Client.GetPackAsync(pack.Definition.Publisher, pack.Definition.PackName, cancellation.Token); }
         catch (AgentstrationApiException exception) { error = exception; }
     }
+
+    private void OpenFork()
+    {
+        if (selected is null) return;
+        forkPublisher = "local";
+        forkName = $"{selected.Value.Definition.PackName}-fork";
+        forkVersion = "0.1.0-dev.1";
+        forkDisplayName = $"{DisplayName(selected.Value)} (Fork)";
+        forkDescription = selected.Value.Definition.Description;
+        forkError = null;
+        forkOpen = true;
+    }
+
+    private void CloseFork() { if (!forking) forkOpen = false; }
+
+    private async Task ForkAsync()
+    {
+        if (selected is null) return;
+        forking = true;
+        forkError = null;
+        try
+        {
+            var project = await Client.ForkAsync(selected.Value.Definition.Publisher, selected.Value.Definition.PackName,
+                new(forkPublisher.Trim(), forkName.Trim(), forkVersion.Trim(), forkDisplayName.Trim(), forkDescription?.Trim()), cancellation.Token);
+            Navigation.NavigateTo($"/pack-projects/{project.Value.Uid:D}");
+        }
+        catch (AgentstrationApiException exception) { forkError = exception.Message; }
+        finally { forking = false; }
+    }
+
+    private void OpenProject(Guid projectId) => Navigation.NavigateTo($"/pack-projects/{projectId:D}");
 
     private async Task UninstallAsync()
     {
