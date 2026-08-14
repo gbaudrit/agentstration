@@ -1,6 +1,6 @@
-using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Flow.Storage.Abstractions;
 
@@ -145,11 +145,21 @@ public sealed class FlowRunService(
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
         {
-            Id = $"flowrun-{Guid.NewGuid():N}", FlowId = draft.FlowId, FlowVersion = validationVersion, DefinitionState = FlowDefinitionState.Draft,
-            DraftRevision = draft.Revision, DefinitionHash = draft.DefinitionHash, DefinitionSnapshotId = $"snapshot-{Guid.NewGuid():N}", DeploymentResourceId = "designer",
-            Trigger = trigger, StartedBy = string.IsNullOrWhiteSpace(startedBy) ? "local-user" : startedBy,
+            Id = $"flowrun-{Guid.NewGuid():N}",
+            FlowId = draft.FlowId,
+            FlowVersion = validationVersion,
+            DefinitionState = FlowDefinitionState.Draft,
+            DraftRevision = draft.Revision,
+            DefinitionHash = draft.DefinitionHash,
+            DefinitionSnapshotId = $"snapshot-{Guid.NewGuid():N}",
+            DeploymentResourceId = "designer",
+            Trigger = trigger,
+            StartedBy = string.IsNullOrWhiteSpace(startedBy) ? "local-user" : startedBy,
             CorrelationId = string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString("N") : correlationId,
-            Input = input.Clone(), CreatedAt = now, DefinitionSnapshot = snapshot, Steps = CreateSteps(snapshot, input)
+            Input = input.Clone(),
+            CreatedAt = now,
+            DefinitionSnapshot = snapshot,
+            Steps = CreateSteps(snapshot, input)
         };
         var stored = await repository.CreateRunAsync(run, cancellationToken);
         RunsCreated.Add(1, new KeyValuePair<string, object?>("flow.definition.state", run.DefinitionState.ToString()));

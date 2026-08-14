@@ -225,8 +225,13 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
 
     private static FlowDocument Document<T>(string key, string kind, FlowId id, string? version, T value, DateTimeOffset now) => new()
     {
-        Key = key, Kind = kind, FlowId = id.Value, Version = version,
-        Payload = JsonSerializer.Serialize(value, JsonOptions), ETag = NewETag(), UpdatedAt = now
+        Key = key,
+        Kind = kind,
+        FlowId = id.Value,
+        Version = version,
+        Payload = JsonSerializer.Serialize(value, JsonOptions),
+        ETag = NewETag(),
+        UpdatedAt = now
     };
     private static StoredFlow ToFlow(FlowDocument document) => new(Deserialize<FlowResource>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowVersion ToVersion(FlowDocument document) => new(Deserialize<FlowVersion>(document), document.ETag, document.UpdatedAt);

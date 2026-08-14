@@ -87,19 +87,19 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
         catch (HttpRequestException exception) { throw new AepProtocolException("extension_unreachable", "The AEP extension is unreachable.", innerException: exception); }
         using (response)
         {
-        await EnsureSuccessAsync(response, cancellationToken);
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var reader = new StreamReader(stream);
-        while (await reader.ReadLineAsync(cancellationToken) is { } line)
-        {
-            if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
-            var data = line[5..].TrimStart();
-            if (data.Length == 0) continue;
-            var update = JsonSerializer.Deserialize<AepChatUpdate>(data, AepProtocol.JsonOptions)
-                ?? throw new AepProtocolException("invalid_response", "The extension returned an empty streaming update.");
-            yield return update;
-            if (update.FinishReason is not null) yield break;
-        }
+            await EnsureSuccessAsync(response, cancellationToken);
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var reader = new StreamReader(stream);
+            while (await reader.ReadLineAsync(cancellationToken) is { } line)
+            {
+                if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
+                var data = line[5..].TrimStart();
+                if (data.Length == 0) continue;
+                var update = JsonSerializer.Deserialize<AepChatUpdate>(data, AepProtocol.JsonOptions)
+                    ?? throw new AepProtocolException("invalid_response", "The extension returned an empty streaming update.");
+                yield return update;
+                if (update.FinishReason is not null) yield break;
+            }
         }
     }
 

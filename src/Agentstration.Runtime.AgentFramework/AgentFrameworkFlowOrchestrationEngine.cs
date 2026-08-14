@@ -215,9 +215,9 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                 return new(handoffBuilder.Build(), null);
             case GroupChatOrchestrationPattern groupChat:
                 return new(AgentWorkflowBuilder.CreateGroupChatBuilderWith(agents => new RoundRobinGroupChatManager(agents)
-                    {
-                        MaximumIterationCount = groupChat.MaximumIterations
-                    })
+                {
+                    MaximumIterationCount = groupChat.MaximumIterations
+                })
                     .AddParticipants(Ordered(definition, participants))
                     .Build(), null);
             case MagenticOrchestrationPattern magentic:
