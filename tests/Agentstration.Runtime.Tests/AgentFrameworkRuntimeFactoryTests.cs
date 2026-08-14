@@ -37,13 +37,13 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     }
 
     [TestMethod]
-    public async Task GroupChatEmitsTurnsWithInternalParticipantIds()
+    public async Task GroupChatWithObservabilityEmitsTurnsWithInternalParticipantIds()
     {
         using var chatClient = new RecordingChatClient();
         var factory = new AgentFrameworkRuntimeFactory(
             new RecordingResolver(chatClient),
             NullLoggerFactory.Instance,
-            new GenAiObservabilityOptions { Enabled = false });
+            new GenAiObservabilityOptions { Enabled = true });
         var engine = new AgentFrameworkFlowOrchestrationEngine(
             new RecordingAgentResolver(),
             new EmptyToolCatalog(),

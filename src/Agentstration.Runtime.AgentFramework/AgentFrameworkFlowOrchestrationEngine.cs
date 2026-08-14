@@ -23,6 +23,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         ArgumentNullException.ThrowIfNull(request);
         var participants = await ResolveParticipantsAsync(request.Definition.Participants, cancellationToken);
         var workflow = await BuildWorkflowAsync(request.Definition, participants, cancellationToken);
+        var participantByExecutorId = MapParticipantExecutors(workflow, participants);
         var messages = new List<ChatMessage> { new(ChatRole.User, Prompt(request.Input)) };
         var outputByParticipant = new Dictionary<string, StringBuilder>(StringComparer.Ordinal);
         var activeTurns = new Dictionary<string, (int Turn, string? ResponseId)>(StringComparer.Ordinal);
@@ -42,7 +43,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
             switch (workflowEvent)
             {
                 case AgentResponseUpdateEvent update:
-                    var participantId = ResolveParticipantId(update.Update.AgentId, update.ExecutorId, participants);
+                    var participantId = ResolveParticipantId(update.Update.AgentId, update.ExecutorId, participants, participantByExecutorId);
                     if (serializedTurns
                         && !string.IsNullOrEmpty(update.Update.Text)
                         && activeTurns.Count > 0
@@ -80,7 +81,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                         yield return new FlowParticipantTurnCompleted(participantId, activeTurn.Turn);
                     break;
                 case AgentResponseEvent response:
-                    participantId = ResolveParticipantId(response.Response.AgentId, response.ExecutorId, participants);
+                    participantId = ResolveParticipantId(response.Response.AgentId, response.ExecutorId, participants, participantByExecutorId);
                     if (!activeTurns.Remove(participantId, out activeTurn))
                     {
                         activeTurn = (++nextTurn, response.Response.ResponseId);
@@ -179,8 +180,12 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
     internal static string ResolveParticipantId(
         string? agentId,
         string executorId,
-        IReadOnlyDictionary<string, AIAgent> participants)
+        IReadOnlyDictionary<string, AIAgent> participants,
+        IReadOnlyDictionary<string, string>? participantByExecutorId = null)
     {
+        if (participantByExecutorId?.TryGetValue(executorId, out var mappedParticipantId) == true)
+            return mappedParticipantId;
+
         foreach (var participant in participants)
         {
             if (string.Equals(participant.Value.Id, agentId, StringComparison.Ordinal)
@@ -191,6 +196,23 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         throw new FlowValidationException(
             "flow_orchestration_participant_unmapped",
             "The orchestration emitted an event for an unknown participant.");
+    }
+
+    private static IReadOnlyDictionary<string, string> MapParticipantExecutors(
+        Workflow workflow,
+        IReadOnlyDictionary<string, AIAgent> participants)
+    {
+        var participantByAgent = new Dictionary<AIAgent, string>(ReferenceEqualityComparer.Instance);
+        foreach (var participant in participants)
+            participantByAgent.Add(participant.Value, participant.Key);
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var binding in workflow.ReflectExecutors())
+        {
+            if (binding.Value.RawValue is AIAgent agent
+                && participantByAgent.TryGetValue(agent, out var participantId))
+                result.Add(binding.Key, participantId);
+        }
+        return result;
     }
 
     private static string Prompt(JsonElement input) =>
