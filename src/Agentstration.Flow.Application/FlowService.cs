@@ -3,7 +3,16 @@ using Agentstration.Flow.Storage.Abstractions;
 
 namespace Agentstration.Flow.Application;
 
-public sealed record CreateFlowCommand(string Name, string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null);
+public sealed record CreateFlowCommand(
+    string Name,
+    string? Description,
+    FlowKind Kind,
+    string Version,
+    bool Enabled,
+    FlowSpec Spec,
+    IReadOnlyDictionary<string, string>? Metadata = null,
+    FlowGraphDefinition? Graph = null,
+    string? DisplayName = null);
 public sealed record UpdateFlowCommand(string? Description, FlowKind Kind, string Version, bool Enabled, FlowSpec Spec, IReadOnlyDictionary<string, string>? Metadata = null, FlowGraphDefinition? Graph = null, string? DisplayName = null);
 
 public interface IFlowDeletionGuard
@@ -22,7 +31,7 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
         ArgumentNullException.ThrowIfNull(command);
         var now = timeProvider.GetUtcNow();
         var definition = new FlowDefinition(new FlowId(command.Name), command.Name, command.Description, command.Kind, command.Version, command.Enabled, null,
-            command.Spec, Copy(command.Metadata), now, now);
+            command.Spec, Copy(command.Metadata), now, now, command.DisplayName, command.Graph);
         FlowValidator.Validate(definition);
         return await repository.CreateAsync(definition, cancellationToken);
     }

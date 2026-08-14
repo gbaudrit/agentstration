@@ -110,6 +110,7 @@ public sealed record PackFlowDefinition
     public bool Enabled { get; init; } = true;
     public FlowSpec Spec { get; init; } = null!;
     public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
+    public FlowGraphDefinition? Graph { get; init; }
     public bool Publish { get; init; } = true;
     public bool Activate { get; init; } = true;
 }
@@ -122,21 +123,26 @@ public sealed record PackResourceEnvelope<T>
     public T Definition { get; init; } = default!;
 }
 
-public sealed class FlowPackResourceHandler(FlowService service, TimeProvider timeProvider) : IPackResourceHandler
+public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinitionValidator graphValidator, TimeProvider timeProvider) : IPackResourceHandler
 {
     public string Kind => ResourceKinds.Flow;
     public int InstallOrder => 50;
-    public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
+    public async Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
     {
         var value = Parse(resource); var now = timeProvider.GetUtcNow();
-        FlowValidator.Validate(new(new(resource.Name), resource.Name, value.Definition.Description, value.Definition.Kind, value.Definition.Version, value.Definition.Enabled, null, value.Definition.Spec, value.Definition.Metadata, now, now, value.Definition.DisplayName));
-        return Task.CompletedTask;
+        FlowValidator.Validate(new(new(resource.Name), resource.Name, value.Definition.Description, value.Definition.Kind, value.Definition.Version, value.Definition.Enabled, null, value.Definition.Spec, value.Definition.Metadata, now, now, value.Definition.DisplayName, value.Definition.Graph));
+        if (value.Definition.Graph is not null)
+        {
+            var validation = await graphValidator.ValidateAsync(value.Definition.Graph, new(ResolveResources: false), cancellationToken);
+            var error = validation.Issues.FirstOrDefault(issue => issue.Severity == FlowValidationSeverity.Error);
+            if (error is not null) throw new FlowValidationException(error.Code, error.Message);
+        }
     }
     public async Task<bool> ExistsAsync(string name, CancellationToken cancellationToken) => await service.GetAsync(new(name), cancellationToken) is not null;
     public async Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
     {
         var value = Parse(resource); var definition = value.Definition;
-        var stored = await service.CreateAsync(new(resource.Name, definition.Description, definition.Kind, definition.Version, definition.Enabled, definition.Spec, PackProvenance.Add(definition.Metadata, pack, packVersion)), cancellationToken);
+        var stored = await service.CreateAsync(new(resource.Name, definition.Description, definition.Kind, definition.Version, definition.Enabled, definition.Spec, PackProvenance.Add(definition.Metadata, pack, packVersion), definition.Graph, definition.DisplayName), cancellationToken);
         if (definition.Publish) { _ = await service.PublishVersionAsync(new(resource.Name), definition.Version, definition.Activate, cancellationToken); stored = (await service.GetAsync(new(resource.Name), cancellationToken))!; }
         return new() { Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = stored.ETag };
     }

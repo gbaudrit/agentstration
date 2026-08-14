@@ -16,5 +16,42 @@ definition:
   metadata:
     sample: who-am-i
     capability: distribution-smoke-test
+  graph:
+    entryStep: input
+    steps:
+      - type: input
+        name: input
+        displayName: Player request
+      - type: agent
+        name: judge
+        displayName: Judge
+        agent:
+          resourceId: who-am-i-judge
+        inputMapping: "${input}"
+      - type: output
+        name: output
+        displayName: Judge response
+        outputMapping: "${steps.judge.output}"
+    transitions:
+      - id: input-to-judge
+        fromStep: input
+        event: completed
+        toStep: judge
+      - id: judge-to-output
+        fromStep: judge
+        event: completed
+        toStep: output
+    designer:
+      preferredLayout: Horizontal
+      nodePositions:
+        input:
+          x: 80
+          y: 160
+        judge:
+          x: 360
+          y: 160
+        output:
+          x: 640
+          y: 160
   publish: true
   activate: true

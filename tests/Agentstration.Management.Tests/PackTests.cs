@@ -182,6 +182,13 @@ public sealed class PackTests
         Assert.HasCount(5, installed.Definition.ManagedResources);
         Assert.IsNotNull(installed.Definition.SourceArtifact);
 
+        using var flowVersionResponse = await client.GetAsync("/api/flows/who-am-i-game/versions/0.1.0");
+        Assert.AreEqual(HttpStatusCode.OK, flowVersionResponse.StatusCode, await flowVersionResponse.Content.ReadAsStringAsync());
+        using var flowVersion = JsonDocument.Parse(await flowVersionResponse.Content.ReadAsStreamAsync());
+        var graph = flowVersion.RootElement.GetProperty("graph");
+        Assert.AreEqual("input", graph.GetProperty("entryStep").GetString());
+        Assert.AreEqual(3, graph.GetProperty("steps").GetArrayLength());
+
         using var forkResponse = await client.PostAsJsonAsync(
             "/api/packs/agentstration/who-am-i/fork",
             new ForkPackCommand("local", "who-am-i-lab", "0.1.0-dev.1", "Who Am I? Lab", "Locally forked sample."));
