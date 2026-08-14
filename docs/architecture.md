@@ -82,6 +82,8 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 
 `Domain` contains no Management types and has no framework dependency. Canonical Management resources and provider-neutral ports live in `Management.Abstractions`; validation and use cases live in `Management.Core`. SQLite and EF Core are confined to `Management.Storage.Sqlite`. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
 
+`Agentstration.Resources` contains the neutral namespace/address value types shared by Management, Flow, Work, and Runtime boundaries. Resource identity is `(workspace, namespace, kind, name)` and existing callers implicitly use `default`. Relative references inherit their owner's namespace; explicit cross-namespace references retain the supplied namespace. See ADR-0035.
+
 ## Module responsibilities
 
 | Module | Current responsibility | Planned extension |
@@ -379,3 +381,5 @@ Standalone startup creates or repairs `local / default`, the local user, active 
 - ADR-0031: Agentstration-native declarative resource envelope
 - ADR-0032: one authoritative standalone server
 - ADR-0033: canonical names and explicit execution identities
+- ADR-0034: MAF Flow orchestration behind the runtime adapter
+- ADR-0035: explicit resource namespaces

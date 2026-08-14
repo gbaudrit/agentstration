@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Application.Work;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
@@ -74,7 +75,10 @@ public sealed class WorkPlaneTests
 
         var draft = new EntryDraft
         {
-            Id = entryId, Name = "request", DisplayName = "Request", Binding = new EntryBinding(EntryBindingKind.Flow, "router"),
+            Id = entryId,
+            Name = "request",
+            DisplayName = "Request",
+            Binding = new EntryBinding(EntryBindingKind.Flow, "router"),
             Presentation = entry.Presentation with
             {
                 Fields =
@@ -224,6 +228,27 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public async Task SqliteWorkplaceStorageIsolatesHomonymousEntriesByNamespace()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var firstNamespace = new ResourceNamespace("team-a");
+        var secondNamespace = new ResourceNamespace("team-b");
+        const string entryName = "request";
+        var first = Entry(new EntryId(entryName, firstNamespace));
+        var second = Entry(new EntryId(entryName, secondNamespace));
+
+        await fixture.Workplace.UpsertEntryDraftAsync(first, default);
+        await fixture.Workplace.UpsertEntryDraftAsync(second, default);
+
+        Assert.AreEqual(firstNamespace, (await fixture.Workplace.GetEntryDraftAsync(first.Id, default))?.Id.Namespace);
+        Assert.AreEqual(secondNamespace, (await fixture.Workplace.GetEntryDraftAsync(second.Id, default))?.Id.Namespace);
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(new EntryId(entryName), default));
+        await fixture.Workplace.DeleteEntryDraftAsync(first.Id, default);
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(first.Id, default));
+        Assert.IsNotNull(await fixture.Workplace.GetEntryDraftAsync(second.Id, default));
+    }
+
+    [TestMethod]
     public async Task WorkApiValidatesCreatesGetsAndReportsUnavailableResult()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -365,12 +390,25 @@ public sealed class WorkPlaneTests
         public Task ConfirmQueuedAsync(WorkExecutionAccepted accepted, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
+    private static EntryDraft Entry(EntryId id) => new()
+    {
+        Id = id,
+        Name = id.Value,
+        DisplayName = id.Value,
+        Binding = new EntryBinding(EntryBindingKind.Flow, "router"),
+        Presentation = new EntryPresentation
+        {
+            Fields = [new EntryFieldDefinition { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }]
+        }
+    };
+
     private sealed class WorkFixture : IAsyncDisposable
     {
         private readonly string _directory;
         private readonly ServiceProvider _provider;
         public WorkItemService Service => _provider.GetRequiredService<WorkItemService>();
         public IWorkItemRepository Repository => _provider.GetRequiredService<IWorkItemRepository>();
+        public IWorkplaceRepository Workplace => _provider.GetRequiredService<IWorkplaceRepository>();
         public FakeGateway Gateway => _provider.GetRequiredService<FakeGateway>();
 
         private WorkFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }

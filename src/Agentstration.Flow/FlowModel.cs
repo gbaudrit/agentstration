@@ -1,14 +1,18 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Resources;
 
 namespace Agentstration.Flow;
 
-public readonly record struct FlowId(string Value)
+public readonly record struct FlowId(string Value, ResourceNamespace Namespace = default)
 {
     public override string ToString() => Value;
 }
 
-public sealed record FlowReference(FlowId FlowId, string? Version = null, bool UseActiveVersion = true);
+public sealed record FlowReference(FlowId FlowId, string? Version = null, bool UseActiveVersion = true, ResourceNamespace? Namespace = null)
+{
+    public FlowId Resolve(ResourceNamespace ownerNamespace) => new(FlowId.Value, Namespace ?? ownerNamespace);
+}
 
 public enum FlowKind { Direct, Routing, Workflow, Orchestration, Composite }
 public enum FlowTargetKind { Agent, Flow }
@@ -35,7 +39,11 @@ public enum FlowRunEventType
     ParticipantTurnCompleted
 }
 
-public sealed record FlowTargetReference(FlowTargetKind Kind, string Id, string? Version = null);
+public sealed record FlowTargetReference(FlowTargetKind Kind, string Id, string? Version = null, ResourceNamespace? Namespace = null)
+{
+    public ResourceAddress Resolve(ResourceNamespace ownerNamespace) =>
+        ResourceAddress.Create(Namespace ?? ownerNamespace, Kind == FlowTargetKind.Agent ? "Agent" : "Flow", Id);
+}
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "flowKind")]
 [JsonDerivedType(typeof(DirectFlowDefinition), "direct")]

@@ -1,4 +1,5 @@
 using Agentstration.Flow;
+using Agentstration.Resources;
 
 namespace Agentstration.Flow.Storage.Abstractions;
 
@@ -15,6 +16,22 @@ public interface IFlowRepository
     Task<StoredFlow> CreateAsync(FlowResource resource, CancellationToken cancellationToken);
     Task<StoredFlow?> GetAsync(FlowId id, CancellationToken cancellationToken);
     Task<FlowPage> ListAsync(int skip, int take, CancellationToken cancellationToken);
+    async Task<FlowPage> ListAsync(ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        var matches = new List<StoredFlow>();
+        var offset = 0;
+        const int pageSize = 1000;
+        while (matches.Count < skip + take)
+        {
+            var page = await ListAsync(offset, pageSize, cancellationToken);
+            matches.AddRange(page.Items.Where(flow => flow.Value.Id.Namespace == @namespace));
+            if (page.Items.Count < pageSize) break;
+            offset += page.Items.Count;
+        }
+        return new FlowPage(matches.Skip(skip).Take(take).ToArray(), matches.Count > skip + take);
+    }
     Task<StoredFlow> UpdateAsync(FlowResource resource, string expectedETag, CancellationToken cancellationToken);
     Task DeleteAsync(FlowId id, string? expectedETag, CancellationToken cancellationToken);
     Task<StoredFlowVersion> CreateVersionAsync(FlowVersion version, CancellationToken cancellationToken);

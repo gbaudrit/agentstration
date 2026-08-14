@@ -14,9 +14,12 @@ public interface IWorkplaceRepository
     Task UpsertEntryAsync(EntryResource entry, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryResource>> ListEntriesAsync(CancellationToken cancellationToken);
     Task<EntryResource?> GetEntryAsync(EntryId entryId, CancellationToken cancellationToken);
+    Task DeleteEntryAsync(EntryId entryId, CancellationToken cancellationToken);
     Task UpsertEntryDraftAsync(EntryDraft draft, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryDraft>> ListEntryDraftsAsync(CancellationToken cancellationToken);
     Task<EntryDraft?> GetEntryDraftAsync(EntryId entryId, CancellationToken cancellationToken);
+    Task DeleteEntryDraftAsync(EntryId entryId, CancellationToken cancellationToken);
+    Task<bool> HasEntryInteractionsAsync(EntryId entryId, CancellationToken cancellationToken);
     Task CreateInteractionAsync(WorkplaceInteraction interaction, CancellationToken cancellationToken);
     Task<WorkplaceInteraction?> GetInteractionAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkplaceWorkspaceId workspaceId, int take, CancellationToken cancellationToken);

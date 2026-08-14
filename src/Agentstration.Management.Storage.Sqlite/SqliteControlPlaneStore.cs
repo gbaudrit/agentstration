@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -25,10 +26,11 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
         document.Property(value => value.LegacyResourceType).HasColumnName("ResourceType").HasMaxLength(256);
         document.Property(value => value.Kind).HasMaxLength(256);
         document.Property(value => value.Name).HasMaxLength(256);
+        document.Property(value => value.Namespace).HasMaxLength(128);
         document.Property(value => value.TenantId);
         document.Property(value => value.WorkspaceId);
         document.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
-        document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.Name }).IsUnique();
+        document.HasIndex(value => new { value.WorkspaceId, value.Namespace, value.Kind, value.Name }).IsUnique();
         modelBuilder.ConfigureIdentityModel();
     }
 }
@@ -40,6 +42,7 @@ internal sealed class ControlPlaneDocument
     public Guid? Uid { get; set; }
     public string? Kind { get; set; }
     public string? Name { get; set; }
+    public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
     public Guid? TenantId { get; set; }
     public Guid? WorkspaceId { get; set; }
     public required string Payload { get; set; }
@@ -58,6 +61,7 @@ public sealed class SqliteControlPlaneStore(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureNamespaceSchemaAsync(context, cancellationToken);
         await SqliteIdentitySchema.EnsureAsync(context, cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_AgentRevisionLookup ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.agentUid'), json_extract(Payload, '$.agentVersion'))",
@@ -74,7 +78,8 @@ public sealed class SqliteControlPlaneStore(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var query = Scoped(context.Documents.AsNoTracking());
-        var document = await query.SingleOrDefaultAsync(value => value.Kind == key.Kind && value.Name == key.Name, cancellationToken);
+        var namespaceValue = key.Namespace.Value;
+        var document = await query.SingleOrDefaultAsync(value => value.Namespace == namespaceValue && value.Kind == key.Kind && value.Name == key.Name, cancellationToken);
         return document is null ? null : Deserialize<T>(document);
     }
 
@@ -85,7 +90,7 @@ public sealed class SqliteControlPlaneStore(
         take = Math.Min(take, 1000);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var query = Scoped(context.Documents.AsNoTracking()).Where(value => value.Kind == kind);
-        var documents = await query.OrderBy(value => value.Name).Skip(skip).Take(take).ToArrayAsync(cancellationToken);
+        var documents = await query.OrderBy(value => value.Namespace).ThenBy(value => value.Name).Skip(skip).Take(take).ToArrayAsync(cancellationToken);
         return documents.Select(Deserialize<T>).ToArray();
     }
 
@@ -93,8 +98,9 @@ public sealed class SqliteControlPlaneStore(
     {
         if (resource is AgentRevision) throw new InvalidOperationException("Published agent revisions are immutable and must be created through CreateImmutableAsync.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var namespaceValue = resource.Namespace.Value;
         var existing = await Scoped(context.Documents).SingleOrDefaultAsync(
-            value => value.Kind == resource.Kind && value.Name == resource.Metadata.Name, cancellationToken);
+            value => value.Namespace == namespaceValue && value.Kind == resource.Kind && value.Name == resource.Metadata.Name, cancellationToken);
         if (existing is null && ifMatch is not null) throw new ControlPlaneConcurrencyException("If-Match cannot update a resource that does not exist.");
         if (existing is not null && ifNoneMatch) throw new ControlPlaneConcurrencyException("If-None-Match prevented replacement of an existing resource.");
         if (existing is not null && ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
@@ -116,6 +122,7 @@ public sealed class SqliteControlPlaneStore(
                 Uid = uid,
                 Kind = resource.Kind,
                 Name = resource.Metadata.Name,
+                Namespace = namespaceValue,
                 TenantId = scope.TenantId,
                 WorkspaceId = scope.WorkspaceId,
                 Payload = JsonSerializer.Serialize(versioned, JsonOptions),
@@ -128,6 +135,7 @@ public sealed class SqliteControlPlaneStore(
             existing.LegacyResourceType = resource.Kind;
             existing.Kind = resource.Kind;
             existing.Name = resource.Metadata.Name;
+            existing.Namespace = namespaceValue;
             existing.TenantId = scope.TenantId;
             existing.WorkspaceId = scope.WorkspaceId;
             existing.Payload = JsonSerializer.Serialize(versioned, JsonOptions);
@@ -153,6 +161,7 @@ public sealed class SqliteControlPlaneStore(
             Uid = uid,
             Kind = resource.Kind,
             Name = resource.Metadata.Name,
+            Namespace = resource.Namespace.Value,
             TenantId = scope.TenantId,
             WorkspaceId = scope.WorkspaceId,
             Payload = JsonSerializer.Serialize(versioned, JsonOptions),
@@ -167,7 +176,8 @@ public sealed class SqliteControlPlaneStore(
     public async Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var existing = await Scoped(context.Documents).SingleOrDefaultAsync(value => value.Kind == key.Kind && value.Name == key.Name, cancellationToken)
+        var namespaceValue = key.Namespace.Value;
+        var existing = await Scoped(context.Documents).SingleOrDefaultAsync(value => value.Namespace == namespaceValue && value.Kind == key.Kind && value.Name == key.Name, cancellationToken)
             ?? throw new ControlPlaneResourceNotFoundException(key);
         if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ControlPlaneConcurrencyException("The supplied ETag does not match the current resource version.");
@@ -231,13 +241,18 @@ public sealed class SqliteControlPlaneStore(
         return results.SingleOrDefault();
     }
 
-    public async Task<StoredResource<AgentDeployment>?> FindDeploymentByRevisionAsync(string revisionName, CancellationToken cancellationToken)
+    public Task<StoredResource<AgentDeployment>?> FindDeploymentByRevisionAsync(string revisionName, CancellationToken cancellationToken) =>
+        FindDeploymentByRevisionAsync(ResourceNamespace.Default, revisionName, cancellationToken);
+
+    public async Task<StoredResource<AgentDeployment>?> FindDeploymentByRevisionAsync(ResourceNamespace @namespace, string revisionName, CancellationToken cancellationToken)
     {
+        var namespaceValue = @namespace.Value;
         var results = requestContext.AccessMode switch
         {
             ControlPlaneAccessMode.System => await LoadFilteredAsync<AgentDeployment>($"""
                 SELECT * FROM ControlPlaneResources
                 WHERE Kind = {ResourceKinds.AgentDeployment}
+                  AND Namespace = {namespaceValue}
                   AND json_extract(Payload, '$.revisionName') = {revisionName}
                 ORDER BY json_extract(Payload, '$.updatedAt') DESC
                 LIMIT 1
@@ -247,6 +262,7 @@ public sealed class SqliteControlPlaneStore(
                 WHERE TenantId = {requestContext.Current.TenantId}
                   AND WorkspaceId = {requestContext.Current.WorkspaceId}
                   AND Kind = {ResourceKinds.AgentDeployment}
+                  AND Namespace = {namespaceValue}
                   AND json_extract(Payload, '$.revisionName') = {revisionName}
                 ORDER BY json_extract(Payload, '$.updatedAt') DESC
                 LIMIT 1
@@ -256,10 +272,14 @@ public sealed class SqliteControlPlaneStore(
         return results.SingleOrDefault();
     }
 
-    public async Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsForAgentAsync(string agentName, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsForAgentAsync(string agentName, CancellationToken cancellationToken) =>
+        ListDeploymentsForAgentAsync(ResourceNamespace.Default, agentName, cancellationToken);
+
+    public async Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsForAgentAsync(ResourceNamespace @namespace, string agentName, CancellationToken cancellationToken) =>
         (await LoadFilteredAsync<AgentDeployment>($"""
             SELECT * FROM ControlPlaneResources
             WHERE Kind = {ResourceKinds.AgentDeployment}
+              AND Namespace = {@namespace.Value}
               AND json_extract(Payload, '$.agentName') = {agentName}
             """, cancellationToken))
         .OrderByDescending(value => value.Value.UpdatedAt)
@@ -273,7 +293,7 @@ public sealed class SqliteControlPlaneStore(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await Scoped(context.Documents.AsNoTracking())
             .Where(value => value.Kind == kind)
-            .OrderBy(value => value.Name)
+            .OrderBy(value => value.Namespace).ThenBy(value => value.Name)
             .ToArrayAsync(cancellationToken);
         return documents.Select(Deserialize<T>).ToArray();
     }
@@ -326,6 +346,24 @@ public sealed class SqliteControlPlaneStore(
         (T)resource.WithSystemState(uid, tenantId, workspaceId, etag);
 
     private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
+
+    private static async Task EnsureNamespaceSchemaAsync(ControlPlaneDbContext context, CancellationToken cancellationToken)
+    {
+        var connection = context.Database.GetDbConnection();
+        await connection.OpenAsync(cancellationToken);
+        var hasNamespace = false;
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info('ControlPlaneResources');";
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                hasNamespace |= string.Equals(reader.GetString(1), "Namespace", StringComparison.OrdinalIgnoreCase);
+        }
+        if (!hasNamespace)
+            await context.Database.ExecuteSqlRawAsync("ALTER TABLE ControlPlaneResources ADD COLUMN Namespace TEXT NOT NULL DEFAULT 'default';", cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("DROP INDEX IF EXISTS IX_ControlPlaneResources_WorkspaceId_Kind_Name;", cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_ControlPlaneResources_WorkspaceId_Namespace_Kind_Name ON ControlPlaneResources (WorkspaceId, Namespace, Kind, Name);", cancellationToken);
+    }
 }
 
 public static class SqliteControlPlaneServiceCollectionExtensions

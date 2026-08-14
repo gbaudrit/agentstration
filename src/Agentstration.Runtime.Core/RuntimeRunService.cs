@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
 
@@ -88,10 +89,13 @@ public sealed class RuntimeRunService(
         runs.ListAsync(agentResourceId, skip, take, cancellationToken);
 
     public async Task<AgentRuntimeReadiness> GetReadinessAsync(string agentResourceId, long generation, CancellationToken cancellationToken)
+        => await GetReadinessAsync(ResourceNamespace.Default, agentResourceId, generation, cancellationToken);
+
+    public async Task<AgentRuntimeReadiness> GetReadinessAsync(ResourceNamespace @namespace, string agentResourceId, long generation, CancellationToken cancellationToken)
     {
         try
         {
-            var resolved = await agents.ResolveAsync(new RuntimeAgentReference(agentResourceId, generation), cancellationToken);
+            var resolved = await agents.ResolveAsync(new RuntimeAgentReference(agentResourceId, generation) { Namespace = @namespace }, cancellationToken);
             var registered = runtimes.TryGet(resolved.DeploymentId, out _);
             var ready = resolved.Ready && registered;
             return new AgentRuntimeReadiness(

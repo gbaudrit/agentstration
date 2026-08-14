@@ -30,6 +30,7 @@
     <Project Path="src/Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <Project Path="src/Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />
     <Project Path="src/Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
+    <Project Path="src/Agentstration.Resources/Agentstration.Resources.csproj" />
     <Project Path="src/Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <Project Path="src/Agentstration.Web/Agentstration.Web.csproj" />
     <Project Path="src/Agentstration.Web.Components/Agentstration.Web.Components.csproj" />

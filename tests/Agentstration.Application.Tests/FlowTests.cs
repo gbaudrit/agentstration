@@ -6,6 +6,7 @@ using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
 using Agentstration.Flow.Storage.Abstractions;
 using Agentstration.Flow.Storage.Sqlite;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -123,6 +124,26 @@ public sealed class FlowTests
     }
 
     [TestMethod]
+    public async Task FlowServiceIsolatesHomonymousFlowsAndResolvesRelativeReferencesWithinOwnerNamespace()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var firstNamespace = new ResourceNamespace("team-a");
+        var secondNamespace = new ResourceNamespace("team-b");
+        var command = new CreateFlowCommand("router", "Routes work", "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant")));
+        var first = await fixture.Service.CreateAsync(command, firstNamespace, default);
+        var second = await fixture.Service.CreateAsync(command, secondNamespace, default);
+        await fixture.Service.PublishVersionAsync(first.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(second.Value.Id, "1.0.0", true, default);
+
+        Assert.AreEqual(firstNamespace, (await fixture.Service.GetAsync(new FlowId("router", firstNamespace), default))?.Value.Id.Namespace);
+        Assert.AreEqual(secondNamespace, (await fixture.Service.GetAsync(new FlowId("router", secondNamespace), default))?.Value.Id.Namespace);
+        Assert.IsNull(await fixture.Service.GetAsync(new FlowId("router"), default));
+        Assert.AreEqual(firstNamespace, (await fixture.Service.ResolveAsync(new FlowReference(new FlowId("router")), firstNamespace, default)).FlowId.Namespace);
+        Assert.AreEqual(secondNamespace, (await fixture.Service.ResolveAsync(new FlowReference(new FlowId("router")), secondNamespace, default)).FlowId.Namespace);
+    }
+
+    [TestMethod]
     public void WorkItemCanReferenceAnExactFlowVersionWithoutEmbeddingDefinition()
     {
         var reference = new FlowReference(new FlowId("technical-router"), "1.0.0", false);
@@ -171,6 +192,31 @@ public sealed class FlowTests
         using var deleted = await client.SendAsync(delete);
         Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
         Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync("/api/flows/direct-sql")).StatusCode);
+    }
+
+    [TestMethod]
+    public async Task FlowApiAddressesHomonymousFlowsThroughNamespaceRoutes()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var firstNamespace = new ResourceNamespace("team-a");
+        var secondNamespace = new ResourceNamespace("team-b");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
+        var first = new CreateFlowRequest("router", null, "1.0.0", true, definition) { Namespace = firstNamespace };
+        var second = first with { Namespace = secondNamespace };
+
+        using var firstResponse = await client.PostAsJsonAsync("/api/namespaces/team-a/flows/", first, JsonOptions);
+        using var secondResponse = await client.PostAsJsonAsync("/api/namespaces/team-b/flows/", second, JsonOptions);
+        Assert.AreEqual(HttpStatusCode.Created, firstResponse.StatusCode, await firstResponse.Content.ReadAsStringAsync());
+        Assert.AreEqual(HttpStatusCode.Created, secondResponse.StatusCode, await secondResponse.Content.ReadAsStringAsync());
+        Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync("/api/flows/router")).StatusCode);
+
+        var firstStored = await client.GetFromJsonAsync<FlowResponse>("/api/namespaces/team-a/flows/router", JsonOptions);
+        var secondStored = await client.GetFromJsonAsync<FlowResponse>("/api/namespaces/team-b/flows/router", JsonOptions);
+        Assert.AreEqual(firstNamespace, firstStored?.Namespace);
+        Assert.AreEqual(secondNamespace, secondStored?.Namespace);
+        var firstPage = await client.GetFromJsonAsync<FlowPageResponse>("/api/namespaces/team-a/flows", JsonOptions);
+        Assert.IsTrue(firstPage?.Value.All(flow => flow.Namespace == firstNamespace));
     }
 
     [TestMethod]

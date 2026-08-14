@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
@@ -19,7 +20,7 @@ public sealed class AgentManagementService(
         ValidateResource(resource, ResourceKinds.Agent);
         ValidateDefinition(resource.Definition);
         await modelProfiles.ValidateAsync(resource.Definition.ModelProfile, cancellationToken);
-        var key = ResourceKey.Create(ResourceKinds.Agent, resource.Metadata.Name);
+        var key = ResourceKey.Create(ResourceKinds.Agent, resource.Metadata.Name, resource.Namespace);
         var existing = await store.GetAsync<AgentResource>(key, cancellationToken);
         ValidatePreconditions(existing, ifMatch, ifNoneMatch);
         if (existing is not null && DesiredStateEquals(existing.Value, resource)) return existing;
@@ -41,6 +42,8 @@ public sealed class AgentManagementService(
 
     public Task<StoredResource<AgentResource>?> GetAgentAsync(string name, CancellationToken cancellationToken) =>
         store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, name), cancellationToken);
+    public Task<StoredResource<AgentResource>?> GetAgentAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, name, @namespace), cancellationToken);
 
     public Task<StoredResource<AgentDeployment>?> GetDeploymentAsync(string name, CancellationToken cancellationToken) =>
         store.GetAsync<AgentDeployment>(new ResourceKey(ResourceKinds.AgentDeployment, name), cancellationToken);
@@ -54,13 +57,28 @@ public sealed class AgentManagementService(
         await eventBus.PublishAsync(new AgentDeleted(existing.Value.Uid, name, timeProvider.GetUtcNow()), cancellationToken);
     }
 
+    public async Task DeleteAgentAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
+    {
+        var key = new ResourceKey(ResourceKinds.Agent, name, @namespace);
+        var existing = await store.GetAsync<AgentResource>(key, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(key);
+        foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(key, cancellationToken);
+        await store.DeleteAsync(key, ifMatch, cancellationToken);
+        await eventBus.PublishAsync(new AgentDeleted(existing.Value.Uid, name, timeProvider.GetUtcNow()), cancellationToken);
+    }
+
     public Task<IReadOnlyList<StoredResource<AgentResource>>> ListAgentsAsync(int skip, int take, CancellationToken cancellationToken) =>
-        store.ListAsync<AgentResource>(ResourceKinds.Agent, skip, take, cancellationToken);
+        ListAgentsAsync(ResourceNamespace.Default, skip, take, cancellationToken);
+
+    public Task<IReadOnlyList<StoredResource<AgentResource>>> ListAgentsAsync(ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken) =>
+        store.ListAsync<AgentResource>(@namespace, ResourceKinds.Agent, skip, take, cancellationToken);
 
     public async Task<StoredResource<AgentRevision>> CreateRevisionAsync(string agentName, AgentDeploymentSpec spec, CancellationToken cancellationToken)
+        => await CreateRevisionAsync(ResourceNamespace.Default, agentName, spec, cancellationToken);
+
+    public async Task<StoredResource<AgentRevision>> CreateRevisionAsync(ResourceNamespace @namespace, string agentName, AgentDeploymentSpec spec, CancellationToken cancellationToken)
     {
         await ValidateRuntimeProfileAsync(spec.RuntimeProfileName, cancellationToken);
-        var agent = await GetAgentAsync(agentName, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, agentName));
+        var agent = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, agentName, @namespace));
         var resolved = compiler.Compile(agent.Value, spec);
         var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
@@ -71,10 +89,12 @@ public sealed class AgentManagementService(
             Metadata = new ResourceMetadata
             {
                 Name = revisionName,
+                Namespace = @namespace,
                 Tags = agent.Value.Metadata.Tags,
                 Annotations = agent.Value.Metadata.Annotations
             },
             AgentUid = agent.Value.Uid,
+            AgentNamespace = @namespace,
             AgentName = agentName,
             AgentVersion = agent.Value.Generation,
             Definition = resolved,
@@ -85,15 +105,19 @@ public sealed class AgentManagementService(
     }
 
     public async Task<StoredResource<AgentDeployment>> CreateDeploymentAsync(string name, string revisionName, AgentDeploymentSpec spec, CancellationToken cancellationToken)
+        => await CreateDeploymentAsync(ResourceNamespace.Default, name, revisionName, spec, cancellationToken);
+
+    public async Task<StoredResource<AgentDeployment>> CreateDeploymentAsync(ResourceNamespace @namespace, string name, string revisionName, AgentDeploymentSpec spec, CancellationToken cancellationToken)
     {
         await ValidateRuntimeProfileAsync(spec.RuntimeProfileName, cancellationToken);
-        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, revisionName), cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.AgentRevision, revisionName));
+        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.AgentRevision, revisionName, @namespace));
         return await store.PutAsync(new AgentDeployment
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.AgentDeployment,
-            Metadata = new ResourceMetadata { Name = name },
+            Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
+            AgentNamespace = @namespace,
             RevisionName = revisionName,
             AgentName = revision.Value.AgentName,
             ModelProfileName = revision.Value.Definition.ModelProfileName,
@@ -122,21 +146,24 @@ public sealed class AgentManagementService(
     }
 
     public async Task<StoredResource<AgentDeployment>> PrepareLocalRuntimeAsync(string agentName, long generation, CancellationToken cancellationToken)
+        => await PrepareLocalRuntimeAsync(ResourceNamespace.Default, agentName, generation, cancellationToken);
+
+    public async Task<StoredResource<AgentDeployment>> PrepareLocalRuntimeAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken)
     {
-        var agent = await GetAgentAsync(agentName, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, agentName));
+        var agent = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, agentName, @namespace));
         if (agent.Value.Generation != generation) throw new ArgumentException($"Only current agent generation '{agent.Value.Generation}' can be prepared.", nameof(generation));
         var spec = new AgentDeploymentSpec { Environment = "local", RuntimeProfileName = "maf-default", HostingMode = AgentHostingMode.InProcess };
         var revision = await agentQueries.FindRevisionAsync(agent.Value.Uid, generation, cancellationToken)
-            ?? await CreateRevisionAsync(agentName, spec, cancellationToken);
-        var deployment = await agentQueries.FindDeploymentByRevisionAsync(revision.Value.Metadata.Name, cancellationToken)
-            ?? await CreateDeploymentAsync($"{agentName}--g{generation:000000}", revision.Value.Metadata.Name, spec, cancellationToken);
+            ?? await CreateRevisionAsync(@namespace, agentName, spec, cancellationToken);
+        var deployment = await agentQueries.FindDeploymentByRevisionAsync(@namespace, revision.Value.Metadata.Name, cancellationToken)
+            ?? await CreateDeploymentAsync(@namespace, $"{agentName}--g{generation:000000}", revision.Value.Metadata.Name, spec, cancellationToken);
         if (deployment.Value.DesiredState != DesiredAgentState.Running) deployment = await StartAsync(deployment, cancellationToken);
         var activated = await ReconcileAsync(deployment, cancellationToken);
         if (activated.Value.OperationalState != OperationalState.Ready) return activated;
 
-        var current = await GetAgentAsync(agentName, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, agentName));
+        var current = await GetAgentAsync(@namespace, agentName, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, agentName, @namespace));
         if (current.Value.Generation != generation) throw new ControlPlaneConcurrencyException($"Agent '{agentName}' changed while generation '{generation}' was being activated.");
-        var deployments = await agentQueries.ListDeploymentsForAgentAsync(agentName, cancellationToken);
+        var deployments = await agentQueries.ListDeploymentsForAgentAsync(@namespace, agentName, cancellationToken);
         foreach (var previous in deployments.Where(item => item.Value.Uid != activated.Value.Uid && item.Value.AgentName == agentName && item.Value.DesiredState != DesiredAgentState.Stopped))
             _ = await ReconcileAsync(await StopAsync(previous, cancellationToken), cancellationToken);
         return activated;

@@ -49,7 +49,7 @@ public sealed class AgentRunnerModel
         }
         return new CreateRuntimeRunRequest
         {
-            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation),
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation) { Namespace = agent.Namespace },
             Input = new RuntimeRunInput
             {
                 Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, Prompt)],

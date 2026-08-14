@@ -1,10 +1,11 @@
 using Agentstration.Application.Work;
-using Agentstration.Work;
-using Agentstration.Work.Contracts;
-using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
+using Agentstration.Work;
+using Agentstration.Work.Contracts;
+using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Web;
 
@@ -21,6 +22,10 @@ public static class WorkplaceEndpoints
         endpoints.MapPut("/api/management/entries/{entryName}", PutEntryDraftAsync);
         endpoints.MapPost("/api/management/entries/{entryName}/validate", ValidateEntryDraftAsync);
         endpoints.MapPost("/api/management/entries/{entryName}/publish", PublishEntryDraftAsync);
+        endpoints.MapGet("/api/namespaces/{namespace}/entries/{entryName}", GetNamespacedEntryAsync);
+        endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}", GetNamespacedEntryDraftAsync);
+        endpoints.MapPut("/api/namespaces/{namespace}/management/entries/{entryName}", PutNamespacedEntryDraftAsync);
+        endpoints.MapPost("/api/namespaces/{namespace}/management/entries/{entryName}/publish", PublishNamespacedEntryDraftAsync);
         endpoints.MapGet("/api/management/entries/{entryName}/dependencies", GetEntryDependenciesAsync);
         endpoints.MapGet("/api/resources", ListResourcesAsync);
         endpoints.MapGet("/api/management/workspaces", ListWorkspaceDraftsAsync);
@@ -56,6 +61,7 @@ public static class WorkplaceEndpoints
     private static Task<IResult> GetWorkspaceAsync(string workspaceName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetWorkspaceAsync(WorkspaceId(workspaceName), token))));
     private static async Task<IResult> ListEntriesAsync(WorkplaceService service, CancellationToken token) => Results.Ok((await service.ListEntriesAsync(token)).Select(ToResponse));
     private static Task<IResult> GetEntryAsync(string entryName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetEntryAsync(EntryResourceId(entryName), token))));
+    private static Task<IResult> GetNamespacedEntryAsync(string @namespace, string entryName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetEntryAsync(NamespacedEntryId(@namespace, entryName), token))));
     private static Task<IResult> SubmitEntryCompatibilityAsync(string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(ParseWorkspaceId(request.WorkspaceId), entryName, request, service, token);
     private static Task<IResult> SubmitEntryAsync(string workspaceName, string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(WorkspaceId(workspaceName), entryName, request, service, token);
     private static Task<IResult> SubmitCoreAsync(WorkplaceWorkspaceId workspaceId, string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () =>
@@ -91,8 +97,8 @@ public static class WorkplaceEndpoints
     private static Task<IResult> MarkReadAsync(string workspaceName, Guid notificationId, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(await service.MarkNotificationReadAsync(WorkspaceId(workspaceName), new(notificationId), token)));
     private static Task<IResult> MarkAllReadAsync(string workspaceName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => { await service.MarkAllNotificationsReadAsync(WorkspaceId(workspaceName), token); return Results.NoContent(); });
 
-    private static WorkplaceWorkspaceResponse ToResponse(WorkplaceWorkspace value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Entries.Select(reference => new WorkspaceEntryReferenceResponse(reference.EntryResourceId.Value, reference.Role, reference.Order)).ToArray(), value.Version, value.PublishedAt);
-    private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt);
+    private static WorkplaceWorkspaceResponse ToResponse(WorkplaceWorkspace value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Entries.Select(reference => new WorkspaceEntryReferenceResponse(reference.EntryResourceId.Value, reference.Role, reference.Order) { Namespace = reference.EntryResourceId.Namespace }).ToArray(), value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
+    private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
 
     private static async Task<IResult> ListEntryDraftsAsync(EntryAdministrationService service, WorkplaceService workplace, CancellationToken token)
     {
@@ -114,10 +120,27 @@ public static class WorkplaceEndpoints
         return Results.Ok(new EntryDraftResponse(draft, published));
     });
 
+    private static Task<IResult> GetNamespacedEntryDraftAsync(string @namespace, string entryName, EntryAdministrationService service, WorkplaceService workplace, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var id = NamespacedEntryId(@namespace, entryName);
+        var draft = await service.GetAsync(id, token);
+        EntryResource? published = null;
+        try { published = await workplace.GetEntryAsync(id, token); } catch (KeyNotFoundException) { }
+        return Results.Ok(new EntryDraftResponse(draft, published));
+    });
+
     private static Task<IResult> PutEntryDraftAsync(string entryName, EntryDraft draft, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
     {
         if (!string.Equals(draft.Name, entryName, StringComparison.Ordinal) || draft.Id != EntryResourceId(entryName))
             throw new WorkValidationException("entry_identity_mismatch", "The Entry route, name and resource id must match.");
+        return Results.Ok(await service.SaveAsync(draft, token));
+    });
+
+    private static Task<IResult> PutNamespacedEntryDraftAsync(string @namespace, string entryName, EntryDraft draft, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var id = NamespacedEntryId(@namespace, entryName);
+        if (!string.Equals(draft.Name, entryName, StringComparison.Ordinal) || draft.Id != id)
+            throw new WorkValidationException("entry_identity_mismatch", "The Entry route, namespace, name and resource id must match.");
         return Results.Ok(await service.SaveAsync(draft, token));
     });
 
@@ -129,6 +152,8 @@ public static class WorkplaceEndpoints
 
     private static Task<IResult> PublishEntryDraftAsync(string entryName, EntryAdministrationService service, CancellationToken token) =>
         ExecuteAsync(async () => Results.Ok(await service.PublishAsync(EntryResourceId(entryName), token)));
+    private static Task<IResult> PublishNamespacedEntryDraftAsync(string @namespace, string entryName, EntryAdministrationService service, CancellationToken token) =>
+        ExecuteAsync(async () => Results.Ok(await service.PublishAsync(NamespacedEntryId(@namespace, entryName), token)));
 
     private static Task<IResult> GetEntryDependenciesAsync(string entryName, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
         Results.Ok((await service.GetDependenciesAsync(EntryResourceId(entryName), token)).Select(value => new EntryDependencyResponse(value.ResourceId, value.ResourceType, value.Relationship))));
@@ -139,13 +164,14 @@ public static class WorkplaceEndpoints
         {
             var values = await agents.ListAgentsAsync(0, 500, token);
             return Results.Ok(values.Select(value => new ResourcePickerItem(value.Value.Metadata.Name, value.Value.Definition.DisplayName, value.Value.Definition.Description, value.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), value.Value.Status.ProvisioningState.ToString(), kind,
-                new Dictionary<string, string> { ["modelProfile"] = value.Value.Definition.ModelProfile.ResourceId })));
+                new Dictionary<string, string> { ["modelProfile"] = value.Value.Definition.ModelProfile.ResourceId })
+            { Namespace = value.Value.Namespace }));
         }
         if (string.Equals(kind, ResourceKinds.Flow, StringComparison.Ordinal))
         {
             var page = await flows.ListAsync(0, 500, token);
             return Results.Ok(page.Items.Where(value => !value.Value.Metadata.TryGetValue("systemManaged", out var system) || !bool.TryParse(system, out var hidden) || !hidden)
-                .Select(value => new ResourcePickerItem(value.Value.Id.Value, value.Value.DisplayName ?? value.Value.Name, value.Value.Description, value.Value.ActiveVersion ?? value.Value.Version, value.Value.Enabled ? "Active" : "Disabled", kind)));
+                .Select(value => new ResourcePickerItem(value.Value.Id.Value, value.Value.DisplayName ?? value.Value.Name, value.Value.Description, value.Value.ActiveVersion ?? value.Value.Version, value.Value.Enabled ? "Active" : "Disabled", kind) { Namespace = value.Value.Id.Namespace }));
         }
         return Results.Problem(statusCode: 400, title: "resource_kind_not_supported", detail: "Only Agent and Flow resources can be selected for an Entry.");
     }
@@ -184,6 +210,7 @@ public static class WorkplaceEndpoints
     private static WorkplaceWorkspaceId ParseWorkspaceId(string value) => WorkspaceId(value);
     private static WorkplaceWorkspaceId WorkspaceId(string name) => new(name);
     private static EntryId EntryResourceId(string name) => new(name);
+    private static EntryId NamespacedEntryId(string @namespace, string name) => new(name, ResourceNamespace.Parse(@namespace));
     private static string WorkspaceName(WorkplaceWorkspaceId id) => id.Value;
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action) { try { return await action(); } catch (KeyNotFoundException exception) { return Results.Problem(statusCode: 404, title: "workplace_resource_not_found", detail: exception.Message); } catch (WorkValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); } catch (WorkTransitionException exception) { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); } catch (WorkplaceConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); } }
 }
