@@ -238,15 +238,14 @@ public sealed class PackTests
         Assert.IsNotNull(conflictingPreview);
         Assert.IsFalse(conflictingPreview.CanInstall, "The fork keeps resource names and must conflict with its installed origin in the same Workspace.");
 
-        using var removeResponse = await client.DeleteAsync("/api/packs/agentstration/who-am-i");
-        Assert.AreEqual(HttpStatusCode.NoContent, removeResponse.StatusCode, await removeResponse.Content.ReadAsStringAsync());
-
-        using var localInstallResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install", null);
+        using var localInstallResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install?replaceOrigin=true", null);
         Assert.AreEqual(HttpStatusCode.Created, localInstallResponse.StatusCode, await localInstallResponse.Content.ReadAsStringAsync());
         var localInstallation = await localInstallResponse.Content.ReadFromJsonAsync<InstalledPackResource>();
         Assert.IsNotNull(localInstallation);
         Assert.AreEqual("local", localInstallation.Definition.Publisher);
         Assert.AreEqual("who-am-i-lab", localInstallation.Definition.PackName);
+        using var removedOriginResponse = await client.GetAsync("/api/packs/agentstration/who-am-i");
+        Assert.AreEqual(HttpStatusCode.NotFound, removedOriginResponse.StatusCode);
 
         using var localReinstallResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install?replaceExisting=true", null);
         Assert.AreEqual(HttpStatusCode.Created, localReinstallResponse.StatusCode, await localReinstallResponse.Content.ReadAsStringAsync());

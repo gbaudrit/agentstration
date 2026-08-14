@@ -167,8 +167,9 @@ public sealed partial class PackAuthoringService(
         return await installations.PreviewAsync(archive, cancellationToken);
     }
 
-    public async Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken)
+    public async Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, bool replaceOrigin, CancellationToken cancellationToken)
     {
+        var project = await RequiredProjectAsync(projectId, cancellationToken);
         var archive = await ReadBuildArchiveAsync(projectId, buildId, cancellationToken);
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
         var existing = await installations.GetAsync(identity, cancellationToken);
@@ -178,11 +179,32 @@ public sealed partial class PackAuthoringService(
                 throw new PackValidationException("pack_already_installed", $"Pack '{identity}' is already installed. Enable replacement to reinstall this development build.");
             await installations.UninstallAsync(identity, cancellationToken);
         }
+
+        var origin = new PackIdentity(project.Value.Definition.Origin.Publisher, project.Value.Definition.Origin.Name);
+        if (replaceOrigin && origin != identity)
+        {
+            var installedOrigin = await installations.GetAsync(origin, cancellationToken)
+                ?? throw new PackValidationException("pack_origin_not_installed", $"The source Pack '{origin}' is no longer installed.");
+            var preview = await installations.PreviewAsync(archive, cancellationToken);
+            var conflicts = preview.Resources.Where(resource => resource.AlreadyExists).ToArray();
+            if (conflicts.Length == 0)
+                throw new PackValidationException("pack_origin_replacement_not_required", $"The build has no resource conflict with source Pack '{origin}'.");
+            var managedByOrigin = installedOrigin.Value.Definition.ManagedResources
+                .Select(resource => (resource.Kind, resource.Name))
+                .ToHashSet();
+            var unrelatedConflict = conflicts.FirstOrDefault(resource => !managedByOrigin.Contains((resource.Kind, resource.Name)));
+            if (unrelatedConflict is not null)
+                throw new PackResourceConflictException(unrelatedConflict.Kind, unrelatedConflict.Name);
+            await installations.UninstallAsync(origin, cancellationToken);
+        }
         return await installations.InstallAsync(archive, cancellationToken);
     }
 
+    public Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken) =>
+        InstallBuildAsync(projectId, buildId, replaceExisting, false, cancellationToken);
+
     public Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken) =>
-        InstallBuildAsync(projectId, buildId, false, cancellationToken);
+        InstallBuildAsync(projectId, buildId, false, false, cancellationToken);
 
     private async Task<PackArchive> ReadBuildArchiveAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken)
     {

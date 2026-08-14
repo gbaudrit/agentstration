@@ -173,10 +173,10 @@ internal sealed class PackEndpoints : IManagementEndpoint
     private static Task<IResult> PreviewBuildAsync(Guid projectId, Guid buildId, PackAuthoringService service, CancellationToken token) =>
         ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.PreviewBuildAsync(projectId, buildId, token)));
 
-    private static Task<IResult> InstallBuildAsync(Guid projectId, Guid buildId, bool? replaceExisting, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
+    private static Task<IResult> InstallBuildAsync(Guid projectId, Guid buildId, bool? replaceExisting, bool? replaceOrigin, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
         ManagementHttp.ExecuteAsync(async () =>
         {
-            var installed = await service.InstallBuildAsync(projectId, buildId, replaceExisting ?? false, token);
+            var installed = await service.InstallBuildAsync(projectId, buildId, replaceExisting ?? false, replaceOrigin ?? false, token);
             response.Headers.ETag = installed.ETag;
             response.Headers.Location = $"/api/packs/{Uri.EscapeDataString(installed.Value.Definition.Publisher)}/{Uri.EscapeDataString(installed.Value.Definition.PackName)}";
             return Results.Created(response.Headers.Location, installed.Value);
