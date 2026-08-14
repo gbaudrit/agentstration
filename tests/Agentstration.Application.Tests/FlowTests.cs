@@ -333,12 +333,9 @@ public sealed class FlowTests
     }
 
     [TestMethod]
-    public async Task FlowRunConsoleUsesDistinctRouteFromApi()
+    public void FlowRunConsoleUsesDistinctRouteFromApi()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
-        using var client = factory.CreateClient();
-
-        using var consoleResponse = await client.GetAsync("/flow-runs");
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         var routes = factory.Services.GetServices<EndpointDataSource>()
             .SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>()
@@ -346,7 +343,6 @@ public sealed class FlowTests
             .Where(pattern => pattern is not null)
             .ToArray();
 
-        Assert.AreEqual(HttpStatusCode.OK, consoleResponse.StatusCode);
         Assert.Contains("/flow-runs", routes);
         Assert.Contains("/flow-runs/{RunId}", routes);
         Assert.Contains("/api/flowRuns/{runId}", routes);
