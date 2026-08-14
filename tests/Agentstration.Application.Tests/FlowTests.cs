@@ -324,16 +324,21 @@ public sealed class FlowTests
         Assert.IsTrue(global!.Value.Any(item => item.Id == run.Id));
         var scoped = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flows/api-run-flow/runs", JsonOptions);
         Assert.IsTrue(scoped!.Value.Any(item => item.Id == run.Id));
+        var routes = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .ToArray();
+        Assert.Contains("/api/flowRuns/{runId}", routes);
+        Assert.DoesNotContain("/flowRuns/{runId}", routes);
     }
 
     [TestMethod]
-    public async Task FlowRunConsoleRouteDoesNotCollideWithPublicRunApi()
+    public async Task FlowRunConsoleUsesDistinctRouteFromApi()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
 
-        using var apiResponse = await client.GetAsync("/flowRuns");
-        using var missingRunResponse = await client.GetAsync("/flowRuns/missing-run");
+        using var consoleResponse = await client.GetAsync("/flow-runs");
         var routes = factory.Services.GetServices<EndpointDataSource>()
             .SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>()
@@ -341,11 +346,11 @@ public sealed class FlowTests
             .Where(pattern => pattern is not null)
             .ToArray();
 
-        Assert.AreEqual(HttpStatusCode.OK, apiResponse.StatusCode);
-        Assert.AreEqual(HttpStatusCode.NotFound, missingRunResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, consoleResponse.StatusCode);
         Assert.Contains("/flow-runs", routes);
         Assert.Contains("/flow-runs/{RunId}", routes);
-        Assert.Contains("/flowRuns/{runId}", routes);
+        Assert.Contains("/api/flowRuns/{runId}", routes);
+        Assert.DoesNotContain("/flowRuns/{runId}", routes);
     }
 
     [TestMethod]

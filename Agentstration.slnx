@@ -54,5 +54,6 @@
     <Project Path="tests/Agentstration.Web.FlowDesigner.Tests/Agentstration.Web.FlowDesigner.Tests.csproj" />
     <Project Path="tests/Agentstration.Work.Api.Tests/Agentstration.Work.Api.Tests.csproj" />
     <Project Path="tests/Agentstration.Workplace.Components.Tests/Agentstration.Workplace.Components.Tests.csproj" />
+    <Project Path="tests/Agentstration.Workplace.Web.Tests/Agentstration.Workplace.Web.Tests.csproj" />
   </Folder>
 </Solution>

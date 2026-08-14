@@ -2,27 +2,150 @@
 @implements IDisposable
 @inject IFlowApiClient Client
 @inject NavigationManager Navigation
+
 <PageTitle>@(run is null ? "Flow Run" : run.Id) · Agentstration</PageTitle>
-@if(run is null){<LoadingState/>}else{
-<PageHeader Title="Flow Run" Description="@run.Id"><Actions>@if(!run.Status.IsTerminal()){<button class="button-danger" @onclick="CancelAsync">Cancel</button>}<a class="button-secondary" href="/flows/@run.FlowId.Value">Flow definition</a></Actions></PageHeader>
-<section class="run-summary"><div><span class="field-label">Status</span><StatusBadge Text="@run.Status.ToString()" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></div><div><span class="field-label">Flow / version</span><strong>@run.FlowId.Value · @run.FlowVersion</strong></div><div><span class="field-label">Deployment</span><strong>@(run.DeploymentResourceId??"—")</strong></div><div><span class="field-label">Trigger / started by</span><strong>@run.Trigger · @(run.StartedBy??"—")</strong></div><div><span class="field-label">Correlation ID</span><code>@run.CorrelationId</code></div><div><span class="field-label">Duration</span><strong>@Duration(run.StartedAt,run.CompletedAt)</strong></div></section>
-@if(run.Error is not null){<article class="panel run-error"><strong>@run.Error.Code</strong><p>@run.Error.Message</p><code>@run.Error.Details</code></article>}
-<article class="panel run-timeline"><div class="panel-header"><h2>Execution timeline</h2><span>@TimelineEvents.Count timeline event(s) · @eventHistory.Count raw</span></div>@if(TimelineEvents.Count==0){<p class="muted">Waiting for execution events…</p>}else{<ol>@foreach(var runEvent in TimelineEvents.TakeLast(100)){<li class="event-@runEvent.Type.ToString().ToLowerInvariant()"><time>@runEvent.Timestamp.LocalDateTime.ToString("T")</time><div><strong>@EventLabel(runEvent)</strong>@if(!string.IsNullOrWhiteSpace(EventContent(runEvent))){<p>@EventContent(runEvent)</p>}<small>#@runEvent.Sequence · @runEvent.Type</small></div></li>}</ol>}</article>
-<section class="designer-layout run-layout"><div><FlowGraph Nodes="FlowGraphNode.From(run)" SelectedName="selected?.StepName" OnSelected="SelectStep" /><article class="panel io-panel"><div class="panel-header"><h2>Run input and output</h2></div><div class="io-grid"><div><span class="field-label">Input</span><pre>@Pretty(run.Input)</pre></div><div><span class="field-label">Output</span><pre>@Pretty(run.Output)</pre></div></div></article></div><article class="panel inspector step-inspector"><div class="panel-header"><h2>Step diagnostic</h2></div>@if(selected is null){<p class="muted">Select a step to inspect its execution.</p>}else{<dl class="details-list"><dt>Status</dt><dd>@selected.Status</dd><dt>Type</dt><dd>@selected.StepType</dd><dt>Duration</dt><dd>@Duration(selected.StartedAt,selected.CompletedAt)</dd><dt>Attempt</dt><dd>@selected.Attempt</dd><dt>Transition</dt><dd>@(selected.SelectedTransition??"—")</dd><dt>Agent</dt><dd>@(selected.AgentResourceId??"—")</dd><dt>Agent version</dt><dd>@(selected.AgentVersion?.ToString()??"—")</dd><dt>Model profile</dt><dd>@(selected.ModelProfileResourceId??"—")</dd><dt>Provider</dt><dd>@(selected.Provider??"—")</dd><dt>Tokens</dt><dd>@(selected.Usage is null?"—":$"{selected.Usage.InputTokens??0} in / {selected.Usage.OutputTokens??0} out")</dd><dt>Tools</dt><dd>@(selected.Tools.Count==0?"—":string.Join(", ",selected.Tools))</dd></dl><span class="field-label">Declared input</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">Resolved input</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">Output</span><pre>@Pretty(selected.Output)</pre><span class="field-label">Logs</span><pre>@string.Join(Environment.NewLine,selected.Logs)</pre>@if(selected.Error is not null){<div class="error-panel"><strong>@selected.Error.Code</strong><p>@selected.Error.Message</p></div>}}</article></section>
+@if (run is null)
+{
+    <LoadingState />
 }
+else
+{
+    <PageHeader Title="Flow Run" Description="@run.Id">
+        <Actions>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">Cancel</button> }<a class="button-secondary" href="/flows/@run.FlowId.Value">Flow definition</a></Actions>
+    </PageHeader>
+    <section class="run-summary">
+        <div><span class="field-label">Status</span><StatusBadge Text="@run.Status.ToString()" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></div>
+        <div><span class="field-label">Flow / version</span><strong>@run.FlowId.Value · @run.FlowVersion</strong></div>
+        <div><span class="field-label">Deployment</span><strong>@(run.DeploymentResourceId ?? "—")</strong></div>
+        <div><span class="field-label">Trigger / started by</span><strong>@run.Trigger · @(run.StartedBy ?? "—")</strong></div>
+        <div><span class="field-label">Correlation ID</span><code>@run.CorrelationId</code></div>
+        <div><span class="field-label">Duration</span><strong>@Duration(run.StartedAt, run.CompletedAt)</strong></div>
+    </section>
+    @if (run.Error is not null)
+    {
+        <article class="panel run-error"><strong>@run.Error.Code</strong><p>@run.Error.Message</p><code>@run.Error.Details</code></article>
+    }
+    <FlowRunTimeline Events="events" IsLive="@(!run.Status.IsTerminal())" />
+    <section class="designer-layout run-layout">
+        <div>
+            <FlowGraph Nodes="FlowGraphNode.From(run)" SelectedName="selected?.StepName" OnSelected="SelectStep" />
+            <article class="panel io-panel"><div class="panel-header"><h2>Run input and output</h2></div><div class="io-grid"><div><span class="field-label">Input</span><pre>@Pretty(run.Input)</pre></div><div><span class="field-label">Output</span><pre>@Pretty(run.Output)</pre></div></div></article>
+        </div>
+        <article class="panel inspector step-inspector">
+            <div class="panel-header"><h2>Step diagnostic</h2></div>
+            @if (selected is null)
+            {
+                <p class="muted">Select a step to inspect its execution.</p>
+            }
+            else
+            {
+                <dl class="details-list"><dt>Status</dt><dd>@selected.Status</dd><dt>Type</dt><dd>@selected.StepType</dd><dt>Duration</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>Attempt</dt><dd>@selected.Attempt</dd><dt>Transition</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>Agent</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>Agent version</dt><dd>@(selected.AgentVersion?.ToString() ?? "—")</dd><dt>Model profile</dt><dd>@(selected.ModelProfileResourceId ?? "—")</dd><dt>Provider</dt><dd>@(selected.Provider ?? "—")</dd><dt>Tokens</dt><dd>@(selected.Usage is null ? "—" : $"{selected.Usage.InputTokens ?? 0} in / {selected.Usage.OutputTokens ?? 0} out")</dd><dt>Tools</dt><dd>@(selected.Tools.Count == 0 ? "—" : string.Join(", ", selected.Tools))</dd></dl>
+                <span class="field-label">Declared input</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">Resolved input</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">Output</span><pre>@Pretty(selected.Output)</pre><span class="field-label">Logs</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
+                @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@selected.Error.Message</p></div> }
+            }
+        </article>
+    </section>
+}
+
 @code {
-    [Parameter]public string RunId{get;set;}=string.Empty;private readonly CancellationTokenSource cancellation=new();private readonly SortedDictionary<long,FlowRunEvent> eventHistory=[];private FlowRun? run;private FlowStepRun? selected;private Microsoft.AspNetCore.SignalR.Client.HubConnection? hub;private long lastSequence;
-    protected override async Task OnParametersSetAsync(){eventHistory.Clear();lastSequence=0;run=await Client.GetFlowRunAsync(RunId,cancellation.Token);selected=run.Steps.FirstOrDefault();await ConnectAsync();}
-    private async Task ConnectAsync(){if(hub is not null)await hub.DisposeAsync();hub=new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder().WithUrl(Navigation.ToAbsoluteUri("/hubs/flow-runs")).WithAutomaticReconnect().Build();hub.On<FlowRunEvent>("FlowRunEvent",ApplyEventAsync);hub.Reconnected+=async _=>await SubscribeAndReplayAsync();await hub.StartAsync(cancellation.Token);await SubscribeAndReplayAsync();}
-    private async Task SubscribeAndReplayAsync(){await hub!.InvokeAsync("SubscribeAsync",RunId,cancellation.Token);foreach(var runEvent in await Client.GetFlowRunEventsAsync(RunId,lastSequence,cancellation.Token))await ApplyEventAsync(runEvent);}
-    private async Task ApplyEventAsync(FlowRunEvent runEvent){if(eventHistory.ContainsKey(runEvent.Sequence))return;eventHistory[runEvent.Sequence]=runEvent;lastSequence=Math.Max(lastSequence,runEvent.Sequence);run=await Client.GetFlowRunAsync(RunId,cancellation.Token);if(selected is not null)selected=run.Steps.FirstOrDefault(x=>x.StepName==selected.StepName);await InvokeAsync(StateHasChanged);}
-    private void SelectStep(string name)=>selected=run?.Steps.FirstOrDefault(x=>x.StepName==name);
-    private async Task CancelAsync(){run=await Client.CancelFlowRunAsync(RunId,cancellation.Token);}
-    private IReadOnlyList<FlowRunEvent> TimelineEvents=>eventHistory.Values.Where(value=>value.Type!=FlowRunEventType.StepOutputDelta).OrderBy(value=>value.Sequence).ToArray();
-    private static string Pretty(JsonElement value)=>JsonSerializer.Serialize(value,new JsonSerializerOptions{WriteIndented=true});private static string Pretty(JsonElement? value)=>value is null?"—":Pretty(value.Value);
-    private static string EventLabel(FlowRunEvent runEvent)=>runEvent.Type switch{FlowRunEventType.ParticipantTurnStarted=>$"Turn {Turn(runEvent)} · {runEvent.StepId} started",FlowRunEventType.ParticipantTurnCompleted=>$"Turn {Turn(runEvent)} · {runEvent.StepId} completed",_=>runEvent.StepId is null?runEvent.Type.ToString():$"{runEvent.StepId} · {runEvent.Type}"};
-    private static int Turn(FlowRunEvent runEvent)=>runEvent.Payload is {ValueKind:JsonValueKind.Object} payload&&payload.TryGetProperty("turn",out var turn)?turn.GetInt32():0;
-    private static string? EventContent(FlowRunEvent runEvent){if(runEvent.Payload is not { } payload)return null;if(payload.ValueKind==JsonValueKind.Object&&payload.TryGetProperty("content",out var content)&&content.ValueKind==JsonValueKind.String)return content.GetString();return runEvent.Type==FlowRunEventType.StepOutputDelta?payload.GetRawText():null;}
-    private static string Duration(DateTimeOffset? start,DateTimeOffset? end){if(start is null)return "—";var value=(end??DateTimeOffset.UtcNow)-start.Value;return value.TotalSeconds>=1?$"{value.TotalSeconds:0.##} s":$"{value.TotalMilliseconds:0} ms";}
-    public void Dispose(){cancellation.Cancel();if(hub is not null)_=hub.DisposeAsync();cancellation.Dispose();}
+    [Parameter] public string RunId { get; set; } = string.Empty;
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly List<FlowRunEvent> events = [];
+    private readonly HashSet<long> eventSequences = [];
+    private FlowRun? run;
+    private FlowStepRun? selected;
+    private Microsoft.AspNetCore.SignalR.Client.HubConnection? hub;
+    private long lastSequence;
+    private int streamingRenderScheduled;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        run = await Client.GetFlowRunAsync(RunId, cancellation.Token);
+        selected = run.Steps.FirstOrDefault();
+        events.Clear();
+        eventSequences.Clear();
+        lastSequence = 0;
+        await ConnectAsync();
+    }
+
+    private async Task ConnectAsync()
+    {
+        if (hub is not null) await hub.DisposeAsync();
+        hub = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder().WithUrl(Navigation.ToAbsoluteUri("/hubs/flow-runs")).WithAutomaticReconnect().Build();
+        hub.On<FlowRunEvent>("FlowRunEvent", ApplyEventAsync);
+        hub.Reconnected += async _ => await SubscribeAndReplayAsync();
+        await hub.StartAsync(cancellation.Token);
+        await SubscribeAndReplayAsync();
+    }
+
+    private async Task SubscribeAndReplayAsync()
+    {
+        await hub!.InvokeAsync("SubscribeAsync", RunId, cancellation.Token);
+        var replay = await Client.GetFlowRunEventsAsync(RunId, lastSequence, cancellation.Token);
+        foreach (var runEvent in replay) AddEvent(runEvent);
+        if (replay.Count > 0) await RefreshRunAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ApplyEventAsync(FlowRunEvent runEvent)
+    {
+        if (!AddEvent(runEvent)) return;
+        if (runEvent.Type == FlowRunEventType.StepOutputDelta)
+        {
+            ScheduleStreamingRender();
+            return;
+        }
+        await RefreshRunAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private bool AddEvent(FlowRunEvent runEvent)
+    {
+        if (!eventSequences.Add(runEvent.Sequence)) return false;
+        lastSequence = Math.Max(lastSequence, runEvent.Sequence);
+        events.Add(runEvent);
+        return true;
+    }
+
+    private async Task RefreshRunAsync()
+    {
+        run = await Client.GetFlowRunAsync(RunId, cancellation.Token);
+        if (selected is not null) selected = run.Steps.FirstOrDefault(value => value.StepName == selected.StepName);
+    }
+
+    private void ScheduleStreamingRender()
+    {
+        if (Interlocked.Exchange(ref streamingRenderScheduled, 1) != 0) return;
+        _ = FlushStreamingRenderAsync();
+    }
+
+    private async Task FlushStreamingRenderAsync()
+    {
+        var renderedSequence = lastSequence;
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(150), cancellation.Token);
+            renderedSequence = lastSequence;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        finally
+        {
+            Volatile.Write(ref streamingRenderScheduled, 0);
+            if (!cancellation.IsCancellationRequested && lastSequence > renderedSequence) ScheduleStreamingRender();
+        }
+    }
+
+    private void SelectStep(string name) => selected = run?.Steps.FirstOrDefault(value => value.StepName == name);
+    private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, cancellation.Token);
+    private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
+    private static string Pretty(JsonElement? value) => value is null ? "—" : Pretty(value.Value);
+    private static string Duration(DateTimeOffset? start, DateTimeOffset? end) { if (start is null) return "—"; var value = (end ?? DateTimeOffset.UtcNow) - start.Value; return value.TotalSeconds >= 1 ? $"{value.TotalSeconds:0.##} s" : $"{value.TotalMilliseconds:0} ms"; }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        if (hub is not null) _ = hub.DisposeAsync();
+        cancellation.Dispose();
+    }
 }

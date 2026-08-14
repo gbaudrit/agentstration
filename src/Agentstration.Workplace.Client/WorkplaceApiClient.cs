@@ -67,6 +67,7 @@ public sealed class WorkplaceApiClient(HttpClient httpClient) : IWorkplaceApiCli
 public sealed class WorkplaceRealtimeClient : IAsyncDisposable
 {
     private readonly HubConnection connection;
+    private readonly SemaphoreSlim subscriptionGate = new(1, 1);
     private string? workspaceId;
     private long lastSequence;
 
@@ -113,14 +114,36 @@ public sealed class WorkplaceRealtimeClient : IAsyncDisposable
 
     public async Task StartAsync(string workspace, long afterSequence, CancellationToken token)
     {
-        workspaceId = workspace;
-        lastSequence = Math.Max(lastSequence, afterSequence);
-        if (connection.State == HubConnectionState.Disconnected) await connection.StartAsync(token);
-        await connection.InvokeAsync("SubscribeAsync", workspace, lastSequence, token);
-        StateChanged?.Invoke(connection.State);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspace);
+        await subscriptionGate.WaitAsync(token);
+        try
+        {
+            if (connection.State == HubConnectionState.Disconnected) await connection.StartAsync(token);
+            if (workspaceId is not null && !string.Equals(workspaceId, workspace, StringComparison.Ordinal))
+            {
+                await connection.InvokeAsync("UnsubscribeAsync", workspaceId, token);
+                lastSequence = afterSequence;
+            }
+            else
+            {
+                lastSequence = Math.Max(lastSequence, afterSequence);
+            }
+
+            workspaceId = workspace;
+            await connection.InvokeAsync("SubscribeAsync", workspace, lastSequence, token);
+            StateChanged?.Invoke(connection.State);
+        }
+        finally
+        {
+            subscriptionGate.Release();
+        }
     }
 
-    public ValueTask DisposeAsync() => connection.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await connection.DisposeAsync();
+        subscriptionGate.Dispose();
+    }
 
     private sealed class CompositeRegistration(IReadOnlyList<IDisposable> registrations) : IDisposable
     {
@@ -143,6 +166,6 @@ public static class WorkplaceClientServiceCollectionExtensions
     public static IServiceCollection AddAgentstrationWorkplaceClient(this IServiceCollection services, Uri apiBaseUrl, Uri hubUrl)
     {
         services.AddHttpClient<IWorkplaceApiClient, WorkplaceApiClient>(client => client.BaseAddress = apiBaseUrl);
-        services.AddSingleton(_ => new WorkplaceRealtimeClient(hubUrl)); return services;
+        services.AddScoped(_ => new WorkplaceRealtimeClient(hubUrl)); return services;
     }
 }

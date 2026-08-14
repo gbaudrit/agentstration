@@ -1,8 +1,8 @@
+using System.Text.Json;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
 using Agentstration.Flow.Storage.Abstractions;
-using System.Text.Json;
 
 namespace Agentstration.Web;
 
@@ -38,9 +38,6 @@ public static class FlowEndpoints
         runs.MapGet("/{runId}/events", ObserveRunAsync);
         runs.MapGet("/{runId}/eventHistory", ListRunEventsAsync);
         runs.MapPost("/{runId}/cancel", CancelRunAsync);
-        var publicRuns = endpoints.MapGroup("/flowRuns");
-        publicRuns.MapGet("/", ListRunsAsync);
-        publicRuns.MapGet("/{runId}", GetRunAsync);
         return endpoints;
     }
 
