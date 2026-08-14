@@ -13,7 +13,16 @@ internal sealed class PackEndpoints : IManagementEndpoint
         group.MapPost("/packs", InstallAsync);
         group.MapGet("/packs", ListAsync);
         group.MapGet("/packs/{publisher}/{name}", GetAsync);
+        group.MapPost("/packs/{publisher}/{name}/fork", ForkAsync);
         group.MapDelete("/packs/{publisher}/{name}", UninstallAsync);
+        group.MapGet("/pack-projects", ListProjectsAsync);
+        group.MapGet("/pack-projects/{projectId:guid}", GetProjectAsync);
+        group.MapPut("/pack-projects/{projectId:guid}", UpdateProjectAsync);
+        group.MapPost("/pack-projects/{projectId:guid}/builds", BuildAsync);
+        group.MapGet("/pack-projects/{projectId:guid}/builds", ListBuildsAsync);
+        group.MapGet("/pack-projects/{projectId:guid}/builds/{buildId:guid}/download", DownloadBuildAsync);
+        group.MapPost("/pack-projects/{projectId:guid}/builds/{buildId:guid}/preview", PreviewBuildAsync);
+        group.MapPost("/pack-projects/{projectId:guid}/builds/{buildId:guid}/install", InstallBuildAsync);
     }
 
     private static Task<IResult> PreviewAsync(
@@ -95,5 +104,63 @@ internal sealed class PackEndpoints : IManagementEndpoint
                 throw new ControlPlaneConcurrencyException("The supplied ETag does not match the installed Pack.");
             await service.UninstallAsync(identity, cancellationToken);
             return Results.NoContent();
+        });
+
+    private static Task<IResult> ForkAsync(string publisher, string name, ForkPackCommand command, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var project = await service.ForkAsync(new(publisher, name), command, token);
+            response.Headers.ETag = project.ETag;
+            response.Headers.Location = $"/api/pack-projects/{project.Value.Uid:D}";
+            return Results.Created(response.Headers.Location, project.Value);
+        });
+
+    private static Task<IResult> ListProjectsAsync(PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok((await service.ListProjectsAsync(token)).Select(value => value.Value)));
+
+    private static Task<IResult> GetProjectAsync(Guid projectId, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var project = await service.GetProjectAsync(projectId, token) ?? throw new KeyNotFoundException($"Pack Project '{projectId}' was not found.");
+            return ManagementHttp.ResourceResult(project, response, StatusCodes.Status200OK);
+        });
+
+    private static Task<IResult> UpdateProjectAsync(Guid projectId, UpdatePackProjectCommand command, HttpRequest request, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var etag = ManagementHttp.IfMatch(request) ?? throw new ControlPlaneConcurrencyException("Updating a Pack Project requires If-Match.");
+            var project = await service.UpdateProjectAsync(projectId, command, etag, token);
+            return ManagementHttp.ResourceResult(project, response, StatusCodes.Status200OK);
+        });
+
+    private static Task<IResult> BuildAsync(Guid projectId, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var build = await service.BuildAsync(projectId, token);
+            response.Headers.Location = $"/api/pack-projects/{projectId:D}/builds/{build.Value.Uid:D}";
+            return Results.Created(response.Headers.Location, build.Value);
+        });
+
+    private static Task<IResult> ListBuildsAsync(Guid projectId, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok((await service.ListBuildsAsync(projectId, token)).Select(value => value.Value)));
+
+    private static Task<IResult> DownloadBuildAsync(Guid projectId, Guid buildId, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var build = await service.GetBuildAsync(projectId, buildId, token);
+            var stream = await service.OpenBuildAsync(projectId, buildId, token);
+            return Results.File(stream, "application/zip", build.Value.Definition.Artifact.FileName, enableRangeProcessing: true);
+        });
+
+    private static Task<IResult> PreviewBuildAsync(Guid projectId, Guid buildId, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.PreviewBuildAsync(projectId, buildId, token)));
+
+    private static Task<IResult> InstallBuildAsync(Guid projectId, Guid buildId, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var installed = await service.InstallBuildAsync(projectId, buildId, token);
+            response.Headers.ETag = installed.ETag;
+            response.Headers.Location = $"/api/packs/{Uri.EscapeDataString(installed.Value.Definition.Publisher)}/{Uri.EscapeDataString(installed.Value.Definition.PackName)}";
+            return Results.Created(response.Headers.Location, installed.Value);
         });
 }

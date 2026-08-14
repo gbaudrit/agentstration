@@ -11,6 +11,7 @@ internal static class ManagementHttp
         catch (ControlPlaneResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
         catch (ControlPlaneConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
         catch (PackNotFoundException exception) { return Results.Problem(statusCode: 404, title: "pack_not_found", detail: exception.Message); }
+        catch (KeyNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
         catch (PackValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
         catch (PackAlreadyInstalledException exception) { return Results.Problem(statusCode: 409, title: "pack_already_installed", detail: exception.Message); }
         catch (PackResourceConflictException exception) { return Results.Problem(statusCode: 409, title: "pack_resource_conflict", detail: exception.Message); }

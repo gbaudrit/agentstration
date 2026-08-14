@@ -94,6 +94,7 @@ public sealed record InstalledPackProperties
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
     public required string Source { get; init; }
+    public PackArtifactReference? SourceArtifact { get; init; }
     public required DateTimeOffset InstalledAt { get; init; }
     public InstalledPackState State { get; init; } = InstalledPackState.Installing;
     public IReadOnlyList<ManagedPackResource> ManagedResources { get; init; } = [];
@@ -113,7 +114,11 @@ public sealed record PackResourceDocument(
     string Name,
     JsonElement Manifest);
 
-public sealed record PackArchive(PackManifest Manifest, IReadOnlyList<PackResourceDocument> Resources, string Source);
+public sealed record PackArchive(
+    PackManifest Manifest,
+    IReadOnlyList<PackResourceDocument> Resources,
+    string Source,
+    ReadOnlyMemory<byte> Content = default);
 
 public sealed record PackResourcePreview(string Path, string Kind, string Name, bool AlreadyExists);
 

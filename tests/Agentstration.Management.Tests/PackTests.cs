@@ -180,9 +180,45 @@ public sealed class PackTests
         Assert.IsNotNull(installed);
         Assert.AreEqual(InstalledPackState.Installed, installed.Definition.State);
         Assert.HasCount(5, installed.Definition.ManagedResources);
+        Assert.IsNotNull(installed.Definition.SourceArtifact);
+
+        using var forkResponse = await client.PostAsJsonAsync(
+            "/api/packs/agentstration/who-am-i/fork",
+            new ForkPackCommand("local", "who-am-i-lab", "0.1.0-dev.1", "Who Am I? Lab", "Locally forked sample."));
+        Assert.AreEqual(HttpStatusCode.Created, forkResponse.StatusCode, await forkResponse.Content.ReadAsStringAsync());
+        var project = await forkResponse.Content.ReadFromJsonAsync<PackProjectResource>();
+        Assert.IsNotNull(project);
+        Assert.AreEqual("agentstration", project.Definition.Origin.Publisher);
+
+        using var buildResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds", null);
+        Assert.AreEqual(HttpStatusCode.Created, buildResponse.StatusCode, await buildResponse.Content.ReadAsStringAsync());
+        var build = await buildResponse.Content.ReadFromJsonAsync<PackProjectBuildResource>();
+        Assert.IsNotNull(build);
+        Assert.AreEqual("0.1.0-dev.1", build.Definition.Version);
+
+        using var conflictingPreviewResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/preview", null);
+        Assert.AreEqual(HttpStatusCode.OK, conflictingPreviewResponse.StatusCode);
+        var conflictingPreview = await conflictingPreviewResponse.Content.ReadFromJsonAsync<PackInstallationPreview>();
+        Assert.IsNotNull(conflictingPreview);
+        Assert.IsFalse(conflictingPreview.CanInstall, "The fork keeps resource names and must conflict with its installed origin in the same Workspace.");
 
         using var removeResponse = await client.DeleteAsync("/api/packs/agentstration/who-am-i");
         Assert.AreEqual(HttpStatusCode.NoContent, removeResponse.StatusCode, await removeResponse.Content.ReadAsStringAsync());
+
+        using var localInstallResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install", null);
+        Assert.AreEqual(HttpStatusCode.Created, localInstallResponse.StatusCode, await localInstallResponse.Content.ReadAsStringAsync());
+        var localInstallation = await localInstallResponse.Content.ReadFromJsonAsync<InstalledPackResource>();
+        Assert.IsNotNull(localInstallation);
+        Assert.AreEqual("local", localInstallation.Definition.Publisher);
+        Assert.AreEqual("who-am-i-lab", localInstallation.Definition.PackName);
+
+        using var downloadResponse = await client.GetAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/download");
+        Assert.AreEqual(HttpStatusCode.OK, downloadResponse.StatusCode);
+        Assert.AreEqual("application/zip", downloadResponse.Content.Headers.ContentType?.MediaType);
+        Assert.IsGreaterThan(0, (await downloadResponse.Content.ReadAsByteArrayAsync()).Length);
+
+        using var removeLocalResponse = await client.DeleteAsync("/api/packs/local/who-am-i-lab");
+        Assert.AreEqual(HttpStatusCode.NoContent, removeLocalResponse.StatusCode);
     }
 
     private static PackArchive Archive(params PackResourceDocument[] resources) => new(

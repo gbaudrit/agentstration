@@ -13,12 +13,23 @@ public sealed class PackAlreadyInstalledException(PackIdentity identity) : Inval
 public sealed class PackResourceConflictException(string kind, string name) : InvalidOperationException($"Resource '{kind}/{name}' already exists and cannot be replaced by Pack V1.");
 public sealed class PackResourceModifiedException(string kind, string name) : InvalidOperationException($"Resource '{kind}/{name}' changed after installation and was preserved.");
 
-public sealed partial class PackManagementService(
-    IControlPlaneStore store,
-    IEnumerable<IPackResourceHandler> resourceHandlers,
-    TimeProvider timeProvider)
+public sealed partial class PackManagementService
 {
-    private readonly IReadOnlyDictionary<string, IPackResourceHandler> handlers = resourceHandlers.ToDictionary(value => value.Kind, StringComparer.Ordinal);
+    private readonly IControlPlaneStore store;
+    private readonly TimeProvider timeProvider;
+    private readonly IPackArtifactStore? artifacts;
+    private readonly IReadOnlyDictionary<string, IPackResourceHandler> handlers;
+
+    public PackManagementService(IControlPlaneStore store, IEnumerable<IPackResourceHandler> resourceHandlers, TimeProvider timeProvider)
+        : this(store, resourceHandlers, timeProvider, null) { }
+
+    public PackManagementService(IControlPlaneStore store, IEnumerable<IPackResourceHandler> resourceHandlers, TimeProvider timeProvider, IPackArtifactStore? artifacts)
+    {
+        this.store = store;
+        this.timeProvider = timeProvider;
+        this.artifacts = artifacts;
+        handlers = resourceHandlers.ToDictionary(value => value.Kind, StringComparer.Ordinal);
+    }
 
     public Task<IReadOnlyList<StoredResource<InstalledPackResource>>> ListAsync(CancellationToken cancellationToken) =>
         store.ListAllAsync<InstalledPackResource>(ResourceKinds.InstalledPack, cancellationToken);
@@ -41,6 +52,9 @@ public sealed partial class PackManagementService(
         if (conflict is not null) throw new PackResourceConflictException(conflict.Kind, conflict.Name);
 
         var now = timeProvider.GetUtcNow();
+        var sourceArtifact = artifacts is not null && !archive.Content.IsEmpty
+            ? await artifacts.SaveAsync(archive.Content, archive.Source, cancellationToken)
+            : null;
         var installed = await store.PutAsync(new InstalledPackResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
@@ -56,6 +70,7 @@ public sealed partial class PackManagementService(
                 DisplayName = archive.Manifest.Metadata.DisplayName,
                 Description = archive.Manifest.Metadata.Description,
                 Source = archive.Source,
+                SourceArtifact = sourceArtifact,
                 InstalledAt = now,
                 State = InstalledPackState.Installing
             }

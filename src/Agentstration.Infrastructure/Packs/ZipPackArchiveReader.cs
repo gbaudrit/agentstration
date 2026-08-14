@@ -18,7 +18,10 @@ public sealed class ZipPackArchiveReader : IPackArchiveReader
     {
         ArgumentNullException.ThrowIfNull(archive);
         if (!archive.CanRead) throw new PackValidationException("pack_archive_unreadable", "The Pack archive stream is not readable.");
-        using var zip = new ZipArchive(archive, ZipArchiveMode.Read, leaveOpen: true);
+        await using var buffered = new MemoryStream();
+        await archive.CopyToAsync(buffered, cancellationToken);
+        var content = buffered.ToArray();
+        using var zip = new ZipArchive(new MemoryStream(content, writable: false), ZipArchiveMode.Read);
         var files = zip.Entries.Where(entry => !string.IsNullOrEmpty(entry.Name)).ToArray();
         if (files.Length == 0) throw new PackValidationException("pack_archive_empty", "The Pack archive is empty.");
         if (files.Length > MaximumEntries) throw new PackValidationException("pack_archive_entry_limit", $"A Pack archive can contain at most {MaximumEntries} files.");
@@ -54,7 +57,7 @@ public sealed class ZipPackArchiveReader : IPackArchiveReader
 
         var safeSource = string.IsNullOrWhiteSpace(source) ? "local-archive" : Path.GetFileName(source.Trim());
         if (safeSource.Length > 256) safeSource = safeSource[..256];
-        return new PackArchive(manifest, documents, safeSource);
+        return new PackArchive(manifest, documents, safeSource, content);
     }
 
     private static PackResourceDocument ReadDocument(string path, JsonElement manifest)

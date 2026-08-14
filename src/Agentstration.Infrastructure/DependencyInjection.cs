@@ -114,6 +114,7 @@ public static class DependencyInjection
         services.AddSingleton<AgentManagementService>();
         services.AddSingleton<AgentExecutionCoordinator>();
         services.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
+        services.AddSingleton<IPackArtifactStore>(_ => new FileSystemPackArtifactStore(Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "pack-artifacts")));
         services.AddSingleton<IPackResourceHandler, ModelProviderPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, RuntimeProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, ModelProfilePackResourceHandler>();
@@ -121,6 +122,7 @@ public static class DependencyInjection
         services.AddSingleton<IPackResourceHandler, FlowPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, EntryPackResourceHandler>();
         services.AddSingleton<PackManagementService>();
+        services.AddSingleton<PackAuthoringService>();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
         runtimeConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "runtime-plane.db")}";
