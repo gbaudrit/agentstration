@@ -22,14 +22,21 @@ public sealed class AgentExecutionCoordinator(
     public async Task<SelectedAgentRoute> SelectAgentAsync(
         string input,
         string? requestedAgentName,
+        CancellationToken cancellationToken) =>
+        await SelectAgentAsync(input, requestedAgentName, Agentstration.Resources.ResourceNamespace.Default, cancellationToken);
+
+    public async Task<SelectedAgentRoute> SelectAgentAsync(
+        string input,
+        string? requestedAgentName,
+        Agentstration.Resources.ResourceNamespace @namespace,
         CancellationToken cancellationToken)
     {
         var ready = (await agentQueries.ListDeploymentsAsync(cancellationToken))
-            .Where(item => item.Value.DesiredState == DesiredAgentState.Running && item.Value.OperationalState == OperationalState.Ready);
+            .Where(item => item.Value.AgentNamespace == @namespace && item.Value.DesiredState == DesiredAgentState.Running && item.Value.OperationalState == OperationalState.Ready);
         var pairs = new List<(AgentDeployment Deployment, AgentRevision Revision)>();
         foreach (var item in ready)
         {
-            var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, item.Value.RevisionName), cancellationToken);
+            var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, item.Value.RevisionName, @namespace), cancellationToken);
             if (revision is not null) pairs.Add((item.Value, revision.Value));
         }
 

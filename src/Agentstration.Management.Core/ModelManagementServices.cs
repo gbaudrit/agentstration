@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Core;
@@ -37,7 +38,7 @@ public sealed class ModelProviderManagementService(
     public async Task<StoredResource<ModelProviderResource>> CreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        if (await GetAsync(resource.Metadata.Name, cancellationToken) is not null) throw new ControlPlaneConcurrencyException($"Model provider '{resource.Metadata.Name}' already exists.");
+        if (await GetAsync(resource.Namespace, resource.Metadata.Name, cancellationToken) is not null) throw new ControlPlaneConcurrencyException($"Model provider '{resource.Address}' already exists.");
         return await store.PutAsync(resource with
         {
             Generation = 1,
@@ -58,6 +59,7 @@ public sealed class ModelProviderManagementService(
     }
 
     public Task<StoredResource<ModelProviderResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(new ResourceKey(ResourceKinds.ModelProvider, name), cancellationToken);
+    public Task<StoredResource<ModelProviderResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(new ResourceKey(ResourceKinds.ModelProvider, name, @namespace), cancellationToken);
 
     public async Task<IReadOnlyList<ModelProviderView>> ListAsync(CancellationToken cancellationToken)
     {
@@ -95,6 +97,12 @@ public sealed class ModelProviderManagementService(
         var usages = await GetUsagesAsync(name, cancellationToken);
         if (usages.Count > 0) throw new ModelProviderInUseException(name, usages);
         await store.DeleteAsync(new(ResourceKinds.ModelProvider, name), ifMatch, cancellationToken);
+    }
+
+    public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
+    {
+        _ = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
+        await store.DeleteAsync(new(ResourceKinds.ModelProvider, name, @namespace), ifMatch, cancellationToken);
     }
 
     private async Task<ModelProviderView> InspectAsync(ModelProviderConfiguration provider, bool includeModels, CancellationToken cancellationToken)
@@ -176,7 +184,7 @@ public sealed class ModelProfileManagementService(
     {
         ValidateIdentity(resource);
         await ValidateDefinitionAsync(resource.Definition, cancellationToken);
-        if (await GetAsync(resource.Metadata.Name, cancellationToken) is not null) throw new ControlPlaneConcurrencyException($"Model profile '{resource.Metadata.Name}' already exists.");
+        if (await GetAsync(resource.Namespace, resource.Metadata.Name, cancellationToken) is not null) throw new ControlPlaneConcurrencyException($"Model profile '{resource.Address}' already exists.");
         return await store.PutAsync(resource with { Generation = 1, Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, null, true, cancellationToken);
     }
 
@@ -194,6 +202,7 @@ public sealed class ModelProfileManagementService(
 
     public Task<StoredResource<ModelProfileResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProfileResource>(new ResourceKey(ResourceKinds.ModelProfile, name), cancellationToken);
     public Task<IReadOnlyList<StoredResource<ModelProfileResource>>> ListAsync(CancellationToken cancellationToken) => store.ListAllAsync<ModelProfileResource>(ResourceKinds.ModelProfile, cancellationToken);
+    public Task<StoredResource<ModelProfileResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => store.GetAsync<ModelProfileResource>(new ResourceKey(ResourceKinds.ModelProfile, name, @namespace), cancellationToken);
 
     public async Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken)
     {
@@ -201,6 +210,12 @@ public sealed class ModelProfileManagementService(
         var usages = await GetUsagesAsync(name, cancellationToken);
         if (usages.Count > 0) throw new ModelProfileInUseException(name, usages);
         await store.DeleteAsync(new(ResourceKinds.ModelProfile, name), ifMatch, cancellationToken);
+    }
+
+    public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
+    {
+        _ = await GetAsync(@namespace, name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, name, @namespace));
+        await store.DeleteAsync(new(ResourceKinds.ModelProfile, name, @namespace), ifMatch, cancellationToken);
     }
 
     public async Task<IReadOnlyList<ModelProfileUsage>> GetUsagesAsync(string profileName, CancellationToken cancellationToken) =>

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Flow.Application;
 
@@ -18,17 +19,21 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
 
     public async Task<StoredFlow> CreateAsync(CreateFlowCommand command, CancellationToken cancellationToken)
+        => await CreateAsync(command, ResourceNamespace.Default, cancellationToken);
+
+    public async Task<StoredFlow> CreateAsync(CreateFlowCommand command, ResourceNamespace @namespace, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         var now = timeProvider.GetUtcNow();
-        var resource = new FlowResource(new FlowId(command.Name), command.Name, command.Description, command.Version, command.Enabled, null,
+        var resource = new FlowResource(new FlowId(command.Name, @namespace), command.Name, command.Description, command.Version, command.Enabled, null,
             command.Definition, Copy(command.Metadata), now, now);
         FlowValidator.Validate(resource);
         return await repository.CreateAsync(resource, cancellationToken);
     }
 
     public Task<StoredFlow?> GetAsync(FlowId id, CancellationToken cancellationToken) => repository.GetAsync(id, cancellationToken);
-    public Task<FlowPage> ListAsync(int skip, int take, CancellationToken cancellationToken) => repository.ListAsync(skip, take, cancellationToken);
+    public Task<FlowPage> ListAsync(int skip, int take, CancellationToken cancellationToken) => ListAsync(ResourceNamespace.Default, skip, take, cancellationToken);
+    public Task<FlowPage> ListAsync(ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken) => repository.ListAsync(@namespace, skip, take, cancellationToken);
 
     public async Task<StoredFlow> UpdateAsync(FlowId id, UpdateFlowCommand command, string expectedETag, CancellationToken cancellationToken)
     {
@@ -83,16 +88,20 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
     public Task<IReadOnlyList<StoredFlowVersion>> ListVersionsAsync(FlowId id, CancellationToken cancellationToken) => repository.ListVersionsAsync(id, cancellationToken);
 
     public async Task<FlowVersion> ResolveAsync(FlowReference reference, CancellationToken cancellationToken)
+        => await ResolveAsync(reference, reference.FlowId.Namespace, cancellationToken);
+
+    public async Task<FlowVersion> ResolveAsync(FlowReference reference, ResourceNamespace ownerNamespace, CancellationToken cancellationToken)
     {
         FlowValidator.ValidateReference(reference);
+        var flowId = reference.Resolve(ownerNamespace);
         var version = reference.Version;
         if (version is null)
         {
-            var flow = await repository.GetAsync(reference.FlowId, cancellationToken) ?? throw new FlowNotFoundException(reference.FlowId);
+            var flow = await repository.GetAsync(flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
             version = flow.Value.ActiveVersion ?? throw new FlowValidationException("flow_active_version_missing", "The referenced Flow has no active version.");
         }
-        return (await repository.GetVersionAsync(reference.FlowId, version, cancellationToken))?.Value
-            ?? throw new FlowValidationException("flow_version_not_found", $"Flow version '{reference.FlowId}:{version}' does not exist.");
+        return (await repository.GetVersionAsync(flowId, version, cancellationToken))?.Value
+            ?? throw new FlowValidationException("flow_version_not_found", $"Flow version '{flowId}:{version}' does not exist.");
     }
 
     private static IReadOnlyDictionary<string, string> Copy(IReadOnlyDictionary<string, string>? source) =>

@@ -13,7 +13,9 @@ public sealed class EntryResourceDeletionGuard(IWorkplaceRepository workplace) :
         await workplace.InitializeAsync(cancellationToken);
         var drafts = await workplace.ListEntryDraftsAsync(cancellationToken);
         var publishedIds = (await workplace.ListEntriesAsync(cancellationToken)).Select(value => value.Id).ToHashSet();
-        var referenced = drafts.Where(value => publishedIds.Contains(value.Id) && string.Equals(ResourceName(value.PublishedBinding?.ResourceId ?? string.Empty), key.Name, StringComparison.Ordinal)).Select(value => value.Name).ToArray();
+        var referenced = drafts.Where(value => publishedIds.Contains(value.Id)
+            && (value.PublishedBinding?.Namespace ?? value.Id.Namespace) == key.Namespace
+            && string.Equals(ResourceName(value.PublishedBinding?.ResourceId ?? string.Empty), key.Name, StringComparison.Ordinal)).Select(value => value.Name).ToArray();
         if (referenced.Length > 0)
             throw new AgentDefinitionValidationException("resource_in_use", $"Resource '{key}' is referenced by Entry: {string.Join(", ", referenced)}.");
     }
@@ -25,6 +27,7 @@ public sealed class EntryResourceDeletionGuard(IWorkplaceRepository workplace) :
         var publishedIds = (await workplace.ListEntriesAsync(cancellationToken)).Select(value => value.Id).ToHashSet();
         var referenced = drafts.Where(value => publishedIds.Contains(value.Id)
                 && value.PublishedBinding?.Kind == Agentstration.Work.EntryBindingKind.Flow
+                && (value.PublishedBinding.Namespace ?? value.Id.Namespace) == flowId.Namespace
                 && string.Equals(ResourceName(value.PublishedBinding.ResourceId), flowId.Value, StringComparison.Ordinal))
             .Select(value => value.Name).ToArray();
         if (referenced.Length > 0)

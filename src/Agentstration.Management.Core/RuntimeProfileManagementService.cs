@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
@@ -16,13 +17,15 @@ public sealed class RuntimeProfileManagementService(IControlPlaneStore store)
     public async Task<StoredResource<RuntimeProfileResource>> CreateAsync(RuntimeProfileResource resource, CancellationToken cancellationToken)
     {
         Validate(resource);
-        if (await GetAsync(resource.Metadata.Name, cancellationToken) is not null)
+        if (await GetAsync(resource.Namespace, resource.Metadata.Name, cancellationToken) is not null)
             throw new ControlPlaneConcurrencyException($"Runtime profile '{resource.Metadata.Name}' already exists.");
         return await store.PutAsync(resource with { Generation = 1, Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, null, true, cancellationToken);
     }
 
     public Task<StoredResource<RuntimeProfileResource>?> GetAsync(string name, CancellationToken cancellationToken) =>
         store.GetAsync<RuntimeProfileResource>(new ResourceKey(ResourceKinds.RuntimeProfile, name), cancellationToken);
+    public Task<StoredResource<RuntimeProfileResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        store.GetAsync<RuntimeProfileResource>(new ResourceKey(ResourceKinds.RuntimeProfile, name, @namespace), cancellationToken);
 
     public Task<IReadOnlyList<StoredResource<RuntimeProfileResource>>> ListAsync(CancellationToken cancellationToken) =>
         store.ListAllAsync<RuntimeProfileResource>(ResourceKinds.RuntimeProfile, cancellationToken);
@@ -52,6 +55,12 @@ public sealed class RuntimeProfileManagementService(IControlPlaneStore store)
         var usages = await GetUsagesAsync(name, cancellationToken);
         if (usages.Count > 0) throw new RuntimeProfileInUseException(existing.Value.Metadata.Name, usages);
         await store.DeleteAsync(new(ResourceKinds.RuntimeProfile, name), ifMatch, cancellationToken);
+    }
+
+    public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
+    {
+        _ = await GetAsync(@namespace, name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.RuntimeProfile, name, @namespace));
+        await store.DeleteAsync(new(ResourceKinds.RuntimeProfile, name, @namespace), ifMatch, cancellationToken);
     }
 
     private static void Validate(RuntimeProfileResource resource)

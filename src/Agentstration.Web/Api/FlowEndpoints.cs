@@ -3,6 +3,7 @@ using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
 using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Web;
 
@@ -32,6 +33,13 @@ public static class FlowEndpoints
         group.MapPost("/{id}/publish", PublishDraftAsync);
         group.MapPost("/{id}/draft/runs", CreateDraftRunAsync);
         group.MapPost("/{id}/versions/{version}/draft", CreateDraftFromVersionAsync);
+        var namespaced = endpoints.MapGroup("/api/namespaces/{namespace}/flows");
+        namespaced.MapPost("/", CreateNamespacedAsync);
+        namespaced.MapGet("/", ListNamespacedAsync);
+        namespaced.MapGet("/{id}", GetNamespacedAsync);
+        namespaced.MapPut("/{id}", UpdateNamespacedAsync);
+        namespaced.MapDelete("/{id}", DeleteNamespacedAsync);
+        namespaced.MapGet("/{id}/versions/{version}", GetNamespacedVersionAsync);
         var runs = endpoints.MapGroup("/api/flowRuns");
         runs.MapGet("/", ListRunsAsync);
         runs.MapGet("/{runId}", GetRunAsync);
@@ -43,18 +51,66 @@ public static class FlowEndpoints
 
     private static Task<IResult> CreateAsync(CreateFlowRequest body, HttpResponse response, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var stored = await service.CreateAsync(new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata), token);
+        var stored = await service.CreateAsync(new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata), body.Namespace, token);
         response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/flows/{stored.Value.Id}";
         return Results.Json(ToResponse(stored.Value), statusCode: StatusCodes.Status201Created);
     });
 
-    private static Task<IResult> ListAsync(int? skip, int? top, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> CreateNamespacedAsync(string @namespace, CreateFlowRequest body, HttpResponse response, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var parsed = ResourceNamespace.Parse(@namespace);
+        if (body.Namespace != parsed) throw new FlowValidationException("route_namespace_mismatch", "The Flow namespace must match the route namespace.");
+        var stored = await service.CreateAsync(new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata), parsed, token);
+        response.Headers.ETag = stored.ETag;
+        response.Headers.Location = $"/api/namespaces/{parsed.Value}/flows/{stored.Value.Id.Value}";
+        return Results.Json(ToResponse(stored.Value), statusCode: StatusCodes.Status201Created);
+    });
+
+    private static Task<IResult> GetNamespacedAsync(string @namespace, string id, HttpResponse response, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var flowId = new FlowId(id, ResourceNamespace.Parse(@namespace));
+        var stored = await service.GetAsync(flowId, token) ?? throw new FlowNotFoundException(flowId);
+        response.Headers.ETag = stored.ETag;
+        return Results.Ok(ToResponse(stored.Value));
+    });
+
+    private static Task<IResult> UpdateNamespacedAsync(string @namespace, string id, UpdateFlowRequest body, HttpRequest request, HttpResponse response, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var flowId = new FlowId(id, ResourceNamespace.Parse(@namespace));
+        var current = await service.GetAsync(flowId, token) ?? throw new FlowNotFoundException(flowId);
+        var stored = await service.UpdateAsync(flowId, new UpdateFlowCommand(body.Description, body.Version, body.Enabled, body.Definition, body.Metadata), request.Headers.IfMatch.FirstOrDefault() ?? current.ETag, token);
+        response.Headers.ETag = stored.ETag;
+        return Results.Ok(ToResponse(stored.Value));
+    });
+
+    private static Task<IResult> DeleteNamespacedAsync(string @namespace, string id, HttpRequest request, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        await service.DeleteAsync(new FlowId(id, ResourceNamespace.Parse(@namespace)), request.Headers.IfMatch.FirstOrDefault(), token);
+        return Results.NoContent();
+    });
+
+    private static Task<IResult> GetNamespacedVersionAsync(string @namespace, string id, string version, HttpResponse response, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var flowId = new FlowId(id, ResourceNamespace.Parse(@namespace));
+        var stored = await service.GetVersionAsync(flowId, version, token) ?? throw new FlowNotFoundException(flowId);
+        response.Headers.ETag = stored.ETag;
+        return Results.Ok(ToVersion(stored.Value));
+    });
+
+    private static Task<IResult> ListAsync(int? skip, int? top, FlowService service, CancellationToken token) =>
+        ListCoreAsync(ResourceNamespace.Default, skip, top, service, token);
+
+    private static Task<IResult> ListNamespacedAsync(string @namespace, int? skip, int? top, FlowService service, CancellationToken token) =>
+        ListCoreAsync(ResourceNamespace.Parse(@namespace), skip, top, service, token);
+
+    private static Task<IResult> ListCoreAsync(ResourceNamespace @namespace, int? skip, int? top, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
     {
         var actualSkip = Math.Max(0, skip ?? 0);
         var actualTop = Math.Clamp(top ?? 50, 1, 200);
-        var page = await service.ListAsync(actualSkip, actualTop, token);
-        var next = page.HasMore ? $"/api/flows?skip={actualSkip + actualTop}&top={actualTop}" : null;
+        var page = await service.ListAsync(@namespace, actualSkip, actualTop, token);
+        var prefix = @namespace.IsDefault ? "/api/flows" : $"/api/namespaces/{@namespace.Value}/flows";
+        var next = page.HasMore ? $"{prefix}?skip={actualSkip + actualTop}&top={actualTop}" : null;
         return Results.Ok(new FlowPageResponse(page.Items.Select(item => ToSummary(item.Value)).ToArray(), next));
     });
 
@@ -241,9 +297,9 @@ public static class FlowEndpoints
     private static async Task<StoredFlowRun> RequiredRunAsync(string id, FlowRunService service, CancellationToken token) =>
         await service.GetAsync(id, token) ?? throw new FlowRunNotFoundException(id);
 
-    private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt);
-    private static FlowSummaryResponse ToSummary(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Definition.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt);
-    private static FlowVersionResponse ToVersion(FlowVersion value) => new(value.FlowId.Value, value.Version, value.Description, value.Definition, value.Metadata, value.PublishedAt, value.Graph, value.DefinitionHash, value.ReleaseNotes);
+    private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt) { Namespace = value.Id.Namespace };
+    private static FlowSummaryResponse ToSummary(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Definition.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt) { Namespace = value.Id.Namespace };
+    private static FlowVersionResponse ToVersion(FlowVersion value) => new(value.FlowId.Value, value.Version, value.Description, value.Definition, value.Metadata, value.PublishedAt, value.Graph, value.DefinitionHash, value.ReleaseNotes) { Namespace = value.FlowId.Namespace };
 
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {

@@ -67,11 +67,12 @@ public sealed class ManagedFlowAgentExecutor(
         var prompt = input.ValueKind == JsonValueKind.Object && input.TryGetProperty("prompt", out var promptProperty) && promptProperty.ValueKind == JsonValueKind.String
             ? promptProperty.GetString()!
             : input.GetRawText();
-        var selected = await execution.SelectAgentAsync(prompt, ResourceName(target.Id), cancellationToken);
+        var targetNamespace = target.Namespace ?? Agentstration.Resources.ResourceNamespace.Default;
+        var selected = await execution.SelectAgentAsync(prompt, ResourceName(target.Id), targetNamespace, cancellationToken);
         var deployment = (await agentQueries.ListDeploymentsAsync(cancellationToken))
-            .SingleOrDefault(value => value.Value.Uid.ToString("N") == selected.DeploymentId)
+            .SingleOrDefault(value => value.Value.AgentNamespace == targetNamespace && value.Value.Uid.ToString("N") == selected.DeploymentId)
             ?? throw new InvalidOperationException("The selected agent deployment no longer exists.");
-        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, deployment.Value.RevisionName), cancellationToken)
+        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, deployment.Value.RevisionName, targetNamespace), cancellationToken)
             ?? throw new InvalidOperationException("The selected agent revision no longer exists.");
         var result = await execution.ExecuteSelectedAsync(selected, prompt, cancellationToken);
         return new FlowAgentExecutionResult(

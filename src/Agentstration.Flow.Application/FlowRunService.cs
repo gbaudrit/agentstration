@@ -233,7 +233,7 @@ public sealed class FlowRunService(
             }
 
             stored = await StartStepAsync(stored, "Agent", runToken);
-            var execution = await agents.ExecuteAsync(target, stored.Value.Input, stored.Value.CorrelationId!, runToken);
+            var execution = await agents.ExecuteAsync(target with { Namespace = target.Namespace ?? stored.Value.FlowId.Namespace }, stored.Value.Input, stored.Value.CorrelationId!, runToken);
             stored = await FinishAgentStepAsync(stored, execution, runToken);
             stored = await CompleteSimpleStepAsync(stored, "Output", execution.Output, null, runToken);
             var completedAt = timeProvider.GetUtcNow();
@@ -445,7 +445,7 @@ public sealed class FlowRunService(
                     var resolvedInput = agent.InputMapping is null ? stored.Value.Input.Clone() : await ResolveJsonAsync(agent.InputMapping.Value, context, runToken);
                     try
                     {
-                        agentResult = await agents.ExecuteAsync(new FlowTargetReference(FlowTargetKind.Agent, agentId), resolvedInput, stored.Value.CorrelationId!, runToken);
+                        agentResult = await agents.ExecuteAsync(new FlowTargetReference(FlowTargetKind.Agent, agentId, Namespace: agent.Agent.Namespace ?? stored.Value.FlowId.Namespace), resolvedInput, stored.Value.CorrelationId!, runToken);
                         output = agentResult.Output.Clone(); eventName = "completed";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
