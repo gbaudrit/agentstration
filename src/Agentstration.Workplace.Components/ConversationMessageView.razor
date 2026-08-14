@@ -1,5 +1,5 @@
 <article class="conversation-message @RoleClass">
-    <div class="message-avatar" aria-hidden="true">@(Message.Role == ConversationRole.User ? "You" : "A")</div>
+    <div class="message-avatar" aria-hidden="true">@if (Message.Role == ConversationRole.User) { <span>You</span> } else { <img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /> }</div>
     <div class="message-body">
         <header><strong>@RoleLabel</strong><time datetime="@Message.CreatedAt.ToString("O")">@Message.CreatedAt.ToLocalTime().ToString("HH:mm")</time></header>
         <p>@Message.Content</p>

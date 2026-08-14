@@ -24,13 +24,36 @@ public partial class Home
     private IReadOnlyList<WorkNotification> notifications = [];
     private bool loading = true;
     private bool busy;
+    private bool showMoreEntries;
     private int unread;
     private string? loadError;
     private string? interactionError;
+    private Guid? loadedInteractionId;
     private bool RealtimeConnected => Realtime.State.ToString() == "Connected";
     [Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "interaction")] public Guid? RequestedInteractionId { get; set; }
 
     protected override Task OnInitializedAsync() { Realtime.StateChanged += HandleRealtimeStateChanged; return LoadAsync(); }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (workspace is null || loading || RequestedInteractionId == loadedInteractionId) return;
+        loadedInteractionId = RequestedInteractionId;
+        if (RequestedInteractionId is null)
+        {
+            ResetInteractionState();
+            return;
+        }
+
+        try
+        {
+            interactionError = null;
+            await LoadInteractionAsync(RequestedInteractionId.Value);
+        }
+        catch when (!lifetime.IsCancellationRequested)
+        {
+            loadError = "The requested conversation could not be loaded from the local Work API.";
+        }
+    }
 
     private async Task LoadAsync()
     {
@@ -44,6 +67,7 @@ public partial class Home
             standardEntries = await Task.WhenAll(standard.Select(value => Api.GetEntryAsync(ResourceName(value.EntryResourceId), lifetime.Token)));
             await RefreshOverviewAsync();
             if (RequestedInteractionId is not null) await LoadInteractionAsync(RequestedInteractionId.Value);
+            loadedInteractionId = RequestedInteractionId;
             realtimeSubscription ??= Realtime.OnWorkspaceChanged(HandleRealtimeEvent);
             try { await Realtime.StartAsync(workspace.Id, 0, lifetime.Token); } catch when (!lifetime.IsCancellationRequested) { }
         }
@@ -97,7 +121,13 @@ public partial class Home
         finally { busy = false; }
     }
 
-    private Task NewRequest() { interaction = null; messages = []; currentAction = null; activeTask = null; activities = []; results = []; artifacts = []; interactionError = null; return Task.CompletedTask; }
+    private Task NewRequest()
+    {
+        ResetInteractionState();
+        loadedInteractionId = null;
+        Navigation.NavigateTo("/", replace: true);
+        return Task.CompletedTask;
+    }
 
     private void HandleRealtimeEvent(WorkplaceEventContract workplaceEvent) => _ = InvokeAsync(async () =>
     {
@@ -127,13 +157,34 @@ public partial class Home
 
     private void HandleRealtimeStateChanged(Microsoft.AspNetCore.SignalR.Client.HubConnectionState state) => _ = InvokeAsync(async () =>
     {
-        if (state.ToString() == "Connected") { await RefreshOverviewAsync(); if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id); }
+        if (state == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+        {
+            try
+            {
+                await RefreshOverviewAsync();
+                if (interaction is not null) await LoadInteractionAsync(interaction.Id);
+                else if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id);
+                interactionError = null;
+            }
+            catch when (!lifetime.IsCancellationRequested)
+            {
+                interactionError = "The latest conversation state could not be restored. Please try again.";
+            }
+        }
         StateHasChanged();
     });
 
     private async Task RefreshActiveTaskAsync(Guid taskId) { activeTask = await Api.GetTaskAsync(WorkspaceName, taskId, lifetime.Token); activities = await Api.ListActivitiesAsync(WorkspaceName, taskId, lifetime.Token); results = await Api.ListResultsAsync(WorkspaceName, taskId, lifetime.Token); artifacts = await Api.ListArtifactsAsync(WorkspaceName, taskId, lifetime.Token); }
     private async Task RefreshOverviewAsync() { tasks = await Api.ListTasksAsync(WorkspaceName, null, lifetime.Token); recentInteractions = await Api.ListInteractionsAsync(WorkspaceName, 20, lifetime.Token); await RefreshNotificationsAsync(); }
-    private async Task LoadInteractionAsync(Guid interactionId) { interaction = await Api.GetInteractionAsync(WorkspaceName, interactionId, lifetime.Token); messages = await Api.ListMessagesAsync(WorkspaceName, interactionId, lifetime.Token); currentAction = interaction.ImmediateResult; if (interaction.TaskId is not null) await RefreshActiveTaskAsync(interaction.TaskId.Value); }
+    private async Task LoadInteractionAsync(Guid interactionId)
+    {
+        interaction = await Api.GetInteractionAsync(WorkspaceName, interactionId, lifetime.Token);
+        messages = await Api.ListMessagesAsync(WorkspaceName, interactionId, lifetime.Token);
+        currentAction = interaction.ImmediateResult;
+        if (interaction.TaskId is not null) await RefreshActiveTaskAsync(interaction.TaskId.Value);
+        else { activeTask = null; activities = []; results = []; artifacts = []; }
+    }
+    private void ResetInteractionState() { interaction = null; messages = []; currentAction = null; activeTask = null; activities = []; results = []; artifacts = []; interactionError = null; }
     private async Task RefreshNotificationsAsync() { notifications = await Api.ListNotificationsAsync(WorkspaceName, false, lifetime.Token); unread = await Api.GetUnreadCountAsync(WorkspaceName, lifetime.Token); }
     private async Task MarkReadAsync(WorkNotificationId id) { await Api.MarkNotificationReadAsync(WorkspaceName, id.Value, lifetime.Token); await RefreshNotificationsAsync(); }
     private async Task MarkAllReadAsync() { await Api.MarkAllNotificationsReadAsync(WorkspaceName, lifetime.Token); await RefreshNotificationsAsync(); }
