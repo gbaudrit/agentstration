@@ -1,6 +1,6 @@
 using Agentstration.Web.Components.Pages;
-using Agentstration.Web.Console;
 using Agentstration.Management.Abstractions;
+using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Bunit;
@@ -151,8 +151,16 @@ public sealed class EntryAdministrationComponentTests
             var published = PublishedEntry(name, @namespace);
             var draft = new EntryDraft
             {
-                Id = EntryId(name, @namespace), Name = name, DisplayName = "Prepare a report", Description = "Prepare a useful report.", Revision = 4, UpdatedAt = Now,
-                Presentation = published.Presentation with { Suggestions = [new EntrySuggestion("Monthly report", "Prepare a monthly report")] },
+                Id = EntryId(name, @namespace),
+                Name = name,
+                DisplayName = "Prepare a report",
+                Description = "Prepare a useful report.",
+                Revision = 4,
+                UpdatedAt = Now,
+                Presentation = published.Presentation with
+                {
+                    Suggestions = [new EntrySuggestion("Monthly report", "Prepare a monthly report")]
+                },
                 Binding = new EntryBinding(EntryBindingKind.Flow, FlowResourceId), PublishedBinding = new EntryBinding(EntryBindingKind.Flow, FlowResourceId)
             };
             return Task.FromResult(new EntryDraftResponse(draft, published));
@@ -187,7 +195,10 @@ public sealed class EntryAdministrationComponentTests
         {
             var draft = new WorkplaceWorkspaceDraft
             {
-                Id = new(WorkspaceResourceId), Name = "personal", DisplayName = "Personal", UpdatedAt = Now,
+                Id = new(WorkspaceResourceId),
+                Name = "personal",
+                DisplayName = "Personal",
+                UpdatedAt = Now,
                 Entries = [new() { EntryResourceId = EntryId("primary"), Role = WorkspaceEntryRole.Primary, Order = 0 }, new() { EntryResourceId = EntryId("secondary"), Role = WorkspaceEntryRole.Standard, Order = 10 }]
             };
             var published = new WorkplaceWorkspace { Id = new(WorkspaceResourceId), Name = "personal", DisplayName = "Personal", Entries = draft.Entries, Version = 2, PublishedAt = Now };
@@ -201,8 +212,14 @@ public sealed class EntryAdministrationComponentTests
         private static EntryId EntryId(string name, Agentstration.Resources.ResourceNamespace @namespace = default) => new(name, @namespace);
         private static EntryResource PublishedEntry(string name, Agentstration.Resources.ResourceNamespace @namespace = default) => new()
         {
-            Id = EntryId(name, @namespace), Name = name, DisplayName = name, PublishedAt = Now,
-            Presentation = new EntryPresentation { Fields = [new EntryFieldDefinition { Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }] },
+            Id = EntryId(name, @namespace),
+            Name = name,
+            DisplayName = name,
+            PublishedAt = Now,
+            Presentation = new EntryPresentation
+            {
+                Fields = [new EntryFieldDefinition { Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }]
+            },
             ResolvedTarget = new EntryResolvedTarget(FlowResourceId, "1.0.0")
         };
         private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
