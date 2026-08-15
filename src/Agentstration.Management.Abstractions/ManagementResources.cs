@@ -39,11 +39,20 @@ public sealed record PackManifest
     public PackSpec Spec { get; init; } = new();
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<PackAudience>))]
+public enum PackAudience
+{
+    [JsonStringEnumMemberName("universal")] Universal,
+    [JsonStringEnumMemberName("personal")] Personal,
+    [JsonStringEnumMemberName("professional")] Professional
+}
+
 public sealed record PackMetadata
 {
     public string Name { get; init; } = string.Empty;
     public string Publisher { get; init; } = string.Empty;
     public string Version { get; init; } = string.Empty;
+    public PackAudience Audience { get; init; } = PackAudience.Universal;
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
     public IReadOnlyList<string> Categories { get; init; } = [];
@@ -95,6 +104,7 @@ public sealed record InstalledPackProperties
     public required string PackName { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public required string Version { get; init; }
+    public PackAudience Audience { get; init; } = PackAudience.Universal;
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
     public required string Source { get; init; }

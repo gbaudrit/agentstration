@@ -4,6 +4,7 @@ metadata:
   name: offline-runtime
   publisher: agentstration
   version: 1.0.0
+  audience: universal
   displayName: Offline Runtime Profile
   description: Installs a transient Microsoft Agent Framework runtime profile.
   categories:

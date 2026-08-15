@@ -2,6 +2,8 @@
 
 A **Pack** is a versioned unit for distributing and installing a coherent set of Agentstration resources. It sits above the resource model and does not add a new way to execute work.
 
+A Pack declares a `personal`, `professional`, or `universal` audience. Audience drives discovery and presentation only; it does not create a separate Pack kind, installation lifecycle, runtime, or security boundary. Legacy manifests without the field default to `universal`.
+
 ```mermaid
 flowchart TD
     Pack["Pack (distribution)"] --> Install["Validate and install"]

@@ -35,6 +35,13 @@ else
             </div>
             <label class="studio-field">Description<textarea rows="4" @bind="description" @bind:after="MarkDirty"></textarea></label>
             <div class="studio-grid">
+                <label>Audience
+                    <select @bind="audience" @bind:after="MarkDirty">
+                        <option value="@PackAudience.Universal">Universal</option>
+                        <option value="@PackAudience.Personal">Personal</option>
+                        <option value="@PackAudience.Professional">Professional</option>
+                    </select>
+                </label>
                 <label>Categories<input @bind="categories" @bind:after="MarkDirty" placeholder="game, sample" /></label>
                 <label>Tags<input @bind="tags" @bind:after="MarkDirty" placeholder="local, experimental" /></label>
             </div>
@@ -108,6 +115,7 @@ else
     private PackInstallationPreview? preview;
     private AgentstrationApiException? error;
     private string version = string.Empty;
+    private PackAudience audience = PackAudience.Universal;
     private string displayName = string.Empty;
     private string? description;
     private string categories = string.Empty;
@@ -135,6 +143,7 @@ else
             builds = await Client.GetBuildsAsync(ProjectId, cancellation.Token);
             var definition = project.Value.Definition;
             version = definition.Version;
+            audience = definition.Audience;
             displayName = definition.DisplayName ?? string.Empty;
             description = definition.Description;
             categories = string.Join(", ", definition.Categories);
@@ -151,7 +160,7 @@ else
         await ExecuteAsync(async () =>
         {
             project = await Client.UpdateProjectAsync(ProjectId,
-                new(version.Trim(), EmptyToNull(displayName), EmptyToNull(description), Split(categories), Split(tags)), project.ETag, cancellation.Token);
+                new(version.Trim(), EmptyToNull(displayName), EmptyToNull(description), Split(categories), Split(tags), audience), project.ETag, cancellation.Token);
             dirty = false;
             message = "Project saved.";
         });
