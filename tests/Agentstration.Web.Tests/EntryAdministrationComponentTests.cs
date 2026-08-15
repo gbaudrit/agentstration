@@ -1,5 +1,5 @@
-using Agentstration.Web.Components.Pages;
 using Agentstration.Management.Abstractions;
+using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -161,7 +161,8 @@ public sealed class EntryAdministrationComponentTests
                 {
                     Suggestions = [new EntrySuggestion("Monthly report", "Prepare a monthly report")]
                 },
-                Binding = new EntryBinding(EntryBindingKind.Flow, FlowResourceId), PublishedBinding = new EntryBinding(EntryBindingKind.Flow, FlowResourceId)
+                Binding = new EntryBinding(EntryBindingKind.Flow, FlowResourceId),
+                PublishedBinding = new EntryBinding(EntryBindingKind.Flow, FlowResourceId)
             };
             return Task.FromResult(new EntryDraftResponse(draft, published));
         }
