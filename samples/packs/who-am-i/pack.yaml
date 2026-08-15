@@ -13,7 +13,7 @@ metadata:
     - conversation
     - multi-agent
     - human-in-the-loop
-spec:
+definition:
   resources:
     - agents/who-am-i-secret.yaml
     - agents/who-am-i-ai-player.yaml

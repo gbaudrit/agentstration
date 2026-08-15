@@ -39,11 +39,14 @@ public sealed class ZipPackArchiveReader : IPackArchiveReader
         if (!byPath.TryGetValue("pack.yaml", out var manifestEntry) && !byPath.TryGetValue("pack.yml", out manifestEntry) && !byPath.TryGetValue("pack.json", out manifestEntry))
             throw new PackValidationException("pack_manifest_missing", "The Pack archive must contain pack.yaml, pack.yml, or pack.json at its root.");
         var manifestText = await ReadTextAsync(manifestEntry, cancellationToken);
+        var manifestDocument = Parse<JsonElement>(manifestEntry, manifestText);
+        if (!manifestDocument.TryGetProperty("definition", out var definition) || definition.ValueKind != JsonValueKind.Object)
+            throw new PackValidationException("pack_definition_missing", "The Pack manifest requires an object-valued 'definition'. The legacy 'spec' envelope is not supported.");
         var manifest = Parse<PackManifest>(manifestEntry, manifestText);
 
-        var documents = new List<PackResourceDocument>(manifest.Spec.Resources.Count);
+        var documents = new List<PackResourceDocument>(manifest.Definition.Resources.Count);
         var listed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var declaredPath in manifest.Spec.Resources)
+        foreach (var declaredPath in manifest.Definition.Resources)
         {
             var path = NormalizePath(declaredPath);
             if (!listed.Add(path)) throw new PackValidationException("pack_resource_path_duplicate", $"Resource path '{path}' is listed more than once.");

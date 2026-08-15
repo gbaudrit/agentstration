@@ -61,6 +61,30 @@ public sealed class PackTests
     }
 
     [TestMethod]
+    public async Task ArchiveReaderRejectsLegacyPackSpecEnvelope()
+    {
+        await using var archive = CreateZip(new Dictionary<string, string>
+        {
+            ["pack.yaml"] = """
+                apiVersion: agentstration.io/v1
+                kind: Pack
+                metadata:
+                  name: legacy-pack
+                  publisher: agentstration
+                  version: 1.0.0
+                spec:
+                  resources: []
+                """
+        });
+
+        var exception = await Assert.ThrowsExactlyAsync<PackValidationException>(() =>
+            new ZipPackArchiveReader().ReadAsync(archive, "legacy.zip", default));
+
+        Assert.AreEqual("pack_definition_missing", exception.Code);
+        StringAssert.Contains(exception.Message, "legacy 'spec'");
+    }
+
+    [TestMethod]
     public async Task FailedInstallationCompensatesAppliedResourcesAndRecordsFailure()
     {
         await using var fixture = await PackFixture.CreateAsync();
@@ -273,7 +297,17 @@ public sealed class PackTests
         using var downloadResponse = await client.GetAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/download");
         Assert.AreEqual(HttpStatusCode.OK, downloadResponse.StatusCode);
         Assert.AreEqual("application/zip", downloadResponse.Content.Headers.ContentType?.MediaType);
-        Assert.IsGreaterThan(0, (await downloadResponse.Content.ReadAsByteArrayAsync()).Length);
+        var downloaded = await downloadResponse.Content.ReadAsByteArrayAsync();
+        Assert.IsGreaterThan(0, downloaded.Length);
+        using (var builtArchive = new ZipArchive(new MemoryStream(downloaded), ZipArchiveMode.Read))
+        {
+            var builtManifest = builtArchive.GetEntry("pack.json");
+            Assert.IsNotNull(builtManifest);
+            await using var manifestStream = builtManifest.Open();
+            using var manifestDocument = await JsonDocument.ParseAsync(manifestStream);
+            Assert.IsTrue(manifestDocument.RootElement.TryGetProperty("definition", out _));
+            Assert.IsFalse(manifestDocument.RootElement.TryGetProperty("spec", out _));
+        }
 
         using var removeLocalResponse = await client.DeleteAsync("/api/packs/local/who-am-i-lab");
         Assert.AreEqual(HttpStatusCode.NoContent, removeLocalResponse.StatusCode);
@@ -287,7 +321,7 @@ public sealed class PackTests
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = PackKinds.Pack,
             Metadata = new PackMetadata { Publisher = "agentstration", Name = "test-pack", Version = "1.0.0" },
-            Spec = new PackSpec { Resources = resources.Select(value => value.Path).ToArray() }
+            Definition = new PackDefinition { Resources = resources.Select(value => value.Path).ToArray() }
         }, resources, "test.pack.zip");
 
     private static PackResourceDocument Document(string kind, string name)
@@ -351,7 +385,7 @@ public sealed class PackTests
           name: test-pack
           publisher: agentstration
           version: 1.0.0
-        spec:
+        definition:
           resources: [{{string.Join(", ", resources)}}]
         """;
 

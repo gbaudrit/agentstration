@@ -68,3 +68,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 36. [ADR-0036 — Runtime resolution and control-plane hardening](0036-runtime-resolution-and-control-plane-hardening.md)
 37. [ADR-0037 — Packs are Management and distribution artifacts](0037-packs-are-management-distribution-artifacts.md)
 38. [ADR-0038 — Pack Projects retain sources and produce local immutable builds](0038-pack-projects-and-local-builds.md)
+39. [ADR-0039 — Pack manifests use the native definition envelope](0039-pack-manifests-use-the-native-definition-envelope.md)
