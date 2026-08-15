@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject IPacksClient Client
 @inject ConsoleContextState ContextState
+@inject IServiceProvider Services
 @inject NavigationManager Navigation
 
 <PageTitle>@(project?.Value.Definition.DisplayName ?? "Pack Project") · Agentstration</PageTitle>
@@ -73,9 +74,38 @@ else
             {
                 <div class="studio-selected-build"><span>Selected build</span><strong>@selectedBuild.Definition.Version</strong><code>@ShortHash(selectedBuild.Definition.Artifact.Sha256)</code></div>
                 <div class="studio-preview">
-                    <StatusBadge Text="@(preview.CanInstall ? "Ready" : preview.AlreadyInstalled ? "Already installed" : "Conflicts")" Status="@(preview.CanInstall ? UiStatus.Success : UiStatus.Warning)" />
+                    <StatusBadge Text="@PreviewStatus" Status="@(CanInstall ? UiStatus.Success : UiStatus.Warning)" />
                     <span>@preview.Resources.Count resources · @preview.Resources.Count(resource => resource.AlreadyExists) conflicts</span>
                 </div>
+                @if (preview.Bindings.Count > 0)
+                {
+                    <section class="studio-bindings" aria-label="Pack resource bindings">
+                        <div><strong>Resource bindings</strong><small>Selections are retained for this Pack identity.</small></div>
+                        @foreach (var binding in preview.Bindings)
+                        {
+                            <label>
+                                <span>@binding.DisplayName <small>@(binding.Required ? "Required" : "Optional") · @BindingKindLabel(binding.TargetKind)</small></span>
+                                <select value="@SelectedBinding(binding.Name)" @onchange="args => BindingChanged(binding.Name, args)">
+                                    <option value="">Select a @BindingKindLabel(binding.TargetKind).ToLowerInvariant()</option>
+                                    @if (binding.TargetKind == PackBindingTargetKind.ModelProfile)
+                                    {
+                                        @foreach (var profile in modelProfiles)
+                                        {
+                                            <option value="@BindingValue(profile.Name, ResourceNamespace.Parse(profile.Namespace))">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        @foreach (var secret in secrets)
+                                        {
+                                            <option value="@BindingValue(secret.Resource.Name, secret.Resource.Namespace)">@secret.Resource.Definition.DisplayName — @secret.Resource.Name (@secret.ValueStatus)</option>
+                                        }
+                                    }
+                                </select>
+                            </label>
+                        }
+                    </section>
+                }
                 @if (preview.AlreadyInstalled)
                 {
                     <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> Reinstall this Pack build</label>
@@ -120,6 +150,9 @@ else
     private IReadOnlyList<PackProjectBuildResource>? builds;
     private PackProjectBuildResource? selectedBuild;
     private PackInstallationPreview? preview;
+    private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
+    private IReadOnlyList<SecretResponse> secrets = [];
+    private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
     private AgentstrationApiException? error;
     private string version = string.Empty;
     private PackAudience audience = PackAudience.Universal;
@@ -135,8 +168,14 @@ else
     private bool building;
     private bool installing;
     private bool replaceExisting;
-    private bool CanInstall => preview?.CanInstall == true
-        || (replaceExisting && preview?.AlreadyInstalled == true);
+    private bool CanInstall => preview is not null
+        && (preview.CanInstall || replaceExisting && preview.AlreadyInstalled)
+        && preview.Bindings.All(binding => !binding.Required || !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)));
+    private string PreviewStatus => preview is null ? "Not previewed"
+        : preview.Bindings.Any(binding => binding.Required && string.IsNullOrWhiteSpace(SelectedBinding(binding.Name))) ? "Configuration required"
+        : preview.CanInstall ? "Ready"
+        : preview.AlreadyInstalled ? "Already installed"
+        : "Conflicts";
     private UiStatus ProjectTone => project?.Value.Definition.State == PackProjectState.Built ? UiStatus.Success : UiStatus.Info;
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
@@ -162,7 +201,7 @@ else
         catch (AgentstrationApiException exception) { error = exception; }
     }
 
-    private void MarkDirty() { dirty = true; message = null; preview = null; selectedBuild = null; }
+    private void MarkDirty() { dirty = true; message = null; preview = null; selectedBuild = null; bindingSelections.Clear(); }
     private async Task SaveAsync()
     {
         if (project is null) return;
@@ -188,6 +227,7 @@ else
                 builds = await Client.GetBuildsAsync(ProjectId, cancellation.Token);
                 project = await Client.GetProjectAsync(ProjectId, cancellation.Token);
                 preview = await Client.PreviewBuildAsync(ProjectId, selectedBuild.Uid, cancellation.Token);
+                await ConfigureBindingsAsync();
                 replaceExisting = false;
                 message = PreviewMessage(selectedBuild.Definition.Version);
             });
@@ -202,6 +242,7 @@ else
         await ExecuteAsync(async () =>
         {
             preview = await Client.PreviewBuildAsync(ProjectId, build.Uid, cancellation.Token);
+            await ConfigureBindingsAsync();
             message = PreviewMessage(build.Definition.Version);
         });
     }
@@ -214,8 +255,13 @@ else
         {
             await ExecuteAsync(async () =>
             {
-                var installed = await Client.InstallBuildAsync(ProjectId, selectedBuild.Uid, replaceExisting, cancellation.Token);
+                var bindings = preview!.Bindings
+                    .Where(binding => !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)))
+                    .Select(binding => new PackBindingSelection(binding.Name, ParseBindingTarget(SelectedBinding(binding.Name)!)))
+                    .ToArray();
+                var installed = await Client.InstallBuildAsync(ProjectId, selectedBuild.Uid, replaceExisting, bindings, cancellation.Token);
                 preview = await Client.PreviewBuildAsync(ProjectId, selectedBuild.Uid, cancellation.Token);
+                await ConfigureBindingsAsync();
                 replaceExisting = false;
                 message = $"Installed {installed.Value.Definition.Publisher}/{installed.Value.Definition.PackName} in the selected workspace.";
             });
@@ -234,6 +280,28 @@ else
     }
 
     private string DownloadPath(PackProjectBuildResource build) => $"/api/pack-projects/{ProjectId:D}/builds/{build.Uid:D}/download";
+    private async Task ConfigureBindingsAsync()
+    {
+        bindingSelections.Clear();
+        if (preview is null || preview.Bindings.Count == 0) return;
+        foreach (var binding in preview.Bindings)
+        {
+            if (binding.TargetAvailable && binding.Target is not null)
+                bindingSelections[binding.Name] = BindingValue(binding.Target.Name, binding.Target.Namespace ?? ResourceNamespace.Default);
+        }
+        modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
+        secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
+    }
+    private string? SelectedBinding(string name) => bindingSelections.GetValueOrDefault(name);
+    private void BindingChanged(string name, ChangeEventArgs args) => bindingSelections[name] = args.Value?.ToString() ?? string.Empty;
+    private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
+    private static ResourceReference ParseBindingTarget(string value)
+    {
+        var parts = value.Split(':', 2);
+        if (parts.Length != 2) throw new InvalidOperationException("The selected Pack binding is invalid.");
+        return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
+    }
+    private static string BindingKindLabel(PackBindingTargetKind kind) => kind == PackBindingTargetKind.Secret ? "Secret" : "Model profile";
     private string PreviewMessage(string buildVersion) => preview?.CanInstall == true
         ? $"Build {buildVersion} is ready for this workspace."
         : preview?.AlreadyInstalled == true

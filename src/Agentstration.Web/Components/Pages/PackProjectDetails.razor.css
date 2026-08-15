@@ -16,6 +16,13 @@
 .studio-namespace { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 10px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: .78rem; }
 .studio-namespace span { color: var(--muted); }
 .studio-preview { display: flex; align-items: center; gap: 10px; font-size: .82rem; }
+.studio-bindings { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.studio-bindings > div strong, .studio-bindings > div small { display: block; }
+.studio-bindings > div small { margin-top: 3px; color: var(--muted); }
+.studio-bindings label { display: grid; gap: 6px; font-size: .78rem; font-weight: 650; }
+.studio-bindings label span { display: flex; justify-content: space-between; gap: 8px; }
+.studio-bindings label small { color: var(--muted); font-weight: 400; }
+.studio-bindings select { width: 100%; min-height: 40px; padding: 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); }
 .studio-selected-build { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
 .studio-selected-build span { grid-column: 1 / -1; color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; }
 .studio-selected-build code { color: var(--muted); font-size: .72rem; }

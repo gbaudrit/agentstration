@@ -16,6 +16,12 @@ metadata:
     - multi-agent
     - human-in-the-loop
 definition:
+  bindings:
+    - name: conversational-model
+      targetKind: modelProfile
+      displayName: Conversational model
+      description: Model profile used by the three game agents.
+      required: true
   resources:
     - agents/who-am-i-secret.yaml
     - agents/who-am-i-ai-player.yaml

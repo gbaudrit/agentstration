@@ -10,6 +10,10 @@
 .pack-resource-list article > div { min-width: 0; flex: 1; }
 .pack-resource-list strong, .pack-resource-list small { display: block; overflow: hidden; text-overflow: ellipsis; }
 .pack-resource-list small { margin-top: 3px; color: var(--muted); }
+.pack-binding-list { display: grid; gap: 10px; }
+.pack-binding-list article { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.pack-binding-list article > div { min-width: 0; flex: 1; }
+.pack-binding-list strong, .pack-binding-list small { display: block; overflow-wrap: anywhere; }
 .pack-kind { flex: 0 0 auto; padding: 4px 7px; border-radius: 5px; background: var(--primary-soft); color: var(--primary); font: 700 .66rem var(--font-mono); }
 .pack-muted { color: var(--muted); }
 .pack-dialog { width: min(680px, 100%); max-width: 680px; max-height: min(820px, calc(100vh - 40px)); overflow: auto; }
@@ -18,6 +22,18 @@
 .pack-file-picker small { color: var(--muted); }
 .pack-preview { margin-top: 18px; padding: 16px; border: 1px solid var(--border); border-radius: 9px; }
 .pack-preview .panel-header small { display: block; margin-top: 5px; color: var(--muted); }
+.pack-bindings { display: grid; gap: 12px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.pack-bindings-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pack-bindings-heading h3 { margin: 2px 0 0; }
+.pack-bindings-heading > span { color: var(--muted); font-size: .75rem; }
+.pack-binding-editor { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
+.pack-binding-editor p { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.45; }
+.pack-binding-editor label { display: grid; gap: 6px; }
+.pack-binding-editor label > span { color: var(--muted); font-size: .72rem; font-weight: 700; }
+.pack-binding-editor select { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); }
+.pack-binding-copy { display: flex; align-items: center; gap: 10px; }
+.pack-binding-copy > div { min-width: 0; }
+.pack-binding-copy strong, .pack-binding-copy small { display: block; }
 .pack-resource-list.compact { grid-template-columns: 1fr; max-height: 250px; overflow: auto; }
 .selected-pack { background: color-mix(in srgb, var(--primary-soft) 55%, transparent); }
 .pack-fork-grid { margin-top: 20px; }

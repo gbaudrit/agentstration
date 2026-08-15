@@ -36,7 +36,8 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
                         profile.Value.Definition.Reasoning,
                         profile.Value.Definition.Output,
                         resolution.Status,
-                        usages.Count)));
+                        usages.Count),
+                    profile.Value.Namespace.Value));
             }
             return Results.Ok(new ValueResponse<ModelProfileSummaryResponse>(responses));
         });

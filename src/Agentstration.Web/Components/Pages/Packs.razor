@@ -1,6 +1,7 @@
 @page "/packs"
 @implements IDisposable
 @inject IPacksClient Client
+@inject IServiceProvider Services
 @inject NavigationManager Navigation
 
 <PageTitle>Packs · Agentstration</PageTitle>
@@ -68,6 +69,21 @@ else
                 <dt>Source</dt><dd>@selected.Value.Definition.Source</dd>
                 <dt>Installed</dt><dd>@selected.Value.Definition.InstalledAt.ToLocalTime().ToString("F")</dd>
             </dl>
+            <h3>Resource bindings</h3>
+            @if (selected.Value.Definition.Bindings.Count == 0) { <p class="pack-muted">This Pack does not declare external resource bindings.</p> }
+            else
+            {
+                <div class="pack-binding-list">
+                    @foreach (var binding in selected.Value.Definition.Bindings)
+                    {
+                        <article>
+                            <span class="pack-kind">@BindingKindLabel(binding.TargetKind)</span>
+                            <div><strong>@binding.Name</strong><small><code>@BindingTarget(binding.Target)</code></small></div>
+                            <StatusBadge Text="Configured" Status="UiStatus.Success" />
+                        </article>
+                    }
+                </div>
+            }
             <h3>Managed resources</h3>
             @if (selected.Value.Definition.ManagedResources.Count == 0) { <p class="pack-muted">This Pack does not currently manage any resources.</p> }
             else
@@ -113,7 +129,7 @@ else
             @if (preview is not null)
             {
                 <section class="pack-preview">
-                    <div class="panel-header"><div><strong>@(preview.Metadata.DisplayName ?? preview.Metadata.Name)</strong><small><code>@preview.Metadata.Publisher/@preview.Metadata.Name</code> · @preview.Metadata.Version · @PurposeLabel(preview.Metadata.Purpose) · @AudienceLabel(preview.Metadata.Audience)</small></div><StatusBadge Text="@(preview.CanInstall ? "Ready" : "Conflict")" Status="@(preview.CanInstall ? UiStatus.Success : UiStatus.Warning)" /></div>
+                    <div class="panel-header"><div><strong>@(preview.Metadata.DisplayName ?? preview.Metadata.Name)</strong><small><code>@preview.Metadata.Publisher/@preview.Metadata.Name</code> · @preview.Metadata.Version · @PurposeLabel(preview.Metadata.Purpose) · @AudienceLabel(preview.Metadata.Audience)</small></div><StatusBadge Text="@PreviewStatus" Status="@(CanInstall ? UiStatus.Success : UiStatus.Warning)" /></div>
                     @if (!string.IsNullOrWhiteSpace(preview.Metadata.Description)) { <p>@preview.Metadata.Description</p> }
                     <div class="pack-resource-list compact">
                         @foreach (var resource in preview.Resources)
@@ -121,10 +137,52 @@ else
                             <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div>@if (resource.AlreadyExists) { <StatusBadge Text="Exists" Status="UiStatus.Warning" /> }</article>
                         }
                     </div>
+                    @if (preview.Bindings.Count > 0)
+                    {
+                        <section class="pack-bindings" aria-labelledby="pack-bindings-title">
+                            <div class="pack-bindings-heading">
+                                <div><p class="eyebrow">Installation configuration</p><h3 id="pack-bindings-title">Resource bindings</h3></div>
+                                <span>@preview.Bindings.Count binding(s)</span>
+                            </div>
+                            <p class="pack-muted">Choose workspace resources for the logical requirements declared by this Pack. Secret values never leave their Vault.</p>
+                            @foreach (var binding in preview.Bindings)
+                            {
+                                <article class="pack-binding-editor">
+                                    <div class="pack-binding-copy">
+                                        <span class="pack-kind">@BindingKindLabel(binding.TargetKind)</span>
+                                        <div><strong>@binding.DisplayName</strong><small><code>@binding.Name</code>@(binding.Required ? " · Required" : " · Optional")</small></div>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(binding.Description)) { <p>@binding.Description</p> }
+                                    <label>
+                                        <span>Workspace resource</span>
+                                        <select value="@SelectedBinding(binding.Name)" @onchange="args => BindingChanged(binding.Name, args)">
+                                            <option value="">Select a @BindingKindLabel(binding.TargetKind).ToLowerInvariant()</option>
+                                            @if (binding.TargetKind == PackBindingTargetKind.ModelProfile)
+                                            {
+                                                @foreach (var profile in modelProfiles)
+                                                {
+                                                    <option value="@BindingValue(profile.Name, ResourceNamespace.Parse(profile.Namespace))">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name · @profile.Properties.Provider.Name / @profile.Properties.Model.Name</option>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                @foreach (var secret in secrets)
+                                                {
+                                                    <option value="@BindingValue(secret.Resource.Name, secret.Resource.Namespace)">@secret.Resource.Definition.DisplayName — @secret.Resource.Namespace/@secret.Resource.Name (@secret.ValueStatus)</option>
+                                                }
+                                            }
+                                        </select>
+                                    </label>
+                                    <small>Used by @string.Join(", ", binding.UsedBy.Select(resource => $"{resource.ResourceKind}/{resource.ResourceName}"))</small>
+                                    @if (binding.Target is not null && !binding.TargetAvailable) { <p class="inline-warning">The previously selected resource is no longer available. Choose a replacement.</p> }
+                                </article>
+                            }
+                        </section>
+                    }
                     @if (preview.AlreadyInstalled) { <p class="error-panel">This Pack identity is already installed in the workspace.</p> }
                 </section>
             }
-            <div class="dialog-actions"><button class="button-secondary" @onclick="CloseInstall">Cancel</button><button class="button-primary" disabled="@(preview?.CanInstall != true || installing)" @onclick="InstallAsync">@(installing ? "Installing…" : "Install Pack")</button></div>
+            <div class="dialog-actions"><button class="button-secondary" @onclick="CloseInstall">Cancel</button><button class="button-primary" disabled="@(!CanInstall || installing)" @onclick="InstallAsync">@(installing ? "Installing…" : "Install Pack")</button></div>
         </section>
     </div>
 }
@@ -178,6 +236,9 @@ else
     private ResourceSnapshot<InstalledPackResource>? selected;
     private AgentstrationApiException? error;
     private PackInstallationPreview? preview;
+    private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
+    private IReadOnlyList<SecretResponse> secrets = [];
+    private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
     private byte[]? archive;
     private string archiveName = string.Empty;
     private string? installError;
@@ -198,6 +259,9 @@ else
     private string? forkNotice;
 
     private int AttentionCount => packs?.Count(pack => pack.Definition.State is InstalledPackState.Failed or InstalledPackState.Degraded) ?? 0;
+    private bool CanInstall => preview?.CanInstall == true
+        && preview.Bindings.All(binding => !binding.Required || !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)));
+    private string PreviewStatus => preview?.CanInstall != true ? "Conflict" : CanInstall ? "Ready" : "Configuration required";
     private bool CanSubmitFork => !forking
         && !string.IsNullOrWhiteSpace(forkPublisher)
         && !string.IsNullOrWhiteSpace(forkName)
@@ -230,6 +294,7 @@ else
         archive = null;
         archiveName = string.Empty;
         installError = null;
+        bindingSelections.Clear();
         installOpen = true;
     }
 
@@ -253,6 +318,17 @@ else
             await input.CopyToAsync(output, cancellation.Token);
             archive = output.ToArray();
             preview = await Client.PreviewAsync(archive, archiveName, cancellation.Token);
+            bindingSelections.Clear();
+            foreach (var binding in preview.Bindings)
+            {
+                if (binding.TargetAvailable && binding.Target is not null)
+                    bindingSelections[binding.Name] = BindingValue(binding.Target.Name, binding.Target.Namespace ?? ResourceNamespace.Default);
+            }
+            if (preview.Bindings.Count > 0)
+            {
+                modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
+                secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
+            }
         }
         catch (AgentstrationApiException exception) { installError = exception.Message; }
         catch (IOException exception) { installError = exception.Message; }
@@ -261,12 +337,16 @@ else
 
     private async Task InstallAsync()
     {
-        if (archive is null || preview?.CanInstall != true) return;
+        if (archive is null || !CanInstall) return;
         installing = true;
         installError = null;
         try
         {
-            selected = await Client.InstallAsync(archive, archiveName, cancellation.Token);
+            var bindings = preview!.Bindings
+                .Where(binding => !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)))
+                .Select(binding => new PackBindingSelection(binding.Name, ParseBindingTarget(SelectedBinding(binding.Name)!)))
+                .ToArray();
+            selected = await Client.InstallAsync(archive, archiveName, bindings, cancellation.Token);
             installOpen = false;
             await LoadAsync();
         }
@@ -349,6 +429,17 @@ else
     private bool IsSelected(InstalledPackResource pack) => selected is not null && SameIdentity(pack, selected.Value);
     private static bool SameIdentity(InstalledPackResource left, InstalledPackResource right) => left.Definition.Publisher == right.Definition.Publisher && left.Definition.PackName == right.Definition.PackName;
     private static string DisplayName(InstalledPackResource pack) => pack.Definition.DisplayName ?? pack.Definition.PackName;
+    private string? SelectedBinding(string name) => bindingSelections.GetValueOrDefault(name);
+    private void BindingChanged(string name, ChangeEventArgs args) => bindingSelections[name] = args.Value?.ToString() ?? string.Empty;
+    private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
+    private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";
+    private static ResourceReference ParseBindingTarget(string value)
+    {
+        var parts = value.Split(':', 2);
+        if (parts.Length != 2) throw new InvalidOperationException("The selected Pack binding is invalid.");
+        return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
+    }
+    private static string BindingKindLabel(PackBindingTargetKind kind) => kind == PackBindingTargetKind.Secret ? "Secret" : "Model profile";
     private static string PurposeLabel(PackPurpose purpose) => purpose switch { PackPurpose.Sample => "SAMPLE", PackPurpose.Template => "TEMPLATE", _ => "STANDARD" };
     private static string AudienceLabel(PackAudience audience) => audience switch { PackAudience.Personal => "Personal", PackAudience.Professional => "Professional", _ => "Universal" };
     private static string StateLabel(InstalledPackState state) => state switch { InstalledPackState.Installing => "Installing", InstalledPackState.Installed => "Installed", InstalledPackState.Uninstalling => "Uninstalling", InstalledPackState.Failed => "Failed", _ => "Degraded" };
