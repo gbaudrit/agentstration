@@ -1,6 +1,6 @@
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
 using Agentstration.Management.Contracts;
+using Agentstration.Management.Core;
 
 namespace Agentstration.Web.Api.Models;
 
