@@ -4,6 +4,8 @@ metadata:
   name: who-am-i
   publisher: agentstration
   version: 0.1.0
+  audience: personal
+  purpose: sample
   displayName: Who Am I?
   description: Installs the resource skeleton for a conversational multi-agent guessing game.
   categories:

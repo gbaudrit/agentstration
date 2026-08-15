@@ -8,6 +8,22 @@ An Agentstration Pack is a versioned, distributable unit that groups a coherent 
 
 The Pack belongs to the Management/distribution plane and is not a Runtime primitive.
 
+Every Pack declares one audience:
+
+- `personal` for everyday individual use;
+- `professional` for governed work and organizational use;
+- `universal` when the same experience is intentionally suitable in both contexts.
+
+Audience is presentation and discovery metadata. It does not create a separate Pack kind, runtime, installation path, or security boundary. Manifests that predate this field default to `universal`.
+
+Every Pack also has one purpose:
+
+- `sample` demonstrates an Agentstration capability or orchestration pattern;
+- `template` is a starting point intended to be forked and customized;
+- `standard` is a regular Pack without a special usage designation.
+
+Purpose is discovery and presentation metadata. It does not imply support, certification, production readiness, or a distinct lifecycle. Manifests that predate this field default to `standard`.
+
 Every installation uses the namespace `publisher.name`. For example, `agentstration/who-am-i` installs into `agentstration.who-am-i`. Publisher and Pack names use lowercase ASCII letters, digits and `-`, which makes this mapping direct and collision-free. Resource `metadata.name` values are not prefixed or rewritten.
 
 ## Archive
@@ -33,6 +49,8 @@ metadata:
   name: price-watch
   publisher: agentstration
   version: 1.0.0
+  audience: personal
+  purpose: standard
   displayName: Price Watch
   description: Monitor product prices and notify at a configured threshold.
   categories: [shopping, automation]

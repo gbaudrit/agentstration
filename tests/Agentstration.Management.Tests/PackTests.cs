@@ -218,6 +218,8 @@ public sealed class PackTests
         var preview = await previewResponse.Content.ReadFromJsonAsync<PackInstallationPreview>();
         Assert.IsNotNull(preview);
         Assert.IsTrue(preview.CanInstall);
+        Assert.AreEqual(PackAudience.Personal, preview.Metadata.Audience);
+        Assert.AreEqual(PackPurpose.Sample, preview.Metadata.Purpose);
         Assert.AreEqual(new ResourceNamespace("agentstration.who-am-i"), preview.Namespace);
         Assert.HasCount(5, preview.Resources);
         CollectionAssert.AreEquivalent(
@@ -249,6 +251,8 @@ public sealed class PackTests
         var project = await forkResponse.Content.ReadFromJsonAsync<PackProjectResource>();
         Assert.IsNotNull(project);
         Assert.AreEqual("agentstration", project.Definition.Origin.Publisher);
+        Assert.AreEqual(PackAudience.Personal, project.Definition.Audience);
+        Assert.AreEqual(PackPurpose.Sample, project.Definition.Purpose);
 
         using var buildResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds", null);
         Assert.AreEqual(HttpStatusCode.Created, buildResponse.StatusCode, await buildResponse.Content.ReadAsStringAsync());
@@ -267,6 +271,8 @@ public sealed class PackTests
         var forkPreview = await forkPreviewResponse.Content.ReadFromJsonAsync<PackInstallationPreview>();
         Assert.IsNotNull(forkPreview);
         Assert.IsTrue(forkPreview.CanInstall, "A fork must coexist with its source because its resources use a distinct Pack namespace.");
+        Assert.AreEqual(PackAudience.Personal, forkPreview.Metadata.Audience);
+        Assert.AreEqual(PackPurpose.Sample, forkPreview.Metadata.Purpose);
         Assert.AreEqual(new ResourceNamespace("local.who-am-i-lab"), forkPreview.Namespace);
         Assert.IsTrue(forkPreview.Resources.All(resource => !resource.AlreadyExists));
 

@@ -69,6 +69,8 @@ public sealed partial class PackManagementService
                 PackName = identity.Name,
                 Namespace = @namespace,
                 Version = archive.Manifest.Metadata.Version,
+                Audience = archive.Manifest.Metadata.Audience,
+                Purpose = archive.Manifest.Metadata.Purpose,
                 DisplayName = archive.Manifest.Metadata.DisplayName,
                 Description = archive.Manifest.Metadata.Description,
                 Source = archive.Source,
@@ -240,6 +242,10 @@ public sealed partial class PackManagementService
         if (manifest.Kind != PackKinds.Pack) throw new PackValidationException("pack_kind_invalid", $"Pack manifest kind must be '{PackKinds.Pack}'.");
         ValidateName(manifest.Metadata.Publisher, "publisher");
         ValidateName(manifest.Metadata.Name, "name");
+        if (!Enum.IsDefined(manifest.Metadata.Audience))
+            throw new PackValidationException("pack_audience_invalid", "Pack audience must be universal, personal, or professional.");
+        if (!Enum.IsDefined(manifest.Metadata.Purpose))
+            throw new PackValidationException("pack_purpose_invalid", "Pack purpose must be sample, template, or standard.");
         if (!SemanticVersionRegex().IsMatch(manifest.Metadata.Version))
             throw new PackValidationException("pack_version_invalid", "Pack version must use Semantic Versioning.");
         if (manifest.Definition.Requirements.Count > 0)
