@@ -455,7 +455,10 @@ public sealed class ApiClientTests
             path = request.RequestUri?.AbsolutePath;
             body = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
             return new HttpResponseMessage(HttpStatusCode.NoContent);
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
         var client = new SecretsApiClient(httpClient);
 
         await client.SetSecretValueAsync("openai-key", "sensitive-value", default);
@@ -479,7 +482,10 @@ public sealed class ApiClientTests
             {
                 Content = JsonContent.Create(new VaultInitializationResponse("initialized", "C:\\data\\secrets\\master.key"))
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
         var client = new SecretsApiClient(httpClient);
 
         var response = await client.InitializeVaultAsync("local vault", default);
