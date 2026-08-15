@@ -26,6 +26,8 @@ using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Secrets.Abstractions;
+using Agentstration.Secrets.Local;
 using Agentstration.Tools.Mcp;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -91,6 +93,14 @@ public static class DependencyInjection
         services.AddSingleton<IEventHandler<Domain.ItemReceived>, ItemReceivedHandler>();
         controlPlaneConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "control-plane.db")}";
         services.AddSqliteControlPlane(controlPlaneConnectionString);
+        var secretPath = Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "secrets");
+        services.AddSingleton(_ => new EnvironmentMasterKeyProvider(Path.Combine(secretPath, "master.key")));
+        services.AddSingleton<IMasterKeyProvider>(provider => provider.GetRequiredService<EnvironmentMasterKeyProvider>());
+        services.AddSingleton<ISecretVaultProvider>(provider => new LocalSecretVaultProvider(
+            secretPath,
+            provider.GetRequiredService<IMasterKeyProvider>()));
+        services.AddSingleton<SecretManagementService>();
+        services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
         services.AddSingleton<IIdentityProvider, LocalIdentityProvider>();
         services.AddSingleton<IAuthorizationService, PermissionAuthorizationService>();
         services.AddSingleton<ILocalEnvironmentBootstrapper, LocalEnvironmentBootstrapper>();

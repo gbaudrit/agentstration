@@ -28,6 +28,7 @@ public static class ModelManagementEndpoints
 
         RuntimeProfileEndpoints.Map(endpoints.MapGroup("/api/runtimeprofiles"));
         ToolProviderEndpoints.Map(endpoints);
+        SecretEndpoints.Map(endpoints);
 
         var agents = endpoints.MapGroup("/api/agents");
         GetAgentModelEndpoint.Map(agents);

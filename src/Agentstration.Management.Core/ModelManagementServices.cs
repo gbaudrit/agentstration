@@ -38,6 +38,7 @@ public sealed class ModelProviderManagementService(
     public async Task<StoredResource<ModelProviderResource>> CreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
+        await ValidateCredentialAsync(resource.Namespace, resource.Definition.Credential, cancellationToken);
         if (await GetAsync(resource.Namespace, resource.Metadata.Name, cancellationToken) is not null) throw new ControlPlaneConcurrencyException($"Model provider '{resource.Address}' already exists.");
         return await store.PutAsync(resource with
         {
@@ -50,6 +51,7 @@ public sealed class ModelProviderManagementService(
     public async Task<StoredResource<ModelProviderResource>> PutAsync(string name, ModelProviderProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {
         var existing = await GetAsync(name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
+        await ValidateCredentialAsync(existing.Value.Namespace, definition.Credential, cancellationToken);
         return await store.PutAsync(existing.Value with
         {
             Generation = checked(existing.Value.Generation + 1),
@@ -160,8 +162,18 @@ public sealed class ModelProviderManagementService(
         DisplayName = resource.Definition.DisplayName,
         ManagementMode = resource.Definition.ManagementMode,
         EndpointDisplayName = resource.Definition.Endpoint.Authority,
-        Capabilities = ["chat"]
+        Capabilities = ["chat"],
+        Credential = resource.Definition.Credential
     };
+
+    private async Task ValidateCredentialAsync(ResourceNamespace ownerNamespace, ResourceReference? credential, CancellationToken cancellationToken)
+    {
+        if (credential is null) return;
+        if (credential.WorkspaceRef is not null) throw new ModelProviderValidationException("Cross-workspace secret references are not supported.");
+        var address = credential.Resolve(ownerNamespace, ResourceKinds.Secret);
+        if (await store.GetAsync<SecretResource>(new(address.Kind, address.Name, address.Namespace), cancellationToken) is null)
+            throw new ModelProviderValidationException($"Referenced secret '{address}' does not exist.");
+    }
 
     private static void ValidateIdentity(ModelProviderResource resource)
     {

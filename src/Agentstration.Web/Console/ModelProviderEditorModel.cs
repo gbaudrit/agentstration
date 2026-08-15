@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
@@ -16,6 +17,7 @@ public sealed class ModelProviderEditorModel
     [Required, Url] public string Endpoint { get; set; } = "http://localhost:5260";
     public ModelProviderManagementMode ManagementMode { get; set; } = ModelProviderManagementMode.External;
     public string? ProviderOptionsJson { get; set; }
+    public string? CredentialId { get; set; }
 
     public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties());
     public PutModelProviderRequest ToPutRequest() => new(ToProperties());
@@ -31,7 +33,8 @@ public sealed class ModelProviderEditorModel
             ProviderType = ProviderType.Trim(),
             Endpoint = endpoint,
             ManagementMode = ManagementMode,
-            ProviderOptions = ParseOptions(ProviderOptionsJson)
+            ProviderOptions = ParseOptions(ProviderOptionsJson),
+            Credential = ParseCredential(CredentialId)
         };
     }
 
@@ -42,10 +45,20 @@ public sealed class ModelProviderEditorModel
         ProviderType = resource.Definition.ProviderType,
         Endpoint = resource.Definition.Endpoint.AbsoluteUri.TrimEnd('/'),
         ManagementMode = resource.Definition.ManagementMode,
+        CredentialId = resource.Definition.Credential is null ? null : $"{(resource.Definition.Credential.Namespace ?? resource.Namespace).Value}:{resource.Definition.Credential.Name}",
         ProviderOptionsJson = resource.Definition.ProviderOptions.Count == 0
             ? null
             : JsonSerializer.Serialize(resource.Definition.ProviderOptions, IndentedJson)
     };
+
+    private static ResourceReference? ParseCredential(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var separator = value.IndexOf(':');
+        if (separator <= 0 || separator == value.Length - 1) throw new ArgumentException("Credential selection is invalid.");
+        var @namespace = ResourceNamespace.Parse(value[..separator]);
+        return new ResourceReference(value[(separator + 1)..], @namespace: @namespace.IsDefault ? null : @namespace);
+    }
 
     private static IReadOnlyDictionary<string, JsonElement> ParseOptions(string? value)
     {
