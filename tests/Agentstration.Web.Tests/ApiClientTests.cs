@@ -30,6 +30,10 @@ public sealed class ApiClientTests
         Assert.AreEqual(
             "/namespaces/agentstration.daily-life-assistant/flows/main",
             ConsoleResourceUrls.Flow(new FlowId("main", new ResourceNamespace("agentstration.daily-life-assistant"))));
+        Assert.AreEqual("/entries/main", ConsoleResourceUrls.Entry(new EntryId("main")));
+        Assert.AreEqual(
+            "/namespaces/agentstration.daily-life-assistant/entries/main",
+            ConsoleResourceUrls.Entry(new EntryId("main", new ResourceNamespace("agentstration.daily-life-assistant"))));
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);

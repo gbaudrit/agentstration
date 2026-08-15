@@ -1,6 +1,7 @@
 using Agentstration.Flow;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
+using Agentstration.Work;
 
 namespace Agentstration.Web.Console;
 
@@ -25,6 +26,10 @@ public static class ConsoleResourceUrls
     public static string Flow(FlowId id) => id.Namespace.IsDefault
         ? $"/flows/{Uri.EscapeDataString(id.Value)}"
         : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/flows/{Uri.EscapeDataString(id.Value)}";
+
+    public static string Entry(EntryId id) => id.Namespace.IsDefault
+        ? $"/entries/{Uri.EscapeDataString(id.Value)}"
+        : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/entries/{Uri.EscapeDataString(id.Value)}";
 }
 public sealed record ExecutionSummary(string Id, string Agent, string? Flow, Guid? WorkItemId, string Status, DateTimeOffset StartedAt, TimeSpan? Duration, string? Result, string? Error);
 public sealed record ManagementSummary(int Agents, int Configurations, int Revisions, int Policies, string DesiredState);

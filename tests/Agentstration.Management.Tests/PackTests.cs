@@ -331,6 +331,10 @@ public sealed class PackTests
         Assert.AreEqual(HttpStatusCode.OK, forkFlowResponse.StatusCode, await forkFlowResponse.Content.ReadAsStringAsync());
         using var forkEntryResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/entries/who-am-i");
         Assert.AreEqual(HttpStatusCode.OK, forkEntryResponse.StatusCode, await forkEntryResponse.Content.ReadAsStringAsync());
+        using var forkEntryDraftResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/management/entries/who-am-i");
+        Assert.AreEqual(HttpStatusCode.OK, forkEntryDraftResponse.StatusCode, await forkEntryDraftResponse.Content.ReadAsStringAsync());
+        using var forkEntryDependenciesResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/management/entries/who-am-i/dependencies");
+        Assert.AreEqual(HttpStatusCode.OK, forkEntryDependenciesResponse.StatusCode, await forkEntryDependenciesResponse.Content.ReadAsStringAsync());
         using var forkEntry = JsonDocument.Parse(await forkEntryResponse.Content.ReadAsStreamAsync());
         Assert.AreEqual("local.who-am-i-lab", forkEntry.RootElement.GetProperty("namespace").GetString());
         Assert.AreEqual("local.who-am-i-lab", forkEntry.RootElement.GetProperty("resolvedTarget").GetProperty("namespace").GetString());

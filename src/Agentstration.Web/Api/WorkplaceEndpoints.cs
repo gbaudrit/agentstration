@@ -27,6 +27,7 @@ public static class WorkplaceEndpoints
         endpoints.MapPut("/api/namespaces/{namespace}/management/entries/{entryName}", PutNamespacedEntryDraftAsync);
         endpoints.MapPost("/api/namespaces/{namespace}/management/entries/{entryName}/publish", PublishNamespacedEntryDraftAsync);
         endpoints.MapGet("/api/management/entries/{entryName}/dependencies", GetEntryDependenciesAsync);
+        endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}/dependencies", GetNamespacedEntryDependenciesAsync);
         endpoints.MapGet("/api/resources", ListResourcesAsync);
         endpoints.MapGet("/api/management/workspaces", ListWorkspaceDraftsAsync);
         endpoints.MapGet("/api/management/workspaces/{workspaceName}", GetWorkspaceDraftAsync);
@@ -157,6 +158,8 @@ public static class WorkplaceEndpoints
 
     private static Task<IResult> GetEntryDependenciesAsync(string entryName, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
         Results.Ok((await service.GetDependenciesAsync(EntryResourceId(entryName), token)).Select(value => new EntryDependencyResponse(value.ResourceId, value.ResourceType, value.Relationship))));
+    private static Task<IResult> GetNamespacedEntryDependenciesAsync(string @namespace, string entryName, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
+        Results.Ok((await service.GetDependenciesAsync(NamespacedEntryId(@namespace, entryName), token)).Select(value => new EntryDependencyResponse(value.ResourceId, value.ResourceType, value.Relationship))));
 
     private static async Task<IResult> ListResourcesAsync(string kind, AgentManagementService agents, FlowService flows, CancellationToken token)
     {

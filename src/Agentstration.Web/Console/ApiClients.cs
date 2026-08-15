@@ -67,10 +67,14 @@ public interface IEntryAdministrationApiClient
 {
     Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken);
     Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken);
+    Task<EntryDraftResponse> GetEntryAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetEntryAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");
     Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken);
     Task<EntryValidationResponse> ValidateEntryAsync(string name, CancellationToken cancellationToken);
     Task<EntryResource> PublishEntryAsync(string name, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryDependencyResponse>> GetDependenciesAsync(string name, CancellationToken cancellationToken);
+    Task<IReadOnlyList<EntryDependencyResponse>> GetDependenciesAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetDependenciesAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");
     Task<IReadOnlyList<ResourcePickerItem>> GetResourcesAsync(EntryBindingKind kind, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkplaceWorkspaceDraftResponse>> GetWorkspacesAsync(CancellationToken cancellationToken);
@@ -229,7 +233,10 @@ public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpCli
         await ApiResponse.ReadAsync<EntryDraftResponse[]>(httpClient, "api/management/entries", cancellationToken);
 
     public Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<EntryDraftResponse>(httpClient, $"api/management/entries/{Uri.EscapeDataString(name)}", cancellationToken);
+        GetEntryAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    public Task<EntryDraftResponse> GetEntryAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<EntryDraftResponse>(httpClient, EntryPath(@namespace, name), cancellationToken);
 
     public async Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken)
     {
@@ -253,7 +260,14 @@ public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpCli
     }
 
     public async Task<IReadOnlyList<EntryDependencyResponse>> GetDependenciesAsync(string name, CancellationToken cancellationToken) =>
-        await ApiResponse.ReadAsync<EntryDependencyResponse[]>(httpClient, $"api/management/entries/{Uri.EscapeDataString(name)}/dependencies", cancellationToken);
+        await GetDependenciesAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    public async Task<IReadOnlyList<EntryDependencyResponse>> GetDependenciesAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<EntryDependencyResponse[]>(httpClient, $"{EntryPath(@namespace, name)}/dependencies", cancellationToken);
+
+    private static string EntryPath(ResourceNamespace @namespace, string name) => @namespace.IsDefault
+        ? $"api/management/entries/{Uri.EscapeDataString(name)}"
+        : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/management/entries/{Uri.EscapeDataString(name)}";
 
     public async Task<IReadOnlyList<ResourcePickerItem>> GetResourcesAsync(EntryBindingKind kind, CancellationToken cancellationToken)
     {
