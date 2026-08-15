@@ -7,6 +7,7 @@ using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Components.Models;
@@ -80,15 +81,23 @@ public interface IFlowApiClient
 {
     Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken);
     Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken);
+    Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetFlowAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
     Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken);
     Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken);
     Task<FlowResourceSnapshot> UpdateFlowAsync(string flowId, UpdateFlowRequest request, string etag, CancellationToken cancellationToken);
     Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetFlowVersionsAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
     Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetFlowRunsAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
     Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken);
     Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken);
+    Task<FlowRun> CreateFlowRunAsync(ResourceNamespace @namespace, string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? CreateFlowRunAsync(flowId, request, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
     Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken);
     IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, CancellationToken cancellationToken);
     Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken);
@@ -271,12 +280,15 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
 
     public async Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken)
     {
-        var page = await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?top=100", cancellationToken);
-        return page.Value.Select(item => new FlowSummary(item.Id, item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt)).ToArray();
+        var page = await ApiResponse.ReadAsync<FlowPageResponse>(httpClient, "api/flows?allNamespaces=true&top=100", cancellationToken);
+        return page.Value.Select(item => new FlowSummary(item.Id, item.Name, item.FlowKind.ToString(), item.ActiveVersion ?? item.Version, item.Enabled ? "Active" : "Disabled", 0, 0, item.UpdatedAt) { Namespace = item.Namespace }).ToArray();
     }
 
     public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<FlowResponse>(httpClient, $"api/flows/{Uri.EscapeDataString(flowId)}", cancellationToken);
+        GetFlowAsync(ResourceNamespace.Default, flowId, cancellationToken);
+
+    public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<FlowResponse>(httpClient, FlowPath(@namespace, flowId), cancellationToken);
 
     public async Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken)
     {
@@ -309,14 +321,20 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
             ?? throw new AgentstrationApiException("Flow API returned an empty published version.", Guid.NewGuid().ToString("N"));
     }
 
-    public async Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) =>
-        await ApiResponse.ReadAsync<FlowVersionResponse[]>(httpClient, $"api/flows/{Uri.EscapeDataString(flowId)}/versions", cancellationToken);
+    public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) =>
+        GetFlowVersionsAsync(ResourceNamespace.Default, flowId, cancellationToken);
+
+    public async Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<FlowVersionResponse[]>(httpClient, $"{FlowPath(@namespace, flowId)}/versions", cancellationToken);
 
     public async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken)
     {
         var path = flowId is null ? "api/flowRuns?top=200" : $"api/flows/{Uri.EscapeDataString(flowId)}/runs?top=200";
         return (await ApiResponse.ReadAsync<FlowRunPageResponse>(httpClient, path, cancellationToken)).Value;
     }
+
+    public async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<FlowRunPageResponse>(httpClient, $"{FlowPath(@namespace, flowId)}/runs?top=200", cancellationToken)).Value;
 
     public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<FlowRun>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}", cancellationToken);
@@ -325,12 +343,19 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
         await ApiResponse.ReadAsync<FlowRunEvent[]>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}/eventHistory?afterSequence={Math.Max(0, afterSequence)}", cancellationToken);
 
     public async Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken)
+        => await CreateFlowRunAsync(ResourceNamespace.Default, flowId, request, cancellationToken);
+
+    public async Task<FlowRun> CreateFlowRunAsync(ResourceNamespace @namespace, string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsJsonAsync($"api/flows/{Uri.EscapeDataString(flowId)}/runs", request, JsonOptions, cancellationToken);
+        using var response = await httpClient.PostAsJsonAsync($"{FlowPath(@namespace, flowId)}/runs", request, JsonOptions, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<FlowRun>(JsonOptions, cancellationToken)
             ?? throw new AgentstrationApiException("Flow API returned an empty Run.", Guid.NewGuid().ToString("N"));
     }
+
+    private static string FlowPath(ResourceNamespace @namespace, string flowId) => @namespace.IsDefault
+        ? $"api/flows/{Uri.EscapeDataString(flowId)}"
+        : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/flows/{Uri.EscapeDataString(flowId)}";
 
     public async Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken)
     {

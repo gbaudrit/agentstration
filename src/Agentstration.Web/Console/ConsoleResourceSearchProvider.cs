@@ -61,7 +61,7 @@ public sealed class ConsoleResourceSearchProvider(
                 .. profilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model profile", item.Id, $"/modelprofiles/{Escape(item.Name)}", item.Properties.Status, "◇", $"{item.Name} {item.Properties.Model.Name}")),
                 .. providersTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model provider", item.Id, $"/modelproviders/{Escape(item.Name)}", item.Properties.Status, "⬡", $"{item.Name} {item.Properties.ProviderType}")),
                 .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, $"/runtimeprofiles/{Escape(item.Name)}", "Configured", "◈", $"{item.Name} {item.Properties.RuntimeType}")),
-                .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, $"/flows/{Escape(item.Id)}", item.Status, "⌘", $"{item.Kind} {item.Version}")),
+                .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, item.DetailsUrl, item.Status, "⌘", $"{item.Namespace.Value} {item.Kind} {item.Version}")),
                 .. runtimesTask.Result.Select(item => new ResourceSearchResult(item.Id, "Runtime", item.Id, "/runtime", item.Status, "◉", $"{item.Agent} {item.Location}")),
                 .. executionsTask.Result.Select(item => new ResourceSearchResult(item.Id, "Execution", item.Id, $"/runs/{Escape(item.Id)}", item.Status, "▶", $"{item.Agent} {item.Flow}")),
                 .. workTask.Result.Select(item => new ResourceSearchResult(item.Title, "Task", item.Id.ToString(), $"/tasks/{item.Id}", item.Status, "✓", $"{item.Type} {item.Owner}"))

@@ -8,6 +8,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Console;
@@ -195,6 +196,48 @@ public sealed class ApiClientTests
             (HttpMethod.Get, "/api/flows/review", (string?)null),
             (HttpMethod.Put, "/api/flows/review", "\"v1\""),
             (HttpMethod.Post, "/api/flows/review/versions", (string?)null)
+        }, requests);
+    }
+
+    [TestMethod]
+    public async Task FlowClientListsAndLoadsNamespacedFlows()
+    {
+        var now = new DateTimeOffset(2026, 8, 15, 10, 0, 0, TimeSpan.Zero);
+        var @namespace = new ResourceNamespace("agentstration.who-am-i");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "who-am-i-host"));
+        var summary = new FlowSummaryResponse("who-am-i-game", "Who Am I?", null, FlowKind.Direct, "0.1.0", true, "0.1.0", now) { Namespace = @namespace };
+        var flow = new FlowResponse(summary.Id, summary.Name, null, summary.Version, true, summary.ActiveVersion, definition, new Dictionary<string, string>(), now, now) { Namespace = @namespace };
+        var version = new FlowVersionResponse(summary.Id, summary.Version, null, definition, new Dictionary<string, string>(), now) { Namespace = @namespace };
+        var requests = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add(request.RequestUri!.PathAndQuery);
+            return request.RequestUri.AbsolutePath switch
+            {
+                "/api/flows" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new FlowPageResponse([summary], null)) },
+                "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) },
+                "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new[] { version }) },
+                "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/runs" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new FlowRunPageResponse([], null)) },
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new FlowApiClient(httpClient);
+
+        var listed = await client.GetFlowsAsync(default);
+        _ = await client.GetFlowAsync(@namespace, summary.Id, default);
+        _ = await client.GetFlowVersionsAsync(@namespace, summary.Id, default);
+        _ = await client.GetFlowRunsAsync(@namespace, summary.Id, default);
+
+        Assert.HasCount(1, listed);
+        Assert.AreEqual(@namespace, listed[0].Namespace);
+        Assert.AreEqual("/namespaces/agentstration.who-am-i/flows/who-am-i-game", listed[0].DetailsUrl);
+        CollectionAssert.AreEqual(new[]
+        {
+            "/api/flows?allNamespaces=true&top=100",
+            "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game",
+            "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions",
+            "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/runs?top=200"
         }, requests);
     }
 

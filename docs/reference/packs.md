@@ -102,6 +102,8 @@ Every contained resource uses `apiVersion: agentstration.io/v1`, the declared `k
 
 Unqualified references between contained resources resolve relative to the Pack namespace. A dependency outside the Pack must carry an explicit namespace; shared standalone resources normally use `namespace: default`. A fork changes the Pack coordinate and therefore installs the same local resource names into a different namespace without conflicting with its source.
 
+The Console Flow catalog includes both workspace Flows from the default namespace and installed Pack Flows from their Pack namespaces. Namespaced Flows can be inspected and run from the Console; direct authoring remains limited to default-namespace workspace Flows.
+
 ## Requirements and configuration
 
 A manifest may describe dependencies on another Pack, a platform capability, or an integration/provider capability. Local V1 rejects every non-empty `requirements` list because dependency resolution is not yet available; it does not silently install or configure a sensitive integration. Pack-to-Pack and capability resolution are deferred.

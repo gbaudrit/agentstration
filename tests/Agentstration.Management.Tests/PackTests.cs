@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Flow.Contracts;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
@@ -236,6 +237,18 @@ public sealed class PackTests
         Assert.HasCount(5, installed.Definition.ManagedResources);
         Assert.IsTrue(installed.Definition.ManagedResources.All(resource => resource.Namespace == installed.Definition.Namespace));
         Assert.IsNotNull(installed.Definition.SourceArtifact);
+
+        var defaultFlows = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows?top=100");
+        Assert.IsNotNull(defaultFlows);
+        Assert.IsFalse(defaultFlows.Value.Any(flow => flow.Id == "who-am-i-game"));
+        var allFlows = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows?allNamespaces=true&top=100");
+        Assert.IsNotNull(allFlows);
+        var installedFlow = allFlows.Value.Single(flow => flow.Id == "who-am-i-game");
+        Assert.AreEqual(new ResourceNamespace("agentstration.who-am-i"), installedFlow.Namespace);
+
+        var flowVersions = await client.GetFromJsonAsync<FlowVersionResponse[]>("/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions");
+        Assert.IsNotNull(flowVersions);
+        Assert.IsTrue(flowVersions.Any(version => version.Version == "0.1.0" && version.Namespace == installedFlow.Namespace));
 
         using var flowVersionResponse = await client.GetAsync("/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions/0.1.0");
         Assert.AreEqual(HttpStatusCode.OK, flowVersionResponse.StatusCode, await flowVersionResponse.Content.ReadAsStringAsync());
