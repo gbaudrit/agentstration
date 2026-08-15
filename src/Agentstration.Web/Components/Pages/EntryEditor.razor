@@ -7,7 +7,10 @@
 
 <PageTitle>@(IsNew ? "Create Entry" : displayName) · Agentstration</PageTitle>
 <PageHeader Eyebrow="Workplace Entry" Title="@(IsNew ? "Create Entry" : displayName)" Description="Configure how this Entry appears in Workplace and which executable Flow it resolves to.">
-    <Actions><a class="button-secondary" href="/entries">Back to Entries</a></Actions>
+    <Actions>
+        @if (!IsNew && published is not null) { <a class="button-primary" href="@WorkspaceConfigurationUrl">Use in Workplace</a> }
+        <a class="button-secondary" href="/entries">Back to Entries</a>
+    </Actions>
 </PageHeader>
 
 @if (loading)
@@ -28,7 +31,7 @@ else
 
     @if (!EntryResourceNamespace.IsDefault)
     {
-        <p class="muted">This Entry is managed by its namespaced Pack source. It can be inspected here but not edited independently.</p>
+        <p class="muted">This published Entry is managed by its namespaced Pack source. Its definition is read-only here, but it can be added to a Workplace workspace.</p>
     }
 
     <div class="entry-tabs">
@@ -243,6 +246,7 @@ else
     private IReadOnlyList<WorkplaceWorkspaceDraftResponse> PublishedUsages => workspaces.Where(value => UsageReference(value) is not null).ToArray();
     private IReadOnlyList<WorkplaceWorkspaceDraftResponse> PrimaryUsages => PublishedUsages.Where(value => UsageReference(value)?.Role == WorkspaceEntryRole.Primary).ToArray();
     private string UsageSummary => PublishedUsages.Count == 0 ? "Not used" : string.Join(", ", PublishedUsages.Take(3).Select(value => value.Published!.DisplayName));
+    private string WorkspaceConfigurationUrl => $"/workspaces?entry={Uri.EscapeDataString(EntryIdValue)}&entryNamespace={Uri.EscapeDataString(EntryResourceNamespace.Value)}";
     private string PublishedBindingSummary => publishedBinding is null ? "Not retained" : $"{publishedBinding.Kind} · {FriendlyResourceName(publishedBinding.ResourceId)}";
     private EntryResource PreviewDefinition => new() { Id = new(string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName), Name = string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName, DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Entry preview" : displayName, Description = description, Presentation = Presentation(), ResolvedTarget = published?.ResolvedTarget ?? new("preview", "1.0.0"), Behavior = Behavior() };
 

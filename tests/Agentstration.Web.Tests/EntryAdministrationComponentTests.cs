@@ -86,8 +86,27 @@ public sealed class EntryAdministrationComponentTests
         Assert.HasCount(4, rendered.FindAll("[role='tab']"));
         Assert.IsFalse(rendered.Markup.Contains("entry-tab-definition", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("managed by its namespaced Pack source", StringComparison.Ordinal));
+        var workplaceLink = rendered.FindAll("a").Single(value => value.TextContent.Contains("Use in Workplace", StringComparison.Ordinal));
+        Assert.AreEqual("workspaces?entry=main&entryNamespace=agentstration.daily-life-assistant", workplaceLink.GetAttribute("href")?.TrimStart('/'));
         await rendered.Find("[data-testid='entry-tab-usage']").ClickAsync(new());
         Assert.AreEqual(@namespace, client.RequestedDependencyNamespace);
+    }
+
+    [TestMethod]
+    public async Task WorkspaceEditorPublishesRequestedPackEntryWithItsNamespace()
+    {
+        using var context = new BunitContext();
+        var client = new FakeEntryAdministrationApiClient();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var @namespace = new Agentstration.Resources.ResourceNamespace("agentstration.daily-life-assistant");
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/workspaces?entry=main&entryNamespace=agentstration.daily-life-assistant");
+        var rendered = context.Render<Workspaces>();
+
+        Assert.IsTrue(rendered.Markup.Contains("ready to be added to Personal", StringComparison.Ordinal));
+        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish workspace", StringComparison.Ordinal)).ClickAsync(new());
+
+        Assert.IsNotNull(client.SavedWorkspace);
+        Assert.IsTrue(client.SavedWorkspace.Entries.Any(value => value.EntryResourceId == new EntryId("main", @namespace)));
     }
 
     [TestMethod]
@@ -158,7 +177,11 @@ public sealed class EntryAdministrationComponentTests
             return Task.FromResult<IReadOnlyList<ResourcePickerItem>>([item]);
         }
 
-        public Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<EntryResponse>>([ToResponse(PublishedEntry("primary")), ToResponse(PublishedEntry("secondary"))]);
+        public Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken)
+        {
+            var packNamespace = new Agentstration.Resources.ResourceNamespace("agentstration.daily-life-assistant");
+            return Task.FromResult<IReadOnlyList<EntryResponse>>([ToResponse(PublishedEntry("primary")), ToResponse(PublishedEntry("secondary")), ToResponse(PublishedEntry("main", packNamespace))]);
+        }
 
         public Task<IReadOnlyList<WorkplaceWorkspaceDraftResponse>> GetWorkspacesAsync(CancellationToken cancellationToken)
         {
@@ -182,6 +205,6 @@ public sealed class EntryAdministrationComponentTests
             Presentation = new EntryPresentation { Fields = [new EntryFieldDefinition { Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }] },
             ResolvedTarget = new EntryResolvedTarget(FlowResourceId, "1.0.0")
         };
-        private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt);
+        private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
     }
 }
