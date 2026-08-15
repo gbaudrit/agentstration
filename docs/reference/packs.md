@@ -37,14 +37,14 @@ metadata:
   description: Monitor product prices and notify at a configured threshold.
   categories: [shopping, automation]
   tags: [price, monitoring]
-spec:
+definition:
   resources:
     - flows/price-watch.yaml
     - agents/product-analyzer.yaml
     - entries/price-watch.yaml
 ```
 
-`pack.yaml` is a distribution manifest, not a normal runtime-capable resource. Every path in `spec.resources` resolves inside the archive and points to an ordinary manifest with its own `apiVersion`, `kind`, metadata, and kind-specific body. Absolute paths, parent traversal, links escaping the archive, duplicate canonical resources, and unbounded archive expansion must be rejected.
+`pack.yaml` uses the same `metadata` and typed `definition` envelope as other Agentstration manifests, while remaining a distribution artifact rather than a runtime-capable resource. Every path in `definition.resources` resolves inside the archive and points to an ordinary manifest with its own `apiVersion`, `kind`, metadata, and kind-specific body. Absolute paths, parent traversal, links escaping the archive, duplicate canonical resources, and unbounded archive expansion must be rejected.
 
 ## Versioning
 

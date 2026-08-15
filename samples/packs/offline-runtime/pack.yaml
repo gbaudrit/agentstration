@@ -11,6 +11,6 @@ metadata:
   tags:
     - offline
     - runtime
-spec:
+definition:
   resources:
     - profiles/offline-pack.yaml

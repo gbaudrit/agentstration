@@ -242,11 +242,11 @@ public sealed partial class PackManagementService
         ValidateName(manifest.Metadata.Name, "name");
         if (!SemanticVersionRegex().IsMatch(manifest.Metadata.Version))
             throw new PackValidationException("pack_version_invalid", "Pack version must use Semantic Versioning.");
-        if (manifest.Spec.Requirements.Count > 0)
+        if (manifest.Definition.Requirements.Count > 0)
             throw new PackValidationException("pack_requirements_unsupported", "Pack requirements are declared but dependency resolution is not available in V1.");
-        if (manifest.Spec.Resources.Count != archive.Resources.Count)
+        if (manifest.Definition.Resources.Count != archive.Resources.Count)
             throw new PackValidationException("pack_resource_count_mismatch", "The Pack resource list does not match the validated archive content.");
-        if (!manifest.Spec.Resources.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(archive.Resources.Select(value => value.Path)))
+        if (!manifest.Definition.Resources.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(archive.Resources.Select(value => value.Path)))
             throw new PackValidationException("pack_resource_path_mismatch", "The Pack resource paths do not match the validated archive content.");
         var duplicates = archive.Resources.GroupBy(value => (value.Kind, value.Name)).FirstOrDefault(value => value.Count() > 1);
         if (duplicates is not null)

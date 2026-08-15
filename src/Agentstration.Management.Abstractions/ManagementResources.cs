@@ -36,7 +36,7 @@ public sealed record PackManifest
     public required string ApiVersion { get; init; }
     public required string Kind { get; init; }
     public PackMetadata Metadata { get; init; } = new();
-    public PackSpec Spec { get; init; } = new();
+    public required PackDefinition Definition { get; init; }
 }
 
 public sealed record PackMetadata
@@ -50,7 +50,7 @@ public sealed record PackMetadata
     public IReadOnlyList<string> Tags { get; init; } = [];
 }
 
-public sealed record PackSpec
+public sealed record PackDefinition
 {
     public IReadOnlyList<string> Resources { get; init; } = [];
     public IReadOnlyList<PackRequirement> Requirements { get; init; } = [];
