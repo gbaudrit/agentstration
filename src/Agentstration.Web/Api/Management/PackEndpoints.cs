@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 
 namespace Agentstration.Web.Api.Management;
@@ -47,12 +48,35 @@ internal sealed class PackEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () =>
         {
             ManagementHttp.RequireApiVersion(request);
-            var archive = await ReadArchiveAsync(request, archiveReader, cancellationToken);
-            var installed = await service.InstallAsync(archive, cancellationToken);
+            var (archive, bindings) = await ReadInstallationAsync(request, archiveReader, cancellationToken);
+            var installed = await service.InstallAsync(archive, bindings, cancellationToken);
             response.Headers.ETag = installed.ETag;
             response.Headers.Location = $"/api/packs/{Uri.EscapeDataString(installed.Value.Definition.Publisher)}/{Uri.EscapeDataString(installed.Value.Definition.PackName)}";
             return Results.Created(response.Headers.Location, installed.Value);
         });
+
+    private static async Task<(PackArchive Archive, IReadOnlyList<PackBindingSelection> Bindings)> ReadInstallationAsync(
+        HttpRequest request,
+        IPackArchiveReader archiveReader,
+        CancellationToken cancellationToken)
+    {
+        if (!request.HasFormContentType)
+            return (await ReadArchiveAsync(request, archiveReader, cancellationToken), []);
+
+        if (request.ContentLength is > MaximumArchiveBytes + 1024 * 1024)
+            throw new PackValidationException("pack_archive_size_limit", $"Pack archives cannot exceed {MaximumArchiveBytes} compressed bytes.");
+        var form = await request.ReadFormAsync(cancellationToken);
+        var file = form.Files.GetFile("archive")
+            ?? throw new PackValidationException("pack_archive_missing", "Pack installation requires an archive file.");
+        if (file.Length > MaximumArchiveBytes)
+            throw new PackValidationException("pack_archive_size_limit", $"Pack archives cannot exceed {MaximumArchiveBytes} compressed bytes.");
+        var bindingsJson = form["bindings"].FirstOrDefault();
+        var bindings = string.IsNullOrWhiteSpace(bindingsJson)
+            ? []
+            : ResourceManifestSerializer.FromJson<PackBindingSelection[]>(bindingsJson);
+        await using var stream = file.OpenReadStream();
+        return (await archiveReader.ReadAsync(stream, file.FileName, cancellationToken), bindings);
+    }
 
     private static async Task<PackArchive> ReadArchiveAsync(HttpRequest request, IPackArchiveReader archiveReader, CancellationToken cancellationToken)
     {
@@ -173,10 +197,13 @@ internal sealed class PackEndpoints : IManagementEndpoint
     private static Task<IResult> PreviewBuildAsync(Guid projectId, Guid buildId, PackAuthoringService service, CancellationToken token) =>
         ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.PreviewBuildAsync(projectId, buildId, token)));
 
-    private static Task<IResult> InstallBuildAsync(Guid projectId, Guid buildId, bool? replaceExisting, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
+    private static Task<IResult> InstallBuildAsync(Guid projectId, Guid buildId, bool? replaceExisting, HttpRequest request, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
         ManagementHttp.ExecuteAsync(async () =>
         {
-            var installed = await service.InstallBuildAsync(projectId, buildId, replaceExisting ?? false, token);
+            var command = request.ContentType?.StartsWith("application/json", StringComparison.OrdinalIgnoreCase) == true
+                ? await request.ReadFromJsonAsync<PackBuildInstallRequest>(token) ?? new()
+                : new PackBuildInstallRequest(replaceExisting ?? false);
+            var installed = await service.InstallBuildAsync(projectId, buildId, command.ReplaceExisting, command.Bindings ?? [], token);
             response.Headers.ETag = installed.ETag;
             response.Headers.Location = $"/api/packs/{Uri.EscapeDataString(installed.Value.Definition.Publisher)}/{Uri.EscapeDataString(installed.Value.Definition.PackName)}";
             return Results.Created(response.Headers.Location, installed.Value);

@@ -57,7 +57,8 @@ public sealed record ModelProfileSummaryPropertiesResponse(
 public sealed record ModelProfileSummaryResponse(
     string Id,
     string Name,
-    ModelProfileSummaryPropertiesResponse Properties);
+    ModelProfileSummaryPropertiesResponse Properties,
+    string Namespace = "default");
 
 public sealed record ModelProfileUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
 public sealed record ModelProfileUsagesResponse(IReadOnlyList<ModelProfileUsageResponse> Value, int Count);

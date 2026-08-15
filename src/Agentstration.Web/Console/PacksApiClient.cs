@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Web.Console;
@@ -9,7 +11,7 @@ public interface IPacksClient
     Task<IReadOnlyList<InstalledPackResource>> GetPacksAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<InstalledPackResource>> GetPackAsync(string publisher, string name, CancellationToken cancellationToken);
     Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken);
-    Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken);
     Task UninstallAsync(string publisher, string name, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<InstalledPackResource>> AttachSourceAsync(string publisher, string name, byte[] archive, string fileName, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken);
@@ -19,11 +21,13 @@ public interface IPacksClient
     Task<PackProjectBuildResource> BuildAsync(Guid projectId, CancellationToken cancellationToken);
     Task<IReadOnlyList<PackProjectBuildResource>> GetBuildsAsync(Guid projectId, CancellationToken cancellationToken);
     Task<PackInstallationPreview> PreviewBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken);
-    Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken);
 }
 
 public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     public async Task<IReadOnlyList<InstalledPackResource>> GetPacksAsync(CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<InstalledPackResource[]>(httpClient, "api/packs", cancellationToken);
 
@@ -41,9 +45,9 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
             ?? throw new AgentstrationApiException("Agentstration API returned an empty Pack preview.", Guid.NewGuid().ToString("N"));
     }
 
-    public async Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, CancellationToken cancellationToken)
+    public async Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken)
     {
-        using var response = await SendArchiveAsync("api/packs", archive, fileName, cancellationToken);
+        using var response = await SendInstallationAsync(archive, fileName, bindings, cancellationToken);
         return await ReadInstalledAsync(response, cancellationToken);
     }
 
@@ -109,9 +113,12 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
             ?? throw Empty("Pack build preview");
     }
 
-    public async Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken)
+    public async Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync(BuildActionPath(projectId, buildId, "install", replaceExisting), null, cancellationToken);
+        using var response = await httpClient.PostAsJsonAsync(
+            BuildActionPath(projectId, buildId, "install", replaceExisting),
+            new PackBuildInstallRequest(replaceExisting, bindings),
+            cancellationToken);
         return await ReadInstalledAsync(response, cancellationToken);
     }
 
@@ -122,6 +129,20 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
         message.Content = new ByteArrayContent(archive);
         message.Content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
         return await httpClient.SendAsync(message, cancellationToken);
+    }
+
+    private async Task<HttpResponseMessage> SendInstallationAsync(
+        byte[] archive,
+        string fileName,
+        IReadOnlyList<PackBindingSelection> bindings,
+        CancellationToken cancellationToken)
+    {
+        using var content = new MultipartFormDataContent();
+        var archiveContent = new ByteArrayContent(archive);
+        archiveContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        content.Add(archiveContent, "archive", fileName);
+        content.Add(new StringContent(JsonSerializer.Serialize(bindings, JsonOptions), Encoding.UTF8, "application/json"), "bindings");
+        return await httpClient.PostAsync("api/packs", content, cancellationToken);
     }
 
     private static async Task<ResourceSnapshot<InstalledPackResource>> ReadInstalledAsync(HttpResponseMessage response, CancellationToken cancellationToken)

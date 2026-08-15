@@ -70,3 +70,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 38. [ADR-0038 — Pack Projects retain sources and produce local immutable builds](0038-pack-projects-and-local-builds.md)
 39. [ADR-0039 — Pack manifests use the native definition envelope](0039-pack-manifests-use-the-native-definition-envelope.md)
 40. [ADR-0040 — Secrets and Vaults V1](0040-secrets-and-vaults-v1.md)
+41. [ADR-0041 — Pack resource bindings are logical and installation-scoped](0041-pack-resource-bindings.md)

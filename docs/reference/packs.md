@@ -56,6 +56,11 @@ metadata:
   categories: [shopping, automation]
   tags: [price, monitoring]
 definition:
+  bindings:
+    - name: conversational-model
+      targetKind: modelProfile
+      displayName: Conversational model
+      required: true
   resources:
     - flows/price-watch.yaml
     - agents/product-analyzer.yaml
@@ -109,6 +114,22 @@ The Console Flow catalog includes both workspace Flows from the default namespac
 A manifest may describe dependencies on another Pack, a platform capability, or an integration/provider capability. Local V1 rejects every non-empty `requirements` list because dependency resolution is not yet available; it does not silently install or configure a sensitive integration. Pack-to-Pack and capability resolution are deferred.
 
 An installation may consequently be ready, need configuration, or report a missing requirement. Pack-wide configuration remains distinct from Work input: global limits and connections belong to installation configuration, while values for one Task or Automation belong to that Work instance.
+
+### Resource bindings
+
+A Pack can declare logical bindings for workspace resources that must be selected at installation time. V1 supports `modelProfile` and `secret` targets. A contained resource references a declaration instead of embedding an environment-specific resource name:
+
+```yaml
+definition:
+  modelProfile:
+    binding: conversational-model
+```
+
+The installer shows every binding, the contained resources that use it, and the currently selected workspace target. It then replaces the placeholder with a normal explicit `ResourceReference` before delegating validation and creation to the resource owner.
+
+Selections are stored against the stable `publisher/name` Pack identity and survive uninstall and reinstall. Updating the Pack version therefore reuses available selections. A fork has a different identity: it keeps the logical requirements but asks for its own selections.
+
+A Secret binding stores only the Secret resource namespace and name. Secret values remain in the selected Vault and are never included in the archive, preview, installed Pack, or browser state. Deleting a selected target makes the binding unavailable and blocks a required installation until a replacement is chosen.
 
 ## V1 lifecycle
 

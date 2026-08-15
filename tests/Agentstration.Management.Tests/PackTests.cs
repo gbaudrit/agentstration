@@ -126,6 +126,109 @@ public sealed class PackTests
     }
 
     [TestMethod]
+    public async Task ResourceBindingsResolveReferencesAndSurviveReinstallation()
+    {
+        await using var fixture = await PackFixture.CreateAsync();
+        _ = await fixture.Store.PutAsync(new ModelProfileResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.ModelProfile,
+            Metadata = new ResourceMetadata { Name = "shared-chat" },
+            Definition = new ModelProfileProperties
+            {
+                DisplayName = "Shared Chat",
+                Provider = new("provider"),
+                Model = new ModelSelection { Name = "model" }
+            }
+        }, null, true, default);
+        _ = await fixture.Store.PutAsync(new SecretResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.Secret,
+            Metadata = new ResourceMetadata { Name = "shared-key" },
+            Definition = new SecretProperties
+            {
+                DisplayName = "Shared Key",
+                Vault = new("local"),
+                Key = "shared-key"
+            }
+        }, null, true, default);
+        var handler = new FakeHandler("Consumer", 10, []);
+        var service = new PackManagementService(fixture.Store, [handler], TimeProvider.System);
+        var document = new PackResourceDocument(
+            "resources/consumer.json",
+            ManagementApiVersions.CoreV1,
+            "Consumer",
+            "consumer",
+            JsonSerializer.SerializeToElement(new
+            {
+                apiVersion = ManagementApiVersions.CoreV1,
+                kind = "Consumer",
+                metadata = new { name = "consumer" },
+                definition = new
+                {
+                    modelProfile = new { binding = "chat" },
+                    credential = new { binding = "credential" }
+                }
+            }));
+        var archive = new PackArchive(
+            new PackManifest
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = PackKinds.Pack,
+                Metadata = new PackMetadata { Publisher = "agentstration", Name = "test-pack", Version = "1.0.0" },
+                Definition = new PackDefinition
+                {
+                    Resources = [document.Path],
+                    Bindings =
+                    [
+                        new PackBindingRequirement { Name = "chat", TargetKind = PackBindingTargetKind.ModelProfile },
+                        new PackBindingRequirement { Name = "credential", TargetKind = PackBindingTargetKind.Secret }
+                    ]
+                }
+            },
+            [document],
+            "bindings.pack.zip");
+
+        var initialPreview = await service.PreviewAsync(archive, default);
+        Assert.IsTrue(initialPreview.RequiresConfiguration);
+        Assert.IsTrue(initialPreview.Bindings.All(binding => binding.UsedBy.Single().ResourceName == "consumer"));
+
+        var wrongKind = await Assert.ThrowsExactlyAsync<PackValidationException>(() => service.InstallAsync(
+            archive,
+            [
+                new PackBindingSelection("chat", new("shared-key", @namespace: ResourceNamespace.Default)),
+                new PackBindingSelection("credential", new("shared-key", @namespace: ResourceNamespace.Default))
+            ],
+            default));
+        Assert.AreEqual("pack_binding_unresolved", wrongKind.Code);
+
+        var installed = await service.InstallAsync(
+            archive,
+            [
+                new PackBindingSelection("chat", new("shared-chat", @namespace: ResourceNamespace.Default)),
+                new PackBindingSelection("credential", new("shared-key", @namespace: ResourceNamespace.Default))
+            ],
+            default);
+
+        Assert.HasCount(2, installed.Value.Definition.Bindings);
+        Assert.IsNotNull(handler.LastInstalledManifest);
+        var definition = handler.LastInstalledManifest.Value.GetProperty("definition");
+        Assert.AreEqual("shared-chat", definition.GetProperty("modelProfile").GetProperty("name").GetString());
+        Assert.AreEqual("default", definition.GetProperty("modelProfile").GetProperty("namespace").GetString());
+        Assert.AreEqual("shared-key", definition.GetProperty("credential").GetProperty("name").GetString());
+
+        await service.UninstallAsync(new("agentstration", "test-pack"), default);
+        var restoredPreview = await service.PreviewAsync(archive, default);
+        Assert.IsFalse(restoredPreview.RequiresConfiguration);
+        Assert.IsTrue(restoredPreview.Bindings.All(binding => binding.TargetAvailable));
+
+        var reinstalled = await service.InstallAsync(archive, default);
+        Assert.HasCount(2, reinstalled.Value.Definition.Bindings);
+        Assert.AreEqual("shared-key", reinstalled.Value.Definition.Bindings.Single(binding => binding.Name == "credential").Target.Name);
+    }
+
+    [TestMethod]
     public async Task HttpApiInstallsListsAndUninstallsLocalPackResource()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
@@ -225,11 +328,17 @@ public sealed class PackTests
         Assert.AreEqual(PackPurpose.Sample, preview.Metadata.Purpose);
         Assert.AreEqual(new ResourceNamespace("agentstration.who-am-i"), preview.Namespace);
         Assert.HasCount(5, preview.Resources);
+        Assert.IsTrue(preview.RequiresConfiguration);
+        Assert.AreEqual("conversational-model", preview.Bindings.Single().Name);
+        Assert.HasCount(3, preview.Bindings.Single().UsedBy);
         CollectionAssert.AreEquivalent(
             new[] { ResourceKinds.Agent, ResourceKinds.Agent, ResourceKinds.Agent, ResourceKinds.Flow, ResourceKinds.Entry },
             preview.Resources.Select(resource => resource.Kind).ToArray());
 
-        using var installContent = ArchiveContent(bytes, "who-am-i.pack.zip");
+        using var installContent = InstallationContent(
+            bytes,
+            "who-am-i.pack.zip",
+            [new PackBindingSelection("conversational-model", new("reasoning-default", @namespace: ResourceNamespace.Default))]);
         using var installResponse = await client.PostAsync("/api/packs", installContent);
         Assert.AreEqual(HttpStatusCode.Created, installResponse.StatusCode, await installResponse.Content.ReadAsStringAsync());
         var installed = await installResponse.Content.ReadFromJsonAsync<InstalledPackResource>();
@@ -237,6 +346,7 @@ public sealed class PackTests
         Assert.AreEqual(InstalledPackState.Installed, installed.Definition.State);
         Assert.AreEqual(new ResourceNamespace("agentstration.who-am-i"), installed.Definition.Namespace);
         Assert.HasCount(5, installed.Definition.ManagedResources);
+        Assert.AreEqual("reasoning-default", installed.Definition.Bindings.Single().Target.Name);
         Assert.IsTrue(installed.Definition.ManagedResources.All(resource => resource.Namespace == installed.Definition.Namespace));
         Assert.IsNotNull(installed.Definition.SourceArtifact);
 
@@ -309,12 +419,16 @@ public sealed class PackTests
         var forkPreview = await forkPreviewResponse.Content.ReadFromJsonAsync<PackInstallationPreview>();
         Assert.IsNotNull(forkPreview);
         Assert.IsTrue(forkPreview.CanInstall, "A fork must coexist with its source because its resources use a distinct Pack namespace.");
+        Assert.IsTrue(forkPreview.RequiresConfiguration, "A fork keeps logical requirements but does not inherit the source Pack's local binding configuration.");
         Assert.AreEqual(PackAudience.Personal, forkPreview.Metadata.Audience);
         Assert.AreEqual(PackPurpose.Sample, forkPreview.Metadata.Purpose);
         Assert.AreEqual(new ResourceNamespace("local.who-am-i-lab"), forkPreview.Namespace);
         Assert.IsTrue(forkPreview.Resources.All(resource => !resource.AlreadyExists));
 
-        using var localInstallResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install", null);
+        using var localInstallResponse = await client.PostAsJsonAsync(
+            $"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install",
+            new PackBuildInstallRequest(
+                Bindings: [new PackBindingSelection("conversational-model", new("reasoning-default", @namespace: ResourceNamespace.Default))]));
         Assert.AreEqual(HttpStatusCode.Created, localInstallResponse.StatusCode, await localInstallResponse.Content.ReadAsStringAsync());
         var localInstallation = await localInstallResponse.Content.ReadFromJsonAsync<InstalledPackResource>();
         Assert.IsNotNull(localInstallation);
@@ -426,6 +540,19 @@ public sealed class PackTests
         return content;
     }
 
+    private static MultipartFormDataContent InstallationContent(
+        byte[] bytes,
+        string fileName,
+        IReadOnlyList<PackBindingSelection> bindings)
+    {
+        var content = new MultipartFormDataContent();
+        var archive = new ByteArrayContent(bytes);
+        archive.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        content.Add(archive, "archive", fileName);
+        content.Add(new StringContent(JsonSerializer.Serialize(bindings), Encoding.UTF8, "application/json"), "bindings");
+        return content;
+    }
+
     private static string Manifest(params string[] resources) => $$"""
         apiVersion: agentstration.io/v1
         kind: Pack
@@ -452,6 +579,7 @@ public sealed class PackTests
         public bool FailInstallation { get; init; }
         public bool Exists { get; private set; }
         public string CurrentToken { get; set; } = "v1";
+        public JsonElement? LastInstalledManifest { get; private set; }
 
         public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => Task.FromResult(Exists);
@@ -459,6 +587,7 @@ public sealed class PackTests
         {
             events.Add($"install:{resource.Kind}/{resource.Name}");
             if (FailInstallation) throw new InvalidOperationException("simulated failure");
+            LastInstalledManifest = resource.Manifest.Clone();
             Exists = true;
             return Task.FromResult(new ManagedPackResource { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = CurrentToken });
         }

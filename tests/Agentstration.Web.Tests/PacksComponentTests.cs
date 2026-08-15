@@ -22,6 +22,7 @@ public sealed class PacksComponentTests
         await rendered.FindAll("button").Single(button => button.TextContent.Contains("Inspect", StringComparison.Ordinal)).ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("Managed resources", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("reasoning-default", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("default/openai-production", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -70,6 +71,10 @@ public sealed class PacksComponentTests
                 Source = "starter.pack.zip",
                 InstalledAt = new DateTimeOffset(2026, 8, 13, 8, 0, 0, TimeSpan.Zero),
                 State = InstalledPackState.Installed,
+                Bindings =
+                [
+                    new PackBindingResolution("credential", PackBindingTargetKind.Secret, new("openai-production", @namespace: Agentstration.Resources.ResourceNamespace.Default))
+                ],
                 ManagedResources =
                 [
                     new ManagedPackResource { Kind = ResourceKinds.ModelProfile, Name = "reasoning-default", Path = "profiles/reasoning.yaml", VersionToken = "v1" },
@@ -81,7 +86,7 @@ public sealed class PacksComponentTests
         public Task<IReadOnlyList<InstalledPackResource>> GetPacksAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<InstalledPackResource>>([pack]);
         public Task<ResourceSnapshot<InstalledPackResource>> GetPackAsync(string publisher, string name, CancellationToken cancellationToken) => Task.FromResult(new ResourceSnapshot<InstalledPackResource>(pack, "\"etag-1\""));
         public Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task UninstallAsync(string publisher, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<InstalledPackResource>> AttachSourceAsync(string publisher, string name, byte[] archive, string fileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -91,6 +96,6 @@ public sealed class PacksComponentTests
         public Task<PackProjectBuildResource> BuildAsync(Guid projectId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<PackProjectBuildResource>> GetBuildsAsync(Guid projectId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<PackInstallationPreview> PreviewBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

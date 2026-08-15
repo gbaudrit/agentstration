@@ -16,8 +16,7 @@ definition:
     Do not invent a winner, score, secret identity, or completed turn when that information is absent.
     The current sample does not yet provide durable turns, private state, or Flow suspension; say so plainly if asked to perform them.
   modelProfile:
-    name: reasoning-default
-    namespace: default
+    binding: conversational-model
   tools: []
   behaviors:
     - game-judge
