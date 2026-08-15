@@ -444,6 +444,89 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public async Task SecretsClientWritesValueThroughDedicatedEndpointAndNeverOffersReadValue()
+    {
+        HttpMethod? method = null;
+        string? path = null;
+        string? body = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            method = request.Method;
+            path = request.RequestUri?.AbsolutePath;
+            body = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.NoContent);
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
+        var client = new SecretsApiClient(httpClient);
+
+        await client.SetSecretValueAsync("openai-key", "sensitive-value", default);
+
+        Assert.AreEqual(HttpMethod.Put, method);
+        Assert.AreEqual("/api/secrets/openai-key/value", path);
+        StringAssert.Contains(body, "sensitive-value");
+        Assert.IsFalse(typeof(ISecretsClient).GetMethods().Any(value => value.Name.Contains("GetSecretValue", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task VaultInitializationPostsToDedicatedEndpointWithoutReturningKeyMaterial()
+    {
+        HttpMethod? method = null;
+        string? path = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            method = request.Method;
+            path = request.RequestUri?.AbsolutePath;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new VaultInitializationResponse("initialized", "C:\\data\\secrets\\master.key"))
+            };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
+        var client = new SecretsApiClient(httpClient);
+
+        var response = await client.InitializeVaultAsync("local vault", default);
+
+        Assert.AreEqual(HttpMethod.Post, method);
+        Assert.AreEqual("/api/vaults/local%20vault/initialize", path);
+        Assert.AreEqual("initialized", response.Status);
+        Assert.AreEqual("C:\\data\\secrets\\master.key", response.KeyFilePath);
+        CollectionAssert.AreEquivalent(
+            new[] { nameof(VaultInitializationResponse.Status), nameof(VaultInitializationResponse.KeyFilePath) },
+            typeof(VaultInitializationResponse).GetProperties().Select(property => property.Name).ToArray());
+    }
+
+    [TestMethod]
+    public void ModelProviderEditorPersistsOnlySecretReference()
+    {
+        var editor = new ModelProviderEditorModel
+        {
+            Name = "openai",
+            DisplayName = "OpenAI",
+            ProviderType = "openai",
+            Endpoint = "https://extension.example.test",
+            CredentialId = "default:openai-api-key"
+        };
+
+        var properties = editor.ToProperties();
+
+        Assert.IsNotNull(properties.Credential);
+        Assert.AreEqual("openai-api-key", properties.Credential.Name);
+        Assert.IsNull(properties.Credential.Namespace);
+    }
+
+    [TestMethod]
+    public void SecretEditorBuildsAValidIdentifierFromDisplayName()
+    {
+        Assert.AreEqual("cle-openai-production", SecretEditorModel.IdentifierFromDisplayName("  Clé OpenAI — Production  "));
+        Assert.AreEqual("github-token", SecretEditorModel.IdentifierFromDisplayName("GitHub___Token"));
+        Assert.AreEqual(string.Empty, SecretEditorModel.IdentifierFromDisplayName("---"));
+    }
+
+    [TestMethod]
     public void ModelProfileEditorPersistsOnlyProviderReferenceModelAndSupportedOptions()
     {
         var editor = new ModelProfileEditorModel

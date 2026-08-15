@@ -14,6 +14,7 @@ public sealed record ModelProviderConfiguration
     public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
     public string? EndpointDisplayName { get; init; }
     public IReadOnlyList<string> Capabilities { get; init; } = ["chat"];
+    public ResourceReference? Credential { get; init; }
 }
 
 public sealed record ModelDeploymentConfiguration

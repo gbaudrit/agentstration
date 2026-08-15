@@ -124,7 +124,7 @@
         new("", [new("Overview", "/", "⌂")]),
         new("Build", [new("Agents", "/agents", "◎", "agent"), new("Model profiles", "/modelprofiles", "◇", "model"), new("Flows", "/flows", "⌘", "flow"), new("Entries", "/entries", "↳", "work")]),
         new("Operate", [new("Runtimes", "/runtime", "◉", "runtime"), new("Executions", "/executions", "▶", "execution"), new("Flow runs", "/flow-runs", "▷", "flow"), new("Tasks", "/tasks", "✓", "work"), new("Events", "/events", "≋")]),
-        new("Configure", [new("Workplace setup", "/workspaces", "▦", "work"), new("Packs", "/packs", "▣"), new("Tools", "/tools", "⌁", "tool"), new("Model providers", "/modelproviders", "⬡", "model"), new("Runtime profiles", "/runtimeprofiles", "◈", "runtime")]),
+        new("Configure", [new("Workplace setup", "/workspaces", "▦", "work"), new("Packs", "/packs", "▣"), new("Tools", "/tools", "⌁", "tool"), new("Model providers", "/modelproviders", "⬡", "model"), new("Runtime profiles", "/runtimeprofiles", "◈", "runtime"), new("Secrets", "/secrets", "◆")]),
         new("System", [new("Organization", "/settings/organization", "♙"), new("Settings", "/settings", "⚙")])
     ];
 
@@ -152,6 +152,10 @@
         new("Create model provider", "/modelproviders/new", "+", "Command", "new provider"),
         new("Runtime profiles", "/runtimeprofiles", "◈", "Configure", "runtime configuration"),
         new("Create runtime profile", "/runtimeprofiles/new", "+", "Command", "new runtime profile"),
+        new("Secrets", "/secrets", "◆", "Configure", "credentials Vaults write only"),
+        new("Create Secret", "/secrets/new", "+", "Command", "new credential"),
+        new("Vaults", "/vaults", "▰", "Configure", "secret storage providers"),
+        new("Create Vault", "/vaults/new", "+", "Command", "new secret storage"),
         new("Settings", "/settings", "⚙", "System", "configuration"),
         new("Organization", "/settings/organization", "♙", "System", "tenant organization"),
         new("Organization workspaces", "/settings/organization/workspaces", "▦", "System", "tenant workspaces"),

@@ -22,6 +22,8 @@ public static class ResourceKinds
     public const string ModelProvider = "ModelProvider";
     public const string ModelProfile = "ModelProfile";
     public const string RuntimeProfile = "RuntimeProfile";
+    public const string Secret = "Secret";
+    public const string Vault = "Vault";
     public const string Tool = "Tool";
     public const string ToolProvider = "ToolProvider";
 }
@@ -460,11 +462,41 @@ public sealed record ModelProviderProperties
     public required Uri Endpoint { get; init; }
     public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
     public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public ResourceReference? Credential { get; init; }
 }
 
 public sealed record ModelProviderResource : Resource
 {
     public ModelProviderProperties Definition { get; init; } = null!;
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<SecretType>))]
+public enum SecretType { [JsonStringEnumMemberName("opaque")] Opaque }
+
+public sealed record VaultProperties
+{
+    public required string DisplayName { get; init; }
+    public required string ProviderType { get; init; }
+    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+}
+
+public sealed record VaultResource : Resource
+{
+    public VaultProperties Definition { get; init; } = null!;
+}
+
+public sealed record SecretProperties
+{
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required ResourceReference Vault { get; init; }
+    public required string Key { get; init; }
+    public SecretType SecretType { get; init; } = SecretType.Opaque;
+}
+
+public sealed record SecretResource : Resource
+{
+    public SecretProperties Definition { get; init; } = null!;
 }
 
 public sealed record ModelGenerationOptions

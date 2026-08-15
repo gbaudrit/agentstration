@@ -7,6 +7,7 @@ Reference documentation describes verified contracts and operational details:
 - [Declarative resources](resources/overview.md)
 - [Pack format and lifecycle](packs.md)
 - [Agent resource](resources/agents.md)
+- [Secrets and Vaults](secrets-and-vaults.md)
 - [Configuration](configuration.md)
 - [Detailed current capabilities and examples](current-capabilities.md)
 

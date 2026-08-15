@@ -66,6 +66,7 @@ const sidebars = {
         'reference/resources/overview',
         'reference/packs',
         'reference/resources/agents',
+        'reference/secrets-and-vaults',
         'reference/configuration',
         'reference/current-capabilities',
       ],

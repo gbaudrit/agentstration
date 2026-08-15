@@ -60,6 +60,7 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<RuntimeProfilesApiClient, IRuntimeProfilesClient>(services, configured.ManagementApi);
         AddClient<PacksApiClient, IPacksClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
+        AddSensitiveClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi);
 
@@ -82,20 +83,27 @@ public static class WebConsoleServiceCollectionExtensions
     private static void AddClient(IServiceCollection services, string name, ApiEndpointOptions options) =>
         Configure(services.AddHttpClient(name), options);
 
+    private static void AddSensitiveClient<TImplementation, TContract>(IServiceCollection services, ApiEndpointOptions options)
+        where TImplementation : class, TContract where TContract : class =>
+        ConfigureClient(services.AddHttpClient<TContract, TImplementation>(), options);
+
     private static void Configure(IHttpClientBuilder builder, ApiEndpointOptions options)
     {
-        builder.ConfigureHttpClient(client =>
-        {
-            client.BaseAddress = new Uri(options.BaseAddress, UriKind.Absolute);
-            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-            client.DefaultRequestHeaders.Add("X-Agentstration-Client", "Agentstration.Web");
-        }).AddStandardResilienceHandler(resilience =>
+        ConfigureClient(builder, options).AddStandardResilienceHandler(resilience =>
         {
             resilience.AttemptTimeout.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
             resilience.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(Math.Min(120, options.TimeoutSeconds * 3));
             resilience.Retry.MaxRetryAttempts = 2;
         });
     }
+
+    private static IHttpClientBuilder ConfigureClient(IHttpClientBuilder builder, ApiEndpointOptions options) =>
+        builder.ConfigureHttpClient(client =>
+        {
+            client.BaseAddress = new Uri(options.BaseAddress, UriKind.Absolute);
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            client.DefaultRequestHeaders.Add("X-Agentstration-Client", "Agentstration.Web");
+        });
 
     private static bool Validate(AgentstrationWebOptions options) => ValidateEndpoint(options.WorkApi) && (options.UseSimulatedData ||
         ValidateEndpoint(options.ManagementApi) && ValidateEndpoint(options.RuntimeApi) && ValidateEndpoint(options.FlowApi)) &&
