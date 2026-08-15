@@ -27,6 +27,7 @@ public static class WorkplaceEndpoints
         endpoints.MapPut("/api/namespaces/{namespace}/management/entries/{entryName}", PutNamespacedEntryDraftAsync);
         endpoints.MapPost("/api/namespaces/{namespace}/management/entries/{entryName}/publish", PublishNamespacedEntryDraftAsync);
         endpoints.MapGet("/api/management/entries/{entryName}/dependencies", GetEntryDependenciesAsync);
+        endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}/dependencies", GetNamespacedEntryDependenciesAsync);
         endpoints.MapGet("/api/resources", ListResourcesAsync);
         endpoints.MapGet("/api/management/workspaces", ListWorkspaceDraftsAsync);
         endpoints.MapGet("/api/management/workspaces/{workspaceName}", GetWorkspaceDraftAsync);
@@ -35,6 +36,7 @@ public static class WorkplaceEndpoints
         endpoints.MapPost("/api/entries/{entryName}/interactions", SubmitEntryCompatibilityAsync);
         var workspaces = endpoints.MapGroup("/api/workspaces/{workspaceName}");
         workspaces.MapPost("/entries/{entryName}/interactions", SubmitEntryAsync);
+        workspaces.MapPost("/namespaces/{namespace}/entries/{entryName}/interactions", SubmitNamespacedEntryAsync);
         workspaces.MapGet("/interactions", ListInteractionsAsync);
         workspaces.MapGet("/interactions/{interactionId:guid}", GetInteractionAsync);
         workspaces.MapGet("/interactions/{interactionId:guid}/messages", GetMessagesAsync);
@@ -62,11 +64,12 @@ public static class WorkplaceEndpoints
     private static async Task<IResult> ListEntriesAsync(WorkplaceService service, CancellationToken token) => Results.Ok((await service.ListEntriesAsync(token)).Select(ToResponse));
     private static Task<IResult> GetEntryAsync(string entryName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetEntryAsync(EntryResourceId(entryName), token))));
     private static Task<IResult> GetNamespacedEntryAsync(string @namespace, string entryName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetEntryAsync(NamespacedEntryId(@namespace, entryName), token))));
-    private static Task<IResult> SubmitEntryCompatibilityAsync(string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(ParseWorkspaceId(request.WorkspaceId), entryName, request, service, token);
-    private static Task<IResult> SubmitEntryAsync(string workspaceName, string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(WorkspaceId(workspaceName), entryName, request, service, token);
-    private static Task<IResult> SubmitCoreAsync(WorkplaceWorkspaceId workspaceId, string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> SubmitEntryCompatibilityAsync(string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(ParseWorkspaceId(request.WorkspaceId), EntryResourceId(entryName), request, service, token);
+    private static Task<IResult> SubmitEntryAsync(string workspaceName, string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(WorkspaceId(workspaceName), EntryResourceId(entryName), request, service, token);
+    private static Task<IResult> SubmitNamespacedEntryAsync(string workspaceName, string @namespace, string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(WorkspaceId(workspaceName), NamespacedEntryId(@namespace, entryName), request, service, token);
+    private static Task<IResult> SubmitCoreAsync(WorkplaceWorkspaceId workspaceId, EntryId entryId, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var attachments = request.Attachments?.Select(WorkEndpoints.ToWorkAttachment).ToArray(); var result = await service.SubmitAsync(new SubmitEntryCommand(workspaceId, EntryResourceId(entryName), request.Values, attachments), token);
+        var attachments = request.Attachments?.Select(WorkEndpoints.ToWorkAttachment).ToArray(); var result = await service.SubmitAsync(new SubmitEntryCommand(workspaceId, entryId, request.Values, attachments), token);
         return Results.Created($"/api/workspaces/{WorkspaceName(workspaceId)}/interactions/{result.Interaction.Id}", new EntrySubmissionResponse(ToResponse(result.Interaction), result.Action, result.Task is null ? null : ToResponse(result.Task)));
     });
     private static Task<IResult> GetInteractionAsync(string workspaceName, Guid interactionId, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetInteractionAsync(WorkspaceId(workspaceName), new(interactionId), token))));
@@ -157,6 +160,8 @@ public static class WorkplaceEndpoints
 
     private static Task<IResult> GetEntryDependenciesAsync(string entryName, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
         Results.Ok((await service.GetDependenciesAsync(EntryResourceId(entryName), token)).Select(value => new EntryDependencyResponse(value.ResourceId, value.ResourceType, value.Relationship))));
+    private static Task<IResult> GetNamespacedEntryDependenciesAsync(string @namespace, string entryName, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
+        Results.Ok((await service.GetDependenciesAsync(NamespacedEntryId(@namespace, entryName), token)).Select(value => new EntryDependencyResponse(value.ResourceId, value.ResourceType, value.Relationship))));
 
     private static async Task<IResult> ListResourcesAsync(string kind, AgentManagementService agents, FlowService flows, CancellationToken token)
     {

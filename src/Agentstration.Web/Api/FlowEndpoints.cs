@@ -39,7 +39,10 @@ public static class FlowEndpoints
         namespaced.MapGet("/{id}", GetNamespacedAsync);
         namespaced.MapPut("/{id}", UpdateNamespacedAsync);
         namespaced.MapDelete("/{id}", DeleteNamespacedAsync);
+        namespaced.MapGet("/{id}/versions", ListNamespacedVersionsAsync);
         namespaced.MapGet("/{id}/versions/{version}", GetNamespacedVersionAsync);
+        namespaced.MapPost("/{id}/runs", CreateNamespacedRunAsync);
+        namespaced.MapGet("/{id}/runs", ListNamespacedFlowRunsAsync);
         var runs = endpoints.MapGroup("/api/flowRuns");
         runs.MapGet("/", ListRunsAsync);
         runs.MapGet("/{runId}", GetRunAsync);
@@ -98,19 +101,25 @@ public static class FlowEndpoints
         return Results.Ok(ToVersion(stored.Value));
     });
 
-    private static Task<IResult> ListAsync(int? skip, int? top, FlowService service, CancellationToken token) =>
-        ListCoreAsync(ResourceNamespace.Default, skip, top, service, token);
+    private static Task<IResult> ListAsync(bool? allNamespaces, int? skip, int? top, FlowService service, CancellationToken token) =>
+        ListCoreAsync(allNamespaces is true ? null : ResourceNamespace.Default, skip, top, service, token);
 
     private static Task<IResult> ListNamespacedAsync(string @namespace, int? skip, int? top, FlowService service, CancellationToken token) =>
         ListCoreAsync(ResourceNamespace.Parse(@namespace), skip, top, service, token);
 
-    private static Task<IResult> ListCoreAsync(ResourceNamespace @namespace, int? skip, int? top, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> ListCoreAsync(ResourceNamespace? @namespace, int? skip, int? top, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
     {
         var actualSkip = Math.Max(0, skip ?? 0);
         var actualTop = Math.Clamp(top ?? 50, 1, 200);
-        var page = await service.ListAsync(@namespace, actualSkip, actualTop, token);
-        var prefix = @namespace.IsDefault ? "/api/flows" : $"/api/namespaces/{@namespace.Value}/flows";
-        var next = page.HasMore ? $"{prefix}?skip={actualSkip + actualTop}&top={actualTop}" : null;
+        var page = @namespace is null
+            ? await service.ListAllAsync(actualSkip, actualTop, token)
+            : await service.ListAsync(@namespace.Value, actualSkip, actualTop, token);
+        var prefix = @namespace is null
+            ? "/api/flows?allNamespaces=true&"
+            : @namespace.Value.IsDefault
+                ? "/api/flows?"
+                : $"/api/namespaces/{@namespace.Value.Value}/flows?";
+        var next = page.HasMore ? $"{prefix}skip={actualSkip + actualTop}&top={actualTop}" : null;
         return Results.Ok(new FlowPageResponse(page.Items.Select(item => ToSummary(item.Value)).ToArray(), next));
     });
 
@@ -157,9 +166,22 @@ public static class FlowEndpoints
         return Results.Ok((await service.ListVersionsAsync(new FlowId(id), token)).Select(item => ToVersion(item.Value)));
     });
 
-    private static Task<IResult> CreateRunAsync(string id, CreateFlowRunRequest body, HttpResponse response, FlowRunService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> ListNamespacedVersionsAsync(string @namespace, string id, FlowService service, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var stored = await service.CreateAsync(new FlowId(id), body.Version, body.DeploymentResourceId, body.Trigger, body.StartedBy, body.CorrelationId, body.Input, token);
+        var flowId = new FlowId(id, ResourceNamespace.Parse(@namespace));
+        _ = await service.GetAsync(flowId, token) ?? throw new FlowNotFoundException(flowId);
+        return Results.Ok((await service.ListVersionsAsync(flowId, token)).Select(item => ToVersion(item.Value)));
+    });
+
+    private static Task<IResult> CreateRunAsync(string id, CreateFlowRunRequest body, HttpResponse response, FlowRunService service, CancellationToken token) =>
+        CreateRunCoreAsync(new FlowId(id), body, response, service, token);
+
+    private static Task<IResult> CreateNamespacedRunAsync(string @namespace, string id, CreateFlowRunRequest body, HttpResponse response, FlowRunService service, CancellationToken token) =>
+        CreateRunCoreAsync(new FlowId(id, ResourceNamespace.Parse(@namespace)), body, response, service, token);
+
+    private static Task<IResult> CreateRunCoreAsync(FlowId flowId, CreateFlowRunRequest body, HttpResponse response, FlowRunService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var stored = await service.CreateAsync(flowId, body.Version, body.DeploymentResourceId, body.Trigger, body.StartedBy, body.CorrelationId, body.Input, token);
         response.Headers.Location = $"/api/flowRuns/{stored.Value.Id}";
         response.Headers.ETag = stored.ETag;
         return Results.Accepted($"/api/flowRuns/{stored.Value.Id}", stored.Value);
@@ -167,6 +189,9 @@ public static class FlowEndpoints
 
     private static Task<IResult> ListFlowRunsAsync(string id, FlowRunStatus? status, int? skip, int? top, FlowRunService service, CancellationToken token) =>
         ListRunsCoreAsync(new FlowId(id), status, skip, top, service, token);
+
+    private static Task<IResult> ListNamespacedFlowRunsAsync(string @namespace, string id, FlowRunStatus? status, int? skip, int? top, FlowRunService service, CancellationToken token) =>
+        ListRunsCoreAsync(new FlowId(id, ResourceNamespace.Parse(@namespace)), status, skip, top, service, token);
 
     private static Task<IResult> ListRunsAsync(string? flowId, FlowRunStatus? status, int? skip, int? top, FlowRunService service, CancellationToken token) =>
         ListRunsCoreAsync(string.IsNullOrWhiteSpace(flowId) ? null : new FlowId(flowId), status, skip, top, service, token);

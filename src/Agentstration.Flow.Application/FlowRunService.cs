@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Flow.Application;
 
@@ -330,7 +331,7 @@ public sealed class FlowRunService(
         FlowOrchestrationResult? result = null;
         var request = new FlowOrchestrationExecutionRequest(
             stored.Value.Id,
-            definition,
+            QualifyOrchestrationTargets(definition, stored.Value.FlowId.Namespace),
             stored.Value.Input,
             stored.Value.CorrelationId!);
 
@@ -383,6 +384,21 @@ public sealed class FlowRunService(
         }, stoppingToken);
         RecordCompletion(stored.Value.CreatedAt, now, stored.Value.DefinitionState);
         await EmitAsync(stored.Value.Id, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
+    }
+
+    private static OrchestrationFlowDefinition QualifyOrchestrationTargets(
+        OrchestrationFlowDefinition definition,
+        ResourceNamespace ownerNamespace)
+    {
+        var participants = definition.Participants
+            .Select(participant => participant.Namespace is null
+                ? participant with { Namespace = ownerNamespace }
+                : participant)
+            .ToArray();
+        var pattern = definition.Pattern is MagenticOrchestrationPattern magentic && magentic.Manager.Namespace is null
+            ? magentic with { Manager = magentic.Manager with { Namespace = ownerNamespace } }
+            : definition.Pattern;
+        return definition with { Participants = participants, Pattern = pattern };
     }
 
     private async Task<StoredFlowRun> FinishParticipantStepAsync(
@@ -476,6 +492,8 @@ public sealed class FlowRunService(
             else if (agentResult is not null) stored = await FinishAgentStepAsync(stored, agentResult, runToken, transition?.Id, step.Name);
             else stored = await FinishGraphStepAsync(stored, step.Name, output, transition?.Id, runToken);
             if (step is OutputFlowStepDefinition) break;
+            if (transition is null && stepError is not null)
+                throw new FlowValidationException(stepError.Code, stepError.Details ?? stepError.Message);
             if (transition is null) throw new FlowValidationException("flow_transition_missing", $"No '{eventName}' transition leaves step '{step.Name}'.");
             currentName = transition.ToStep;
         }

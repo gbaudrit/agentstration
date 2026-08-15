@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Management.Core;
@@ -8,19 +9,22 @@ public sealed class ControlPlaneRuntimeAgentResolver(
     IAgentResourceQueries queries) : IRuntimeAgentResolver
 {
     public async Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, CancellationToken cancellationToken)
+        => await ResolveLatestAsync(resourceId, ResourceNamespace.Default, cancellationToken);
+
+    public async Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, ResourceNamespace @namespace, CancellationToken cancellationToken)
     {
-        var agent = await store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, resourceId), cancellationToken)
-            ?? throw new RuntimeAgentResolutionException("agent_not_found", $"Agent '{resourceId}' was not found.");
-        return await ResolveAsync(new RuntimeAgentReference(resourceId, agent.Value.Generation), cancellationToken);
+        var agent = await store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, resourceId, @namespace), cancellationToken)
+            ?? throw new RuntimeAgentResolutionException("agent_not_found", $"Agent '{@namespace}/{resourceId}' was not found.");
+        return await ResolveAsync(new RuntimeAgentReference(resourceId, agent.Value.Generation) { Namespace = @namespace }, cancellationToken);
     }
 
     public async Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken)
     {
-        var agent = await store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, reference.ResourceId), cancellationToken)
-            ?? throw new RuntimeAgentResolutionException("agent_not_found", $"Agent '{reference.ResourceId}' was not found.");
+        var agent = await store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, reference.ResourceId, reference.Namespace), cancellationToken)
+            ?? throw new RuntimeAgentResolutionException("agent_not_found", $"Agent '{reference.Namespace}/{reference.ResourceId}' was not found.");
         var revision = await queries.FindRevisionAsync(agent.Value.Uid, reference.Version, cancellationToken)
             ?? throw new RuntimeAgentResolutionException("agent_version_not_found", $"Agent version '{reference.Version}' does not exist.");
-        var deployment = await queries.FindDeploymentByRevisionAsync(revision.Value.Metadata.Name, cancellationToken)
+        var deployment = await queries.FindDeploymentByRevisionAsync(reference.Namespace, revision.Value.Metadata.Name, cancellationToken)
             ?? throw new RuntimeAgentResolutionException("deployment_not_found", $"Agent generation '{reference.Version}' has no deployment.");
         var ready = deployment.Value.DesiredState == DesiredAgentState.Running
             && deployment.Value.OperationalState == OperationalState.Ready;

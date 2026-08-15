@@ -102,6 +102,8 @@ Every contained resource uses `apiVersion: agentstration.io/v1`, the declared `k
 
 Unqualified references between contained resources resolve relative to the Pack namespace. A dependency outside the Pack must carry an explicit namespace; shared standalone resources normally use `namespace: default`. A fork changes the Pack coordinate and therefore installs the same local resource names into a different namespace without conflicting with its source.
 
+The Console Flow catalog includes both workspace Flows from the default namespace and installed Pack Flows from their Pack namespaces. Namespaced Flows can be inspected and run from the Console; direct authoring remains limited to default-namespace workspace Flows.
+
 ## Requirements and configuration
 
 A manifest may describe dependencies on another Pack, a platform capability, or an integration/provider capability. Local V1 rejects every non-empty `requirements` list because dependency resolution is not yet available; it does not silently install or configure a sensitive integration. Pack-to-Pack and capability resolution are deferred.
@@ -161,7 +163,7 @@ Invoke-RestMethod -Method Delete http://localhost:5100/api/packs/agentstration/o
 
 Installation refuses to replace an existing resource in the same namespace. It records progress after every applied resource and compensates in reverse order on failure. Uninstall compares each current ETag or module version token with its installation evidence; modified resources are preserved and the Pack becomes `degraded`.
 
-The repository also contains `samples/packs/who-am-i`, a five-resource distribution smoke test with three role-specific Agents, a Direct Flow, and a conversational Entry. It deliberately documents rather than conceals the current execution gaps: Agent deployment, Workspace exposure, multi-agent turns, private state, and generic human-input suspension are not supplied by Pack V1.
+The repository also contains `samples/packs/who-am-i`, a five-resource distribution smoke test with three role-specific Agents, a Direct Flow, and a conversational Entry. Namespaced Agents and Flows appear in their global Console catalogs. The first local Flow run prepares the referenced Agent generation in the same namespace, so installing a Pack does not need to create mutable runtime deployments eagerly. The sample deliberately documents rather than conceals the remaining execution gaps: Workspace exposure, multi-agent turns, private state, and generic human-input suspension are not supplied by Pack V1.
 
 ## Distribution and trust
 

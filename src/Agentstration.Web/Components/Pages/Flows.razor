@@ -11,8 +11,8 @@ else if (items.Count == 0) { <EmptyState Title="No Flow definitions" Message="Cr
 else
 {
     <DataGrid TItem="FlowSummary" Items="items">
-        <Header><tr><th>Flow</th><th>Kind</th><th>Version</th><th>Status</th><th>Updated</th><th></th></tr></Header>
-        <Row Context="item"><tr><td><strong>@item.Name</strong><br/><code>@item.Id</code></td><td>@item.Kind</td><td>@item.Version</td><td><StatusBadge Text="@item.Status" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td><a class="text-button" href="/flows/@Uri.EscapeDataString(item.Id)">Open</a></td></tr></Row>
+        <Header><tr><th>Flow</th><th>Namespace</th><th>Kind</th><th>Version</th><th>Status</th><th>Updated</th><th></th></tr></Header>
+        <Row Context="item"><tr><td><strong>@item.Name</strong><br/><code>@item.Id</code></td><td><code>@item.Namespace.Value</code></td><td>@item.Kind</td><td>@item.Version</td><td><StatusBadge Text="@item.Status" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td><a class="text-button" href="@item.DetailsUrl">Open</a></td></tr></Row>
     </DataGrid>
 }
 @code {

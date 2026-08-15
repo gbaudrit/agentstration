@@ -1,6 +1,6 @@
+using Agentstration.Management.Abstractions;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
-using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Web.Console;
 
@@ -66,7 +66,7 @@ public sealed class ConsoleResourceSearchProvider(
                 .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, $"/runtimeprofiles/{Escape(item.Name)}", "Configured", "◈", $"{item.Name} {item.Properties.RuntimeType}")),
                 .. secretsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Secret", item.Resource.Address.ToString(), $"/secrets/{Escape(item.Resource.Name)}", item.ValueStatus, "◆", $"{item.Resource.Name} {item.Resource.Definition.Vault.Name}")),
                 .. vaultsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Vault", item.Resource.Address.ToString(), $"/vaults/{Escape(item.Resource.Name)}", item.Status, "▰", $"{item.Resource.Name} {item.Resource.Definition.ProviderType}")),
-                .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, $"/flows/{Escape(item.Id)}", item.Status, "⌘", $"{item.Kind} {item.Version}")),
+                .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, item.DetailsUrl, item.Status, "⌘", $"{item.Namespace.Value} {item.Kind} {item.Version}")),
                 .. runtimesTask.Result.Select(item => new ResourceSearchResult(item.Id, "Runtime", item.Id, "/runtime", item.Status, "◉", $"{item.Agent} {item.Location}")),
                 .. executionsTask.Result.Select(item => new ResourceSearchResult(item.Id, "Execution", item.Id, $"/runs/{Escape(item.Id)}", item.Status, "▶", $"{item.Agent} {item.Flow}")),
                 .. workTask.Result.Select(item => new ResourceSearchResult(item.Title, "Task", item.Id.ToString(), $"/tasks/{item.Id}", item.Status, "✓", $"{item.Type} {item.Owner}"))
@@ -93,7 +93,7 @@ public sealed class ConsoleResourceSearchProvider(
 
     private static ResourceSearchResult ToResult(AgentSummary item)
     {
-        return new ResourceSearchResult(item.Name, "Agent", item.Id, $"/agents/{Escape(item.Id)}", StatusPresentation.Label(item.Status), "◎", $"{item.Id} {item.ModelProfile}");
+        return new ResourceSearchResult(item.Name, "Agent", item.Id, item.DetailsUrl, StatusPresentation.Label(item.Status), "◎", $"{item.Namespace.Value} {item.Id} {item.ModelProfile}");
     }
 
     private static bool Matches(ResourceSearchResult item, string query) =>

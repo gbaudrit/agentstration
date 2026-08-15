@@ -34,6 +34,7 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
     public Task<StoredFlow?> GetAsync(FlowId id, CancellationToken cancellationToken) => repository.GetAsync(id, cancellationToken);
     public Task<FlowPage> ListAsync(int skip, int take, CancellationToken cancellationToken) => ListAsync(ResourceNamespace.Default, skip, take, cancellationToken);
     public Task<FlowPage> ListAsync(ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken) => repository.ListAsync(@namespace, skip, take, cancellationToken);
+    public Task<FlowPage> ListAllAsync(int skip, int take, CancellationToken cancellationToken) => repository.ListAsync(skip, take, cancellationToken);
 
     public async Task<StoredFlow> UpdateAsync(FlowId id, UpdateFlowCommand command, string expectedETag, CancellationToken cancellationToken)
     {

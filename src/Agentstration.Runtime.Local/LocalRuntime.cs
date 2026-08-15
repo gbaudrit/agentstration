@@ -154,7 +154,7 @@ public sealed class LocalAgentDeploymentReconciler(
         }
 
         if (current is not null) await provisioner.DeprovisionAsync(deployment, cancellationToken);
-        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, deployment.RevisionName), cancellationToken);
+        var revision = await store.GetAsync<AgentRevision>(new ResourceKey(ResourceKinds.AgentRevision, deployment.RevisionName, deployment.AgentNamespace), cancellationToken);
         if (revision is null) return Failed(deployment, $"Revision '{deployment.RevisionName}' does not exist.");
         var result = await provisioner.ProvisionAsync(revision.Value, deployment, cancellationToken);
         if (!result.Succeeded) return Failed(deployment, result.Error ?? "Provisioning failed.");

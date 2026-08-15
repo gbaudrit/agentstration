@@ -1,4 +1,5 @@
 @page "/workspaces"
+@using Agentstration.Resources
 @rendermode InteractiveServer
 @inject IEntryAdministrationApiClient Client
 
@@ -25,17 +26,17 @@ else
         <div class="workspace-entry-list">
             @foreach (var entry in entries)
             {
-                var configured = composition.FirstOrDefault(value => value.EntryResourceId.Value == entry.Id);
+                var configured = composition.FirstOrDefault(value => value.EntryResourceId == EntryId(entry));
                 <article class="workspace-entry-row @(configured is null ? "excluded" : null)">
                     <label class="workspace-entry-toggle">
                         <input type="checkbox" checked="@(configured is not null)" @onchange="args => ToggleEntry(entry, args)" />
-                        <span><strong>@entry.DisplayName</strong><small>Entry v@entry.Version · Flow @entry.ResolvedTarget.Version</small></span>
+                        <span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · Entry v@entry.Version · Flow @entry.ResolvedTarget.Version</small></span>
                     </label>
                     @if (configured is not null)
                     {
                         <div class="workspace-entry-config">
-                            <label><span>Role</span><select data-testid="workspace-entry-role" value="@configured.Role" @onchange="args => ChangeRole(entry.Id, args)"><option value="Primary">Primary</option><option value="Featured">Featured</option><option value="Standard">Standard</option></select></label>
-                            <label><span>Order</span><input type="number" min="0" step="10" value="@configured.Order" @onchange="args => ChangeOrder(entry.Id, args)" /></label>
+                            <label><span>Role</span><select data-testid="workspace-entry-role" value="@configured.Role" @onchange="args => ChangeRole(entry, args)"><option value="Primary">Primary</option><option value="Featured">Featured</option><option value="Standard">Standard</option></select></label>
+                            <label><span>Order</span><input type="number" min="0" step="10" value="@configured.Order" @onchange="args => ChangeOrder(entry, args)" /></label>
                         </div>
                     }
                     else
@@ -51,6 +52,8 @@ else
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "entry")] public string? RequestedEntryName { get; set; }
+    [SupplyParameterFromQuery(Name = "entryNamespace")] public string? RequestedEntryNamespace { get; set; }
     private bool loading = true, busy, error;
     private string selectedName = "", message = "";
     private IReadOnlyList<WorkplaceWorkspaceDraftResponse> workspaces = [];
@@ -62,12 +65,26 @@ else
     {
         workspaces = await Client.GetWorkspacesAsync(default); entries = await Client.GetPublishedEntriesAsync(default);
         selected = workspaces.FirstOrDefault(); selectedName = selected?.Value.Name ?? ""; composition = selected?.Value.Entries.ToList() ?? []; loading = false;
+        PreselectRequestedEntry();
     }
     private void WorkspaceChanged(ChangeEventArgs args) { selectedName = args.Value?.ToString() ?? ""; selected = workspaces.First(value => value.Value.Name == selectedName); composition = selected.Value.Entries.ToList(); }
-    private void ToggleEntry(EntryResponse entry, ChangeEventArgs args) { if (args.Value is true) composition.Add(new WorkspaceEntryReference { EntryResourceId = new(entry.Id), Role = composition.Count == 0 ? WorkspaceEntryRole.Primary : WorkspaceEntryRole.Standard, Order = composition.Count * 10 }); else composition.RemoveAll(value => value.EntryResourceId.Value == entry.Id); }
-    private void ChangeRole(string entryId, ChangeEventArgs args) { var role = Enum.Parse<WorkspaceEntryRole>(args.Value?.ToString() ?? "Standard"); if (role == WorkspaceEntryRole.Primary) for (var i = 0; i < composition.Count; i++) if (composition[i].Role == WorkspaceEntryRole.Primary) composition[i] = composition[i] with { Role = WorkspaceEntryRole.Standard }; Replace(entryId, value => value with { Role = role }); }
-    private void ChangeOrder(string entryId, ChangeEventArgs args) { _ = int.TryParse(args.Value?.ToString(), out var order); Replace(entryId, value => value with { Order = order }); }
-    private void Replace(string entryId, Func<WorkspaceEntryReference, WorkspaceEntryReference> update) { var index = composition.FindIndex(value => value.EntryResourceId.Value == entryId); if (index >= 0) composition[index] = update(composition[index]); }
+    private void ToggleEntry(EntryResponse entry, ChangeEventArgs args) { var entryId = EntryId(entry); if (args.Value is true && composition.All(value => value.EntryResourceId != entryId)) composition.Add(new WorkspaceEntryReference { EntryResourceId = entryId, Role = composition.Count == 0 ? WorkspaceEntryRole.Primary : WorkspaceEntryRole.Standard, Order = composition.Count * 10 }); else if (args.Value is not true) composition.RemoveAll(value => value.EntryResourceId == entryId); }
+    private void ChangeRole(EntryResponse entry, ChangeEventArgs args) { var role = Enum.Parse<WorkspaceEntryRole>(args.Value?.ToString() ?? "Standard"); if (role == WorkspaceEntryRole.Primary) for (var i = 0; i < composition.Count; i++) if (composition[i].Role == WorkspaceEntryRole.Primary) composition[i] = composition[i] with { Role = WorkspaceEntryRole.Standard }; Replace(EntryId(entry), value => value with { Role = role }); }
+    private void ChangeOrder(EntryResponse entry, ChangeEventArgs args) { _ = int.TryParse(args.Value?.ToString(), out var order); Replace(EntryId(entry), value => value with { Order = order }); }
+    private void Replace(EntryId entryId, Func<WorkspaceEntryReference, WorkspaceEntryReference> update) { var index = composition.FindIndex(value => value.EntryResourceId == entryId); if (index >= 0) composition[index] = update(composition[index]); }
+    private void PreselectRequestedEntry()
+    {
+        if (selected is null || string.IsNullOrWhiteSpace(RequestedEntryName)) return;
+        var requestedNamespace = string.IsNullOrWhiteSpace(RequestedEntryNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(RequestedEntryNamespace);
+        var entry = entries.FirstOrDefault(value => value.Id == RequestedEntryName && value.Namespace == requestedNamespace);
+        if (entry is null) { error = true; message = "The requested published Entry is not available for Workplace."; return; }
+        var entryId = EntryId(entry);
+        if (composition.Any(value => value.EntryResourceId == entryId)) { message = $"{entry.DisplayName} is already included in {selected.Value.DisplayName}."; return; }
+        composition.Add(new WorkspaceEntryReference { EntryResourceId = entryId, Role = composition.Count == 0 ? WorkspaceEntryRole.Primary : WorkspaceEntryRole.Standard, Order = composition.Count * 10 });
+        message = $"{entry.DisplayName} is ready to be added to {selected.Value.DisplayName}. Publish the workspace to make it available in Workplace.";
+    }
+    private static EntryId EntryId(EntryResponse entry) => new(entry.Id, entry.Namespace);
+    private static string EntryScope(EntryResponse entry) => entry.Namespace.IsDefault ? "Local Entry" : $"Pack · {entry.Namespace.Value}";
     private WorkplaceWorkspaceDraft Draft() => selected!.Value with { Entries = composition.OrderBy(value => value.Order).ToArray() };
     private async Task SaveAsync() => await ExecuteAsync(async () => { var saved = await Client.SaveWorkspaceAsync(Draft(), default); selected = selected! with { Value = saved }; message = $"Workspace draft revision {saved.Revision} saved. Workplace is unchanged."; });
     private async Task PublishAsync() => await ExecuteAsync(async () => { var saved = await Client.SaveWorkspaceAsync(Draft(), default); var published = await Client.PublishWorkspaceAsync(saved.Name, default); selected = new(saved, published); message = $"Workspace v{published.Version} published with {published.Entries.Count} Entries."; });
