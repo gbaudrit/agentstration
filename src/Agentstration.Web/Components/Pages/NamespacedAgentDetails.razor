@@ -1,0 +1,54 @@
+@page "/namespaces/{AgentNamespace}/agents/{Name}"
+@using Agentstration.Resources
+@implements IDisposable
+@inject IManagementApiClient Client
+
+<PageTitle>@(agent?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+
+@if (loading)
+{
+    <LoadingState Message="Loading Agent resource…" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId" />
+}
+else if (agent is not null)
+{
+    <ResourceHeader ResourceType="Agent" Domain="agent" Icon="◎" Name="@agent.Definition.DisplayName" Description="@agent.Definition.Description" StatusText="@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())" Status="@StatusPresentation.Tone(agent.Status.ProvisioningState.ToString())">
+        <Metadata><span><code>@AgentResourceNamespace.Value/@agent.Metadata.Name</code></span><span>Generation @agent.Generation</span></Metadata>
+        <Actions><a class="button-secondary" href="/agents">Back to agents</a></Actions>
+    </ResourceHeader>
+    <p class="muted">This Agent is managed by its namespaced source. Fork or repack its Pack to change the definition.</p>
+    <article class="panel definition-grid">
+        <div><span class="field-label">Namespace</span><code>@AgentResourceNamespace.Value</code></div>
+        <div><span class="field-label">Resource name</span><code>@agent.Metadata.Name</code></div>
+        <div><span class="field-label">Handler</span><strong>@agent.Definition.Handler</strong></div>
+        <div><span class="field-label">Model profile</span><strong>@agent.Definition.ModelProfile.Name</strong></div>
+        <div><span class="field-label">Capabilities</span><strong>@Capabilities</strong></div>
+        <div><span class="field-label">Status</span><strong>@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())</strong></div>
+    </article>
+    <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Instructions</h2></div></div><pre>@agent.Definition.Instructions</pre></section>
+}
+
+@code {
+    [Parameter] public string AgentNamespace { get; set; } = string.Empty;
+    [Parameter] public string Name { get; set; } = string.Empty;
+    private readonly CancellationTokenSource cancellation = new();
+    private AgentResource? agent;
+    private AgentstrationApiException? error;
+    private bool loading = true;
+    private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Parse(AgentNamespace);
+    private string Capabilities => agent is null || agent.Definition.Behaviors.Count == 0 ? "—" : string.Join(", ", agent.Definition.Behaviors);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        error = null;
+        try { agent = (await Client.GetAgentAsync(AgentResourceNamespace, Name, cancellation.Token)).Value; }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

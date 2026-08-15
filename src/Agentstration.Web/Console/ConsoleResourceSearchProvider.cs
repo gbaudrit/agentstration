@@ -1,6 +1,6 @@
+using Agentstration.Management.Abstractions;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
-using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Web.Console;
 
@@ -88,7 +88,7 @@ public sealed class ConsoleResourceSearchProvider(
 
     private static ResourceSearchResult ToResult(AgentSummary item)
     {
-        return new ResourceSearchResult(item.Name, "Agent", item.Id, $"/agents/{Escape(item.Id)}", StatusPresentation.Label(item.Status), "◎", $"{item.Id} {item.ModelProfile}");
+        return new ResourceSearchResult(item.Name, "Agent", item.Id, item.DetailsUrl, StatusPresentation.Label(item.Status), "◎", $"{item.Namespace.Value} {item.Id} {item.ModelProfile}");
     }
 
     private static bool Matches(ResourceSearchResult item, string query) =>

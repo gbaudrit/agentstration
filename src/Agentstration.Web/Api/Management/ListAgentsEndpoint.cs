@@ -17,22 +17,30 @@ internal sealed class ListAgentsEndpoint : IManagementEndpoint
         HandleCoreAsync(ResourceNamespace.Parse(@namespace), skip, top, request, service, cancellationToken);
 
     private static Task<IResult> HandleAsync(
+        bool? allNamespaces,
         int? skip,
         int? top,
         HttpRequest request,
         AgentManagementService service,
         CancellationToken cancellationToken) =>
-        HandleCoreAsync(ResourceNamespace.Default, skip, top, request, service, cancellationToken);
+        HandleCoreAsync(allNamespaces is true ? null : ResourceNamespace.Default, skip, top, request, service, cancellationToken);
 
-    private static Task<IResult> HandleCoreAsync(ResourceNamespace @namespace, int? skip, int? top, HttpRequest request, AgentManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleCoreAsync(ResourceNamespace? @namespace, int? skip, int? top, HttpRequest request, AgentManagementService service, CancellationToken cancellationToken) =>
         ManagementHttp.ExecuteAsync(async () =>
         {
             ManagementHttp.RequireApiVersion(request);
             var actualSkip = Math.Max(0, skip ?? 0);
             var actualTop = Math.Clamp(top ?? 100, 1, 1000);
-            var values = await service.ListAgentsAsync(@namespace, actualSkip, actualTop, cancellationToken);
+            var values = @namespace is null
+                ? await service.ListAllAgentsAsync(actualSkip, actualTop, cancellationToken)
+                : await service.ListAgentsAsync(@namespace.Value, actualSkip, actualTop, cancellationToken);
+            var prefix = @namespace is null
+                ? "/api/agents?allNamespaces=true&"
+                : @namespace.Value.IsDefault
+                    ? "/api/agents?"
+                    : $"/api/namespaces/{@namespace.Value.Value}/agents?";
             var nextLink = values.Count == actualTop
-                ? $"/api/{(@namespace.IsDefault ? string.Empty : $"namespaces/{@namespace.Value}/")}agents?skip={actualSkip + actualTop}&top={actualTop}"
+                ? $"{prefix}skip={actualSkip + actualTop}&top={actualTop}"
                 : null;
             return Results.Ok(new PagedResponse<AgentResource>(values.Select(value => value.Value).ToArray(), nextLink));
         });

@@ -5,6 +5,7 @@ using System.Threading.Channels;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Core;
 
 namespace Agentstration.Infrastructure.Flows;
 
@@ -57,7 +58,8 @@ public sealed class LocalFlowRunCancellationRegistry : IFlowRunCancellationRegis
 public sealed class ManagedFlowAgentExecutor(
     AgentExecutionCoordinator execution,
     IControlPlaneStore store,
-    IAgentResourceQueries agentQueries) : IFlowAgentExecutor
+    IAgentResourceQueries agentQueries,
+    AgentManagementService agents) : IFlowAgentExecutor
 {
     public async Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken)
     {
@@ -68,6 +70,11 @@ public sealed class ManagedFlowAgentExecutor(
             ? promptProperty.GetString()!
             : input.GetRawText();
         var targetNamespace = target.Namespace ?? Agentstration.Resources.ResourceNamespace.Default;
+        var agent = await agents.GetAgentAsync(targetNamespace, ResourceName(target.Id), cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, ResourceName(target.Id), targetNamespace));
+        var prepared = await agents.PrepareLocalRuntimeAsync(targetNamespace, agent.Value.Metadata.Name, agent.Value.Generation, cancellationToken);
+        if (prepared.Value.OperationalState != OperationalState.Ready)
+            throw new InvalidOperationException(prepared.Value.LastError ?? $"Agent '{target.Id}' could not be prepared for local execution.");
         var selected = await execution.SelectAgentAsync(prompt, ResourceName(target.Id), targetNamespace, cancellationToken);
         var deployment = (await agentQueries.ListDeploymentsAsync(cancellationToken))
             .SingleOrDefault(value => value.Value.AgentNamespace == targetNamespace && value.Value.Uid.ToString("N") == selected.DeploymentId)

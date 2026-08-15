@@ -163,7 +163,7 @@ Invoke-RestMethod -Method Delete http://localhost:5100/api/packs/agentstration/o
 
 Installation refuses to replace an existing resource in the same namespace. It records progress after every applied resource and compensates in reverse order on failure. Uninstall compares each current ETag or module version token with its installation evidence; modified resources are preserved and the Pack becomes `degraded`.
 
-The repository also contains `samples/packs/who-am-i`, a five-resource distribution smoke test with three role-specific Agents, a Direct Flow, and a conversational Entry. It deliberately documents rather than conceals the current execution gaps: Agent deployment, Workspace exposure, multi-agent turns, private state, and generic human-input suspension are not supplied by Pack V1.
+The repository also contains `samples/packs/who-am-i`, a five-resource distribution smoke test with three role-specific Agents, a Direct Flow, and a conversational Entry. Namespaced Agents and Flows appear in their global Console catalogs. The first local Flow run prepares the referenced Agent generation in the same namespace, so installing a Pack does not need to create mutable runtime deployments eagerly. The sample deliberately documents rather than conceals the remaining execution gaps: Workspace exposure, multi-agent turns, private state, and generic human-input suspension are not supplied by Pack V1.
 
 ## Distribution and trust
 

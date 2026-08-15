@@ -20,6 +20,8 @@ public interface IManagementApiClient
 {
     Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetAgentAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agents.");
     Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken);
     Task DeleteAgentAsync(string name, string etag, CancellationToken cancellationToken);
     Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken);
@@ -123,14 +125,17 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
 {
     public async Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken)
     {
-        var path = "api/agents";
+        var path = "api/agents?allNamespaces=true&top=1000";
         var page = await ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, path, cancellationToken);
-        return page.Value.Select(agent => new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Definition.ModelProfile.Name)).ToArray();
+        return page.Value.Select(agent => new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Definition.ModelProfile.Name) { Namespace = agent.Namespace }).ToArray();
     }
 
     public async Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken)
+        => await GetAgentAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    public async Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        var path = AgentPath(name);
+        var path = AgentPath(@namespace, name);
         using var response = await httpClient.GetAsync(path, cancellationToken);
         return await ReadResourceAsync<AgentResource>(response, cancellationToken);
     }
@@ -162,8 +167,11 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
         return new(0, agents.Count, agents.Sum(item => int.TryParse(item.Version, out var version) ? version : 0), 0, "Managed");
     }
 
-    private static string AgentPath(string name) =>
-        $"api/agents/{Uri.EscapeDataString(name)}";
+    private static string AgentPath(string name) => AgentPath(ResourceNamespace.Default, name);
+
+    private static string AgentPath(ResourceNamespace @namespace, string name) => @namespace.IsDefault
+        ? $"api/agents/{Uri.EscapeDataString(name)}"
+        : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(name)}";
 
     private static async Task<ResourceSnapshot<T>> ReadResourceAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {

@@ -476,6 +476,8 @@ public sealed class FlowRunService(
             else if (agentResult is not null) stored = await FinishAgentStepAsync(stored, agentResult, runToken, transition?.Id, step.Name);
             else stored = await FinishGraphStepAsync(stored, step.Name, output, transition?.Id, runToken);
             if (step is OutputFlowStepDefinition) break;
+            if (transition is null && stepError is not null)
+                throw new FlowValidationException(stepError.Code, stepError.Details ?? stepError.Message);
             if (transition is null) throw new FlowValidationException("flow_transition_missing", $"No '{eventName}' transition leaves step '{step.Name}'.");
             currentName = transition.ToStep;
         }

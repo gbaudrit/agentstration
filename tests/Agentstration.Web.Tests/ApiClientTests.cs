@@ -6,9 +6,9 @@ using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
-using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Console;
@@ -269,11 +269,15 @@ public sealed class ApiClientTests
     [TestMethod]
     public async Task ManagementClientListsAgentsThroughApiInsteadOfRazorPage()
     {
-        var resource = CreateAgentResource("web-agent");
-        string? requestPath = null;
+        var @namespace = new ResourceNamespace("agentstration.who-am-i");
+        var resource = CreateAgentResource("web-agent") with
+        {
+            Metadata = CreateAgentResource("web-agent").Metadata with { Namespace = @namespace }
+        };
+        string? requestPathAndQuery = null;
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
-            requestPath = request.RequestUri?.AbsolutePath;
+            requestPathAndQuery = request.RequestUri?.PathAndQuery;
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = JsonContent.Create(new PagedResponse<AgentResource>([resource], null))
@@ -284,8 +288,35 @@ public sealed class ApiClientTests
 
         var agents = await client.GetAgentsAsync(CancellationToken.None);
 
-        Assert.AreEqual("/api/agents", requestPath);
+        Assert.AreEqual("/api/agents?allNamespaces=true&top=1000", requestPathAndQuery);
         Assert.HasCount(1, agents);
+        Assert.AreEqual(@namespace, agents[0].Namespace);
+        Assert.AreEqual("/namespaces/agentstration.who-am-i/agents/web-agent", agents[0].DetailsUrl);
+    }
+
+    [TestMethod]
+    public async Task ManagementClientGetsAgentFromItsNamespace()
+    {
+        var @namespace = new ResourceNamespace("agentstration.who-am-i");
+        var resource = CreateAgentResource("who-am-i-judge") with
+        {
+            Metadata = CreateAgentResource("who-am-i-judge").Metadata with { Namespace = @namespace }
+        };
+        Uri? requested = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri;
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
+            response.Headers.ETag = new EntityTagHeaderValue("\"stored\"");
+            return response;
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new ManagementApiClient(httpClient);
+
+        var actual = await client.GetAgentAsync(@namespace, resource.Metadata.Name, CancellationToken.None);
+
+        Assert.AreEqual("/api/namespaces/agentstration.who-am-i/agents/who-am-i-judge", requested!.AbsolutePath);
+        Assert.AreEqual(@namespace, actual.Value.Namespace);
     }
 
     [TestMethod]
