@@ -35,6 +35,7 @@ public sealed record PackProjectProperties
     public required string PackName { get; init; }
     public required string Version { get; init; }
     public PackAudience Audience { get; init; } = PackAudience.Universal;
+    public PackPurpose Purpose { get; init; } = PackPurpose.Standard;
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
     public IReadOnlyList<string> Categories { get; init; } = [];
@@ -76,7 +77,8 @@ public sealed record ForkPackCommand(
     string Version,
     string? DisplayName = null,
     string? Description = null,
-    PackAudience? Audience = null);
+    PackAudience? Audience = null,
+    PackPurpose? Purpose = null);
 
 public sealed record UpdatePackProjectCommand(
     string Version,
@@ -84,4 +86,5 @@ public sealed record UpdatePackProjectCommand(
     string? Description,
     IReadOnlyList<string>? Categories = null,
     IReadOnlyList<string>? Tags = null,
-    PackAudience? Audience = null);
+    PackAudience? Audience = null,
+    PackPurpose? Purpose = null);

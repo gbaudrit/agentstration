@@ -4,6 +4,8 @@ A **Pack** is a versioned unit for distributing and installing a coherent set of
 
 A Pack declares a `personal`, `professional`, or `universal` audience. Audience drives discovery and presentation only; it does not create a separate Pack kind, installation lifecycle, runtime, or security boundary. Legacy manifests without the field default to `universal`.
 
+A Pack also declares a `sample`, `template`, or `standard` purpose. Samples demonstrate a capability, templates are intended to be forked, and standard Packs have no special usage designation. Legacy manifests default to `standard`.
+
 ```mermaid
 flowchart TD
     Pack["Pack (distribution)"] --> Install["Validate and install"]

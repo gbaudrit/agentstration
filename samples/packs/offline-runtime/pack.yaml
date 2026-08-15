@@ -5,6 +5,7 @@ metadata:
   publisher: agentstration
   version: 1.0.0
   audience: universal
+  purpose: sample
   displayName: Offline Runtime Profile
   description: Installs a transient Microsoft Agent Framework runtime profile.
   categories:

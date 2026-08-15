@@ -42,6 +42,13 @@ else
                         <option value="@PackAudience.Professional">Professional</option>
                     </select>
                 </label>
+                <label>Purpose
+                    <select @bind="purpose" @bind:after="MarkDirty">
+                        <option value="@PackPurpose.Standard">Standard</option>
+                        <option value="@PackPurpose.Sample">Sample</option>
+                        <option value="@PackPurpose.Template">Template</option>
+                    </select>
+                </label>
                 <label>Categories<input @bind="categories" @bind:after="MarkDirty" placeholder="game, sample" /></label>
                 <label>Tags<input @bind="tags" @bind:after="MarkDirty" placeholder="local, experimental" /></label>
             </div>
@@ -116,6 +123,7 @@ else
     private AgentstrationApiException? error;
     private string version = string.Empty;
     private PackAudience audience = PackAudience.Universal;
+    private PackPurpose purpose = PackPurpose.Standard;
     private string displayName = string.Empty;
     private string? description;
     private string categories = string.Empty;
@@ -144,6 +152,7 @@ else
             var definition = project.Value.Definition;
             version = definition.Version;
             audience = definition.Audience;
+            purpose = definition.Purpose;
             displayName = definition.DisplayName ?? string.Empty;
             description = definition.Description;
             categories = string.Join(", ", definition.Categories);
@@ -160,7 +169,7 @@ else
         await ExecuteAsync(async () =>
         {
             project = await Client.UpdateProjectAsync(ProjectId,
-                new(version.Trim(), EmptyToNull(displayName), EmptyToNull(description), Split(categories), Split(tags), audience), project.ETag, cancellation.Token);
+                new(version.Trim(), EmptyToNull(displayName), EmptyToNull(description), Split(categories), Split(tags), audience, purpose), project.ETag, cancellation.Token);
             dirty = false;
             message = "Project saved.";
         });

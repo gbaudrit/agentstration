@@ -52,6 +52,7 @@ public sealed partial class PackAuthoringService(
                 PackName = command.Name,
                 Version = command.Version,
                 Audience = command.Audience ?? sourceArchive.Manifest.Metadata.Audience,
+                Purpose = command.Purpose ?? sourceArchive.Manifest.Metadata.Purpose,
                 DisplayName = command.DisplayName ?? sourceArchive.Manifest.Metadata.DisplayName ?? command.Name,
                 Description = command.Description ?? sourceArchive.Manifest.Metadata.Description,
                 Categories = sourceArchive.Manifest.Metadata.Categories.ToArray(),
@@ -72,6 +73,7 @@ public sealed partial class PackAuthoringService(
         {
             Version = command.Version,
             Audience = command.Audience ?? current.Value.Definition.Audience,
+            Purpose = command.Purpose ?? current.Value.Definition.Purpose,
             DisplayName = command.DisplayName,
             Description = command.Description,
             Categories = command.Categories?.ToArray() ?? current.Value.Definition.Categories,
@@ -102,6 +104,7 @@ public sealed partial class PackAuthoringService(
                 Name = project.Value.Definition.PackName,
                 Version = project.Value.Definition.Version,
                 Audience = project.Value.Definition.Audience,
+                Purpose = project.Value.Definition.Purpose,
                 DisplayName = project.Value.Definition.DisplayName,
                 Description = project.Value.Definition.Description,
                 Categories = project.Value.Definition.Categories,

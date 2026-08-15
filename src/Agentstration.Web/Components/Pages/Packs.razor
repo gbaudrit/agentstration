@@ -37,9 +37,10 @@ else
     else
     {
         <DataGrid TItem="InstalledPackResource" Items="packs">
-            <Header><tr><th>Pack</th><th>Audience</th><th>Version</th><th>Status</th><th>Resources</th><th>Installed</th><th></th></tr></Header>
+            <Header><tr><th>Pack</th><th>Purpose</th><th>Audience</th><th>Version</th><th>Status</th><th>Resources</th><th>Installed</th><th></th></tr></Header>
             <Row Context="pack"><tr class="@(IsSelected(pack) ? "selected-pack" : null)">
                 <td><strong>@DisplayName(pack)</strong><br /><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></td>
+                <td><span class="pack-kind">@PurposeLabel(pack.Definition.Purpose)</span></td>
                 <td>@AudienceLabel(pack.Definition.Audience)</td>
                 <td><code>@pack.Definition.Version</code></td>
                 <td><StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" /></td>
@@ -62,6 +63,7 @@ else
                 <dt>Identity</dt><dd><code>@selected.Value.Definition.Publisher/@selected.Value.Definition.PackName</code></dd>
                 <dt>Namespace</dt><dd><code>@selected.Value.Definition.Namespace</code></dd>
                 <dt>Version</dt><dd>@selected.Value.Definition.Version</dd>
+                <dt>Purpose</dt><dd><span class="pack-kind">@PurposeLabel(selected.Value.Definition.Purpose)</span></dd>
                 <dt>Audience</dt><dd>@AudienceLabel(selected.Value.Definition.Audience)</dd>
                 <dt>Source</dt><dd>@selected.Value.Definition.Source</dd>
                 <dt>Installed</dt><dd>@selected.Value.Definition.InstalledAt.ToLocalTime().ToString("F")</dd>
@@ -88,7 +90,7 @@ else
             <div class="pack-resource-list">
                 @foreach (var project in projects)
                 {
-                    <article><span class="pack-kind">Project</span><div><strong>@project.Definition.DisplayName</strong><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @project.Definition.Version · @AudienceLabel(project.Definition.Audience)</small></div><button class="text-button" @onclick="() => OpenProject(project.Uid)">Open</button></article>
+                    <article><span class="pack-kind">Project</span><div><strong>@project.Definition.DisplayName</strong><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @project.Definition.Version · @PurposeLabel(project.Definition.Purpose) · @AudienceLabel(project.Definition.Audience)</small></div><button class="text-button" @onclick="() => OpenProject(project.Uid)">Open</button></article>
                 }
             </div>
         </section>
@@ -111,7 +113,7 @@ else
             @if (preview is not null)
             {
                 <section class="pack-preview">
-                    <div class="panel-header"><div><strong>@(preview.Metadata.DisplayName ?? preview.Metadata.Name)</strong><small><code>@preview.Metadata.Publisher/@preview.Metadata.Name</code> · @preview.Metadata.Version · @AudienceLabel(preview.Metadata.Audience)</small></div><StatusBadge Text="@(preview.CanInstall ? "Ready" : "Conflict")" Status="@(preview.CanInstall ? UiStatus.Success : UiStatus.Warning)" /></div>
+                    <div class="panel-header"><div><strong>@(preview.Metadata.DisplayName ?? preview.Metadata.Name)</strong><small><code>@preview.Metadata.Publisher/@preview.Metadata.Name</code> · @preview.Metadata.Version · @PurposeLabel(preview.Metadata.Purpose) · @AudienceLabel(preview.Metadata.Audience)</small></div><StatusBadge Text="@(preview.CanInstall ? "Ready" : "Conflict")" Status="@(preview.CanInstall ? UiStatus.Success : UiStatus.Warning)" /></div>
                     @if (!string.IsNullOrWhiteSpace(preview.Metadata.Description)) { <p>@preview.Metadata.Description</p> }
                     <div class="pack-resource-list compact">
                         @foreach (var resource in preview.Resources)
@@ -347,6 +349,7 @@ else
     private bool IsSelected(InstalledPackResource pack) => selected is not null && SameIdentity(pack, selected.Value);
     private static bool SameIdentity(InstalledPackResource left, InstalledPackResource right) => left.Definition.Publisher == right.Definition.Publisher && left.Definition.PackName == right.Definition.PackName;
     private static string DisplayName(InstalledPackResource pack) => pack.Definition.DisplayName ?? pack.Definition.PackName;
+    private static string PurposeLabel(PackPurpose purpose) => purpose switch { PackPurpose.Sample => "SAMPLE", PackPurpose.Template => "TEMPLATE", _ => "STANDARD" };
     private static string AudienceLabel(PackAudience audience) => audience switch { PackAudience.Personal => "Personal", PackAudience.Professional => "Professional", _ => "Universal" };
     private static string StateLabel(InstalledPackState state) => state switch { InstalledPackState.Installing => "Installing", InstalledPackState.Installed => "Installed", InstalledPackState.Uninstalling => "Uninstalling", InstalledPackState.Failed => "Failed", _ => "Degraded" };
     private static UiStatus StateTone(InstalledPackState state) => state switch { InstalledPackState.Installed => UiStatus.Success, InstalledPackState.Failed => UiStatus.Danger, InstalledPackState.Degraded => UiStatus.Warning, _ => UiStatus.Info };
