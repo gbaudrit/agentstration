@@ -23,6 +23,15 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class ApiClientTests
 {
+    [TestMethod]
+    public void FlowConsoleUrlPreservesTheResourceNamespace()
+    {
+        Assert.AreEqual("/flows/main", ConsoleResourceUrls.Flow(new FlowId("main")));
+        Assert.AreEqual(
+            "/namespaces/agentstration.daily-life-assistant/flows/main",
+            ConsoleResourceUrls.Flow(new FlowId("main", new ResourceNamespace("agentstration.daily-life-assistant"))));
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [TestMethod]

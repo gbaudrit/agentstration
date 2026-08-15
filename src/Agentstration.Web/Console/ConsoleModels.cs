@@ -1,3 +1,4 @@
+using Agentstration.Flow;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
 
@@ -16,9 +17,14 @@ public sealed record WorkSummary(Guid Id, string Title, string Type, string Stat
 public sealed record FlowSummary(string Id, string Name, string Kind, string Version, string Status, int Steps, int ActiveExecutions, DateTimeOffset UpdatedAt)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
-    public string DetailsUrl => Namespace.IsDefault
-        ? $"/flows/{Uri.EscapeDataString(Id)}"
-        : $"/namespaces/{Uri.EscapeDataString(Namespace.Value)}/flows/{Uri.EscapeDataString(Id)}";
+    public string DetailsUrl => ConsoleResourceUrls.Flow(new FlowId(Id, Namespace));
+}
+
+public static class ConsoleResourceUrls
+{
+    public static string Flow(FlowId id) => id.Namespace.IsDefault
+        ? $"/flows/{Uri.EscapeDataString(id.Value)}"
+        : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/flows/{Uri.EscapeDataString(id.Value)}";
 }
 public sealed record ExecutionSummary(string Id, string Agent, string? Flow, Guid? WorkItemId, string Status, DateTimeOffset StartedAt, TimeSpan? Duration, string? Result, string? Error);
 public sealed record ManagementSummary(int Agents, int Configurations, int Revisions, int Policies, string DesiredState);
