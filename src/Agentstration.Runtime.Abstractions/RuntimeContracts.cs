@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Agentstration.Resources;
 
 namespace Agentstration.Runtime.Abstractions;
 
@@ -144,6 +145,11 @@ public interface IRuntimeAgentResolver
 
     Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, CancellationToken cancellationToken) =>
         throw new RuntimeAgentResolutionException("latest_agent_resolution_unsupported", $"Latest-version resolution is not supported for agent '{resourceId}'.");
+
+    Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        @namespace == ResourceNamespace.Default
+            ? ResolveLatestAsync(resourceId, cancellationToken)
+            : throw new RuntimeAgentResolutionException("latest_agent_resolution_unsupported", $"Latest-version resolution is not supported for agent '{@namespace}/{resourceId}'.");
 }
 
 public sealed class RuntimeAgentResolutionException(string code, string message) : Exception(message)

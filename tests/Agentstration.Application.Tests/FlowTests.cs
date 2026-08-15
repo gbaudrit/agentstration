@@ -277,7 +277,7 @@ public sealed class FlowTests
                     new FlowTargetReference(FlowTargetKind.Agent, "researcher"),
                     new FlowTargetReference(FlowTargetKind.Agent, "reviewer")
                 ],
-                new SequentialOrchestrationPattern())), default);
+                new SequentialOrchestrationPattern())), new ResourceNamespace("daily-life-assistant"), default);
         await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
         var queue = new TestFlowRunQueue();
         var expressions = new FlowExpressionParser();
@@ -682,6 +682,8 @@ public sealed class FlowTests
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             Assert.AreEqual(FlowOrchestrationStrategy.Sequential, request.Definition.Strategy);
+            Assert.IsTrue(request.Definition.Participants.All(participant =>
+                participant.Namespace == new ResourceNamespace("daily-life-assistant")));
             cancellationToken.ThrowIfCancellationRequested();
             yield return new FlowParticipantTurnStarted("researcher", 1);
             yield return new FlowParticipantDelta("researcher", "draft");

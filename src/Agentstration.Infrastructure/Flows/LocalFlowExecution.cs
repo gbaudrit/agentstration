@@ -6,6 +6,7 @@ using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Runtime.AgentFramework;
 
 namespace Agentstration.Infrastructure.Flows;
 
@@ -94,6 +95,34 @@ public sealed class ManagedFlowAgentExecutor(
     }
 
     private static string ResourceName(string id) => id;
+}
+
+public sealed class ManagedFlowOrchestrationEngine(
+    AgentFrameworkFlowOrchestrationEngine inner,
+    AgentManagementService agents) : IFlowOrchestrationEngine
+{
+    public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
+        FlowOrchestrationExecutionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var references = request.Definition.Participants.AsEnumerable();
+        if (request.Definition.Pattern is MagenticOrchestrationPattern magentic)
+            references = references.Append(magentic.Manager);
+
+        foreach (var reference in references.DistinctBy(target => (target.Namespace, target.Id)))
+        {
+            var targetNamespace = reference.Namespace ?? Agentstration.Resources.ResourceNamespace.Default;
+            var agent = await agents.GetAgentAsync(targetNamespace, reference.Id, cancellationToken)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Agent, reference.Id, targetNamespace));
+            var prepared = await agents.PrepareLocalRuntimeAsync(targetNamespace, agent.Value.Metadata.Name, agent.Value.Generation, cancellationToken);
+            if (prepared.Value.OperationalState != OperationalState.Ready)
+                throw new InvalidOperationException(prepared.Value.LastError ?? $"Agent '{targetNamespace}/{reference.Id}' could not be prepared for local execution.");
+        }
+
+        await foreach (var executionEvent in inner.ExecuteAsync(request, cancellationToken))
+            yield return executionEvent;
+    }
 }
 
 public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore store) : IFlowResourceReferenceResolver
