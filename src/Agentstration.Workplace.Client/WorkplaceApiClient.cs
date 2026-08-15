@@ -11,8 +11,8 @@ public interface IWorkplaceApiClient
 {
     Task<IReadOnlyList<WorkplaceWorkspaceResponse>> ListWorkspacesAsync(CancellationToken token);
     Task<WorkplaceWorkspaceResponse> GetWorkspaceAsync(string workspaceName, CancellationToken token);
-    Task<EntryResponse> GetEntryAsync(string entryName, CancellationToken token);
-    Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, string entryName, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token);
+    Task<EntryResponse> GetEntryAsync(EntryId entryId, CancellationToken token);
+    Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, EntryId entryId, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token);
     Task<InteractionResponse> GetInteractionAsync(string workspaceName, Guid interactionId, CancellationToken token);
     Task<IReadOnlyList<InteractionResponse>> ListInteractionsAsync(string workspaceName, int take, CancellationToken token);
     Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(string workspaceName, Guid interactionId, CancellationToken token);
@@ -37,8 +37,8 @@ public sealed class WorkplaceApiClient(HttpClient httpClient) : IWorkplaceApiCli
 {
     public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> ListWorkspacesAsync(CancellationToken token) => await httpClient.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>($"api/workplace/workspaces?api-version={WorkplaceApiVersions.V20260805}", token) ?? [];
     public Task<WorkplaceWorkspaceResponse> GetWorkspaceAsync(string workspaceName, CancellationToken token) => GetAsync<WorkplaceWorkspaceResponse>($"api/workspaces/{E(workspaceName)}", token);
-    public Task<EntryResponse> GetEntryAsync(string entryName, CancellationToken token) => GetAsync<EntryResponse>($"api/entries/{E(entryName)}", token);
-    public async Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, string entryName, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token) => await PostAsync<CreateInteractionRequest, EntrySubmissionResponse>($"api/workspaces/{E(workspaceName)}/entries/{E(entryName)}/interactions", new CreateInteractionRequest(workspaceName, values), token);
+    public Task<EntryResponse> GetEntryAsync(EntryId entryId, CancellationToken token) => GetAsync<EntryResponse>($"api/{EntryPath(entryId)}", token);
+    public async Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, EntryId entryId, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token) => await PostAsync<CreateInteractionRequest, EntrySubmissionResponse>($"api/workspaces/{E(workspaceName)}/{EntryPath(entryId)}/interactions", new CreateInteractionRequest(workspaceName, values), token);
     public Task<InteractionResponse> GetInteractionAsync(string workspaceName, Guid interactionId, CancellationToken token) => GetAsync<InteractionResponse>($"api/workspaces/{E(workspaceName)}/interactions/{interactionId}", token);
     public async Task<IReadOnlyList<InteractionResponse>> ListInteractionsAsync(string workspaceName, int take, CancellationToken token) => (await GetAsync<InteractionPageResponse>($"api/workspaces/{E(workspaceName)}/interactions?take={Math.Clamp(take, 1, 100)}", token)).Value;
     public async Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(string workspaceName, Guid interactionId, CancellationToken token) => await httpClient.GetFromJsonAsync<ConversationMessage[]>($"api/workspaces/{E(workspaceName)}/interactions/{interactionId}/messages", token) ?? [];
@@ -61,6 +61,7 @@ public sealed class WorkplaceApiClient(HttpClient httpClient) : IWorkplaceApiCli
     private async Task<T> GetAsync<T>(string uri, CancellationToken token) => await httpClient.GetFromJsonAsync<T>(uri, token) ?? throw new InvalidOperationException($"The Work API returned no {typeof(T).Name} payload.");
     private async Task<TResponse> PostAsync<TRequest, TResponse>(string uri, TRequest body, CancellationToken token) { using var response = await httpClient.PostAsJsonAsync(uri, body, token); response.EnsureSuccessStatusCode(); return (await response.Content.ReadFromJsonAsync<TResponse>(token))!; }
     private async Task<T> PostEmptyAsync<T>(string uri, CancellationToken token) { using var response = await httpClient.PostAsync(uri, null, token); response.EnsureSuccessStatusCode(); return (await response.Content.ReadFromJsonAsync<T>(token))!; }
+    private static string EntryPath(EntryId entryId) => entryId.Namespace.IsDefault ? $"entries/{E(entryId.Value)}" : $"namespaces/{E(entryId.Namespace.Value)}/entries/{E(entryId.Value)}";
     private static string E(string value) => Uri.EscapeDataString(value);
 }
 
