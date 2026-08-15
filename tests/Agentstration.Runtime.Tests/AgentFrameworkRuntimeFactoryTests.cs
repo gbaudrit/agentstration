@@ -6,6 +6,7 @@ using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Local;
@@ -44,14 +45,16 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             new RecordingResolver(chatClient),
             NullLoggerFactory.Instance,
             new GenAiObservabilityOptions { Enabled = true });
+        var agentResolver = new RecordingAgentResolver();
         var engine = new AgentFrameworkFlowOrchestrationEngine(
-            new RecordingAgentResolver(),
+            agentResolver,
             new EmptyToolCatalog(),
             factory);
+        var packNamespace = new ResourceNamespace("daily-life-assistant");
         var definition = new OrchestrationFlowDefinition(
             [
-                new FlowTargetReference(FlowTargetKind.Agent, "agent-1"),
-                new FlowTargetReference(FlowTargetKind.Agent, "agent-2")
+                new FlowTargetReference(FlowTargetKind.Agent, "agent-1", Namespace: packNamespace),
+                new FlowTargetReference(FlowTargetKind.Agent, "agent-2", Namespace: packNamespace)
             ],
             new GroupChatOrchestrationPattern(2));
         var events = new List<FlowExecutionEvent>();
@@ -69,6 +72,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         CollectionAssert.AreEqual(
             new[] { 1, 2 },
             events.OfType<FlowParticipantTurnStarted>().Select(item => item.Turn).ToArray());
+        Assert.IsTrue(agentResolver.ResolvedNamespaces.All(@namespace => @namespace == packNamespace));
         Assert.AreEqual(2, events.OfType<FlowParticipantTurnCompleted>().Count());
         var transitions = events.Where(item => item is FlowParticipantTurnStarted or FlowParticipantTurnCompleted)
             .Select(item => item switch
@@ -362,11 +366,17 @@ public sealed class AgentFrameworkRuntimeFactoryTests
 
     private sealed class RecordingAgentResolver : IRuntimeAgentResolver
     {
+        public List<ResourceNamespace> ResolvedNamespaces { get; } = [];
+
         public Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken) =>
-            ResolveLatestAsync(reference.ResourceId, cancellationToken);
+            ResolveLatestAsync(reference.ResourceId, reference.Namespace, cancellationToken);
 
         public Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, CancellationToken cancellationToken)
+            => ResolveLatestAsync(resourceId, ResourceNamespace.Default, cancellationToken);
+
+        public Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, ResourceNamespace @namespace, CancellationToken cancellationToken)
         {
+            ResolvedNamespaces.Add(@namespace);
             var definition = Definition(resourceId);
             return Task.FromResult(new ResolvedRuntimeAgent(
                 definition.AgentId,

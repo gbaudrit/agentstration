@@ -153,7 +153,8 @@ public static class DependencyInjection
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();
         services.AddSingleton<IFlowAgentExecutor, ManagedFlowAgentExecutor>();
-        services.AddSingleton<IFlowOrchestrationEngine, AgentFrameworkFlowOrchestrationEngine>();
+        services.AddSingleton<AgentFrameworkFlowOrchestrationEngine>();
+        services.AddSingleton<IFlowOrchestrationEngine, ManagedFlowOrchestrationEngine>();
         services.AddSingleton<IFlowResourceReferenceResolver, ManagementFlowResourceReferenceResolver>();
         services.AddSingleton<FlowExpressionParser>();
         services.AddSingleton<IExpressionParser>(provider => provider.GetRequiredService<FlowExpressionParser>());

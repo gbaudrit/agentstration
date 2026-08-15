@@ -277,7 +277,7 @@ public sealed class FlowTests
                     new FlowTargetReference(FlowTargetKind.Agent, "researcher"),
                     new FlowTargetReference(FlowTargetKind.Agent, "reviewer")
                 ],
-                new SequentialOrchestrationPattern())), default);
+                new SequentialOrchestrationPattern())), new ResourceNamespace("daily-life-assistant"), default);
         await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
         var queue = new TestFlowRunQueue();
         var expressions = new FlowExpressionParser();
@@ -543,6 +543,31 @@ public sealed class FlowTests
     }
 
     [TestMethod]
+    public async Task GraphWithoutFailureTransitionPreservesAgentError()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "agent",
+            Steps = [new AgentFlowStepDefinition { Name = "agent", Agent = new("sql-expert") }],
+            Transitions = []
+        };
+        var now = TimeProvider.System.GetUtcNow();
+        var draft = new FlowDraft { Id = "failing-draft", FlowId = new("failing-run"), DisplayName = "Failing run", Definition = graph, CreatedAt = now, UpdatedAt = now };
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new FailingAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(), TimeProvider.System);
+        using var input = JsonDocument.Parse("{}");
+
+        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "failing-correlation", input.RootElement, default);
+        await runs.ExecuteAsync(pending.Value.Id, default);
+
+        var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Failed, completed.Status);
+        Assert.AreEqual("agent_step_failed", completed.Error?.Code);
+        Assert.AreEqual("simulated agent failure", completed.Error?.Message);
+    }
+
+    [TestMethod]
     public async Task DraftSnapshotsPreserveRouterAndStaticAgentTargetsWithoutTreatingExpressionsAsAgents()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -644,6 +669,12 @@ public sealed class FlowTests
             Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), $"/agents/{target.Id}", 3, "/profiles/default", "Deterministic", new FlowStepRunUsage(12, 4), ["lookup"], ["executed"]));
     }
 
+    private sealed class FailingAgentExecutor : IFlowAgentExecutor
+    {
+        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken) =>
+            Task.FromException<FlowAgentExecutionResult>(new InvalidOperationException("simulated agent failure"));
+    }
+
     private sealed class TestOrchestrationEngine : IFlowOrchestrationEngine
     {
         public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
@@ -651,6 +682,8 @@ public sealed class FlowTests
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             Assert.AreEqual(FlowOrchestrationStrategy.Sequential, request.Definition.Strategy);
+            Assert.IsTrue(request.Definition.Participants.All(participant =>
+                participant.Namespace == new ResourceNamespace("daily-life-assistant")));
             cancellationToken.ThrowIfCancellationRequested();
             yield return new FlowParticipantTurnStarted("researcher", 1);
             yield return new FlowParticipantDelta("researcher", "draft");

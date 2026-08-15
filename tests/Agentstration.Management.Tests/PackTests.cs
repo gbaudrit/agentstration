@@ -4,8 +4,11 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Flow;
+using Agentstration.Flow.Contracts;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Resources;
@@ -237,12 +240,47 @@ public sealed class PackTests
         Assert.IsTrue(installed.Definition.ManagedResources.All(resource => resource.Namespace == installed.Definition.Namespace));
         Assert.IsNotNull(installed.Definition.SourceArtifact);
 
+        var defaultFlows = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows?top=100");
+        Assert.IsNotNull(defaultFlows);
+        Assert.IsFalse(defaultFlows.Value.Any(flow => flow.Id == "who-am-i-game"));
+        var allFlows = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows?allNamespaces=true&top=100");
+        Assert.IsNotNull(allFlows);
+        var installedFlow = allFlows.Value.Single(flow => flow.Id == "who-am-i-game");
+        Assert.AreEqual(new ResourceNamespace("agentstration.who-am-i"), installedFlow.Namespace);
+
+        var defaultAgents = await client.GetFromJsonAsync<PagedResponse<AgentResource>>("/api/agents?top=100");
+        Assert.IsNotNull(defaultAgents);
+        Assert.IsFalse(defaultAgents.Value.Any(agent => agent.Metadata.Name.StartsWith("who-am-i-", StringComparison.Ordinal)));
+        var allAgents = await client.GetFromJsonAsync<PagedResponse<AgentResource>>("/api/agents?allNamespaces=true&top=100");
+        Assert.IsNotNull(allAgents);
+        var installedAgents = allAgents.Value.Where(agent => agent.Namespace == installed.Definition.Namespace).ToArray();
+        Assert.HasCount(3, installedAgents);
+
+        var flowVersions = await client.GetFromJsonAsync<FlowVersionResponse[]>("/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions");
+        Assert.IsNotNull(flowVersions);
+        Assert.IsTrue(flowVersions.Any(version => version.Version == "0.1.0" && version.Namespace == installedFlow.Namespace));
+
         using var flowVersionResponse = await client.GetAsync("/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions/0.1.0");
         Assert.AreEqual(HttpStatusCode.OK, flowVersionResponse.StatusCode, await flowVersionResponse.Content.ReadAsStringAsync());
         using var flowVersion = JsonDocument.Parse(await flowVersionResponse.Content.ReadAsStreamAsync());
         var graph = flowVersion.RootElement.GetProperty("graph");
         Assert.AreEqual("input", graph.GetProperty("entryStep").GetString());
         Assert.AreEqual(3, graph.GetProperty("steps").GetArrayLength());
+
+        using var input = JsonDocument.Parse("""{"prompt":"Start the game"}""");
+        using var runResponse = await client.PostAsJsonAsync(
+            "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/runs",
+            new CreateFlowRunRequest(input.RootElement.Clone(), Version: "0.1.0"));
+        Assert.AreEqual(HttpStatusCode.Accepted, runResponse.StatusCode, await runResponse.Content.ReadAsStringAsync());
+        var run = await runResponse.Content.ReadFromJsonAsync<FlowRun>();
+        Assert.IsNotNull(run);
+        for (var attempt = 0; attempt < 50 && !run.Status.IsTerminal(); attempt++)
+        {
+            await Task.Delay(100);
+            run = await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{run.Id}");
+            Assert.IsNotNull(run);
+        }
+        Assert.AreEqual(FlowRunStatus.Succeeded, run.Status, run.Error?.Details ?? run.Error?.Message);
 
         using var forkResponse = await client.PostAsJsonAsync(
             "/api/packs/agentstration/who-am-i/fork",
@@ -293,6 +331,10 @@ public sealed class PackTests
         Assert.AreEqual(HttpStatusCode.OK, forkFlowResponse.StatusCode, await forkFlowResponse.Content.ReadAsStringAsync());
         using var forkEntryResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/entries/who-am-i");
         Assert.AreEqual(HttpStatusCode.OK, forkEntryResponse.StatusCode, await forkEntryResponse.Content.ReadAsStringAsync());
+        using var forkEntryDraftResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/management/entries/who-am-i");
+        Assert.AreEqual(HttpStatusCode.OK, forkEntryDraftResponse.StatusCode, await forkEntryDraftResponse.Content.ReadAsStringAsync());
+        using var forkEntryDependenciesResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/management/entries/who-am-i/dependencies");
+        Assert.AreEqual(HttpStatusCode.OK, forkEntryDependenciesResponse.StatusCode, await forkEntryDependenciesResponse.Content.ReadAsStringAsync());
         using var forkEntry = JsonDocument.Parse(await forkEntryResponse.Content.ReadAsStreamAsync());
         Assert.AreEqual("local.who-am-i-lab", forkEntry.RootElement.GetProperty("namespace").GetString());
         Assert.AreEqual("local.who-am-i-lab", forkEntry.RootElement.GetProperty("resolvedTarget").GetProperty("namespace").GetString());

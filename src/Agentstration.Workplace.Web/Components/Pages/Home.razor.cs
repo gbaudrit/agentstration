@@ -62,9 +62,9 @@ public partial class Home
         {
             workspace = await Api.GetWorkspaceAsync(WorkspaceName, lifetime.Token);
             var reference = workspace.Entries.FirstOrDefault(value => value.Role == WorkspaceEntryRole.Primary);
-            primary = reference is null ? null : await Api.GetEntryAsync(ResourceName(reference.EntryResourceId), lifetime.Token);
+            primary = reference is null ? null : await Api.GetEntryAsync(EntryId(reference), lifetime.Token);
             var standard = workspace.Entries.Where(value => value.Role == WorkspaceEntryRole.Standard).OrderBy(value => value.Order);
-            standardEntries = await Task.WhenAll(standard.Select(value => Api.GetEntryAsync(ResourceName(value.EntryResourceId), lifetime.Token)));
+            standardEntries = await Task.WhenAll(standard.Select(value => Api.GetEntryAsync(EntryId(value), lifetime.Token)));
             await RefreshOverviewAsync();
             if (RequestedInteractionId is not null) await LoadInteractionAsync(RequestedInteractionId.Value);
             loadedInteractionId = RequestedInteractionId;
@@ -81,7 +81,7 @@ public partial class Home
         busy = true; interactionError = null;
         try
         {
-            var submission = await Api.SubmitAsync(WorkspaceName, entry.Name, values, lifetime.Token);
+            var submission = await Api.SubmitAsync(WorkspaceName, new EntryId(entry.Id, entry.Namespace), values, lifetime.Token);
             interaction = submission.Interaction; messages = submission.Interaction.Messages; currentAction = submission.Action; activeTask = submission.Task;
             if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id);
             await RefreshOverviewAsync();
@@ -189,9 +189,9 @@ public partial class Home
     private async Task MarkReadAsync(WorkNotificationId id) { await Api.MarkNotificationReadAsync(WorkspaceName, id.Value, lifetime.Token); await RefreshNotificationsAsync(); }
     private async Task MarkAllReadAsync() { await Api.MarkAllNotificationsReadAsync(WorkspaceName, lifetime.Token); await RefreshNotificationsAsync(); }
     private string ArtifactUrl(WorkTaskArtifact artifact) => Api.GetArtifactContentUri(WorkspaceName, artifact.WorkTaskId.Value, artifact.Id.Value).ToString();
-    private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
+    private static EntryId EntryId(WorkspaceEntryReferenceResponse reference) => new(reference.EntryResourceId, reference.Namespace);
     private static string ConversationTitle(InteractionResponse value) => value.Messages.FirstOrDefault(message => message.Role == ConversationRole.User)?.Content ?? "Conversation";
     private static string ConversationStatus(InteractionStatus value) => value switch { InteractionStatus.Idle => "Ready to continue", InteractionStatus.Processing => "In progress", InteractionStatus.WaitingForUser => "Needs input", InteractionStatus.Closed => "Closed", _ => value.ToString() };
-    private static EntryResource ToDefinition(EntryResponse value) => new() { Id = new(value.Id), Name = value.Name, DisplayName = value.DisplayName, Description = value.Description, Presentation = value.Presentation, ResolvedTarget = value.ResolvedTarget, Behavior = value.Behavior, ApiVersion = value.ApiVersion, Type = value.Type, Version = value.Version, PublishedAt = value.PublishedAt };
+    private static EntryResource ToDefinition(EntryResponse value) => new() { Id = new(value.Id, value.Namespace), Name = value.Name, DisplayName = value.DisplayName, Description = value.Description, Presentation = value.Presentation, ResolvedTarget = value.ResolvedTarget, Behavior = value.Behavior, ApiVersion = value.ApiVersion, Type = value.Type, Version = value.Version, PublishedAt = value.PublishedAt };
     public void Dispose() { Realtime.StateChanged -= HandleRealtimeStateChanged; realtimeSubscription?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); GC.SuppressFinalize(this); }
 }

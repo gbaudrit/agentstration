@@ -6,6 +6,7 @@ using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Components;
@@ -22,6 +23,19 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class ApiClientTests
 {
+    [TestMethod]
+    public void FlowConsoleUrlPreservesTheResourceNamespace()
+    {
+        Assert.AreEqual("/flows/main", ConsoleResourceUrls.Flow(new FlowId("main")));
+        Assert.AreEqual(
+            "/namespaces/agentstration.daily-life-assistant/flows/main",
+            ConsoleResourceUrls.Flow(new FlowId("main", new ResourceNamespace("agentstration.daily-life-assistant"))));
+        Assert.AreEqual("/entries/main", ConsoleResourceUrls.Entry(new EntryId("main")));
+        Assert.AreEqual(
+            "/namespaces/agentstration.daily-life-assistant/entries/main",
+            ConsoleResourceUrls.Entry(new EntryId("main", new ResourceNamespace("agentstration.daily-life-assistant"))));
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [TestMethod]
@@ -199,6 +213,48 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public async Task FlowClientListsAndLoadsNamespacedFlows()
+    {
+        var now = new DateTimeOffset(2026, 8, 15, 10, 0, 0, TimeSpan.Zero);
+        var @namespace = new ResourceNamespace("agentstration.who-am-i");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "who-am-i-host"));
+        var summary = new FlowSummaryResponse("who-am-i-game", "Who Am I?", null, FlowKind.Direct, "0.1.0", true, "0.1.0", now) { Namespace = @namespace };
+        var flow = new FlowResponse(summary.Id, summary.Name, null, summary.Version, true, summary.ActiveVersion, definition, new Dictionary<string, string>(), now, now) { Namespace = @namespace };
+        var version = new FlowVersionResponse(summary.Id, summary.Version, null, definition, new Dictionary<string, string>(), now) { Namespace = @namespace };
+        var requests = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add(request.RequestUri!.PathAndQuery);
+            return request.RequestUri.AbsolutePath switch
+            {
+                "/api/flows" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new FlowPageResponse([summary], null)) },
+                "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) },
+                "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new[] { version }) },
+                "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/runs" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new FlowRunPageResponse([], null)) },
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new FlowApiClient(httpClient);
+
+        var listed = await client.GetFlowsAsync(default);
+        _ = await client.GetFlowAsync(@namespace, summary.Id, default);
+        _ = await client.GetFlowVersionsAsync(@namespace, summary.Id, default);
+        _ = await client.GetFlowRunsAsync(@namespace, summary.Id, default);
+
+        Assert.HasCount(1, listed);
+        Assert.AreEqual(@namespace, listed[0].Namespace);
+        Assert.AreEqual("/namespaces/agentstration.who-am-i/flows/who-am-i-game", listed[0].DetailsUrl);
+        CollectionAssert.AreEqual(new[]
+        {
+            "/api/flows?allNamespaces=true&top=100",
+            "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game",
+            "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions",
+            "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/runs?top=200"
+        }, requests);
+    }
+
+    [TestMethod]
     public async Task ManagementClientPreservesETagAndSendsCreatePrecondition()
     {
         var resource = CreateAgentResource("web-agent");
@@ -226,11 +282,15 @@ public sealed class ApiClientTests
     [TestMethod]
     public async Task ManagementClientListsAgentsThroughApiInsteadOfRazorPage()
     {
-        var resource = CreateAgentResource("web-agent");
-        string? requestPath = null;
+        var @namespace = new ResourceNamespace("agentstration.who-am-i");
+        var resource = CreateAgentResource("web-agent") with
+        {
+            Metadata = CreateAgentResource("web-agent").Metadata with { Namespace = @namespace }
+        };
+        string? requestPathAndQuery = null;
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
-            requestPath = request.RequestUri?.AbsolutePath;
+            requestPathAndQuery = request.RequestUri?.PathAndQuery;
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = JsonContent.Create(new PagedResponse<AgentResource>([resource], null))
@@ -241,8 +301,35 @@ public sealed class ApiClientTests
 
         var agents = await client.GetAgentsAsync(CancellationToken.None);
 
-        Assert.AreEqual("/api/agents", requestPath);
+        Assert.AreEqual("/api/agents?allNamespaces=true&top=1000", requestPathAndQuery);
         Assert.HasCount(1, agents);
+        Assert.AreEqual(@namespace, agents[0].Namespace);
+        Assert.AreEqual("/namespaces/agentstration.who-am-i/agents/web-agent", agents[0].DetailsUrl);
+    }
+
+    [TestMethod]
+    public async Task ManagementClientGetsAgentFromItsNamespace()
+    {
+        var @namespace = new ResourceNamespace("agentstration.who-am-i");
+        var resource = CreateAgentResource("who-am-i-judge") with
+        {
+            Metadata = CreateAgentResource("who-am-i-judge").Metadata with { Namespace = @namespace }
+        };
+        Uri? requested = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri;
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
+            response.Headers.ETag = new EntityTagHeaderValue("\"stored\"");
+            return response;
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new ManagementApiClient(httpClient);
+
+        var actual = await client.GetAgentAsync(@namespace, resource.Metadata.Name, CancellationToken.None);
+
+        Assert.AreEqual("/api/namespaces/agentstration.who-am-i/agents/who-am-i-judge", requested!.AbsolutePath);
+        Assert.AreEqual(@namespace, actual.Value.Namespace);
     }
 
     [TestMethod]

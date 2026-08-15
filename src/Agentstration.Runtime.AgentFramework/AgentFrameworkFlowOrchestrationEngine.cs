@@ -181,7 +181,10 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         var participants = new Dictionary<string, ResolvedParticipant>(StringComparer.Ordinal);
         foreach (var reference in references)
         {
-            var resolved = await agentResolver.ResolveLatestAsync(reference.Id, cancellationToken);
+            var resolved = await agentResolver.ResolveLatestAsync(
+                reference.Id,
+                reference.Namespace ?? Agentstration.Resources.ResourceNamespace.Default,
+                cancellationToken);
             if (!resolved.Ready)
                 throw new FlowValidationException("flow_participant_not_ready", $"Agent '{reference.Id}' is not ready: {resolved.Error ?? resolved.State}.");
             if (!string.Equals(resolved.Definition.Handler, agentFactory.Handler, StringComparison.Ordinal))
