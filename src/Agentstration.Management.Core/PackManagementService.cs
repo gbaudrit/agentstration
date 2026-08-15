@@ -1,5 +1,8 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
@@ -39,18 +42,31 @@ public sealed partial class PackManagementService
 
     public async Task<PackInstallationPreview> PreviewAsync(PackArchive archive, CancellationToken cancellationToken)
     {
-        var prepared = await PrepareAsync(archive, cancellationToken);
+        var prepared = await PrepareAsync(archive, [], cancellationToken);
         return prepared.Preview;
     }
 
     public async Task<StoredResource<InstalledPackResource>> InstallAsync(PackArchive archive, CancellationToken cancellationToken)
+        => await InstallAsync(archive, [], cancellationToken);
+
+    public async Task<StoredResource<InstalledPackResource>> InstallAsync(
+        PackArchive archive,
+        IReadOnlyList<PackBindingSelection> bindings,
+        CancellationToken cancellationToken)
     {
-        var prepared = await PrepareAsync(archive, cancellationToken);
+        var prepared = await PrepareAsync(archive, bindings, cancellationToken);
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
         var @namespace = identity.Namespace;
         if (prepared.Preview.AlreadyInstalled) throw new PackAlreadyInstalledException(identity);
         var conflict = prepared.Preview.Resources.FirstOrDefault(resource => resource.AlreadyExists);
         if (conflict is not null) throw new PackResourceConflictException(conflict.Kind, conflict.Name);
+        var unresolved = prepared.Preview.Bindings.FirstOrDefault(binding => !binding.IsResolved);
+        if (unresolved is not null)
+            throw new PackValidationException("pack_binding_unresolved", $"Pack binding '{unresolved.Name}' requires an available {unresolved.TargetKind} resource.");
+        var resolutions = prepared.Preview.Bindings
+            .Where(binding => binding.Target is not null && binding.TargetAvailable)
+            .Select(binding => new PackBindingResolution(binding.Name, binding.TargetKind, binding.Target!))
+            .ToArray();
 
         var now = timeProvider.GetUtcNow();
         var sourceArtifact = artifacts is not null && !archive.Content.IsEmpty
@@ -76,7 +92,8 @@ public sealed partial class PackManagementService
                 Source = archive.Source,
                 SourceArtifact = sourceArtifact,
                 InstalledAt = now,
-                State = InstalledPackState.Installing
+                State = InstalledPackState.Installing,
+                Bindings = resolutions
             }
         }, null, true, cancellationToken);
 
@@ -90,12 +107,14 @@ public sealed partial class PackManagementService
                 installed = await UpdateAsync(installed, installed.Value.Definition with { ManagedResources = applied.Select(value => value.Resource).ToArray() }, ProvisioningState.Creating, cancellationToken);
             }
 
-            return await UpdateAsync(installed, installed.Value.Definition with
+            installed = await UpdateAsync(installed, installed.Value.Definition with
             {
                 State = InstalledPackState.Installed,
                 ErrorCode = null,
                 ErrorMessage = null
             }, ProvisioningState.Succeeded, cancellationToken);
+            await SaveConfigurationAsync(identity, resolutions, cancellationToken);
+            return installed;
         }
         catch (Exception exception)
         {
@@ -129,7 +148,7 @@ public sealed partial class PackManagementService
             || !string.Equals(archive.Manifest.Metadata.Version, installed.Value.Definition.Version, StringComparison.Ordinal))
             throw new PackValidationException("pack_source_identity_mismatch", "The selected archive must have the same publisher, name, and version as the installed Pack.");
 
-        _ = await PrepareAsync(archive, cancellationToken);
+        _ = await PrepareAsync(archive, installed.Value.Definition.Bindings.Select(binding => new PackBindingSelection(binding.Name, binding.Target)).ToArray(), cancellationToken);
         var expected = installed.Value.Definition.ManagedResources
             .Select(resource => (resource.Kind, resource.Name, resource.Path))
             .OrderBy(resource => resource.Kind, StringComparer.Ordinal)
@@ -156,15 +175,28 @@ public sealed partial class PackManagementService
 
     private async Task<(PackInstallationPreview Preview, IReadOnlyDictionary<PackResourceDocument, IPackResourceHandler> Handlers)> PrepareAsync(
         PackArchive archive,
+        IReadOnlyList<PackBindingSelection> requestedBindings,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(archive);
         ValidateManifest(archive);
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
         var @namespace = identity.Namespace;
+        var bindingPreviews = await PrepareBindingsAsync(archive, identity, requestedBindings, cancellationToken);
+        var validationTargets = bindingPreviews.ToDictionary(
+            binding => binding.Name,
+            binding => binding.TargetAvailable && binding.Target is not null
+                ? binding.Target
+                : binding.Required
+                    ? new ResourceReference($"binding-{binding.Name}", @namespace: ResourceNamespace.Default)
+                    : null,
+            StringComparer.Ordinal);
+        var resolvedResources = archive.Resources
+            .Select(resource => ResolveBindings(resource, validationTargets))
+            .ToArray();
         var selectedHandlers = new Dictionary<PackResourceDocument, IPackResourceHandler>();
         var resources = new List<PackResourcePreview>();
-        foreach (var resource in archive.Resources)
+        foreach (var resource in resolvedResources)
         {
             if (resource.ApiVersion != ManagementApiVersions.CoreV1)
                 throw new PackValidationException("pack_resource_api_version_unsupported", $"Resource '{resource.Path}' uses unsupported apiVersion '{resource.ApiVersion}'.");
@@ -180,9 +212,167 @@ public sealed partial class PackManagementService
             resources,
             await GetAsync(identity, cancellationToken) is not null)
         {
-            Namespace = @namespace
+            Namespace = @namespace,
+            Bindings = bindingPreviews
         };
         return (preview, selectedHandlers);
+    }
+
+    private async Task<IReadOnlyList<PackBindingPreview>> PrepareBindingsAsync(
+        PackArchive archive,
+        PackIdentity identity,
+        IReadOnlyList<PackBindingSelection> requestedBindings,
+        CancellationToken cancellationToken)
+    {
+        var duplicates = requestedBindings.GroupBy(binding => binding.Name, StringComparer.Ordinal).FirstOrDefault(group => group.Count() > 1);
+        if (duplicates is not null)
+            throw new PackValidationException("pack_binding_selection_duplicate", $"Pack binding '{duplicates.Key}' was selected more than once.");
+        var declaredNames = archive.Manifest.Definition.Bindings.Select(binding => binding.Name).ToHashSet(StringComparer.Ordinal);
+        var unknownSelection = requestedBindings.FirstOrDefault(binding => !declaredNames.Contains(binding.Name));
+        if (unknownSelection is not null)
+            throw new PackValidationException("pack_binding_selection_unknown", $"Pack binding '{unknownSelection.Name}' is not declared by this Pack.");
+
+        var stored = await GetConfigurationAsync(identity, cancellationToken);
+        var targets = stored?.Value.Definition.Bindings.ToDictionary(binding => binding.Name, binding => binding.Target, StringComparer.Ordinal)
+            ?? new Dictionary<string, ResourceReference>(StringComparer.Ordinal);
+        foreach (var selection in requestedBindings)
+        {
+            if (!string.IsNullOrWhiteSpace(selection.Target.WorkspaceRef))
+                throw new PackValidationException("pack_binding_cross_workspace_unsupported", $"Pack binding '{selection.Name}' cannot target another workspace.");
+            targets[selection.Name] = Normalize(selection.Target);
+        }
+
+        var result = new List<PackBindingPreview>(archive.Manifest.Definition.Bindings.Count);
+        foreach (var requirement in archive.Manifest.Definition.Bindings)
+        {
+            var uses = archive.Resources
+                .Where(resource => BindingNames(resource.Manifest).Contains(requirement.Name, StringComparer.Ordinal))
+                .Select(resource => new PackBindingUsage(resource.Kind, resource.Name, resource.Path))
+                .ToArray();
+            targets.TryGetValue(requirement.Name, out var target);
+            var available = target is not null && await BindingTargetExistsAsync(requirement.TargetKind, target, cancellationToken);
+            result.Add(new(
+                requirement.Name,
+                requirement.TargetKind,
+                requirement.DisplayName ?? requirement.Name,
+                requirement.Description,
+                requirement.Required,
+                uses,
+                target,
+                available));
+        }
+        return result;
+    }
+
+    private async Task<bool> BindingTargetExistsAsync(PackBindingTargetKind kind, ResourceReference target, CancellationToken cancellationToken)
+    {
+        var @namespace = target.Namespace ?? ResourceNamespace.Default;
+        return kind switch
+        {
+            PackBindingTargetKind.ModelProfile => await store.GetAsync<ModelProfileResource>(new(ResourceKinds.ModelProfile, target.Name, @namespace), cancellationToken) is not null,
+            PackBindingTargetKind.Secret => await store.GetAsync<SecretResource>(new(ResourceKinds.Secret, target.Name, @namespace), cancellationToken) is not null,
+            _ => false
+        };
+    }
+
+    private Task<StoredResource<PackConfigurationResource>?> GetConfigurationAsync(PackIdentity identity, CancellationToken cancellationToken) =>
+        store.GetAsync<PackConfigurationResource>(new(ResourceKinds.PackConfiguration, identity.ResourceName), cancellationToken);
+
+    private async Task SaveConfigurationAsync(PackIdentity identity, IReadOnlyList<PackBindingResolution> bindings, CancellationToken cancellationToken)
+    {
+        var current = await GetConfigurationAsync(identity, cancellationToken);
+        var resource = new PackConfigurationResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.PackConfiguration,
+            Metadata = new ResourceMetadata { Name = identity.ResourceName },
+            Generation = current is null ? 1 : checked(current.Value.Generation + 1),
+            Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
+            Definition = new PackConfigurationProperties
+            {
+                Publisher = identity.Publisher,
+                PackName = identity.Name,
+                Bindings = bindings,
+                UpdatedAt = timeProvider.GetUtcNow()
+            }
+        };
+        _ = await store.PutAsync(resource, current?.ETag, current is null, cancellationToken);
+    }
+
+    private static ResourceReference Normalize(ResourceReference target)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(target.Name);
+        return new(target.Name.Trim(), @namespace: target.Namespace ?? ResourceNamespace.Default);
+    }
+
+    private static PackResourceDocument ResolveBindings(PackResourceDocument resource, IReadOnlyDictionary<string, ResourceReference?> targets)
+    {
+        var node = JsonNode.Parse(resource.Manifest.GetRawText())
+            ?? throw new PackValidationException("pack_resource_invalid", $"Resource '{resource.Path}' is empty.");
+        var resolved = ResolveNode(node, targets);
+        return resource with { Manifest = JsonSerializer.SerializeToElement(resolved) };
+    }
+
+    private static JsonNode? ResolveNode(JsonNode? node, IReadOnlyDictionary<string, ResourceReference?> targets)
+    {
+        if (node is JsonObject bindingObject
+            && bindingObject.Count == 1
+            && bindingObject["binding"] is JsonValue bindingValue
+            && bindingValue.TryGetValue<string>(out var bindingName))
+        {
+            if (!targets.TryGetValue(bindingName, out var target))
+                throw new PackValidationException("pack_binding_reference_unknown", $"Resource references undeclared Pack binding '{bindingName}'.");
+            if (target is null) return null;
+            return new JsonObject
+            {
+                ["name"] = target.Name,
+                ["namespace"] = (target.Namespace ?? ResourceNamespace.Default).Value
+            };
+        }
+        if (node is JsonObject objectNode)
+        {
+            foreach (var property in objectNode.ToArray())
+            {
+                var resolved = ResolveNode(property.Value, targets);
+                if (!ReferenceEquals(resolved, property.Value)) objectNode[property.Key] = resolved;
+            }
+        }
+        else if (node is JsonArray arrayNode)
+        {
+            for (var index = 0; index < arrayNode.Count; index++)
+            {
+                var resolved = ResolveNode(arrayNode[index], targets);
+                if (!ReferenceEquals(resolved, arrayNode[index])) arrayNode[index] = resolved;
+            }
+        }
+        return node;
+    }
+
+    private static IReadOnlyList<string> BindingNames(JsonElement manifest)
+    {
+        var names = new List<string>();
+        Visit(manifest, names);
+        return names;
+    }
+
+    private static void Visit(JsonElement element, List<string> names)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            var properties = element.EnumerateObject().ToArray();
+            if (properties.Length == 1
+                && properties[0].NameEquals("binding")
+                && properties[0].Value.ValueKind == JsonValueKind.String)
+            {
+                names.Add(properties[0].Value.GetString()!);
+                return;
+            }
+            foreach (var property in properties) Visit(property.Value, names);
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) Visit(item, names);
+        }
     }
 
     public async Task UninstallAsync(PackIdentity identity, CancellationToken cancellationToken)
@@ -250,6 +440,22 @@ public sealed partial class PackManagementService
             throw new PackValidationException("pack_version_invalid", "Pack version must use Semantic Versioning.");
         if (manifest.Definition.Requirements.Count > 0)
             throw new PackValidationException("pack_requirements_unsupported", "Pack requirements are declared but dependency resolution is not available in V1.");
+        var duplicateBinding = manifest.Definition.Bindings.GroupBy(binding => binding.Name, StringComparer.Ordinal).FirstOrDefault(group => group.Count() > 1);
+        if (duplicateBinding is not null)
+            throw new PackValidationException("pack_binding_duplicate", $"Pack binding '{duplicateBinding.Key}' is declared more than once.");
+        foreach (var binding in manifest.Definition.Bindings)
+        {
+            ValidateBindingName(binding.Name);
+            if (!Enum.IsDefined(binding.TargetKind))
+                throw new PackValidationException("pack_binding_kind_invalid", $"Pack binding '{binding.Name}' has an unsupported target kind.");
+        }
+        var referencedBindings = archive.Resources.SelectMany(resource => BindingNames(resource.Manifest)).ToArray();
+        var undeclaredBinding = referencedBindings.FirstOrDefault(name => !manifest.Definition.Bindings.Any(binding => string.Equals(binding.Name, name, StringComparison.Ordinal)));
+        if (undeclaredBinding is not null)
+            throw new PackValidationException("pack_binding_reference_unknown", $"Resource references undeclared Pack binding '{undeclaredBinding}'.");
+        var unusedBinding = manifest.Definition.Bindings.FirstOrDefault(binding => !referencedBindings.Contains(binding.Name, StringComparer.Ordinal));
+        if (unusedBinding is not null)
+            throw new PackValidationException("pack_binding_unused", $"Pack binding '{unusedBinding.Name}' is not referenced by a contained resource.");
         if (manifest.Definition.Resources.Count != archive.Resources.Count)
             throw new PackValidationException("pack_resource_count_mismatch", "The Pack resource list does not match the validated archive content.");
         if (!manifest.Definition.Resources.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(archive.Resources.Select(value => value.Path)))
@@ -263,6 +469,15 @@ public sealed partial class PackManagementService
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > 60 || !char.IsAsciiLetterOrDigit(value[0]) || value.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-') || value.Any(char.IsUpper))
             throw new PackValidationException($"pack_{field}_invalid", $"Pack {field} must contain 1 to 60 lowercase ASCII letters, digits or '-' and start with a letter or digit.");
+    }
+
+    private static void ValidateBindingName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)
+            || value.Length > 128
+            || !char.IsAsciiLetterOrDigit(value[0])
+            || value.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '.'))
+            throw new PackValidationException("pack_binding_name_invalid", "Pack binding names must contain 1 to 128 ASCII letters, digits, '-' or '.' and start with a letter or digit.");
     }
 
     [GeneratedRegex(@"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$", RegexOptions.CultureInvariant)]

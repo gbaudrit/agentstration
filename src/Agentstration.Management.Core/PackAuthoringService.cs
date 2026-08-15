@@ -174,6 +174,14 @@ public sealed partial class PackAuthoringService(
     }
 
     public async Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, CancellationToken cancellationToken)
+        => await InstallBuildAsync(projectId, buildId, replaceExisting, [], cancellationToken);
+
+    public async Task<StoredResource<InstalledPackResource>> InstallBuildAsync(
+        Guid projectId,
+        Guid buildId,
+        bool replaceExisting,
+        IReadOnlyList<PackBindingSelection> bindings,
+        CancellationToken cancellationToken)
     {
         var archive = await ReadBuildArchiveAsync(projectId, buildId, cancellationToken);
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
@@ -185,7 +193,7 @@ public sealed partial class PackAuthoringService(
             await installations.UninstallAsync(identity, cancellationToken);
         }
 
-        return await installations.InstallAsync(archive, cancellationToken);
+        return await installations.InstallAsync(archive, bindings, cancellationToken);
     }
 
     public Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken) =>

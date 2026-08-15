@@ -19,6 +19,7 @@ public static class ResourceKinds
     public const string Entry = "Entry";
     public const string ManagementOperation = "ManagementOperation";
     public const string InstalledPack = "InstalledPack";
+    public const string PackConfiguration = "PackConfiguration";
     public const string ModelProvider = "ModelProvider";
     public const string ModelProfile = "ModelProfile";
     public const string RuntimeProfile = "RuntimeProfile";
@@ -74,6 +75,49 @@ public sealed record PackDefinition
 {
     public IReadOnlyList<string> Resources { get; init; } = [];
     public IReadOnlyList<PackRequirement> Requirements { get; init; } = [];
+    public IReadOnlyList<PackBindingRequirement> Bindings { get; init; } = [];
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<PackBindingTargetKind>))]
+public enum PackBindingTargetKind
+{
+    [JsonStringEnumMemberName("modelProfile")] ModelProfile,
+    [JsonStringEnumMemberName("secret")] Secret
+}
+
+public sealed record PackBindingRequirement
+{
+    public required string Name { get; init; }
+    public required PackBindingTargetKind TargetKind { get; init; }
+    public string? DisplayName { get; init; }
+    public string? Description { get; init; }
+    public bool Required { get; init; } = true;
+}
+
+public sealed record PackBindingSelection(string Name, ResourceReference Target);
+
+public sealed record PackBuildInstallRequest(
+    bool ReplaceExisting = false,
+    IReadOnlyList<PackBindingSelection>? Bindings = null);
+
+public sealed record PackBindingResolution(
+    string Name,
+    PackBindingTargetKind TargetKind,
+    ResourceReference Target);
+
+public sealed record PackBindingUsage(string ResourceKind, string ResourceName, string Path);
+
+public sealed record PackBindingPreview(
+    string Name,
+    PackBindingTargetKind TargetKind,
+    string DisplayName,
+    string? Description,
+    bool Required,
+    IReadOnlyList<PackBindingUsage> UsedBy,
+    ResourceReference? Target,
+    bool TargetAvailable)
+{
+    public bool IsResolved => !Required || TargetAvailable;
 }
 
 public sealed record PackRequirement
@@ -123,6 +167,7 @@ public sealed record InstalledPackProperties
     public PackArtifactReference? SourceArtifact { get; init; }
     public required DateTimeOffset InstalledAt { get; init; }
     public InstalledPackState State { get; init; } = InstalledPackState.Installing;
+    public IReadOnlyList<PackBindingResolution> Bindings { get; init; } = [];
     public IReadOnlyList<ManagedPackResource> ManagedResources { get; init; } = [];
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
@@ -131,6 +176,19 @@ public sealed record InstalledPackProperties
 public sealed record InstalledPackResource : Resource
 {
     public InstalledPackProperties Definition { get; init; } = null!;
+}
+
+public sealed record PackConfigurationProperties
+{
+    public required string Publisher { get; init; }
+    public required string PackName { get; init; }
+    public IReadOnlyList<PackBindingResolution> Bindings { get; init; } = [];
+    public required DateTimeOffset UpdatedAt { get; init; }
+}
+
+public sealed record PackConfigurationResource : Resource
+{
+    public PackConfigurationProperties Definition { get; init; } = null!;
 }
 
 public sealed record PackResourceDocument(
@@ -154,7 +212,9 @@ public sealed record PackInstallationPreview(
     bool AlreadyInstalled)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public IReadOnlyList<PackBindingPreview> Bindings { get; init; } = [];
     public bool CanInstall => !AlreadyInstalled && Resources.All(resource => !resource.AlreadyExists);
+    public bool RequiresConfiguration => Bindings.Any(binding => !binding.IsResolved);
 }
 
 public interface IPackArchiveReader
