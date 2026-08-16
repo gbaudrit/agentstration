@@ -16,6 +16,7 @@ public sealed class ApiEndpointOptions
 {
     public string BaseAddress { get; set; } = "http://localhost:5100/";
     public int TimeoutSeconds { get; set; } = 15;
+    public bool ForwardSessionCookie { get; set; }
 }
 
 public sealed class AuthenticationOptions

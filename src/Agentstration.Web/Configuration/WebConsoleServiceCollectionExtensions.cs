@@ -89,19 +89,26 @@ public static class WebConsoleServiceCollectionExtensions
 
             var authentication = services.AddAuthentication(authenticationOptions =>
                 {
-                    authenticationOptions.DefaultScheme = "Agentstration";
-                    authenticationOptions.DefaultChallengeScheme = "Agentstration";
+                    authenticationOptions.DefaultScheme = AgentstrationAuthenticationDefaults.PolicyScheme;
+                    authenticationOptions.DefaultChallengeScheme = AgentstrationAuthenticationDefaults.PolicyScheme;
                 })
-                .AddPolicyScheme("Agentstration", "Agentstration authentication", policy =>
+                .AddPolicyScheme(AgentstrationAuthenticationDefaults.PolicyScheme, "Agentstration authentication", policy =>
                 {
                     policy.ForwardDefaultSelector = context =>
-                        (oidc && (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/mcp")))
-                            || ((oidc || hybrid) && context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var bearer = context.Request.Headers.Authorization.ToString()
+                            .StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
+                        var apiWithoutWebSession = oidc
+                            && (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/mcp"))
+                            && !context.Request.Cookies.ContainsKey(AgentstrationAuthenticationDefaults.ApplicationCookie);
+                        return (oidc || hybrid) && (bearer || apiWithoutWebSession)
                             ? JwtBearerDefaults.AuthenticationScheme
                             : IdentityConstants.ApplicationScheme;
+                    };
                 })
                 .AddCookie(IdentityConstants.ApplicationScheme, cookie =>
                 {
+                    cookie.Cookie.Name = AgentstrationAuthenticationDefaults.ApplicationCookie;
                     cookie.LoginPath = "/login";
                     cookie.AccessDeniedPath = "/access-denied";
                     cookie.SlidingExpiration = true;
@@ -204,13 +211,26 @@ public static class WebConsoleServiceCollectionExtensions
         });
     }
 
-    private static IHttpClientBuilder ConfigureClient(IHttpClientBuilder builder, ApiEndpointOptions options) =>
+    private static IHttpClientBuilder ConfigureClient(IHttpClientBuilder builder, ApiEndpointOptions options)
+    {
+        var baseAddress = new Uri(options.BaseAddress, UriKind.Absolute);
         builder.ConfigureHttpClient(client =>
         {
-            client.BaseAddress = new Uri(options.BaseAddress, UriKind.Absolute);
+            client.BaseAddress = baseAddress;
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
             client.DefaultRequestHeaders.Add("X-Agentstration-Client", "Agentstration.Web");
         });
+        if (options.ForwardSessionCookie)
+        {
+            builder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+            builder.AddHttpMessageHandler(provider => new ConsoleApiSessionHandler(
+                provider.GetRequiredService<IHttpContextAccessor>(),
+                provider.GetRequiredService<ICurrentRequestContext>(),
+                baseAddress,
+                AgentstrationAuthenticationDefaults.ApplicationCookie));
+        }
+        return builder;
+    }
 
     private static bool Validate(AgentstrationWebOptions options) => ValidateEndpoint(options.WorkApi) && (options.UseSimulatedData ||
         ValidateEndpoint(options.ManagementApi) && ValidateEndpoint(options.RuntimeApi) && ValidateEndpoint(options.FlowApi)) &&

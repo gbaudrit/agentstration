@@ -19,6 +19,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Tests;
 
@@ -39,6 +45,35 @@ public sealed class ApiClientTests
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    [TestMethod]
+    public void OidcApisPreferBearerButAcceptTheTrustedConsoleSession()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agentstration:Authentication:Mode"] = Agentstration.Web.Configuration.AuthenticationOptions.Oidc,
+            ["Agentstration:Authentication:Authority"] = "https://identity.example/",
+            ["Agentstration:Authentication:Audience"] = "agentstration-api",
+            ["Agentstration:Authentication:ClientId"] = "agentstration-console"
+        }).Build();
+        services.AddLogging();
+        services.AddAgentstrationWebConsole(configuration, new TestHostEnvironment());
+        using var provider = services.BuildServiceProvider();
+        var selector = provider.GetRequiredService<IOptionsMonitor<PolicySchemeOptions>>()
+            .Get(AgentstrationAuthenticationDefaults.PolicyScheme).ForwardDefaultSelector;
+        Assert.IsNotNull(selector);
+
+        var api = new DefaultHttpContext();
+        api.Request.Path = "/api/agents";
+        Assert.AreEqual(JwtBearerDefaults.AuthenticationScheme, selector(api));
+
+        api.Request.Headers.Cookie = $"{AgentstrationAuthenticationDefaults.ApplicationCookie}=session";
+        Assert.AreEqual(IdentityConstants.ApplicationScheme, selector(api));
+
+        api.Request.Headers.Authorization = "Bearer access-token";
+        Assert.AreEqual(JwtBearerDefaults.AuthenticationScheme, selector(api));
+    }
 
     [TestMethod]
     public void AgentManagementAndRunnerUseCanonicalHttpClientsWhenDashboardSimulationIsEnabled()

@@ -72,3 +72,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 40. [ADR-0040 — Secrets and Vaults V1](0040-secrets-and-vaults-v1.md)
 41. [ADR-0041 — Pack resource bindings are logical and installation-scoped](0041-pack-resource-bindings.md)
 39. [ADR-0039 — Authentication and authorization boundaries](0039-authentication-and-authorization-boundaries.md)
+40. [ADR-0040 — Console API calls propagate only an explicitly trusted Web session](0040-console-api-session-propagation.md)
