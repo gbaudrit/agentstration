@@ -74,6 +74,8 @@ public sealed record LocalAccountView(
     int AccessFailedCount,
     DateTimeOffset? LockoutEnd,
     bool PlatformAdministrator);
+public sealed record LocalAccountSecurityView(Guid AccountId, string UserName, string? Email);
+public sealed record LocalAccountSecurityResult(bool Succeeded, IReadOnlyList<string> Errors);
 
 public sealed class LocalBootstrapCoordinator(
     UserManager<LocalIdentityUser> users,
@@ -234,6 +236,52 @@ public sealed class LocalAccountAdministrationService(
             await platformAuthorization.IsPlatformAdministratorAsync(principal.Id, cancellationToken));
 }
 
+public sealed class LocalAccountSecurityService(
+    UserManager<LocalIdentityUser> users,
+    SignInManager<LocalIdentityUser> signIn)
+{
+    public async Task<LocalAccountSecurityView?> GetAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var account = await users.FindByIdAsync(accountId.ToString("D"));
+        return account is null
+            ? null
+            : new(account.Id, account.UserName ?? account.Id.ToString("D"), account.Email);
+    }
+
+    public async Task<LocalAccountSecurityResult> ChangePasswordAsync(
+        Guid accountId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var account = await users.FindByIdAsync(accountId.ToString("D"));
+        if (account is null) return new(false, ["The local account no longer exists."]);
+        var changed = await users.ChangePasswordAsync(account, currentPassword, newPassword);
+        if (!changed.Succeeded)
+            return new(false, changed.Errors.Select(error => error.Description).ToArray());
+
+        await signIn.RefreshSignInAsync(account);
+        return new(true, []);
+    }
+
+    public async Task<LocalAccountSecurityResult> SignOutOtherSessionsAsync(
+        Guid accountId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var account = await users.FindByIdAsync(accountId.ToString("D"));
+        if (account is null) return new(false, ["The local account no longer exists."]);
+        var updated = await users.UpdateSecurityStampAsync(account);
+        if (!updated.Succeeded)
+            return new(false, updated.Errors.Select(error => error.Description).ToArray());
+
+        await signIn.RefreshSignInAsync(account);
+        return new(true, []);
+    }
+}
+
 public sealed class LocalBootstrapLock
 {
     internal SemaphoreSlim Semaphore { get; } = new(1, 1);
@@ -325,6 +373,7 @@ public static class LocalIdentityServiceCollectionExtensions
         services.AddScoped<IUserClaimsPrincipalFactory<LocalIdentityUser>, LocalIdentityClaimsPrincipalFactory>();
         services.AddScoped<LocalBootstrapCoordinator>();
         services.AddScoped<LocalAccountAdministrationService>();
+        services.AddScoped<LocalAccountSecurityService>();
         services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero);
         services.AddSingleton<LocalBootstrapLock>();
         services.AddSingleton<LocalIdentityDatabaseInitializer>();

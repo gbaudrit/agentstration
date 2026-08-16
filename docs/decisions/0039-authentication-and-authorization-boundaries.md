@@ -60,4 +60,4 @@ Agentstration does not expose `/authorize`, `/token`, or `/userinfo`, does not i
 
 ## Follow-up
 
-Add password change/recovery and optional confirmation flows, Platform administrator reassignment, account deletion/retention policy, external-account provisioning/linking, persistent Data Protection configuration, audit events, and authorization coverage for the remaining planes. Reconcile Work/Workplace Workspace identities before applying canonical Workspace policies there.
+Password changes and current-user revocation of other cookie sessions are delivered through ASP.NET Core Identity. Add password recovery and optional confirmation flows only after defining a secure delivery channel. Remaining work includes Platform administrator reassignment, account deletion/retention policy, external-account provisioning/linking, audit events, and authorization coverage for the remaining planes. Reconcile Work/Workplace Workspace identities before applying canonical Workspace policies there.

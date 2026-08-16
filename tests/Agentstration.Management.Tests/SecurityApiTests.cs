@@ -15,6 +15,7 @@ namespace Agentstration.Management.Tests;
 public sealed class SecurityApiTests
 {
     private const string LocalPassword = "A-strong-local-password-42!";
+    private const string ChangedLocalPassword = "A-changed-local-password-84!";
 
     [TestMethod]
     public async Task LocalAuthenticationPagesBootstrapAndLoginWithAntiforgery()
@@ -109,6 +110,86 @@ public sealed class SecurityApiTests
         using var logout = await client.GetAsync("/logout");
         Assert.AreEqual(HttpStatusCode.Redirect, logout.StatusCode);
         Assert.AreEqual("/login", logout.Headers.Location?.AbsolutePath);
+    }
+
+    [TestMethod]
+    public async Task LocalAccountCanChangePasswordAndOtherSessionsAreInvalidated()
+    {
+        await using var factory = Factory("Local");
+        using var currentBrowser = UnredirectedClient(factory);
+        using var otherBrowser = UnredirectedClient(factory);
+        await BootstrapAsync(currentBrowser, "security-user");
+        await LoginAsync(otherBrowser, "security-user", LocalPassword);
+
+        using var securityPage = await currentBrowser.GetAsync("/account/security");
+        Assert.AreEqual(HttpStatusCode.OK, securityPage.StatusCode);
+        var securityHtml = await securityPage.Content.ReadAsStringAsync();
+        StringAssert.Contains(securityHtml, "Change password");
+        var token = AntiforgeryToken(securityHtml);
+
+        using var noAntiforgery = await currentBrowser.PostAsync(
+            "/account/security?handler=ChangePassword",
+            ChangePasswordForm(null, LocalPassword, ChangedLocalPassword));
+        Assert.AreEqual(HttpStatusCode.BadRequest, noAntiforgery.StatusCode);
+
+        using var wrongCurrentPassword = await currentBrowser.PostAsync(
+            "/account/security?handler=ChangePassword",
+            ChangePasswordForm(token, "A-wrong-current-password-42!", ChangedLocalPassword));
+        Assert.AreEqual(HttpStatusCode.OK, wrongCurrentPassword.StatusCode);
+        StringAssert.Contains(await wrongCurrentPassword.Content.ReadAsStringAsync(), "Incorrect password");
+
+        using var weakPassword = await currentBrowser.PostAsync(
+            "/account/security?handler=ChangePassword",
+            ChangePasswordForm(token, LocalPassword, "weak"));
+        Assert.AreEqual(HttpStatusCode.OK, weakPassword.StatusCode);
+        StringAssert.Contains(await weakPassword.Content.ReadAsStringAsync(), "Passwords must be at least 12 characters");
+
+        using var changed = await currentBrowser.PostAsync(
+            "/account/security?handler=ChangePassword",
+            ChangePasswordForm(token, LocalPassword, ChangedLocalPassword));
+        Assert.AreEqual(HttpStatusCode.Redirect, changed.StatusCode);
+        Assert.AreEqual("/account/security?status=password-changed", changed.Headers.Location?.OriginalString);
+
+        using var currentSession = await currentBrowser.GetAsync("/api/agents");
+        using var invalidatedSession = await otherBrowser.GetAsync("/api/agents");
+        Assert.AreEqual(HttpStatusCode.OK, currentSession.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, invalidatedSession.StatusCode);
+
+        using var logout = await currentBrowser.PostAsync("/api/auth/logout", null);
+        Assert.AreEqual(HttpStatusCode.NoContent, logout.StatusCode);
+        using var oldPassword = await currentBrowser.PostAsJsonAsync("/api/auth/local/login", new
+        {
+            userName = "security-user",
+            password = LocalPassword
+        });
+        Assert.AreEqual(HttpStatusCode.Unauthorized, oldPassword.StatusCode);
+        await LoginAsync(currentBrowser, "security-user", ChangedLocalPassword);
+    }
+
+    [TestMethod]
+    public async Task LocalAccountCanSignOutOtherSessionsWithoutEndingCurrentSession()
+    {
+        await using var factory = Factory("Local");
+        using var currentBrowser = UnredirectedClient(factory);
+        using var otherBrowser = UnredirectedClient(factory);
+        await BootstrapAsync(currentBrowser, "session-user");
+        await LoginAsync(otherBrowser, "session-user", LocalPassword);
+
+        using var securityPage = await currentBrowser.GetAsync("/account/security");
+        var token = AntiforgeryToken(await securityPage.Content.ReadAsStringAsync());
+        using var signedOut = await currentBrowser.PostAsync(
+            "/account/security?handler=SignOutOtherSessions",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token
+            }));
+        Assert.AreEqual(HttpStatusCode.Redirect, signedOut.StatusCode);
+        Assert.AreEqual("/account/security?status=sessions-signed-out", signedOut.Headers.Location?.OriginalString);
+
+        using var currentSession = await currentBrowser.GetAsync("/api/agents");
+        using var invalidatedSession = await otherBrowser.GetAsync("/api/agents");
+        Assert.AreEqual(HttpStatusCode.OK, currentSession.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, invalidatedSession.StatusCode);
     }
 
     [TestMethod]
@@ -381,6 +462,45 @@ public sealed class SecurityApiTests
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", mode);
         });
+
+    private static HttpClient UnredirectedClient(WebApplicationFactory<Program> factory) =>
+        factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
+
+    private static async Task BootstrapAsync(HttpClient client, string userName)
+    {
+        using var response = await client.PostAsJsonAsync("/api/auth/bootstrap", new
+        {
+            userName,
+            password = LocalPassword,
+            displayName = "Security test user"
+        });
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    private static async Task LoginAsync(HttpClient client, string userName, string password)
+    {
+        using var response = await client.PostAsJsonAsync("/api/auth/local/login", new { userName, password });
+        Assert.AreEqual(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    private static FormUrlEncodedContent ChangePasswordForm(
+        string? antiforgeryToken,
+        string currentPassword,
+        string newPassword)
+    {
+        var values = new Dictionary<string, string>
+        {
+            ["Input.CurrentPassword"] = currentPassword,
+            ["Input.NewPassword"] = newPassword,
+            ["Input.ConfirmPassword"] = newPassword
+        };
+        if (antiforgeryToken is not null) values["__RequestVerificationToken"] = antiforgeryToken;
+        return new FormUrlEncodedContent(values);
+    }
 
     private static string AntiforgeryToken(string html)
     {

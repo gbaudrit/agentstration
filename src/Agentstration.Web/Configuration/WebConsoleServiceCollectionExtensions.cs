@@ -113,9 +113,13 @@ public static class WebConsoleServiceCollectionExtensions
                     cookie.AccessDeniedPath = "/access-denied";
                     cookie.SlidingExpiration = true;
                     if (oidc) cookie.ForwardChallenge = OpenIdConnectDefaults.AuthenticationScheme;
+                    cookie.Events.OnValidatePrincipal = SecurityStampValidator.ValidatePrincipalAsync;
                     cookie.Events.OnRedirectToLogin = context => ApiStatusOrRedirect(context, StatusCodes.Status401Unauthorized);
                     cookie.Events.OnRedirectToAccessDenied = context => ApiStatusOrRedirect(context, StatusCodes.Status403Forbidden);
-                });
+                })
+                .AddCookie(IdentityConstants.ExternalScheme)
+                .AddCookie(IdentityConstants.TwoFactorRememberMeScheme)
+                .AddCookie(IdentityConstants.TwoFactorUserIdScheme);
 
             if (oidc || hybrid)
             {

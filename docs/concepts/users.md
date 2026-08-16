@@ -6,4 +6,6 @@ Workspace membership and role assignments are Agentstration data. An identity-pr
 
 Local-account administration is restricted to Platform administrators. Workspace-role administration is contextual and uses the built-in `Owner`, `Admin`, `Member`, and `Viewer` roles. `PlatformAdmin` remains an instance grant rather than a Workspace role.
 
+An authenticated local user can change their own password and revoke their other cookie sessions from `/account/security`. These operations remain credential concerns handled by ASP.NET Core Identity; they do not alter the Agentstration Principal or Workspace memberships.
+
 The conversation labels `User`, `Agentstration`, and `System` remain functional message roles, not Principal records. See [ADR-0039](../decisions/0039-authentication-and-authorization-boundaries.md).
