@@ -1,17 +1,24 @@
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
+using Agentstration.Management.Abstractions;
 using Agentstration.Web.Features.Flows.Designer;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.DependencyInjection;
+using Agentstration.Web.Security;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 
 namespace Agentstration.Web.Configuration;
 
 public static class WebConsoleServiceCollectionExtensions
 {
-    public static IServiceCollection AddAgentstrationWebConsole(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddAgentstrationWebConsole(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         services.AddOptions<AgentstrationWebOptions>()
             .Bind(configuration.GetSection(AgentstrationWebOptions.SectionName))
@@ -64,13 +71,113 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi);
 
-        services.AddAuthentication(DevelopmentAuthenticationHandler.SchemeName)
-            .AddScheme<AuthenticationSchemeOptions, DevelopmentAuthenticationHandler>(DevelopmentAuthenticationHandler.SchemeName, _ => { });
-        services.AddAuthorizationBuilder()
-            .AddPolicy("Viewer", policy => policy.RequireRole("Viewer", "Operator", "Administrator"))
-            .AddPolicy("Operator", policy => policy.RequireRole("Operator", "Administrator"))
-            .AddPolicy("Administrator", policy => policy.RequireRole("Administrator"));
+        AddSecurity(services, configured.Authentication, environment);
         return services;
+    }
+
+    private static void AddSecurity(IServiceCollection services, AuthenticationOptions options, IHostEnvironment environment)
+    {
+        services.AddHttpContextAccessor();
+        var local = string.Equals(options.Mode, AuthenticationOptions.Local, StringComparison.OrdinalIgnoreCase);
+        var oidc = string.Equals(options.Mode, AuthenticationOptions.Oidc, StringComparison.OrdinalIgnoreCase);
+        var hybrid = string.Equals(options.Mode, AuthenticationOptions.Hybrid, StringComparison.OrdinalIgnoreCase);
+        if (local || oidc || hybrid)
+        {
+            if ((oidc || hybrid) && (string.IsNullOrWhiteSpace(options.Authority) || string.IsNullOrWhiteSpace(options.Audience)
+                || string.IsNullOrWhiteSpace(options.ClientId)))
+                throw new InvalidOperationException("OIDC authentication requires Authority, Audience, and ClientId.");
+
+            var authentication = services.AddAuthentication(authenticationOptions =>
+                {
+                    authenticationOptions.DefaultScheme = "Agentstration";
+                    authenticationOptions.DefaultChallengeScheme = "Agentstration";
+                })
+                .AddPolicyScheme("Agentstration", "Agentstration authentication", policy =>
+                {
+                    policy.ForwardDefaultSelector = context =>
+                        (oidc && (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/mcp")))
+                            || ((oidc || hybrid) && context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                            ? JwtBearerDefaults.AuthenticationScheme
+                            : IdentityConstants.ApplicationScheme;
+                })
+                .AddCookie(IdentityConstants.ApplicationScheme, cookie =>
+                {
+                    cookie.LoginPath = "/login";
+                    cookie.AccessDeniedPath = "/access-denied";
+                    cookie.SlidingExpiration = true;
+                    if (oidc) cookie.ForwardChallenge = OpenIdConnectDefaults.AuthenticationScheme;
+                    cookie.Events.OnRedirectToLogin = context => ApiStatusOrRedirect(context, StatusCodes.Status401Unauthorized);
+                    cookie.Events.OnRedirectToAccessDenied = context => ApiStatusOrRedirect(context, StatusCodes.Status403Forbidden);
+                });
+
+            if (oidc || hybrid)
+            {
+                authentication.AddJwtBearer(jwt =>
+                {
+                    jwt.Authority = options.Authority;
+                    jwt.Audience = options.Audience;
+                    jwt.RequireHttpsMetadata = options.RequireHttpsMetadata;
+                    jwt.MapInboundClaims = false;
+                }).AddOpenIdConnect(oidcOptions =>
+                {
+                    oidcOptions.Authority = options.Authority;
+                    oidcOptions.ClientId = options.ClientId;
+                    oidcOptions.ClientSecret = options.ClientSecret;
+                    oidcOptions.RequireHttpsMetadata = options.RequireHttpsMetadata;
+                    oidcOptions.ResponseType = "code";
+                    oidcOptions.UsePkce = true;
+                    oidcOptions.SaveTokens = true;
+                    oidcOptions.MapInboundClaims = false;
+                    oidcOptions.SignInScheme = IdentityConstants.ApplicationScheme;
+                    oidcOptions.Scope.Clear();
+                    oidcOptions.Scope.Add("openid");
+                    oidcOptions.Scope.Add("profile");
+                    oidcOptions.Scope.Add("email");
+                });
+            }
+        }
+        else
+        {
+            if (!string.Equals(options.Mode, AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(options.Mode, AuthenticationOptions.Disabled, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Unsupported authentication mode '{options.Mode}'.");
+            if (!environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
+                throw new InvalidOperationException($"Authentication mode '{options.Mode}' is permitted only in Development or Testing.");
+            services.AddAuthentication(DevelopmentAuthenticationHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, DevelopmentAuthenticationHandler>(DevelopmentAuthenticationHandler.SchemeName, _ => { });
+        }
+
+        services.AddSingleton<IAuthorizationHandler, WorkspacePermissionHandler>();
+        services.AddSingleton<IAuthorizationHandler, WorkspaceResourcePermissionHandler>();
+        services.AddSingleton<IAuthorizationHandler, PlatformAdministratorHandler>();
+        services.AddAuthorizationBuilder()
+            .AddPolicy(AgentstrationPolicies.Authenticated, policy => policy.RequireAuthenticatedUser())
+            .AddPolicy(AgentstrationPolicies.PlatformAdmin, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new PlatformAdministratorRequirement());
+            })
+            .AddPolicy(AgentstrationPolicies.WorkspaceReader, policy => WorkspacePolicy(policy, AuthorizationPermissions.WorkspacesRead))
+            .AddPolicy(AgentstrationPolicies.WorkspaceAdmin, policy => WorkspacePolicy(policy, AuthorizationPermissions.WorkspacesWrite))
+            .AddPolicy(AgentstrationPolicies.AuthorizationReader, policy => WorkspacePolicy(policy, AuthorizationPermissions.AuthorizationRead))
+            .AddPolicy(AgentstrationPolicies.AuthorizationAdmin, policy => WorkspacePolicy(policy, AuthorizationPermissions.AuthorizationWrite))
+            .AddPolicy(AgentstrationPolicies.CanReadAgents, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesRead))
+            .AddPolicy(AgentstrationPolicies.CanManageAgents, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesWrite))
+            .AddPolicy(AgentstrationPolicies.CanRunAgents, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute));
+    }
+
+    private static void WorkspacePolicy(AuthorizationPolicyBuilder policy, string permission)
+    {
+        policy.RequireAuthenticatedUser();
+        policy.AddRequirements(new WorkspacePermissionRequirement(permission));
+    }
+
+    private static Task ApiStatusOrRedirect(RedirectContext<CookieAuthenticationOptions> context, int statusCode)
+    {
+        if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/mcp"))
+            context.Response.StatusCode = statusCode;
+        else context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
     }
 
     private static void AddClient<TImplementation, TContract>(IServiceCollection services, ApiEndpointOptions options)

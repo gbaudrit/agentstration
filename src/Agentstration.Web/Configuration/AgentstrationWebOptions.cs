@@ -20,5 +20,19 @@ public sealed class ApiEndpointOptions
 
 public sealed class AuthenticationOptions
 {
-    public bool DevelopmentMode { get; set; } = true;
+    public const string Local = "Local";
+    public const string Hybrid = "Hybrid";
+    public const string Development = "Development";
+    public const string Disabled = "Disabled";
+    public const string Oidc = "Oidc";
+
+    public string Mode { get; set; } = Local;
+    public string? Authority { get; set; }
+    public string? Audience { get; set; }
+    public string? ClientId { get; set; }
+    public string? ClientSecret { get; set; }
+    public bool RequireHttpsMetadata { get; set; } = true;
+    public string DevelopmentIssuer { get; set; } = Agentstration.Management.Core.LocalBootstrapOptions.DevelopmentIssuer;
+    public string DevelopmentSubject { get; set; } = Agentstration.Management.Core.LocalBootstrapOptions.DevelopmentSubject;
+    public string DevelopmentDisplayName { get; set; } = "Local operator";
 }

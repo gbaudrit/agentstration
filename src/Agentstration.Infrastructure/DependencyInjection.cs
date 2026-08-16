@@ -102,9 +102,14 @@ public static class DependencyInjection
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
         services.AddSingleton<IIdentityProvider, LocalIdentityProvider>();
+        services.AddSingleton<IPrincipalResolver, ExternalIdentityPrincipalResolver>();
+        services.AddSingleton<IInitialPrincipalProvisioner, InitialPrincipalProvisioner>();
+        services.AddSingleton<ILocalPrincipalProvisioner, LocalPrincipalProvisioner>();
+        services.AddSingleton<IPlatformAuthorizationService, PlatformAuthorizationService>();
         services.AddSingleton<IAuthorizationService, PermissionAuthorizationService>();
         services.AddSingleton<ILocalEnvironmentBootstrapper, LocalEnvironmentBootstrapper>();
         services.AddSingleton<IdentityAdministrationService>();
+        services.AddSingleton<WorkspaceMembershipAdministrationService>();
         services.AddSingleton<IdentityExperienceService>();
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
         services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();

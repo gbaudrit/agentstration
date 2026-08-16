@@ -1,5 +1,9 @@
-# Users
+# Principals and authentication identities
 
-**Not implemented yet.** Agentstration has requester strings and functional conversation roles, but no canonical User, Profile, account, role, or permission resource in the current standalone vertical.
+Agentstration represents a stable caller as a provider-neutral `Principal`. A Principal may be human or a workload and can be linked to a local ASP.NET Core Identity account and multiple external identities. `LocalIdentity` links the Identity account identifier without exposing credentials. Each external identity is keyed by the exact `(Issuer, Subject)` pair from a validated OIDC/OAuth identity. Email and display name are attributes and never identity keys.
 
-The conversation labels `User`, `Agentstration`, and `System` are message roles, not identity records.
+Workspace membership and role assignments are Agentstration data. An identity-provider tenant, group, or role does not automatically create a Workspace or grant access. The first enforced vertical protects Management Agents and Identity Workspace operations; other planes remain planned.
+
+Local-account administration is restricted to Platform administrators. Workspace-role administration is contextual and uses the built-in `Owner`, `Admin`, `Member`, and `Viewer` roles. `PlatformAdmin` remains an instance grant rather than a Workspace role.
+
+The conversation labels `User`, `Agentstration`, and `System` remain functional message roles, not Principal records. See [ADR-0039](../decisions/0039-authentication-and-authorization-boundaries.md).

@@ -9,7 +9,7 @@ else
 {
     <DataGrid TItem="AccessRow" Items="Rows">
         <Header><tr><th>Principal</th><th>Role</th><th>Scope</th><th>Inheritance</th></tr></Header>
-        <Row Context="row"><tr><td>@row.Member.User.DisplayName</td><td><strong>@row.Assignment.Role.DisplayName</strong></td><td><code>@row.Assignment.Scope</code></td><td>@if(row.Assignment.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="Inherited" Status="UiStatus.Info" />}else{<span>Explicit</span>}</td></tr></Row>
+        <Row Context="row"><tr><td>@row.Member.Principal.DisplayName</td><td><strong>@row.Assignment.Role.DisplayName</strong></td><td><code>@row.Assignment.Scope</code></td><td>@if(row.Assignment.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="Inherited" Status="UiStatus.Info" />}else{<span>Explicit</span>}</td></tr></Row>
     </DataGrid>
 }
 @code {

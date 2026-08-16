@@ -22,12 +22,25 @@ using Agentstration.Runtime.AgentFramework;
 using Agentstration.Web.Features.Flows;
 using Agentstration.Web.Features.Workplace;
 using Agentstration.Work;
+using Agentstration.Security.AspNetCoreIdentity;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton(builder.Configuration.GetSection("Agentstration:Bootstrap").Get<LocalBootstrapOptions>() ?? new LocalBootstrapOptions());
+var bootstrapOptions = builder.Configuration.GetSection("Agentstration:Bootstrap").Get<LocalBootstrapOptions>() ?? new LocalBootstrapOptions();
+var configuredAuthentication = builder.Configuration.GetSection("Agentstration:Authentication").Get<Agentstration.Web.Configuration.AuthenticationOptions>() ?? new();
+if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
+{
+    bootstrapOptions.ExternalIdentityIssuer = configuredAuthentication.DevelopmentIssuer;
+    bootstrapOptions.ExternalIdentitySubject = configuredAuthentication.DevelopmentSubject;
+    bootstrapOptions.PrincipalDisplayName = configuredAuthentication.DevelopmentDisplayName;
+}
+builder.Services.AddSingleton(bootstrapOptions);
 var genAiObservability = builder.Configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new();
 genAiObservability.Validate(builder.Environment.IsDevelopment());
 var dataPath = builder.Configuration["Data:Path"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "data.json");
+var identityConnectionString = builder.Configuration.GetConnectionString("Identity")
+    ?? (builder.Environment.IsEnvironment("Testing")
+        ? $"Data Source={Path.Combine(Path.GetTempPath(), $"agentstration-identity-tests-{Guid.NewGuid():N}.db")}"
+        : $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "identity.db")}");
 var aiProvider = builder.Configuration["AI:Provider"] ?? "Managed";
 var useManagedProfileResolver = string.Equals(aiProvider, "Managed", StringComparison.OrdinalIgnoreCase)
     || string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase);
@@ -66,9 +79,10 @@ builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSignalR();
+builder.Services.AddAgentstrationLocalIdentity(identityConnectionString);
 builder.Services.AddSingleton<IFlowRunEventSink, SignalRFlowRunEventSink>();
 builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>();
-builder.Services.AddAgentstrationWebConsole(builder.Configuration);
+builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);
 builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
 builder.Services.AddHostedService<ItemProcessingWorker>();
 builder.Services.AddHostedService<MissionSchedulerWorker>();
@@ -126,12 +140,15 @@ if (genAiObservability.HttpPayloadCapture.Enabled)
 }
 app.UseExceptionHandler();
 app.UseStatusCodePages();
-app.UseMiddleware<RequestContextMiddleware>();
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapOpenApi();
 app.UseAuthentication();
+app.UseMiddleware<PrincipalResolutionMiddleware>();
+app.UseMiddleware<RequestContextMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapAgentstrationAuthentication();
+app.MapAgentstrationLocalAccountAdministration();
 app.MapAgentstrationApi();
 app.MapAgentstrationIdentityApi();
 app.MapAgentstrationManagementApi();
@@ -146,17 +163,24 @@ app.MapHub<WorkplaceHub>("/hubs/workplace");
 if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();
 app.MapMcp("/mcp");
 app.MapStaticAssets();
-app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode();
+app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode()
+    .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
 await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
+await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
+if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase)
+    || string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Oidc, StringComparison.OrdinalIgnoreCase))
+    await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
-await WorkplaceDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
-await DemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+if (app.Services.GetRequiredService<ICurrentRequestContext>().IsInitialized)
+{
+    await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+    await WorkplaceDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+    await DemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+}
 await app.RunAsync();
 
 public partial class Program;

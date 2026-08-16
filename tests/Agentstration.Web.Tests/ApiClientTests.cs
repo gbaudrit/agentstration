@@ -17,6 +17,8 @@ using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 
 namespace Agentstration.Web.Tests;
 
@@ -49,7 +51,7 @@ public sealed class ApiClientTests
             ["Agentstration:RuntimeApi:BaseAddress"] = "http://localhost:5080/"
         }).Build();
         services.AddLogging();
-        services.AddAgentstrationWebConsole(configuration);
+        services.AddAgentstrationWebConsole(configuration, new TestHostEnvironment());
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
 
@@ -758,5 +760,16 @@ public sealed class ApiClientTests
     private sealed class StubHttpClientFactory(Func<string, HttpClient> factory) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => factory(name);
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Testing";
+
+        public string ApplicationName { get; set; } = nameof(ApiClientTests);
+
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

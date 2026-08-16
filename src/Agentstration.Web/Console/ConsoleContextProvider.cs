@@ -9,7 +9,7 @@ public sealed class ConsoleContextProvider(IdentityExperienceService experience)
     {
         var view = await experience.GetContextAsync(cancellationToken);
         return new ConsoleContextSnapshot(
-            view.Context.UserId,
+            view.Context.PrincipalId,
             view.UserDisplayName,
             view.Context.TenantId,
             view.TenantName,

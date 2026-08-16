@@ -85,7 +85,9 @@ Pages depend on `IAgentstrationEventStream`, not a transport implementation. The
 
 ## Authentication
 
-Local launch uses an explicitly configured development authentication handler. Authorization policies named `Viewer`, `Operator`, and `Administrator` are registered now. Set `Agentstration:Authentication:DevelopmentMode` to `false` when wiring the host to OpenID Connect/Microsoft Entra ID; no Entra tenant is required for local startup.
+Local launch uses ASP.NET Core Identity with a dedicated SQLite credential store. A fresh instance exposes the one-time bootstrap endpoints under `/api/auth/bootstrap`; no default account or password is created. `Local`, `Oidc`, and `Hybrid` modes converge toward the same Agentstration `Principal` and Workspace policies. The isolated `Development` handler remains available only through explicit Development/Testing configuration.
+
+Platform administrators can list, create, enable, and disable local accounts from **Organization > Members** or `/api/identity/accounts`. Member details manage the current Workspace role through `/api/identity/workspaces/{workspaceId}/memberships`; the service prevents removal or demotion of the final Owner.
 
 ## Tests
 

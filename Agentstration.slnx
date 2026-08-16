@@ -32,6 +32,7 @@
     <Project Path="src/Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
     <Project Path="src/Agentstration.Secrets.Abstractions/Agentstration.Secrets.Abstractions.csproj" />
     <Project Path="src/Agentstration.Secrets.Local/Agentstration.Secrets.Local.csproj" />
+    <Project Path="src/Agentstration.Security.AspNetCoreIdentity/Agentstration.Security.AspNetCoreIdentity.csproj" />
     <Project Path="src/Agentstration.Resources/Agentstration.Resources.csproj" />
     <Project Path="src/Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <Project Path="src/Agentstration.Web/Agentstration.Web.csproj" />

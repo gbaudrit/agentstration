@@ -1,9 +1,37 @@
 @page "/settings/organization/members"
 @inject Agentstration.Management.Core.IdentityAdministrationService Service
+@inject Agentstration.Security.AspNetCoreIdentity.LocalAccountAdministrationService Accounts
+@inject Agentstration.Management.Abstractions.ICurrentRequestContext RequestContext
+@inject Agentstration.Management.Abstractions.IPlatformAuthorizationService PlatformAuthorization
+@inject Microsoft.Extensions.Options.IOptions<Agentstration.Web.Configuration.AgentstrationWebOptions> Options
 
 <PageTitle>Members · Organization · Agentstration</PageTitle>
 <PageHeader Title="Members" Description="Tenant memberships and their tenant or workspace role assignments." />
 <OrganizationSettingsNav />
+
+@if (canManageLocalAccounts)
+{
+    <section class="panel" style="margin-bottom:18px">
+        <div class="panel-header"><div><h2>Local accounts</h2><p class="muted">Create an ASP.NET Core Identity account and assign its initial Workspace role.</p></div></div>
+        @if (!string.IsNullOrWhiteSpace(accountMessage)) { <p class="form-alert @(accountError ? "form-alert-danger" : "form-alert-success")">@accountMessage</p> }
+        <div class="form-grid">
+            <label><span>Username</span><input @bind="newUserName" autocomplete="off" /></label>
+            <label><span>Display name</span><input @bind="newDisplayName" /></label>
+            <label><span>Email (optional)</span><input @bind="newEmail" type="email" autocomplete="off" /></label>
+            <label><span>Initial password</span><input @bind="newPassword" type="password" autocomplete="new-password" /></label>
+            <label><span>Workspace</span><select @bind="newWorkspaceId">@foreach(var workspace in view?.Workspaces ?? []){<option value="@workspace.Id">@workspace.DisplayName</option>}</select></label>
+            <label><span>Role</span><select @bind="newRole">@foreach(var role in Agentstration.Management.Core.BuiltInIdentityRoles.Names){<option value="@role">@role</option>}</select></label>
+        </div>
+        <div class="form-actions"><button class="button-primary" @onclick="CreateAccountAsync" disabled="@savingAccount">@(savingAccount ? "Creating…" : "Create local account")</button></div>
+        @if (localAccounts.Count > 0)
+        {
+            <DataGrid TItem="Agentstration.Security.AspNetCoreIdentity.LocalAccountView" Items="localAccounts">
+                <Header><tr><th>Account</th><th>Principal</th><th>Status</th><th>Instance role</th><th></th></tr></Header>
+                <Row Context="account"><tr><td><strong>@account.UserName</strong><br /><small>@(account.Email ?? "No email")</small></td><td>@account.DisplayName<br /><code>@account.PrincipalId</code></td><td><StatusBadge Text="@account.PrincipalStatus.ToString()" Status="@(account.PrincipalStatus == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Warning)" /></td><td>@(account.PlatformAdministrator ? "PlatformAdmin" : "—")</td><td>@if(!account.PlatformAdministrator){<button class="text-button" @onclick="() => SetEnabledAsync(account, account.PrincipalStatus != PrincipalStatus.Active)">@(account.PrincipalStatus == PrincipalStatus.Active ? "Disable" : "Enable")</button>}</td></tr></Row>
+            </DataGrid>
+        }
+    </section>
+}
 
 @if (view is null) { <LoadingState Message="Loading members…" /> }
 else if (view.Members.Count == 0) { <EmptyState Title="No members" Message="No active or suspended membership exists in this organization." /> }
@@ -11,12 +39,41 @@ else
 {
     <DataGrid TItem="Agentstration.Management.Core.MemberAdministrationView" Items="view.Members">
         <Header><tr><th>Member</th><th>Identity</th><th>Membership</th><th>Assigned access</th></tr></Header>
-        <Row Context="member"><tr><td><a href="@($"/settings/organization/members/{member.User.Id:D}")"><strong>@member.User.DisplayName</strong></a><br /><small>@(member.User.Email ?? "No email")</small></td><td>@(member.User.ExternalSubject?.StartsWith("agentstration:local", StringComparison.Ordinal) == true ? "Local identity" : "External identity")</td><td><StatusBadge Text="@member.Membership.Status.ToString()" Status="UiStatus.Success" /></td><td>@if(member.Roles.Count == 0){<span>None</span>}else{@foreach(var assigned in member.Roles){<div><strong>@assigned.Role.DisplayName</strong> <small>@ScopeLabel(assigned.Scope)</small></div>}}</td></tr></Row>
+        <Row Context="member"><tr><td><a href="@($"/settings/organization/members/{member.Principal.Id:D}")"><strong>@member.Principal.DisplayName</strong></a><br /><small>@(member.Principal.Email ?? "No email")</small></td><td>@(member.ExternalIdentities.Count == 0 ? "Unlinked" : $"{member.ExternalIdentities.Count} external identity")</td><td><StatusBadge Text="@member.Membership.Status.ToString()" Status="UiStatus.Success" /></td><td>@if(member.Roles.Count == 0){<span>None</span>}else{@foreach(var assigned in member.Roles){<div><strong>@assigned.Role.DisplayName</strong> <small>@ScopeLabel(assigned.Scope)</small></div>}}</td></tr></Row>
     </DataGrid>
 }
 
 @code {
     private Agentstration.Management.Core.TenantAdministrationView? view;
-    protected override async Task OnInitializedAsync() => view = await Service.GetCurrentAsync(default);
+    private IReadOnlyList<Agentstration.Security.AspNetCoreIdentity.LocalAccountView> localAccounts = [];
+    private bool canManageLocalAccounts; private bool savingAccount; private bool accountError;
+    private string newUserName = ""; private string newDisplayName = ""; private string? newEmail; private string newPassword = "";
+    private Guid newWorkspaceId; private string newRole = Agentstration.Management.Core.BuiltInIdentityRoles.Member; private string? accountMessage;
+    protected override async Task OnInitializedAsync()
+    {
+        view = await Service.GetCurrentAsync(default);
+        newWorkspaceId = RequestContext.Current.WorkspaceId;
+        var mode = Options.Value.Authentication.Mode;
+        var supportsLocal = string.Equals(mode, Agentstration.Web.Configuration.AuthenticationOptions.Local, StringComparison.OrdinalIgnoreCase) || string.Equals(mode, Agentstration.Web.Configuration.AuthenticationOptions.Hybrid, StringComparison.OrdinalIgnoreCase);
+        canManageLocalAccounts = supportsLocal && await PlatformAuthorization.IsPlatformAdministratorAsync(RequestContext.Current.PrincipalId, default);
+        if (canManageLocalAccounts) localAccounts = await Accounts.ListAsync(default);
+    }
+    private async Task CreateAccountAsync()
+    {
+        savingAccount = true; accountMessage = null;
+        try
+        {
+            var result = await Accounts.CreateAsync(new(newUserName, newPassword, newDisplayName, newEmail, newWorkspaceId, newRole), default);
+            accountError = result.Account is null; accountMessage = result.Account is null ? string.Join(" ", result.Errors) : $"Account '{result.Account.UserName}' created.";
+            if (result.Account is not null) { newUserName = newDisplayName = newPassword = ""; newEmail = null; localAccounts = await Accounts.ListAsync(default); view = await Service.GetCurrentAsync(default); }
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { accountError = true; accountMessage = exception.Message; }
+        finally { savingAccount = false; }
+    }
+    private async Task SetEnabledAsync(Agentstration.Security.AspNetCoreIdentity.LocalAccountView account, bool enabled)
+    {
+        try { await Accounts.SetEnabledAsync(account.AccountId, enabled, default); localAccounts = await Accounts.ListAsync(default); accountError = false; accountMessage = $"Account '{account.UserName}' {(enabled ? "enabled" : "disabled")}."; }
+        catch (InvalidOperationException exception) { accountError = true; accountMessage = exception.Message; }
+    }
     private string ScopeLabel(string scope) => scope.StartsWith("/tenants/", StringComparison.Ordinal) ? "Tenant · inherited by all workspaces" : view?.Workspaces.FirstOrDefault(workspace => scope == AuthorizationScopes.Workspace(workspace.Id)) is { } workspace ? $"Workspace · {workspace.DisplayName}" : scope;
 }

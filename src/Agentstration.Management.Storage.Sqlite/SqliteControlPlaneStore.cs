@@ -12,8 +12,12 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     internal DbSet<ControlPlaneDocument> Documents => Set<ControlPlaneDocument>();
     internal DbSet<TenantRow> Tenants => Set<TenantRow>();
     internal DbSet<WorkspaceRow> Workspaces => Set<WorkspaceRow>();
-    internal DbSet<UserRow> Users => Set<UserRow>();
+    internal DbSet<PrincipalRow> Principals => Set<PrincipalRow>();
+    internal DbSet<ExternalIdentityRow> ExternalIdentities => Set<ExternalIdentityRow>();
+    internal DbSet<LocalIdentityRow> LocalIdentities => Set<LocalIdentityRow>();
+    internal DbSet<PlatformAdministratorRow> PlatformAdministrators => Set<PlatformAdministratorRow>();
     internal DbSet<TenantMembershipRow> TenantMemberships => Set<TenantMembershipRow>();
+    internal DbSet<WorkspaceMembershipRow> WorkspaceMemberships => Set<WorkspaceMembershipRow>();
     internal DbSet<RoleDefinitionRow> RoleDefinitions => Set<RoleDefinitionRow>();
     internal DbSet<RoleAssignmentRow> RoleAssignments => Set<RoleAssignmentRow>();
 

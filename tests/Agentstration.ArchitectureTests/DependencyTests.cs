@@ -217,6 +217,42 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void NeutralLayersDoNotReferenceIdentityProviderSdksOrAspNetAuthentication()
+    {
+        var assemblies = new[]
+        {
+            typeof(Agentstration.Domain.Workspace).Assembly,
+            typeof(IPlatformStore).Assembly,
+            typeof(IControlPlaneStore).Assembly,
+            typeof(AgentManagementService).Assembly
+        };
+        var forbidden = new[] { "Azure.Identity", "Microsoft.Identity", "Keycloak", "Zitadel", "Auth0", "WorkOS", "OpenIddict", "Microsoft.AspNetCore.Authentication", "Microsoft.AspNetCore.Identity" };
+
+        Assert.IsFalse(assemblies.SelectMany(value => value.GetReferencedAssemblies())
+            .Any(reference => forbidden.Any(value => reference.Name!.Contains(value, StringComparison.OrdinalIgnoreCase))));
+    }
+
+    [TestMethod]
+    public void PrincipalContainsNoCredentialMaterial()
+    {
+        var forbidden = new[] { "password", "hash", "salt", "token", "secret", "credential", "recovery", "mfa" };
+        Assert.IsFalse(typeof(Principal).GetProperties().Any(property =>
+            forbidden.Any(value => property.Name.Contains(value, StringComparison.OrdinalIgnoreCase))));
+    }
+
+    [TestMethod]
+    public void ApiEndpointsDoNotImplementClaimOrRoleAuthorizationLogic()
+    {
+        var apiRoot = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Web", "Api");
+        var forbidden = new[] { "User.IsInRole", "User.Claims", "User.FindFirst", "ClaimTypes." };
+        var violations = Directory.EnumerateFiles(apiRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => forbidden.Any(value => File.ReadAllText(path).Contains(value, StringComparison.Ordinal)))
+            .Select(Path.GetFileName)
+            .ToArray();
+        Assert.IsEmpty(violations, $"Endpoint authorization must remain policy based: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
     public void WorkPlaneCoreDoesNotReferenceInfrastructureRuntimeOrFrameworks()
     {
         var references = typeof(WorkItem).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
