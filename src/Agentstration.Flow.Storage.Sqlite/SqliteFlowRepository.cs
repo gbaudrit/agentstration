@@ -177,6 +177,9 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == RunKey(run.Id), cancellationToken)
             ?? throw new FlowRunNotFoundException(run.Id);
         if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal)) throw new FlowConcurrencyException("The Flow Run was modified concurrently.");
+        var existing = ToRun(document).Value;
+        if (existing.Scope != run.Scope)
+            throw new FlowConcurrencyException("The Flow Run execution scope is immutable.");
         var now = timeProvider.GetUtcNow();
         document.Payload = JsonSerializer.Serialize(run, JsonOptions);
         document.ETag = NewETag();

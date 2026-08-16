@@ -207,10 +207,12 @@ Membership administration supports list, assignment/change, and removal. It crea
 | `agentstration:agents:read` | `resources/read` in the current context |
 | `agentstration:agents:manage` | `resources/write` in the current context |
 | `agentstration:agents:run` | `runs/execute` in the current context |
+| `agentstration:runs:read` | `runs/read` in the current context |
+| `agentstration:flows:run` | `runs/execute` in the current context |
 
 `WorkspacePermissionHandler` evaluates contextual requests. `WorkspaceResourcePermissionHandler` additionally verifies that a loaded Workspace resource matches the Principal, Tenant, and selected Workspace. Endpoints declare policies; they do not inspect provider claims or implement role rules.
 
-The first protected business vertical covers Management Agent list/get/put/delete routes, including namespaced variants. Identity and Workspace administration endpoints are also protected. Flow, Runtime, Work, Workplace, MCP, SignalR, AEP, and legacy content routes do not yet have complete canonical Workspace authorization coverage.
+The protected business verticals cover Management Agent list/get/put/delete routes, Identity and Workspace administration, and direct FlowRun creation, reading, events, cancellation, and queued execution. Flow execution persists the server-resolved Tenant, Workspace, and Principal scope and revalidates `runs/execute` in the worker. Runtime, Work, Workplace, MCP, SignalR, AEP, and legacy content routes do not yet have complete canonical Workspace authorization coverage.
 
 ## Platform administrator lifecycle
 

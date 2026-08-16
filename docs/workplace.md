@@ -76,6 +76,8 @@ The correlation chain is:
 
 ```text
 InteractionId → WorkTaskId → WorkExecutionId → FlowRunId → runtime execution
+
+For the shipped local topology, Workplace Web is a separate Interactive Server host while Work and Flow APIs remain in the authoritative Agentstration host. Its server-side API client forwards only the Agentstration session-cookie chunks and Workspace-selection cookie to the exact configured API origin; redirects are disabled. The API remains responsible for authenticating the cookie, resolving the canonical Management context, and authorizing `runs/execute`. A Flow-backed Work submission without that context is rejected before a WorkItem or FlowRun is queued. This cookie relay is intentionally limited to the local, same-session topology. A Workplace deployed independently must authenticate API calls through a standard mechanism such as OAuth Bearer; it must not forward cookies to a broader set of origins.
 ```
 
 Conversation messages use the functional roles `User`, `Agentstration`, and `System`; these labels are not identity records. Exact submitted JSON and attachments remain attached to the Interaction. Results, activities, notifications, and artifact metadata are separate durable projections. Artifact bytes are stored under the configured local data directory through `IArtifactStore` and are downloaded only through a workspace-scoped API route.

@@ -182,6 +182,7 @@ public sealed record FlowVersion(
     string? ReleaseNotes = null);
 
 public sealed record FlowRunError(string Code, string Message, string? Details = null);
+public sealed record FlowRunScope(Guid TenantId, Guid WorkspaceId, Guid PrincipalId);
 public sealed record FlowRunEvent(string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp);
 public sealed record FlowStepRunUsage(int? InputTokens = null, int? OutputTokens = null);
 public sealed record FlowParticipantTurnResult(int Turn, string Content);
@@ -240,6 +241,7 @@ public sealed record FlowRun
     public string? InteractionId { get; init; }
     public string? WorkTaskId { get; init; }
     public string? TriggerMessageId { get; init; }
+    public FlowRunScope? Scope { get; init; }
     public required JsonElement Input { get; init; }
     public JsonElement? Output { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }

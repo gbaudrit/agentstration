@@ -172,6 +172,8 @@ public static class DependencyInjection
         services.AddSingleton<WorkspaceAdministrationService>();
         services.AddSingleton<IFlowRunQueue, LocalFlowRunQueue>();
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
+        services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
+        services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();
         services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();
         services.AddSingleton<IFlowAgentExecutor, ManagedFlowAgentExecutor>();
         services.AddSingleton<AgentFrameworkFlowOrchestrationEngine>();

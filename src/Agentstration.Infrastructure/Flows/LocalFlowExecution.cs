@@ -7,24 +7,62 @@ using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Runtime.AgentFramework;
+using Agentstration.Work;
 
 namespace Agentstration.Infrastructure.Flows;
 
 public sealed class LocalFlowRunQueue : IFlowRunQueue
 {
-    private readonly Channel<string> channel = Channel.CreateBounded<string>(new BoundedChannelOptions(256)
+    private readonly Channel<FlowRunQueueItem> channel = Channel.CreateBounded<FlowRunQueueItem>(new BoundedChannelOptions(256)
     {
         FullMode = BoundedChannelFullMode.Wait,
         SingleReader = true,
         SingleWriter = false
     });
 
-    public ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken) => channel.Writer.WriteAsync(runId, cancellationToken);
+    public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken) => channel.Writer.WriteAsync(item, cancellationToken);
 
-    public async IAsyncEnumerable<string> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await foreach (var runId in channel.Reader.ReadAllAsync(cancellationToken)) yield return runId;
+        await foreach (var item in channel.Reader.ReadAllAsync(cancellationToken)) yield return item;
     }
+}
+
+public sealed class WorkspaceFlowRunExecutionScope(
+    IIdentityStore identities,
+    Agentstration.Management.Abstractions.IAuthorizationService authorization,
+    IRequestContextScopeFactory scopeFactory) : IFlowRunExecutionScope
+{
+    public async ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken)
+    {
+        var principal = await identities.GetPrincipalAsync(scope.PrincipalId, cancellationToken);
+        var workspace = await identities.GetWorkspaceAsync(scope.TenantId, scope.WorkspaceId, cancellationToken);
+        if (principal?.Status != PrincipalStatus.Active || workspace?.Status != WorkspaceStatus.Active)
+            throw Denied();
+
+        var requestContext = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId);
+        try
+        {
+            await authorization.EnsurePermissionAsync(requestContext, AuthorizationPermissions.RunsExecute, cancellationToken);
+        }
+        catch (AuthorizationDeniedException)
+        {
+            throw Denied();
+        }
+    }
+
+    public IDisposable Enter(FlowRunScope scope) =>
+        scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId));
+
+    private static FlowValidationException Denied() =>
+        new("flow_run_authorization_denied", "The Principal is no longer authorized to execute this Flow Run in its Workspace.");
+}
+
+public sealed class CurrentWorkExecutionScopeAccessor(ICurrentRequestContext requestContext) : IWorkExecutionScopeAccessor
+{
+    public FlowRunScope? Current => requestContext.IsInitialized
+        ? new FlowRunScope(requestContext.Current.TenantId, requestContext.Current.WorkspaceId, requestContext.Current.PrincipalId)
+        : null;
 }
 
 public sealed class LocalFlowRunCancellationRegistry : IFlowRunCancellationRegistry

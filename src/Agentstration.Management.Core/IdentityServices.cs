@@ -360,9 +360,12 @@ public sealed class PermissionAuthorizationService(IIdentityStore store) : IAuth
 {
     public async Task<IReadOnlySet<string>> GetPermissionsAsync(RequestContext context, CancellationToken cancellationToken)
     {
+        var principal = await store.GetPrincipalAsync(context.PrincipalId, cancellationToken);
+        if (principal?.Status != PrincipalStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
         var membership = await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, cancellationToken);
         if (membership?.Status != MembershipStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
-        if (await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken) is null) return new HashSet<string>(StringComparer.Ordinal);
+        var workspace = await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken);
+        if (workspace?.Status != WorkspaceStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
 
         var tenantScope = AuthorizationScopes.Tenant(context.TenantId);
         var workspaceScope = AuthorizationScopes.Workspace(context.WorkspaceId);

@@ -77,3 +77,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 45. [ADR-0045 — Security events are an append-only Management log](0045-security-events-are-an-append-only-management-log.md)
 46. [ADR-0046 — Platform administration is explicitly transferable](0046-platform-administration-is-explicitly-transferable.md)
 47. [ADR-0047 — External identities are explicitly linked to Principals](0047-external-identities-are-explicitly-linked-to-principals.md)
+48. [ADR-0048 — FlowRuns carry a durable execution scope](0048-flow-runs-carry-a-durable-execution-scope.md)

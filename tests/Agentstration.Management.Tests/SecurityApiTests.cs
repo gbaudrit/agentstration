@@ -207,9 +207,15 @@ public sealed class SecurityApiTests
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync("/api/agents");
+        using var flowRuns = await client.GetAsync("/api/flowRuns");
+        using var workplaceSubmission = await client.PostAsJsonAsync(
+            "/api/workspaces/personal/entries/request/interactions",
+            new { workspaceId = "personal", values = new Dictionary<string, object>() });
         using var externalIdentities = await client.GetAsync($"/api/identity/principals/{Guid.NewGuid():D}/external-identities");
 
         Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, flowRuns.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, workplaceSubmission.StatusCode);
         Assert.AreEqual(HttpStatusCode.Unauthorized, externalIdentities.StatusCode);
     }
 
@@ -222,12 +228,16 @@ public sealed class SecurityApiTests
         var context = factory.Services.GetRequiredService<CurrentRequestContext>().Current;
 
         using var allowed = await client.GetAsync("/api/agents");
+        using var allowedRuns = await client.GetAsync("/api/flowRuns");
         Assert.AreEqual(HttpStatusCode.OK, allowed.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, allowedRuns.StatusCode);
 
         foreach (var assignment in await store.ListRoleAssignmentsAsync(context.TenantId, context.PrincipalId, default))
             await store.RemoveRoleAssignmentAsync(assignment.Id, default);
         using var denied = await client.GetAsync("/api/agents");
+        using var deniedRuns = await client.GetAsync("/api/flowRuns");
         Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Forbidden, deniedRuns.StatusCode);
     }
 
     [TestMethod]

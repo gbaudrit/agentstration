@@ -1,4 +1,5 @@
 using Agentstration.Workplace.Client;
+using Agentstration.Workplace.Web;
 using Agentstration.Workplace.Web.Components;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -11,7 +12,15 @@ var hubValue = builder.Configuration["Agentstration:WorkplaceHubUrl"];
 hubValue = string.IsNullOrWhiteSpace(hubValue) ? new Uri(apiUrl, "hubs/workplace").ToString() : hubValue;
 if (!Uri.TryCreate(hubValue, UriKind.Absolute, out var hubUrl) || hubUrl.Scheme is not ("http" or "https")) throw new InvalidOperationException("Agentstration:WorkplaceHubUrl must be an absolute HTTP(S) URL.");
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-builder.Services.AddAgentstrationWorkplaceClient(apiUrl, hubUrl);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient(provider => new WorkplaceApiSessionHandler(
+    provider.GetRequiredService<IHttpContextAccessor>(),
+    apiUrl,
+    ".Agentstration.Identity.Application",
+    "agentstration.workspace"));
+builder.Services.AddAgentstrationWorkplaceClient(apiUrl, hubUrl)
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
+    .AddHttpMessageHandler<WorkplaceApiSessionHandler>();
 builder.Services.AddProblemDetails(); builder.Services.AddHealthChecks();
 var otlp = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 builder.Services.AddOpenTelemetry().ConfigureResource(value => value.AddService("Agentstration.Workplace.Web")).WithTracing(value => { value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation(); if (otlp) value.AddOtlpExporter(); }).WithMetrics(value => { value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation(); if (otlp) value.AddOtlpExporter(); });

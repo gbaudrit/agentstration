@@ -6,6 +6,7 @@ using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
 using Agentstration.Flow.Storage.Abstractions;
 using Agentstration.Flow.Storage.Sqlite;
+using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
@@ -241,12 +242,14 @@ public sealed class FlowTests
             expressions,
             expressions,
             new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(),
             TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"Review this SQL query"}""");
 
-        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "correlation-1", input.RootElement, default);
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "correlation-1", input.RootElement, TestScope, default);
         Assert.AreEqual(FlowRunStatus.Pending, pending.Value.Status);
-        Assert.AreEqual(pending.Value.Id, queue.Enqueued.Single());
+        Assert.AreEqual(pending.Value.Id, queue.Enqueued.Single().RunId);
+        Assert.AreEqual(TestScope, queue.Enqueued.Single().Scope);
 
         await runs.ExecuteAsync(pending.Value.Id, default);
         var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
@@ -261,6 +264,72 @@ public sealed class FlowTests
         Assert.AreEqual(12, agent.Usage!.InputTokens);
         Assert.AreEqual("done", completed.Output!.Value.GetString());
         Assert.AreEqual(1, (await runs.ListAsync(created.Value.Id, FlowRunStatus.Succeeded, 0, 20, default)).Items.Count);
+    }
+
+    [TestMethod]
+    public async Task FlowRunsAreIsolatedByTheirDurableWorkspaceScope()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(new CreateFlowCommand("scoped-run", null, "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
+        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
+            new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions,
+            new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
+        var otherScope = TestScope with { WorkspaceId = Guid.Parse("44444444-4444-4444-4444-444444444444") };
+        using var input = JsonDocument.Parse("""{"prompt":"test"}""");
+
+        var own = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "own", input.RootElement, TestScope, default);
+        var other = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "other", input.RootElement, otherScope, default);
+
+        Assert.IsNotNull(await runs.GetAsync(own.Value.Id, TestScope, default));
+        Assert.IsNull(await runs.GetAsync(other.Value.Id, TestScope, default));
+        var page = await runs.ListAsync(null, null, 0, 20, TestScope, default);
+        CollectionAssert.AreEqual(new[] { own.Value.Id }, page.Items.Select(item => item.Value.Id).ToArray());
+        await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.CancelAsync(other.Value.Id, TestScope, default));
+    }
+
+    [TestMethod]
+    public async Task FlowRunAuthorizationIsRevalidatedBeforeExecution()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(new CreateFlowCommand("revoked-run", null, "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
+        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        var expressions = new FlowExpressionParser();
+        var agent = new TrackingAgentExecutor();
+        var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
+            agent, new UnsupportedFlowOrchestrationEngine(), expressions, expressions,
+            new NullFlowRunEventSink(), new DeniedFlowRunExecutionScope(), TimeProvider.System);
+        using var input = JsonDocument.Parse("""{"prompt":"test"}""");
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "revoked", input.RootElement, TestScope, default);
+
+        await runs.ExecuteAsync(pending.Value.Id, default);
+
+        var failed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
+        Assert.AreEqual("flow_run_authorization_denied", failed.Error?.Code);
+        Assert.AreEqual(0, agent.ExecutionCount);
+    }
+
+    [TestMethod]
+    public async Task FlowRunExecutionScopeCannotBeChangedAfterCreation()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(new CreateFlowCommand("immutable-scope", null, "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
+        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
+            new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions,
+            new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
+        using var input = JsonDocument.Parse("""{"prompt":"test"}""");
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "immutable", input.RootElement, TestScope, default);
+        var changedScope = TestScope with { PrincipalId = Guid.Parse("55555555-5555-5555-5555-555555555555") };
+
+        await Assert.ThrowsExactlyAsync<FlowConcurrencyException>(() => fixture.Repository.UpdateRunAsync(
+            pending.Value with { Scope = changedScope }, pending.ETag, default));
     }
 
     [TestMethod]
@@ -290,10 +359,11 @@ public sealed class FlowTests
             expressions,
             expressions,
             new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(),
             TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"Investigate"}""");
 
-        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "orchestration-correlation", input.RootElement, default);
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "orchestration-correlation", input.RootElement, TestScope, default);
         await runs.ExecuteAsync(pending.Value.Id, default);
 
         var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
@@ -336,11 +406,12 @@ public sealed class FlowTests
             expressions,
             expressions,
             new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(),
             TimeProvider.System,
             new FlowRunExecutionOptions { OrchestrationTimeout = TimeSpan.FromMilliseconds(50) });
         using var input = JsonDocument.Parse("""{"prompt":"Wait"}""");
 
-        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "timeout-correlation", input.RootElement, default);
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "timeout-correlation", input.RootElement, TestScope, default);
         await runs.ExecuteAsync(pending.Value.Id, default);
 
         var timedOut = (await runs.GetAsync(pending.Value.Id, default))!.Value;
@@ -360,12 +431,17 @@ public sealed class FlowTests
         Assert.AreEqual(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/flows/api-run-flow/versions", new CreateFlowVersionRequest("1.0.0"))).StatusCode);
         using var input = JsonDocument.Parse("""{"prompt":"Explain SQL joins"}""");
         using var createdResponse = await client.PostAsJsonAsync("/api/flows/api-run-flow/runs",
-            new CreateFlowRunRequest(input.RootElement.Clone(), StartedBy: "api-test"), JsonOptions);
+            new CreateFlowRunRequest(input.RootElement.Clone()), JsonOptions);
         Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);
         var run = await createdResponse.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
         Assert.IsNotNull(run);
         Assert.AreEqual("1.0.0", run.FlowVersion);
         Assert.AreEqual(3, run.Steps.Count);
+        var requestContext = factory.Services.GetRequiredService<ICurrentRequestContext>().Current;
+        Assert.AreEqual(new FlowRunScope(requestContext.TenantId, requestContext.WorkspaceId, requestContext.PrincipalId), run.Scope);
+        var principal = await factory.Services.GetRequiredService<IIdentityStore>().GetPrincipalAsync(requestContext.PrincipalId, default);
+        Assert.AreEqual(principal?.DisplayName, run.StartedBy);
+        Assert.IsNull(typeof(CreateFlowRunRequest).GetProperty("StartedBy"));
         var global = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flowRuns", JsonOptions);
         Assert.IsTrue(global!.Value.Any(item => item.Id == run.Id));
         var scoped = await client.GetFromJsonAsync<FlowRunPageResponse>("/api/flows/api-run-flow/runs", JsonOptions);
@@ -524,10 +600,10 @@ public sealed class FlowTests
         var draft = new FlowDraft { Id = "typed-draft", FlowId = new("typed-run"), DisplayName = "Typed run", Definition = graph, CreatedAt = now, UpdatedAt = now };
         var queue = new TestFlowRunQueue();
         var expressionEngine = new FlowExpressionParser();
-        var runs = new FlowRunService(fixture.Repository, queue, new TestCancellationRegistry(), new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressionEngine, expressionEngine, new NullFlowRunEventSink(), TimeProvider.System);
+        var runs = new FlowRunService(fixture.Repository, queue, new TestCancellationRegistry(), new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressionEngine, expressionEngine, new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"Review this query"}""");
 
-        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "typed-correlation", input.RootElement, default);
+        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "typed-correlation", input.RootElement, TestScope, default);
         await runs.ExecuteAsync(pending.Value.Id, default);
 
         var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
@@ -555,10 +631,10 @@ public sealed class FlowTests
         var now = TimeProvider.System.GetUtcNow();
         var draft = new FlowDraft { Id = "failing-draft", FlowId = new("failing-run"), DisplayName = "Failing run", Definition = graph, CreatedAt = now, UpdatedAt = now };
         var expressions = new FlowExpressionParser();
-        var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new FailingAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(), TimeProvider.System);
+        var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new FailingAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
         using var input = JsonDocument.Parse("{}");
 
-        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "failing-correlation", input.RootElement, default);
+        var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "failing-correlation", input.RootElement, TestScope, default);
         await runs.ExecuteAsync(pending.Value.Id, default);
 
         var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
@@ -573,7 +649,7 @@ public sealed class FlowTests
         await using var fixture = await FlowFixture.CreateAsync();
         var queue = new TestFlowRunQueue();
         var expressions = new FlowExpressionParser();
-        var runs = new FlowRunService(fixture.Repository, queue, new TestCancellationRegistry(), new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(), TimeProvider.System);
+        var runs = new FlowRunService(fixture.Repository, queue, new TestCancellationRegistry(), new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
 
         var routed = await SnapshotAsync("routed", new FlowGraphDefinition
         {
@@ -614,7 +690,7 @@ public sealed class FlowTests
             var now = TimeProvider.System.GetUtcNow();
             var draft = new FlowDraft { Id = $"{id}-draft", FlowId = new(id), DisplayName = id, Definition = graph, CreatedAt = now, UpdatedAt = now };
             using var input = JsonDocument.Parse("{}");
-            var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", id, input.RootElement, default);
+            var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", id, input.RootElement, TestScope, default);
             return Assert.IsInstanceOfType<RoutingFlowDefinition>(pending.Value.DefinitionSnapshot.Definition);
         }
     }
@@ -651,10 +727,26 @@ public sealed class FlowTests
 
     private sealed class TestFlowRunQueue : IFlowRunQueue
     {
-        public List<string> Enqueued { get; } = [];
-        public ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken) { Enqueued.Add(runId); return ValueTask.CompletedTask; }
-        public async IAsyncEnumerable<string> ReadAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken) { await Task.CompletedTask; yield break; }
+        public List<FlowRunQueueItem> Enqueued { get; } = [];
+        public ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken) { Enqueued.Add(item); return ValueTask.CompletedTask; }
+        public async IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken) { await Task.CompletedTask; yield break; }
     }
+
+    private sealed class TestFlowRunExecutionScope : IFlowRunExecutionScope
+    {
+        public ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public IDisposable Enter(FlowRunScope scope) => new Scope();
+        private sealed class Scope : IDisposable { public void Dispose() { } }
+    }
+
+    private sealed class DeniedFlowRunExecutionScope : IFlowRunExecutionScope
+    {
+        public ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken) =>
+            ValueTask.FromException(new FlowValidationException("flow_run_authorization_denied", "Execution permission was revoked."));
+        public IDisposable Enter(FlowRunScope scope) => throw new AssertFailedException("A denied scope must not be entered.");
+    }
+
+    private static FlowRunScope TestScope { get; } = new(Guid.Parse("11111111-1111-1111-1111-111111111111"), Guid.Parse("22222222-2222-2222-2222-222222222222"), Guid.Parse("33333333-3333-3333-3333-333333333333"));
 
     private sealed class TestCancellationRegistry : IFlowRunCancellationRegistry
     {
@@ -667,6 +759,17 @@ public sealed class FlowTests
     {
         public Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken) =>
             Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), $"/agents/{target.Id}", 3, "/profiles/default", "Deterministic", new FlowStepRunUsage(12, 4), ["lookup"], ["executed"]));
+    }
+
+    private sealed class TrackingAgentExecutor : IFlowAgentExecutor
+    {
+        public int ExecutionCount { get; private set; }
+
+        public Task<FlowAgentExecutionResult> ExecuteAsync(FlowTargetReference target, JsonElement input, string correlationId, CancellationToken cancellationToken)
+        {
+            ExecutionCount++;
+            return Task.FromResult(new FlowAgentExecutionResult(JsonSerializer.SerializeToElement("done"), "/agents/agent", 1, "/profiles/default", "Test", null, [], []));
+        }
     }
 
     private sealed class FailingAgentExecutor : IFlowAgentExecutor
