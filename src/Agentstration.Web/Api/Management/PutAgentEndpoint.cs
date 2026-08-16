@@ -2,6 +2,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
 
@@ -9,8 +10,8 @@ internal sealed class PutAgentEndpoint : IManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPut("/agents/{name}", HandleAsync);
-        group.MapPut("/namespaces/{namespace}/agents/{name}", HandleNamespacedAsync);
+        group.MapPut("/agents/{name}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanManageAgents);
+        group.MapPut("/namespaces/{namespace}/agents/{name}", HandleNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanManageAgents);
     }
 
     private static Task<IResult> HandleNamespacedAsync(string @namespace, string name, AgentResourceRequest body, HttpRequest request, HttpResponse response, AgentManagementService service, CancellationToken cancellationToken) =>

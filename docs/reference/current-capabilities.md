@@ -138,7 +138,9 @@ Open `http://localhost:5180`; its API defaults to `http://localhost:5100`. The r
 
 The Console Tasks section at `/tasks` supervises the real WorkTasks exposed by Work API. It uses server-side pagination and SignalR updates, remains readable when Workplace is stopped, and never substitutes fictitious Tasks when Work API is unavailable.
 
-The same process now hosts the Blazor operations console in Interactive Server mode. Agent and model management always use the canonical persisted HTTP APIs; unrelated dashboard projections remain simulated by default so every operational section is immediately explorable. See the [Web console guide](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/src/Agentstration.Web/README.md) for API client, authentication, rendering, and UI component configuration.
+The same process now hosts the Blazor operations console in Interactive Server mode. Agent and model management always use the canonical persisted HTTP APIs; unrelated dashboard projections remain simulated by default so every operational section is immediately explorable. See the [Web console guide](https://github.com/gbaudrit/agentstration/blob/main/src/Agentstration.Web/README.md) for API client, authentication, rendering, and UI component configuration.
+
+Local ASP.NET Core Identity accounts, OIDC/JWT authentication, stable Principals, Workspace-scoped RBAC, Platform administrator lifecycle, external identity links, durable security audit, and the corresponding administration Console are implemented. See the [identity and authorization reference](identity-and-authorization.md) for exact modes, routes, policies, persistence, tests, and deferred surfaces.
 
 For the Aspire dashboard and orchestration experience:
 
@@ -421,6 +423,6 @@ This baseline is intentionally offline and cost-free. LLM-as-judge quality evalu
 
 ## Current boundaries
 
-This is a product foundation, not a production multi-tenant release. Pack dependency resolution, updates, signatures and Gallery access, parallel Flow scheduling, loops, waits, approvals, subflows, semantic/LLM routing, checkpoints, durable distributed Work dispatch, requester authorization, external artifact storage, execution recovery, retries, advanced connection/identity providers, revision traffic splitting, dedicated process/container hosting, Foundry bindings, runtime session storage, and management authentication remain planned.
+This is a product foundation, not a production multi-tenant release. Pack dependency resolution, updates, signatures and Gallery access, parallel Flow scheduling, loops, waits, approvals, subflows, semantic/LLM routing, checkpoints, durable distributed Work dispatch, authorization coverage outside the first Management/identity vertical, external-only identity provisioning, external artifact storage, execution recovery, retries, advanced connection providers, revision traffic splitting, dedicated process/container hosting, Foundry bindings, and runtime session storage remain planned.
 
 See [architecture](../architecture.md), [decisions](../decisions/index.md), [security](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/SECURITY.md), and [contributing](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/CONTRIBUTING.md).

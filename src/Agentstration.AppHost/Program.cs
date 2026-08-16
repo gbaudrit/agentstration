@@ -20,9 +20,13 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
 console.WaitFor(utilitiesExtension);
 console
     .WithEnvironment("Agentstration__ManagementApi__BaseAddress", console.GetEndpoint("http"))
+    .WithEnvironment("Agentstration__ManagementApi__ForwardSessionCookie", "true")
     .WithEnvironment("Agentstration__RuntimeApi__BaseAddress", console.GetEndpoint("http"))
+    .WithEnvironment("Agentstration__RuntimeApi__ForwardSessionCookie", "true")
     .WithEnvironment("Agentstration__WorkApi__BaseAddress", console.GetEndpoint("http"))
-    .WithEnvironment("Agentstration__FlowApi__BaseAddress", console.GetEndpoint("http"));
+    .WithEnvironment("Agentstration__WorkApi__ForwardSessionCookie", "true")
+    .WithEnvironment("Agentstration__FlowApi__BaseAddress", console.GetEndpoint("http"))
+    .WithEnvironment("Agentstration__FlowApi__ForwardSessionCookie", "true");
 
 var workplace = builder.AddProject<Projects.Agentstration_Workplace_Web>("agentstration-workplace")
     .WithEnvironment("Agentstration__ApiBaseUrl", console.GetEndpoint("http"))

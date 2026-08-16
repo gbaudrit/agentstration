@@ -1,10 +1,10 @@
-using Agentstration.Infrastructure;
+using System.Text.Json;
 using Agentstration.Application.Work;
-using Agentstration.Runtime.Local;
-using Agentstration.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
-using System.Text.Json;
+using Agentstration.Infrastructure;
+using Agentstration.Runtime.Local;
+using Agentstration.Work;
 
 namespace Agentstration.Web.Hosting;
 
@@ -84,6 +84,7 @@ public sealed class LocalWorkExecutionWorker(
             execution.Request.Metadata.GetValueOrDefault("workplace.interactionId"),
             execution.Request.Metadata.GetValueOrDefault("workplace.taskId") ?? execution.Request.WorkItemId.Value.ToString("D"),
             execution.Request.Metadata.GetValueOrDefault("workplace.triggerMessageId"),
+            execution.Request.ExecutionScope,
             cancellationToken);
         FlowRun current = created.Value;
         await foreach (var observed in flowRuns.ObserveAsync(created.Value.Id, cancellationToken)) current = observed;

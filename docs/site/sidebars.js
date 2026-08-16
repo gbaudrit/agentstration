@@ -68,6 +68,7 @@ const sidebars = {
         'reference/resources/agents',
         'reference/secrets-and-vaults',
         'reference/configuration',
+        'reference/identity-and-authorization',
         'reference/current-capabilities',
       ],
     },

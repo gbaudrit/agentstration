@@ -64,6 +64,8 @@
                 <EnvironmentSwitcher />
                 <button class="icon-button" @onclick="Preferences.ToggleTheme" aria-label="Toggle color theme">@(Preferences.IsDarkTheme ? "☀" : "◐")</button>
                 <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="Notifications"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
+                <a class="icon-button" href="/account/security" aria-label="Account security" title="Account security"><UiIcon Name="shield-check" /></a>
+                <a class="icon-button" href="/logout" aria-label="Sign out" title="Sign out"><UiIcon Name="log-out" /></a>
             </div>
         </header>
         <main class="content" id="main-content">@Body</main>

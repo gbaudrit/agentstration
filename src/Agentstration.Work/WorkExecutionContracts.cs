@@ -11,7 +11,13 @@ public sealed record WorkExecutionRequest(
     IReadOnlyList<WorkInput> Inputs,
     IReadOnlyList<WorkAttachment> Attachments,
     IReadOnlyDictionary<string, string> Metadata,
-    FlowReference? Flow = null);
+    FlowReference? Flow = null,
+    FlowRunScope? ExecutionScope = null);
+
+public interface IWorkExecutionScopeAccessor
+{
+    FlowRunScope? Current { get; }
+}
 
 public sealed record WorkExecutionAccepted(WorkExecutionId ExecutionId, string? SelectedAgentId, DateTimeOffset AcceptedAt, Guid EventId);
 

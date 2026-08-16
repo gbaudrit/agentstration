@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Application.Work;
+using Agentstration.Flow;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -193,6 +194,7 @@ public sealed class WorkPlaneTests
 
         Assert.AreEqual(WorkItemStatus.Queued, created.Value.Status);
         Assert.AreEqual(created.Value.Id, fixture.Gateway.Request!.WorkItemId);
+        Assert.AreEqual(TestWorkExecutionScopeAccessor.Scope, fixture.Gateway.Request.ExecutionScope);
         Assert.IsTrue(fixture.Gateway.Confirmed);
         var executionId = created.Value.CurrentExecutionId!.Value;
         await service.ApplyExecutionEventAsync(new WorkExecutionStarted(Guid.NewGuid(), created.Value.Id, executionId, Now, "dotnet-expert"), default);
@@ -390,6 +392,28 @@ public sealed class WorkPlaneTests
         public Task ConfirmQueuedAsync(WorkExecutionAccepted accepted, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
+    [TestMethod]
+    public async Task FlowBackedWorkIsRejectedBeforeQueueingWithoutAnExecutionScope()
+    {
+        await using var fixture = await WorkFixture.CreateAsync(withExecutionScope: false);
+
+        var exception = await Assert.ThrowsExactlyAsync<WorkValidationException>(() => fixture.Service.SubmitAsync(
+            new SubmitWorkItemCommand("flow", "Run", Flow: new FlowReference(new FlowId("main"))), default));
+
+        Assert.AreEqual("work_execution_scope_required", exception.Code);
+        Assert.IsNull(fixture.Gateway.Request);
+    }
+
+    private sealed class TestWorkExecutionScopeAccessor : IWorkExecutionScopeAccessor
+    {
+        public static FlowRunScope Scope { get; } = new(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            Guid.Parse("33333333-3333-3333-3333-333333333333"));
+
+        public FlowRunScope Current => Scope;
+    }
+
     private static EntryDraft Entry(EntryId id) => new()
     {
         Id = id,
@@ -413,7 +437,7 @@ public sealed class WorkPlaneTests
 
         private WorkFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
 
-        public static async Task<WorkFixture> CreateAsync()
+        public static async Task<WorkFixture> CreateAsync(bool withExecutionScope = true)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-work-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -423,6 +447,7 @@ public sealed class WorkPlaneTests
             services.AddSqliteWorkPlane($"Data Source={Path.Combine(directory, "work.db")};Pooling=False");
             services.AddSingleton<FakeGateway>();
             services.AddSingleton<IWorkExecutionGateway>(provider => provider.GetRequiredService<FakeGateway>());
+            if (withExecutionScope) services.AddSingleton<IWorkExecutionScopeAccessor, TestWorkExecutionScopeAccessor>();
             services.AddSingleton<WorkItemService>();
             var provider = services.BuildServiceProvider();
             var fixture = new WorkFixture(directory, provider);

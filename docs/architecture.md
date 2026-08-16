@@ -97,7 +97,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
 | Flows | typed graph drafts, typed orchestration authoring, immutable versions, durable Runs, visual editors and SignalR replay | checkpoints and long-running interactive steps |
 | Flow storage | independent readable JSON documents, ETags, active/current definition separation | migrations, indirect reference projections |
-| Identity | local-user boundary only | OIDC, users, members, workspace authorization |
+| Identity | local accounts, Principal mapping, Workspace memberships/RBAC, bootstrap, account security, append-only security audit | external-account provisioning/linking, recovery, workload authentication |
 | Workspaces | workspace and inbox lifecycle | teams, organizations, policies |
 | Ingestion | text, JSON, multipart file, URL, hash deduplication | webhooks, email, connectors |
 | Memory | normalized content, summaries, categories, search contract | facts, relations, embeddings, conversations |
@@ -327,7 +327,7 @@ MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and i
 
 The Management boundary persists a `Tenant -> Workspace` hierarchy and a global `User -> TenantMembership -> RoleAssignment -> RoleDefinition` authorization model in the SQLite control-plane database. Management resource rows carry explicit tenant and workspace scope columns in addition to their JSON payload. Store reads, writes, lists, and deletes are filtered by the initialized request context.
 
-Standalone startup creates or repairs `local / default`, the local user, active tenant membership, and a tenant-level Owner assignment before management demo data is seeded. Parent tenant assignments inherit into every accessible workspace. The request pipeline validates the workspace selection stored in an HTTP-only cookie, installs it as an ambient request context, and restores the standalone fallback after the request. The Console exposes a dynamic workspace selector plus General, Workspaces, Members, and Access Control views. Management HTTP routes use `/api/...`; workspace scope comes from the authorized context. See ADR-0031.
+In explicit Development mode, standalone startup creates or repairs the development Principal and its `local / default` context. In the default Local mode, a fresh instance instead exposes a one-time Web bootstrap that creates the first ASP.NET Core Identity account, its Principal, the initial tenant and workspace, Workspace Owner assignment, and Platform administrator grant. No default credential exists. The request pipeline resolves the authenticated identity, validates the workspace selection stored in an HTTP-only cookie, and installs it as an ambient request context for the request. The Console exposes a dynamic workspace selector plus General, Workspaces, Members, Access Control, and PlatformAdmin-only Security audit views. Platform administration can be transferred explicitly to another active Principal; self-revocation, self-disable, and removal of the last active administrator are rejected. Platform administrators can also link exact OIDC `(Issuer, Subject)` pairs to existing human Principals without email matching or provider-specific types. Authentication and authorization mutations append structured identifier-only events to the Management Control Plane. Management HTTP routes use `/api/...`; workspace scope comes from the authorized context. See ADR-0042, ADR-0045, ADR-0046, and ADR-0047.
 
 ## Implementation plan
 
@@ -390,3 +390,9 @@ Standalone startup creates or repairs `local / default`, the local user, active 
 - ADR-0036: runtime resolution and control-plane hardening
 - ADR-0037: Packs are Management and distribution artifacts
 - ADR-0038: Pack Projects retain sources and produce local immutable builds
+- ADR-0042: authentication and authorization boundaries
+- ADR-0043: trusted Console API session propagation
+- ADR-0044: durable Identity schema and Data Protection key material
+- ADR-0045: append-only Management security audit
+- ADR-0046: transferable Platform administration
+- ADR-0047: explicit external identity links

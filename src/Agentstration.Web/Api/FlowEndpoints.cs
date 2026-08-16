@@ -3,7 +3,9 @@ using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
 using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web;
 
@@ -20,10 +22,10 @@ public static class FlowEndpoints
         group.MapGet("/{id}/versions", ListVersionsAsync);
         group.MapGet("/{id}/versions/{version}", GetVersionAsync);
         group.MapPost("/{id}/versions", CreateVersionAsync);
-        group.MapPost("/{id}/runs", CreateRunAsync);
-        group.MapGet("/{id}/runs", ListFlowRunsAsync);
-        group.MapGet("/{id}/runs/{runId}", GetFlowRunAsync);
-        group.MapPost("/{id}/runs/{runId}/cancel", CancelFlowRunAsync);
+        group.MapPost("/{id}/runs", CreateRunAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
+        group.MapGet("/{id}/runs", ListFlowRunsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        group.MapGet("/{id}/runs/{runId}", GetFlowRunAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        group.MapPost("/{id}/runs/{runId}/cancel", CancelFlowRunAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         group.MapPost("/drafts", CreateDraftAsync);
         group.MapGet("/{id}/draft", GetDraftAsync);
         group.MapPut("/{id}/draft", SaveDraftAsync);
@@ -31,7 +33,7 @@ public static class FlowEndpoints
         group.MapGet("/{id}/draft/source", GetDraftSourceAsync);
         group.MapPut("/{id}/draft/source", ReplaceDraftSourceAsync);
         group.MapPost("/{id}/publish", PublishDraftAsync);
-        group.MapPost("/{id}/draft/runs", CreateDraftRunAsync);
+        group.MapPost("/{id}/draft/runs", CreateDraftRunAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         group.MapPost("/{id}/versions/{version}/draft", CreateDraftFromVersionAsync);
         var namespaced = endpoints.MapGroup("/api/namespaces/{namespace}/flows");
         namespaced.MapPost("/", CreateNamespacedAsync);
@@ -41,14 +43,14 @@ public static class FlowEndpoints
         namespaced.MapDelete("/{id}", DeleteNamespacedAsync);
         namespaced.MapGet("/{id}/versions", ListNamespacedVersionsAsync);
         namespaced.MapGet("/{id}/versions/{version}", GetNamespacedVersionAsync);
-        namespaced.MapPost("/{id}/runs", CreateNamespacedRunAsync);
-        namespaced.MapGet("/{id}/runs", ListNamespacedFlowRunsAsync);
+        namespaced.MapPost("/{id}/runs", CreateNamespacedRunAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
+        namespaced.MapGet("/{id}/runs", ListNamespacedFlowRunsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         var runs = endpoints.MapGroup("/api/flowRuns");
-        runs.MapGet("/", ListRunsAsync);
-        runs.MapGet("/{runId}", GetRunAsync);
-        runs.MapGet("/{runId}/events", ObserveRunAsync);
-        runs.MapGet("/{runId}/eventHistory", ListRunEventsAsync);
-        runs.MapPost("/{runId}/cancel", CancelRunAsync);
+        runs.MapGet("/", ListRunsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        runs.MapGet("/{runId}", GetRunAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        runs.MapGet("/{runId}/events", ObserveRunAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        runs.MapGet("/{runId}/eventHistory", ListRunEventsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        runs.MapPost("/{runId}/cancel", CancelRunAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         return endpoints;
     }
 
@@ -173,62 +175,65 @@ public static class FlowEndpoints
         return Results.Ok((await service.ListVersionsAsync(flowId, token)).Select(item => ToVersion(item.Value)));
     });
 
-    private static Task<IResult> CreateRunAsync(string id, CreateFlowRunRequest body, HttpResponse response, FlowRunService service, CancellationToken token) =>
-        CreateRunCoreAsync(new FlowId(id), body, response, service, token);
+    private static Task<IResult> CreateRunAsync(string id, CreateFlowRunRequest body, HttpContext context, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
+        CreateRunCoreAsync(new FlowId(id), body, context, response, service, requestContext, token);
 
-    private static Task<IResult> CreateNamespacedRunAsync(string @namespace, string id, CreateFlowRunRequest body, HttpResponse response, FlowRunService service, CancellationToken token) =>
-        CreateRunCoreAsync(new FlowId(id, ResourceNamespace.Parse(@namespace)), body, response, service, token);
+    private static Task<IResult> CreateNamespacedRunAsync(string @namespace, string id, CreateFlowRunRequest body, HttpContext context, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
+        CreateRunCoreAsync(new FlowId(id, ResourceNamespace.Parse(@namespace)), body, context, response, service, requestContext, token);
 
-    private static Task<IResult> CreateRunCoreAsync(FlowId flowId, CreateFlowRunRequest body, HttpResponse response, FlowRunService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> CreateRunCoreAsync(FlowId flowId, CreateFlowRunRequest body, HttpContext context, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var stored = await service.CreateAsync(flowId, body.Version, body.DeploymentResourceId, body.Trigger, body.StartedBy, body.CorrelationId, body.Input, token);
+        var scope = CurrentScope(requestContext);
+        var startedBy = context.Features.Get<ResolvedPrincipalFeature>()?.Principal.DisplayName ?? scope.PrincipalId.ToString("D");
+        var stored = await service.CreateAsync(flowId, body.Version, body.DeploymentResourceId, body.Trigger, startedBy, body.CorrelationId, body.Input, scope, token);
         response.Headers.Location = $"/api/flowRuns/{stored.Value.Id}";
         response.Headers.ETag = stored.ETag;
         return Results.Accepted($"/api/flowRuns/{stored.Value.Id}", stored.Value);
     });
 
-    private static Task<IResult> ListFlowRunsAsync(string id, FlowRunStatus? status, int? skip, int? top, FlowRunService service, CancellationToken token) =>
-        ListRunsCoreAsync(new FlowId(id), status, skip, top, service, token);
+    private static Task<IResult> ListFlowRunsAsync(string id, FlowRunStatus? status, int? skip, int? top, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
+        ListRunsCoreAsync(new FlowId(id), status, skip, top, service, requestContext, token);
 
-    private static Task<IResult> ListNamespacedFlowRunsAsync(string @namespace, string id, FlowRunStatus? status, int? skip, int? top, FlowRunService service, CancellationToken token) =>
-        ListRunsCoreAsync(new FlowId(id, ResourceNamespace.Parse(@namespace)), status, skip, top, service, token);
+    private static Task<IResult> ListNamespacedFlowRunsAsync(string @namespace, string id, FlowRunStatus? status, int? skip, int? top, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
+        ListRunsCoreAsync(new FlowId(id, ResourceNamespace.Parse(@namespace)), status, skip, top, service, requestContext, token);
 
-    private static Task<IResult> ListRunsAsync(string? flowId, FlowRunStatus? status, int? skip, int? top, FlowRunService service, CancellationToken token) =>
-        ListRunsCoreAsync(string.IsNullOrWhiteSpace(flowId) ? null : new FlowId(flowId), status, skip, top, service, token);
+    private static Task<IResult> ListRunsAsync(string? flowId, FlowRunStatus? status, int? skip, int? top, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
+        ListRunsCoreAsync(string.IsNullOrWhiteSpace(flowId) ? null : new FlowId(flowId), status, skip, top, service, requestContext, token);
 
-    private static Task<IResult> ListRunsCoreAsync(FlowId? flowId, FlowRunStatus? status, int? skip, int? top, FlowRunService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> ListRunsCoreAsync(FlowId? flowId, FlowRunStatus? status, int? skip, int? top, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         var actualSkip = Math.Max(0, skip ?? 0);
         var actualTop = Math.Clamp(top ?? 50, 1, 200);
-        var page = await service.ListAsync(flowId, status, actualSkip, actualTop, token);
+        var page = await service.ListAsync(flowId, status, actualSkip, actualTop, CurrentScope(requestContext), token);
         var next = page.HasMore ? $"/api/flowRuns?skip={actualSkip + actualTop}&top={actualTop}" : null;
         return Results.Ok(new FlowRunPageResponse(page.Items.Select(item => item.Value).ToArray(), next));
     });
 
-    private static Task<IResult> GetFlowRunAsync(string id, string runId, HttpResponse response, FlowRunService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> GetFlowRunAsync(string id, string runId, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var stored = await RequiredRunAsync(runId, service, token);
+        var stored = await RequiredRunAsync(runId, service, CurrentScope(requestContext), token);
         if (stored.Value.FlowId != new FlowId(id)) throw new FlowRunNotFoundException(runId);
         response.Headers.ETag = stored.ETag;
         return Results.Ok(stored.Value);
     });
 
-    private static Task<IResult> GetRunAsync(string runId, HttpResponse response, FlowRunService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> GetRunAsync(string runId, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var stored = await RequiredRunAsync(runId, service, token);
+        var stored = await RequiredRunAsync(runId, service, CurrentScope(requestContext), token);
         response.Headers.ETag = stored.ETag;
         return Results.Ok(stored.Value);
     });
 
-    private static Task<IResult> CancelFlowRunAsync(string id, string runId, FlowRunService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> CancelFlowRunAsync(string id, string runId, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var stored = await RequiredRunAsync(runId, service, token);
+        var scope = CurrentScope(requestContext);
+        var stored = await RequiredRunAsync(runId, service, scope, token);
         if (stored.Value.FlowId != new FlowId(id)) throw new FlowRunNotFoundException(runId);
-        return Results.Ok((await service.CancelAsync(runId, token)).Value);
+        return Results.Ok((await service.CancelAsync(runId, scope, token)).Value);
     });
 
-    private static Task<IResult> CancelRunAsync(string runId, FlowRunService service, CancellationToken token) => ExecuteAsync(async () =>
-        Results.Ok((await service.CancelAsync(runId, token)).Value));
+    private static Task<IResult> CancelRunAsync(string runId, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+        Results.Ok((await service.CancelAsync(runId, CurrentScope(requestContext), token)).Value));
 
     private static Task<IResult> CreateDraftAsync(CreateFlowDraftRequest body, HttpResponse response, FlowDraftService service, CancellationToken token) => ExecuteAsync(async () =>
     {
@@ -283,12 +288,14 @@ public static class FlowEndpoints
         return Results.Json(ToVersion(stored.Value), statusCode: StatusCodes.Status201Created);
     });
 
-    private static Task<IResult> CreateDraftRunAsync(string id, CreateFlowRunRequest body, HttpResponse response, FlowDraftService drafts, FlowRunService runs, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> CreateDraftRunAsync(string id, CreateFlowRunRequest body, HttpContext context, HttpResponse response, FlowDraftService drafts, FlowRunService runs, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         var draft = await drafts.GetAsync(new FlowId(id), token) ?? throw new FlowNotFoundException(new FlowId(id));
         var validation = await drafts.ValidateAsync(new FlowId(id), token);
         if (!validation.IsValid) throw new FlowValidationException("flow_validation_failed", "The Flow Draft contains validation errors and cannot run.");
-        var stored = await runs.CreateDraftAsync(draft.Value, body.Trigger, body.StartedBy, body.CorrelationId, body.Input, token);
+        var scope = CurrentScope(requestContext);
+        var startedBy = context.Features.Get<ResolvedPrincipalFeature>()?.Principal.DisplayName ?? scope.PrincipalId.ToString("D");
+        var stored = await runs.CreateDraftAsync(draft.Value, body.Trigger, startedBy, body.CorrelationId, body.Input, scope, token);
         response.Headers.Location = $"/api/flowRuns/{stored.Value.Id}";
         return Results.Accepted($"/api/flowRuns/{stored.Value.Id}", stored.Value);
     });
@@ -300,27 +307,34 @@ public static class FlowEndpoints
         return Results.Ok(new FlowDraftResponse(stored.Value, stored.ETag));
     });
 
-    private static async Task ObserveRunAsync(string runId, HttpResponse response, FlowRunService service, CancellationToken token)
+    private static async Task ObserveRunAsync(string runId, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token)
     {
         response.ContentType = "text/event-stream";
         response.Headers.CacheControl = "no-cache";
-        await foreach (var run in service.ObserveAsync(runId, token))
+        await foreach (var run in service.ObserveAsync(runId, CurrentScope(requestContext), token))
         {
             await response.WriteAsync($"data: {JsonSerializer.Serialize(run, JsonOptions)}\n\n", token);
             await response.Body.FlushAsync(token);
         }
     }
 
-    private static Task<IResult> ListRunEventsAsync(string runId, long? afterSequence, FlowRunService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> ListRunEventsAsync(string runId, long? afterSequence, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        _ = await RequiredRunAsync(runId, service, token);
+        _ = await RequiredRunAsync(runId, service, CurrentScope(requestContext), token);
         return Results.Ok(await service.ListEventsAsync(runId, Math.Max(0, afterSequence ?? 0), token));
     });
 
     private static async Task<StoredFlow> RequiredAsync(string id, FlowService service, CancellationToken token) =>
         await service.GetAsync(new FlowId(id), token) ?? throw new FlowNotFoundException(new FlowId(id));
-    private static async Task<StoredFlowRun> RequiredRunAsync(string id, FlowRunService service, CancellationToken token) =>
-        await service.GetAsync(id, token) ?? throw new FlowRunNotFoundException(id);
+    private static async Task<StoredFlowRun> RequiredRunAsync(string id, FlowRunService service, FlowRunScope scope, CancellationToken token) =>
+        await service.GetAsync(id, scope, token) ?? throw new FlowRunNotFoundException(id);
+    private static FlowRunScope CurrentScope(ICurrentRequestContext requestContext)
+    {
+        if (!requestContext.IsInitialized)
+            throw new FlowValidationException("flow_run_context_required", "A Flow Run requires an authenticated Workspace context.");
+        var current = requestContext.Current;
+        return new(current.TenantId, current.WorkspaceId, current.PrincipalId);
+    }
 
     private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt) { Namespace = value.Id.Namespace };
     private static FlowSummaryResponse ToSummary(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Definition.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt) { Namespace = value.Id.Namespace };

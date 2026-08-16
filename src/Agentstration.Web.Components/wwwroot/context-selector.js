@@ -1,5 +1,5 @@
 export async function selectWorkspace(workspaceId) {
-    const response = await fetch('/api/identity/context/workspace', {
+    const response = await fetch('/bff/identity/context/workspace', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },

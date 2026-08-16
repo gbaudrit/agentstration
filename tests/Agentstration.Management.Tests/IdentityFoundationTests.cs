@@ -1,12 +1,12 @@
+using System.Net;
+using System.Net.Http.Json;
 using Agentstration.Infrastructure;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
-using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using System.Net;
-using System.Net.Http.Json;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
 
@@ -26,6 +26,7 @@ public sealed class IdentityFoundationTests
         Assert.AreEqual(1, (await store.ListTenantsAsync(default)).Count);
         Assert.AreEqual(1, (await store.ListWorkspacesAsync(first.TenantId, default)).Count);
         Assert.IsNotNull(await store.FindMembershipAsync(first.TenantId, first.UserId, default));
+        Assert.IsNotNull(await store.FindWorkspaceMembershipAsync(first.WorkspaceId, first.PrincipalId, default));
         Assert.AreEqual(1, (await store.ListRoleAssignmentsAsync(first.TenantId, first.UserId, default)).Count);
     }
 
@@ -70,18 +71,20 @@ public sealed class IdentityFoundationTests
         var now = DateTimeOffset.UtcNow;
         var reader = new RoleDefinition(Guid.NewGuid(), "Reader-test", "Reader", [AuthorizationPermissions.ResourcesRead], false);
         await store.AddRoleDefinitionAsync(reader, default);
-        var readerUser = new User(Guid.NewGuid(), "reader-test", "Reader", null, UserStatus.Active, now);
-        await store.AddUserAsync(readerUser, default);
-        await store.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), context.TenantId, readerUser.Id, MembershipStatus.Active, now), default);
-        await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), context.TenantId, readerUser.Id, PrincipalType.User, reader.Id, AuthorizationScopes.Workspace(context.WorkspaceId)), default);
-        var readerContext = context with { UserId = readerUser.Id };
+        var readerPrincipal = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Reader", null, PrincipalStatus.Active, now);
+        await store.AddPrincipalAsync(readerPrincipal, default);
+        await store.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), context.TenantId, readerPrincipal.Id, MembershipStatus.Active, now), default);
+        await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), context.WorkspaceId, readerPrincipal.Id, MembershipStatus.Active, now), default);
+        await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), context.TenantId, readerPrincipal.Id, PrincipalType.User, reader.Id, AuthorizationScopes.Workspace(context.WorkspaceId)), default);
+        var readerContext = context with { PrincipalId = readerPrincipal.Id };
         Assert.IsTrue(await authorization.HasPermissionAsync(readerContext, AuthorizationPermissions.ResourcesRead, default));
         Assert.IsFalse(await authorization.HasPermissionAsync(readerContext, AuthorizationPermissions.ResourcesWrite, default));
 
-        var unassigned = new User(Guid.NewGuid(), "unassigned-test", "Unassigned", null, UserStatus.Active, now);
-        await store.AddUserAsync(unassigned, default);
+        var unassigned = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Unassigned", null, PrincipalStatus.Active, now);
+        await store.AddPrincipalAsync(unassigned, default);
         await store.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), context.TenantId, unassigned.Id, MembershipStatus.Active, now), default);
-        Assert.IsFalse(await authorization.HasPermissionAsync(context with { UserId = unassigned.Id }, AuthorizationPermissions.ResourcesRead, default));
+        await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), context.WorkspaceId, unassigned.Id, MembershipStatus.Active, now), default);
+        Assert.IsFalse(await authorization.HasPermissionAsync(context with { PrincipalId = unassigned.Id }, AuthorizationPermissions.ResourcesRead, default));
     }
 
     [TestMethod]
@@ -152,6 +155,42 @@ public sealed class IdentityFoundationTests
 
         var denied = await client.PostAsJsonAsync("/api/identity/context/workspace", new { workspaceId = Guid.NewGuid() });
         Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ExternalIdentityUsesIssuerAndSubjectAndIgnoresEmailChanges()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var resolver = fixture.Services.GetRequiredService<IPrincipalResolver>();
+        var now = DateTimeOffset.UtcNow;
+        var first = new Principal(Guid.NewGuid(), PrincipalKind.Human, "First", "before@example.test", PrincipalStatus.Active, now);
+        var second = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Second", null, PrincipalStatus.Active, now);
+        await store.AddPrincipalAsync(first, default);
+        await store.AddPrincipalAsync(second, default);
+        await store.AddExternalIdentityAsync(new ExternalIdentity(Guid.NewGuid(), "https://issuer-a.test", "same-subject", first.Id, now), default);
+        await store.AddExternalIdentityAsync(new ExternalIdentity(Guid.NewGuid(), "https://issuer-b.test", "same-subject", second.Id, now), default);
+
+        Assert.AreEqual(first.Id, (await resolver.ResolveAsync("https://issuer-a.test", "same-subject", default))?.Id);
+        Assert.AreEqual(second.Id, (await resolver.ResolveAsync("https://issuer-b.test", "same-subject", default))?.Id);
+
+        await store.UpdatePrincipalAsync(first with { Email = "after@example.test" }, default);
+        Assert.AreEqual(first.Id, (await resolver.ResolveAsync("https://issuer-a.test", "same-subject", default))?.Id);
+    }
+
+    [TestMethod]
+    public async Task ExistingIdentityRowsMigrateToExternalIdentityAndWorkspaceMembership()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var context = fixture.Context.Current;
+        await fixture.ExecuteSqlAsync("DROP TABLE WorkspaceMemberships; DROP TABLE ExternalIdentities; UPDATE Users SET ExternalSubject = 'legacy-subject';");
+
+        await fixture.Services.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);
+
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var identity = await store.FindExternalIdentityAsync(LocalBootstrapOptions.DevelopmentIssuer, "legacy-subject", default);
+        Assert.AreEqual(context.PrincipalId, identity?.PrincipalId);
+        Assert.IsNotNull(await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, default));
     }
 
     private static RuntimeProfileResource Profile(string id, RequestContext context) => new()

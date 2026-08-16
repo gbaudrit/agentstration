@@ -2,6 +2,8 @@ using System.Net;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Workplace.Client;
+using Agentstration.Workplace.Web;
+using Microsoft.AspNetCore.Http;
 
 namespace Agentstration.Workplace.Web.Tests;
 
@@ -23,14 +25,62 @@ public sealed class WorkplaceApiClientTests
         Assert.AreEqual("/api/workspaces/personal/namespaces/agentstration.daily-life-assistant/entries/main/interactions", handler.RequestUri?.AbsolutePath);
     }
 
-    private sealed class CaptureHandler : HttpMessageHandler
+    [TestMethod]
+    public async Task WorkplaceForwardsOnlyAgentstrationSessionCookiesToTheConfiguredApiOrigin()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = ".Agentstration.Identity.Application=chunks-2; .Agentstration.Identity.ApplicationC1=part; agentstration.workspace=workspace-id; unrelated=secret";
+        var capture = new CaptureHandler(HttpStatusCode.OK);
+        var handler = new WorkplaceApiSessionHandler(
+            new HttpContextAccessor { HttpContext = context },
+            new Uri("http://localhost:5100/"),
+            ".Agentstration.Identity.Application",
+            "agentstration.workspace")
+        {
+            InnerHandler = capture
+        };
+        using var invoker = new HttpMessageInvoker(handler);
+
+        using var response = await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://localhost:5100/api/workplace/workspaces"), default);
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.AreEqual(
+            ".Agentstration.Identity.Application=chunks-2; .Agentstration.Identity.ApplicationC1=part; agentstration.workspace=workspace-id",
+            capture.Cookie);
+        Assert.IsFalse(capture.Cookie?.Contains("unrelated", StringComparison.Ordinal) == true);
+    }
+
+    [TestMethod]
+    public async Task WorkplaceDoesNotForwardSessionCookiesToAnotherOrigin()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = ".Agentstration.Identity.Application=session";
+        var capture = new CaptureHandler(HttpStatusCode.OK);
+        var handler = new WorkplaceApiSessionHandler(
+            new HttpContextAccessor { HttpContext = context },
+            new Uri("http://localhost:5100/"),
+            ".Agentstration.Identity.Application",
+            "agentstration.workspace")
+        {
+            InnerHandler = capture
+        };
+        using var invoker = new HttpMessageInvoker(handler);
+
+        _ = await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://localhost:5200/api/workplace/workspaces"), default);
+
+        Assert.IsNull(capture.Cookie);
+    }
+
+    private sealed class CaptureHandler(HttpStatusCode statusCode = HttpStatusCode.NotFound) : HttpMessageHandler
     {
         public Uri? RequestUri { get; private set; }
+        public string? Cookie { get; private set; }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             RequestUri = request.RequestUri;
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound) { RequestMessage = request });
+            Cookie = request.Headers.TryGetValues("Cookie", out var values) ? string.Join("; ", values) : null;
+            return Task.FromResult(new HttpResponseMessage(statusCode) { RequestMessage = request });
         }
     }
 }

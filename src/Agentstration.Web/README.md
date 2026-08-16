@@ -85,7 +85,21 @@ Pages depend on `IAgentstrationEventStream`, not a transport implementation. The
 
 ## Authentication
 
-Local launch uses an explicitly configured development authentication handler. Authorization policies named `Viewer`, `Operator`, and `Administrator` are registered now. Set `Agentstration:Authentication:DevelopmentMode` to `false` when wiring the host to OpenID Connect/Microsoft Entra ID; no Entra tenant is required for local startup.
+Local launch uses ASP.NET Core Identity with a dedicated SQLite credential store. A fresh instance redirects to the one-time, server-rendered `/bootstrap` page; no default account or password is created. `/login`, `/logout`, and `/access-denied` stay outside the protected Interactive Server circuit so the application cookie is established at the normal ASP.NET Core HTTP boundary. Forms use antiforgery validation, and return URLs are restricted to local paths. The JSON bootstrap and login endpoints under `/api/auth` remain available for programmatic clients. `Local`, `Oidc`, and `Hybrid` modes converge toward the same Agentstration `Principal` and Workspace policies. The isolated `Development` handler remains available only through explicit Development/Testing configuration.
+
+`identity.db` is upgraded with versioned EF Core migrations. The persistent Data Protection key ring defaults beside the local data file and can be changed with `Agentstration:Authentication:DataProtectionKeysPath`. Back up and protect both stores; the key directory contains sensitive material required to keep cookies and Identity lifecycle tokens valid across restarts.
+
+Platform administrators can list, create, enable, and disable local accounts from **Organization > Members** or `/api/identity/accounts`. Member details manage the current Workspace role through `/api/identity/workspaces/{workspaceId}/memberships`; the service prevents removal or demotion of the final Owner.
+
+Member details also manage the instance-level Platform administrator grant. The lifecycle API under `/api/identity/platform-administrators` supports listing, granting, and revoking administrators while preventing self-lockout and removal of the last active administrator. Transfer administration by granting and authenticating the successor before that successor disables or revokes the predecessor.
+
+Platform administrators can link and unlink exact external OIDC identities from the same member details page or `/api/identity/principals/{principalId}/external-identities`. Links use the case-sensitive `(Issuer, Subject)` pair, never email. Pair ownership is unique, operations are audited without claim values, and the final authentication method is protected. Unknown external callers are not provisioned automatically.
+
+Local users can change their password or invalidate their other application-cookie sessions from `/account/security`. Both operations use ASP.NET Core Identity and antiforgery-protected server-rendered forms. Password recovery remains deliberately unavailable until a secure delivery channel is designed.
+
+The Management Control Plane keeps an append-only security history for authentication and authorization mutations. Platform administrators can inspect the latest events from **Organization > Security audit** or `GET /api/identity/audit-events`; records deliberately exclude credentials, usernames, email addresses, claims, and tokens.
+
+Interactive Server components invoke canonical APIs through server-side typed clients. For the standalone same-instance endpoints, `ForwardSessionCookie=true` propagates only the authenticated Agentstration session and resolved Workspace to the exact configured origin; redirects are disabled and unrelated cookies are never copied. The APIs still execute their authentication and authorization policies. Keep this option off for unrelated or independently deployed APIs and use OAuth Bearer access tokens at that boundary.
 
 ## Tests
 

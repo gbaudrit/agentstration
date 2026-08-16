@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
 
@@ -8,8 +9,8 @@ internal sealed class GetAgentEndpoint : IManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/agents/{name}", HandleAsync);
-        group.MapGet("/namespaces/{namespace}/agents/{name}", HandleNamespacedAsync);
+        group.MapGet("/agents/{name}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadAgents);
+        group.MapGet("/namespaces/{namespace}/agents/{name}", HandleNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanReadAgents);
     }
 
     private static Task<IResult> HandleNamespacedAsync(string @namespace, string name, HttpRequest request, HttpResponse response, AgentManagementService service, CancellationToken cancellationToken) =>

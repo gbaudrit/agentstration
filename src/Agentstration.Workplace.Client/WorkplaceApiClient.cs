@@ -164,9 +164,10 @@ public sealed class WorkplaceRealtimeClient : IAsyncDisposable
 
 public static class WorkplaceClientServiceCollectionExtensions
 {
-    public static IServiceCollection AddAgentstrationWorkplaceClient(this IServiceCollection services, Uri apiBaseUrl, Uri hubUrl)
+    public static IHttpClientBuilder AddAgentstrationWorkplaceClient(this IServiceCollection services, Uri apiBaseUrl, Uri hubUrl)
     {
-        services.AddHttpClient<IWorkplaceApiClient, WorkplaceApiClient>(client => client.BaseAddress = apiBaseUrl);
-        services.AddScoped(_ => new WorkplaceRealtimeClient(hubUrl)); return services;
+        var builder = services.AddHttpClient<IWorkplaceApiClient, WorkplaceApiClient>(client => client.BaseAddress = apiBaseUrl);
+        services.AddScoped(_ => new WorkplaceRealtimeClient(hubUrl));
+        return builder;
     }
 }

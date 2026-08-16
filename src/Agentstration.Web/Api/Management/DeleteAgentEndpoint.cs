@@ -1,5 +1,6 @@
 using Agentstration.Management.Core;
 using Agentstration.Resources;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
 
@@ -7,8 +8,8 @@ internal sealed class DeleteAgentEndpoint : IManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapDelete("/agents/{name}", HandleAsync);
-        group.MapDelete("/namespaces/{namespace}/agents/{name}", HandleNamespacedAsync);
+        group.MapDelete("/agents/{name}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanManageAgents);
+        group.MapDelete("/namespaces/{namespace}/agents/{name}", HandleNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanManageAgents);
     }
 
     private static Task<IResult> HandleNamespacedAsync(string @namespace, string name, HttpRequest request, AgentManagementService service, CancellationToken cancellationToken) =>

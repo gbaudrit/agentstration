@@ -24,8 +24,16 @@ public interface IFlowAgentExecutor
 
 public interface IFlowRunQueue
 {
-    ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken);
-    IAsyncEnumerable<string> ReadAllAsync(CancellationToken cancellationToken);
+    ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken);
+    IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(CancellationToken cancellationToken);
+}
+
+public sealed record FlowRunQueueItem(string RunId, FlowRunScope? Scope);
+
+public interface IFlowRunExecutionScope
+{
+    ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken);
+    IDisposable Enter(FlowRunScope scope);
 }
 
 public interface IFlowRunCancellationRegistry
@@ -59,6 +67,7 @@ public sealed class FlowRunService(
     IExpressionParser expressionParser,
     IExpressionEvaluator expressions,
     IFlowRunEventSink eventSink,
+    IFlowRunExecutionScope executionScope,
     TimeProvider timeProvider,
     FlowRunExecutionOptions? executionOptions = null)
 {
@@ -78,7 +87,7 @@ public sealed class FlowRunService(
     {
         var page = await repository.ListRunsAsync(null, null, 0, 1000, cancellationToken);
         foreach (var run in page.Items.Where(item => item.Value.Status is FlowRunStatus.Pending or FlowRunStatus.Running))
-            await queue.EnqueueAsync(run.Value.Id, cancellationToken);
+            await queue.EnqueueAsync(new(run.Value.Id, run.Value.Scope), cancellationToken);
     }
 
     public async Task<StoredFlowRun> CreateAsync(
@@ -90,7 +99,19 @@ public sealed class FlowRunService(
         string? correlationId,
         JsonElement input,
         CancellationToken cancellationToken)
-        => await CreateAsync(flowId, version, deploymentResourceId, trigger, startedBy, correlationId, input, null, null, null, null, cancellationToken);
+        => await CreateAsync(flowId, version, deploymentResourceId, trigger, startedBy, correlationId, input, null, null, null, null, null, cancellationToken);
+
+    public Task<StoredFlowRun> CreateAsync(
+        FlowId flowId,
+        string? version,
+        string? deploymentResourceId,
+        FlowRunTrigger trigger,
+        string? startedBy,
+        string? correlationId,
+        JsonElement input,
+        FlowRunScope scope,
+        CancellationToken cancellationToken) =>
+        CreateAsync(flowId, version, deploymentResourceId, trigger, startedBy, correlationId, input, null, null, null, null, scope, cancellationToken);
 
     public async Task<StoredFlowRun> CreateAsync(
         FlowId flowId,
@@ -104,6 +125,7 @@ public sealed class FlowRunService(
         string? interactionId,
         string? workTaskId,
         string? triggerMessageId,
+        FlowRunScope? scope,
         CancellationToken cancellationToken)
     {
         var resolved = await ResolveVersionAsync(flowId, version, cancellationToken);
@@ -122,6 +144,7 @@ public sealed class FlowRunService(
             InteractionId = interactionId,
             WorkTaskId = workTaskId,
             TriggerMessageId = triggerMessageId,
+            Scope = scope,
             Input = input.Clone(),
             CreatedAt = now,
             DefinitionSnapshot = resolved,
@@ -133,11 +156,14 @@ public sealed class FlowRunService(
         var stored = await repository.CreateRunAsync(run, cancellationToken);
         RunsCreated.Add(1, new KeyValuePair<string, object?>("flow.definition.state", run.DefinitionState.ToString()));
         await EmitAsync(run.Id, FlowRunEventType.FlowRunCreated, null, JsonSerializer.SerializeToElement(new { run.Status, run.DefinitionState }), cancellationToken);
-        await queue.EnqueueAsync(run.Id, cancellationToken);
+        await queue.EnqueueAsync(new(run.Id, run.Scope), cancellationToken);
         return stored;
     }
 
     public async Task<StoredFlowRun> CreateDraftAsync(FlowDraft draft, FlowRunTrigger trigger, string? startedBy, string? correlationId, JsonElement input, CancellationToken cancellationToken)
+        => await CreateDraftAsync(draft, trigger, startedBy, correlationId, input, null, cancellationToken);
+
+    public async Task<StoredFlowRun> CreateDraftAsync(FlowDraft draft, FlowRunTrigger trigger, string? startedBy, string? correlationId, JsonElement input, FlowRunScope? scope, CancellationToken cancellationToken)
     {
         ValidateInput(draft.Definition.InputSchema, input);
         var validationVersion = $"0.0.0-draft.{draft.Revision}";
@@ -157,6 +183,7 @@ public sealed class FlowRunService(
             Trigger = trigger,
             StartedBy = string.IsNullOrWhiteSpace(startedBy) ? "local-user" : startedBy,
             CorrelationId = string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString("N") : correlationId,
+            Scope = scope,
             Input = input.Clone(),
             CreatedAt = now,
             DefinitionSnapshot = snapshot,
@@ -165,14 +192,36 @@ public sealed class FlowRunService(
         var stored = await repository.CreateRunAsync(run, cancellationToken);
         RunsCreated.Add(1, new KeyValuePair<string, object?>("flow.definition.state", run.DefinitionState.ToString()));
         await EmitAsync(run.Id, FlowRunEventType.FlowRunCreated, null, JsonSerializer.SerializeToElement(new { run.Status, run.DefinitionState, run.DraftRevision }), cancellationToken);
-        await queue.EnqueueAsync(run.Id, cancellationToken);
+        await queue.EnqueueAsync(new(run.Id, run.Scope), cancellationToken);
         return stored;
     }
 
     public Task<StoredFlowRun?> GetAsync(string runId, CancellationToken cancellationToken) => repository.GetRunAsync(runId, cancellationToken);
 
+    public async Task<StoredFlowRun?> GetAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)
+    {
+        var stored = await repository.GetRunAsync(runId, cancellationToken);
+        return stored is not null && HasScope(stored.Value, scope) ? stored : null;
+    }
+
     public Task<FlowRunPage> ListAsync(FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken) =>
         repository.ListRunsAsync(flowId, status, skip, take, cancellationToken);
+
+    public async Task<FlowRunPage> ListAsync(FlowId? flowId, FlowRunStatus? status, int skip, int take, FlowRunScope scope, CancellationToken cancellationToken)
+    {
+        var matches = new List<StoredFlowRun>();
+        var offset = 0;
+        const int pageSize = 200;
+        while (matches.Count < skip + take + 1)
+        {
+            var page = await repository.ListRunsAsync(flowId, null, offset, pageSize, cancellationToken);
+            matches.AddRange(page.Items.Where(item => HasScope(item.Value, scope) && (status is null || item.Value.Status == status)));
+            offset += page.Items.Count;
+            if (!page.HasMore || page.Items.Count == 0) break;
+        }
+        var items = matches.Skip(skip).Take(take).ToArray();
+        return new(items, matches.Count > skip + take);
+    }
 
     public async Task<StoredFlowRun> CancelAsync(string runId, CancellationToken cancellationToken)
     {
@@ -194,6 +243,12 @@ public sealed class FlowRunService(
         return cancelled;
     }
 
+    public async Task<StoredFlowRun> CancelAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)
+    {
+        _ = await RequiredAsync(runId, scope, cancellationToken);
+        return await CancelAsync(runId, cancellationToken);
+    }
+
     public async Task ExecuteAsync(string runId, CancellationToken stoppingToken)
     {
         var stored = await RequiredAsync(runId, stoppingToken);
@@ -211,8 +266,13 @@ public sealed class FlowRunService(
             ? null
             : CancellationTokenSource.CreateLinkedTokenSource(runToken, timeout.Token);
         var executionToken = executionTimeoutLink?.Token ?? runToken;
+        IDisposable? activeExecutionScope = null;
         try
         {
+            if (stored.Value.Scope is null)
+                throw new FlowValidationException("flow_run_scope_missing", "The Flow Run does not contain a durable execution scope.");
+            await executionScope.ValidateAsync(stored.Value.Scope, stoppingToken);
+            activeExecutionScope = executionScope.Enter(stored.Value.Scope);
             stored = await SaveAsync(stored, stored.Value with { Status = FlowRunStatus.Running, StartedAt = timeProvider.GetUtcNow() }, stoppingToken);
             await EmitAsync(runId, FlowRunEventType.FlowRunStarted, null, null, stoppingToken);
             if (stored.Value.DefinitionSnapshot.Graph is not null)
@@ -260,6 +320,7 @@ public sealed class FlowRunService(
         }
         finally
         {
+            activeExecutionScope?.Dispose();
             cancellations.Complete(runId);
         }
     }
@@ -277,6 +338,15 @@ public sealed class FlowRunService(
             }
             if (stored.Value.Status.IsTerminal()) yield break;
             await Task.Delay(TimeSpan.FromMilliseconds(300), timeProvider, cancellationToken);
+        }
+    }
+
+    public async IAsyncEnumerable<FlowRun> ObserveAsync(string runId, FlowRunScope scope, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (var run in ObserveAsync(runId, cancellationToken))
+        {
+            if (!HasScope(run, scope)) throw new FlowRunNotFoundException(runId);
+            yield return run;
         }
     }
 
@@ -736,6 +806,9 @@ public sealed class FlowRunService(
 
     private Task<StoredFlowRun> SaveAsync(StoredFlowRun stored, FlowRun value, CancellationToken token) => repository.UpdateRunAsync(value, stored.ETag, token);
     private async Task<StoredFlowRun> RequiredAsync(string id, CancellationToken token) => await repository.GetRunAsync(id, token) ?? throw new FlowRunNotFoundException(id);
+    private async Task<StoredFlowRun> RequiredAsync(string id, FlowRunScope scope, CancellationToken token) =>
+        await GetAsync(id, scope, token) ?? throw new FlowRunNotFoundException(id);
+    private static bool HasScope(FlowRun run, FlowRunScope scope) => run.Scope == scope;
     private async Task EmitAsync(string runId, FlowRunEventType type, string? stepId, JsonElement? payload, CancellationToken token)
     {
         var runEvent = await repository.AppendRunEventAsync(new FlowRunEvent(runId, 0, type, stepId, payload?.Clone(), timeProvider.GetUtcNow()), token);

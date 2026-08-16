@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Agentstration.Flow;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
-using Agentstration.Flow;
 using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Application.Work;
@@ -25,7 +25,8 @@ public sealed class WorkItemService(
     IWorkExecutionGateway executionGateway,
     TimeProvider timeProvider,
     ILogger<WorkItemService> logger,
-    IEnumerable<IWorkTaskEventSink> eventSinks)
+    IEnumerable<IWorkTaskEventSink> eventSinks,
+    IEnumerable<IWorkExecutionScopeAccessor> executionScopeAccessors)
 {
     public static readonly ActivitySource ActivitySource = new("Agentstration.Work");
     public static readonly Meter Meter = new("Agentstration.Work");
@@ -59,10 +60,14 @@ public sealed class WorkItemService(
             command.RequesterIdentity, command.CorrelationId, command.Metadata, command.RequestedAgentId, command.Inputs, command.Attachments, command.Flow);
         activity?.SetTag("work.item.id", item.Id.ToString());
         activity?.SetTag("work.correlation.id", item.CorrelationId.ToString());
+        var executionScope = executionScopeAccessors.Select(accessor => accessor.Current).FirstOrDefault(scope => scope is not null);
+        if (item.Flow is not null && executionScope is null)
+            throw new WorkValidationException("work_execution_scope_required", "Flow-backed work requires an authenticated execution scope.");
         await repository.CreateAsync(item, cancellationToken);
 
         var accepted = await executionGateway.RequestExecutionAsync(new WorkExecutionRequest(
-            item.Id, item.CorrelationId, item.Type, item.Instruction, item.RequestedAgentId, item.Inputs, item.Attachments, item.Metadata, item.Flow), cancellationToken);
+            item.Id, item.CorrelationId, item.Type, item.Instruction, item.RequestedAgentId, item.Inputs, item.Attachments, item.Metadata, item.Flow,
+            executionScope), cancellationToken);
         var expectedVersion = item.Version;
         item.MarkQueued(accepted.ExecutionId, accepted.SelectedAgentId, accepted.EventId, accepted.AcceptedAt);
         var stored = await repository.SaveAsync(item, expectedVersion, cancellationToken);
