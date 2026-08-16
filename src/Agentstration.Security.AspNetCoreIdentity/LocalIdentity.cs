@@ -157,6 +157,7 @@ public sealed class LocalAccountAdministrationService(
     ILocalPrincipalProvisioner provisioner,
     ICurrentRequestContext requestContext,
     IPlatformAuthorizationService platformAuthorization,
+    IPlatformAdministratorPolicy platformAdministratorPolicy,
     ISecurityAuditWriter audit)
 {
     public async Task<IReadOnlyList<LocalAccountView>> ListAsync(CancellationToken cancellationToken)
@@ -224,21 +225,28 @@ public sealed class LocalAccountAdministrationService(
             ?? throw new InvalidOperationException("The local account is not linked to a Principal.");
         var principal = await identityStore.GetPrincipalAsync(link.PrincipalId, cancellationToken)
             ?? throw new InvalidOperationException("The linked Principal does not exist.");
-        if (!enabled && await platformAuthorization.IsPlatformAdministratorAsync(principal.Id, cancellationToken))
-            throw new InvalidOperationException("A Platform administrator account cannot be disabled in this iteration.");
+        IAsyncDisposable? lifecycleLease = null;
+        try
+        {
+            if (!enabled) lifecycleLease = await platformAdministratorPolicy.AcquireDisableLeaseAsync(principal.Id, cancellationToken);
 
-        account.LockoutEnabled = true;
-        account.LockoutEnd = enabled ? null : DateTimeOffset.MaxValue;
-        var updated = await users.UpdateAsync(account);
-        if (!updated.Succeeded) throw new InvalidOperationException(string.Join("; ", updated.Errors.Select(error => error.Description)));
-        await users.UpdateSecurityStampAsync(account);
-        principal = principal with { Status = enabled ? PrincipalStatus.Active : PrincipalStatus.Disabled };
-        await identityStore.UpdatePrincipalAsync(principal, cancellationToken);
-        await audit.WriteAsync(new(
-            enabled ? SecurityAuditActions.LocalAccountEnabled : SecurityAuditActions.LocalAccountDisabled,
-            TargetPrincipalId: principal.Id,
-            TargetAccountId: account.Id), cancellationToken);
-        return await ViewAsync(account, principal, cancellationToken);
+            account.LockoutEnabled = true;
+            account.LockoutEnd = enabled ? null : DateTimeOffset.MaxValue;
+            var updated = await users.UpdateAsync(account);
+            if (!updated.Succeeded) throw new InvalidOperationException(string.Join("; ", updated.Errors.Select(error => error.Description)));
+            await users.UpdateSecurityStampAsync(account);
+            principal = principal with { Status = enabled ? PrincipalStatus.Active : PrincipalStatus.Disabled };
+            await identityStore.UpdatePrincipalAsync(principal, cancellationToken);
+            await audit.WriteAsync(new(
+                enabled ? SecurityAuditActions.LocalAccountEnabled : SecurityAuditActions.LocalAccountDisabled,
+                TargetPrincipalId: principal.Id,
+                TargetAccountId: account.Id), cancellationToken);
+            return await ViewAsync(account, principal, cancellationToken);
+        }
+        finally
+        {
+            if (lifecycleLease is not null) await lifecycleLease.DisposeAsync();
+        }
     }
 
     private async Task EnsurePlatformAdministratorAsync(CancellationToken cancellationToken)

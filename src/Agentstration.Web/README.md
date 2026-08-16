@@ -91,6 +91,8 @@ Local launch uses ASP.NET Core Identity with a dedicated SQLite credential store
 
 Platform administrators can list, create, enable, and disable local accounts from **Organization > Members** or `/api/identity/accounts`. Member details manage the current Workspace role through `/api/identity/workspaces/{workspaceId}/memberships`; the service prevents removal or demotion of the final Owner.
 
+Member details also manage the instance-level Platform administrator grant. The lifecycle API under `/api/identity/platform-administrators` supports listing, granting, and revoking administrators while preventing self-lockout and removal of the last active administrator. Transfer administration by granting and authenticating the successor before that successor disables or revokes the predecessor.
+
 Local users can change their password or invalidate their other application-cookie sessions from `/account/security`. Both operations use ASP.NET Core Identity and antiforgery-protected server-rendered forms. Password recovery remains deliberately unavailable until a secure delivery channel is designed.
 
 The Management Control Plane keeps an append-only security history for authentication and authorization mutations. Platform administrators can inspect the latest events from **Organization > Security audit** or `GET /api/identity/audit-events`; records deliberately exclude credentials, usernames, email addresses, claims, and tokens.

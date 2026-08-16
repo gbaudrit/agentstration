@@ -75,3 +75,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 40. [ADR-0040 — Console API calls propagate only an explicitly trusted Web session](0040-console-api-session-propagation.md)
 41. [ADR-0041 — Identity schema and Web key material are durable](0041-durable-identity-schema-and-data-protection.md)
 42. [ADR-0042 — Security events are an append-only Management log](0042-security-events-are-an-append-only-management-log.md)
+43. [ADR-0043 — Platform administration is explicitly transferable](0043-platform-administration-is-explicitly-transferable.md)

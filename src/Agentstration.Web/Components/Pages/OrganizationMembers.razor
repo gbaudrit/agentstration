@@ -27,7 +27,7 @@
         {
             <DataGrid TItem="Agentstration.Security.AspNetCoreIdentity.LocalAccountView" Items="localAccounts">
                 <Header><tr><th>Account</th><th>Principal</th><th>Status</th><th>Instance role</th><th></th></tr></Header>
-                <Row Context="account"><tr><td><strong>@account.UserName</strong><br /><small>@(account.Email ?? "No email")</small></td><td>@account.DisplayName<br /><code>@account.PrincipalId</code></td><td><StatusBadge Text="@account.PrincipalStatus.ToString()" Status="@(account.PrincipalStatus == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Warning)" /></td><td>@(account.PlatformAdministrator ? "PlatformAdmin" : "—")</td><td>@if(!account.PlatformAdministrator){<button class="text-button" @onclick="() => SetEnabledAsync(account, account.PrincipalStatus != PrincipalStatus.Active)">@(account.PrincipalStatus == PrincipalStatus.Active ? "Disable" : "Enable")</button>}</td></tr></Row>
+                <Row Context="account"><tr><td><strong>@account.UserName</strong><br /><small>@(account.Email ?? "No email")</small></td><td>@account.DisplayName<br /><code>@account.PrincipalId</code></td><td><StatusBadge Text="@account.PrincipalStatus.ToString()" Status="@(account.PrincipalStatus == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Warning)" /></td><td>@(account.PlatformAdministrator ? "PlatformAdmin" : "—")</td><td><button class="text-button" @onclick="() => SetEnabledAsync(account, account.PrincipalStatus != PrincipalStatus.Active)">@(account.PrincipalStatus == PrincipalStatus.Active ? "Disable" : "Enable")</button></td></tr></Row>
             </DataGrid>
         }
     </section>

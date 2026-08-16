@@ -1,7 +1,9 @@
 @page "/settings/organization/members/{UserId:guid}"
 @inject Agentstration.Management.Core.IdentityAdministrationService Service
 @inject Agentstration.Management.Core.WorkspaceMembershipAdministrationService Memberships
+@inject Agentstration.Management.Core.PlatformAdministratorAdministrationService PlatformAdministrators
 @inject Agentstration.Management.Abstractions.ICurrentRequestContext RequestContext
+@inject Agentstration.Management.Abstractions.IPlatformAuthorizationService PlatformAuthorization
 
 <PageTitle>Member access · Agentstration</PageTitle>
 @if (member is null) { <LoadingState Message="Loading member access…" /> }
@@ -10,7 +12,7 @@ else
     <PageHeader Title="@member.Principal.DisplayName" Description="Effective tenant and workspace access for this principal." />
     <OrganizationSettingsNav />
     <section class="dashboard-grid">
-        <article class="panel"><div class="panel-header"><h2>Principal</h2><StatusBadge Text="@member.Principal.Status.ToString()" Status="UiStatus.Success" /></div><p><strong>Kind:</strong> @member.Principal.Kind</p><p><strong>Email:</strong> @(member.Principal.Email ?? "—")</p><p><strong>Principal ID:</strong> <code>@member.Principal.Id</code></p>@foreach(var identity in member.ExternalIdentities){<p><strong>External identity:</strong> <code>@identity.Issuer</code> · <code>@identity.Subject</code></p>}</article>
+        <article class="panel"><div class="panel-header"><h2>Principal</h2><StatusBadge Text="@member.Principal.Status.ToString()" Status="UiStatus.Success" /></div><p><strong>Kind:</strong> @member.Principal.Kind</p><p><strong>Email:</strong> @(member.Principal.Email ?? "—")</p><p><strong>Principal ID:</strong> <code>@member.Principal.Id</code></p><p><strong>Instance role:</strong> @(targetIsPlatformAdministrator ? "PlatformAdmin" : "—")</p>@foreach(var identity in member.ExternalIdentities){<p><strong>External identity:</strong> <code>@identity.Issuer</code> · <code>@identity.Subject</code></p>}</article>
         <article class="panel"><div class="panel-header"><h2>Membership</h2><StatusBadge Text="@member.Membership.Status.ToString()" Status="UiStatus.Success" /></div><p>Joined @member.Membership.JoinedAt.ToLocalTime().ToString("g")</p></article>
     </section>
     <section class="panel" style="margin-top:18px"><div class="panel-header"><h2>Role assignments</h2></div>@if(member.Roles.Count == 0){<EmptyState Title="No access assigned" Message="Membership alone does not grant workspace access." />}else{@foreach(var assigned in member.Roles){<article><p><strong>@assigned.Role.DisplayName</strong> @if(assigned.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="Inherited" Status="UiStatus.Info" />}</p><code>@assigned.Scope</code></article>}}</section>
@@ -20,17 +22,38 @@ else
         <div class="form-grid"><label><span>Role</span><select @bind="selectedRole">@foreach(var role in Agentstration.Management.Core.BuiltInIdentityRoles.Names){<option value="@role">@role</option>}</select></label></div>
         <div class="form-actions"><button class="button-primary" @onclick="SaveMembershipAsync">Save role</button>@if(workspaceMembership is not null){<button class="button-secondary" @onclick="RemoveMembershipAsync">Remove from Workspace</button>}</div>
     </section>
+    @if (canManagePlatformAdministrators)
+    {
+        <section class="panel" style="margin-top:18px">
+            <div class="panel-header"><div><h2>Instance administration</h2><p class="muted">PlatformAdmin grants apply to the Agentstration instance, independently of Workspace roles.</p></div></div>
+            @if (!string.IsNullOrWhiteSpace(platformMessage)) { <p class="form-alert @(platformError ? "form-alert-danger" : "form-alert-success")">@platformMessage</p> }
+            <div class="form-actions">
+                @if (targetIsPlatformAdministrator)
+                {
+                    <button class="button-secondary" @onclick="RevokePlatformAdministratorAsync" disabled="@(UserId == RequestContext.Current.PrincipalId)">Revoke PlatformAdmin</button>
+                }
+                else
+                {
+                    <button class="button-primary" @onclick="GrantPlatformAdministratorAsync" disabled="@(member.Principal.Status != PrincipalStatus.Active)">Grant PlatformAdmin</button>
+                }
+            </div>
+        </section>
+    }
 }
 
 @code {
     [Parameter] public Guid UserId { get; set; }
     private Agentstration.Management.Core.MemberAdministrationView? member;
     private Agentstration.Management.Core.WorkspaceMemberView? workspaceMembership; private string selectedRole = Agentstration.Management.Core.BuiltInIdentityRoles.Viewer; private string? message; private bool hasError;
+    private bool canManagePlatformAdministrators; private bool targetIsPlatformAdministrator; private string? platformMessage; private bool platformError;
     protected override async Task OnParametersSetAsync()
     {
         member = (await Service.GetCurrentAsync(default)).Members.SingleOrDefault(value => value.Principal.Id == UserId);
         workspaceMembership = (await Memberships.ListAsync(RequestContext.Current.WorkspaceId, default)).SingleOrDefault(value => value.Principal.Id == UserId);
         selectedRole = workspaceMembership?.Role ?? Agentstration.Management.Core.BuiltInIdentityRoles.Viewer;
+        canManagePlatformAdministrators = await PlatformAuthorization.IsPlatformAdministratorAsync(RequestContext.Current.PrincipalId, default);
+        if (canManagePlatformAdministrators)
+            targetIsPlatformAdministrator = (await PlatformAdministrators.ListAsync(default)).Any(value => value.Principal.Id == UserId);
     }
     private async Task SaveMembershipAsync()
     {
@@ -41,5 +64,15 @@ else
     {
         try { await Memberships.RemoveAsync(RequestContext.Current.WorkspaceId, UserId, default); workspaceMembership = null; hasError = false; message = "Principal removed from the Workspace."; }
         catch (InvalidOperationException exception) { hasError = true; message = exception.Message; }
+    }
+    private async Task GrantPlatformAdministratorAsync()
+    {
+        try { await PlatformAdministrators.GrantAsync(UserId, default); targetIsPlatformAdministrator = true; platformError = false; platformMessage = "PlatformAdmin granted."; }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { platformError = true; platformMessage = exception.Message; }
+    }
+    private async Task RevokePlatformAdministratorAsync()
+    {
+        try { await PlatformAdministrators.RevokeAsync(UserId, default); targetIsPlatformAdministrator = false; platformError = false; platformMessage = "PlatformAdmin revoked."; }
+        catch (InvalidOperationException exception) { platformError = true; platformMessage = exception.Message; }
     }
 }

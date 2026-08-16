@@ -361,8 +361,10 @@ public sealed class SecurityApiTests
 
         using var workspaceAccess = await client.GetAsync("/api/agents");
         using var platformAccess = await client.GetAsync("/api/identity/platform");
+        using var platformAdministrationAccess = await client.GetAsync("/api/identity/platform-administrators");
         Assert.AreEqual(HttpStatusCode.OK, workspaceAccess.StatusCode);
         Assert.AreEqual(HttpStatusCode.Forbidden, platformAccess.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Forbidden, platformAdministrationAccess.StatusCode);
     }
 
     [TestMethod]
@@ -416,6 +418,123 @@ public sealed class SecurityApiTests
         Assert.IsNotNull(auditEvents);
         Assert.IsTrue(auditEvents.Any(value => value.Action == SecurityAuditActions.LocalAccountDisabled && value.TargetAccountId == account.AccountId));
         Assert.IsTrue(auditEvents.Any(value => value.Action == SecurityAuditActions.LocalAccountEnabled && value.TargetAccountId == account.AccountId));
+    }
+
+    [TestMethod]
+    public async Task PlatformAdministratorLifecycleSupportsSafeAdministrationTransfer()
+    {
+        await using var factory = Factory("Local");
+        using var initialAdministrator = UnredirectedClient(factory);
+        using var successorAdministrator = UnredirectedClient(factory);
+        await BootstrapAsync(initialAdministrator, "initial-platform-admin");
+        var context = await initialAdministrator.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.IsNotNull(context);
+
+        using var created = await initialAdministrator.PostAsJsonAsync("/api/identity/accounts/", new
+        {
+            userName = "successor-platform-admin",
+            password = LocalPassword,
+            displayName = "Successor administrator",
+            workspaceId = context.Context.WorkspaceId,
+            role = BuiltInIdentityRoles.Admin
+        });
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
+        var successor = await created.Content.ReadFromJsonAsync<LocalAccountView>();
+        Assert.IsNotNull(successor);
+        var accounts = await initialAdministrator.GetFromJsonAsync<LocalAccountView[]>("/api/identity/accounts/");
+        Assert.IsNotNull(accounts);
+        var initial = accounts.Single(value => value.PlatformAdministrator);
+
+        using var selfDisable = await initialAdministrator.PutAsJsonAsync(
+            $"/api/identity/accounts/{initial.AccountId:D}/status", new { enabled = false });
+        Assert.AreEqual(HttpStatusCode.Conflict, selfDisable.StatusCode);
+
+        using var granted = await initialAdministrator.PutAsync(
+            $"/api/identity/platform-administrators/{successor.PrincipalId:D}", null);
+        Assert.AreEqual(HttpStatusCode.OK, granted.StatusCode);
+        var administrators = await initialAdministrator.GetFromJsonAsync<PlatformAdministratorView[]>(
+            "/api/identity/platform-administrators");
+        Assert.IsNotNull(administrators);
+        Assert.HasCount(2, administrators);
+
+        using var selfRevoke = await initialAdministrator.DeleteAsync(
+            $"/api/identity/platform-administrators/{initial.PrincipalId:D}");
+        Assert.AreEqual(HttpStatusCode.Conflict, selfRevoke.StatusCode);
+
+        await LoginAsync(successorAdministrator, "successor-platform-admin", LocalPassword);
+        using var disableInitial = await successorAdministrator.PutAsJsonAsync(
+            $"/api/identity/accounts/{initial.AccountId:D}/status", new { enabled = false });
+        Assert.AreEqual(HttpStatusCode.OK, disableInitial.StatusCode);
+        using var invalidatedInitialSession = await initialAdministrator.GetAsync("/api/identity/platform");
+        Assert.AreEqual(HttpStatusCode.Unauthorized, invalidatedInitialSession.StatusCode);
+
+        using var revoked = await successorAdministrator.DeleteAsync(
+            $"/api/identity/platform-administrators/{initial.PrincipalId:D}");
+        Assert.AreEqual(HttpStatusCode.NoContent, revoked.StatusCode);
+        using var grantDisabled = await successorAdministrator.PutAsync(
+            $"/api/identity/platform-administrators/{initial.PrincipalId:D}", null);
+        Assert.AreEqual(HttpStatusCode.Conflict, grantDisabled.StatusCode);
+        using var enableInitial = await successorAdministrator.PutAsJsonAsync(
+            $"/api/identity/accounts/{initial.AccountId:D}/status", new { enabled = true });
+        Assert.AreEqual(HttpStatusCode.OK, enableInitial.StatusCode);
+        await LoginAsync(initialAdministrator, "initial-platform-admin", LocalPassword);
+        using var formerAdministratorDenied = await initialAdministrator.GetAsync("/api/identity/platform");
+        Assert.AreEqual(HttpStatusCode.Forbidden, formerAdministratorDenied.StatusCode);
+
+        using var lastAdministratorSelfRevoke = await successorAdministrator.DeleteAsync(
+            $"/api/identity/platform-administrators/{successor.PrincipalId:D}");
+        Assert.AreEqual(HttpStatusCode.Conflict, lastAdministratorSelfRevoke.StatusCode);
+        administrators = await successorAdministrator.GetFromJsonAsync<PlatformAdministratorView[]>(
+            "/api/identity/platform-administrators");
+        Assert.IsNotNull(administrators);
+        Assert.HasCount(1, administrators);
+        Assert.AreEqual(successor.PrincipalId, administrators[0].Principal.Id);
+
+        var auditEvents = await successorAdministrator.GetFromJsonAsync<SecurityAuditEvent[]>("/api/identity/audit-events");
+        Assert.IsNotNull(auditEvents);
+        Assert.IsTrue(auditEvents.Any(value => value.Action == SecurityAuditActions.PlatformAdministratorGranted
+            && value.TargetPrincipalId == successor.PrincipalId));
+        Assert.IsTrue(auditEvents.Any(value => value.Action == SecurityAuditActions.PlatformAdministratorRevoked
+            && value.TargetPrincipalId == initial.PrincipalId && value.ActorPrincipalId == successor.PrincipalId));
+    }
+
+    [TestMethod]
+    public async Task ConcurrentPlatformAdministratorsCannotDisableEachOtherAndLeaveNoActiveAdministrator()
+    {
+        await using var factory = Factory("Local");
+        using var initialAdministrator = UnredirectedClient(factory);
+        using var successorAdministrator = UnredirectedClient(factory);
+        await BootstrapAsync(initialAdministrator, "concurrent-initial-admin");
+        var context = await initialAdministrator.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.IsNotNull(context);
+
+        using var created = await initialAdministrator.PostAsJsonAsync("/api/identity/accounts/", new
+        {
+            userName = "concurrent-successor-admin",
+            password = LocalPassword,
+            displayName = "Concurrent successor",
+            workspaceId = context.Context.WorkspaceId,
+            role = BuiltInIdentityRoles.Admin
+        });
+        var successor = await created.Content.ReadFromJsonAsync<LocalAccountView>();
+        Assert.IsNotNull(successor);
+        var initial = (await initialAdministrator.GetFromJsonAsync<LocalAccountView[]>("/api/identity/accounts/"))!
+            .Single(value => value.PlatformAdministrator);
+        using var granted = await initialAdministrator.PutAsync(
+            $"/api/identity/platform-administrators/{successor.PrincipalId:D}", null);
+        Assert.AreEqual(HttpStatusCode.OK, granted.StatusCode);
+        await LoginAsync(successorAdministrator, "concurrent-successor-admin", LocalPassword);
+
+        var responses = await Task.WhenAll(
+            initialAdministrator.PutAsJsonAsync($"/api/identity/accounts/{successor.AccountId:D}/status", new { enabled = false }),
+            successorAdministrator.PutAsJsonAsync($"/api/identity/accounts/{initial.AccountId:D}/status", new { enabled = false }));
+        Assert.AreEqual(1, responses.Count(response => response.StatusCode == HttpStatusCode.OK));
+
+        var activeClient = responses[0].StatusCode == HttpStatusCode.OK ? initialAdministrator : successorAdministrator;
+        var accounts = await activeClient.GetFromJsonAsync<LocalAccountView[]>("/api/identity/accounts/");
+        Assert.IsNotNull(accounts);
+        Assert.AreEqual(1, accounts.Count(value => value.PlatformAdministrator && value.PrincipalStatus == PrincipalStatus.Active));
+        foreach (var response in responses) response.Dispose();
     }
 
     [TestMethod]

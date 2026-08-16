@@ -181,6 +181,11 @@ public interface IPlatformAuthorizationService
     Task<bool> IsPlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);
 }
 
+public interface IPlatformAdministratorPolicy
+{
+    Task<IAsyncDisposable> AcquireDisableLeaseAsync(Guid principalId, CancellationToken cancellationToken);
+}
+
 public interface ILocalEnvironmentBootstrapper
 {
     Task EnsureInitializedAsync(CancellationToken cancellationToken);
@@ -214,7 +219,10 @@ public interface IIdentityStore
     Task<IReadOnlyList<LocalIdentity>> ListLocalIdentitiesAsync(CancellationToken cancellationToken);
     Task AddLocalIdentityAsync(LocalIdentity localIdentity, CancellationToken cancellationToken);
     Task<bool> IsPlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);
+    Task<PlatformAdministrator?> GetPlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PlatformAdministrator>> ListPlatformAdministratorsAsync(CancellationToken cancellationToken);
     Task AddPlatformAdministratorAsync(PlatformAdministrator administrator, CancellationToken cancellationToken);
+    Task RemovePlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);
     Task<TenantMembership?> FindMembershipAsync(Guid tenantId, Guid principalId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TenantMembership>> ListMembershipsAsync(Guid tenantId, CancellationToken cancellationToken);
     Task AddMembershipAsync(TenantMembership membership, CancellationToken cancellationToken);

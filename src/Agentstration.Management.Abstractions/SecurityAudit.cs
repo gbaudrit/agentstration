@@ -10,6 +10,7 @@ public static class SecurityAuditActions
 {
     public const string InstanceBootstrapped = "instance.bootstrapped";
     public const string PlatformAdministratorGranted = "platform-administrator.granted";
+    public const string PlatformAdministratorRevoked = "platform-administrator.revoked";
     public const string LocalLogin = "local-account.login";
     public const string LocalLogout = "local-account.logout";
     public const string LocalAccountCreated = "local-account.created";

@@ -30,6 +30,13 @@ public static class IdentityEndpoints
             Results.Ok((await service.GetCurrentAsync(token)).Members)).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
         group.MapGet("/platform", () => Results.Ok(new { role = "PlatformAdmin" }))
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapGet("/platform-administrators", async (PlatformAdministratorAdministrationService service, CancellationToken token) =>
+            Results.Ok(await service.ListAsync(token)))
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapPut("/platform-administrators/{principalId:guid}", GrantPlatformAdministratorAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapDelete("/platform-administrators/{principalId:guid}", RevokePlatformAdministratorAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapGet("/audit-events", async (int? limit, SecurityAuditService service, CancellationToken token) =>
             Results.Ok(await service.ListLatestAsync(limit ?? 100, token)))
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
@@ -128,6 +135,29 @@ public static class IdentityEndpoints
         try
         {
             await service.RemoveAsync(workspaceId, principalId, cancellationToken);
+            return Results.NoContent();
+        }
+        catch (InvalidOperationException exception) { return Results.Conflict(new { error = exception.Message }); }
+    }
+
+    private static async Task<IResult> GrantPlatformAdministratorAsync(
+        Guid principalId,
+        PlatformAdministratorAdministrationService service,
+        CancellationToken cancellationToken)
+    {
+        try { return Results.Ok(await service.GrantAsync(principalId, cancellationToken)); }
+        catch (ArgumentException exception) { return Results.NotFound(new { error = exception.Message }); }
+        catch (InvalidOperationException exception) { return Results.Conflict(new { error = exception.Message }); }
+    }
+
+    private static async Task<IResult> RevokePlatformAdministratorAsync(
+        Guid principalId,
+        PlatformAdministratorAdministrationService service,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await service.RevokeAsync(principalId, cancellationToken);
             return Results.NoContent();
         }
         catch (InvalidOperationException exception) { return Results.Conflict(new { error = exception.Message }); }

@@ -6,6 +6,8 @@ Workspace membership and role assignments are Agentstration data. An identity-pr
 
 Local-account administration is restricted to Platform administrators. Workspace-role administration is contextual and uses the built-in `Owner`, `Admin`, `Member`, and `Viewer` roles. `PlatformAdmin` remains an instance grant rather than a Workspace role.
 
+Platform administration is transferable between active Principals, regardless of whether they authenticate locally or externally. The safe handover grants the successor first, then the authenticated successor disables or revokes the predecessor. Agentstration rejects self-revocation, self-disable, assignment to a disabled Principal, and removal of the last active administrator. Disabling an administrator preserves its grant until a separate revoke. See [ADR-0043](../decisions/0043-platform-administration-is-explicitly-transferable.md).
+
 An authenticated local user can change their own password and revoke their other cookie sessions from `/account/security`. These operations remain credential concerns handled by ASP.NET Core Identity; they do not alter the Agentstration Principal or Workspace memberships.
 
 Bootstrap, local authentication, account lifecycle, password/session changes, and Workspace membership mutations produce structured append-only security events in the Management Control Plane. Only Platform administrators can read this history. Events correlate stable IDs and scopes without copying credentials or mutable personal attributes.
