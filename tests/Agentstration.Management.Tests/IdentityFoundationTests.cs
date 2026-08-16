@@ -1,12 +1,12 @@
+using System.Net;
+using System.Net.Http.Json;
 using Agentstration.Infrastructure;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
-using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using System.Net;
-using System.Net.Http.Json;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
 
