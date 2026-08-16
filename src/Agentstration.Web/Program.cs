@@ -77,6 +77,7 @@ builder.Services.AddAgentstrationModelProviders(
 builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSignalR();
 builder.Services.AddAgentstrationLocalIdentity(identityConnectionString);
@@ -163,6 +164,7 @@ app.MapHub<WorkplaceHub>("/hubs/workplace");
 if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();
 app.MapMcp("/mcp");
 app.MapStaticAssets();
+app.MapRazorPages();
 app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode()
     .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
 await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);

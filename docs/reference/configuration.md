@@ -10,7 +10,7 @@ Do not commit API keys. HTTP payload capture is disabled by default, and sensiti
 
 `Agentstration:Authentication:Mode` is `Local`, `Oidc`, `Hybrid`, `Development`, or `Disabled`. `Local` is the offline default. `Development` and `Disabled` are rejected outside Development and Testing.
 
-Local mode uses ASP.NET Core Identity and `ConnectionStrings:Identity`, defaulting to `.agentstration/identity.db`. A fresh instance exposes `GET/POST /api/auth/bootstrap`; the POST accepts the first username, password, display name, and optional email. No default credential exists. Hybrid adds explicit OIDC login while retaining local accounts.
+Local mode uses ASP.NET Core Identity and `ConnectionStrings:Identity`, defaulting to `.agentstration/identity.db`. A fresh instance redirects the Console to the server-rendered `/bootstrap` page; the equivalent programmatic API remains available at `GET/POST /api/auth/bootstrap`. The submitted account has no default credential, becomes the first Platform administrator and Workspace Owner, and the bootstrap becomes inaccessible after initialization. `/login`, `/logout`, and `/access-denied` form the public Web authentication boundary. State-changing Web forms use antiforgery tokens and accept only local return URLs. Hybrid adds explicit OIDC login while retaining local accounts.
 
 After bootstrap, Platform administrators manage local accounts through `/api/identity/accounts` or Console **Organization > Members**. Workspace memberships are exposed under `/api/identity/workspaces/{workspaceId}/memberships`. Built-in roles are `Owner`, `Admin`, `Member`, and `Viewer`; the last Owner cannot be removed or demoted.
 

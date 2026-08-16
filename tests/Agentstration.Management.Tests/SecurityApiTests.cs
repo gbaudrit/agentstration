@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Security.AspNetCoreIdentity;
@@ -14,6 +15,101 @@ namespace Agentstration.Management.Tests;
 public sealed class SecurityApiTests
 {
     private const string LocalPassword = "A-strong-local-password-42!";
+
+    [TestMethod]
+    public async Task LocalAuthenticationPagesBootstrapAndLoginWithAntiforgery()
+    {
+        await using var factory = Factory("Local");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
+
+        using var loginBeforeInitialization = await client.GetAsync("/login?returnUrl=%2Fagents");
+        Assert.AreEqual(HttpStatusCode.Redirect, loginBeforeInitialization.StatusCode);
+        Assert.StartsWith("/bootstrap", loginBeforeInitialization.Headers.Location?.OriginalString);
+
+        using var bootstrapPage = await client.GetAsync(loginBeforeInitialization.Headers.Location);
+        Assert.AreEqual(HttpStatusCode.OK, bootstrapPage.StatusCode);
+        var bootstrapHtml = await bootstrapPage.Content.ReadAsStringAsync();
+        StringAssert.Contains(bootstrapHtml, "Initialize Agentstration");
+        Assert.IsFalse(bootstrapHtml.Contains(LocalPassword, StringComparison.Ordinal));
+
+        using var missingAntiforgery = await client.PostAsync("/bootstrap", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Input.DisplayName"] = "Web administrator",
+            ["Input.UserName"] = "web-admin",
+            ["Input.Password"] = LocalPassword,
+            ["Input.ConfirmPassword"] = LocalPassword
+        }));
+        Assert.AreEqual(HttpStatusCode.BadRequest, missingAntiforgery.StatusCode);
+
+        var bootstrapToken = AntiforgeryToken(bootstrapHtml);
+        using var initialized = await client.PostAsync("/bootstrap", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = bootstrapToken,
+            ["ReturnUrl"] = "/agents",
+            ["Input.DisplayName"] = "Web administrator",
+            ["Input.UserName"] = "web-admin",
+            ["Input.Email"] = "web-admin@example.test",
+            ["Input.Password"] = LocalPassword,
+            ["Input.ConfirmPassword"] = LocalPassword
+        }));
+        Assert.AreEqual(HttpStatusCode.Redirect, initialized.StatusCode);
+        Assert.AreEqual("/agents", initialized.Headers.Location?.OriginalString);
+
+        using var authorized = await client.GetAsync("/api/agents");
+        Assert.AreEqual(HttpStatusCode.OK, authorized.StatusCode);
+        using var loggedOut = await client.PostAsync("/api/auth/logout", null);
+        Assert.AreEqual(HttpStatusCode.NoContent, loggedOut.StatusCode);
+
+        using var loginPage = await client.GetAsync("/login?returnUrl=%2F%2Fevil.example");
+        Assert.AreEqual(HttpStatusCode.OK, loginPage.StatusCode);
+        var loginHtml = await loginPage.Content.ReadAsStringAsync();
+        var loginToken = AntiforgeryToken(loginHtml);
+        using var signedIn = await client.PostAsync("/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = loginToken,
+            ["ReturnUrl"] = "//evil.example",
+            ["Input.UserName"] = "web-admin",
+            ["Input.Password"] = LocalPassword
+        }));
+        Assert.AreEqual(HttpStatusCode.Redirect, signedIn.StatusCode);
+        Assert.AreEqual("/", signedIn.Headers.Location?.OriginalString);
+
+        using var logoutPage = await client.GetAsync("/logout");
+        Assert.AreEqual(HttpStatusCode.OK, logoutPage.StatusCode);
+        var logoutToken = AntiforgeryToken(await logoutPage.Content.ReadAsStringAsync());
+        using var logoutWithoutToken = await client.PostAsync("/logout", new FormUrlEncodedContent([]));
+        Assert.AreEqual(HttpStatusCode.BadRequest, logoutWithoutToken.StatusCode);
+        using var signedOut = await client.PostAsync("/logout", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = logoutToken
+        }));
+        Assert.AreEqual(HttpStatusCode.Redirect, signedOut.StatusCode);
+        Assert.AreEqual("/login", signedOut.Headers.Location?.OriginalString);
+        using var anonymous = await client.GetAsync("/api/agents");
+        Assert.AreEqual(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task LogoutAndAccessDeniedPagesAreAvailableAtTheAuthenticationBoundary()
+    {
+        await using var factory = Factory("Local");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
+
+        using var denied = await client.GetAsync("/access-denied");
+        Assert.AreEqual(HttpStatusCode.OK, denied.StatusCode);
+
+        using var logout = await client.GetAsync("/logout");
+        Assert.AreEqual(HttpStatusCode.Redirect, logout.StatusCode);
+        Assert.AreEqual("/login", logout.Headers.Location?.AbsolutePath);
+    }
 
     [TestMethod]
     public async Task ProtectedAgentEndpointReturns401WithoutAuthentication()
@@ -285,6 +381,16 @@ public sealed class SecurityApiTests
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", mode);
         });
+
+    private static string AntiforgeryToken(string html)
+    {
+        var match = Regex.Match(
+            html,
+            "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"",
+            RegexOptions.CultureInvariant);
+        Assert.IsTrue(match.Success, "The rendered form must contain an antiforgery token.");
+        return WebUtility.HtmlDecode(match.Groups[1].Value);
+    }
 
     private sealed record BootstrapStatus(bool Initialized);
 }

@@ -85,7 +85,7 @@ Pages depend on `IAgentstrationEventStream`, not a transport implementation. The
 
 ## Authentication
 
-Local launch uses ASP.NET Core Identity with a dedicated SQLite credential store. A fresh instance exposes the one-time bootstrap endpoints under `/api/auth/bootstrap`; no default account or password is created. `Local`, `Oidc`, and `Hybrid` modes converge toward the same Agentstration `Principal` and Workspace policies. The isolated `Development` handler remains available only through explicit Development/Testing configuration.
+Local launch uses ASP.NET Core Identity with a dedicated SQLite credential store. A fresh instance redirects to the one-time, server-rendered `/bootstrap` page; no default account or password is created. `/login`, `/logout`, and `/access-denied` stay outside the protected Interactive Server circuit so the application cookie is established at the normal ASP.NET Core HTTP boundary. Forms use antiforgery validation, and return URLs are restricted to local paths. The JSON bootstrap and login endpoints under `/api/auth` remain available for programmatic clients. `Local`, `Oidc`, and `Hybrid` modes converge toward the same Agentstration `Principal` and Workspace policies. The isolated `Development` handler remains available only through explicit Development/Testing configuration.
 
 Platform administrators can list, create, enable, and disable local accounts from **Organization > Members** or `/api/identity/accounts`. Member details manage the current Workspace role through `/api/identity/workspaces/{workspaceId}/memberships`; the service prevents removal or demotion of the final Owner.
 

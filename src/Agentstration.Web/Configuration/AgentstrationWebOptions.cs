@@ -35,4 +35,12 @@ public sealed class AuthenticationOptions
     public string DevelopmentIssuer { get; set; } = Agentstration.Management.Core.LocalBootstrapOptions.DevelopmentIssuer;
     public string DevelopmentSubject { get; set; } = Agentstration.Management.Core.LocalBootstrapOptions.DevelopmentSubject;
     public string DevelopmentDisplayName { get; set; } = "Local operator";
+
+    public static bool SupportsLocalAccounts(string mode) =>
+        string.Equals(mode, Local, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(mode, Hybrid, StringComparison.OrdinalIgnoreCase);
+
+    public static bool SupportsExternalLogin(string mode) =>
+        string.Equals(mode, Oidc, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(mode, Hybrid, StringComparison.OrdinalIgnoreCase);
 }

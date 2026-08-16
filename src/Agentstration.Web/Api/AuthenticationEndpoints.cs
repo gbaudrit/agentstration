@@ -37,7 +37,7 @@ public static class AuthenticationEndpoints
         IOptions<AgentstrationWebOptions> options,
         CancellationToken cancellationToken)
     {
-        if (!SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
+        if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
         return Results.Ok(await accounts.ListAsync(cancellationToken));
     }
 
@@ -47,7 +47,7 @@ public static class AuthenticationEndpoints
         IOptions<AgentstrationWebOptions> options,
         CancellationToken cancellationToken)
     {
-        if (!SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
+        if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
         try
         {
             var result = await accounts.CreateAsync(request, cancellationToken);
@@ -68,7 +68,7 @@ public static class AuthenticationEndpoints
         IOptions<AgentstrationWebOptions> options,
         CancellationToken cancellationToken)
     {
-        if (!SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
+        if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
         try { return Results.Ok(await accounts.SetEnabledAsync(accountId, request.Enabled, cancellationToken)); }
         catch (ArgumentException exception) { return Results.NotFound(new { error = exception.Message }); }
         catch (InvalidOperationException exception) { return Results.Conflict(new { error = exception.Message }); }
@@ -79,7 +79,7 @@ public static class AuthenticationEndpoints
         IOptions<AgentstrationWebOptions> options,
         CancellationToken cancellationToken)
     {
-        if (!SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
+        if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
         return Results.Ok(new { initialized = await bootstrap.IsInitializedAsync(cancellationToken) });
     }
 
@@ -91,7 +91,7 @@ public static class AuthenticationEndpoints
         IOptions<AgentstrationWebOptions> options,
         CancellationToken cancellationToken)
     {
-        if (!SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
+        if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
         if (await bootstrap.IsInitializedAsync(cancellationToken))
             return Results.Conflict(new { error = "instance_already_initialized" });
         var result = await bootstrap.BootstrapAsync(request, cancellationToken);
@@ -109,7 +109,7 @@ public static class AuthenticationEndpoints
         SignInManager<LocalIdentityUser> signIn,
         IOptions<AgentstrationWebOptions> options)
     {
-        if (!SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
+        if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
         if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password)) return Results.Unauthorized();
         var result = await signIn.PasswordSignInAsync(request.UserName.Trim(), request.Password, request.RememberMe, lockoutOnFailure: true);
         if (result.IsLockedOut) return Results.Problem(statusCode: StatusCodes.Status423Locked, title: "account_locked");
@@ -123,20 +123,14 @@ public static class AuthenticationEndpoints
         return Results.NoContent();
     }
 
-    private static IResult OidcLogin(HttpContext context, IOptions<AgentstrationWebOptions> options)
+    private static IResult OidcLogin(string? returnUrl, IOptions<AgentstrationWebOptions> options)
     {
         var mode = options.Value.Authentication.Mode;
-        if (!string.Equals(mode, WebAuthenticationOptions.Oidc, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(mode, WebAuthenticationOptions.Hybrid, StringComparison.OrdinalIgnoreCase))
-            return Results.NotFound();
+        if (!WebAuthenticationOptions.SupportsExternalLogin(mode)) return Results.NotFound();
         return Results.Challenge(
-            new AuthenticationProperties { RedirectUri = "/" },
+            new AuthenticationProperties { RedirectUri = AuthenticationReturnUrls.Normalize(returnUrl) },
             [OpenIdConnectDefaults.AuthenticationScheme]);
     }
-
-    private static bool SupportsLocalAccounts(string mode) =>
-        string.Equals(mode, WebAuthenticationOptions.Local, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(mode, WebAuthenticationOptions.Hybrid, StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record LocalLoginRequest(string UserName, string Password, bool RememberMe = false);

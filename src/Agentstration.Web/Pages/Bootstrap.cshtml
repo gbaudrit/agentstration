@@ -1,0 +1,33 @@
+@page "/bootstrap"
+@model BootstrapModel
+@{
+    ViewData["Title"] = "Initialize instance";
+}
+
+<header class="auth-heading">
+    <p class="eyebrow">First-time setup</p>
+    <h1>Initialize Agentstration</h1>
+    <p>Create the first local account. It will administer this instance and own the initial workspace.</p>
+</header>
+
+<form method="post" class="auth-form">
+    <input type="hidden" asp-for="ReturnUrl" />
+    <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+    <label asp-for="Input.DisplayName"></label>
+    <input asp-for="Input.DisplayName" autocomplete="name" autofocus />
+    <span asp-validation-for="Input.DisplayName" class="field-error"></span>
+    <label asp-for="Input.UserName"></label>
+    <input asp-for="Input.UserName" autocomplete="username" />
+    <span asp-validation-for="Input.UserName" class="field-error"></span>
+    <label asp-for="Input.Email"></label>
+    <input asp-for="Input.Email" autocomplete="email" />
+    <span asp-validation-for="Input.Email" class="field-error"></span>
+    <label asp-for="Input.Password"></label>
+    <input asp-for="Input.Password" autocomplete="new-password" />
+    <span asp-validation-for="Input.Password" class="field-error"></span>
+    <p class="password-guidance">Use at least 12 characters with uppercase, lowercase, number and symbol.</p>
+    <label asp-for="Input.ConfirmPassword"></label>
+    <input asp-for="Input.ConfirmPassword" autocomplete="new-password" />
+    <span asp-validation-for="Input.ConfirmPassword" class="field-error"></span>
+    <button type="submit" class="primary-action">Create administrator</button>
+</form>
