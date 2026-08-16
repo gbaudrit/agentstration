@@ -38,6 +38,7 @@ For the standalone end-user Workplace and its Work API, follow the [local instal
 - [Reference](docs/reference/overview.md)
 - [Architecture decisions](docs/decisions/index.md)
 - [Detailed current capabilities](docs/reference/current-capabilities.md)
+- [Identity and authorization reference](docs/reference/identity-and-authorization.md)
 
 Run the documentation site locally with `npm install` and `npm start` from `docs/site`. The complete workflow is documented in [Working on the documentation](docs/contributing/documentation.md).
 
