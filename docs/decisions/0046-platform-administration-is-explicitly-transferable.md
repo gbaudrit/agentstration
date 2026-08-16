@@ -1,4 +1,4 @@
-# ADR-0043: Platform administration is explicitly transferable
+# ADR-0046: Platform administration is explicitly transferable
 
 Status: Accepted — 2026-08-16
 

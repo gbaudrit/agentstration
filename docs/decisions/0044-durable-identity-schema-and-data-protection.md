@@ -1,4 +1,4 @@
-# ADR-0041: Identity schema and Web key material are durable
+# ADR-0044: Identity schema and Web key material are durable
 
 Status: Accepted — 2026-08-16
 

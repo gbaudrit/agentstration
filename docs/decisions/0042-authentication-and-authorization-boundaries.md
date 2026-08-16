@@ -1,4 +1,4 @@
-# ADR-0039: Authentication and authorization boundaries
+# ADR-0042: Authentication and authorization boundaries
 
 Status: Accepted — 2026-08-16
 
@@ -56,8 +56,8 @@ Agentstration does not expose `/authorize`, `/token`, or `/userinfo`, does not i
 - Identical external subjects from different issuers remain distinct; email changes do not alter identity.
 - Human and workload Principals are distinct kinds. Full workload authentication remains future work.
 - The first protected vertical covers Agent Management and Identity/Workspace operations. Flow, Runtime, Work, Workplace, MCP, SignalR, and AEP still require explicit scoping work.
-- The first implementation used EF Core `EnsureCreated` for the new dedicated `identity.db`; [ADR-0041](0041-durable-identity-schema-and-data-protection.md) supersedes that persistence detail with versioned migrations and a verified legacy baseline.
+- The first implementation used EF Core `EnsureCreated` for the new dedicated `identity.db`; [ADR-0044](0044-durable-identity-schema-and-data-protection.md) supersedes that persistence detail with versioned migrations and a verified legacy baseline.
 
 ## Follow-up
 
-Password changes and current-user revocation of other cookie sessions are delivered through ASP.NET Core Identity. [ADR-0042](0042-security-events-are-an-append-only-management-log.md) delivers the first durable security audit. [ADR-0043](0043-platform-administration-is-explicitly-transferable.md) supersedes the initial Platform administrator lifecycle limitation with an explicit, protected handover. [ADR-0044](0044-external-identities-are-explicitly-linked-to-principals.md) adds explicit administration of external authentication links. Add password recovery and optional confirmation flows only after defining a secure delivery channel. Remaining work includes account deletion/retention policy, invitation or provisioning of external-only Principals, audit retention/export, and authorization coverage for the remaining planes. Reconcile Work/Workplace Workspace identities before applying canonical Workspace policies there.
+Password changes and current-user revocation of other cookie sessions are delivered through ASP.NET Core Identity. [ADR-0045](0045-security-events-are-an-append-only-management-log.md) delivers the first durable security audit. [ADR-0046](0046-platform-administration-is-explicitly-transferable.md) supersedes the initial Platform administrator lifecycle limitation with an explicit, protected handover. [ADR-0047](0047-external-identities-are-explicitly-linked-to-principals.md) adds explicit administration of external authentication links. Add password recovery and optional confirmation flows only after defining a secure delivery channel. Remaining work includes account deletion/retention policy, invitation or provisioning of external-only Principals, audit retention/export, and authorization coverage for the remaining planes. Reconcile Work/Workplace Workspace identities before applying canonical Workspace policies there.

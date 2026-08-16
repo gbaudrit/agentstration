@@ -1,4 +1,4 @@
-# ADR-0040: Console API calls propagate only an explicitly trusted Web session
+# ADR-0043: Console API calls propagate only an explicitly trusted Web session
 
 Status: Accepted — 2026-08-16
 

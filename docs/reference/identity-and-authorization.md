@@ -5,7 +5,7 @@ sidebar_position: 7
 
 # Identity and authorization reference
 
-This document is the consolidated description of the identity vertical implemented in Agentstration. It describes current behavior, not a target architecture. The normative decisions are ADR-0039 through ADR-0044.
+This document is the consolidated description of the identity vertical implemented in Agentstration. It describes current behavior, not a target architecture. The normative decisions are ADR-0042 through ADR-0047.
 
 ## Delivered scope
 
@@ -311,7 +311,7 @@ When enabled, `ConsoleApiSessionHandler`:
 - never forwards unrelated browser cookies;
 - does not bypass API authentication or authorization.
 
-Remote or independently deployed APIs must leave this setting disabled and use Bearer access tokens. See ADR-0040.
+Remote or independently deployed APIs must leave this setting disabled and use Bearer access tokens. See ADR-0043.
 
 ## Persistence and operational data
 
@@ -379,7 +379,7 @@ dotnet build Agentstration.slnx --configuration Release --no-restore
 dotnet test Agentstration.slnx --configuration Release --no-build
 
 Build: 0 warnings, 0 errors
-Tests: 264 passed, 0 failed, 0 skipped
+Tests: 281 passed, 0 failed, 0 skipped
 ```
 
 Tests require no Internet connection, external IdP, live model, or cloud service.
@@ -399,9 +399,9 @@ Tests require no Internet connection, external IdP, live model, or cloud service
 
 ## Decision records
 
-- [ADR-0039 — Authentication and authorization boundaries](../decisions/0039-authentication-and-authorization-boundaries.md)
-- [ADR-0040 — Console API calls propagate only an explicitly trusted Web session](../decisions/0040-console-api-session-propagation.md)
-- [ADR-0041 — Identity schema and Web key material are durable](../decisions/0041-durable-identity-schema-and-data-protection.md)
-- [ADR-0042 — Security events are an append-only Management log](../decisions/0042-security-events-are-an-append-only-management-log.md)
-- [ADR-0043 — Platform administration is explicitly transferable](../decisions/0043-platform-administration-is-explicitly-transferable.md)
-- [ADR-0044 — External identities are explicitly linked to Principals](../decisions/0044-external-identities-are-explicitly-linked-to-principals.md)
+- [ADR-0042 — Authentication and authorization boundaries](../decisions/0042-authentication-and-authorization-boundaries.md)
+- [ADR-0043 — Console API calls propagate only an explicitly trusted Web session](../decisions/0043-console-api-session-propagation.md)
+- [ADR-0044 — Identity schema and Web key material are durable](../decisions/0044-durable-identity-schema-and-data-protection.md)
+- [ADR-0045 — Security events are an append-only Management log](../decisions/0045-security-events-are-an-append-only-management-log.md)
+- [ADR-0046 — Platform administration is explicitly transferable](../decisions/0046-platform-administration-is-explicitly-transferable.md)
+- [ADR-0047 — External identities are explicitly linked to Principals](../decisions/0047-external-identities-are-explicitly-linked-to-principals.md)

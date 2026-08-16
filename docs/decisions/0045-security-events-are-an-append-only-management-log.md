@@ -1,4 +1,4 @@
-# ADR-0042: Security events are an append-only Management log
+# ADR-0045: Security events are an append-only Management log
 
 Status: Accepted — 2026-08-16
 

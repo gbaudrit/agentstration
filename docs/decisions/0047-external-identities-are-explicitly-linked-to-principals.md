@@ -1,4 +1,4 @@
-# ADR-0044: External identities are explicitly linked to Principals
+# ADR-0047: External identities are explicitly linked to Principals
 
 Status: Accepted — 2026-08-16
 

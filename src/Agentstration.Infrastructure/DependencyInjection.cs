@@ -101,7 +101,6 @@ public static class DependencyInjection
             provider.GetRequiredService<IMasterKeyProvider>()));
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
-        services.AddSingleton<IIdentityProvider, LocalIdentityProvider>();
         services.AddSingleton<IPrincipalResolver, ExternalIdentityPrincipalResolver>();
         services.AddSingleton<IInitialPrincipalProvisioner, InitialPrincipalProvisioner>();
         services.AddSingleton<ILocalPrincipalProvisioner, LocalPrincipalProvisioner>();
