@@ -109,6 +109,8 @@ public static class DependencyInjection
         services.AddSingleton<PlatformAdministratorLifecycleLock>();
         services.AddSingleton<PlatformAdministratorAdministrationService>();
         services.AddSingleton<IPlatformAdministratorPolicy>(provider => provider.GetRequiredService<PlatformAdministratorAdministrationService>());
+        services.AddSingleton<ExternalIdentityLifecycleLock>();
+        services.AddSingleton<ExternalIdentityAdministrationService>();
         services.AddSingleton<IAuthorizationService, PermissionAuthorizationService>();
         services.AddSingleton<SecurityAuditService>();
         services.AddSingleton<ISecurityAuditWriter>(provider => provider.GetRequiredService<SecurityAuditService>());

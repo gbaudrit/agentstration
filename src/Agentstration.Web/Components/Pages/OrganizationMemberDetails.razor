@@ -2,6 +2,7 @@
 @inject Agentstration.Management.Core.IdentityAdministrationService Service
 @inject Agentstration.Management.Core.WorkspaceMembershipAdministrationService Memberships
 @inject Agentstration.Management.Core.PlatformAdministratorAdministrationService PlatformAdministrators
+@inject Agentstration.Management.Core.ExternalIdentityAdministrationService ExternalIdentities
 @inject Agentstration.Management.Abstractions.ICurrentRequestContext RequestContext
 @inject Agentstration.Management.Abstractions.IPlatformAuthorizationService PlatformAuthorization
 
@@ -25,6 +26,22 @@ else
     @if (canManagePlatformAdministrators)
     {
         <section class="panel" style="margin-top:18px">
+            <div class="panel-header"><div><h2>External authentication</h2><p class="muted">Link the exact issuer and subject emitted by a validated OIDC provider. Email is never used as an identity key.</p></div></div>
+            @if (!string.IsNullOrWhiteSpace(identityMessage)) { <p class="form-alert @(identityError ? "form-alert-danger" : "form-alert-success")">@identityMessage</p> }
+            <div class="form-grid">
+                <label><span>Issuer</span><input @bind="newIssuer" placeholder="https://identity.example/realms/company" autocomplete="off" /></label>
+                <label><span>Subject</span><input @bind="newSubject" autocomplete="off" /></label>
+            </div>
+            <div class="form-actions"><button class="button-primary" @onclick="LinkExternalIdentityAsync">Link external identity</button></div>
+            @if (member.ExternalIdentities.Count > 0)
+            {
+                <DataGrid TItem="ExternalIdentity" Items="member.ExternalIdentities">
+                    <Header><tr><th>Issuer</th><th>Subject</th><th>Linked</th><th></th></tr></Header>
+                    <Row Context="identity"><tr><td><code>@identity.Issuer</code></td><td><code>@identity.Subject</code></td><td>@identity.LinkedAt.ToLocalTime().ToString("g")</td><td><button class="text-button" @onclick="() => UnlinkExternalIdentityAsync(identity.Id)">Unlink</button></td></tr></Row>
+                </DataGrid>
+            }
+        </section>
+        <section class="panel" style="margin-top:18px">
             <div class="panel-header"><div><h2>Instance administration</h2><p class="muted">PlatformAdmin grants apply to the Agentstration instance, independently of Workspace roles.</p></div></div>
             @if (!string.IsNullOrWhiteSpace(platformMessage)) { <p class="form-alert @(platformError ? "form-alert-danger" : "form-alert-success")">@platformMessage</p> }
             <div class="form-actions">
@@ -46,6 +63,7 @@ else
     private Agentstration.Management.Core.MemberAdministrationView? member;
     private Agentstration.Management.Core.WorkspaceMemberView? workspaceMembership; private string selectedRole = Agentstration.Management.Core.BuiltInIdentityRoles.Viewer; private string? message; private bool hasError;
     private bool canManagePlatformAdministrators; private bool targetIsPlatformAdministrator; private string? platformMessage; private bool platformError;
+    private string newIssuer = ""; private string newSubject = ""; private string? identityMessage; private bool identityError;
     protected override async Task OnParametersSetAsync()
     {
         member = (await Service.GetCurrentAsync(default)).Members.SingleOrDefault(value => value.Principal.Id == UserId);
@@ -74,5 +92,27 @@ else
     {
         try { await PlatformAdministrators.RevokeAsync(UserId, default); targetIsPlatformAdministrator = false; platformError = false; platformMessage = "PlatformAdmin revoked."; }
         catch (InvalidOperationException exception) { platformError = true; platformMessage = exception.Message; }
+    }
+    private async Task LinkExternalIdentityAsync()
+    {
+        try
+        {
+            await ExternalIdentities.LinkAsync(UserId, newIssuer, newSubject, default);
+            member = (await Service.GetCurrentAsync(default)).Members.Single(value => value.Principal.Id == UserId);
+            newIssuer = newSubject = ""; identityError = false; identityMessage = "External identity linked.";
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or ControlPlaneConcurrencyException)
+        { identityError = true; identityMessage = exception.Message; }
+    }
+    private async Task UnlinkExternalIdentityAsync(Guid externalIdentityId)
+    {
+        try
+        {
+            await ExternalIdentities.UnlinkAsync(UserId, externalIdentityId, default);
+            member = (await Service.GetCurrentAsync(default)).Members.Single(value => value.Principal.Id == UserId);
+            identityError = false; identityMessage = "External identity unlinked.";
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException)
+        { identityError = true; identityMessage = exception.Message; }
     }
 }

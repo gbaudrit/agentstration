@@ -215,7 +215,9 @@ public interface IIdentityStore
     Task<ExternalIdentity?> FindExternalIdentityAsync(string issuer, string subject, CancellationToken cancellationToken);
     Task<IReadOnlyList<ExternalIdentity>> ListExternalIdentitiesAsync(Guid principalId, CancellationToken cancellationToken);
     Task AddExternalIdentityAsync(ExternalIdentity externalIdentity, CancellationToken cancellationToken);
+    Task RemoveExternalIdentityAsync(Guid principalId, Guid externalIdentityId, CancellationToken cancellationToken);
     Task<LocalIdentity?> FindLocalIdentityAsync(Guid accountId, CancellationToken cancellationToken);
+    Task<LocalIdentity?> FindLocalIdentityByPrincipalAsync(Guid principalId, CancellationToken cancellationToken);
     Task<IReadOnlyList<LocalIdentity>> ListLocalIdentitiesAsync(CancellationToken cancellationToken);
     Task AddLocalIdentityAsync(LocalIdentity localIdentity, CancellationToken cancellationToken);
     Task<bool> IsPlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);

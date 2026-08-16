@@ -207,8 +207,10 @@ public sealed class SecurityApiTests
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync("/api/agents");
+        using var externalIdentities = await client.GetAsync($"/api/identity/principals/{Guid.NewGuid():D}/external-identities");
 
         Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, externalIdentities.StatusCode);
     }
 
     [TestMethod]
@@ -330,6 +332,7 @@ public sealed class SecurityApiTests
         });
         Assert.AreEqual(HttpStatusCode.Created, bootstrapped.StatusCode);
 
+        Guid workspaceOwnerPrincipalId;
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var users = scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>();
@@ -343,6 +346,7 @@ public sealed class SecurityApiTests
             var owner = await store.FindRoleDefinitionByNameAsync("Owner", default);
             Assert.IsNotNull(owner);
             var principal = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Workspace owner", null, PrincipalStatus.Active, DateTimeOffset.UtcNow);
+            workspaceOwnerPrincipalId = principal.Id;
             await store.AddPrincipalAsync(principal, default);
             await store.AddLocalIdentityAsync(new LocalIdentity(workspaceOwner.Id, principal.Id, DateTimeOffset.UtcNow), default);
             await store.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), tenant.Id, principal.Id, MembershipStatus.Active, DateTimeOffset.UtcNow), default);
@@ -362,9 +366,11 @@ public sealed class SecurityApiTests
         using var workspaceAccess = await client.GetAsync("/api/agents");
         using var platformAccess = await client.GetAsync("/api/identity/platform");
         using var platformAdministrationAccess = await client.GetAsync("/api/identity/platform-administrators");
+        using var externalIdentityAdministrationAccess = await client.GetAsync($"/api/identity/principals/{workspaceOwnerPrincipalId:D}/external-identities");
         Assert.AreEqual(HttpStatusCode.OK, workspaceAccess.StatusCode);
         Assert.AreEqual(HttpStatusCode.Forbidden, platformAccess.StatusCode);
         Assert.AreEqual(HttpStatusCode.Forbidden, platformAdministrationAccess.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Forbidden, externalIdentityAdministrationAccess.StatusCode);
     }
 
     [TestMethod]
@@ -534,6 +540,107 @@ public sealed class SecurityApiTests
         var accounts = await activeClient.GetFromJsonAsync<LocalAccountView[]>("/api/identity/accounts/");
         Assert.IsNotNull(accounts);
         Assert.AreEqual(1, accounts.Count(value => value.PlatformAdministrator && value.PrincipalStatus == PrincipalStatus.Active));
+        foreach (var response in responses) response.Dispose();
+    }
+
+    [TestMethod]
+    public async Task PlatformAdministratorCanManageProviderNeutralExternalIdentityLinks()
+    {
+        await using var factory = Factory("Local");
+        using var administrator = UnredirectedClient(factory);
+        await BootstrapAsync(administrator, "external-identity-admin");
+        var context = await administrator.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.IsNotNull(context);
+
+        async Task<LocalAccountView> CreateTargetAsync(string userName)
+        {
+            using var response = await administrator.PostAsJsonAsync("/api/identity/accounts/", new
+            {
+                userName,
+                password = LocalPassword,
+                displayName = userName,
+                workspaceId = context.Context.WorkspaceId,
+                role = BuiltInIdentityRoles.Member
+            });
+            Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
+            return (await response.Content.ReadFromJsonAsync<LocalAccountView>())!;
+        }
+
+        var first = await CreateTargetAsync("external-target-one");
+        var second = await CreateTargetAsync("external-target-two");
+        using var invalidIssuer = await administrator.PostAsJsonAsync(
+            $"/api/identity/principals/{first.PrincipalId:D}/external-identities",
+            new { issuer = "not-an-issuer", subject = "subject-1" });
+        Assert.AreEqual(HttpStatusCode.BadRequest, invalidIssuer.StatusCode);
+
+        const string firstIssuer = "https://issuer-a.example/tenant";
+        const string secondIssuer = "https://issuer-b.example/tenant";
+        using var linked = await administrator.PostAsJsonAsync(
+            $"/api/identity/principals/{first.PrincipalId:D}/external-identities",
+            new { issuer = firstIssuer, subject = "same-subject" });
+        Assert.AreEqual(HttpStatusCode.OK, linked.StatusCode);
+        var firstIdentity = await linked.Content.ReadFromJsonAsync<ExternalIdentity>();
+        Assert.IsNotNull(firstIdentity);
+
+        using var idempotent = await administrator.PostAsJsonAsync(
+            $"/api/identity/principals/{first.PrincipalId:D}/external-identities",
+            new { issuer = firstIssuer, subject = "same-subject" });
+        Assert.AreEqual(firstIdentity.Id, (await idempotent.Content.ReadFromJsonAsync<ExternalIdentity>())?.Id);
+        using var otherIssuer = await administrator.PostAsJsonAsync(
+            $"/api/identity/principals/{first.PrincipalId:D}/external-identities",
+            new { issuer = secondIssuer, subject = "same-subject" });
+        Assert.AreEqual(HttpStatusCode.OK, otherIssuer.StatusCode);
+
+        using var collision = await administrator.PostAsJsonAsync(
+            $"/api/identity/principals/{second.PrincipalId:D}/external-identities",
+            new { issuer = firstIssuer, subject = "same-subject" });
+        Assert.AreEqual(HttpStatusCode.Conflict, collision.StatusCode);
+        var identities = await administrator.GetFromJsonAsync<ExternalIdentity[]>(
+            $"/api/identity/principals/{first.PrincipalId:D}/external-identities");
+        Assert.IsNotNull(identities);
+        Assert.HasCount(2, identities);
+
+        var resolver = factory.Services.GetRequiredService<IPrincipalResolver>();
+        Assert.AreEqual(first.PrincipalId, (await resolver.ResolveAsync(firstIssuer, "same-subject", default))?.Id);
+        Assert.AreEqual(first.PrincipalId, (await resolver.ResolveAsync(secondIssuer, "same-subject", default))?.Id);
+        using var removed = await administrator.DeleteAsync(
+            $"/api/identity/principals/{first.PrincipalId:D}/external-identities/{firstIdentity.Id:D}");
+        Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.IsNull(await resolver.ResolveAsync(firstIssuer, "same-subject", default));
+
+        using var details = await administrator.GetAsync($"/settings/organization/members/{first.PrincipalId:D}");
+        Assert.AreEqual(HttpStatusCode.OK, details.StatusCode);
+        StringAssert.Contains(await details.Content.ReadAsStringAsync(), "External authentication");
+        var auditEvents = await administrator.GetFromJsonAsync<SecurityAuditEvent[]>("/api/identity/audit-events");
+        Assert.IsNotNull(auditEvents);
+        Assert.IsTrue(auditEvents.Any(value => value.Action == SecurityAuditActions.ExternalIdentityLinked
+            && value.TargetPrincipalId == first.PrincipalId));
+        Assert.IsTrue(auditEvents.Any(value => value.Action == SecurityAuditActions.ExternalIdentityUnlinked
+            && value.TargetPrincipalId == first.PrincipalId));
+    }
+
+    [TestMethod]
+    public async Task ConcurrentUnlinkCannotRemoveEveryAuthenticationIdentity()
+    {
+        await using var factory = Factory("Local");
+        using var administrator = UnredirectedClient(factory);
+        await BootstrapAsync(administrator, "external-concurrency-admin");
+        var principal = new Principal(Guid.NewGuid(), PrincipalKind.Human, "External only", null,
+            PrincipalStatus.Active, DateTimeOffset.UtcNow);
+        var first = new ExternalIdentity(Guid.NewGuid(), "https://issuer.example/one", "subject", principal.Id, DateTimeOffset.UtcNow);
+        var second = new ExternalIdentity(Guid.NewGuid(), "https://issuer.example/two", "subject", principal.Id, DateTimeOffset.UtcNow);
+        var store = factory.Services.GetRequiredService<IIdentityStore>();
+        await store.AddPrincipalAsync(principal, default);
+        await store.AddExternalIdentityAsync(first, default);
+        await store.AddExternalIdentityAsync(second, default);
+
+        var responses = await Task.WhenAll(
+            administrator.DeleteAsync($"/api/identity/principals/{principal.Id:D}/external-identities/{first.Id:D}"),
+            administrator.DeleteAsync($"/api/identity/principals/{principal.Id:D}/external-identities/{second.Id:D}"));
+        Assert.AreEqual(1, responses.Count(value => value.StatusCode == HttpStatusCode.NoContent));
+        Assert.AreEqual(1, responses.Count(value => value.StatusCode == HttpStatusCode.Conflict));
+        var remaining = await store.ListExternalIdentitiesAsync(principal.Id, default);
+        Assert.HasCount(1, remaining);
         foreach (var response in responses) response.Dispose();
     }
 

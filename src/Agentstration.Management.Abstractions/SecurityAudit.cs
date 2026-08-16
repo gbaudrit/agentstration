@@ -18,6 +18,8 @@ public static class SecurityAuditActions
     public const string LocalAccountDisabled = "local-account.disabled";
     public const string LocalPasswordChanged = "local-account.password-changed";
     public const string LocalSessionsRevoked = "local-account.sessions-revoked";
+    public const string ExternalIdentityLinked = "external-identity.linked";
+    public const string ExternalIdentityUnlinked = "external-identity.unlinked";
     public const string WorkspaceMembershipSet = "workspace-membership.set";
     public const string WorkspaceMembershipRemoved = "workspace-membership.removed";
 }

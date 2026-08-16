@@ -37,6 +37,12 @@ public static class IdentityEndpoints
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapDelete("/platform-administrators/{principalId:guid}", RevokePlatformAdministratorAsync)
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapGet("/principals/{principalId:guid}/external-identities", ListExternalIdentitiesAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapPost("/principals/{principalId:guid}/external-identities", LinkExternalIdentityAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapDelete("/principals/{principalId:guid}/external-identities/{externalIdentityId:guid}", UnlinkExternalIdentityAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapGet("/audit-events", async (int? limit, SecurityAuditService service, CancellationToken token) =>
             Results.Ok(await service.ListLatestAsync(limit ?? 100, token)))
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
@@ -161,6 +167,61 @@ public static class IdentityEndpoints
             return Results.NoContent();
         }
         catch (InvalidOperationException exception) { return Results.Conflict(new { error = exception.Message }); }
+    }
+
+    private static async Task<IResult> ListExternalIdentitiesAsync(
+        Guid principalId,
+        ExternalIdentityAdministrationService service,
+        CancellationToken cancellationToken)
+    {
+        try { return Results.Ok(await service.ListAsync(principalId, cancellationToken)); }
+        catch (ArgumentException exception) { return Results.NotFound(new { error = exception.Message }); }
+    }
+
+    private static async Task<IResult> LinkExternalIdentityAsync(
+        Guid principalId,
+        LinkExternalIdentityRequest request,
+        ExternalIdentityAdministrationService service,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var identity = await service.LinkAsync(principalId, request.Issuer, request.Subject, cancellationToken);
+            return Results.Ok(identity);
+        }
+        catch (ArgumentException exception) when (exception.ParamName == "principalId")
+        {
+            return Results.NotFound(new { error = exception.Message });
+        }
+        catch (ArgumentException exception)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { [exception.ParamName ?? "identity"] = [exception.Message] });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or ControlPlaneConcurrencyException)
+        {
+            return Results.Conflict(new { error = exception.Message });
+        }
+    }
+
+    private static async Task<IResult> UnlinkExternalIdentityAsync(
+        Guid principalId,
+        Guid externalIdentityId,
+        ExternalIdentityAdministrationService service,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await service.UnlinkAsync(principalId, externalIdentityId, cancellationToken);
+            return Results.NoContent();
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            return Results.NotFound(new { error = exception.Message });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Results.Conflict(new { error = exception.Message });
+        }
     }
 }
 

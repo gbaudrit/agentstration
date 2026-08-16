@@ -2,6 +2,8 @@
 
 Agentstration represents a stable caller as a provider-neutral `Principal`. A Principal may be human or a workload and can be linked to a local ASP.NET Core Identity account and multiple external identities. `LocalIdentity` links the Identity account identifier without exposing credentials. Each external identity is keyed by the exact `(Issuer, Subject)` pair from a validated OIDC/OAuth identity. Email and display name are attributes and never identity keys.
 
+Platform administrators explicitly add or remove external links from a member's details. A pair cannot move silently between Principals, and the last authentication method cannot be removed. Unknown external logins are not provisioned or matched by email in this iteration. See [ADR-0044](../decisions/0044-external-identities-are-explicitly-linked-to-principals.md).
+
 Workspace membership and role assignments are Agentstration data. An identity-provider tenant, group, or role does not automatically create a Workspace or grant access. The first enforced vertical protects Management Agents and Identity Workspace operations; other planes remain planned.
 
 Local-account administration is restricted to Platform administrators. Workspace-role administration is contextual and uses the built-in `Owner`, `Admin`, `Member`, and `Viewer` roles. `PlatformAdmin` remains an instance grant rather than a Workspace role.
