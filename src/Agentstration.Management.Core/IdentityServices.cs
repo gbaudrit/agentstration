@@ -55,6 +55,7 @@ public sealed class ExternalIdentityPrincipalResolver(IIdentityStore store) : IP
 public sealed class InitialPrincipalProvisioner(
     IIdentityStore store,
     IResourceScopeMigrator resourceMigrator,
+    ISecurityAuditWriter audit,
     TimeProvider timeProvider,
     LocalBootstrapOptions options) : IInitialPrincipalProvisioner
 {
@@ -90,6 +91,13 @@ public sealed class InitialPrincipalProvisioner(
         await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), tenant.Id, principal.Id, PrincipalType.User, owner.Id, AuthorizationScopes.Workspace(workspace.Id)), cancellationToken);
         await store.AddPlatformAdministratorAsync(new PlatformAdministrator(principal.Id, now), cancellationToken);
         await resourceMigrator.BackfillUnscopedResourcesAsync(tenant.Id, workspace.Id, cancellationToken);
+        await audit.WriteAsync(new(
+            SecurityAuditActions.PlatformAdministratorGranted,
+            ActorPrincipalId: principal.Id,
+            TargetPrincipalId: principal.Id,
+            TargetAccountId: request.AccountId,
+            TenantId: tenant.Id,
+            WorkspaceId: workspace.Id), cancellationToken);
         return new InitialPrincipalProvisioningResult(principal, tenant, workspace);
     }
 }
@@ -129,6 +137,7 @@ public sealed class LocalPrincipalProvisioner(
     IIdentityStore store,
     ICurrentRequestContext requestContext,
     IPlatformAuthorizationService platformAuthorization,
+    ISecurityAuditWriter audit,
     TimeProvider timeProvider) : ILocalPrincipalProvisioner
 {
     public async Task<Principal> ProvisionAsync(LocalPrincipalProvisioning request, CancellationToken cancellationToken)
@@ -153,6 +162,13 @@ public sealed class LocalPrincipalProvisioner(
         await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), workspace.Id, principal.Id, MembershipStatus.Active, now), cancellationToken);
         await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), workspace.TenantId, principal.Id, PrincipalType.User, role.Id, AuthorizationScopes.Workspace(workspace.Id)), cancellationToken);
         await store.AddLocalIdentityAsync(new LocalIdentity(request.AccountId, principal.Id, now), cancellationToken);
+        await audit.WriteAsync(new(
+            SecurityAuditActions.WorkspaceMembershipSet,
+            TargetPrincipalId: principal.Id,
+            TargetAccountId: request.AccountId,
+            TenantId: workspace.TenantId,
+            WorkspaceId: workspace.Id,
+            ReasonCode: $"role-{role.Name.ToLowerInvariant()}"), cancellationToken);
         return principal;
     }
 }
@@ -163,6 +179,7 @@ public sealed class WorkspaceMembershipAdministrationService(
     IIdentityStore store,
     ICurrentRequestContext requestContext,
     IAuthorizationService authorization,
+    ISecurityAuditWriter audit,
     TimeProvider timeProvider)
 {
     public async Task<IReadOnlyList<WorkspaceMemberView>> ListAsync(Guid workspaceId, CancellationToken cancellationToken)
@@ -215,6 +232,12 @@ public sealed class WorkspaceMembershipAdministrationService(
                      .Where(value => string.Equals(value.Scope, scope, StringComparison.Ordinal)))
             await store.RemoveRoleAssignmentAsync(assignment.Id, cancellationToken);
         await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), workspace.TenantId, principal.Id, PrincipalType.User, role.Id, scope), cancellationToken);
+        await audit.WriteAsync(new(
+            SecurityAuditActions.WorkspaceMembershipSet,
+            TargetPrincipalId: principal.Id,
+            TenantId: workspace.TenantId,
+            WorkspaceId: workspace.Id,
+            ReasonCode: $"role-{role.Name.ToLowerInvariant()}"), cancellationToken);
         return new WorkspaceMemberView(principal, membership, role.Name, false);
     }
 
@@ -231,6 +254,11 @@ public sealed class WorkspaceMembershipAdministrationService(
                      .Where(value => string.Equals(value.Scope, scope, StringComparison.Ordinal)))
             await store.RemoveRoleAssignmentAsync(assignment.Id, cancellationToken);
         await store.RemoveWorkspaceMembershipAsync(membership.Id, cancellationToken);
+        await audit.WriteAsync(new(
+            SecurityAuditActions.WorkspaceMembershipRemoved,
+            TargetPrincipalId: principalId,
+            TenantId: workspace.TenantId,
+            WorkspaceId: workspace.Id), cancellationToken);
     }
 
     private async Task<Workspace> RequireWorkspaceAccessAsync(Guid workspaceId, string permission, CancellationToken cancellationToken)

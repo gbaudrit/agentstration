@@ -1,0 +1,49 @@
+@page "/settings/organization/security-audit"
+@inject Agentstration.Management.Core.SecurityAuditService Audit
+
+<PageTitle>Security audit · Organization · Agentstration</PageTitle>
+<PageHeader Title="Security audit" Description="Append-only history of authentication and authorization changes for this instance." />
+<OrganizationSettingsNav />
+
+@if (loading)
+{
+    <LoadingState Message="Loading security events…" />
+}
+else if (denied)
+{
+    <ErrorState Title="Platform administrator required" Message="Only Platform administrators can inspect the instance security audit." />
+}
+else if (events.Count == 0)
+{
+    <EmptyState Title="No security event" Message="Security events will appear here after authentication or authorization changes." />
+}
+else
+{
+    <DataGrid TItem="Agentstration.Management.Abstractions.SecurityAuditEvent" Items="events">
+        <Header><tr><th>Time</th><th>Action</th><th>Outcome</th><th>Actor</th><th>Target</th><th>Scope</th><th>Correlation</th></tr></Header>
+        <Row Context="entry"><tr>
+            <td>@entry.OccurredAt.ToLocalTime().ToString("g")</td>
+            <td><strong>@entry.Action</strong>@if (!string.IsNullOrWhiteSpace(entry.ReasonCode)) { <br /><small>@entry.ReasonCode</small> }</td>
+            <td><StatusBadge Text="@entry.Outcome.ToString()" Status="@(entry.Outcome == SecurityAuditOutcome.Succeeded ? UiStatus.Success : UiStatus.Warning)" /></td>
+            <td><code>@ShortId(entry.ActorPrincipalId)</code></td>
+            <td>@if (entry.TargetPrincipalId is not null) { <span>Principal <code>@ShortId(entry.TargetPrincipalId)</code></span> } else if (entry.TargetAccountId is not null) { <span>Account <code>@ShortId(entry.TargetAccountId)</code></span> } else { <span>—</span> }</td>
+            <td>@if (entry.WorkspaceId is not null) { <span>Workspace <code>@ShortId(entry.WorkspaceId)</code></span> } else if (entry.TenantId is not null) { <span>Tenant <code>@ShortId(entry.TenantId)</code></span> } else { <span>Instance</span> }</td>
+            <td><code>@(string.IsNullOrWhiteSpace(entry.CorrelationId) ? "—" : entry.CorrelationId[..Math.Min(12, entry.CorrelationId.Length)])</code></td>
+        </tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private IReadOnlyList<Agentstration.Management.Abstractions.SecurityAuditEvent> events = [];
+    private bool loading = true;
+    private bool denied;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { events = await Audit.ListLatestAsync(200, default); }
+        catch (AuthorizationDeniedException) { denied = true; }
+        finally { loading = false; }
+    }
+
+    private static string ShortId(Guid? value) => value is null ? "—" : value.Value.ToString("D")[..8];
+}

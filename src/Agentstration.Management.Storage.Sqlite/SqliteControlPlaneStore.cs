@@ -20,6 +20,7 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     internal DbSet<WorkspaceMembershipRow> WorkspaceMemberships => Set<WorkspaceMembershipRow>();
     internal DbSet<RoleDefinitionRow> RoleDefinitions => Set<RoleDefinitionRow>();
     internal DbSet<RoleAssignmentRow> RoleAssignments => Set<RoleAssignmentRow>();
+    internal DbSet<SecurityAuditRow> SecurityAuditEvents => Set<SecurityAuditRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -380,7 +381,9 @@ public static class SqliteControlPlaneServiceCollectionExtensions
         services.AddSingleton<IControlPlaneStore, SqliteControlPlaneStore>();
         services.AddSingleton<IAgentResourceQueries>(provider => (SqliteControlPlaneStore)provider.GetRequiredService<IControlPlaneStore>());
         services.AddSingleton<IResourceScopeMigrator>(provider => (SqliteControlPlaneStore)provider.GetRequiredService<IControlPlaneStore>());
-        services.AddSingleton<IIdentityStore, SqliteIdentityStore>();
+        services.AddSingleton<SqliteIdentityStore>();
+        services.AddSingleton<IIdentityStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());
+        services.AddSingleton<ISecurityAuditStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());
         return services;
     }
 }

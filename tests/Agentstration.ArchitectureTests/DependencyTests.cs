@@ -241,6 +241,14 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void SecurityAuditEventsContainNoCredentialOrMutablePersonalAttributes()
+    {
+        var forbidden = new[] { "password", "hash", "salt", "token", "secret", "credential", "recovery", "mfa", "email", "username", "claim" };
+        Assert.IsFalse(typeof(SecurityAuditEvent).GetProperties().Any(property =>
+            forbidden.Any(value => property.Name.Contains(value, StringComparison.OrdinalIgnoreCase))));
+    }
+
+    [TestMethod]
     public void ApiEndpointsDoNotImplementClaimOrRoleAuthorizationLogic()
     {
         var apiRoot = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Web", "Api");

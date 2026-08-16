@@ -76,11 +76,13 @@ public sealed record LocalAccountView(
     bool PlatformAdministrator);
 public sealed record LocalAccountSecurityView(Guid AccountId, string UserName, string? Email);
 public sealed record LocalAccountSecurityResult(bool Succeeded, IReadOnlyList<string> Errors);
+public enum LocalLoginOutcome { Succeeded, Failed, LockedOut }
 
 public sealed class LocalBootstrapCoordinator(
     UserManager<LocalIdentityUser> users,
     LocalIdentityDbContext database,
     IInitialPrincipalProvisioner provisioner,
+    ISecurityAuditWriter audit,
     TimeProvider timeProvider,
     LocalBootstrapLock bootstrapLock)
 {
@@ -129,6 +131,11 @@ public sealed class LocalBootstrapCoordinator(
                     CompletedAt = timeProvider.GetUtcNow()
                 });
                 await database.SaveChangesAsync(cancellationToken);
+                await audit.WriteAsync(new(
+                    SecurityAuditActions.InstanceBootstrapped,
+                    ActorPrincipalId: principalId,
+                    TargetPrincipalId: principalId,
+                    TargetAccountId: accountId), cancellationToken);
                 return new(true, principalId, []);
             }
             catch
@@ -149,7 +156,8 @@ public sealed class LocalAccountAdministrationService(
     IIdentityStore identityStore,
     ILocalPrincipalProvisioner provisioner,
     ICurrentRequestContext requestContext,
-    IPlatformAuthorizationService platformAuthorization)
+    IPlatformAuthorizationService platformAuthorization,
+    ISecurityAuditWriter audit)
 {
     public async Task<IReadOnlyList<LocalAccountView>> ListAsync(CancellationToken cancellationToken)
     {
@@ -193,6 +201,11 @@ public sealed class LocalAccountAdministrationService(
                 request.Role,
                 request.DisplayName.Trim(),
                 account.Email), cancellationToken);
+            await audit.WriteAsync(new(
+                SecurityAuditActions.LocalAccountCreated,
+                TargetPrincipalId: principal.Id,
+                TargetAccountId: account.Id,
+                WorkspaceId: request.WorkspaceId), cancellationToken);
             return (await ViewAsync(account, principal, cancellationToken), []);
         }
         catch
@@ -221,6 +234,10 @@ public sealed class LocalAccountAdministrationService(
         await users.UpdateSecurityStampAsync(account);
         principal = principal with { Status = enabled ? PrincipalStatus.Active : PrincipalStatus.Disabled };
         await identityStore.UpdatePrincipalAsync(principal, cancellationToken);
+        await audit.WriteAsync(new(
+            enabled ? SecurityAuditActions.LocalAccountEnabled : SecurityAuditActions.LocalAccountDisabled,
+            TargetPrincipalId: principal.Id,
+            TargetAccountId: account.Id), cancellationToken);
         return await ViewAsync(account, principal, cancellationToken);
     }
 
@@ -238,7 +255,9 @@ public sealed class LocalAccountAdministrationService(
 
 public sealed class LocalAccountSecurityService(
     UserManager<LocalIdentityUser> users,
-    SignInManager<LocalIdentityUser> signIn)
+    SignInManager<LocalIdentityUser> signIn,
+    IIdentityStore identityStore,
+    ISecurityAuditWriter audit)
 {
     public async Task<LocalAccountSecurityView?> GetAsync(Guid accountId, CancellationToken cancellationToken)
     {
@@ -257,12 +276,24 @@ public sealed class LocalAccountSecurityService(
     {
         cancellationToken.ThrowIfCancellationRequested();
         var account = await users.FindByIdAsync(accountId.ToString("D"));
-        if (account is null) return new(false, ["The local account no longer exists."]);
+        if (account is null)
+        {
+            await audit.WriteAsync(new(SecurityAuditActions.LocalPasswordChanged, SecurityAuditOutcome.Failed,
+                TargetAccountId: accountId, ReasonCode: "account-not-found"), cancellationToken);
+            return new(false, ["The local account no longer exists."]);
+        }
         var changed = await users.ChangePasswordAsync(account, currentPassword, newPassword);
         if (!changed.Succeeded)
+        {
+            await audit.WriteAsync(new(SecurityAuditActions.LocalPasswordChanged, SecurityAuditOutcome.Failed,
+                TargetPrincipalId: await PrincipalIdAsync(accountId, cancellationToken), TargetAccountId: accountId,
+                ReasonCode: "credential-rejected"), cancellationToken);
             return new(false, changed.Errors.Select(error => error.Description).ToArray());
+        }
 
         await signIn.RefreshSignInAsync(account);
+        await audit.WriteAsync(new(SecurityAuditActions.LocalPasswordChanged,
+            TargetPrincipalId: await PrincipalIdAsync(accountId, cancellationToken), TargetAccountId: accountId), cancellationToken);
         return new(true, []);
     }
 
@@ -272,13 +303,75 @@ public sealed class LocalAccountSecurityService(
     {
         cancellationToken.ThrowIfCancellationRequested();
         var account = await users.FindByIdAsync(accountId.ToString("D"));
-        if (account is null) return new(false, ["The local account no longer exists."]);
+        if (account is null)
+        {
+            await audit.WriteAsync(new(SecurityAuditActions.LocalSessionsRevoked, SecurityAuditOutcome.Failed,
+                TargetAccountId: accountId, ReasonCode: "account-not-found"), cancellationToken);
+            return new(false, ["The local account no longer exists."]);
+        }
         var updated = await users.UpdateSecurityStampAsync(account);
         if (!updated.Succeeded)
+        {
+            await audit.WriteAsync(new(SecurityAuditActions.LocalSessionsRevoked, SecurityAuditOutcome.Failed,
+                TargetPrincipalId: await PrincipalIdAsync(accountId, cancellationToken), TargetAccountId: accountId,
+                ReasonCode: "security-stamp-update-failed"), cancellationToken);
             return new(false, updated.Errors.Select(error => error.Description).ToArray());
+        }
 
         await signIn.RefreshSignInAsync(account);
+        await audit.WriteAsync(new(SecurityAuditActions.LocalSessionsRevoked,
+            TargetPrincipalId: await PrincipalIdAsync(accountId, cancellationToken), TargetAccountId: accountId), cancellationToken);
         return new(true, []);
+    }
+
+    private async Task<Guid?> PrincipalIdAsync(Guid accountId, CancellationToken cancellationToken) =>
+        (await identityStore.FindLocalIdentityAsync(accountId, cancellationToken))?.PrincipalId;
+}
+
+public sealed class LocalAuthenticationService(
+    UserManager<LocalIdentityUser> users,
+    SignInManager<LocalIdentityUser> signIn,
+    IIdentityStore identityStore,
+    ISecurityAuditWriter audit)
+{
+    public async Task<LocalLoginOutcome> PasswordSignInAsync(
+        string userName,
+        string password,
+        bool rememberMe,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password))
+        {
+            await audit.WriteAsync(new(SecurityAuditActions.LocalLogin, SecurityAuditOutcome.Failed,
+                ReasonCode: "missing-credentials"), cancellationToken);
+            return LocalLoginOutcome.Failed;
+        }
+        var normalized = userName.Trim();
+        var result = await signIn.PasswordSignInAsync(normalized, password, rememberMe, lockoutOnFailure: true);
+        var account = await users.FindByNameAsync(normalized);
+        var principalId = account is null
+            ? null
+            : (await identityStore.FindLocalIdentityAsync(account.Id, cancellationToken))?.PrincipalId;
+        var outcome = result.Succeeded ? LocalLoginOutcome.Succeeded : result.IsLockedOut ? LocalLoginOutcome.LockedOut : LocalLoginOutcome.Failed;
+        await audit.WriteAsync(new(
+            SecurityAuditActions.LocalLogin,
+            result.Succeeded ? SecurityAuditOutcome.Succeeded : SecurityAuditOutcome.Failed,
+            ActorPrincipalId: result.Succeeded ? principalId : null,
+            TargetPrincipalId: principalId,
+            TargetAccountId: account?.Id,
+            ReasonCode: outcome switch
+            {
+                LocalLoginOutcome.LockedOut => "locked-out",
+                LocalLoginOutcome.Failed => "invalid-credentials",
+                _ => null
+            }), cancellationToken);
+        return outcome;
+    }
+
+    public async Task SignOutAsync(CancellationToken cancellationToken)
+    {
+        await signIn.SignOutAsync();
+        await audit.WriteAsync(new(SecurityAuditActions.LocalLogout), cancellationToken);
     }
 }
 
@@ -374,6 +467,7 @@ public static class LocalIdentityServiceCollectionExtensions
         services.AddScoped<LocalBootstrapCoordinator>();
         services.AddScoped<LocalAccountAdministrationService>();
         services.AddScoped<LocalAccountSecurityService>();
+        services.AddScoped<LocalAuthenticationService>();
         services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero);
         services.AddSingleton<LocalBootstrapLock>();
         services.AddSingleton<LocalIdentityDatabaseInitializer>();

@@ -30,6 +30,9 @@ public static class IdentityEndpoints
             Results.Ok((await service.GetCurrentAsync(token)).Members)).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
         group.MapGet("/platform", () => Results.Ok(new { role = "PlatformAdmin" }))
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapGet("/audit-events", async (int? limit, SecurityAuditService service, CancellationToken token) =>
+            Results.Ok(await service.ListLatestAsync(limit ?? 100, token)))
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         endpoints.MapPost("/bff/identity/context/workspace", SelectWorkspaceAsync)
             .RequireAuthorization(AgentstrationPolicies.Authenticated);
         return endpoints;

@@ -106,20 +106,22 @@ public static class AuthenticationEndpoints
 
     private static async Task<IResult> LoginAsync(
         LocalLoginRequest request,
-        SignInManager<LocalIdentityUser> signIn,
-        IOptions<AgentstrationWebOptions> options)
+        LocalAuthenticationService authentication,
+        IOptions<AgentstrationWebOptions> options,
+        CancellationToken cancellationToken)
     {
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
-        if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password)) return Results.Unauthorized();
-        var result = await signIn.PasswordSignInAsync(request.UserName.Trim(), request.Password, request.RememberMe, lockoutOnFailure: true);
-        if (result.IsLockedOut) return Results.Problem(statusCode: StatusCodes.Status423Locked, title: "account_locked");
-        if (!result.Succeeded) return Results.Unauthorized();
-        return Results.NoContent();
+        return (await authentication.PasswordSignInAsync(request.UserName, request.Password, request.RememberMe, cancellationToken)) switch
+        {
+            LocalLoginOutcome.Succeeded => Results.NoContent(),
+            LocalLoginOutcome.LockedOut => Results.Problem(statusCode: StatusCodes.Status423Locked, title: "account_locked"),
+            _ => Results.Unauthorized()
+        };
     }
 
-    private static async Task<IResult> LogoutAsync(SignInManager<LocalIdentityUser> signIn)
+    private static async Task<IResult> LogoutAsync(LocalAuthenticationService authentication, CancellationToken cancellationToken)
     {
-        await signIn.SignOutAsync();
+        await authentication.SignOutAsync(cancellationToken);
         return Results.NoContent();
     }
 

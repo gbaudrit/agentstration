@@ -154,6 +154,10 @@ public sealed class SecurityApiTests
         using var invalidatedSession = await otherBrowser.GetAsync("/api/agents");
         Assert.AreEqual(HttpStatusCode.OK, currentSession.StatusCode);
         Assert.AreEqual(HttpStatusCode.Unauthorized, invalidatedSession.StatusCode);
+        var passwordEvents = await currentBrowser.GetFromJsonAsync<SecurityAuditEvent[]>("/api/identity/audit-events");
+        Assert.IsNotNull(passwordEvents);
+        Assert.IsTrue(passwordEvents.Any(value => value.Action == SecurityAuditActions.LocalPasswordChanged
+            && value.Outcome == SecurityAuditOutcome.Succeeded));
 
         using var logout = await currentBrowser.PostAsync("/api/auth/logout", null);
         Assert.AreEqual(HttpStatusCode.NoContent, logout.StatusCode);
@@ -190,6 +194,10 @@ public sealed class SecurityApiTests
         using var invalidatedSession = await otherBrowser.GetAsync("/api/agents");
         Assert.AreEqual(HttpStatusCode.OK, currentSession.StatusCode);
         Assert.AreEqual(HttpStatusCode.Unauthorized, invalidatedSession.StatusCode);
+        var sessionEvents = await currentBrowser.GetFromJsonAsync<SecurityAuditEvent[]>("/api/identity/audit-events");
+        Assert.IsNotNull(sessionEvents);
+        Assert.IsTrue(sessionEvents.Any(value => value.Action == SecurityAuditActions.LocalSessionsRevoked
+            && value.Outcome == SecurityAuditOutcome.Succeeded));
     }
 
     [TestMethod]
@@ -404,6 +412,10 @@ public sealed class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.OK, enabled.StatusCode);
         using var protectPlatformAdmin = await client.PutAsJsonAsync($"/api/identity/accounts/{accounts.Single(value => value.PlatformAdministrator).AccountId:D}/status", new { enabled = false });
         Assert.AreEqual(HttpStatusCode.Conflict, protectPlatformAdmin.StatusCode);
+        var auditEvents = await client.GetFromJsonAsync<SecurityAuditEvent[]>("/api/identity/audit-events");
+        Assert.IsNotNull(auditEvents);
+        Assert.IsTrue(auditEvents.Any(value => value.Action == SecurityAuditActions.LocalAccountDisabled && value.TargetAccountId == account.AccountId));
+        Assert.IsTrue(auditEvents.Any(value => value.Action == SecurityAuditActions.LocalAccountEnabled && value.TargetAccountId == account.AccountId));
     }
 
     [TestMethod]
@@ -454,6 +466,73 @@ public sealed class SecurityApiTests
         using var platformAdminDenied = await client.GetAsync("/api/identity/accounts/");
         Assert.AreEqual(HttpStatusCode.OK, workspaceAdminAllowed.StatusCode);
         Assert.AreEqual(HttpStatusCode.Forbidden, platformAdminDenied.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task SecurityAuditRecordsSensitiveOperationsAndRequiresPlatformAdministrator()
+    {
+        await using var factory = Factory("Local");
+        using var administrator = UnredirectedClient(factory);
+        using var memberBrowser = UnredirectedClient(factory);
+
+        using var anonymousAudit = await administrator.GetAsync("/api/identity/audit-events");
+        Assert.AreEqual(HttpStatusCode.Unauthorized, anonymousAudit.StatusCode);
+        await BootstrapAsync(administrator, "audit-admin");
+        var context = await administrator.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.IsNotNull(context);
+
+        using var created = await administrator.PostAsJsonAsync("/api/identity/accounts/", new
+        {
+            userName = "audit-member",
+            password = LocalPassword,
+            displayName = "Audit member",
+            email = "audit-member@example.test",
+            workspaceId = context.Context.WorkspaceId,
+            role = BuiltInIdentityRoles.Admin
+        });
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
+        var account = await created.Content.ReadFromJsonAsync<LocalAccountView>();
+        Assert.IsNotNull(account);
+
+        using var failedLogin = await memberBrowser.PostAsJsonAsync("/api/auth/local/login", new
+        {
+            userName = "audit-member",
+            password = "Not-the-right-password-42!"
+        });
+        Assert.AreEqual(HttpStatusCode.Unauthorized, failedLogin.StatusCode);
+        await LoginAsync(memberBrowser, "audit-member", LocalPassword);
+
+        using var deniedAudit = await memberBrowser.GetAsync("/api/identity/audit-events");
+        Assert.AreEqual(HttpStatusCode.Forbidden, deniedAudit.StatusCode);
+
+        using var removed = await administrator.DeleteAsync(
+            $"/api/identity/workspaces/{context.Context.WorkspaceId:D}/memberships/{account.PrincipalId:D}");
+        Assert.AreEqual(HttpStatusCode.NoContent, removed.StatusCode);
+
+        using var auditResponse = await administrator.GetAsync("/api/identity/audit-events?limit=200");
+        Assert.AreEqual(HttpStatusCode.OK, auditResponse.StatusCode);
+        var events = await auditResponse.Content.ReadFromJsonAsync<SecurityAuditEvent[]>();
+        Assert.IsNotNull(events);
+        Assert.IsTrue(events.Any(value => value.Action == SecurityAuditActions.InstanceBootstrapped));
+        Assert.IsTrue(events.Any(value => value.Action == SecurityAuditActions.PlatformAdministratorGranted));
+        Assert.IsTrue(events.Any(value => value.Action == SecurityAuditActions.LocalAccountCreated
+            && value.TargetPrincipalId == account.PrincipalId && value.ActorPrincipalId == context.Context.PrincipalId));
+        Assert.IsTrue(events.Any(value => value.Action == SecurityAuditActions.WorkspaceMembershipSet
+            && value.TargetPrincipalId == account.PrincipalId && value.WorkspaceId == context.Context.WorkspaceId));
+        Assert.IsTrue(events.Any(value => value.Action == SecurityAuditActions.LocalLogin
+            && value.Outcome == SecurityAuditOutcome.Failed && value.ReasonCode == "invalid-credentials"));
+        Assert.IsTrue(events.Any(value => value.Action == SecurityAuditActions.LocalLogin
+            && value.Outcome == SecurityAuditOutcome.Succeeded && value.ActorPrincipalId == account.PrincipalId));
+        Assert.IsTrue(events.Any(value => value.Action == SecurityAuditActions.WorkspaceMembershipRemoved
+            && value.TargetPrincipalId == account.PrincipalId && value.WorkspaceId == context.Context.WorkspaceId));
+
+        var json = await auditResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("audit-member@example.test", json, StringComparison.Ordinal);
+        Assert.DoesNotContain(LocalPassword, json, StringComparison.Ordinal);
+
+        using var auditPage = await administrator.GetAsync("/settings/organization/security-audit");
+        Assert.AreEqual(HttpStatusCode.OK, auditPage.StatusCode);
+        StringAssert.Contains(await auditPage.Content.ReadAsStringAsync(), "Security audit");
     }
 
     private static WebApplicationFactory<Program> Factory(string mode) =>

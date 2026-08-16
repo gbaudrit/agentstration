@@ -93,6 +93,8 @@ Platform administrators can list, create, enable, and disable local accounts fro
 
 Local users can change their password or invalidate their other application-cookie sessions from `/account/security`. Both operations use ASP.NET Core Identity and antiforgery-protected server-rendered forms. Password recovery remains deliberately unavailable until a secure delivery channel is designed.
 
+The Management Control Plane keeps an append-only security history for authentication and authorization mutations. Platform administrators can inspect the latest events from **Organization > Security audit** or `GET /api/identity/audit-events`; records deliberately exclude credentials, usernames, email addresses, claims, and tokens.
+
 Interactive Server components invoke canonical APIs through server-side typed clients. For the standalone same-instance endpoints, `ForwardSessionCookie=true` propagates only the authenticated Agentstration session and resolved Workspace to the exact configured origin; redirects are disabled and unrelated cookies are never copied. The APIs still execute their authentication and authorization policies. Keep this option off for unrelated or independently deployed APIs and use OAuth Bearer access tokens at that boundary.
 
 ## Tests

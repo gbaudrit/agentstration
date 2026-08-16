@@ -107,6 +107,8 @@ public static class DependencyInjection
         services.AddSingleton<ILocalPrincipalProvisioner, LocalPrincipalProvisioner>();
         services.AddSingleton<IPlatformAuthorizationService, PlatformAuthorizationService>();
         services.AddSingleton<IAuthorizationService, PermissionAuthorizationService>();
+        services.AddSingleton<SecurityAuditService>();
+        services.AddSingleton<ISecurityAuditWriter>(provider => provider.GetRequiredService<SecurityAuditService>());
         services.AddSingleton<ILocalEnvironmentBootstrapper, LocalEnvironmentBootstrapper>();
         services.AddSingleton<IdentityAdministrationService>();
         services.AddSingleton<WorkspaceMembershipAdministrationService>();
