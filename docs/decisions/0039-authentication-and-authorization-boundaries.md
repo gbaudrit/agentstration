@@ -56,7 +56,7 @@ Agentstration does not expose `/authorize`, `/token`, or `/userinfo`, does not i
 - Identical external subjects from different issuers remain distinct; email changes do not alter identity.
 - Human and workload Principals are distinct kinds. Full workload authentication remains future work.
 - The first protected vertical covers Agent Management and Identity/Workspace operations. Flow, Runtime, Work, Workplace, MCP, SignalR, and AEP still require explicit scoping work.
-- EF Core `EnsureCreated` creates the first Identity schema because `identity.db` is a new dedicated database. Future schema changes must use migrations rather than relying on `EnsureCreated`.
+- The first implementation used EF Core `EnsureCreated` for the new dedicated `identity.db`; [ADR-0041](0041-durable-identity-schema-and-data-protection.md) supersedes that persistence detail with versioned migrations and a verified legacy baseline.
 
 ## Follow-up
 

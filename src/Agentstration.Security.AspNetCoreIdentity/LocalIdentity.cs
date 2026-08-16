@@ -2,7 +2,10 @@ using System.Security.Claims;
 using Agentstration.Management.Abstractions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -24,6 +27,17 @@ public sealed class LocalIdentityDbContext(DbContextOptions<LocalIdentityDbConte
     {
         base.OnModelCreating(builder);
         builder.Entity<BootstrapState>().ToTable("AgentstrationBootstrap").HasKey(value => value.Id);
+    }
+}
+
+public sealed class LocalIdentityDbContextFactory : IDesignTimeDbContextFactory<LocalIdentityDbContext>
+{
+    public LocalIdentityDbContext CreateDbContext(string[] args)
+    {
+        var options = new DbContextOptionsBuilder<LocalIdentityDbContext>()
+            .UseSqlite("Data Source=identity-design.db")
+            .Options;
+        return new LocalIdentityDbContext(options);
     }
 }
 
@@ -227,19 +241,72 @@ public sealed class LocalBootstrapLock
 
 public sealed class LocalIdentityDatabaseInitializer(IServiceScopeFactory scopeFactory)
 {
+    public const string InitialMigration = "20260816100707_InitialIdentity";
+    private static readonly string[] LegacyTables =
+    [
+        "AgentstrationBootstrap", "AspNetRoleClaims", "AspNetRoles", "AspNetUserClaims",
+        "AspNetUserLogins", "AspNetUserRoles", "AspNetUsers", "AspNetUserTokens"
+    ];
+
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var database = scope.ServiceProvider.GetRequiredService<LocalIdentityDbContext>();
-        await database.Database.EnsureCreatedAsync(cancellationToken);
+        await BaselineLegacyDatabaseAsync(database, cancellationToken);
+        await database.Database.MigrateAsync(cancellationToken);
+    }
+
+    private static async Task BaselineLegacyDatabaseAsync(LocalIdentityDbContext database, CancellationToken cancellationToken)
+    {
+        await database.Database.OpenConnectionAsync(cancellationToken);
+        try
+        {
+            var existing = new HashSet<string>(StringComparer.Ordinal);
+            await using (var command = database.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table'";
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken)) existing.Add(reader.GetString(0));
+            }
+
+            if (!existing.Contains("AspNetUsers")) return;
+            var missing = LegacyTables.Where(table => !existing.Contains(table)).ToArray();
+            if (missing.Length > 0)
+                throw new InvalidOperationException(
+                    $"The existing Identity database has a partial legacy schema. Missing tables: {string.Join(", ", missing)}.");
+
+            await database.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+                    "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+                    "ProductVersion" TEXT NOT NULL
+                );
+                """,
+                cancellationToken);
+            await database.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT OR IGNORE INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({InitialMigration}, {ProductInfo.GetVersion()})",
+                cancellationToken);
+        }
+        finally
+        {
+            await database.Database.CloseConnectionAsync();
+        }
     }
 }
 
 public static class LocalIdentityServiceCollectionExtensions
 {
-    public static IServiceCollection AddAgentstrationLocalIdentity(this IServiceCollection services, string connectionString)
+    public static IServiceCollection AddAgentstrationLocalIdentity(
+        this IServiceCollection services,
+        string connectionString,
+        string dataProtectionKeysPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataProtectionKeysPath);
+        var keysDirectory = PrepareDataProtectionKeysDirectory(dataProtectionKeysPath);
+        services.AddDataProtection()
+            .SetApplicationName("Agentstration")
+            .PersistKeysToFileSystem(keysDirectory);
         services.AddDbContext<LocalIdentityDbContext>(options => options.UseSqlite(connectionString));
         services.AddIdentityCore<LocalIdentityUser>(options =>
             {
@@ -262,5 +329,33 @@ public static class LocalIdentityServiceCollectionExtensions
         services.AddSingleton<LocalBootstrapLock>();
         services.AddSingleton<LocalIdentityDatabaseInitializer>();
         return services;
+    }
+
+    private static DirectoryInfo PrepareDataProtectionKeysDirectory(string path)
+    {
+        try
+        {
+            var directory = new DirectoryInfo(Path.GetFullPath(path));
+            directory.Create();
+            directory.Refresh();
+            var probe = Path.Combine(directory.FullName, $".agentstration-write-test-{Guid.NewGuid():N}");
+            using (new FileStream(probe, new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                BufferSize = 1,
+                Options = FileOptions.DeleteOnClose
+            })) { }
+            return directory;
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            throw new InvalidOperationException("The configured Data Protection keys path is not a writable directory.", exception);
+        }
     }
 }

@@ -41,6 +41,13 @@ var identityConnectionString = builder.Configuration.GetConnectionString("Identi
     ?? (builder.Environment.IsEnvironment("Testing")
         ? $"Data Source={Path.Combine(Path.GetTempPath(), $"agentstration-identity-tests-{Guid.NewGuid():N}.db")}"
         : $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "identity.db")}");
+var dataProtectionKeysPath = configuredAuthentication.DataProtectionKeysPath;
+if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    dataProtectionKeysPath = builder.Environment.IsEnvironment("Testing")
+        ? Path.Combine(Path.GetTempPath(), $"agentstration-data-protection-tests-{Guid.NewGuid():N}")
+        : Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "data-protection-keys");
+}
 var aiProvider = builder.Configuration["AI:Provider"] ?? "Managed";
 var useManagedProfileResolver = string.Equals(aiProvider, "Managed", StringComparison.OrdinalIgnoreCase)
     || string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase);
@@ -80,7 +87,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSignalR();
-builder.Services.AddAgentstrationLocalIdentity(identityConnectionString);
+builder.Services.AddAgentstrationLocalIdentity(identityConnectionString, dataProtectionKeysPath);
 builder.Services.AddSingleton<IFlowRunEventSink, SignalRFlowRunEventSink>();
 builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>();
 builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);

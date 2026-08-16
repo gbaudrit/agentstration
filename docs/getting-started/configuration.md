@@ -11,6 +11,8 @@ The main verified settings are:
 | `Data:ControlPlanePath` | `.agentstration/control-plane.db` | Management Plane SQLite database. |
 | `Data:WorkPlanePath` | `.agentstration/work-plane.db` | Work Plane SQLite database. |
 | `Data:FlowPath` | `.agentstration/flow-plane.db` | Flow SQLite database. |
+| `ConnectionStrings:Identity` | `.agentstration/identity.db` | ASP.NET Core Identity account database, managed through EF Core migrations. |
+| `Agentstration:Authentication:DataProtectionKeysPath` | `.agentstration/data-protection-keys` | Persistent ASP.NET Core Data Protection key ring for cookies and Identity tokens. |
 | `Agentstration:WorkApi:BaseAddress` | `http://localhost:5100/` | Console-to-Work-API connection on the authoritative server. |
 | `Agentstration:ApiBaseUrl` | `http://localhost:5100/` | Workplace-to-server API connection. |
 | `Agentstration:WorkplaceHubUrl` | `http://localhost:5100/hubs/workplace` | Workplace real-time endpoint. |
