@@ -85,25 +85,26 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                         await run.SendResponseAsync(CreateResponse(interaction.Request, request.AnsweredInput));
                         break;
                     }
-                    if (checkpointManager is null || run.LastCheckpoint is null)
-                        throw new FlowValidationException(
-                            "flow_orchestration_interaction_not_durable",
-                            "The orchestration requested external input before durable runtime state was available.");
                     var sourceState = states.Values
                         .Where(value => value.Active is not null)
                         .OrderByDescending(value => value.Active!.Turn)
                         .FirstOrDefault();
-                    var source = sourceState is null ? null : new WorkflowActor(sourceState.Participant.Id, false);
                     var prompt = sourceState is not null
                         ? sourceState.Active?.Content.ToString()
                         : null;
+                    for (var attempt = 0; checkpointManager is not null && run.LastCheckpoint is null && attempt < 100; attempt++)
+                        await Task.Delay(TimeSpan.FromMilliseconds(10), timeProvider, cancellationToken);
+                    if (checkpointManager is null || run.LastCheckpoint is null)
+                        throw new FlowValidationException(
+                            "flow_orchestration_interaction_not_durable",
+                            "The orchestration requested external input before durable runtime state was available.");
                     var interactionDescription = DescribeInteraction(interaction.Request, prompt);
                     yield return new FlowExternalInputRequested(
                         interaction.Request.RequestId,
                         interactionDescription.Prompt,
                         interactionDescription.Type,
                         [],
-                        source?.Id,
+                        sourceState?.Participant.Id,
                         new DurableRuntimeStateReference(
                             AgentFrameworkCheckpointStore.RuntimeType,
                             run.LastCheckpoint.CheckpointId,
@@ -378,6 +379,10 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                 : [new ChatMessage(ChatRole.User, [approvalResponse])];
             return request.CreateResponse(envelope.CreateResponse(messages));
         }
+        if (value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            && request.TryGetDataAs<ToolApprovalRequestContent>(out var directApproval)
+            && directApproval is not null)
+            return request.CreateResponse(directApproval.CreateResponse(value.GetBoolean()));
         if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
             return request.CreateResponse(value.GetBoolean());
         if (request.IsDataOfType<ChatMessage>())
@@ -389,6 +394,8 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
 
     internal static InteractionDescription DescribeInteraction(ExternalRequest request, string? participantPrompt)
     {
+        if (request.TryGetDataAs<ToolApprovalRequestContent>(out var approval) && approval is not null)
+            return new(InputRequestType.Confirmation, "Approve the requested tool operation?");
         if (request.TryGetDataAs<IExternalRequestEnvelope>(out var envelope)
             && envelope?.GetInnerRequestContent() is ToolApprovalRequestContent)
             return new(InputRequestType.Confirmation, "Approve the requested tool operation?");

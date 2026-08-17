@@ -10,9 +10,12 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Local;
+using Agentstration.Runtime.Storage.Sqlite;
+using Microsoft.Data.Sqlite;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Runtime.Tests;
@@ -52,6 +55,99 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         var approvalResponse = wrapped!.Messages.SelectMany(message => message.Contents)
             .OfType<ToolApprovalResponseContent>().Single();
         Assert.IsTrue(approvalResponse.Approved);
+    }
+
+    [TestMethod]
+    public async Task MafApprovalRequestResumesFromSqliteAfterCompleteReconstruction()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-maf-resume-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var databasePath = Path.Combine(directory, "runtime.db");
+        try
+        {
+            static ServiceProvider StateProvider(string path)
+            {
+                var services = new ServiceCollection();
+                services.AddSingleton(TimeProvider.System);
+                services.AddSqliteRuntimeRuns($"Data Source={path};Pooling=False");
+                return services.BuildServiceProvider();
+            }
+
+            var definition = new OrchestrationFlowDefinition(
+                [new FlowTargetReference(FlowTargetKind.Agent, "agent-1")],
+                new SequentialOrchestrationPattern());
+            var initialEvents = new List<FlowExecutionEvent>();
+            var agentResolver = new RecordingAgentResolver();
+            FlowExternalInputRequested suspended;
+            IReadOnlyList<RuntimeExecutionBinding> bindings;
+
+            await using (var firstProvider = StateProvider(databasePath))
+            {
+                await firstProvider.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
+                using var requestingClient = new RecordingChatClient
+                {
+                    ResponseFactory = (_, _, _) => new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                    [
+                        new ToolApprovalRequestContent(
+                            "approval-1",
+                            new FunctionCallContent("call-1", "delete_record", new Dictionary<string, object?>()))
+                    ]))
+                };
+                var factory = new AgentFrameworkRuntimeFactory(
+                    new RecordingResolver(requestingClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions());
+                var firstEngine = new AgentFrameworkFlowOrchestrationEngine(
+                    agentResolver, new EmptyToolCatalog(), factory,
+                    firstProvider.GetRequiredService<IRuntimeExecutionStateStore>());
+
+                await foreach (var item in firstEngine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+                    "run-maf-resume", definition, JsonSerializer.SerializeToElement(new { prompt = "Delete it" }), "correlation-1")))
+                    initialEvents.Add(item);
+                suspended = initialEvents.OfType<FlowExternalInputRequested>().Single();
+                bindings = initialEvents.OfType<FlowRuntimeBindingsResolved>().Single().Bindings;
+                Assert.AreEqual(InputRequestType.Confirmation, suspended.Type);
+                Assert.IsNotNull(await firstProvider.GetRequiredService<IRuntimeExecutionStateStore>().GetAsync(
+                    "run-maf-resume", suspended.RuntimeState.RuntimeType, suspended.RuntimeState.StateId, default));
+            }
+
+            await using (var secondProvider = StateProvider(databasePath))
+            {
+                await secondProvider.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
+                using var resumedClient = new RecordingChatClient
+                {
+                    ResponseFactory = (_, _, _) =>
+                        new ChatResponse(new ChatMessage(ChatRole.Assistant, "APPROVED_OK"))
+                };
+                var factory = new AgentFrameworkRuntimeFactory(
+                    new RecordingResolver(resumedClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions());
+                var resumedEngine = new AgentFrameworkFlowOrchestrationEngine(
+                    agentResolver, new EmptyToolCatalog(), factory,
+                    secondProvider.GetRequiredService<IRuntimeExecutionStateStore>());
+                var answer = new InputRequest
+                {
+                    Id = "input-1",
+                    RunId = "run-maf-resume",
+                    RuntimeRequestId = suspended.RuntimeRequestId,
+                    Prompt = suspended.Prompt,
+                    Type = InputRequestType.Confirmation,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+                    Status = InputRequestStatus.Answered,
+                    Response = new(DateTimeOffset.UtcNow, JsonSerializer.SerializeToElement(true), "principal-1")
+                };
+                var resumedEvents = new List<FlowExecutionEvent>();
+                await foreach (var item in resumedEngine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+                    "run-maf-resume", definition, JsonSerializer.SerializeToElement(new { prompt = "Delete it" }),
+                    "correlation-1", bindings, suspended.RuntimeState, answer)))
+                    resumedEvents.Add(item);
+
+                Assert.AreEqual("APPROVED_OK", resumedEvents.OfType<FlowExecutionCompleted>().Single().Result.FinalOutput.GetString());
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
     }
 
     [TestMethod]
@@ -401,6 +497,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
 
     private sealed class RecordingAgentResolver : IRuntimeAgentResolver
     {
+        private readonly Dictionary<string, Guid> agentIds = new(StringComparer.Ordinal);
         public List<ResourceNamespace> ResolvedNamespaces { get; } = [];
 
         public Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken) =>
@@ -412,7 +509,12 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         public Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, ResourceNamespace @namespace, CancellationToken cancellationToken)
         {
             ResolvedNamespaces.Add(@namespace);
-            var definition = Definition(resourceId);
+            if (!agentIds.TryGetValue(resourceId, out var agentId))
+            {
+                agentId = Guid.NewGuid();
+                agentIds.Add(resourceId, agentId);
+            }
+            var definition = Definition(resourceId) with { AgentId = agentId };
             return Task.FromResult(new ResolvedRuntimeAgent(
                 definition.AgentId,
                 resourceId,
