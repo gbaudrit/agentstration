@@ -26,6 +26,7 @@ else
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Profile resource</h2></div>@if (resolution is not null) { <StatusBadge Text="@ModelManagementUi.Label(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
             <div class="form-grid">
                 <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
+                <label><span>Namespace</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
                 <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
                 <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>
@@ -33,7 +34,7 @@ else
 
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Model selection</p><h2>Provider and model</h2></div></div>
             <div class="form-grid">
-                <label><span>Provider</span><select value="@model.ProviderName" @onchange="ProviderChangedAsync"><option value="">Select a provider</option>@foreach (var provider in providers) { <option value="@provider.Name">@provider.Properties.DisplayName — @provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
+                <label><span>Provider</span><select value="@SelectedProvider" @onchange="ProviderChangedAsync"><option value="">Select a provider</option>@foreach (var provider in providers) { <option value="@ProviderKey(provider)">@provider.Properties.DisplayName — @provider.Namespace/@provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
                 <label><span>Model</span><select @bind="model.ModelName" disabled="@loadingModels"><option value="">@(loadingModels ? "Loading models…" : "Select a model")</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — not currently discovered</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @ModelManagementUi.Label(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
             </div>
             @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderName)) { <p class="inline-warning">No model is currently reported by this provider. An existing model name may remain configured while the provider is unavailable.</p> }
@@ -90,17 +91,20 @@ else
 
 @code {
     [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = [];
     private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
     private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool confirmDelete;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
+    private string SelectedProvider => model is null || string.IsNullOrWhiteSpace(model.ProviderName) ? string.Empty : $"{model.ProviderNamespace}:{model.ProviderName}";
     private string Definition
     {
         get
         {
             if (model is null) return string.Empty;
-            try { return JsonSerializer.Serialize(new { apiVersion = ManagementApiVersions.CoreV1, kind = ResourceKinds.ModelProfile, metadata = new { name = model.Name }, definition = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
+            try { return JsonSerializer.Serialize(new { apiVersion = ManagementApiVersions.CoreV1, kind = ResourceKinds.ModelProfile, metadata = new { name = model.Name, @namespace = model.Namespace }, definition = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
             catch (ArgumentException) { return "The declarative definition is unavailable until the configuration is structurally valid."; }
         }
     }
@@ -111,13 +115,13 @@ else
         try
         {
             providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
-            if (IsNew) model = new ModelProfileEditorModel();
+            if (IsNew) model = new ModelProfileEditorModel { Namespace = SelectedNamespace.Value };
             else
             {
-                var snapshot = await Client.GetModelProfileAsync(Name!, cancellation.Token);
+                var snapshot = await Client.GetModelProfileAsync(SelectedNamespace, Name!, cancellation.Token);
                 model = ModelProfileEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag;
-                usages = (await Client.GetModelProfileUsagesAsync(Name!, cancellation.Token)).Value;
-                resolution = await Client.GetModelProfileResolutionAsync(Name!, cancellation.Token);
+                usages = (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value;
+                resolution = await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
             }
             if (!string.IsNullOrWhiteSpace(model.ProviderName)) await LoadModelsAsync(clearSelection: false);
         }
@@ -126,14 +130,19 @@ else
     }
     private async Task ProviderChangedAsync(ChangeEventArgs args)
     {
-        if (model is null) return; model.ProviderName = args.Value?.ToString() ?? string.Empty; await LoadModelsAsync(clearSelection: true);
+        if (model is null) return;
+        var value = args.Value?.ToString() ?? string.Empty;
+        var separator = value.IndexOf(':');
+        model.ProviderNamespace = separator > 0 ? value[..separator] : ResourceNamespace.DefaultValue;
+        model.ProviderName = separator > 0 ? value[(separator + 1)..] : value;
+        await LoadModelsAsync(clearSelection: true);
     }
     private async Task LoadModelsAsync(bool clearSelection)
     {
         if (model is null) return; if (clearSelection) model.ModelName = string.Empty; models = []; warning = null;
         if (string.IsNullOrWhiteSpace(model.ProviderName)) return;
         loadingModels = true;
-        try { models = await ProvidersClient.GetProviderModelsAsync(model.ProviderName, cancellation.Token); }
+        try { models = await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, cancellation.Token); }
         catch (AgentstrationApiException exception) { warning = $"Models cannot currently be discovered: {exception.Message}"; }
         finally { loadingModels = false; }
     }
@@ -144,9 +153,9 @@ else
         {
             ResourceSnapshot<ModelProfileResource> snapshot = IsNew
                 ? await Client.CreateModelProfileAsync(model.ToCreateRequest(), cancellation.Token)
-                : await Client.UpdateModelProfileAsync(model.Name, model.ToPutRequest(), etag!, cancellation.Token);
+                : await Client.UpdateModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, model.ToPutRequest(), etag!, cancellation.Token);
             etag = snapshot.ETag; Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? "Model profile created" : "Model profile updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
-            Navigation.NavigateTo($"/modelprofiles/{Uri.EscapeDataString(snapshot.Value.Name)}");
+            Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name));
         }
         catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); }
         catch (AgentstrationApiException exception) { error = exception; }
@@ -156,10 +165,12 @@ else
     private async Task DeleteAsync()
     {
         if (model is null || etag is null) return; confirmDelete = false;
-        try { await Client.DeleteModelProfileAsync(model.Name, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
+        try { await Client.DeleteModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
         catch (AgentstrationApiException exception) { error = exception; }
     }
     private static bool IsUnavailable(AvailableModelResponse model) => string.Equals(model.Status, "unavailable", StringComparison.OrdinalIgnoreCase);
     private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
+    private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";
+    private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/modelprofiles/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

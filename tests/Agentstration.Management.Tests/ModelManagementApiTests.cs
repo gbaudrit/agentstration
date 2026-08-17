@@ -6,6 +6,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -408,6 +409,61 @@ public sealed class ModelManagementApiTests
 
         await service.DeleteAsync("maf-persistent-test", updated.ETag, default);
         Assert.IsNull(await service.GetAsync("maf-persistent-test", default));
+    }
+
+    [TestMethod]
+    public async Task ModelAndRuntimeApisAddressHomonymousResourcesByNamespace()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        const string resourceNamespace = "team-a";
+        const string providerName = "ollama-local";
+
+        using var providerResponse = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
+            providerName,
+            new ModelProviderProperties
+            {
+                DisplayName = "Team Ollama",
+                ProviderType = "ollama",
+                Endpoint = new Uri("http://127.0.0.1:11439")
+            },
+            resourceNamespace));
+        Assert.AreEqual(HttpStatusCode.Created, providerResponse.StatusCode);
+
+        var provider = await client.GetFromJsonAsync<ModelProviderResource>($"/api/modelproviders/{providerName}?resourceNamespace={resourceNamespace}");
+        Assert.AreEqual(resourceNamespace, provider?.Namespace.Value);
+        Assert.AreEqual("Team Ollama", provider?.Definition.DisplayName);
+        var defaultProvider = await client.GetFromJsonAsync<ModelProviderResource>($"/api/modelproviders/{providerName}");
+        Assert.AreEqual(ResourceNamespace.Default, defaultProvider?.Namespace);
+
+        const string profileName = "shared";
+        using var profileResponse = await client.PostAsJsonAsync("/api/modelprofiles", new CreateModelProfileRequest(
+            profileName,
+            new ModelProfileProperties
+            {
+                DisplayName = "Team profile",
+                Provider = new ResourceReference(providerName, @namespace: new ResourceNamespace(resourceNamespace)),
+                Model = new ModelSelection { Name = "qwen3:8b" }
+            },
+            resourceNamespace));
+        Assert.AreEqual(HttpStatusCode.Created, profileResponse.StatusCode);
+        var profile = await client.GetFromJsonAsync<ModelProfileResource>($"/api/modelprofiles/{profileName}?resourceNamespace={resourceNamespace}");
+        Assert.AreEqual(resourceNamespace, profile?.Namespace.Value);
+
+        using var runtimeResponse = await client.PostAsJsonAsync("/api/runtimeprofiles", new CreateRuntimeProfileRequest(
+            profileName,
+            new RuntimeProfileProperties { DisplayName = "Team runtime", RuntimeType = "microsoft-agent-framework" },
+            resourceNamespace));
+        Assert.AreEqual(HttpStatusCode.Created, runtimeResponse.StatusCode);
+        var runtime = await client.GetFromJsonAsync<RuntimeProfileResource>($"/api/runtimeprofiles/{profileName}?resourceNamespace={resourceNamespace}");
+        Assert.AreEqual(resourceNamespace, runtime?.Namespace.Value);
+
+        var providers = await client.GetFromJsonAsync<ValueResponse<ModelProviderResponse>>("/api/modelproviders");
+        Assert.IsTrue(providers!.Value.Any(value => value.Name == providerName && value.Namespace == resourceNamespace));
+        var profiles = await client.GetFromJsonAsync<ValueResponse<ModelProfileSummaryResponse>>("/api/modelprofiles");
+        Assert.IsTrue(profiles!.Value.Any(value => value.Name == profileName && value.Namespace == resourceNamespace));
+        var runtimes = await client.GetFromJsonAsync<ValueResponse<RuntimeProfileSummaryResponse>>("/api/runtimeprofiles");
+        Assert.IsTrue(runtimes!.Value.Any(value => value.Name == profileName && value.Namespace == resourceNamespace));
     }
 
     private static WebApplicationFactory<Program> Factory() =>

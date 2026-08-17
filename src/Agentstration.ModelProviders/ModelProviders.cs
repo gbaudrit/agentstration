@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 using Microsoft.Extensions.AI;
 
 namespace Agentstration.ModelProviders;
@@ -7,6 +8,7 @@ namespace Agentstration.ModelProviders;
 public sealed record ModelProviderConfiguration
 {
     public required Guid Uid { get; init; }
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public required string Name { get; init; }
     public required string ProviderType { get; init; }
     public required Uri Endpoint { get; init; }

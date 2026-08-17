@@ -12,6 +12,7 @@ public sealed class ModelProviderEditorModel
 
     [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
     public string Name { get; set; } = string.Empty;
+    [Required] public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
     [Required] public string DisplayName { get; set; } = string.Empty;
     [Required] public string ProviderType { get; set; } = "ollama";
     [Required, Url] public string Endpoint { get; set; } = "http://localhost:5260";
@@ -19,7 +20,7 @@ public sealed class ModelProviderEditorModel
     public string? ProviderOptionsJson { get; set; }
     public string? CredentialId { get; set; }
 
-    public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties());
+    public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value);
     public PutModelProviderRequest ToPutRequest() => new(ToProperties());
 
     public ModelProviderProperties ToProperties()
@@ -41,6 +42,7 @@ public sealed class ModelProviderEditorModel
     public static ModelProviderEditorModel FromResource(ModelProviderResource resource) => new()
     {
         Name = resource.Name,
+        Namespace = resource.Namespace.Value,
         DisplayName = resource.Definition.DisplayName,
         ProviderType = resource.Definition.ProviderType,
         Endpoint = resource.Definition.Endpoint.AbsoluteUri.TrimEnd('/'),

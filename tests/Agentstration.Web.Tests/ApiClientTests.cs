@@ -512,6 +512,36 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ModelManagementClientsPreserveNamespaceInResourceRequests()
+    {
+        var requests = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add(request.RequestUri!.PathAndQuery);
+            object response = request.RequestUri.AbsolutePath switch
+            {
+                var path when path.Contains("modelproviders", StringComparison.Ordinal) => new ValueResponse<AvailableModelResponse>([]),
+                var path when path.Contains("modelprofiles", StringComparison.Ordinal) => new ModelProfileUsagesResponse([], 0),
+                _ => new RuntimeProfileUsagesResponse([], 0)
+            };
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var resourceNamespace = new ResourceNamespace("team-a");
+
+        _ = await new ModelProvidersApiClient(httpClient).GetProviderModelsAsync(resourceNamespace, "shared", default);
+        _ = await new ModelProfilesApiClient(httpClient).GetModelProfileUsagesAsync(resourceNamespace, "shared", default);
+        _ = await new RuntimeProfilesApiClient(httpClient).GetRuntimeProfileUsagesAsync(resourceNamespace, "shared", default);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            "/api/modelproviders/shared/models?resourceNamespace=team-a",
+            "/api/modelprofiles/shared/usages?resourceNamespace=team-a",
+            "/api/runtimeprofiles/shared/usages?resourceNamespace=team-a"
+        }, requests);
+    }
+
+    [TestMethod]
     public async Task ModelProfilesClientPreservesETagForUpdateAndDelete()
     {
         var profile = CreateModelProfile("reasoning-default");

@@ -61,9 +61,9 @@ public sealed class ConsoleResourceSearchProvider(
             cache =
             [
                 .. agentsTask.Result.Select(ToResult),
-                .. profilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model profile", item.Id, $"/modelprofiles/{Escape(item.Name)}", item.Properties.Status, "◇", $"{item.Name} {item.Properties.Model.Name}")),
-                .. providersTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model provider", item.Id, $"/modelproviders/{Escape(item.Name)}", item.Properties.Status, "⬡", $"{item.Name} {item.Properties.ProviderType}")),
-                .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, $"/runtimeprofiles/{Escape(item.Name)}", "Configured", "◈", $"{item.Name} {item.Properties.RuntimeType}")),
+                .. profilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model profile", item.Id, ResourceUrl("modelprofiles", item.Namespace, item.Name), item.Properties.Status, "◇", $"{item.Namespace} {item.Name} {item.Properties.Model.Name}")),
+                .. providersTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model provider", item.Id, ResourceUrl("modelproviders", item.Namespace, item.Name), item.Properties.Status, "⬡", $"{item.Namespace} {item.Name} {item.Properties.ProviderType}")),
+                .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, ResourceUrl("runtimeprofiles", item.Namespace, item.Name), "Configured", "◈", $"{item.Namespace} {item.Name} {item.Properties.RuntimeType}")),
                 .. secretsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Secret", item.Resource.Address.ToString(), $"/secrets/{Escape(item.Resource.Name)}", item.ValueStatus, "◆", $"{item.Resource.Name} {item.Resource.Definition.Vault.Name}")),
                 .. vaultsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Vault", item.Resource.Address.ToString(), $"/vaults/{Escape(item.Resource.Name)}", item.Status, "▰", $"{item.Resource.Name} {item.Resource.Definition.ProviderType}")),
                 .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, item.DetailsUrl, item.Status, "⌘", $"{item.Namespace.Value} {item.Kind} {item.Version}")),
@@ -104,4 +104,7 @@ public sealed class ConsoleResourceSearchProvider(
         || (item.SearchText?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
 
     private static string Escape(string value) => Uri.EscapeDataString(value);
+
+    private static string ResourceUrl(string resourceType, string resourceNamespace, string name) =>
+        $"/{resourceType}/{Escape(name)}?namespace={Escape(resourceNamespace)}";
 }
