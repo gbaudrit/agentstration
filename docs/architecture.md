@@ -95,7 +95,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Model providers | SQLite-backed provider declarations with ETag CRUD and usage protection, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | credentials/connections, additional AEP extensions, cached discovery |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
-| Flows | typed graph drafts, typed orchestration authoring, immutable versions, durable Runs, visual editors and SignalR replay | checkpoints and long-running interactive steps |
+| Flows | typed graph drafts, typed orchestration authoring, immutable versions, durable Runs, opaque SQLite-backed runtime state, interactive input suspension/recovery, visual editors and SignalR replay | distributed dispatch, arbitrary graph waits, HumanApproval nodes, and provider-level effect idempotency |
 | Flow storage | independent readable JSON documents, ETags, active/current definition separation | migrations, indirect reference projections |
 | Identity | local accounts, Principal mapping, Workspace memberships/RBAC, bootstrap, account security, append-only security audit | external-account provisioning/linking, recovery, workload authentication |
 | Workspaces | workspace and inbox lifecycle | teams, organizations, policies |

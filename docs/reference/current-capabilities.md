@@ -105,7 +105,7 @@ Runtime
 Agents
 ```
 
-The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. Its local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary.
+The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. Its local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary. Orchestration Runs can suspend durably for text, choice, or confirmation input, survive process reconstruction through opaque SQLite-backed MAF checkpoints, and resume with the exact Flow snapshot and Agent revisions selected at first execution.
 
 The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework. The existing ingestion, memory, mission, REST, Razor, and MCP verticals remain available as product capabilities.
 
@@ -423,6 +423,6 @@ This baseline is intentionally offline and cost-free. LLM-as-judge quality evalu
 
 ## Current boundaries
 
-This is a product foundation, not a production multi-tenant release. Pack dependency resolution, updates, signatures and Gallery access, parallel Flow scheduling, loops, waits, approvals, subflows, semantic/LLM routing, checkpoints, durable distributed Work dispatch, authorization coverage outside the first Management/identity vertical, external-only identity provisioning, external artifact storage, execution recovery, retries, advanced connection providers, revision traffic splitting, dedicated process/container hosting, Foundry bindings, and runtime session storage remain planned.
+This is a product foundation, not a production multi-tenant release. Pack dependency resolution, updates, signatures and Gallery access, parallel Flow scheduling, loops, arbitrary graph waits, HumanApproval nodes, subflows, semantic/LLM routing, durable distributed Work dispatch, authorization coverage outside the first Management/identity vertical, external-only identity provisioning, external artifact storage, general retry policies, provider-level tool idempotency, revision traffic splitting, dedicated process/container hosting, Foundry bindings, and runtime session storage remain planned. Interactive orchestration recovery is implemented for the standalone SQLite/MAF path; it provides at-least-once execution and does not claim exactly-once external effects.
 
 See [architecture](../architecture.md), [decisions](../decisions/index.md), [security](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/SECURITY.md), and [contributing](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/CONTRIBUTING.md).
