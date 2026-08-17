@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
 
@@ -8,11 +10,12 @@ internal sealed class StreamRuntimeRunEventsEndpoint : IRuntimeEndpoint
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/{runId}/events", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{runId}/events", HandleAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
 
-    private static async Task HandleAsync(string runId, HttpRequest request, HttpResponse response, RuntimeRunService service, CancellationToken cancellationToken)
+    private static async Task HandleAsync(string runId, HttpRequest request, HttpResponse response, RuntimeRunService service, ICurrentRequestContext requestContext, CancellationToken cancellationToken)
     {
-        if (await service.GetAsync(runId, cancellationToken) is null)
+        var workspaceId = new WorkspaceId(requestContext.Current.WorkspaceId);
+        if (await service.GetAsync(workspaceId, runId, cancellationToken) is null)
         {
             response.StatusCode = StatusCodes.Status404NotFound;
             await response.WriteAsJsonAsync(new { title = "run_not_found", detail = $"Runtime run '{runId}' was not found.", status = 404 }, cancellationToken);
@@ -24,7 +27,7 @@ internal sealed class StreamRuntimeRunEventsEndpoint : IRuntimeEndpoint
         response.ContentType = "text/event-stream";
         response.Headers.CacheControl = "no-cache";
         response.Headers.Connection = "keep-alive";
-        await foreach (var runEvent in service.ObserveAsync(runId, afterSequence, cancellationToken))
+        await foreach (var runEvent in service.ObserveAsync(workspaceId, runId, afterSequence, cancellationToken))
         {
             await response.WriteAsync($"id: {runEvent.Sequence}\n", cancellationToken);
             await response.WriteAsync($"event: {runEvent.Kind}\n", cancellationToken);

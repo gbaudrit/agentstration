@@ -123,14 +123,14 @@ public sealed record PackResourceEnvelope<T>
     public T Definition { get; init; } = default!;
 }
 
-public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinitionValidator graphValidator, TimeProvider timeProvider) : IPackResourceHandler
+public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinitionValidator graphValidator, TimeProvider timeProvider, ICurrentRequestContext requestContext) : IPackResourceHandler
 {
     public string Kind => ResourceKinds.Flow;
     public int InstallOrder => 50;
     public async Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
     {
         var value = Parse(resource); var now = timeProvider.GetUtcNow();
-        FlowValidator.Validate(new(new(resource.Name), resource.Name, value.Definition.Description, value.Definition.Version, value.Definition.Enabled, null, value.Definition.Spec, value.Definition.Metadata, now, now, value.Definition.DisplayName, value.Definition.Graph));
+        FlowValidator.Validate(new(CurrentWorkspaceId(), new(resource.Name), resource.Name, value.Definition.Description, value.Definition.Version, value.Definition.Enabled, null, value.Definition.Spec, value.Definition.Metadata, now, now, value.Definition.DisplayName, value.Definition.Graph));
         if (value.Definition.Graph is not null)
         {
             var validation = await graphValidator.ValidateAsync(value.Definition.Graph, new(ResolveResources: false), cancellationToken);
@@ -138,17 +138,19 @@ public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinition
             if (error is not null) throw new FlowValidationException(error.Code, error.Message);
         }
     }
-    public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(new(name, @namespace), cancellationToken) is not null;
+    public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(CurrentWorkspaceId(), new(name, @namespace), cancellationToken) is not null;
     public async Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, ResourceNamespace @namespace, string packVersion, CancellationToken cancellationToken)
     {
         var value = Parse(resource); var definition = value.Definition;
-        var stored = await service.CreateAsync(new(resource.Name, definition.Description, definition.Version, definition.Enabled, definition.Spec, PackProvenance.Add(definition.Metadata, pack, packVersion), definition.Graph, definition.DisplayName), @namespace, cancellationToken);
+        var workspaceId = CurrentWorkspaceId();
+        var stored = await service.CreateAsync(workspaceId, new(resource.Name, definition.Description, definition.Version, definition.Enabled, definition.Spec, PackProvenance.Add(definition.Metadata, pack, packVersion), definition.Graph, definition.DisplayName), @namespace, cancellationToken);
         var flowId = new FlowId(resource.Name, @namespace);
-        if (definition.Publish) { _ = await service.PublishVersionAsync(flowId, definition.Version, definition.Activate, cancellationToken); stored = (await service.GetAsync(flowId, cancellationToken))!; }
+        if (definition.Publish) { _ = await service.PublishVersionAsync(workspaceId, flowId, definition.Version, definition.Activate, cancellationToken); stored = (await service.GetAsync(workspaceId, flowId, cancellationToken))!; }
         return new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = stored.ETag };
     }
-    public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAsync(new(name, @namespace), cancellationToken))?.ETag;
-    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(new(resource.Name, resource.Namespace), resource.VersionToken, cancellationToken);
+    public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAsync(CurrentWorkspaceId(), new(name, @namespace), cancellationToken))?.ETag;
+    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(CurrentWorkspaceId(), new(resource.Name, resource.Namespace), resource.VersionToken, cancellationToken);
+    private WorkspaceId CurrentWorkspaceId() => new(requestContext.Current.WorkspaceId);
     private static PackResourceEnvelope<PackFlowDefinition> Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<PackResourceEnvelope<PackFlowDefinition>>(resource.Manifest.GetRawText());
 }
 

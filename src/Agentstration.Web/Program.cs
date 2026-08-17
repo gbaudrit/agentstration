@@ -166,7 +166,7 @@ app.MapAgentstrationWorkplaceApi();
 app.MapAgentstrationWorkOperationsApi();
 app.MapAgentstrationFlowApi();
 app.MapAgentstrationRuntimeApi();
-app.MapHub<FlowRunHub>("/hubs/flow-runs");
+app.MapHub<FlowRunHub>("/hubs/flow-runs").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
 app.MapHub<WorkplaceHub>("/hubs/workplace");
 if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();
 app.MapMcp("/mcp");

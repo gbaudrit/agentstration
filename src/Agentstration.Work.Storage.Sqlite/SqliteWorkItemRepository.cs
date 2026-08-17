@@ -26,7 +26,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
     {
         var item = modelBuilder.Entity<WorkItemDocument>();
         item.ToTable("WorkItems");
-        item.HasKey(value => value.Id);
+        item.HasKey(value => new { value.WorkspaceId, value.Id });
         item.Property(value => value.Id).HasMaxLength(36);
         item.Property(value => value.Type).HasMaxLength(128);
         item.Property(value => value.Status).HasConversion<string>().HasMaxLength(32);
@@ -34,13 +34,17 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.Property(value => value.RequestedAgentId).HasMaxLength(1024);
         item.Property(value => value.SelectedAgentId).HasMaxLength(1024);
         item.Property(value => value.Title).HasMaxLength(512);
-        item.Property(value => value.WorkspaceId).HasMaxLength(512);
+        item.Property(value => value.WorkspaceId).HasMaxLength(36).IsRequired();
         item.Property(value => value.InteractionId).HasMaxLength(36);
         item.Property(value => value.EntryId).HasMaxLength(512);
         item.Property(value => value.AnchorTaskId).HasMaxLength(36);
         item.Property(value => value.FlowRunId).HasMaxLength(128);
         item.Property(value => value.CreatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         item.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
+        item.HasIndex(value => new { value.WorkspaceId, value.Status, value.UpdatedAt });
+        item.HasIndex(value => new { value.WorkspaceId, value.InteractionId, value.UpdatedAt });
+        item.HasIndex(value => new { value.WorkspaceId, value.AnchorTaskId, value.UpdatedAt });
+        item.HasIndex(value => new { value.WorkspaceId, value.FlowRunId });
         item.Property(value => value.Version).IsConcurrencyToken();
         item.HasIndex(value => new { value.Status, value.CreatedAt });
         item.HasIndex(value => new { value.Type, value.CreatedAt });
@@ -256,7 +260,6 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsureOperationalColumnsAsync(context, cancellationToken);
     }
 
     public async Task<StoredWorkItem> CreateAsync(WorkItem workItem, CancellationToken cancellationToken)
@@ -269,10 +272,11 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         return Stored(workItem);
     }
 
-    public async Task<StoredWorkItem?> GetAsync(WorkItemId id, CancellationToken cancellationToken)
+    public async Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.WorkItems.AsNoTracking().SingleOrDefaultAsync(value => value.Id == id.ToString(), cancellationToken);
+        var workspaceKey = workspaceId.ToString();
+        var document = await context.WorkItems.AsNoTracking().SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.Id == id.ToString(), cancellationToken);
         return document is null ? null : FromDocument(document);
     }
 
@@ -281,7 +285,8 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         ArgumentNullException.ThrowIfNull(workItem);
         if (workItem.Version <= expectedVersion) throw new WorkItemConcurrencyException("The work item version must increase before it is saved.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.WorkItems.SingleOrDefaultAsync(value => value.Id == workItem.Id.ToString(), cancellationToken)
+        var workspaceKey = workItem.WorkspaceId.ToString();
+        var document = await context.WorkItems.SingleOrDefaultAsync(value => value.WorkspaceId == workspaceKey && value.Id == workItem.Id.ToString(), cancellationToken)
             ?? throw new KeyNotFoundException($"Work item '{workItem.Id}' was not found.");
         if (document.Version != expectedVersion) throw new WorkItemConcurrencyException("The supplied version does not match the current work item version.");
         Apply(document, workItem);
@@ -296,7 +301,8 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         ArgumentOutOfRangeException.ThrowIfLessThan(query.Take, 1);
         var take = Math.Min(query.Take, 200);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        IQueryable<WorkItemDocument> documents = context.WorkItems.AsNoTracking();
+        var workspaceKey = query.WorkspaceId.ToString();
+        IQueryable<WorkItemDocument> documents = context.WorkItems.AsNoTracking().Where(value => value.WorkspaceId == workspaceKey);
         if (query.Status is not null && !query.OperationalTasks) documents = documents.Where(value => value.Status == query.Status);
         if (!string.IsNullOrWhiteSpace(query.Type)) documents = documents.Where(value => value.Type == query.Type);
         if (!string.IsNullOrWhiteSpace(query.RequesterIdentity)) documents = documents.Where(value => value.RequesterIdentity == query.RequesterIdentity);
@@ -305,7 +311,6 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         if (query.CreatedTo is not null) documents = documents.Where(value => value.CreatedAt <= query.CreatedTo);
         if (query.UpdatedFrom is not null) documents = documents.Where(value => value.UpdatedAt >= query.UpdatedFrom);
         if (query.UpdatedTo is not null) documents = documents.Where(value => value.UpdatedAt <= query.UpdatedTo);
-        if (!string.IsNullOrWhiteSpace(query.WorkspaceId)) documents = documents.Where(value => value.WorkspaceId == query.WorkspaceId);
         if (!string.IsNullOrWhiteSpace(query.InteractionId)) documents = documents.Where(value => value.InteractionId == query.InteractionId);
         if (!string.IsNullOrWhiteSpace(query.EntryId)) documents = documents.Where(value => value.EntryId == query.EntryId);
         if (!string.IsNullOrWhiteSpace(query.AnchorTaskId)) documents = documents.Where(value => value.AnchorTaskId == query.AnchorTaskId);
@@ -317,17 +322,17 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
             if (query.Status is not null)
             {
                 documents = documents.Where(anchor =>
-                    context.WorkItems.Where(child => child.AnchorTaskId == anchor.Id)
+                    context.WorkItems.Where(child => child.WorkspaceId == workspaceKey && child.AnchorTaskId == anchor.Id)
                         .OrderByDescending(child => child.UpdatedAt)
                         .Select(child => (WorkItemStatus?)child.Status)
                         .FirstOrDefault() == query.Status
-                    || !context.WorkItems.Any(child => child.AnchorTaskId == anchor.Id) && anchor.Status == query.Status);
+                    || !context.WorkItems.Any(child => child.WorkspaceId == workspaceKey && child.AnchorTaskId == anchor.Id) && anchor.Status == query.Status);
             }
             if (query.HasPendingAction is not null)
             {
                 documents = query.HasPendingAction.Value
-                    ? documents.Where(value => context.PendingActions.Any(action => action.WorkTaskId == value.Id && action.Status == PendingActionStatus.Pending))
-                    : documents.Where(value => !context.PendingActions.Any(action => action.WorkTaskId == value.Id && action.Status == PendingActionStatus.Pending));
+                    ? documents.Where(value => context.PendingActions.Any(action => action.WorkspaceId == workspaceKey && action.WorkTaskId == value.Id && action.Status == PendingActionStatus.Pending))
+                    : documents.Where(value => !context.PendingActions.Any(action => action.WorkspaceId == workspaceKey && action.WorkTaskId == value.Id && action.Status == PendingActionStatus.Pending));
             }
         }
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -362,7 +367,7 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         SelectedAgentId = item.SelectedAgentId,
         Title = item.Title,
         Description = item.Description,
-        WorkspaceId = Metadata(item, "workplace.workspaceId"),
+        WorkspaceId = item.WorkspaceId.ToString(),
         InteractionId = Metadata(item, "workplace.interactionId"),
         EntryId = Metadata(item, "workplace.entryId"),
         AnchorTaskId = Metadata(item, "workplace.taskId"),
@@ -403,41 +408,6 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
     private static StoredWorkItem Stored(WorkItem item) => new(item, ETag(item.Version), item.UpdatedAt);
     private static string? Metadata(WorkItem item, string name) => item.Metadata.TryGetValue(name, out var value) ? value : null;
 
-    private static async Task EnsureOperationalColumnsAsync(WorkDbContext context, CancellationToken cancellationToken)
-    {
-        var connection = context.Database.GetDbConnection();
-        await connection.OpenAsync(cancellationToken);
-        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        await using (var command = connection.CreateCommand())
-        {
-            command.CommandText = "PRAGMA table_info('WorkItems');";
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken)) columns.Add(reader.GetString(1));
-        }
-        var definitions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Title"] = "TEXT NULL",
-            ["Description"] = "TEXT NULL",
-            ["WorkspaceId"] = "TEXT NULL",
-            ["InteractionId"] = "TEXT NULL",
-            ["EntryId"] = "TEXT NULL",
-            ["AnchorTaskId"] = "TEXT NULL",
-            ["FlowRunId"] = "TEXT NULL"
-        };
-        foreach (var definition in definitions.Where(value => !columns.Contains(value.Key)))
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = $"ALTER TABLE WorkItems ADD COLUMN {definition.Key} {definition.Value};";
-            await command.ExecuteNonQueryAsync(cancellationToken);
-        }
-        var legacyDocuments = await context.WorkItems.Where(value => value.WorkspaceId == null && EF.Functions.Like(value.Payload, "%workplace.workspaceId%")).ToArrayAsync(cancellationToken);
-        foreach (var document in legacyDocuments) Apply(document, FromDocument(document).Value);
-        if (legacyDocuments.Length > 0) await context.SaveChangesAsync(cancellationToken);
-        await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_WorkItems_WorkspaceId_Status_UpdatedAt ON WorkItems (WorkspaceId, Status, UpdatedAt);", cancellationToken);
-        await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_WorkItems_WorkspaceId_InteractionId_UpdatedAt ON WorkItems (WorkspaceId, InteractionId, UpdatedAt);", cancellationToken);
-        await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_WorkItems_WorkspaceId_AnchorTaskId_UpdatedAt ON WorkItems (WorkspaceId, AnchorTaskId, UpdatedAt);", cancellationToken);
-        await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_WorkItems_FlowRunId ON WorkItems (FlowRunId);", cancellationToken);
-    }
     private static string ETag(long version) => $"\"{version}\"";
 }
 

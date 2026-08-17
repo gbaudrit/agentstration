@@ -19,7 +19,7 @@ public sealed class FlowEditorStoreTests
             Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }],
             Transitions = [new("input-output", "input", "completed", "output")]
         };
-        var draft = new FlowDraft { Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
+        var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
         var store = new FlowEditorStore();
         store.Load(new FlowDraftResponse(draft, "\"etag-1\""), "entryStep: input");
 
@@ -87,4 +87,6 @@ public sealed class FlowEditorStoreTests
         Assert.IsFalse(store.State.IsDirty);
         Assert.IsTrue(store.State.IsReadOnly);
     }
+
+    private static readonly Agentstration.Resources.WorkspaceId WorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
 }

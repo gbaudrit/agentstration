@@ -49,9 +49,9 @@ public interface IWorkplaceRepository
 
 public interface IArtifactStore
 {
-    Task<ArtifactReference> SaveAsync(ArtifactContent content, CancellationToken cancellationToken);
-    Task<Stream> OpenReadAsync(ArtifactReference reference, CancellationToken cancellationToken);
-    Task DeleteAsync(ArtifactReference reference, CancellationToken cancellationToken);
+    Task<ArtifactReference> SaveAsync(WorkspaceId workspaceId, ArtifactContent content, CancellationToken cancellationToken);
+    Task<Stream> OpenReadAsync(WorkspaceId workspaceId, ArtifactReference reference, CancellationToken cancellationToken);
+    Task DeleteAsync(WorkspaceId workspaceId, ArtifactReference reference, CancellationToken cancellationToken);
 }
 
 public sealed class WorkplaceConcurrencyException(string message) : Exception(message);

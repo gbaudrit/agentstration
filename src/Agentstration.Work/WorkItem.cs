@@ -1,4 +1,5 @@
 using Agentstration.Flow;
+using Agentstration.Resources;
 
 namespace Agentstration.Work;
 
@@ -14,6 +15,7 @@ public sealed class WorkItem
     private WorkItem(WorkItemSnapshot snapshot)
     {
         Id = snapshot.Id;
+        WorkspaceId = snapshot.WorkspaceId;
         Type = snapshot.Type;
         Title = snapshot.Title;
         Instruction = snapshot.Instruction;
@@ -40,6 +42,7 @@ public sealed class WorkItem
     }
 
     public WorkItemId Id { get; }
+    public WorkspaceId WorkspaceId { get; }
     public string Type { get; }
     public string? Title { get; }
     public string Instruction { get; }
@@ -65,6 +68,7 @@ public sealed class WorkItem
 
     public static WorkItem Create(
         WorkItemId id,
+        WorkspaceId workspaceId,
         string type,
         string instruction,
         DateTimeOffset now,
@@ -79,6 +83,7 @@ public sealed class WorkItem
         FlowReference? flow = null)
     {
         if (id.Value == Guid.Empty) throw new WorkValidationException("workitem_id_required", "A work item identifier is required.");
+        if (workspaceId.Value == Guid.Empty) throw new WorkValidationException("workspace_id_required", "A workspace identifier is required.");
         if (string.IsNullOrWhiteSpace(type)) throw new WorkValidationException("workitem_type_required", "A work item type is required.");
         if (string.IsNullOrWhiteSpace(instruction)) throw new WorkValidationException("workitem_instruction_required", "A work item instruction is required.");
         if (instruction.Length > 100_000) throw new WorkValidationException("workitem_instruction_too_long", "The work item instruction cannot exceed 100000 characters.");
@@ -87,6 +92,7 @@ public sealed class WorkItem
         var submittedId = Guid.NewGuid();
         return new WorkItem(new WorkItemSnapshot(
             id,
+            workspaceId,
             type.Trim(),
             Normalize(title),
             instruction.Trim(),
@@ -114,13 +120,14 @@ public sealed class WorkItem
     public static WorkItem Restore(WorkItemSnapshot snapshot) => new(snapshot);
 
     public WorkItemSnapshot ToSnapshot() => new(
-        Id, Type, Title, Instruction, Description, Status, CreatedAt, UpdatedAt, RequesterIdentity, CorrelationId,
+        Id, WorkspaceId, Type, Title, Instruction, Description, Status, CreatedAt, UpdatedAt, RequesterIdentity, CorrelationId,
         Metadata, RequestedAgentId, Flow, SelectedAgentId, CurrentExecutionId, [.. _inputs], [.. _attachments], [.. _messages],
         [.. _interactions], [.. _history], Result, Error, Version);
 
     public bool ApplyRuntimeEvent(WorkExecutionEvent executionEvent)
     {
         ArgumentNullException.ThrowIfNull(executionEvent);
+        if (executionEvent.WorkspaceId != WorkspaceId) throw new WorkTransitionException("workspace_mismatch", "The runtime event belongs to another workspace.");
         if (executionEvent.WorkItemId != Id) throw new WorkTransitionException("workitem_mismatch", "The runtime event belongs to another work item.");
         if (_appliedRuntimeEvents.Contains(executionEvent.EventId)) return false;
         if (CurrentExecutionId is not null && executionEvent.ExecutionId != CurrentExecutionId)

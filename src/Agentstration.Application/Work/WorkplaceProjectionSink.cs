@@ -65,7 +65,7 @@ public sealed class WorkplaceProjectionSink(
         await repository.AddResultAsync(result, token); await EmitAsync(new TaskResultAddedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, result), token);
         var artifactText = content?.Text ?? structured.GetRawText(); await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(artifactText));
         var artifactName = resultSequence switch { 1 => "monthly-report.txt", 2 => "executive-summary.txt", _ => $"monthly-report-v{resultSequence}.txt" };
-        var reference = await artifacts.SaveAsync(new ArtifactContent(artifactName, "text/plain; charset=utf-8", stream), token);
+        var reference = await artifacts.SaveAsync(workspaceId, new ArtifactContent(artifactName, "text/plain; charset=utf-8", stream), token);
         var artifact = new WorkTaskArtifact(WorkTaskArtifactId.New(), workspaceId, taskId, flowRunId, artifactName, reference.ContentType, reference.Length, reference.StorageKey, snapshot.UpdatedAt, resultSequence);
         await repository.AddArtifactAsync(artifact, token); await EmitAsync(new TaskArtifactAddedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, new(artifact.Id.Value, artifact.WorkTaskId.Value, artifact.FlowRunId, artifact.Name, artifact.ContentType, artifact.Length, artifact.CreatedAt, artifact.Sequence)), token);
         if (flowRunId is not null) await EmitAsync(new FlowRunCompletedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, interactionId.Value, taskId.Value, flowRunId), token);

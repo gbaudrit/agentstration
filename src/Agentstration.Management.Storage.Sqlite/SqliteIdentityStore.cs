@@ -1,4 +1,3 @@
-using System.Data;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -32,52 +31,6 @@ internal static class IdentityModel
         var role = modelBuilder.Entity<RoleDefinitionRow>(); role.ToTable("RoleDefinitions"); role.HasKey(x => x.Id); role.HasIndex(x => x.Name).IsUnique();
         var assignment = modelBuilder.Entity<RoleAssignmentRow>(); assignment.ToTable("RoleAssignments"); assignment.HasKey(x => x.Id); assignment.HasIndex(x => new { x.TenantId, x.PrincipalId }); assignment.HasIndex(x => new { x.TenantId, x.Scope }); assignment.HasIndex(x => new { x.TenantId, x.PrincipalId, x.RoleDefinitionId, x.Scope }).IsUnique();
         var audit = modelBuilder.Entity<SecurityAuditRow>(); audit.ToTable("SecurityAuditEvents"); audit.HasKey(x => x.Id); audit.Property(x => x.Action).HasMaxLength(128); audit.Property(x => x.ReasonCode).HasMaxLength(64); audit.Property(x => x.CorrelationId).HasMaxLength(64); audit.HasIndex(x => new { x.OccurredAtUtcTicks, x.Id }); audit.HasIndex(x => x.Action); audit.HasIndex(x => x.ActorPrincipalId); audit.HasIndex(x => x.TargetPrincipalId);
-    }
-}
-
-internal static class SqliteIdentitySchema
-{
-    public static async Task EnsureAsync(ControlPlaneDbContext context, CancellationToken cancellationToken)
-    {
-        var connection = context.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(cancellationToken);
-        await AddColumnIfMissingAsync(connection, "ControlPlaneResources", "TenantId", "TEXT NULL", cancellationToken);
-        await AddColumnIfMissingAsync(connection, "ControlPlaneResources", "WorkspaceId", "TEXT NULL", cancellationToken);
-        await AddColumnIfMissingAsync(connection, "ControlPlaneResources", "Uid", "TEXT NULL", cancellationToken);
-        await AddColumnIfMissingAsync(connection, "ControlPlaneResources", "Kind", "TEXT NULL", cancellationToken);
-        await AddColumnIfMissingAsync(connection, "ControlPlaneResources", "Name", "TEXT NULL", cancellationToken);
-        string[] commands =
-        [
-            "CREATE TABLE IF NOT EXISTS Tenants (Id TEXT NOT NULL PRIMARY KEY, Name TEXT NOT NULL, DisplayName TEXT NOT NULL, Status INTEGER NOT NULL, CreatedAt TEXT NOT NULL); CREATE UNIQUE INDEX IF NOT EXISTS IX_Tenants_Name ON Tenants(Name);",
-            "CREATE TABLE IF NOT EXISTS Workspaces (Id TEXT NOT NULL PRIMARY KEY, TenantId TEXT NOT NULL, Name TEXT NOT NULL, DisplayName TEXT NOT NULL, Status INTEGER NOT NULL, CreatedAt TEXT NOT NULL, FOREIGN KEY(TenantId) REFERENCES Tenants(Id) ON DELETE CASCADE); CREATE UNIQUE INDEX IF NOT EXISTS IX_Workspaces_TenantId_Name ON Workspaces(TenantId, Name);",
-            "CREATE TABLE IF NOT EXISTS Users (Id TEXT NOT NULL PRIMARY KEY, ExternalSubject TEXT NULL, DisplayName TEXT NOT NULL, Email TEXT NULL, Status INTEGER NOT NULL, CreatedAt TEXT NOT NULL); CREATE UNIQUE INDEX IF NOT EXISTS IX_Users_ExternalSubject ON Users(ExternalSubject);",
-            "CREATE TABLE IF NOT EXISTS TenantMemberships (Id TEXT NOT NULL PRIMARY KEY, TenantId TEXT NOT NULL, UserId TEXT NOT NULL, Status INTEGER NOT NULL, JoinedAt TEXT NOT NULL, FOREIGN KEY(TenantId) REFERENCES Tenants(Id) ON DELETE CASCADE, FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE); CREATE UNIQUE INDEX IF NOT EXISTS IX_TenantMemberships_TenantId_UserId ON TenantMemberships(TenantId, UserId);",
-            "CREATE TABLE IF NOT EXISTS ExternalIdentities (Id TEXT NOT NULL PRIMARY KEY, Issuer TEXT NOT NULL, Subject TEXT NOT NULL, PrincipalId TEXT NOT NULL, LinkedAt TEXT NOT NULL, FOREIGN KEY(PrincipalId) REFERENCES Users(Id) ON DELETE CASCADE); CREATE UNIQUE INDEX IF NOT EXISTS IX_ExternalIdentities_Issuer_Subject ON ExternalIdentities(Issuer, Subject); CREATE INDEX IF NOT EXISTS IX_ExternalIdentities_PrincipalId ON ExternalIdentities(PrincipalId);",
-            "CREATE TABLE IF NOT EXISTS LocalIdentities (AccountId TEXT NOT NULL PRIMARY KEY, PrincipalId TEXT NOT NULL, LinkedAt TEXT NOT NULL, FOREIGN KEY(PrincipalId) REFERENCES Users(Id) ON DELETE CASCADE); CREATE UNIQUE INDEX IF NOT EXISTS IX_LocalIdentities_PrincipalId ON LocalIdentities(PrincipalId);",
-            "CREATE TABLE IF NOT EXISTS PlatformAdministrators (PrincipalId TEXT NOT NULL PRIMARY KEY, GrantedAt TEXT NOT NULL, FOREIGN KEY(PrincipalId) REFERENCES Users(Id) ON DELETE CASCADE);",
-            "CREATE TABLE IF NOT EXISTS WorkspaceMemberships (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, PrincipalId TEXT NOT NULL, Status INTEGER NOT NULL, JoinedAt TEXT NOT NULL, FOREIGN KEY(WorkspaceId) REFERENCES Workspaces(Id) ON DELETE CASCADE, FOREIGN KEY(PrincipalId) REFERENCES Users(Id) ON DELETE CASCADE); CREATE UNIQUE INDEX IF NOT EXISTS IX_WorkspaceMemberships_WorkspaceId_PrincipalId ON WorkspaceMemberships(WorkspaceId, PrincipalId); CREATE INDEX IF NOT EXISTS IX_WorkspaceMemberships_PrincipalId ON WorkspaceMemberships(PrincipalId);",
-            "CREATE TABLE IF NOT EXISTS RoleDefinitions (Id TEXT NOT NULL PRIMARY KEY, Name TEXT NOT NULL, DisplayName TEXT NOT NULL, PermissionsJson TEXT NOT NULL, IsBuiltIn INTEGER NOT NULL); CREATE UNIQUE INDEX IF NOT EXISTS IX_RoleDefinitions_Name ON RoleDefinitions(Name);",
-            "CREATE TABLE IF NOT EXISTS RoleAssignments (Id TEXT NOT NULL PRIMARY KEY, TenantId TEXT NOT NULL, PrincipalId TEXT NOT NULL, PrincipalType INTEGER NOT NULL, RoleDefinitionId TEXT NOT NULL, Scope TEXT NOT NULL); CREATE INDEX IF NOT EXISTS IX_RoleAssignments_TenantId_PrincipalId ON RoleAssignments(TenantId, PrincipalId); CREATE INDEX IF NOT EXISTS IX_RoleAssignments_TenantId_Scope ON RoleAssignments(TenantId, Scope); CREATE UNIQUE INDEX IF NOT EXISTS IX_RoleAssignments_Unique ON RoleAssignments(TenantId, PrincipalId, RoleDefinitionId, Scope);",
-            "CREATE TABLE IF NOT EXISTS SecurityAuditEvents (Id TEXT NOT NULL PRIMARY KEY, Action TEXT NOT NULL, Outcome INTEGER NOT NULL, ActorPrincipalId TEXT NULL, TargetPrincipalId TEXT NULL, TargetAccountId TEXT NULL, TenantId TEXT NULL, WorkspaceId TEXT NULL, ReasonCode TEXT NULL, CorrelationId TEXT NULL, OccurredAtUtcTicks INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS IX_SecurityAuditEvents_OccurredAtUtcTicks_Id ON SecurityAuditEvents(OccurredAtUtcTicks, Id); CREATE INDEX IF NOT EXISTS IX_SecurityAuditEvents_Action ON SecurityAuditEvents(Action); CREATE INDEX IF NOT EXISTS IX_SecurityAuditEvents_ActorPrincipalId ON SecurityAuditEvents(ActorPrincipalId); CREATE INDEX IF NOT EXISTS IX_SecurityAuditEvents_TargetPrincipalId ON SecurityAuditEvents(TargetPrincipalId);",
-            "DROP INDEX IF EXISTS IX_ControlPlaneResources_LogicalIdentity; CREATE UNIQUE INDEX IF NOT EXISTS IX_ControlPlaneResources_LogicalIdentity ON ControlPlaneResources(WorkspaceId, Namespace, Kind, Name);"
-        ];
-        foreach (var sql in commands) await context.Database.ExecuteSqlRawAsync(sql, cancellationToken);
-        await AddColumnIfMissingAsync(connection, "Users", "Kind", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
-        await context.Database.ExecuteSqlRawAsync(
-            "INSERT OR IGNORE INTO ExternalIdentities (Id, Issuer, Subject, PrincipalId, LinkedAt) SELECT lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1,1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6))), 'https://agentstration.local/development', ExternalSubject, Id, CreatedAt FROM Users WHERE ExternalSubject IS NOT NULL",
-            cancellationToken);
-        await context.Database.ExecuteSqlRawAsync(
-            "INSERT OR IGNORE INTO WorkspaceMemberships (Id, WorkspaceId, PrincipalId, Status, JoinedAt) SELECT lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1,1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6))), Workspaces.Id, TenantMemberships.UserId, TenantMemberships.Status, TenantMemberships.JoinedAt FROM TenantMemberships JOIN Workspaces ON Workspaces.TenantId = TenantMemberships.TenantId",
-            cancellationToken);
-    }
-
-    private static async Task AddColumnIfMissingAsync(System.Data.Common.DbConnection connection, string table, string column, string definition, CancellationToken cancellationToken)
-    {
-        await using var check = connection.CreateCommand(); check.CommandText = $"PRAGMA table_info({table})";
-        await using var reader = await check.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken)) if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase)) return;
-        await reader.DisposeAsync();
-        await using var alter = connection.CreateCommand(); alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}"; await alter.ExecuteNonQueryAsync(cancellationToken);
     }
 }
 

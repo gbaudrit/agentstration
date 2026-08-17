@@ -79,3 +79,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 47. [ADR-0047 — External identities are explicitly linked to Principals](0047-external-identities-are-explicitly-linked-to-principals.md)
 48. [ADR-0048 — FlowRuns carry a durable execution scope](0048-flow-runs-carry-a-durable-execution-scope.md)
 49. [ADR-0049 — Workplace Dashboards own Entry composition](0049-workplace-dashboards-own-entry-composition.md)
+50. [ADR-0050 — Workspace scope is part of durable identity](0050-workspace-scope-is-part-of-durable-identity.md)

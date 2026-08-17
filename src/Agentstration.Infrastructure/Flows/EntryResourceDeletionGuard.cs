@@ -22,10 +22,9 @@ public sealed class EntryResourceDeletionGuard(IWorkplaceRepository workplace, I
             throw new AgentDefinitionValidationException("resource_in_use", $"Resource '{key}' is referenced by Entry: {string.Join(", ", referenced)}.");
     }
 
-    async Task IFlowDeletionGuard.ValidateDeleteAsync(FlowId flowId, CancellationToken cancellationToken)
+    async Task IFlowDeletionGuard.ValidateDeleteAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken)
     {
         await workplace.InitializeAsync(cancellationToken);
-        var workspaceId = new WorkspaceId(requestContext.Current.WorkspaceId);
         var drafts = await workplace.ListEntryDraftsAsync(workspaceId, cancellationToken);
         var publishedIds = (await workplace.ListEntriesAsync(workspaceId, cancellationToken)).Select(value => value.Id).ToHashSet();
         var referenced = drafts.Where(value => publishedIds.Contains(value.Id)

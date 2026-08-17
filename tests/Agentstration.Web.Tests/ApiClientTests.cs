@@ -184,6 +184,7 @@ public sealed class ApiClientTests
         var flow = new FlowResponse(flowId.Value, flowId.Value, null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), now, now);
         var draft = new FlowDraftResponse(new FlowDraft
         {
+            WorkspaceId = TestWorkspaceId,
             Id = "draft-universal-router",
             FlowId = flowId,
             DisplayName = "Universal router",
@@ -824,6 +825,8 @@ public sealed class ApiClientTests
 
     private static RuntimeRun CreateRun(string id) => new()
     {
+        WorkspaceId = TestWorkspaceId,
+        Scope = new RuntimeRunScope(Guid.Empty, TestWorkspaceId, Guid.Empty),
         Id = id,
         Name = id,
         Properties = new RuntimeRunProperties
@@ -837,6 +840,7 @@ public sealed class ApiClientTests
 
     private static RuntimeRunEvent RunEvent(long sequence, RuntimeRunEventKind kind, string? content = null, RuntimeRunState? state = null) => new()
     {
+        WorkspaceId = TestWorkspaceId,
         Sequence = sequence,
         EventId = Guid.NewGuid(),
         RunId = "run-test",
@@ -845,6 +849,8 @@ public sealed class ApiClientTests
         Content = content,
         State = state
     };
+
+    private static readonly Agentstration.Resources.WorkspaceId TestWorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
 
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory) : HttpMessageHandler
     {

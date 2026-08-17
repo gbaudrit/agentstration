@@ -178,21 +178,6 @@ public sealed class IdentityFoundationTests
         Assert.AreEqual(first.Id, (await resolver.ResolveAsync("https://issuer-a.test", "same-subject", default))?.Id);
     }
 
-    [TestMethod]
-    public async Task ExistingIdentityRowsMigrateToExternalIdentityAndWorkspaceMembership()
-    {
-        await using var fixture = await IdentityFixture.CreateAsync();
-        var context = fixture.Context.Current;
-        await fixture.ExecuteSqlAsync("DROP TABLE WorkspaceMemberships; DROP TABLE ExternalIdentities; UPDATE Users SET ExternalSubject = 'legacy-subject';");
-
-        await fixture.Services.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);
-
-        var store = fixture.Services.GetRequiredService<IIdentityStore>();
-        var identity = await store.FindExternalIdentityAsync(LocalBootstrapOptions.DevelopmentIssuer, "legacy-subject", default);
-        Assert.AreEqual(context.PrincipalId, identity?.PrincipalId);
-        Assert.IsNotNull(await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, default));
-    }
-
     private static RuntimeProfileResource Profile(string id, RequestContext context) => new()
     {
         Metadata = new ResourceMetadata { Name = id },

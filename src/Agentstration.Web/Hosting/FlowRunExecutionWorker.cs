@@ -8,9 +8,9 @@ public sealed class FlowRunExecutionWorker(IFlowRunQueue queue, FlowRunService r
     {
         await foreach (var item in queue.ReadAllAsync(stoppingToken))
         {
-            try { await runs.ExecuteAsync(item.RunId, stoppingToken); }
+            try { await runs.ExecuteAsync(item, stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
-            catch (Exception exception) { logger.LogError(exception, "Unexpected Flow Run worker failure for {RunId}", item.RunId); }
+            catch (Exception exception) { logger.LogError(exception, "Unexpected Flow Run worker failure for {WorkspaceId}/{RunId}", item.Scope.WorkspaceId, item.RunId); }
         }
     }
 }

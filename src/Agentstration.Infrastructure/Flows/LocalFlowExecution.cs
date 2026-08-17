@@ -6,6 +6,7 @@ using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Work;
 
@@ -36,11 +37,11 @@ public sealed class WorkspaceFlowRunExecutionScope(
     public async ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken)
     {
         var principal = await identities.GetPrincipalAsync(scope.PrincipalId, cancellationToken);
-        var workspace = await identities.GetWorkspaceAsync(scope.TenantId, scope.WorkspaceId, cancellationToken);
+        var workspace = await identities.GetWorkspaceAsync(scope.TenantId, scope.WorkspaceId.Value, cancellationToken);
         if (principal?.Status != PrincipalStatus.Active || workspace?.Status != WorkspaceStatus.Active)
             throw Denied();
 
-        var requestContext = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId);
+        var requestContext = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value);
         try
         {
             await authorization.EnsurePermissionAsync(requestContext, AuthorizationPermissions.RunsExecute, cancellationToken);
@@ -52,7 +53,7 @@ public sealed class WorkspaceFlowRunExecutionScope(
     }
 
     public IDisposable Enter(FlowRunScope scope) =>
-        scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId));
+        scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value));
 
     private static FlowValidationException Denied() =>
         new("flow_run_authorization_denied", "The Principal is no longer authorized to execute this Flow Run in its Workspace.");
@@ -61,30 +62,30 @@ public sealed class WorkspaceFlowRunExecutionScope(
 public sealed class CurrentWorkExecutionScopeAccessor(ICurrentRequestContext requestContext) : IWorkExecutionScopeAccessor
 {
     public FlowRunScope? Current => requestContext.IsInitialized
-        ? new FlowRunScope(requestContext.Current.TenantId, requestContext.Current.WorkspaceId, requestContext.Current.PrincipalId)
+        ? new FlowRunScope(requestContext.Current.TenantId, new WorkspaceId(requestContext.Current.WorkspaceId), requestContext.Current.PrincipalId)
         : null;
 }
 
 public sealed class LocalFlowRunCancellationRegistry : IFlowRunCancellationRegistry
 {
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> sources = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<FlowRunKey, CancellationTokenSource> sources = new();
 
-    public CancellationToken Register(string runId, CancellationToken stoppingToken)
+    public CancellationToken Register(FlowRunKey key, CancellationToken stoppingToken)
     {
         var source = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        if (!sources.TryAdd(runId, source))
+        if (!sources.TryAdd(key, source))
         {
             source.Dispose();
-            return sources[runId].Token;
+            return sources[key].Token;
         }
         return source.Token;
     }
 
-    public bool Cancel(string runId) => sources.TryGetValue(runId, out var source) && TryCancel(source);
+    public bool Cancel(FlowRunKey key) => sources.TryGetValue(key, out var source) && TryCancel(source);
 
-    public void Complete(string runId)
+    public void Complete(FlowRunKey key)
     {
-        if (sources.TryRemove(runId, out var source)) source.Dispose();
+        if (sources.TryRemove(key, out var source)) source.Dispose();
     }
 
     private static bool TryCancel(CancellationTokenSource source)

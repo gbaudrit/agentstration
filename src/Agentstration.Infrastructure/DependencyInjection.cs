@@ -16,6 +16,7 @@ using Agentstration.Infrastructure.Ingestion;
 using Agentstration.Infrastructure.Missions;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.Persistence;
+using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Work;
 using Agentstration.Infrastructure.Workflows;
 using Agentstration.Management.Abstractions;
@@ -131,6 +132,7 @@ public static class DependencyInjection
         services.AddSingleton<IRuntimeRegistry, RuntimeRegistry>();
         services.AddSingleton<IRuntimeRunQueue, LocalRuntimeRunQueue>();
         services.AddSingleton<IRuntimeRunCancellationRegistry, LocalRuntimeRunCancellationRegistry>();
+        services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         services.AddSingleton<IAgentDeploymentProvisioner, InProcessAgentProvisioner>();
         services.AddSingleton<IAgentDeploymentProvisioner, SharedHostAgentProvisioner>();
         services.AddSingleton<IAgentDeploymentReconciler, LocalAgentDeploymentReconciler>();
