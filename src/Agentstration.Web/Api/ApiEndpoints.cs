@@ -30,13 +30,9 @@ public static class ApiEndpoints
     }
 
     private static async Task<IResult> ListWorkspacesAsync(
-        [Microsoft.AspNetCore.Mvc.FromQuery(Name = "api-version")] string? apiVersion,
         WorkspaceService legacyService,
-        Agentstration.Application.Work.WorkplaceService workplaceService,
         CancellationToken token)
     {
-        if (string.Equals(apiVersion, Agentstration.Work.WorkplaceApiVersions.V20260805, StringComparison.Ordinal))
-            return await WorkplaceEndpoints.ListWorkspacesAsync(workplaceService, token);
         return Results.Ok(await legacyService.ListAsync(token));
     }
 

@@ -168,7 +168,8 @@ public sealed class WorkplaceApiTests
             workspacePublished.EnsureSuccessStatusCode();
             var workspaceAfterPublish = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse>("/api/workspaces/personal");
             Assert.AreEqual("Unpublished workspace", workspaceAfterPublish?.DisplayName);
-            Assert.AreEqual(1, workspaceAfterPublish?.Entries.Count(value => value.Role == WorkspaceEntryRole.Primary));
+            var defaultDashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>("/api/workspaces/personal/dashboard");
+            Assert.AreEqual(1, defaultDashboard?.Entries.Count(value => value.Role == DashboardItemRole.Primary));
 
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/personal/entries/universal-request/interactions",

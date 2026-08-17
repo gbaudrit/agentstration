@@ -119,19 +119,36 @@ public static class WorkplaceDemoData
             Id = new WorkplaceWorkspaceId("personal"),
             Name = "personal",
             DisplayName = "Personal workspace",
-            Description = "Your local place to delegate and follow work.",
-            Entries =
-            [
-                new WorkspaceEntryReference { EntryResourceId = reportEntryId, Role = WorkspaceEntryRole.Primary, Order = 0 },
-                new WorkspaceEntryReference { EntryResourceId = entryId, Role = WorkspaceEntryRole.Standard, Order = 10 },
-                new WorkspaceEntryReference { EntryResourceId = guidedEntryId, Role = WorkspaceEntryRole.Standard, Order = 20 },
-                new WorkspaceEntryReference { EntryResourceId = immediateEntryId, Role = WorkspaceEntryRole.Standard, Order = 30 }
-            ]
+            Description = "Your local place to delegate and follow work."
         };
         if (!(await workspaceAdministration.ListAsync(cancellationToken)).Any(value => value.Id == workspaceDraft.Id))
             await workspaceAdministration.SaveAsync(workspaceDraft, cancellationToken);
         if (!(await workplace.ListWorkspacesAsync(cancellationToken)).Any(value => value.Id == workspaceDraft.Id))
             await workspaceAdministration.PublishAsync(workspaceDraft.Id, cancellationToken);
+
+        var dashboardAdministration = services.GetRequiredService<DashboardAdministrationService>();
+        var home = new WorkplaceDashboardDraft
+        {
+            Id = new DashboardId("home"),
+            WorkspaceId = workspaceDraft.Id,
+            Name = "home",
+            DisplayName = "Home",
+            Description = "Your default Workplace dashboard.",
+            IsDefault = true,
+            Entries =
+            [
+                new DashboardEntryReference { EntryResourceId = reportEntryId, Role = DashboardItemRole.Primary, Order = 0 },
+                new DashboardEntryReference { EntryResourceId = entryId, Role = DashboardItemRole.Featured, Order = 10 },
+                new DashboardEntryReference { EntryResourceId = guidedEntryId, Role = DashboardItemRole.Standard, Order = 20 },
+                new DashboardEntryReference { EntryResourceId = immediateEntryId, Role = DashboardItemRole.Standard, Order = 30 }
+            ]
+        };
+        var existingHome = (await dashboardAdministration.ListAsync(workspaceDraft.Id, cancellationToken)).SingleOrDefault(value => value.Id == home.Id);
+        if (existingHome is null || existingHome.Entries.Count == 0)
+        {
+            var savedHome = await dashboardAdministration.SaveAsync(home, cancellationToken);
+            await dashboardAdministration.PublishAsync(workspaceDraft.Id, savedHome.Id, cancellationToken);
+        }
     }
 
     private static async Task SaveAndPublishAsync(EntryAdministrationService service, WorkplaceService workplace, EntryDraft draft, CancellationToken cancellationToken)

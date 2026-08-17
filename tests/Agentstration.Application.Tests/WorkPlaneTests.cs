@@ -37,15 +37,16 @@ public sealed class WorkPlaneTests
     public void WorkplaceResourcesEnforcePrimaryEntryAndDeterministicFieldRules()
     {
         var entryId = new EntryId("request");
-        var duplicatePrimary = new WorkplaceWorkspace
+        var duplicatePrimary = new WorkplaceDashboard
         {
-            Id = new WorkplaceWorkspaceId("personal"),
-            Name = "personal",
-            DisplayName = "Personal",
+            Id = new DashboardId("home"),
+            WorkspaceId = new WorkplaceWorkspaceId("personal"),
+            Name = "home",
+            DisplayName = "Home",
             Entries =
             [
-                new WorkspaceEntryReference { EntryResourceId = entryId, Role = WorkspaceEntryRole.Primary },
-                new WorkspaceEntryReference { EntryResourceId = new EntryId(entryId.Value + "-two"), Role = WorkspaceEntryRole.Primary }
+                new DashboardEntryReference { EntryResourceId = entryId, Role = DashboardItemRole.Primary },
+                new DashboardEntryReference { EntryResourceId = new EntryId(entryId.Value + "-two"), Role = DashboardItemRole.Primary }
             ]
         };
         Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(duplicatePrimary));
@@ -106,6 +107,88 @@ public sealed class WorkPlaneTests
         var legacyBindingError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateBinding(
             new EntryBinding(EntryBindingKind.Flow, "legacy/router")));
         Assert.AreEqual("entry_binding_invalid", legacyBindingError.Code);
+    }
+
+    [TestMethod]
+    public void DashboardValidationAllowsNoPrimaryAndNamespacedEntriesButRejectsDuplicates()
+    {
+        var packEntry = new EntryId("weather", new ResourceNamespace("daily-life"));
+        var dashboard = new WorkplaceDashboard
+        {
+            Id = new("home"),
+            WorkspaceId = new("personal"),
+            Name = "home",
+            DisplayName = "Home",
+            IsDefault = true,
+            Entries =
+            [
+                new() { EntryResourceId = packEntry, Role = DashboardItemRole.Featured },
+                new() { EntryResourceId = new EntryId("summary"), Role = DashboardItemRole.Standard, Order = 10 }
+            ]
+        };
+
+        WorkplaceValidation.Validate(dashboard);
+        var error = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(dashboard with
+        {
+            Entries = [dashboard.Entries[0], dashboard.Entries[0] with { Order = 20 }]
+        }));
+        Assert.AreEqual("dashboard_entry_duplicate", error.Code);
+    }
+
+    [TestMethod]
+    public async Task DashboardAdministrationMaintainsOneDefaultAndAllowsEntryReuse()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var workspaceId = new WorkplaceWorkspaceId("personal");
+        await fixture.Workplace.UpsertWorkspaceAsync(new WorkplaceWorkspace
+        {
+            Id = workspaceId,
+            Name = "personal",
+            DisplayName = "Personal",
+            PublishedAt = Now
+        }, default);
+        var entry = new EntryResource
+        {
+            Id = new("request"),
+            Name = "request",
+            DisplayName = "Request",
+            Presentation = new EntryPresentation { Fields = [new() { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }] },
+            ResolvedTarget = new("router", "1.0.0"),
+            PublishedAt = Now
+        };
+        await fixture.Workplace.UpsertEntryAsync(entry, default);
+        var service = new DashboardAdministrationService(fixture.Workplace, TimeProvider.System);
+        var home = await service.SaveAsync(new WorkplaceDashboardDraft
+        {
+            Id = new("home"),
+            WorkspaceId = workspaceId,
+            Name = "home",
+            DisplayName = "Home",
+            IsDefault = true,
+            Entries = [new() { EntryResourceId = entry.Id, Role = DashboardItemRole.Primary }]
+        }, default);
+        await service.PublishAsync(workspaceId, home.Id, default);
+        var travel = await service.SaveAsync(new WorkplaceDashboardDraft
+        {
+            Id = new("travel"),
+            WorkspaceId = workspaceId,
+            Name = "travel",
+            DisplayName = "Travel",
+            IsDefault = true,
+            Entries = [new() { EntryResourceId = entry.Id, Role = DashboardItemRole.Featured }]
+        }, default);
+        await service.PublishAsync(workspaceId, travel.Id, default);
+
+        var published = await fixture.Workplace.ListDashboardsAsync(workspaceId, default);
+        Assert.HasCount(2, published);
+        Assert.AreEqual("travel", published.Single(value => value.IsDefault).Name);
+        Assert.IsTrue(published.All(value => value.Entries.Single().EntryResourceId == entry.Id));
+        var drafts = await fixture.Workplace.ListDashboardDraftsAsync(workspaceId, default);
+        Assert.AreEqual("travel", drafts.Single(value => value.IsDefault).Name);
+
+        await service.SaveAsync(travel with { IsDefault = false }, default);
+        var error = await Assert.ThrowsAsync<WorkValidationException>(() => service.PublishAsync(workspaceId, travel.Id, default));
+        Assert.AreEqual("dashboard_default_required", error.Code);
     }
 
     [TestMethod]
@@ -328,9 +411,10 @@ public sealed class WorkPlaneTests
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
-        var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>($"/api/workplace/workspaces?api-version={WorkplaceApiVersions.V20260805}");
+        var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
         var workspace = workspaces!.Single(value => value.Name == "personal");
-        Assert.AreEqual(WorkspaceEntryRole.Primary, workspace.Entries.Single(value => value.Role == WorkspaceEntryRole.Primary).Role);
+        var dashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>("/api/workspaces/personal/dashboard");
+        Assert.AreEqual(DashboardItemRole.Primary, dashboard!.Entries.Single(value => value.Role == DashboardItemRole.Primary).Role);
 
         using var submittedResponse = await client.PostAsJsonAsync("/api/entries/universal-request/interactions", new CreateInteractionRequest(
             workspace.Id,

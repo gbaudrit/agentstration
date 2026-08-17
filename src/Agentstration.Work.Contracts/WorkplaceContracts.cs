@@ -4,12 +4,14 @@ using Agentstration.Work;
 
 namespace Agentstration.Work.Contracts;
 
-public sealed record WorkplaceWorkspaceResponse(string Id, string Name, string Type, string ApiVersion, string DisplayName, string? Description, IReadOnlyList<WorkspaceEntryReferenceResponse> Entries, int Version, DateTimeOffset PublishedAt)
+public sealed record WorkplaceWorkspaceResponse(string Id, string Name, string Type, string ApiVersion, string DisplayName, string? Description, int Version, DateTimeOffset PublishedAt)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
 }
 public sealed record WorkplaceWorkspaceDraftResponse(WorkplaceWorkspaceDraft Value, WorkplaceWorkspace? Published);
-public sealed record WorkspaceEntryReferenceResponse(string EntryResourceId, WorkspaceEntryRole Role, int Order)
+public sealed record WorkplaceDashboardResponse(string Id, string WorkspaceId, string Name, string Type, string ApiVersion, string DisplayName, string? Description, bool IsDefault, IReadOnlyList<DashboardEntryReferenceResponse> Entries, int Version, DateTimeOffset PublishedAt);
+public sealed record WorkplaceDashboardDraftResponse(WorkplaceDashboardDraft Value, WorkplaceDashboard? Published);
+public sealed record DashboardEntryReferenceResponse(string EntryResourceId, DashboardItemRole Role, int Order)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
 }
