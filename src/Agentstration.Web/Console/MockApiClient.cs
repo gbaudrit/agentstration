@@ -94,7 +94,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
                 Input = request.Input,
                 Execution = request.Execution,
                 Origin = request.Origin,
-                Initiator = request.Initiator ?? "local-user"
+                Initiator = "local-user"
             },
             Status = new RuntimeRunStatus
             {
@@ -180,8 +180,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
             Agent = source.Properties.Agent,
             Input = source.Properties.Input,
             Execution = source.Properties.Execution,
-            Origin = source.Properties.Origin,
-            Initiator = source.Properties.Initiator
+            Origin = source.Properties.Origin
         }, cancellationToken);
     }
 

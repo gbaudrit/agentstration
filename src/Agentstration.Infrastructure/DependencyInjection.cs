@@ -16,6 +16,7 @@ using Agentstration.Infrastructure.Ingestion;
 using Agentstration.Infrastructure.Missions;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.Persistence;
+using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Work;
 using Agentstration.Infrastructure.Workflows;
 using Agentstration.Management.Abstractions;
@@ -153,6 +154,7 @@ public static class DependencyInjection
         services.AddSqliteRuntimeRuns(runtimeConnectionString);
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
+        services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         workPlaneConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "work-plane.db")}";
         services.AddSqliteWorkPlane(workPlaneConnectionString);
         services.AddSingleton<IArtifactStore>(_ => new FileSystemArtifactStore(Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "artifacts")));

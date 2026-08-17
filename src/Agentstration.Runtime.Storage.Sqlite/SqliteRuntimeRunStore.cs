@@ -96,6 +96,9 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
             ?? throw new RuntimeRunNotFoundException(run.Id);
         if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal))
             throw new RuntimeRunConcurrencyException("The supplied ETag does not match the current runtime run version.");
+        var current = Deserialize(document).Value;
+        if (current.Properties.Scope != run.Properties.Scope)
+            throw new RuntimeRunConcurrencyException("The Runtime Run execution scope is immutable.");
         var etag = NewETag();
         var now = timeProvider.GetUtcNow();
         var versioned = run with { ETag = etag };

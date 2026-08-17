@@ -29,6 +29,7 @@ public sealed record RuntimeAgentReference(string ResourceId, long Version)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
 }
+public sealed record RuntimeRunScope(Guid TenantId, Guid WorkspaceId, Guid PrincipalId);
 public sealed record RuntimeRunMessage(RuntimeMessageRole Role, string Content);
 
 public sealed record RuntimeRunInput
@@ -52,6 +53,7 @@ public sealed record RuntimeRunProperties
     public required RuntimeExecutionOptions Execution { get; init; }
     public RuntimeRunOrigin Origin { get; init; } = RuntimeRunOrigin.Api;
     public string Initiator { get; init; } = "local-user";
+    public RuntimeRunScope? Scope { get; init; }
 }
 
 public sealed record RuntimeToolCall
@@ -128,6 +130,12 @@ public interface IRuntimeRunQueue
 {
     ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken);
     IAsyncEnumerable<string> ReadAllAsync(CancellationToken cancellationToken);
+}
+
+public interface IRuntimeRunExecutionScope
+{
+    ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken);
+    IDisposable Enter(RuntimeRunScope scope);
 }
 
 public interface IRuntimeRunCancellationRegistry

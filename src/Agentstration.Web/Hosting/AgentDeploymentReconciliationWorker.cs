@@ -1,9 +1,11 @@
+using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 
 namespace Agentstration.Web.Hosting;
 
 public sealed class AgentDeploymentReconciliationWorker(
     AgentManagementService management,
+    IRequestContextScopeFactory requestContextScopeFactory,
     IConfiguration configuration,
     ILogger<AgentDeploymentReconciliationWorker> logger) : BackgroundService
 {
@@ -13,7 +15,11 @@ public sealed class AgentDeploymentReconciliationWorker(
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(seconds));
         do
         {
-            try { await management.ReconcileAllAsync(stoppingToken); }
+            try
+            {
+                using var systemScope = requestContextScopeFactory.PushSystem();
+                await management.ReconcileAllAsync(stoppingToken);
+            }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception exception) { logger.LogError(exception, "Agent deployment reconciliation iteration failed."); }
         }

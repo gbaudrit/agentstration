@@ -12,6 +12,7 @@ public sealed class RuntimeRunService(
     IRuntimeRunCancellationRegistry cancellations,
     IRuntimeAgentResolver agents,
     IRuntimeRegistry runtimes,
+    IRuntimeRunExecutionScope executionScope,
     RuntimeRunStateManager stateManager,
     TimeProvider timeProvider,
     ILogger<RuntimeRunService> logger)
@@ -37,6 +38,7 @@ public sealed class RuntimeRunService(
         RuntimeExecutionOptions execution,
         RuntimeRunOrigin origin,
         string initiator,
+        RuntimeRunScope scope,
         CancellationToken cancellationToken)
     {
         Validate(agentReference, input, execution, initiator);
@@ -56,7 +58,8 @@ public sealed class RuntimeRunService(
                 Input = input,
                 Execution = execution,
                 Origin = origin,
-                Initiator = initiator
+                Initiator = initiator,
+                Scope = scope
             },
             Status = new RuntimeRunStatus
             {
@@ -80,6 +83,7 @@ public sealed class RuntimeRunService(
             source.Value.Properties.Execution,
             source.Value.Properties.Origin,
             source.Value.Properties.Initiator,
+            source.Value.Properties.Scope ?? throw MissingScope(),
             cancellationToken);
     }
 
@@ -158,6 +162,9 @@ public sealed class RuntimeRunService(
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(runToken, timeoutTimer.Token);
         try
         {
+            var scope = stored.Value.Properties.Scope ?? throw MissingScope();
+            await executionScope.ValidateAsync(scope, stoppingToken);
+            using var requestContextScope = executionScope.Enter(scope);
             stored = await stateManager.TransitionAsync(stored, RuntimeRunState.Running, null, null, stoppingToken);
             await stateManager.AppendEventAsync(runId, RuntimeRunEventKind.StatusChanged, "Run started", state: RuntimeRunState.Running, cancellationToken: stoppingToken);
 
@@ -284,6 +291,9 @@ public sealed class RuntimeRunService(
         _ = ParseExecutionOptions(execution);
         ArgumentException.ThrowIfNullOrWhiteSpace(initiator);
     }
+
+    private static RuntimeRunValidationException MissingScope() =>
+        new("runtime_run_execution_scope_required", "The Runtime Run does not contain a durable execution scope.");
 
     private static ModelExecutionOptions ParseExecutionOptions(RuntimeExecutionOptions execution)
     {
