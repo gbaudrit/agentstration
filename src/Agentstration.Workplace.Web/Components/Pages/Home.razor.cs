@@ -34,7 +34,7 @@ public partial class Home
     private Guid? loadedInteractionId;
     private string? loadedRoute;
     private bool RealtimeConnected => Realtime.State.ToString() == "Connected";
-    private string CurrentWorkspaceName => workspace?.Name ?? WorkspaceName ?? throw new InvalidOperationException("A Workspace route is required.");
+    private string CurrentWorkspaceName => WorkspaceName ?? workspace?.Name ?? throw new InvalidOperationException("A Workspace route is required.");
     private string CurrentDashboardName => dashboard?.Name ?? DashboardName ?? throw new InvalidOperationException("A Dashboard route is required.");
     [Parameter] public string? WorkspaceName { get; set; }
     [Parameter] public string? DashboardName { get; set; }
@@ -79,10 +79,8 @@ public partial class Home
             if (string.IsNullOrWhiteSpace(workspaceName))
             {
                 var available = await Api.ListWorkspacesAsync(lifetime.Token);
-                var configured = Configuration["Agentstration:DefaultWorkspace"];
-                workspaceName = available.FirstOrDefault(value => string.Equals(value.Name, configured, StringComparison.Ordinal))?.Name
-                    ?? available.OrderBy(value => value.Name, StringComparer.Ordinal).FirstOrDefault()?.Name
-                    ?? throw new InvalidOperationException("No published Workplace Workspace is available.");
+                workspaceName = available.FirstOrDefault()?.Name
+                    ?? throw new InvalidOperationException("No canonical Workspace is available.");
                 Navigation.NavigateTo($"/w/{Uri.EscapeDataString(workspaceName)}", replace: true);
                 return;
             }
@@ -107,7 +105,7 @@ public partial class Home
             if (RequestedInteractionId is not null) await LoadInteractionAsync(RequestedInteractionId.Value);
             loadedInteractionId = RequestedInteractionId;
             realtimeSubscription ??= Realtime.OnWorkspaceChanged(HandleRealtimeEvent);
-            try { await Realtime.StartAsync(workspace.Id, 0, lifetime.Token); } catch when (!lifetime.IsCancellationRequested) { }
+            try { await Realtime.StartAsync(workspace.Id.ToString("D"), 0, lifetime.Token); } catch when (!lifetime.IsCancellationRequested) { }
         }
         catch when (!lifetime.IsCancellationRequested) { loadError = "The local Work API could not be reached. Check that it is running, then retry."; }
         finally { loading = false; }
@@ -233,6 +231,6 @@ public partial class Home
     private static EntryId EntryId(DashboardEntryReferenceResponse reference) => new(reference.EntryResourceId, reference.Namespace);
     private static string ConversationTitle(InteractionResponse value) => value.Messages.FirstOrDefault(message => message.Role == ConversationRole.User)?.Content ?? "Conversation";
     private static string ConversationStatus(InteractionStatus value) => value switch { InteractionStatus.Idle => "Ready to continue", InteractionStatus.Processing => "In progress", InteractionStatus.WaitingForUser => "Needs input", InteractionStatus.Closed => "Closed", _ => value.ToString() };
-    private static EntryResource ToDefinition(EntryResponse value) => new() { Id = new(value.Id, value.Namespace), Name = value.Name, DisplayName = value.DisplayName, Description = value.Description, Presentation = value.Presentation, ResolvedTarget = value.ResolvedTarget, Behavior = value.Behavior, ApiVersion = value.ApiVersion, Type = value.Type, Version = value.Version, PublishedAt = value.PublishedAt };
+    private static EntryResource ToDefinition(EntryResponse value) => new() { WorkspaceId = new(value.WorkspaceId), Id = new(value.Id, value.Namespace), Name = value.Name, DisplayName = value.DisplayName, Description = value.Description, Presentation = value.Presentation, ResolvedTarget = value.ResolvedTarget, Behavior = value.Behavior, ApiVersion = value.ApiVersion, Type = value.Type, Version = value.Version, PublishedAt = value.PublishedAt };
     public void Dispose() { Realtime.StateChanged -= HandleRealtimeStateChanged; realtimeSubscription?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); GC.SuppressFinalize(this); }
 }

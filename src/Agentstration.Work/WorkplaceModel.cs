@@ -12,14 +12,8 @@ public static class WorkplaceApiVersions
 
 public static class WorkResourceTypes
 {
-    public const string Workspaces = "Agentstration.Work/workspaces";
     public const string Dashboards = "Agentstration.Work/dashboards";
     public const string Entries = "Agentstration.Work/entries";
-}
-
-public readonly record struct WorkplaceWorkspaceId(string Value, ResourceNamespace Namespace = default)
-{
-    public override string ToString() => Value;
 }
 
 public readonly record struct EntryId(string Value, ResourceNamespace Namespace = default)
@@ -75,32 +69,10 @@ public sealed record DashboardEntryReference
     public int Order { get; init; }
 }
 
-public sealed record WorkplaceWorkspace
-{
-    public required WorkplaceWorkspaceId Id { get; init; }
-    public required string Name { get; init; }
-    public string Type { get; init; } = WorkResourceTypes.Workspaces;
-    public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
-    public required string DisplayName { get; init; }
-    public string? Description { get; init; }
-    public int Version { get; init; } = 1;
-    public DateTimeOffset PublishedAt { get; init; }
-}
-
-public sealed record WorkplaceWorkspaceDraft
-{
-    public required WorkplaceWorkspaceId Id { get; init; }
-    public required string Name { get; init; }
-    public required string DisplayName { get; init; }
-    public string? Description { get; init; }
-    public long Revision { get; init; } = 1;
-    public DateTimeOffset UpdatedAt { get; init; }
-}
-
 public sealed record WorkplaceDashboard
 {
     public required DashboardId Id { get; init; }
-    public required WorkplaceWorkspaceId WorkspaceId { get; init; }
+    public required WorkspaceId WorkspaceId { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Dashboards;
     public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
@@ -115,7 +87,7 @@ public sealed record WorkplaceDashboard
 public sealed record WorkplaceDashboardDraft
 {
     public required DashboardId Id { get; init; }
-    public required WorkplaceWorkspaceId WorkspaceId { get; init; }
+    public required WorkspaceId WorkspaceId { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Dashboards;
     public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
@@ -167,6 +139,7 @@ public sealed record EntryBehavior(TaskCreationMode TaskCreationMode = TaskCreat
 
 public sealed record EntryDraft
 {
+    public required WorkspaceId WorkspaceId { get; init; }
     public required EntryId Id { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Entries;
@@ -183,6 +156,7 @@ public sealed record EntryDraft
 
 public sealed record EntryResource
 {
+    public required WorkspaceId WorkspaceId { get; init; }
     public required EntryId Id { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Entries;
@@ -199,7 +173,7 @@ public sealed record EntryResource
 public sealed record EntryDependency(string ResourceId, string ResourceType, string Relationship);
 
 public sealed record ConversationMessage(
-    Guid Id, WorkplaceWorkspaceId WorkspaceId, InteractionId InteractionId, WorkTaskId? WorkTaskId,
+    Guid Id, WorkspaceId WorkspaceId, InteractionId InteractionId, WorkTaskId? WorkTaskId,
     ConversationRole Role, string Content, DateTimeOffset CreatedAt, string? AgentResourceId = null,
     IReadOnlyList<WorkAttachment>? Attachments = null, PendingActionId? PendingActionId = null,
     IReadOnlyDictionary<string, string>? Metadata = null);
@@ -209,7 +183,7 @@ public sealed record PendingActionResponse(IReadOnlyDictionary<string, JsonEleme
 public sealed record PendingAction
 {
     public required PendingActionId Id { get; init; }
-    public required WorkplaceWorkspaceId WorkspaceId { get; init; }
+    public required WorkspaceId WorkspaceId { get; init; }
     public required InteractionId InteractionId { get; init; }
     public WorkTaskId? WorkTaskId { get; init; }
     public string? FlowRunId { get; init; }
@@ -228,24 +202,24 @@ public sealed record PendingAction
 }
 
 public sealed record WorkTaskActivity(
-    WorkTaskActivityId Id, WorkplaceWorkspaceId WorkspaceId, WorkTaskId WorkTaskId,
+    WorkTaskActivityId Id, WorkspaceId WorkspaceId, WorkTaskId WorkTaskId,
     WorkTaskActivityType Type, string Title, string? Description, DateTimeOffset CreatedAt,
     WorkActorKind ActorKind, string? FlowRunId = null, IReadOnlyDictionary<string, string>? Metadata = null);
 
 public sealed record WorkTaskResult(
-    WorkTaskResultId Id, WorkplaceWorkspaceId WorkspaceId, WorkTaskId WorkTaskId, string? FlowRunId,
+    WorkTaskResultId Id, WorkspaceId WorkspaceId, WorkTaskId WorkTaskId, string? FlowRunId,
     WorkTaskResultKind Kind, string Title, JsonElement Content, DateTimeOffset CreatedAt, int Sequence = 1);
 
 public sealed record ArtifactReference(string StorageKey, string ContentType, long Length);
 public sealed record ArtifactContent(string Name, string ContentType, Stream Content);
 public sealed record WorkTaskArtifact(
-    WorkTaskArtifactId Id, WorkplaceWorkspaceId WorkspaceId, WorkTaskId WorkTaskId, string? FlowRunId,
+    WorkTaskArtifactId Id, WorkspaceId WorkspaceId, WorkTaskId WorkTaskId, string? FlowRunId,
     string Name, string ContentType, long Length, string StorageKey, DateTimeOffset CreatedAt, int Sequence = 1);
 
 public sealed record WorkNotification
 {
     public required WorkNotificationId Id { get; init; }
-    public required WorkplaceWorkspaceId WorkspaceId { get; init; }
+    public required WorkspaceId WorkspaceId { get; init; }
     public required WorkNotificationKind Kind { get; init; }
     public required string Title { get; init; }
     public required string Message { get; init; }
@@ -261,7 +235,7 @@ public sealed record WorkNotification
 public sealed record WorkplaceInteraction
 {
     public required InteractionId Id { get; init; }
-    public required WorkplaceWorkspaceId WorkspaceId { get; init; }
+    public required WorkspaceId WorkspaceId { get; init; }
     public required EntryId EntryId { get; init; }
     public InteractionStatus Status { get; init; } = InteractionStatus.Active;
     public required DateTimeOffset StartedAt { get; init; }
@@ -296,7 +270,7 @@ public sealed record ShowErrorAction(string Title, string? Description) : Workpl
 
 public sealed record WorkTask(
     WorkTaskId Id,
-    WorkplaceWorkspaceId WorkspaceId,
+    WorkspaceId WorkspaceId,
     EntryId EntryId,
     InteractionId InteractionId,
     string Title,
@@ -314,24 +288,6 @@ public sealed record WorkTask(
 
 public static class WorkplaceValidation
 {
-    public static void Validate(WorkplaceWorkspace workspace)
-    {
-        ArgumentNullException.ThrowIfNull(workspace);
-        ValidateName(workspace.Id.Value, "workspace_id_invalid");
-        if (!string.Equals(workspace.Id.Value, workspace.Name, StringComparison.Ordinal))
-            throw new WorkValidationException("workspace_identity_mismatch", "Workspace id and name must match.");
-        if (string.IsNullOrWhiteSpace(workspace.DisplayName)) throw new WorkValidationException("workspace_display_name_required", "A Workspace display name is required.");
-    }
-
-    public static void Validate(WorkplaceWorkspaceDraft workspace)
-    {
-        ArgumentNullException.ThrowIfNull(workspace);
-        ValidateName(workspace.Id.Value, "workspace_id_invalid");
-        if (!string.Equals(workspace.Id.Value, workspace.Name, StringComparison.Ordinal))
-            throw new WorkValidationException("workspace_identity_mismatch", "Workspace id and name must match.");
-        if (string.IsNullOrWhiteSpace(workspace.DisplayName)) throw new WorkValidationException("workspace_display_name_required", "A Workspace display name is required.");
-    }
-
     public static void Validate(WorkplaceDashboard dashboard)
     {
         ArgumentNullException.ThrowIfNull(dashboard);
@@ -402,12 +358,13 @@ public static class WorkplaceValidation
 
     private static void ValidateDashboard(
         DashboardId id,
-        WorkplaceWorkspaceId workspaceId,
+        WorkspaceId workspaceId,
         string name,
         string displayName,
         IReadOnlyList<DashboardEntryReference> entries)
     {
-        ValidateName(workspaceId.Value, "workspace_id_invalid");
+        if (workspaceId.Value == Guid.Empty)
+            throw new WorkValidationException("workspace_id_invalid", "A canonical Workspace id is required.");
         ValidateName(id.Value, "dashboard_id_invalid");
         if (!string.Equals(id.Value, name, StringComparison.Ordinal))
             throw new WorkValidationException("dashboard_identity_mismatch", "Dashboard id and name must match.");

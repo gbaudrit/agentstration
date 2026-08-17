@@ -238,7 +238,7 @@ else
     private EntryValidationResponse? validation;
     private IReadOnlyList<ResourcePickerItem> resources = [];
     private IReadOnlyList<EntryDependencyResponse> dependencies = [];
-    private IReadOnlyList<WorkplaceWorkspaceDraftResponse> workspaces = [];
+    private IReadOnlyList<WorkplaceWorkspaceResponse> workspaces = [];
     private IReadOnlyList<WorkplaceDashboardDraftResponse> dashboards = [];
     private ResourcePickerItem? SelectedResource => resources.FirstOrDefault(value => ResourceKey(value) == resourceId) ?? resources.FirstOrDefault(value => value.ResourceId == resourceId);
     private string? SelectedModelProfile => SelectedResource?.Details?.GetValueOrDefault("modelProfile");
@@ -249,7 +249,7 @@ else
     private string UsageSummary => PublishedUsages.Count == 0 ? "Not used" : string.Join(", ", PublishedUsages.Take(3).Select(value => value.Published!.DisplayName));
     private string WorkspaceConfigurationUrl => $"/workspaces?entry={Uri.EscapeDataString(EntryIdValue)}&entryNamespace={Uri.EscapeDataString(EntryResourceNamespace.Value)}";
     private string PublishedBindingSummary => publishedBinding is null ? "Not retained" : $"{publishedBinding.Kind} · {FriendlyResourceName(publishedBinding.ResourceId)}";
-    private EntryResource PreviewDefinition => new() { Id = new(string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName), Name = string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName, DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Entry preview" : displayName, Description = description, Presentation = Presentation(), ResolvedTarget = published?.ResolvedTarget ?? new("preview", "1.0.0"), Behavior = Behavior() };
+    private EntryResource PreviewDefinition => new() { WorkspaceId = CurrentWorkspaceId, Id = new(string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName), Name = string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName, DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Entry preview" : displayName, Description = description, Presentation = Presentation(), ResolvedTarget = published?.ResolvedTarget ?? new("preview", "1.0.0"), Behavior = Behavior() };
 
     protected override async Task OnInitializedAsync()
     {
@@ -273,7 +273,7 @@ else
     {
         workspaces = await Client.GetWorkspacesAsync(default);
         var values = new List<WorkplaceDashboardDraftResponse>();
-        foreach (var workspace in workspaces) values.AddRange(await Client.GetDashboardsAsync(workspace.Value.Name, default));
+        foreach (var workspace in workspaces) values.AddRange(await Client.GetDashboardsAsync(workspace.Name, default));
         dashboards = values;
     }
     private string EntryIdValue => resourceName;
@@ -293,7 +293,8 @@ else
     private EntryPresentation Presentation() => new() { Kind = presentationKind, Placeholder = placeholder, AllowAttachments = allowAttachments, Fields = fields.Select((value, index) => new EntryFieldDefinition { Name = value.Name.Trim(), Label = string.IsNullOrWhiteSpace(value.Label) ? null : value.Label.Trim(), Type = value.Type, Required = value.Required, Role = value.Primary ? EntryFieldRole.PrimaryInput : EntryFieldRole.Standard, Order = index, Options = ParseOptions(value.Options), Validation = value.Type is EntryFieldType.Prompt or EntryFieldType.Text or EntryFieldType.Textarea or EntryFieldType.Conversation ? new EntryFieldValidation(1, 10_000) : null }).ToArray(), Suggestions = suggestions.Where(value => !string.IsNullOrWhiteSpace(value.Label) && !string.IsNullOrWhiteSpace(value.Value)).Select(value => new EntrySuggestion(value.Label.Trim(), value.Value.Trim())).ToArray() };
     private static IReadOnlyList<EntryFieldOption> ParseOptions(string options) => options.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(value => { var parts = value.Split(':', 2, StringSplitOptions.TrimEntries); return new EntryFieldOption(parts[0], parts.Length == 2 ? parts[1] : parts[0]); }).ToArray();
     private EntryBehavior Behavior() => new(taskMode, allowConversation, streamResponse, new EntryConversationBehavior(allowConversation));
-    private EntryDraft Draft() => new() { Id = new(EntryIdValue, EntryResourceNamespace), Name = resourceName.Trim(), DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Presentation = Presentation(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace), PublishedBinding = publishedBinding, Behavior = Behavior(), Revision = draftRevision };
+    private Agentstration.Resources.WorkspaceId CurrentWorkspaceId => new(workspaces.FirstOrDefault()?.Id ?? published?.WorkspaceId.Value ?? Guid.Empty);
+    private EntryDraft Draft() => new() { WorkspaceId = CurrentWorkspaceId, Id = new(EntryIdValue, EntryResourceNamespace), Name = resourceName.Trim(), DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Presentation = Presentation(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace), PublishedBinding = publishedBinding, Behavior = Behavior(), Revision = draftRevision };
     private async Task SaveAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; publishedBinding = saved.PublishedBinding; message = $"Draft revision {saved.Revision} saved. Workplace is unchanged."; if (IsNew) Navigation.NavigateTo($"/entries/{saved.Name}", forceLoad: true); }); }
     private async Task ValidateAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(resourceName, default); message = validation.IsValid ? "Entry is valid and ready to publish." : "Validation found errors."; hasError = !validation.IsValid; }); }
     private async Task PublishAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(resourceName, default); if (!validation.IsValid) { hasError = true; message = "Resolve validation errors before publication."; return; } published = await Client.PublishEntryAsync(resourceName, default); publishedBinding = saved.Binding; dependencies = await Client.GetDependenciesAsync(resourceName, default); await LoadDashboardUsagesAsync(); message = $"Published Entry v{published.Version} with pinned Flow {published.ResolvedTarget.Version}."; }); }

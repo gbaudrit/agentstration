@@ -2,17 +2,19 @@ using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Infrastructure.Flows;
 
-public sealed class EntryResourceDeletionGuard(IWorkplaceRepository workplace) : IManagementResourceDeletionGuard, IFlowDeletionGuard
+public sealed class EntryResourceDeletionGuard(IWorkplaceRepository workplace, ICurrentRequestContext requestContext) : IManagementResourceDeletionGuard, IFlowDeletionGuard
 {
     public async Task ValidateDeleteAsync(ResourceKey key, CancellationToken cancellationToken)
     {
         await workplace.InitializeAsync(cancellationToken);
-        var drafts = await workplace.ListEntryDraftsAsync(cancellationToken);
-        var publishedIds = (await workplace.ListEntriesAsync(cancellationToken)).Select(value => value.Id).ToHashSet();
+        var workspaceId = new WorkspaceId(requestContext.Current.WorkspaceId);
+        var drafts = await workplace.ListEntryDraftsAsync(workspaceId, cancellationToken);
+        var publishedIds = (await workplace.ListEntriesAsync(workspaceId, cancellationToken)).Select(value => value.Id).ToHashSet();
         var referenced = drafts.Where(value => publishedIds.Contains(value.Id)
             && (value.PublishedBinding?.Namespace ?? value.Id.Namespace) == key.Namespace
             && string.Equals(ResourceName(value.PublishedBinding?.ResourceId ?? string.Empty), key.Name, StringComparison.Ordinal)).Select(value => value.Name).ToArray();
@@ -23,8 +25,9 @@ public sealed class EntryResourceDeletionGuard(IWorkplaceRepository workplace) :
     async Task IFlowDeletionGuard.ValidateDeleteAsync(FlowId flowId, CancellationToken cancellationToken)
     {
         await workplace.InitializeAsync(cancellationToken);
-        var drafts = await workplace.ListEntryDraftsAsync(cancellationToken);
-        var publishedIds = (await workplace.ListEntriesAsync(cancellationToken)).Select(value => value.Id).ToHashSet();
+        var workspaceId = new WorkspaceId(requestContext.Current.WorkspaceId);
+        var drafts = await workplace.ListEntryDraftsAsync(workspaceId, cancellationToken);
+        var publishedIds = (await workplace.ListEntriesAsync(workspaceId, cancellationToken)).Select(value => value.Id).ToHashSet();
         var referenced = drafts.Where(value => publishedIds.Contains(value.Id)
                 && value.PublishedBinding?.Kind == Agentstration.Work.EntryBindingKind.Flow
                 && (value.PublishedBinding.Namespace ?? value.Id.Namespace) == flowId.Namespace

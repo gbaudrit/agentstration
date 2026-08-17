@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Workplace.Components;
 using Bunit;
@@ -89,7 +90,7 @@ public sealed class WorkplaceUxTests
     public void ResolvedPendingAnswerAndSuccessiveOutputsRemainReadableInTheThread()
     {
         using var context = new BunitContext();
-        var workspaceId = new WorkplaceWorkspaceId("personal");
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var interactionId = InteractionId.New();
         var taskId = new WorkTaskId(Guid.NewGuid());
         var answer = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.User, "style: concise", DateTimeOffset.UtcNow, PendingActionId: PendingActionId.New());
@@ -120,7 +121,7 @@ public sealed class WorkplaceUxTests
     public void ProgressAndArtifactsExposeFunctionalInformationWithoutStorageDetails()
     {
         using var context = new BunitContext();
-        var workspaceId = new WorkplaceWorkspaceId("personal");
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var taskId = new WorkTaskId(Guid.NewGuid());
         var activity = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.TaskStarted, "Generating report", "Building the requested content.", DateTimeOffset.UtcNow, WorkActorKind.System);
         var progress = context.Render<TaskProgressTimeline>(parameters => parameters.Add(value => value.Activities, [activity]).Add(value => value.Status, WorkTaskStatus.Running));
@@ -135,6 +136,7 @@ public sealed class WorkplaceUxTests
 
     private static EntryResource PromptDefinition() => new()
     {
+        WorkspaceId = new(Guid.Parse("22222222-2222-2222-2222-222222222222")),
         Id = new EntryId("prepare-report"),
         Name = "prepare-report",
         DisplayName = "Prepare a report",

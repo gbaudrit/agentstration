@@ -1,6 +1,7 @@
 using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
@@ -85,7 +86,7 @@ public static class WorkOperationsEndpoints
     private static Task<IResult> ResumeAsync(Guid taskId, WorkplaceService service, CancellationToken token) => WithTaskAsync(taskId, service, async value => Results.Ok(await service.ResumeTaskAsync(value.WorkspaceId, value.Task.Id, token)), token);
     private static Task<IResult> CancelAsync(Guid taskId, WorkplaceService service, CancellationToken token) => WithTaskAsync(taskId, service, async value => Results.Ok(await service.CancelTaskAsync(value.WorkspaceId, value.Task.Id, token)), token);
 
-    private static Task<IResult> WithTaskAsync(Guid id, WorkplaceService service, Func<(WorkplaceWorkspaceId WorkspaceId, WorkTask Task), Task<IResult>> action, CancellationToken token) =>
+    private static Task<IResult> WithTaskAsync(Guid id, WorkplaceService service, Func<(WorkspaceId WorkspaceId, WorkTask Task), Task<IResult>> action, CancellationToken token) =>
         ExecuteAsync(async () => await action(await service.GetOperationalTaskAsync(new(id), token)));
 
     private static async Task<WorkTaskOperationsSummary> SummaryOfAsync(WorkTask task, WorkplaceService service, FlowRunService flowRuns, CancellationToken token)
@@ -98,7 +99,7 @@ public static class WorkOperationsEndpoints
         var started = activities.FirstOrDefault(value => value.Type == WorkTaskActivityType.TaskStarted)?.CreatedAt;
         var completed = activities.LastOrDefault(value => value.Type is WorkTaskActivityType.TaskCompleted or WorkTaskActivityType.TaskFailed or WorkTaskActivityType.TaskCancelled)?.CreatedAt;
         var error = task.Error is null ? null : new WorkTaskErrorResponse(task.Error.Code, "Task failed", task.Error.Message, task.Error.OccurredAt, task.FlowRunId, task.Error.IsRecoverable);
-        return new(task.Id.Value, task.WorkspaceId.Value, task.EntryId.Value, task.InteractionId.Value, task.Title, task.Description, task.Status,
+        return new(task.Id.Value, task.WorkspaceId.ToString(), task.EntryId.Value, task.InteractionId.Value, task.Title, task.Description, task.Status,
             task.CreatedAt, started, task.UpdatedAt, completed, task.FlowRunId, results.LastOrDefault()?.Id.Value, pending, results.Count, artifacts.Count, runs.Count,
             activities.LastOrDefault()?.Title, error);
     }
@@ -114,10 +115,10 @@ public static class WorkOperationsEndpoints
     }
 
     private static WorkTaskResultResponse ToResult(WorkTaskResult value) => new(value.Id.Value, value.FlowRunId, value.Kind, value.Title, value.Content, value.CreatedAt, value.Sequence);
-    private static WorkTaskArtifactResponse ToArtifact(WorkTaskArtifact value, WorkplaceWorkspaceId workspaceId) => new(value.Id.Value, value.FlowRunId, value.Name, value.ContentType, value.Length, value.CreatedAt, value.Sequence,
+    private static WorkTaskArtifactResponse ToArtifact(WorkTaskArtifact value, WorkspaceId workspaceId) => new(value.Id.Value, value.FlowRunId, value.Name, value.ContentType, value.Length, value.CreatedAt, value.Sequence,
         $"/api/workspaces/{Uri.EscapeDataString(WorkspaceName(workspaceId))}/tasks/{value.WorkTaskId}/artifacts/{value.Id}/content");
     private static InteractionResponse ToInteraction(WorkplaceInteraction value) => new(value.Id.Value, value.WorkspaceId.Value, value.EntryId.Value, value.Status, value.StartedAt, value.LastActivityAt, value.InputValues, value.Attachments, value.Messages, value.PendingActionId?.Value, value.TaskId?.Value, value.ImmediateResult, value.Version, value.LastFlowRunId, value.LastTriggerMessageId);
-    private static string WorkspaceName(WorkplaceWorkspaceId id) => id.Value[(id.Value.LastIndexOf('/') + 1)..];
+    private static string WorkspaceName(WorkspaceId id) => id.ToString();
 
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {

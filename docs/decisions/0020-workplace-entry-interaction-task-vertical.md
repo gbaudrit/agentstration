@@ -2,7 +2,7 @@
 
 Status: Accepted — 2026-08-06
 
-Entry composition ownership in this decision is superseded by [ADR-0049](0049-workplace-dashboards-own-entry-composition.md). Interaction and Task decisions remain in force.
+Workspace resource ownership and Entry composition ownership in this decision are superseded by [ADR-0049](0049-workplace-dashboards-own-entry-composition.md). Interaction and Task decisions remain in force.
 
 ## Decision
 

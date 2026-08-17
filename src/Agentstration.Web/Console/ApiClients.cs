@@ -77,10 +77,7 @@ public interface IEntryAdministrationApiClient
         @namespace.IsDefault ? GetDependenciesAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");
     Task<IReadOnlyList<ResourcePickerItem>> GetResourcesAsync(EntryBindingKind kind, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken);
-    Task<IReadOnlyList<WorkplaceWorkspaceDraftResponse>> GetWorkspacesAsync(CancellationToken cancellationToken);
-    Task<WorkplaceWorkspaceDraftResponse> GetWorkspaceAsync(string name, CancellationToken cancellationToken);
-    Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken);
-    Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken);
     Task<WorkplaceDashboardDraftResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken);
     Task<WorkplaceDashboardDraft> SaveDashboardAsync(WorkplaceDashboardDraft draft, CancellationToken cancellationToken);
@@ -285,29 +282,15 @@ public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpCli
 
     public async Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<EntryResponse[]>(httpClient, "api/entries", cancellationToken);
-    public async Task<IReadOnlyList<WorkplaceWorkspaceDraftResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) =>
-        await ApiResponse.ReadAsync<WorkplaceWorkspaceDraftResponse[]>(httpClient, "api/management/workspaces", cancellationToken);
-    public Task<WorkplaceWorkspaceDraftResponse> GetWorkspaceAsync(string name, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<WorkplaceWorkspaceDraftResponse>(httpClient, $"api/management/workspaces/{Uri.EscapeDataString(name)}", cancellationToken);
-    public async Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken)
-    {
-        using var response = await httpClient.PutAsJsonAsync($"api/management/workspaces/{Uri.EscapeDataString(draft.Name)}", draft, cancellationToken);
-        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
-        return await response.Content.ReadFromJsonAsync<WorkplaceWorkspaceDraft>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty Workspace draft.", Guid.NewGuid().ToString("N"));
-    }
-    public async Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken)
-    {
-        using var response = await httpClient.PostAsync($"api/management/workspaces/{Uri.EscapeDataString(name)}/publish", null, cancellationToken);
-        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
-        return await response.Content.ReadFromJsonAsync<WorkplaceWorkspace>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty published Workspace.", Guid.NewGuid().ToString("N"));
-    }
+    public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<WorkplaceWorkspaceResponse[]>(httpClient, "api/workplace/workspaces", cancellationToken);
     public async Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<WorkplaceDashboardDraftResponse[]>(httpClient, $"api/management/workspaces/{Uri.EscapeDataString(workspaceName)}/dashboards", cancellationToken);
     public Task<WorkplaceDashboardDraftResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<WorkplaceDashboardDraftResponse>(httpClient, $"api/management/workspaces/{Uri.EscapeDataString(workspaceName)}/dashboards/{Uri.EscapeDataString(dashboardName)}", cancellationToken);
     public async Task<WorkplaceDashboardDraft> SaveDashboardAsync(WorkplaceDashboardDraft draft, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PutAsJsonAsync($"api/management/workspaces/{Uri.EscapeDataString(draft.WorkspaceId.Value)}/dashboards/{Uri.EscapeDataString(draft.Name)}", draft, cancellationToken);
+        using var response = await httpClient.PutAsJsonAsync($"api/management/workspaces/{draft.WorkspaceId.Value:D}/dashboards/{Uri.EscapeDataString(draft.Name)}", draft, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<WorkplaceDashboardDraft>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty Dashboard draft.", Guid.NewGuid().ToString("N"));
     }

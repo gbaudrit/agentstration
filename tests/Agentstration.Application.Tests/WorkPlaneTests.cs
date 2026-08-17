@@ -19,6 +19,7 @@ namespace Agentstration.Application.Tests;
 public sealed class WorkPlaneTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly WorkspaceId WorkplaceId = new(Guid.Parse("22222222-2222-2222-2222-222222222222"));
 
     [TestMethod]
     public void WorkItemCreationValidatesRequiredData()
@@ -40,7 +41,7 @@ public sealed class WorkPlaneTests
         var duplicatePrimary = new WorkplaceDashboard
         {
             Id = new DashboardId("home"),
-            WorkspaceId = new WorkplaceWorkspaceId("personal"),
+            WorkspaceId = WorkplaceId,
             Name = "home",
             DisplayName = "Home",
             Entries =
@@ -53,6 +54,7 @@ public sealed class WorkPlaneTests
 
         var entry = new EntryResource
         {
+            WorkspaceId = WorkplaceId,
             Id = entryId,
             Name = "request",
             DisplayName = "Request",
@@ -77,6 +79,7 @@ public sealed class WorkPlaneTests
 
         var draft = new EntryDraft
         {
+            WorkspaceId = WorkplaceId,
             Id = entryId,
             Name = "request",
             DisplayName = "Request",
@@ -116,7 +119,7 @@ public sealed class WorkPlaneTests
         var dashboard = new WorkplaceDashboard
         {
             Id = new("home"),
-            WorkspaceId = new("personal"),
+            WorkspaceId = WorkplaceId,
             Name = "home",
             DisplayName = "Home",
             IsDefault = true,
@@ -139,16 +142,10 @@ public sealed class WorkPlaneTests
     public async Task DashboardAdministrationMaintainsOneDefaultAndAllowsEntryReuse()
     {
         await using var fixture = await WorkFixture.CreateAsync();
-        var workspaceId = new WorkplaceWorkspaceId("personal");
-        await fixture.Workplace.UpsertWorkspaceAsync(new WorkplaceWorkspace
-        {
-            Id = workspaceId,
-            Name = "personal",
-            DisplayName = "Personal",
-            PublishedAt = Now
-        }, default);
+        var workspaceId = WorkplaceId;
         var entry = new EntryResource
         {
+            WorkspaceId = workspaceId,
             Id = new("request"),
             Name = "request",
             DisplayName = "Request",
@@ -325,12 +322,12 @@ public sealed class WorkPlaneTests
         await fixture.Workplace.UpsertEntryDraftAsync(first, default);
         await fixture.Workplace.UpsertEntryDraftAsync(second, default);
 
-        Assert.AreEqual(firstNamespace, (await fixture.Workplace.GetEntryDraftAsync(first.Id, default))?.Id.Namespace);
-        Assert.AreEqual(secondNamespace, (await fixture.Workplace.GetEntryDraftAsync(second.Id, default))?.Id.Namespace);
-        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(new EntryId(entryName), default));
-        await fixture.Workplace.DeleteEntryDraftAsync(first.Id, default);
-        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(first.Id, default));
-        Assert.IsNotNull(await fixture.Workplace.GetEntryDraftAsync(second.Id, default));
+        Assert.AreEqual(firstNamespace, (await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, first.Id, default))?.Id.Namespace);
+        Assert.AreEqual(secondNamespace, (await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, second.Id, default))?.Id.Namespace);
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, new EntryId(entryName), default));
+        await fixture.Workplace.DeleteEntryDraftAsync(WorkplaceId, first.Id, default);
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, first.Id, default));
+        Assert.IsNotNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, second.Id, default));
     }
 
     [TestMethod]
@@ -413,11 +410,11 @@ public sealed class WorkPlaneTests
         using var client = factory.CreateClient();
         var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
         var workspace = workspaces!.Single(value => value.Name == "personal");
-        var dashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>("/api/workspaces/personal/dashboard");
+        var workspaceRoute = workspace.Id.ToString("D");
+        var dashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>($"/api/workspaces/{workspaceRoute}/dashboard");
         Assert.AreEqual(DashboardItemRole.Primary, dashboard!.Entries.Single(value => value.Role == DashboardItemRole.Primary).Role);
 
-        using var submittedResponse = await client.PostAsJsonAsync("/api/entries/universal-request/interactions", new CreateInteractionRequest(
-            workspace.Id,
+        using var submittedResponse = await client.PostAsJsonAsync($"/api/workspaces/{workspaceRoute}/entries/universal-request/interactions", new CreateInteractionRequest(
             new Dictionary<string, System.Text.Json.JsonElement> { ["request"] = System.Text.Json.JsonSerializer.SerializeToElement("Explain dependency injection in .NET") }));
         Assert.AreEqual(HttpStatusCode.Created, submittedResponse.StatusCode);
         var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
@@ -427,7 +424,7 @@ public sealed class WorkPlaneTests
         WorkTaskResponse? task = null;
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            task = await client.GetFromJsonAsync<WorkTaskResponse>($"/api/workspaces/personal/tasks/{submitted.Task.Id}");
+            task = await client.GetFromJsonAsync<WorkTaskResponse>($"/api/workspaces/{workspaceRoute}/tasks/{submitted.Task.Id}");
             if (task?.Status is WorkTaskStatus.Completed or WorkTaskStatus.Failed) break;
             await Task.Delay(25);
         }
@@ -500,6 +497,7 @@ public sealed class WorkPlaneTests
 
     private static EntryDraft Entry(EntryId id) => new()
     {
+        WorkspaceId = WorkplaceId,
         Id = id,
         Name = id.Value,
         DisplayName = id.Value,

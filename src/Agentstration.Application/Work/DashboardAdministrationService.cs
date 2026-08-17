@@ -1,3 +1,4 @@
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 
@@ -6,12 +7,12 @@ namespace Agentstration.Application.Work;
 public sealed class DashboardAdministrationService(IWorkplaceRepository repository, TimeProvider timeProvider)
 {
     public Task<IReadOnlyList<WorkplaceDashboardDraft>> ListAsync(
-        WorkplaceWorkspaceId workspaceId,
+        WorkspaceId workspaceId,
         CancellationToken cancellationToken) =>
         repository.ListDashboardDraftsAsync(workspaceId, cancellationToken);
 
     public async Task<WorkplaceDashboardDraft> GetAsync(
-        WorkplaceWorkspaceId workspaceId,
+        WorkspaceId workspaceId,
         DashboardId id,
         CancellationToken cancellationToken) =>
         await repository.GetDashboardDraftAsync(workspaceId, id, cancellationToken)
@@ -22,8 +23,6 @@ public sealed class DashboardAdministrationService(IWorkplaceRepository reposito
         CancellationToken cancellationToken)
     {
         WorkplaceValidation.Validate(draft);
-        _ = await repository.GetWorkspaceAsync(draft.WorkspaceId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Workspace '{draft.WorkspaceId}' was not found.");
         var current = await repository.GetDashboardDraftAsync(draft.WorkspaceId, draft.Id, cancellationToken);
         var saved = draft with
         {
@@ -48,7 +47,7 @@ public sealed class DashboardAdministrationService(IWorkplaceRepository reposito
     }
 
     public async Task<WorkplaceDashboard> PublishAsync(
-        WorkplaceWorkspaceId workspaceId,
+        WorkspaceId workspaceId,
         DashboardId id,
         CancellationToken cancellationToken)
     {
@@ -56,7 +55,7 @@ public sealed class DashboardAdministrationService(IWorkplaceRepository reposito
         WorkplaceValidation.Validate(draft);
         foreach (var reference in draft.Entries)
         {
-            _ = await repository.GetEntryAsync(reference.EntryResourceId, cancellationToken)
+            _ = await repository.GetEntryAsync(workspaceId, reference.EntryResourceId, cancellationToken)
                 ?? throw new WorkValidationException(
                     "dashboard_entry_not_published",
                     $"Entry '{reference.EntryResourceId}' is not published.");
@@ -92,7 +91,7 @@ public sealed class DashboardAdministrationService(IWorkplaceRepository reposito
     }
 
     public async Task DeleteAsync(
-        WorkplaceWorkspaceId workspaceId,
+        WorkspaceId workspaceId,
         DashboardId id,
         CancellationToken cancellationToken)
     {
@@ -109,25 +108,25 @@ public sealed class DashboardAdministrationService(IWorkplaceRepository reposito
     }
 
     public async Task<WorkplaceDashboard> EnsureHomeAsync(
-        WorkplaceWorkspace workspace,
+        WorkspaceId workspaceId,
         CancellationToken cancellationToken)
     {
-        var existing = await repository.ListDashboardsAsync(workspace.Id, cancellationToken);
+        var existing = await repository.ListDashboardsAsync(workspaceId, cancellationToken);
         var currentDefault = existing.SingleOrDefault(value => value.IsDefault);
         if (currentDefault is not null) return currentDefault;
 
         var homeId = new DashboardId("home");
-        var draft = await repository.GetDashboardDraftAsync(workspace.Id, homeId, cancellationToken)
+        var draft = await repository.GetDashboardDraftAsync(workspaceId, homeId, cancellationToken)
             ?? new WorkplaceDashboardDraft
             {
                 Id = homeId,
-                WorkspaceId = workspace.Id,
+                WorkspaceId = workspaceId,
                 Name = homeId.Value,
                 DisplayName = "Home",
                 IsDefault = true
             };
         if (!draft.IsDefault) draft = draft with { IsDefault = true };
         var saved = await SaveAsync(draft, cancellationToken);
-        return await PublishAsync(workspace.Id, saved.Id, cancellationToken);
+        return await PublishAsync(workspaceId, saved.Id, cancellationToken);
     }
 }

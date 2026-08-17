@@ -140,21 +140,14 @@ public sealed class EntryAdministrationComponentTests
     }
 
     [TestMethod]
-    public async Task DashboardEditorCreatesAndPublishesTheFirstWorkspace()
+    public void DashboardEditorDirectsWorkspaceCreationToOrganizationSettings()
     {
         using var context = new BunitContext();
         var client = new FakeEntryAdministrationApiClient { HasWorkspace = false };
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var rendered = context.Render<Workspaces>();
 
-        await rendered.Find("[data-testid='workspace-name']").ChangeAsync(new ChangeEventArgs { Value = "personal" });
-        await rendered.Find("[data-testid='workspace-display-name']").ChangeAsync(new ChangeEventArgs { Value = "Personal workspace" });
-        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Create Workspace", StringComparison.Ordinal)).ClickAsync(new());
-
-        Assert.IsNotNull(client.SavedWorkspace);
-        Assert.AreEqual("personal", client.SavedWorkspace.Name);
-        Assert.AreEqual("personal", client.PublishedWorkspaceName);
-        Assert.IsTrue(rendered.Markup.Contains("Dashboard composition", StringComparison.Ordinal));
+        Assert.AreEqual("/settings/organization/workspaces", rendered.Find("a.button-primary").GetAttribute("href"));
     }
 
     private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
@@ -163,7 +156,7 @@ public sealed class EntryAdministrationComponentTests
     {
         internal const string AgentResourceId = "deterministic";
         internal const string FlowResourceId = "router";
-        private const string WorkspaceResourceId = "personal";
+        private static readonly Guid WorkspaceResourceId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         private static readonly DateTimeOffset Now = new(2026, 8, 6, 12, 0, 0, TimeSpan.Zero);
 
         public List<EntryBindingKind> RequestedKinds { get; } = [];
@@ -173,8 +166,6 @@ public sealed class EntryAdministrationComponentTests
         public WorkplaceDashboardDraft? SavedDashboard { get; private set; }
         public bool HasDashboard { get; init; } = true;
         public bool HasWorkspace { get; set; } = true;
-        public WorkplaceWorkspaceDraft? SavedWorkspace { get; private set; }
-        public string? PublishedWorkspaceName { get; private set; }
 
         public Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<EntryDraftResponse>>([]);
         public Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken)
@@ -185,6 +176,7 @@ public sealed class EntryAdministrationComponentTests
             var published = PublishedEntry(name, @namespace);
             var draft = new EntryDraft
             {
+                WorkspaceId = new(WorkspaceResourceId),
                 Id = EntryId(name, @namespace),
                 Name = name,
                 DisplayName = "Prepare a report",
@@ -226,31 +218,10 @@ public sealed class EntryAdministrationComponentTests
             return Task.FromResult<IReadOnlyList<EntryResponse>>([ToResponse(PublishedEntry("primary")), ToResponse(PublishedEntry("secondary")), ToResponse(PublishedEntry("main", packNamespace))]);
         }
 
-        public Task<IReadOnlyList<WorkplaceWorkspaceDraftResponse>> GetWorkspacesAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken)
         {
-            if (!HasWorkspace) return Task.FromResult<IReadOnlyList<WorkplaceWorkspaceDraftResponse>>([]);
-            var draft = new WorkplaceWorkspaceDraft
-            {
-                Id = new(WorkspaceResourceId),
-                Name = "personal",
-                DisplayName = "Personal",
-                UpdatedAt = Now
-            };
-            var published = new WorkplaceWorkspace { Id = new(WorkspaceResourceId), Name = "personal", DisplayName = "Personal", Version = 2, PublishedAt = Now };
-            return Task.FromResult<IReadOnlyList<WorkplaceWorkspaceDraftResponse>>([new(draft, published)]);
-        }
-
-        public Task<WorkplaceWorkspaceDraftResponse> GetWorkspaceAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken)
-        {
-            HasWorkspace = true;
-            SavedWorkspace = draft with { Revision = 1, UpdatedAt = Now };
-            return Task.FromResult(SavedWorkspace);
-        }
-        public Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken)
-        {
-            PublishedWorkspaceName = name;
-            return Task.FromResult(new WorkplaceWorkspace { Id = new(name), Name = name, DisplayName = SavedWorkspace?.DisplayName ?? name, PublishedAt = Now });
+            if (!HasWorkspace) return Task.FromResult<IReadOnlyList<WorkplaceWorkspaceResponse>>([]);
+            return Task.FromResult<IReadOnlyList<WorkplaceWorkspaceResponse>>([new(WorkspaceResourceId, "personal", "Personal")]);
         }
         public Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken)
         {
@@ -268,6 +239,7 @@ public sealed class EntryAdministrationComponentTests
         private static EntryId EntryId(string name, Agentstration.Resources.ResourceNamespace @namespace = default) => new(name, @namespace);
         private static EntryResource PublishedEntry(string name, Agentstration.Resources.ResourceNamespace @namespace = default) => new()
         {
+            WorkspaceId = new(WorkspaceResourceId),
             Id = EntryId(name, @namespace),
             Name = name,
             DisplayName = name,
@@ -278,6 +250,6 @@ public sealed class EntryAdministrationComponentTests
             },
             ResolvedTarget = new EntryResolvedTarget(FlowResourceId, "1.0.0")
         };
-        private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
+        private static EntryResponse ToResponse(EntryResource value) => new(value.WorkspaceId.Value, value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
     }
 }

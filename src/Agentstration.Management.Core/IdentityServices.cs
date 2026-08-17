@@ -8,8 +8,8 @@ public sealed class LocalBootstrapOptions
     public const string DevelopmentSubject = "local-operator";
     public string TenantName { get; set; } = "local";
     public string TenantDisplayName { get; set; } = "Local organization";
-    public string WorkspaceName { get; set; } = "default";
-    public string WorkspaceDisplayName { get; set; } = "Default workspace";
+    public string WorkspaceName { get; set; } = "personal";
+    public string WorkspaceDisplayName { get; set; } = "Personal";
     public string PrincipalDisplayName { get; set; } = "Local operator";
     public string ExternalIdentityIssuer { get; set; } = DevelopmentIssuer;
     public string ExternalIdentitySubject { get; set; } = DevelopmentSubject;

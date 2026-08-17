@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
@@ -52,7 +53,7 @@ public sealed class WorkplaceProjectionSink(
         }
     }
 
-    private async Task CompleteAsync(WorkItemSnapshot snapshot, WorkplaceWorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, CancellationToken token)
+    private async Task CompleteAsync(WorkItemSnapshot snapshot, WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, CancellationToken token)
     {
         var existingResults = await repository.ListResultsAsync(workspaceId, taskId, token);
         var content = snapshot.Result?.Contents.FirstOrDefault(); var structured = content?.Structured ?? JsonSerializer.SerializeToElement(content?.Text ?? string.Empty);
@@ -72,7 +73,7 @@ public sealed class WorkplaceProjectionSink(
         await NotifyAsync(workspaceId, WorkNotificationKind.TaskCompleted, resultSequence == 1 ? "Task completed" : "New version ready", $"{resultTitle} and its deliverable are ready.", taskId, snapshot.UpdatedAt, token);
     }
 
-    private async Task CompleteInteractionAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, string? flowRunId, string resultTitle, DateTimeOffset now, CancellationToken token)
+    private async Task CompleteInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, string? flowRunId, string resultTitle, DateTimeOffset now, CancellationToken token)
     {
         var interaction = await repository.GetInteractionAsync(workspaceId, interactionId, token);
         if (interaction is null || interaction.Status == InteractionStatus.Closed) return;
@@ -88,7 +89,7 @@ public sealed class WorkplaceProjectionSink(
         catch (WorkplaceConcurrencyException) { }
     }
 
-    private async Task FailInteractionAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, string error, DateTimeOffset now, CancellationToken token)
+    private async Task FailInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, string error, DateTimeOffset now, CancellationToken token)
     {
         var interaction = await repository.GetInteractionAsync(workspaceId, interactionId, token);
         if (interaction is null || interaction.Status == InteractionStatus.Closed) return;
@@ -104,7 +105,7 @@ public sealed class WorkplaceProjectionSink(
         catch (WorkplaceConcurrencyException) { }
     }
 
-    private async Task NotifyAsync(WorkplaceWorkspaceId workspaceId, WorkNotificationKind kind, string title, string message, WorkTaskId taskId, DateTimeOffset now, CancellationToken token)
+    private async Task NotifyAsync(WorkspaceId workspaceId, WorkNotificationKind kind, string title, string message, WorkTaskId taskId, DateTimeOffset now, CancellationToken token)
     {
         var notification = new WorkNotification { Id = WorkNotificationId.New(), WorkspaceId = workspaceId, Kind = kind, Title = title, Message = message, CreatedAt = now, WorkTaskId = taskId, ActionUrl = $"/tasks/{taskId}" };
         await repository.CreateNotificationAsync(notification, token); await EmitAsync(new NotificationCreatedEvent(Id(), workspaceId.Value, Next(), now, notification), token);
@@ -114,11 +115,11 @@ public sealed class WorkplaceProjectionSink(
     private async Task EmitAsync(WorkplaceEventContract value, CancellationToken token) { foreach (var sink in eventSinks) await sink.PublishAsync(value, token); }
     private long Next() => Interlocked.Increment(ref sequence);
     private static string Id() => Guid.NewGuid().ToString("N");
-    private static bool TryContext(WorkItemSnapshot snapshot, out WorkplaceWorkspaceId workspaceId, out InteractionId interactionId, out WorkTaskId taskId)
+    private static bool TryContext(WorkItemSnapshot snapshot, out WorkspaceId workspaceId, out InteractionId interactionId, out WorkTaskId taskId)
     {
         taskId = snapshot.Metadata.TryGetValue("workplace.taskId", out var taskValue) && Guid.TryParse(taskValue, out var taskGuid) ? new(taskGuid) : WorkTaskId.FromWorkItem(snapshot.Id);
         interactionId = snapshot.Metadata.TryGetValue("workplace.interactionId", out var interactionValue) && Guid.TryParse(interactionValue, out var interactionGuid) ? new(interactionGuid) : default;
-        if (snapshot.Metadata.TryGetValue("workplace.workspaceId", out var value) && interactionId != default) { workspaceId = new(value); return true; }
+        if (snapshot.Metadata.TryGetValue("workplace.workspaceId", out var value) && Guid.TryParse(value, out var workspaceGuid) && interactionId != default) { workspaceId = new(workspaceGuid); return true; }
         workspaceId = default; return false;
     }
     private static WorkActorKind Actor(WorkTaskActivityType type) => type is WorkTaskActivityType.TaskPaused or WorkTaskActivityType.TaskResumed or WorkTaskActivityType.TaskCancelled ? WorkActorKind.User : WorkActorKind.Agentstration;

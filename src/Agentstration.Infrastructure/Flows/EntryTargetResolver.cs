@@ -2,6 +2,7 @@ using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 
@@ -23,13 +24,13 @@ public sealed class EntryTargetResolver(
         };
     }
 
-    public async Task<IReadOnlyList<EntryDependency>> GetDependenciesAsync(EntryId entryId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<EntryDependency>> GetDependenciesAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
     {
         var dependencies = new List<EntryDependency>();
-        var draft = await workplace.GetEntryDraftAsync(entryId, cancellationToken);
+        var draft = await workplace.GetEntryDraftAsync(workspaceId, entryId, cancellationToken);
         if (draft is not null)
             dependencies.Add(new EntryDependency(draft.Binding.ResourceId, draft.Binding.Kind.ToString(), "DependsOn"));
-        var published = await workplace.GetEntryAsync(entryId, cancellationToken);
+        var published = await workplace.GetEntryAsync(workspaceId, entryId, cancellationToken);
         if (published is not null)
             dependencies.Add(new EntryDependency(published.ResolvedTarget.FlowResourceId, "Flow", "ResolvedTarget"));
         return dependencies.DistinctBy(value => (value.ResourceId, value.Relationship)).ToArray();

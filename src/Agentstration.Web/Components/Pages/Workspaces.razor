@@ -7,29 +7,17 @@
 <PageHeader Eyebrow="Workplace" Title="Dashboard composition" Description="Compose published Entries independently from the Workspace work context." />
 
 @if (loading) { <LoadingState Message="Loading Dashboards…" /> }
-else if (creatingWorkspace || workspaces.Count == 0)
+else if (workspaces.Count == 0)
 {
-    <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">Workspace</p><h2>Create a Workplace Workspace</h2><p>A default Home Dashboard will be created automatically.</p></div></div>
-        <div class="form-grid">
-            <label><span>Name</span><input data-testid="workspace-name" @bind="newWorkspaceName" placeholder="personal" /></label>
-            <label><span>Display name</span><input data-testid="workspace-display-name" @bind="newWorkspaceDisplayName" placeholder="Personal workspace" /></label>
-            <label class="form-span-2"><span>Description</span><textarea @bind="newWorkspaceDescription" rows="2"></textarea></label>
-        </div>
-        <div class="form-actions">
-            <button class="button-primary" type="button" @onclick="CreateWorkspaceAsync" disabled="@busy">@(busy ? "Creating…" : "Create Workspace")</button>
-            @if (workspaces.Count > 0) { <button class="button-secondary" type="button" @onclick="CancelWorkspaceCreation" disabled="@busy">Cancel</button> }
-        </div>
-        @if (!string.IsNullOrWhiteSpace(message)) { <p class="@(error ? "inline-warning" : "resource-hint")">@message</p> }
-    </section>
+    <EmptyState Title="No Workspace" Message="Create a Workspace from Organization settings before composing Dashboards." />
+    <a class="button-primary" href="/settings/organization/workspaces">Manage Workspaces</a>
 }
 else
 {
     <section class="panel workspace-overview">
-        <div class="workspace-picker"><label>Workspace</label><select value="@workspaceName" @onchange="WorkspaceChanged">@foreach (var item in workspaces) { <option value="@item.Value.Name">@item.Value.DisplayName</option> }</select></div>
+        <div class="workspace-picker"><label>Workspace</label><select value="@workspaceName" @onchange="WorkspaceChanged">@foreach (var item in workspaces) { <option value="@item.Id.ToString("D")">@item.DisplayName</option> }</select></div>
         <div class="workspace-picker"><label>Dashboard</label><select value="@dashboardName" @onchange="DashboardChanged">@foreach (var item in dashboards) { <option value="@item.Value.Name">@item.Value.DisplayName@(item.Value.IsDefault ? " · default" : "")</option> }</select></div>
         <button class="button-secondary" type="button" @onclick="NewDashboard">New Dashboard</button>
-        <button class="button-secondary" type="button" @onclick="BeginWorkspaceCreation">New Workspace</button>
     </section>
 
     @if (selected is null) { <EmptyState Title="No Dashboard" Message="Create the first Dashboard for this Workspace." /> }
@@ -70,10 +58,9 @@ else
 @code {
     [SupplyParameterFromQuery(Name = "entry")] public string? RequestedEntryName { get; set; }
     [SupplyParameterFromQuery(Name = "entryNamespace")] public string? RequestedEntryNamespace { get; set; }
-    private bool loading = true, busy, error, creating, creatingWorkspace, isDefault;
+    private bool loading = true, busy, error, creating, isDefault;
     private string workspaceName = "", dashboardName = "", name = "", displayName = "", description = "", message = "";
-    private string newWorkspaceName = "", newWorkspaceDisplayName = "", newWorkspaceDescription = "";
-    private IReadOnlyList<WorkplaceWorkspaceDraftResponse> workspaces = [];
+    private IReadOnlyList<WorkplaceWorkspaceResponse> workspaces = [];
     private IReadOnlyList<WorkplaceDashboardDraftResponse> dashboards = [];
     private IReadOnlyList<EntryResponse> entries = [];
     private WorkplaceDashboardDraftResponse? selected;
@@ -83,37 +70,16 @@ else
     {
         workspaces = await Client.GetWorkspacesAsync(default);
         entries = await Client.GetPublishedEntriesAsync(default);
-        workspaceName = workspaces.FirstOrDefault()?.Value.Name ?? "";
-        creatingWorkspace = workspaces.Count == 0;
-        if (!creatingWorkspace) { await LoadDashboardsAsync(); PreselectRequestedEntry(); }
+        workspaceName = workspaces.FirstOrDefault()?.Id.ToString("D") ?? "";
+        if (workspaces.Count > 0) { await LoadDashboardsAsync(); PreselectRequestedEntry(); }
         loading = false;
     }
-    private void BeginWorkspaceCreation() { creatingWorkspace = true; newWorkspaceName = newWorkspaceDisplayName = newWorkspaceDescription = message = ""; error = false; }
-    private void CancelWorkspaceCreation() { creatingWorkspace = false; message = ""; error = false; }
-    private async Task CreateWorkspaceAsync() => await ExecuteAsync(async () =>
-    {
-        var normalizedName = newWorkspaceName.Trim();
-        var draft = new WorkplaceWorkspaceDraft
-        {
-            Id = new(normalizedName),
-            Name = normalizedName,
-            DisplayName = newWorkspaceDisplayName.Trim(),
-            Description = string.IsNullOrWhiteSpace(newWorkspaceDescription) ? null : newWorkspaceDescription.Trim()
-        };
-        var saved = await Client.SaveWorkspaceAsync(draft, default);
-        await Client.PublishWorkspaceAsync(saved.Name, default);
-        workspaces = await Client.GetWorkspacesAsync(default);
-        workspaceName = saved.Name;
-        creatingWorkspace = false;
-        await LoadDashboardsAsync();
-        message = $"Workspace {saved.DisplayName} created with its default Home Dashboard.";
-    });
     private async Task WorkspaceChanged(ChangeEventArgs args)
     {
         var requestedName = args.Value?.ToString();
-        var workspace = workspaces.FirstOrDefault(value => string.Equals(value.Value.Name, requestedName, StringComparison.Ordinal));
+        var workspace = workspaces.FirstOrDefault(value => string.Equals(value.Id.ToString("D"), requestedName, StringComparison.OrdinalIgnoreCase));
         if (workspace is null) { ShowWorkspaceSelectionError(); return; }
-        workspaceName = workspace.Value.Name;
+        workspaceName = workspace.Name;
         await LoadDashboardsAsync();
     }
     private void DashboardChanged(ChangeEventArgs args)
@@ -126,7 +92,7 @@ else
     {
         var workspace = SelectedWorkspace();
         if (workspace is null) { ShowWorkspaceSelectionError(); return; }
-        workspaceName = workspace.Value.Name;
+        workspaceName = workspace.Name;
         dashboards = await Client.GetDashboardsAsync(workspaceName, default);
         selected = dashboards.FirstOrDefault(value => value.Value.IsDefault) ?? dashboards.FirstOrDefault();
         if (selected is not null) Select(selected); else NewDashboard();
@@ -136,9 +102,9 @@ else
     {
         var workspace = SelectedWorkspace();
         if (workspace is null) { ShowWorkspaceSelectionError(); return; }
-        workspaceName = workspace.Value.Name;
+        workspaceName = workspace.Name;
         creating = true; dashboardName = name = ""; displayName = ""; description = ""; isDefault = dashboards.Count == 0; composition = [];
-        selected = new(new WorkplaceDashboardDraft { Id = new("new"), WorkspaceId = workspace.Value.Id, Name = "new", DisplayName = "New Dashboard", IsDefault = isDefault }, null);
+        selected = new(new WorkplaceDashboardDraft { Id = new("new"), WorkspaceId = new(workspace.Id), Name = "new", DisplayName = "New Dashboard", IsDefault = isDefault }, null);
     }
     private void ToggleEntry(EntryResponse entry, ChangeEventArgs args) { var id = EntryId(entry); if (args.Value is true && composition.All(value => value.EntryResourceId != id)) composition.Add(new DashboardEntryReference { EntryResourceId = id, Role = DashboardItemRole.Standard, Order = composition.Count * 10 }); else if (args.Value is not true) composition.RemoveAll(value => value.EntryResourceId == id); }
     private void ChangeRole(EntryResponse entry, ChangeEventArgs args) { var role = Enum.Parse<DashboardItemRole>(args.Value?.ToString() ?? "Standard"); if (role == DashboardItemRole.Primary) for (var i = 0; i < composition.Count; i++) if (composition[i].Role == DashboardItemRole.Primary) composition[i] = composition[i] with { Role = DashboardItemRole.Standard }; Replace(EntryId(entry), value => value with { Role = role }); }
@@ -150,7 +116,7 @@ else
     private async Task PublishAsync() => await ExecuteAsync(async () => { var saved = await Client.SaveDashboardAsync(Draft(), default); var published = await Client.PublishDashboardAsync(workspaceName, saved.Name, default); dashboards = await Client.GetDashboardsAsync(workspaceName, default); Select(dashboards.FirstOrDefault(value => value.Value.Name == saved.Name) ?? new(saved, published)); message = $"Dashboard v{published.Version} published with {published.Entries.Count} Entries."; });
     private async Task DeleteAsync() => await ExecuteAsync(async () => { await Client.DeleteDashboardAsync(workspaceName, name, default); await LoadDashboardsAsync(); message = "Dashboard deleted."; });
     private async Task ExecuteAsync(Func<Task> action) { busy = true; error = false; message = ""; try { await action(); } catch (Exception exception) { error = true; message = exception.Message; } finally { busy = false; } }
-    private WorkplaceWorkspaceDraftResponse? SelectedWorkspace() => workspaces.FirstOrDefault(value => string.Equals(value.Value.Name, workspaceName, StringComparison.Ordinal)) ?? workspaces.FirstOrDefault();
+    private WorkplaceWorkspaceResponse? SelectedWorkspace() => workspaces.FirstOrDefault(value => string.Equals(value.Id.ToString("D"), workspaceName, StringComparison.OrdinalIgnoreCase)) ?? workspaces.FirstOrDefault();
     private void ShowWorkspaceSelectionError() { dashboards = []; selected = null; error = true; message = "No Workspace is available for Dashboard composition."; }
     private static EntryId EntryId(EntryResponse entry) => new(entry.Id, entry.Namespace);
     private static string EntryScope(EntryResponse entry) => entry.Namespace.IsDefault ? "Local Entry" : $"Pack · {entry.Namespace.Value}";

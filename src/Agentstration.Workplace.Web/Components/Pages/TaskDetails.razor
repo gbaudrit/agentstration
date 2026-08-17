@@ -54,7 +54,7 @@ else if (task is not null)
                 _ = InvokeAsync(RefreshAsync);
         });
         Realtime.StateChanged += HandleRealtimeStateChanged;
-        try { var workspace = await Api.GetWorkspaceAsync(WorkspaceName, lifetime.Token); await Realtime.StartAsync(workspace.Id, 0, lifetime.Token); }
+        try { var workspace = await Api.GetWorkspaceAsync(WorkspaceName, lifetime.Token); await Realtime.StartAsync(workspace.Id.ToString("D"), 0, lifetime.Token); }
         catch when (!lifetime.IsCancellationRequested) { }
         await RefreshAsync();
     }

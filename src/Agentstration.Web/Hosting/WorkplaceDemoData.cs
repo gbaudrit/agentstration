@@ -1,6 +1,8 @@
 using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
+using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 using Agentstration.Work;
 
 namespace Agentstration.Web.Hosting;
@@ -9,6 +11,12 @@ public static class WorkplaceDemoData
 {
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
+        var identityStore = services.GetRequiredService<IIdentityStore>();
+        var tenant = (await identityStore.ListTenantsAsync(cancellationToken)).FirstOrDefault();
+        if (tenant is null) return;
+        var canonicalWorkspace = (await identityStore.ListWorkspacesAsync(tenant.Id, cancellationToken)).FirstOrDefault();
+        if (canonicalWorkspace is null) return;
+        var workspaceId = new WorkspaceId(canonicalWorkspace.Id);
         var flows = services.GetRequiredService<FlowService>();
         var flowId = new FlowId("universal-router");
         var flow = await flows.GetAsync(flowId, cancellationToken);
@@ -34,6 +42,7 @@ public static class WorkplaceDemoData
         var entryId = new EntryId("universal-request");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
+            WorkspaceId = workspaceId,
             Id = entryId,
             Name = "universal-request",
             DisplayName = "Ask Agentstration",
@@ -59,6 +68,7 @@ public static class WorkplaceDemoData
         var reportEntryId = new EntryId("prepare-report");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
+            WorkspaceId = workspaceId,
             Id = reportEntryId,
             Name = "prepare-report",
             DisplayName = "Prepare a report",
@@ -81,6 +91,7 @@ public static class WorkplaceDemoData
         var guidedEntryId = new EntryId("guided-request");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
+            WorkspaceId = workspaceId,
             Id = guidedEntryId,
             Name = "guided-request",
             DisplayName = "Guided request",
@@ -98,6 +109,7 @@ public static class WorkplaceDemoData
         var immediateEntryId = new EntryId("quick-answer");
         await SaveAndPublishAsync(entries, workplace, new EntryDraft
         {
+            WorkspaceId = workspaceId,
             Id = immediateEntryId,
             Name = "quick-answer",
             DisplayName = "Quick acknowledgement",
@@ -113,24 +125,11 @@ public static class WorkplaceDemoData
             Behavior = new EntryBehavior(TaskCreationMode.Never)
         }, cancellationToken);
 
-        var workspaceAdministration = services.GetRequiredService<WorkspaceAdministrationService>();
-        var workspaceDraft = new WorkplaceWorkspaceDraft
-        {
-            Id = new WorkplaceWorkspaceId("personal"),
-            Name = "personal",
-            DisplayName = "Personal workspace",
-            Description = "Your local place to delegate and follow work."
-        };
-        if (!(await workspaceAdministration.ListAsync(cancellationToken)).Any(value => value.Id == workspaceDraft.Id))
-            await workspaceAdministration.SaveAsync(workspaceDraft, cancellationToken);
-        if (!(await workplace.ListWorkspacesAsync(cancellationToken)).Any(value => value.Id == workspaceDraft.Id))
-            await workspaceAdministration.PublishAsync(workspaceDraft.Id, cancellationToken);
-
         var dashboardAdministration = services.GetRequiredService<DashboardAdministrationService>();
         var home = new WorkplaceDashboardDraft
         {
             Id = new DashboardId("home"),
-            WorkspaceId = workspaceDraft.Id,
+            WorkspaceId = workspaceId,
             Name = "home",
             DisplayName = "Home",
             Description = "Your default Workplace dashboard.",
@@ -143,21 +142,21 @@ public static class WorkplaceDemoData
                 new DashboardEntryReference { EntryResourceId = immediateEntryId, Role = DashboardItemRole.Standard, Order = 30 }
             ]
         };
-        var existingHome = (await dashboardAdministration.ListAsync(workspaceDraft.Id, cancellationToken)).SingleOrDefault(value => value.Id == home.Id);
+        var existingHome = (await dashboardAdministration.ListAsync(workspaceId, cancellationToken)).SingleOrDefault(value => value.Id == home.Id);
         if (existingHome is null || existingHome.Entries.Count == 0)
         {
             var savedHome = await dashboardAdministration.SaveAsync(home, cancellationToken);
-            await dashboardAdministration.PublishAsync(workspaceDraft.Id, savedHome.Id, cancellationToken);
+            await dashboardAdministration.PublishAsync(workspaceId, savedHome.Id, cancellationToken);
         }
     }
 
     private static async Task SaveAndPublishAsync(EntryAdministrationService service, WorkplaceService workplace, EntryDraft draft, CancellationToken cancellationToken)
     {
-        var existing = await service.ListAsync(cancellationToken);
+        var existing = await service.ListAsync(draft.WorkspaceId, cancellationToken);
         var current = existing.SingleOrDefault(value => value.Id == draft.Id);
         if (current is null || current.Binding != draft.Binding) await service.SaveAsync(draft, cancellationToken);
-        var published = (await workplace.ListEntriesAsync(cancellationToken)).SingleOrDefault(value => value.Id == draft.Id);
+        var published = (await workplace.ListEntriesAsync(draft.WorkspaceId, cancellationToken)).SingleOrDefault(value => value.Id == draft.Id);
         if (published is null || published.ResolvedTarget.FlowResourceId.Contains('/', StringComparison.Ordinal))
-            await service.PublishAsync(draft.Id, cancellationToken);
+            await service.PublishAsync(draft.WorkspaceId, draft.Id, cancellationToken);
     }
 }
