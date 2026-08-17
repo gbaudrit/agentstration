@@ -10,19 +10,20 @@ public sealed class FlowTopologyViewerTests
     public void CanvasExposesZoomControlsInReadOnlyMode()
     {
         using var context = new BunitContext();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        context.JSInterop.Setup<Blazor.Diagrams.Core.Geometry.Rectangle>(_ => true)
-            .SetResult(new(0, 0, 800, 600));
+        var graph = new FlowTopologyGraph(
+            [new("step:input", "input", "Input", "input", 0, 0)],
+            [],
+            "graph",
+            "Read-only topology");
+        var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph));
 
-        var rendered = context.Render<FlowCanvas>(parameters => parameters
-            .Add(component => component.Document, new([], []))
-            .Add(component => component.IsReadOnly, true));
-
-        Assert.AreEqual("100%", rendered.Find(".flow-zoom-controls span").TextContent.Trim());
+        Assert.AreEqual("100%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());
         rendered.Find("button[aria-label='Zoom in']").Click();
-        Assert.AreEqual("115%", rendered.Find(".flow-zoom-controls span").TextContent.Trim());
+        Assert.AreEqual("115%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());
         Assert.IsNotNull(rendered.Find("button[aria-label='Zoom out']"));
-        Assert.IsNotNull(rendered.FindAll(".flow-zoom-controls button").Single(button => button.TextContent.Trim() == "Fit"));
+        rendered.FindAll(".topology-zoom-controls button").Single(button => button.TextContent.Trim() == "Fit").Click();
+        Assert.AreEqual("100%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());
     }
 
     [TestMethod]
