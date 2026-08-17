@@ -297,7 +297,7 @@ public static class FlowTopologyProjector
             $"flow:{flow.FlowId.Value}", flow.FlowId.Value, flow.FlowId.Value, "flow", HorizontalGap * (index + 1), 0,
             flow.Version ?? "active version")));
         nodes.Add(SystemNode("output", "Output", "output", HorizontalGap * (definition.Flows.Count + 1), 0, run));
-        return new(nodes, LinearEdges(nodes), definition.Mode.ToString().ToLowerInvariant(), $"Composite Flow ({definition.Mode}); execution is not implemented") ;
+        return new(nodes, LinearEdges(nodes), definition.Mode.ToString().ToLowerInvariant(), $"Composite Flow ({definition.Mode}); execution is not implemented");
     }
 
     private static FlowTopologyNode SystemNode(string key, string label, string type, double x, double y, FlowRun? run) =>

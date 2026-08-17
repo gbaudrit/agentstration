@@ -13,8 +13,8 @@ using Agentstration.Web.Components;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Console;
 using Agentstration.Web.Features.Flows.Designer;
-using Agentstration.Web.Security;
 using Agentstration.Web.FlowDesigner.Backend;
+using Agentstration.Web.Security;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Microsoft.AspNetCore.Authentication;
@@ -314,7 +314,8 @@ public sealed class ApiClientTests
             return request.RequestUri.AbsolutePath.EndsWith("/versions/1.2.0", StringComparison.Ordinal)
                 ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(version) }
                 : new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var backend = new FlowDesignerBackend(new FlowApiClient(httpClient));
         var target = new FlowDesignerTarget(@namespace, "sample");
 
@@ -345,7 +346,8 @@ public sealed class ApiClientTests
         var version = new FlowVersionResponse("legacy", "1.0.0", null, definition, new Dictionary<string, string>(), now) { Namespace = @namespace };
         using var httpClient = new HttpClient(new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/versions/1.0.0", StringComparison.Ordinal)
             ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(version) }
-            : new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) })) { BaseAddress = new Uri("http://localhost/") };
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => new FlowDesignerBackend(new FlowApiClient(httpClient)).LoadAsync(new(@namespace, "legacy"), default));
 
