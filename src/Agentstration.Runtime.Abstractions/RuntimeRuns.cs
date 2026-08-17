@@ -29,8 +29,10 @@ public sealed record RuntimeAgentReference(string ResourceId, long Version)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
 }
-public sealed record RuntimeRunScope(Guid TenantId, Guid WorkspaceId, Guid PrincipalId);
 public sealed record RuntimeRunMessage(RuntimeMessageRole Role, string Content);
+public sealed record RuntimeRunScope(Guid TenantId, WorkspaceId WorkspaceId, Guid PrincipalId);
+public readonly record struct RuntimeRunKey(WorkspaceId WorkspaceId, string RunId);
+public sealed record RuntimeRunQueueItem(RuntimeRunScope Scope, string RunId);
 
 public sealed record RuntimeRunInput
 {
@@ -90,6 +92,8 @@ public sealed record RuntimeRunStatus
 
 public sealed record RuntimeRun
 {
+    public required WorkspaceId WorkspaceId { get; init; }
+    public required RuntimeRunScope Scope { get; init; }
     public required string Id { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = RuntimeResourceTypes.Runs;
@@ -101,6 +105,7 @@ public sealed record RuntimeRun
 
 public sealed record RuntimeRunEvent
 {
+    public required WorkspaceId WorkspaceId { get; init; }
     public long Sequence { get; init; }
     public required Guid EventId { get; init; }
     public required string RunId { get; init; }
@@ -119,17 +124,18 @@ public interface IRuntimeRunStore
 {
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredRuntimeRun> CreateAsync(RuntimeRun run, CancellationToken cancellationToken);
-    Task<StoredRuntimeRun?> GetAsync(string runId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(string? agentResourceId, int skip, int take, CancellationToken cancellationToken);
+    Task<StoredRuntimeRun?> GetAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(WorkspaceId workspaceId, string? agentResourceId, int skip, int take, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RuntimeRunKey>> ListRecoverableAsync(int skip, int take, CancellationToken cancellationToken);
     Task<StoredRuntimeRun> UpdateAsync(RuntimeRun run, string expectedETag, CancellationToken cancellationToken);
     Task<RuntimeRunEvent> AppendEventAsync(RuntimeRunEvent runEvent, CancellationToken cancellationToken);
-    Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken);
 }
 
 public interface IRuntimeRunQueue
 {
-    ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken);
-    IAsyncEnumerable<string> ReadAllAsync(CancellationToken cancellationToken);
+    ValueTask EnqueueAsync(RuntimeRunQueueItem item, CancellationToken cancellationToken);
+    IAsyncEnumerable<RuntimeRunQueueItem> ReadAllAsync(CancellationToken cancellationToken);
 }
 
 public interface IRuntimeRunExecutionScope
@@ -140,9 +146,9 @@ public interface IRuntimeRunExecutionScope
 
 public interface IRuntimeRunCancellationRegistry
 {
-    CancellationToken Register(string runId, CancellationToken stoppingToken);
-    bool Cancel(string runId);
-    void Complete(string runId);
+    CancellationToken Register(RuntimeRunKey key, CancellationToken stoppingToken);
+    bool Cancel(RuntimeRunKey key);
+    void Complete(RuntimeRunKey key);
 }
 
 public sealed class RuntimeRunNotFoundException(string runId) : Exception($"Runtime run '{runId}' was not found.");

@@ -119,7 +119,7 @@ public static class WorkplaceEndpoints
     private static Task<IResult> GetActivitiesAsync(string workspaceName, Guid taskId, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => { await service.GetTaskAsync(WorkspaceId(workspaceName), new(taskId), token); return Results.Ok(await service.ListActivitiesAsync(WorkspaceId(workspaceName), new(taskId), token)); });
     private static Task<IResult> GetResultsAsync(string workspaceName, Guid taskId, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => { await service.GetTaskAsync(WorkspaceId(workspaceName), new(taskId), token); return Results.Ok(await service.ListResultsAsync(WorkspaceId(workspaceName), new(taskId), token)); });
     private static Task<IResult> GetArtifactsAsync(string workspaceName, Guid taskId, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => { await service.GetTaskAsync(WorkspaceId(workspaceName), new(taskId), token); return Results.Ok(await service.ListArtifactsAsync(WorkspaceId(workspaceName), new(taskId), token)); });
-    private static Task<IResult> GetArtifactContentAsync(string workspaceName, Guid taskId, Guid artifactId, WorkplaceService service, IArtifactStore store, CancellationToken token) => ExecuteAsync(async () => { var value = await service.GetArtifactAsync(WorkspaceId(workspaceName), new(taskId), new(artifactId), token); var stream = await store.OpenReadAsync(new ArtifactReference(value.StorageKey, value.ContentType, value.Length), token); return Results.File(stream, value.ContentType, value.Name, enableRangeProcessing: true); });
+    private static Task<IResult> GetArtifactContentAsync(string workspaceName, Guid taskId, Guid artifactId, WorkplaceService service, IArtifactStore store, CancellationToken token) => ExecuteAsync(async () => { var workspaceId = WorkspaceId(workspaceName); var value = await service.GetArtifactAsync(workspaceId, new(taskId), new(artifactId), token); var stream = await store.OpenReadAsync(workspaceId, new ArtifactReference(value.StorageKey, value.ContentType, value.Length), token); return Results.File(stream, value.ContentType, value.Name, enableRangeProcessing: true); });
     private static Task<IResult> GetNotificationsAsync(string workspaceName, bool? unreadOnly, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(new WorkNotificationPageResponse(await service.ListNotificationsAsync(WorkspaceId(workspaceName), unreadOnly, token))));
     private static Task<IResult> GetUnreadCountAsync(string workspaceName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(new UnreadNotificationCountResponse(await service.UnreadCountAsync(WorkspaceId(workspaceName), token))));
     private static Task<IResult> MarkReadAsync(string workspaceName, Guid notificationId, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(await service.MarkNotificationReadAsync(WorkspaceId(workspaceName), new(notificationId), token)));
@@ -188,7 +188,7 @@ public static class WorkplaceEndpoints
     private static Task<IResult> GetNamespacedEntryDependenciesAsync(string @namespace, string entryName, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
         Results.Ok((await service.GetDependenciesAsync(NamespacedEntryId(@namespace, entryName), token)).Select(value => new EntryDependencyResponse(value.ResourceId, value.ResourceType, value.Relationship))));
 
-    private static async Task<IResult> ListResourcesAsync(string kind, AgentManagementService agents, FlowService flows, CancellationToken token)
+    private static async Task<IResult> ListResourcesAsync(string kind, AgentManagementService agents, FlowService flows, IWorkplaceContext workplaceContext, CancellationToken token)
     {
         if (string.Equals(kind, ResourceKinds.Agent, StringComparison.Ordinal))
         {
@@ -199,7 +199,7 @@ public static class WorkplaceEndpoints
         }
         if (string.Equals(kind, ResourceKinds.Flow, StringComparison.Ordinal))
         {
-            var page = await flows.ListAsync(0, 500, token);
+            var page = await flows.ListAsync(workplaceContext.WorkspaceId, 0, 500, token);
             return Results.Ok(page.Items.Where(value => !value.Value.Metadata.TryGetValue("systemManaged", out var system) || !bool.TryParse(system, out var hidden) || !hidden)
                 .Select(value => new ResourcePickerItem(value.Value.Id.Value, value.Value.DisplayName ?? value.Value.Name, value.Value.Description, value.Value.ActiveVersion ?? value.Value.Version, value.Value.Enabled ? "Active" : "Disabled", kind) { Namespace = value.Value.Id.Namespace }));
         }

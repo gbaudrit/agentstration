@@ -1,20 +1,21 @@
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Runtime.Core;
 
 public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider timeProvider)
 {
-    public async Task CompleteFailureAsync(string runId, RuntimeRunState state, string error, CancellationToken cancellationToken)
+    public async Task CompleteFailureAsync(WorkspaceId workspaceId, string runId, RuntimeRunState state, string error, CancellationToken cancellationToken)
     {
         for (var attempt = 0; ; attempt++)
         {
-            var current = await RequiredAsync(runId, cancellationToken);
+            var current = await RequiredAsync(workspaceId, runId, cancellationToken);
             if (current.Value.Status.State.IsTerminal()) return;
             try
             {
                 await TransitionAsync(current, state, null, error, cancellationToken);
-                await AppendEventAsync(runId, RuntimeRunEventKind.Error, error, state: state, cancellationToken: cancellationToken);
-                await AppendEventAsync(runId, RuntimeRunEventKind.RunCompleted, error, state: state, cancellationToken: cancellationToken);
+                await AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.Error, error, state: state, cancellationToken: cancellationToken);
+                await AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.RunCompleted, error, state: state, cancellationToken: cancellationToken);
                 return;
             }
             catch (RuntimeRunConcurrencyException) when (attempt < 2)
@@ -50,13 +51,14 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         return runs.UpdateAsync(stored.Value with { Status = status }, stored.ETag, cancellationToken);
     }
 
-    public async Task TraceStepAsync(string runId, string step, CancellationToken cancellationToken)
+    public async Task TraceStepAsync(WorkspaceId workspaceId, string runId, string step, CancellationToken cancellationToken)
     {
-        await AppendEventAsync(runId, RuntimeRunEventKind.StepStarted, step, step, cancellationToken: cancellationToken);
-        await AppendEventAsync(runId, RuntimeRunEventKind.StepCompleted, step, step, cancellationToken: cancellationToken);
+        await AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StepStarted, step, step, cancellationToken: cancellationToken);
+        await AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StepCompleted, step, step, cancellationToken: cancellationToken);
     }
 
     public Task<RuntimeRunEvent> AppendEventAsync(
+        WorkspaceId workspaceId,
         string runId,
         RuntimeRunEventKind kind,
         string? message = null,
@@ -66,6 +68,7 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         CancellationToken cancellationToken = default) =>
         runs.AppendEventAsync(new RuntimeRunEvent
         {
+            WorkspaceId = workspaceId,
             EventId = Guid.NewGuid(),
             RunId = runId,
             Kind = kind,
@@ -76,6 +79,6 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
             State = state
         }, cancellationToken);
 
-    private async Task<StoredRuntimeRun> RequiredAsync(string runId, CancellationToken cancellationToken) =>
-        await runs.GetAsync(runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);
+    private async Task<StoredRuntimeRun> RequiredAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) =>
+        await runs.GetAsync(workspaceId, runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);
 }

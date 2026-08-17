@@ -148,19 +148,24 @@ public sealed class FlowTopologyProjectorTests
 
     private static FlowRun Run(FlowDefinition definition, FlowGraphDefinition? graph = null) => new()
     {
+        WorkspaceId = WorkspaceId,
         Id = "run-1",
         FlowId = new("flow"),
         FlowVersion = "1.0.0",
         Input = JsonSerializer.SerializeToElement(new { prompt = "test" }),
         CreatedAt = DateTimeOffset.UtcNow,
-        DefinitionSnapshot = new FlowVersion(new("flow"), "1.0.0", null, definition, new Dictionary<string, string>(), DateTimeOffset.UtcNow, graph)
+        Scope = new FlowRunScope(Guid.Empty, WorkspaceId, Guid.Empty),
+        DefinitionSnapshot = new FlowVersion(WorkspaceId, new("flow"), "1.0.0", null, definition, new Dictionary<string, string>(), DateTimeOffset.UtcNow, graph)
     };
 
     private static FlowRunEvent Event(long sequence, string participant) => new(
+        WorkspaceId,
         "run-1",
         sequence,
         FlowRunEventType.ParticipantTurnStarted,
         participant,
         JsonSerializer.SerializeToElement(new { turn = sequence }),
         DateTimeOffset.UtcNow);
+
+    private static readonly Agentstration.Resources.WorkspaceId WorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
 }

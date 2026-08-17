@@ -10,11 +10,11 @@ public sealed class RuntimeRunExecutionWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var runId in queue.ReadAllAsync(stoppingToken))
+        await foreach (var item in queue.ReadAllAsync(stoppingToken))
         {
             try
             {
-                await runs.ExecuteAsync(runId, stoppingToken);
+                await runs.ExecuteAsync(item, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -22,7 +22,7 @@ public sealed class RuntimeRunExecutionWorker(
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Unexpected runtime run worker failure for {RunId}", runId);
+                logger.LogError(exception, "Unexpected runtime run worker failure for {WorkspaceId}/{RunId}", item.Scope.WorkspaceId, item.RunId);
             }
         }
     }

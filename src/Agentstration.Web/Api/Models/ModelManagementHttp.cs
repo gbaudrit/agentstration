@@ -1,7 +1,8 @@
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
 using Agentstration.Management.Contracts;
+using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Agentstration.Web.Api.Models;
@@ -78,6 +79,7 @@ internal static class ModelManagementHttp
     }
 
     public static string? IfMatch(HttpRequest request) => request.Headers.IfMatch.FirstOrDefault();
+    public static ResourceNamespace Namespace(string? value) => ResourceNamespace.Parse(value);
 
     public static ModelProfileResolutionResponse Resolution(ModelProfileResolution resolution) => new(
         new ModelProfileIdentityResponse(resolution.Profile.Metadata.Name, resolution.Profile.Metadata.Name, resolution.Profile.Definition.DisplayName),

@@ -24,7 +24,7 @@ public sealed class WorkspacePackResourceCatalog(
         var resources = new List<PackCompositionCatalogItem>();
         resources.AddRange((await store.ListAsync<AgentResource>(ResourceNamespace.Default, ResourceKinds.Agent, 0, 1000, cancellationToken))
             .Select(value => AgentItem(value.Value)));
-        resources.AddRange((await flows.ListAsync(ResourceNamespace.Default, 0, 1000, cancellationToken)).Items
+        resources.AddRange((await flows.ListAsync(workplaceContext.WorkspaceId, ResourceNamespace.Default, 0, 1000, cancellationToken)).Items
             .Select(value => FlowItem(value.Value)));
         resources.AddRange((await workplace.ListEntryDraftsAsync(workplaceContext.WorkspaceId, cancellationToken))
             .Where(value => value.Id.Namespace.IsDefault)
@@ -93,7 +93,7 @@ public sealed class WorkspacePackResourceCatalog(
 
     private async Task<PackCompositionResourceSnapshot?> GetFlowAsync(PackCompositionResourceKey key, CancellationToken token)
     {
-        var flow = (await flows.GetAsync(new(key.Name, key.NamespaceValue), token))?.Value;
+        var flow = (await flows.GetAsync(workplaceContext.WorkspaceId, new(key.Name, key.NamespaceValue), token))?.Value;
         if (flow is null) return null;
         var dependencies = FlowDependencies(flow).DistinctBy(value => (value.Target.Address, value.Relationship)).ToArray();
         return new(FlowItem(flow) with { DependencyCount = dependencies.Length }, dependencies);
@@ -185,7 +185,7 @@ public sealed class WorkspacePackResourceCatalog(
         IReadOnlyDictionary<ResourceAddress, string> bindings,
         CancellationToken token)
     {
-        var flow = (await flows.GetAsync(new(key.Name, key.NamespaceValue), token))?.Value
+        var flow = (await flows.GetAsync(workplaceContext.WorkspaceId, new(key.Name, key.NamespaceValue), token))?.Value
             ?? throw new KeyNotFoundException($"Flow '{key.Name}' was not found.");
         var envelope = new PackResourceEnvelope<PackFlowDefinition>
         {

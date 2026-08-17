@@ -82,3 +82,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 50. [ADR-0050 — Background Control Plane access is explicit](0050-background-control-plane-access-is-explicit.md)
 51. [ADR-0051 — Pack Projects can originate from reviewed workspace snapshots](0051-pack-projects-from-workspace-snapshots.md)
 52. [ADR-0052 — Pack composition distinguishes contained model configuration from bindings](0052-pack-composition-distinguishes-contained-model-configuration-from-bindings.md)
+53. [ADR-0053 — Workspace scope is part of durable identity](0053-workspace-scope-is-part-of-durable-identity.md)

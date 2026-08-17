@@ -11,11 +11,11 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
     public async ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken)
     {
         var principal = await identities.GetPrincipalAsync(scope.PrincipalId, cancellationToken);
-        var workspace = await identities.GetWorkspaceAsync(scope.TenantId, scope.WorkspaceId, cancellationToken);
+        var workspace = await identities.GetWorkspaceAsync(scope.TenantId, scope.WorkspaceId.Value, cancellationToken);
         if (principal?.Status != PrincipalStatus.Active || workspace?.Status != WorkspaceStatus.Active)
             throw Denied();
 
-        var requestContext = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId);
+        var requestContext = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value);
         try
         {
             await authorization.EnsurePermissionAsync(requestContext, AuthorizationPermissions.RunsExecute, cancellationToken);
@@ -27,7 +27,7 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
     }
 
     public IDisposable Enter(RuntimeRunScope scope) =>
-        scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId));
+        scopeFactory.Push(new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value));
 
     private static RuntimeRunValidationException Denied() =>
         new("runtime_run_authorization_denied", "The Principal is no longer authorized to execute this Runtime Run in its Workspace.");

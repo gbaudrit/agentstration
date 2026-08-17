@@ -243,10 +243,5 @@ public interface IIdentityStore
     Task RemoveRoleAssignmentAsync(Guid roleAssignmentId, CancellationToken cancellationToken);
 }
 
-public interface IResourceScopeMigrator
-{
-    Task BackfillUnscopedResourcesAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken);
-}
-
 public sealed class AuthorizationDeniedException(string permission)
     : Exception($"The current principal does not have permission '{permission}'.");

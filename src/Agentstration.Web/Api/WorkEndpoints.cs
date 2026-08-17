@@ -1,5 +1,7 @@
 using System.Globalization;
 using Agentstration.Application.Work;
+using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
@@ -10,7 +12,7 @@ public static class WorkEndpoints
 {
     public static IEndpointRouteBuilder MapAgentstrationWorkApi(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/work/workitems");
+        var group = endpoints.MapGroup("/api/work/workitems").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
         group.MapPost("/", CreateAsync);
         group.MapGet("/", ListAsync);
         group.MapGet("/{workItemId:guid}", GetAsync);
@@ -23,14 +25,14 @@ public static class WorkEndpoints
         return endpoints;
     }
 
-    private static Task<IResult> CreateAsync(CreateWorkItemRequest request, HttpResponse response, WorkItemService service, CancellationToken token) =>
+    private static Task<IResult> CreateAsync(CreateWorkItemRequest request, HttpResponse response, WorkItemService service, ICurrentRequestContext requestContext, CancellationToken token) =>
         ExecuteAsync(async () =>
         {
             var inputs = request.Inputs?.Select(value => new WorkInput(value.Text, value.Structured, value.Metadata)).ToArray();
             var attachments = request.Attachments?.Select(ToWorkAttachment).ToArray();
             WorkCorrelationId? correlation = string.IsNullOrWhiteSpace(request.CorrelationId) ? null : new WorkCorrelationId(request.CorrelationId.Trim());
             var stored = await service.SubmitAsync(new SubmitWorkItemCommand(
-                request.Type, request.Instruction, request.Title, request.Description, request.RequesterIdentity,
+                CurrentWorkspace(requestContext), request.Type, request.Instruction, request.Title, request.Description, request.RequesterIdentity,
                 correlation, request.RequestedAgentId, request.Metadata, inputs, attachments, request.Flow), token);
             SetEntityHeaders(response, stored);
             response.Headers.Location = $"/api/work/workitems/{stored.Value.Id}";
@@ -49,76 +51,81 @@ public static class WorkEndpoints
         WorkItemSortField? sortBy,
         WorkItemSortDirection? sortDirection,
         WorkItemService service,
+        ICurrentRequestContext requestContext,
         CancellationToken token) => ExecuteAsync(async () =>
         {
             var actualSkip = Math.Max(0, skip ?? 0);
             var actualTop = Math.Clamp(top ?? 50, 1, 200);
             var query = new WorkItemQuery(
-                actualSkip, actualTop, status, type, requester, agent, createdFrom, createdTo,
+                CurrentWorkspace(requestContext), actualSkip, actualTop, status, type, requester, agent, createdFrom, createdTo,
                 sortBy ?? WorkItemSortField.CreatedAt, sortDirection ?? WorkItemSortDirection.Descending);
             var page = await service.QueryAsync(query, token);
             var next = page.HasMore ? NextLink(query with { Skip = actualSkip + actualTop }) : null;
             return Results.Ok(new WorkItemPageResponse(page.Items.Select(value => ToSummary(value.Value)).ToArray(), next));
         });
 
-    private static Task<IResult> GetAsync(Guid workItemId, HttpResponse response, WorkItemService service, CancellationToken token) =>
+    private static Task<IResult> GetAsync(Guid workItemId, HttpResponse response, WorkItemService service, ICurrentRequestContext requestContext, CancellationToken token) =>
         ExecuteAsync(async () =>
         {
-            var stored = await RequiredAsync(workItemId, service, token);
+            var stored = await RequiredAsync(CurrentWorkspace(requestContext), workItemId, service, token);
             SetEntityHeaders(response, stored);
             return Results.Ok(ToResponse(stored.Value));
         });
 
-    private static Task<IResult> GetResultAsync(Guid workItemId, HttpResponse response, WorkItemService service, CancellationToken token) =>
+    private static Task<IResult> GetResultAsync(Guid workItemId, HttpResponse response, WorkItemService service, ICurrentRequestContext requestContext, CancellationToken token) =>
         ExecuteAsync(async () =>
         {
-            var stored = await RequiredAsync(workItemId, service, token);
+            var stored = await RequiredAsync(CurrentWorkspace(requestContext), workItemId, service, token);
             SetEntityHeaders(response, stored);
             return stored.Value.Result is null
                 ? Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "result_not_available", detail: "The work item does not have a final result yet.")
                 : Results.Ok(ToResult(stored.Value.Result));
         });
 
-    private static Task<IResult> GetEventsAsync(Guid workItemId, WorkItemService service, CancellationToken token) =>
+    private static Task<IResult> GetEventsAsync(Guid workItemId, WorkItemService service, ICurrentRequestContext requestContext, CancellationToken token) =>
         ExecuteAsync(async () =>
         {
-            var stored = await RequiredAsync(workItemId, service, token);
+            var stored = await RequiredAsync(CurrentWorkspace(requestContext), workItemId, service, token);
             return Results.Ok(stored.Value.History.Select(value => new WorkEventResponse(value.EventId, value.Sequence, value.Type, value.Origin, value.OccurredAt, value.Metadata)));
         });
 
-    private static Task<IResult> CancelAsync(Guid workItemId, HttpRequest request, HttpResponse response, WorkItemService service, CancellationToken token) =>
+    private static Task<IResult> CancelAsync(Guid workItemId, HttpRequest request, HttpResponse response, WorkItemService service, ICurrentRequestContext requestContext, CancellationToken token) =>
         ExecuteAsync(async () =>
         {
-            await RequireIfMatchAsync(workItemId, request, service, token);
-            var stored = await service.CancelAsync(new WorkItemId(workItemId), null, token);
+            var workspaceId = CurrentWorkspace(requestContext);
+            await RequireIfMatchAsync(workspaceId, workItemId, request, service, token);
+            var stored = await service.CancelAsync(workspaceId, new WorkItemId(workItemId), null, token);
             SetEntityHeaders(response, stored);
             return Results.Ok(ToResponse(stored.Value));
         });
 
-    private static Task<IResult> AddMessageAsync(Guid workItemId, AddWorkMessageRequest body, HttpRequest request, HttpResponse response, WorkItemService service, CancellationToken token) =>
+    private static Task<IResult> AddMessageAsync(Guid workItemId, AddWorkMessageRequest body, HttpRequest request, HttpResponse response, WorkItemService service, ICurrentRequestContext requestContext, CancellationToken token) =>
         ExecuteAsync(async () =>
         {
-            await RequireIfMatchAsync(workItemId, request, service, token);
-            var stored = await service.AddMessageAsync(new WorkItemId(workItemId), body.Content, body.AuthorId, token);
+            var workspaceId = CurrentWorkspace(requestContext);
+            await RequireIfMatchAsync(workspaceId, workItemId, request, service, token);
+            var stored = await service.AddMessageAsync(workspaceId, new WorkItemId(workItemId), body.Content, body.AuthorId, token);
             SetEntityHeaders(response, stored);
             return Results.Ok(ToResponse(stored.Value));
         });
 
-    private static Task<IResult> ProvideInputAsync(Guid workItemId, ProvideWorkInputRequest body, HttpRequest request, HttpResponse response, WorkItemService service, CancellationToken token) =>
+    private static Task<IResult> ProvideInputAsync(Guid workItemId, ProvideWorkInputRequest body, HttpRequest request, HttpResponse response, WorkItemService service, ICurrentRequestContext requestContext, CancellationToken token) =>
         ExecuteAsync(async () =>
         {
             if (string.IsNullOrWhiteSpace(body.Text) && body.Structured is null) throw new WorkValidationException("input_required", "Text or structured input is required.");
-            await RequireIfMatchAsync(workItemId, request, service, token);
-            var stored = await service.ProvideInputAsync(new WorkItemId(workItemId), new WorkInput(body.Text, body.Structured, body.Metadata), body.AuthorId, token);
+            var workspaceId = CurrentWorkspace(requestContext);
+            await RequireIfMatchAsync(workspaceId, workItemId, request, service, token);
+            var stored = await service.ProvideInputAsync(workspaceId, new WorkItemId(workItemId), new WorkInput(body.Text, body.Structured, body.Metadata), body.AuthorId, token);
             SetEntityHeaders(response, stored);
             return Results.Ok(ToResponse(stored.Value));
         });
 
-    private static Task<IResult> SubmitApprovalAsync(Guid workItemId, SubmitWorkApprovalRequest body, HttpRequest request, HttpResponse response, WorkItemService service, CancellationToken token) =>
+    private static Task<IResult> SubmitApprovalAsync(Guid workItemId, SubmitWorkApprovalRequest body, HttpRequest request, HttpResponse response, WorkItemService service, ICurrentRequestContext requestContext, CancellationToken token) =>
         ExecuteAsync(async () =>
         {
-            await RequireIfMatchAsync(workItemId, request, service, token);
-            var stored = await service.SubmitApprovalAsync(new WorkItemId(workItemId), body.Decision, body.AuthorId, body.Comment, token);
+            var workspaceId = CurrentWorkspace(requestContext);
+            await RequireIfMatchAsync(workspaceId, workItemId, request, service, token);
+            var stored = await service.SubmitApprovalAsync(workspaceId, new WorkItemId(workItemId), body.Decision, body.AuthorId, body.Comment, token);
             SetEntityHeaders(response, stored);
             return Results.Ok(ToResponse(stored.Value));
         });
@@ -130,18 +137,19 @@ public static class WorkEndpoints
         return new WorkAttachment(request.Name.Trim(), new WorkContentReference(request.Uri, request.MediaType, request.Name), request.Size, request.Metadata);
     }
 
-    private static async Task<StoredWorkItem> RequiredAsync(Guid id, WorkItemService service, CancellationToken token) =>
-        await service.GetAsync(new WorkItemId(id), token) ?? throw new KeyNotFoundException($"Work item '{id}' was not found.");
+    private static async Task<StoredWorkItem> RequiredAsync(WorkspaceId workspaceId, Guid id, WorkItemService service, CancellationToken token) =>
+        await service.GetAsync(workspaceId, new WorkItemId(id), token) ?? throw new KeyNotFoundException($"Work item '{id}' was not found.");
 
-    private static async Task RequireIfMatchAsync(Guid id, HttpRequest request, WorkItemService service, CancellationToken token)
+    private static async Task RequireIfMatchAsync(WorkspaceId workspaceId, Guid id, HttpRequest request, WorkItemService service, CancellationToken token)
     {
         var supplied = request.Headers.IfMatch.FirstOrDefault();
         if (supplied is null) return;
-        var current = await RequiredAsync(id, service, token);
+        var current = await RequiredAsync(workspaceId, id, service, token);
         if (!string.Equals(current.ETag, supplied, StringComparison.Ordinal)) throw new WorkItemConcurrencyException("The supplied ETag does not match the current work item version.");
     }
 
     private static void SetEntityHeaders(HttpResponse response, StoredWorkItem stored) => response.Headers.ETag = stored.ETag;
+    private static WorkspaceId CurrentWorkspace(ICurrentRequestContext requestContext) => new(requestContext.Current.WorkspaceId);
 
     private static WorkItemResponse ToResponse(WorkItem item) => new(
         item.Id.Value, item.Type, item.Title, item.Instruction, item.Description, item.Status, item.CreatedAt, item.UpdatedAt,

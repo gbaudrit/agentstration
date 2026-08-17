@@ -132,6 +132,7 @@ public static class DependencyInjection
         services.AddSingleton<IRuntimeRegistry, RuntimeRegistry>();
         services.AddSingleton<IRuntimeRunQueue, LocalRuntimeRunQueue>();
         services.AddSingleton<IRuntimeRunCancellationRegistry, LocalRuntimeRunCancellationRegistry>();
+        services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         services.AddSingleton<IAgentDeploymentProvisioner, InProcessAgentProvisioner>();
         services.AddSingleton<IAgentDeploymentProvisioner, SharedHostAgentProvisioner>();
         services.AddSingleton<IAgentDeploymentReconciler, LocalAgentDeploymentReconciler>();

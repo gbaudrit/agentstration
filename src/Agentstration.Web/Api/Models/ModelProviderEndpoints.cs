@@ -1,6 +1,6 @@
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
 using Agentstration.Management.Contracts;
+using Agentstration.Management.Core;
 
 namespace Agentstration.Web.Api.Models;
 
@@ -18,10 +18,10 @@ internal sealed class ListModelProvidersEndpoint : IModelManagementEndpoint
 internal sealed class GetModelProviderEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}", HandleAsync);
-    private static Task<IResult> HandleAsync(string providerName, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var stored = await service.GetAsync(providerName, cancellationToken)
+            var stored = await service.GetAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, cancellationToken)
                 ?? throw new ModelProviderResourceNotFoundException(providerName);
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
@@ -35,12 +35,12 @@ internal sealed class CreateModelProviderEndpoint : IModelManagementEndpoint
         {
             var stored = await service.CreateAsync(new ModelProviderResource
             {
-                Metadata = new ResourceMetadata { Name = body.Name },
+                Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
                 Kind = ResourceKinds.ModelProvider,
                 ApiVersion = ManagementApiVersions.CoreV1,
                 Definition = body.Properties
             }, cancellationToken);
-            response.Headers.Location = $"/api/modelproviders/{Uri.EscapeDataString(stored.Value.Name)}";
+            response.Headers.Location = $"/api/modelproviders/{Uri.EscapeDataString(stored.Value.Name)}?resourceNamespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}";
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);
         });
 }
@@ -48,9 +48,9 @@ internal sealed class CreateModelProviderEndpoint : IModelManagementEndpoint
 internal sealed class PutModelProviderEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapPut("/{providerName}", HandleAsync);
-    private static Task<IResult> HandleAsync(string providerName, PutModelProviderRequest body, HttpRequest request, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, PutModelProviderRequest body, HttpRequest request, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () => ModelManagementHttp.ResourceResult(
-            await service.PutAsync(providerName, body.Properties, ModelManagementHttp.IfMatch(request), cancellationToken),
+            await service.PutAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, body.Properties, ModelManagementHttp.IfMatch(request), cancellationToken),
             response,
             StatusCodes.Status200OK));
 }
@@ -58,10 +58,10 @@ internal sealed class PutModelProviderEndpoint : IModelManagementEndpoint
 internal sealed class DeleteModelProviderEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapDelete("/{providerName}", HandleAsync);
-    private static Task<IResult> HandleAsync(string providerName, HttpRequest request, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, HttpRequest request, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            await service.DeleteAsync(providerName, ModelManagementHttp.IfMatch(request), cancellationToken);
+            await service.DeleteAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, ModelManagementHttp.IfMatch(request), cancellationToken);
             return Results.NoContent();
         });
 }
@@ -69,11 +69,12 @@ internal sealed class DeleteModelProviderEndpoint : IModelManagementEndpoint
 internal sealed class GetModelProviderUsagesEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/usages", HandleAsync);
-    private static Task<IResult> HandleAsync(string providerName, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            _ = await service.GetAsync(providerName, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(providerName);
-            var usages = await service.GetUsagesAsync(ModelProviderManagementService.ModelProviderId(providerName), cancellationToken);
+            var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
+            _ = await service.GetAsync(@namespace, providerName, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(providerName);
+            var usages = await service.GetUsagesAsync(@namespace, ModelProviderManagementService.ModelProviderId(providerName), cancellationToken);
             var values = usages.Select(value => new ModelProviderUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName)).ToArray();
             return Results.Ok(new ModelProviderUsagesResponse(values, values.Length));
         });
@@ -82,10 +83,10 @@ internal sealed class GetModelProviderUsagesEndpoint : IModelManagementEndpoint
 internal sealed class TestModelProviderEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapPost("/{providerName}/test", HandleAsync);
-    private static Task<IResult> HandleAsync(string providerName, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var provider = await service.GetStatusAsync(providerName, cancellationToken);
+            var provider = await service.GetStatusAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, cancellationToken);
             return Results.Ok(new ModelProviderStatusResponse(provider.Configuration.Name, provider.Health.Status, provider.CheckedAt, provider.Health.Details));
         });
 }
@@ -93,10 +94,10 @@ internal sealed class TestModelProviderEndpoint : IModelManagementEndpoint
 internal sealed class ListProviderModelsEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/models", HandleAsync);
-    private static Task<IResult> HandleAsync(string providerName, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var models = await service.ListModelsAsync(providerName, cancellationToken);
+            var models = await service.ListModelsAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, cancellationToken);
             return Results.Ok(new ValueResponse<AvailableModelResponse>(models.Select(model =>
                 new AvailableModelResponse(model.Name, model.DisplayName, model.Status, model.Capabilities, model.Metadata)).ToArray()));
         });
@@ -105,10 +106,10 @@ internal sealed class ListProviderModelsEndpoint : IModelManagementEndpoint
 internal sealed class GetModelProviderStatusEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/status", HandleAsync);
-    private static Task<IResult> HandleAsync(string providerName, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var provider = await service.GetStatusAsync(providerName, cancellationToken);
+            var provider = await service.GetStatusAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, cancellationToken);
             return Results.Ok(new ModelProviderStatusResponse(provider.Configuration.Name, provider.Health.Status, provider.CheckedAt, provider.Health.Details));
         });
 }
@@ -126,5 +127,6 @@ internal static class ModelProviderMappings
             provider.Configuration.EndpointDisplayName,
             provider.Models.Count,
             includeEndpoint ? provider.Configuration.Endpoint : null,
-            provider.CheckedAt));
+            provider.CheckedAt),
+        provider.Configuration.Namespace.Value);
 }

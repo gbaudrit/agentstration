@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
@@ -11,8 +12,11 @@ public sealed class ModelProfileEditorModel
     [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
     public string Name { get; set; } = string.Empty;
 
+    [Required] public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
+
     [Required] public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
+    [Required] public string ProviderNamespace { get; set; } = ResourceNamespace.DefaultValue;
     [Required] public string ProviderName { get; set; } = string.Empty;
     [Required] public string ModelName { get; set; } = string.Empty;
     [Range(0d, 2d)] public double? Temperature { get; set; }
@@ -28,7 +32,7 @@ public sealed class ModelProfileEditorModel
     public bool StrictOutput { get; set; }
     public string? ProviderOptionsJson { get; set; }
 
-    public CreateModelProfileRequest ToCreateRequest() => new(Name.Trim(), ToProperties());
+    public CreateModelProfileRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value);
     public PutModelProfileRequest ToPutRequest() => new(ToProperties());
 
     public ModelProfileProperties ToProperties()
@@ -39,7 +43,7 @@ public sealed class ModelProfileEditorModel
         {
             DisplayName = DisplayName.Trim(),
             Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
-            Provider = new ResourceReference(ProviderName.Trim()),
+            Provider = new ResourceReference(ProviderName.Trim(), @namespace: ResourceNamespace.Parse(ProviderNamespace)),
             Model = new ModelSelection { Name = ModelName.Trim() },
             Generation = new ModelGenerationOptions
             {
@@ -64,8 +68,10 @@ public sealed class ModelProfileEditorModel
     public static ModelProfileEditorModel FromResource(ModelProfileResource resource) => new()
     {
         Name = resource.Name,
+        Namespace = resource.Namespace.Value,
         DisplayName = resource.Definition.DisplayName,
         Description = resource.Definition.Description,
+        ProviderNamespace = (resource.Definition.Provider.Namespace ?? resource.Namespace).Value,
         ProviderName = resource.Definition.Provider.Name,
         ModelName = resource.Definition.Model.Name,
         Temperature = resource.Definition.Generation.Temperature,

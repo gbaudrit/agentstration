@@ -58,7 +58,7 @@ internal sealed class ControlPlaneDocument
 public sealed class SqliteControlPlaneStore(
     IDbContextFactory<ControlPlaneDbContext> contextFactory,
     TimeProvider timeProvider,
-    ICurrentRequestContext requestContext) : IControlPlaneStore, IAgentResourceQueries, IResourceScopeMigrator
+    ICurrentRequestContext requestContext) : IControlPlaneStore, IAgentResourceQueries
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -66,8 +66,6 @@ public sealed class SqliteControlPlaneStore(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsureNamespaceSchemaAsync(context, cancellationToken);
-        await SqliteIdentitySchema.EnsureAsync(context, cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_AgentRevisionLookup ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.agentUid'), json_extract(Payload, '$.agentVersion'))",
             cancellationToken);
@@ -196,16 +194,6 @@ public sealed class SqliteControlPlaneStore(
             ?? throw new InvalidOperationException($"Stored resource '{document.Kind}/{document.Name}' is invalid.");
         value = ApplySystemState(value, document.Uid ?? value.Uid, document.TenantId ?? Guid.Empty, document.WorkspaceId ?? Guid.Empty, document.ETag);
         return new StoredResource<T>(value, document.ETag, document.UpdatedAt);
-    }
-
-    public async Task BackfillUnscopedResourcesAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
-    {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        await context.Documents
-            .Where(value => value.TenantId == null || value.WorkspaceId == null)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(value => value.TenantId, tenantId)
-                .SetProperty(value => value.WorkspaceId, workspaceId), cancellationToken);
     }
 
     public Task<IReadOnlyList<StoredResource<T>>> ListAllAsync<T>(string kind, CancellationToken cancellationToken) where T : Resource =>
@@ -352,23 +340,6 @@ public sealed class SqliteControlPlaneStore(
 
     private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
 
-    private static async Task EnsureNamespaceSchemaAsync(ControlPlaneDbContext context, CancellationToken cancellationToken)
-    {
-        var connection = context.Database.GetDbConnection();
-        await connection.OpenAsync(cancellationToken);
-        var hasNamespace = false;
-        await using (var command = connection.CreateCommand())
-        {
-            command.CommandText = "PRAGMA table_info('ControlPlaneResources');";
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-                hasNamespace |= string.Equals(reader.GetString(1), "Namespace", StringComparison.OrdinalIgnoreCase);
-        }
-        if (!hasNamespace)
-            await context.Database.ExecuteSqlRawAsync("ALTER TABLE ControlPlaneResources ADD COLUMN Namespace TEXT NOT NULL DEFAULT 'default';", cancellationToken);
-        await context.Database.ExecuteSqlRawAsync("DROP INDEX IF EXISTS IX_ControlPlaneResources_WorkspaceId_Kind_Name;", cancellationToken);
-        await context.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_ControlPlaneResources_WorkspaceId_Namespace_Kind_Name ON ControlPlaneResources (WorkspaceId, Namespace, Kind, Name);", cancellationToken);
-    }
 }
 
 public static class SqliteControlPlaneServiceCollectionExtensions
@@ -380,7 +351,6 @@ public static class SqliteControlPlaneServiceCollectionExtensions
         services.AddDbContextFactory<ControlPlaneDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IControlPlaneStore, SqliteControlPlaneStore>();
         services.AddSingleton<IAgentResourceQueries>(provider => (SqliteControlPlaneStore)provider.GetRequiredService<IControlPlaneStore>());
-        services.AddSingleton<IResourceScopeMigrator>(provider => (SqliteControlPlaneStore)provider.GetRequiredService<IControlPlaneStore>());
         services.AddSingleton<SqliteIdentityStore>();
         services.AddSingleton<IIdentityStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());
         services.AddSingleton<ISecurityAuditStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());

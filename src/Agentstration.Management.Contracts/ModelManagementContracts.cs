@@ -17,7 +17,8 @@ public sealed record ModelProviderPropertiesResponse(
 public sealed record ModelProviderResponse(
     string Id,
     string Name,
-    ModelProviderPropertiesResponse Properties);
+    ModelProviderPropertiesResponse Properties,
+    string Namespace = "default");
 
 public sealed record AvailableModelResponse(
     string Name,
@@ -29,14 +30,16 @@ public sealed record AvailableModelResponse(
 public sealed record ModelProviderStatusResponse(string Provider, string Status, DateTimeOffset CheckedAt, string? Details);
 public sealed record CreateModelProviderRequest(
     string Name,
-    ModelProviderProperties Properties);
+    ModelProviderProperties Properties,
+    string Namespace = "default");
 public sealed record PutModelProviderRequest(ModelProviderProperties Properties);
 public sealed record ModelProviderUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
 public sealed record ModelProviderUsagesResponse(IReadOnlyList<ModelProviderUsageResponse> Value, int Count);
 
 public sealed record CreateModelProfileRequest(
     string Name,
-    ModelProfileProperties Properties);
+    ModelProfileProperties Properties,
+    string Namespace = "default");
 
 public sealed record PutModelProfileRequest(ModelProfileProperties Properties);
 
@@ -90,13 +93,15 @@ public sealed record AgentModelResponse(
 
 public sealed record CreateRuntimeProfileRequest(
     string Name,
-    RuntimeProfileProperties Properties);
+    RuntimeProfileProperties Properties,
+    string Namespace = "default");
 public sealed record PutRuntimeProfileRequest(RuntimeProfileProperties Properties);
 public sealed record RuntimeProfileSummaryResponse(
     string Id,
     string Name,
     RuntimeProfileProperties Properties,
-    int UsageCount);
+    int UsageCount,
+    string Namespace = "default");
 public sealed record RuntimeProfileUsageResponse(
     string ResourceId,
     string Name,

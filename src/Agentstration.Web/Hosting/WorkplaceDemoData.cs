@@ -19,10 +19,10 @@ public static class WorkplaceDemoData
         var workspaceId = new WorkspaceId(canonicalWorkspace.Id);
         var flows = services.GetRequiredService<FlowService>();
         var flowId = new FlowId("universal-router");
-        var flow = await flows.GetAsync(flowId, cancellationToken);
+        var flow = await flows.GetAsync(workspaceId, flowId, cancellationToken);
         if (flow is null)
         {
-            flow = await flows.CreateAsync(new CreateFlowCommand(
+            flow = await flows.CreateAsync(workspaceId, new CreateFlowCommand(
                 flowId.Value,
                 "Routes the Workplace primary Entry through the local managed-agent runtime.",
                 "1.0.0",
@@ -30,11 +30,11 @@ public static class WorkplaceDemoData
                 new DirectFlowDefinition(new FlowTargetReference(
                     FlowTargetKind.Agent,
                     "dotnet-expert"))), cancellationToken);
-            await flows.PublishVersionAsync(flowId, "1.0.0", true, cancellationToken);
+            await flows.PublishVersionAsync(workspaceId, flowId, "1.0.0", true, cancellationToken);
         }
         else if (flow.Value.ActiveVersion is null)
         {
-            await flows.PublishVersionAsync(flowId, flow.Value.Version, true, cancellationToken);
+            await flows.PublishVersionAsync(workspaceId, flowId, flow.Value.Version, true, cancellationToken);
         }
 
         var workplace = services.GetRequiredService<WorkplaceService>();

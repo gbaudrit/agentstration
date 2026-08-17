@@ -23,25 +23,24 @@ namespace Agentstration.Runtime.Tests;
 public sealed class RuntimeRunTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly RuntimeRunScope TestScope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
     [TestMethod]
     public async Task CreatePreservesPayloadAndRequiresExactAgentVersion()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var input = Input("Optimize this query.", "{\"engine\":\"sqlserver\"}");
 
-        var created = await fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 3), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Console, "operator", TestScope, default);
+        var created = await fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference(fixture.AgentId, 3), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Console, "operator", default);
 
         Assert.AreEqual(RuntimeRunState.Pending, created.Value.Status.State);
         Assert.AreEqual(3L, created.Value.Properties.Agent.Version);
         Assert.AreEqual("Optimize this query.", created.Value.Properties.Input.Messages[0].Content);
         Assert.AreEqual(RuntimeRunOrigin.Console, created.Value.Properties.Origin);
         Assert.AreEqual(TestScope, created.Value.Properties.Scope);
-        var missingVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 2), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", TestScope, default));
+        var missingVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference(fixture.AgentId, 2), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
         Assert.AreEqual("agent_version_not_found", missingVersion.Code);
-        var invalidReference = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference("", 1), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", TestScope, default));
+        var invalidReference = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference("", 1), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
         Assert.AreEqual("agent_reference_invalid", invalidReference.Code);
-        var invalidVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 0), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", TestScope, default));
+        var invalidVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference(fixture.AgentId, 0), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
         Assert.AreEqual("agent_version_invalid", invalidVersion.Code);
     }
 
@@ -51,9 +50,9 @@ public sealed class RuntimeRunTests
         await using var fixture = await RuntimeFixture.CreateAsync();
         var created = await fixture.CreateRunAsync();
 
-        await fixture.Service.ExecuteAsync(created.Value.Id, default);
-        var completed = await fixture.Service.GetAsync(created.Value.Id, default);
-        var events = await fixture.Store.ListEventsAsync(created.Value.Id, 0, default);
+        await fixture.Service.ExecuteAsync(new(TestScope, created.Value.Id), default);
+        var completed = await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default);
+        var events = await fixture.Store.ListEventsAsync(TestScope.WorkspaceId, created.Value.Id, 0, default);
 
         Assert.IsNotNull(completed);
         Assert.AreEqual(RuntimeRunState.Succeeded, completed.Value.Status.State);
@@ -66,31 +65,17 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
-    public async Task RuntimeRunScopeIsImmutableAndLegacyRunsFailClosed()
+    public async Task RuntimeRunScopeIsImmutable()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var created = await fixture.CreateRunAsync();
-        var changedScope = TestScope with { WorkspaceId = Guid.NewGuid() };
+        var changedScope = TestScope with { WorkspaceId = new(Guid.NewGuid()) };
 
         var mutation = await Assert.ThrowsAsync<RuntimeRunConcurrencyException>(() => fixture.Store.UpdateAsync(
-            created.Value with { Properties = created.Value.Properties with { Scope = changedScope } },
+            created.Value with { Scope = changedScope, Properties = created.Value.Properties with { Scope = changedScope } },
             created.ETag,
             default));
         StringAssert.Contains(mutation.Message, "scope is immutable");
-
-        var legacy = created.Value with
-        {
-            Id = $"run-{Guid.NewGuid():N}",
-            Name = $"run-{Guid.NewGuid():N}",
-            Properties = created.Value.Properties with { Scope = null },
-            ETag = null
-        };
-        var storedLegacy = await fixture.Store.CreateAsync(legacy, default);
-        await fixture.Service.ExecuteAsync(storedLegacy.Value.Id, default);
-        var failed = await fixture.Service.GetAsync(storedLegacy.Value.Id, default);
-
-        Assert.AreEqual(RuntimeRunState.Failed, failed!.Value.Status.State);
-        StringAssert.Contains(failed.Value.Status.Error, "durable execution scope");
     }
 
     [TestMethod]
@@ -107,7 +92,7 @@ public sealed class RuntimeRunTests
         await using var fixture = await RuntimeFixture.CreateAsync();
         var created = await fixture.CreateRunAsync();
 
-        await fixture.Service.ExecuteAsync(created.Value.Id, default);
+        await fixture.Service.ExecuteAsync(new(TestScope, created.Value.Id), default);
 
         Assert.HasCount(1, stopped);
         var activity = stopped.Single();
@@ -128,11 +113,11 @@ public sealed class RuntimeRunTests
                 ["maxOutputTokens"] = JsonSerializer.SerializeToElement(750)
             }
         };
-        var created = await fixture.Service.CreateAsync(new RuntimeAgentReference(fixture.AgentId, 3), Input("test prompt"), options, RuntimeRunOrigin.Console, "operator", TestScope, default);
+        var created = await fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference(fixture.AgentId, 3), Input("test prompt"), options, RuntimeRunOrigin.Console, "operator", default);
 
         var readiness = await fixture.Service.GetReadinessAsync(fixture.AgentId, 3, default);
-        await fixture.Service.ExecuteAsync(created.Value.Id, default);
-        var completed = await fixture.Service.GetAsync(created.Value.Id, default);
+        await fixture.Service.ExecuteAsync(new(TestScope, created.Value.Id), default);
+        var completed = await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default);
 
         Assert.IsTrue(readiness.Ready);
         Assert.AreEqual(0.6f, fixture.Registry.LastRequest?.Options?.Temperature);
@@ -150,8 +135,8 @@ public sealed class RuntimeRunTests
             Parameters = new Dictionary<string, JsonElement> { ["model"] = JsonSerializer.SerializeToElement("other-model") }
         };
 
-        var exception = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(
-            new RuntimeAgentReference(fixture.AgentId, 3), Input("test prompt"), options, RuntimeRunOrigin.Console, "operator", TestScope, default));
+        var exception = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(TestScope,
+            new RuntimeAgentReference(fixture.AgentId, 3), Input("test prompt"), options, RuntimeRunOrigin.Console, "operator", default));
 
         Assert.AreEqual("runtime_parameter_unsupported", exception.Code);
     }
@@ -162,17 +147,17 @@ public sealed class RuntimeRunTests
         await using var fixture = await RuntimeFixture.CreateAsync();
         fixture.Registry.Behavior = RuntimeBehavior.Fail;
         var failed = await fixture.CreateRunAsync();
-        await fixture.Service.ExecuteAsync(failed.Value.Id, default);
-        Assert.AreEqual(RuntimeRunState.Failed, (await fixture.Service.GetAsync(failed.Value.Id, default))!.Value.Status.State);
+        await fixture.Service.ExecuteAsync(new(TestScope, failed.Value.Id), default);
+        Assert.AreEqual(RuntimeRunState.Failed, (await fixture.Service.GetAsync(TestScope.WorkspaceId, failed.Value.Id, default))!.Value.Status.State);
 
         fixture.Registry.Behavior = RuntimeBehavior.Block;
         var running = await fixture.CreateRunAsync();
-        var execution = fixture.Service.ExecuteAsync(running.Value.Id, default);
+        var execution = fixture.Service.ExecuteAsync(new(TestScope, running.Value.Id), default);
         await fixture.Registry.ExecutionStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await fixture.Service.CancelAsync(running.Value.Id, default);
+        await fixture.Service.CancelAsync(TestScope.WorkspaceId, running.Value.Id, default);
         await execution;
 
-        Assert.AreEqual(RuntimeRunState.Cancelled, (await fixture.Service.GetAsync(running.Value.Id, default))!.Value.Status.State);
+        Assert.AreEqual(RuntimeRunState.Cancelled, (await fixture.Service.GetAsync(TestScope.WorkspaceId, running.Value.Id, default))!.Value.Status.State);
     }
 
     [TestMethod]
@@ -180,18 +165,17 @@ public sealed class RuntimeRunTests
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         fixture.Registry.Behavior = RuntimeBehavior.Block;
-        var run = await fixture.Service.CreateAsync(
+        var run = await fixture.Service.CreateAsync(TestScope,
             new RuntimeAgentReference(fixture.AgentId, 3),
             Input("timeout"),
             new RuntimeExecutionOptions { TimeoutSeconds = 1 },
             RuntimeRunOrigin.Api,
             "test",
-            TestScope,
             default);
 
-        await fixture.Service.ExecuteAsync(run.Value.Id, default);
+        await fixture.Service.ExecuteAsync(new(TestScope, run.Value.Id), default);
 
-        Assert.AreEqual(RuntimeRunState.TimedOut, (await fixture.Service.GetAsync(run.Value.Id, default))!.Value.Status.State);
+        Assert.AreEqual(RuntimeRunState.TimedOut, (await fixture.Service.GetAsync(TestScope.WorkspaceId, run.Value.Id, default))!.Value.Status.State);
     }
 
     [TestMethod]
@@ -199,6 +183,8 @@ public sealed class RuntimeRunTests
     {
         var run = new RuntimeRun
         {
+            WorkspaceId = TestScope.WorkspaceId,
+            Scope = TestScope,
             Id = "concurrent-terminal",
             Name = "concurrent-terminal",
             Properties = new RuntimeRunProperties
@@ -212,7 +198,7 @@ public sealed class RuntimeRunTests
         var store = new ConcurrentTerminalRunStore(run);
         var manager = new RuntimeRunStateManager(store, TimeProvider.System);
 
-        await manager.CompleteFailureAsync(run.Id, RuntimeRunState.TimedOut, "Run timed out.", default);
+        await manager.CompleteFailureAsync(run.WorkspaceId, run.Id, RuntimeRunState.TimedOut, "Run timed out.", default);
 
         Assert.AreEqual(RuntimeRunState.Cancelled, store.Current.Value.Status.State);
         Assert.AreEqual(1, store.UpdateAttempts);
@@ -239,10 +225,12 @@ public sealed class RuntimeRunTests
 
         await fixture.Service.InitializeAsync(default);
 
-        CollectionAssert.AreEquivalent(new[] { pending.Value.Id, running.Value.Id }, fixture.Queue.Enqueued.ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { new RuntimeRunQueueItem(TestScope, pending.Value.Id), new RuntimeRunQueueItem(TestScope, running.Value.Id) },
+            fixture.Queue.Enqueued.ToArray());
 
-        await fixture.Service.ExecuteAsync(running.Value.Id, default);
-        var recovered = await fixture.Service.GetAsync(running.Value.Id, default);
+        await fixture.Service.ExecuteAsync(new(TestScope, running.Value.Id), default);
+        var recovered = await fixture.Service.GetAsync(TestScope.WorkspaceId, running.Value.Id, default);
         Assert.AreEqual(RuntimeRunState.Succeeded, recovered!.Value.Status.State);
         Assert.AreEqual(startedAt, recovered.Value.Status.StartedAt);
 
@@ -255,11 +243,11 @@ public sealed class RuntimeRunTests
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var original = await fixture.CreateRunAsync();
-        await fixture.Service.ExecuteAsync(original.Value.Id, default);
+        await fixture.Service.ExecuteAsync(new(TestScope, original.Value.Id), default);
 
-        var retry = await fixture.Service.RetryAsync(original.Value.Id, default);
+        var retry = await fixture.Service.RetryAsync(TestScope, original.Value.Id, default);
         var observed = new List<RuntimeRunEvent>();
-        await foreach (var runEvent in fixture.Service.ObserveAsync(original.Value.Id, 0, default)) observed.Add(runEvent);
+        await foreach (var runEvent in fixture.Service.ObserveAsync(TestScope.WorkspaceId, original.Value.Id, 0, default)) observed.Add(runEvent);
 
         Assert.AreNotEqual(original.Value.Id, retry.Value.Id);
         CollectionAssert.AreEqual(original.Value.Properties.Input.Messages.ToArray(), retry.Value.Properties.Input.Messages.ToArray());
@@ -268,69 +256,14 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
-    public async Task InitializationMigratesLegacyRuntimeRunSchemaWithoutLosingRows()
+    public async Task FreshRuntimeSchemaAllowsTheSameRunIdInDifferentWorkspaces()
     {
-        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-migration-{Guid.NewGuid():N}");
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-scope-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
         var databasePath = Path.Combine(directory, "runtime.db");
         try
         {
             var timestamp = new DateTimeOffset(2026, 8, 12, 10, 0, 0, TimeSpan.Zero);
-            var legacyRun = new RuntimeRun
-            {
-                Id = "existing",
-                Name = "existing",
-                Properties = new RuntimeRunProperties
-                {
-                    Agent = new RuntimeAgentReference("sql-expert", 1),
-                    Input = new RuntimeRunInput { Messages = [new(RuntimeMessageRole.User, "legacy")] },
-                    Execution = new RuntimeExecutionOptions()
-                },
-                Status = new RuntimeRunStatus { State = RuntimeRunState.Pending, CreatedAt = timestamp }
-            };
-            var legacyEvent = new RuntimeRunEvent
-            {
-                Sequence = 1,
-                EventId = Guid.NewGuid(),
-                RunId = legacyRun.Id,
-                Kind = RuntimeRunEventKind.RunCreated,
-                Timestamp = timestamp,
-                State = RuntimeRunState.Pending
-            };
-            await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
-            {
-                await connection.OpenAsync();
-                await using var command = connection.CreateCommand();
-                var legacyColumn = "Resource" + "Group";
-                command.CommandText =
-                    $$"""
-                    CREATE TABLE RuntimeRuns (
-                        RunId TEXT NOT NULL PRIMARY KEY,
-                        AgentResourceId TEXT NOT NULL,
-                        {{legacyColumn}} TEXT NOT NULL,
-                        State TEXT NOT NULL,
-                        Payload TEXT NOT NULL,
-                        ETag TEXT NOT NULL,
-                        CreatedAt INTEGER NOT NULL,
-                        UpdatedAt INTEGER NOT NULL
-                    );
-                    CREATE TABLE RuntimeRunEvents (
-                        RunId TEXT NOT NULL,
-                        Sequence INTEGER NOT NULL,
-                        Payload TEXT NOT NULL,
-                        Timestamp TEXT NOT NULL,
-                        PRIMARY KEY (RunId, Sequence)
-                    );
-                    INSERT INTO RuntimeRuns VALUES ('existing', 'sql-expert', 'default', 'Pending', $runPayload, 'etag', $ticks, $ticks);
-                    INSERT INTO RuntimeRunEvents VALUES ('existing', 1, $eventPayload, $timestamp);
-                    """;
-                command.Parameters.AddWithValue("$runPayload", JsonSerializer.Serialize(legacyRun, JsonOptions));
-                command.Parameters.AddWithValue("$eventPayload", JsonSerializer.Serialize(legacyEvent, JsonOptions));
-                command.Parameters.AddWithValue("$ticks", timestamp.UtcTicks);
-                command.Parameters.AddWithValue("$timestamp", timestamp.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
-                await command.ExecuteNonQueryAsync();
-            }
-
             var services = new ServiceCollection();
             services.AddSingleton(TimeProvider.System);
             services.AddSqliteRuntimeRuns($"Data Source={databasePath}");
@@ -339,27 +272,40 @@ public sealed class RuntimeRunTests
 
             await store.InitializeAsync(default);
             await store.InitializeAsync(default);
+            var otherScope = TestScope with { WorkspaceId = new(Guid.Parse("44444444-4444-4444-4444-444444444444")) };
+            await store.CreateAsync(Run(TestScope, "first"), default);
+            await store.CreateAsync(Run(otherScope, "second"), default);
+            await store.AppendEventAsync(Event(TestScope.WorkspaceId), default);
+            await store.AppendEventAsync(Event(otherScope.WorkspaceId), default);
 
-            var restored = await store.GetAsync("existing", default);
-            Assert.IsNotNull(restored);
-            Assert.AreEqual("legacy", restored.Value.Properties.Input.Messages.Single().Content);
-            var restoredEvents = await store.ListEventsAsync("existing", 0, default);
-            Assert.HasCount(1, restoredEvents);
-            Assert.AreEqual(RuntimeRunEventKind.RunCreated, restoredEvents[0].Kind);
+            Assert.AreEqual("first", (await store.GetAsync(TestScope.WorkspaceId, "shared-run", default))!.Value.Name);
+            Assert.AreEqual("second", (await store.GetAsync(otherScope.WorkspaceId, "shared-run", default))!.Value.Name);
+            Assert.HasCount(1, await store.ListEventsAsync(TestScope.WorkspaceId, "shared-run", 0, default));
+            Assert.HasCount(1, await store.ListEventsAsync(otherScope.WorkspaceId, "shared-run", 0, default));
 
-            await using var verification = new SqliteConnection($"Data Source={databasePath}");
-            await verification.OpenAsync();
-            await using var schema = verification.CreateCommand();
-            schema.CommandText = "PRAGMA table_info('RuntimeRuns');";
-            await using var reader = await schema.ExecuteReaderAsync();
-            var columns = new List<string>();
-            while (await reader.ReadAsync()) columns.Add(reader.GetString(1));
-            Assert.IsFalse(columns.Contains("Resource" + "Group", StringComparer.OrdinalIgnoreCase));
-            await reader.DisposeAsync();
-            schema.CommandText = "SELECT COUNT(*) FROM RuntimeRuns WHERE RunId = 'existing';";
-            Assert.AreEqual(1L, (long)(await schema.ExecuteScalarAsync())!);
-            schema.CommandText = "SELECT COUNT(*) FROM RuntimeRunEvents WHERE RunId = 'existing';";
-            Assert.AreEqual(1L, (long)(await schema.ExecuteScalarAsync())!);
+            RuntimeRun Run(RuntimeRunScope scope, string name) => new()
+            {
+                WorkspaceId = scope.WorkspaceId,
+                Scope = scope,
+                Id = "shared-run",
+                Name = name,
+                Properties = new RuntimeRunProperties
+                {
+                    Agent = new RuntimeAgentReference("sql-expert", 1),
+                    Input = Input(name),
+                    Execution = new RuntimeExecutionOptions()
+                },
+                Status = new RuntimeRunStatus { State = RuntimeRunState.Pending, CreatedAt = timestamp }
+            };
+            RuntimeRunEvent Event(Agentstration.Resources.WorkspaceId workspaceId) => new()
+            {
+                WorkspaceId = workspaceId,
+                EventId = Guid.NewGuid(),
+                RunId = "shared-run",
+                Kind = RuntimeRunEventKind.RunCreated,
+                Timestamp = timestamp,
+                State = RuntimeRunState.Pending
+            };
         }
         finally
         {
@@ -398,7 +344,7 @@ public sealed class RuntimeRunTests
         var created = await createdResponse.Content.ReadFromJsonAsync<RuntimeRun>();
         Assert.IsNotNull(created);
         var current = factory.Services.GetRequiredService<ICurrentRequestContext>().Current;
-        Assert.AreEqual(new RuntimeRunScope(current.TenantId, current.WorkspaceId, current.PrincipalId), created.Properties.Scope);
+        Assert.AreEqual(new RuntimeRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId), created.Properties.Scope);
         Assert.AreEqual(current.PrincipalId.ToString("D"), created.Properties.Initiator);
         Assert.IsNull(typeof(CreateRuntimeRunRequest).GetProperty("Initiator"));
 
@@ -515,7 +461,7 @@ public sealed class RuntimeRunTests
             return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, registry, queue, agentId);
         }
 
-        public Task<StoredRuntimeRun> CreateRunAsync() => Service.CreateAsync(new RuntimeAgentReference(AgentId, 3), Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", TestScope, default);
+        public Task<StoredRuntimeRun> CreateRunAsync() => Service.CreateAsync(TestScope, new RuntimeAgentReference(AgentId, 3), Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", default);
 
         public async ValueTask DisposeAsync()
         {
@@ -598,14 +544,14 @@ public sealed class RuntimeRunTests
 
     private sealed class TestRuntimeRunQueue : IRuntimeRunQueue
     {
-        public List<string> Enqueued { get; } = [];
-        public ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken)
+        public List<RuntimeRunQueueItem> Enqueued { get; } = [];
+        public ValueTask EnqueueAsync(RuntimeRunQueueItem run, CancellationToken cancellationToken)
         {
-            Enqueued.Add(runId);
+            Enqueued.Add(run);
             return ValueTask.CompletedTask;
         }
 
-        public async IAsyncEnumerable<string> ReadAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        public async IAsyncEnumerable<RuntimeRunQueueItem> ReadAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
         {
             await Task.CompletedTask;
             yield break;
@@ -620,8 +566,9 @@ public sealed class RuntimeRunTests
 
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<StoredRuntimeRun> CreateAsync(RuntimeRun value, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<StoredRuntimeRun?> GetAsync(string runId, CancellationToken cancellationToken) => Task.FromResult<StoredRuntimeRun?>(Current);
-        public Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(string? agentResourceId, int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<StoredRuntimeRun?> GetAsync(Agentstration.Resources.WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) => Task.FromResult<StoredRuntimeRun?>(Current);
+        public Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(Agentstration.Resources.WorkspaceId workspaceId, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<RuntimeRunKey>> ListRecoverableAsync(int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<StoredRuntimeRun> UpdateAsync(RuntimeRun value, string expectedETag, CancellationToken cancellationToken)
         {
             UpdateAttempts++;
@@ -638,7 +585,12 @@ public sealed class RuntimeRunTests
             return Task.FromResult(runEvent);
         }
 
-        public Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(Agentstration.Resources.WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<RuntimeRunEvent>>(Events);
     }
+
+    private static RuntimeRunScope TestScope { get; } = new(
+        Guid.Parse("11111111-1111-1111-1111-111111111111"),
+        new(Guid.Parse("22222222-2222-2222-2222-222222222222")),
+        Guid.Parse("33333333-3333-3333-3333-333333333333"));
 }

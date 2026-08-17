@@ -66,7 +66,6 @@ public sealed class ExternalIdentityPrincipalResolver(IIdentityStore store) : IP
 
 public sealed class InitialPrincipalProvisioner(
     IIdentityStore store,
-    IResourceScopeMigrator resourceMigrator,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
     LocalBootstrapOptions options) : IInitialPrincipalProvisioner
@@ -102,7 +101,6 @@ public sealed class InitialPrincipalProvisioner(
             ?? throw new InvalidOperationException("The Owner role could not be initialized.");
         await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), tenant.Id, principal.Id, PrincipalType.User, owner.Id, AuthorizationScopes.Workspace(workspace.Id)), cancellationToken);
         await store.AddPlatformAdministratorAsync(new PlatformAdministrator(principal.Id, now), cancellationToken);
-        await resourceMigrator.BackfillUnscopedResourcesAsync(tenant.Id, workspace.Id, cancellationToken);
         await audit.WriteAsync(new(
             SecurityAuditActions.PlatformAdministratorGranted,
             ActorPrincipalId: principal.Id,
@@ -314,7 +312,6 @@ public sealed class PlatformAuthorizationService(IIdentityStore store) : IPlatfo
 public sealed class LocalEnvironmentBootstrapper(
     IIdentityStore store,
     IRequestContextInitializer contextInitializer,
-    IResourceScopeMigrator resourceMigrator,
     TimeProvider timeProvider,
     LocalBootstrapOptions options) : ILocalEnvironmentBootstrapper
 {
@@ -364,7 +361,6 @@ public sealed class LocalEnvironmentBootstrapper(
             await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), tenant.Id, principal.Id, PrincipalType.User, owner.Id, tenantScope), cancellationToken);
 
         contextInitializer.Initialize(new RequestContext(principal.Id, tenant.Id, workspace.Id));
-        await resourceMigrator.BackfillUnscopedResourcesAsync(tenant.Id, workspace.Id, cancellationToken);
     }
 }
 
