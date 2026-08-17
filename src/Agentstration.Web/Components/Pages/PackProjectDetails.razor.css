@@ -9,6 +9,9 @@
 .studio-origin { display: grid; grid-template-columns: 110px 1fr; gap: 8px 14px; margin-top: 22px; }
 .studio-origin dt { color: var(--muted); }
 .studio-origin dd { margin: 0; overflow-wrap: anywhere; }
+.studio-source-resources { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.studio-source-resources span { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.studio-source-resources small { color: var(--muted); }
 .studio-install { align-self: start; display: grid; gap: 16px; }
 .studio-checkbox { display: flex; align-items: flex-start; gap: 8px; font-size: .82rem; }
 .studio-checkbox input { margin-top: 2px; }

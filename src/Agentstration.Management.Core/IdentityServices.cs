@@ -17,17 +17,29 @@ public sealed class LocalBootstrapOptions
 
 public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestContextInitializer, IRequestContextScopeFactory
 {
-    private readonly AsyncLocal<RequestContext?> ambient = new();
+    private readonly AsyncLocal<AmbientRequestContext?> ambient = new();
     private RequestContext? fallback;
-    public bool IsInitialized => ambient.Value is not null || fallback is not null;
-    public RequestContext Current => ambient.Value ?? fallback ?? throw new InvalidOperationException("The request context has not been initialized.");
+    public bool IsInitialized => AccessMode == ControlPlaneAccessMode.Workspace;
+    public ControlPlaneAccessMode AccessMode => ambient.Value?.AccessMode
+        ?? (fallback is null ? ControlPlaneAccessMode.Unavailable : ControlPlaneAccessMode.Workspace);
+    public RequestContext Current => ambient.Value switch
+    {
+        { AccessMode: ControlPlaneAccessMode.Workspace, Context: not null } value => value.Context,
+        { AccessMode: ControlPlaneAccessMode.System } => throw new InvalidOperationException("System operations do not have a workspace request context."),
+        _ => fallback ?? throw new InvalidOperationException("The request context has not been initialized.")
+    };
     public void Initialize(RequestContext context) => fallback = context;
-    public IDisposable Push(RequestContext context)
+    public IDisposable Push(RequestContext context) => Push(new AmbientRequestContext(ControlPlaneAccessMode.Workspace, context));
+    public IDisposable PushSystem() => Push(new AmbientRequestContext(ControlPlaneAccessMode.System, null));
+
+    private IDisposable Push(AmbientRequestContext context)
     {
         var previous = ambient.Value;
         ambient.Value = context;
         return new Scope(() => ambient.Value = previous);
     }
+
+    private sealed record AmbientRequestContext(ControlPlaneAccessMode AccessMode, RequestContext? Context);
 
     private sealed class Scope(Action dispose) : IDisposable
     {

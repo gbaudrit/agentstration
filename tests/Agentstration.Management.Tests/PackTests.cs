@@ -23,6 +23,71 @@ namespace Agentstration.Management.Tests;
 public sealed class PackTests
 {
     [TestMethod]
+    public async Task ComposerCreatesProjectFromWorkspaceCatalog()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+
+        var catalog = await client.GetFromJsonAsync<PackCompositionCatalogItem[]>("/api/pack-projects/composer/resources")
+            ?? throw new AssertFailedException("The Pack Composer catalog response was empty.");
+        var agent = catalog.Single(item => item.Resource.Kind == ResourceKinds.Agent && item.Resource.Name == "dotnet-expert");
+        var modelProfile = catalog.Single(item => item.Resource.Kind == ResourceKinds.ModelProfile && item.Resource.Name == "reasoning-default");
+        var modelProvider = catalog.Single(item => item.Resource.Kind == ResourceKinds.ModelProvider && item.Resource.Name == "ollama-local");
+        var runtimeProfile = catalog.Single(item => item.Resource.Kind == ResourceKinds.RuntimeProfile && item.Resource.Name == "maf-default");
+        Assert.AreEqual(PackCompositionAvailability.Selectable, agent.Availability);
+        Assert.AreEqual(PackCompositionAvailability.Selectable, modelProfile.Availability);
+        Assert.AreEqual(PackCompositionAvailability.Selectable, modelProvider.Availability);
+        Assert.AreEqual(PackCompositionAvailability.Selectable, runtimeProfile.Availability);
+
+        var previewResponse = await client.PostAsJsonAsync(
+            "/api/pack-projects/composer/preview",
+            new PreviewPackCompositionCommand([agent.Resource]));
+        previewResponse.EnsureSuccessStatusCode();
+        var preview = await previewResponse.Content.ReadFromJsonAsync<PackCompositionPreview>();
+        Assert.IsNotNull(preview);
+        Assert.IsTrue(preview.CanCreate);
+        Assert.AreEqual("dotnet-expert", preview.Resources.Single().Resource.Name);
+        Assert.AreEqual(PackBindingTargetKind.ModelProfile, preview.Bindings.Single().TargetKind);
+
+        previewResponse = await client.PostAsJsonAsync(
+            "/api/pack-projects/composer/preview",
+            new PreviewPackCompositionCommand([agent.Resource, modelProfile.Resource]));
+        previewResponse.EnsureSuccessStatusCode();
+        preview = await previewResponse.Content.ReadFromJsonAsync<PackCompositionPreview>();
+        Assert.IsNotNull(preview);
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceKinds.Agent, ResourceKinds.ModelProfile },
+            preview.Resources.Select(resource => resource.Resource.Kind).ToArray());
+        Assert.AreEqual(PackBindingTargetKind.ModelProvider, preview.Bindings.Single().TargetKind);
+
+        previewResponse = await client.PostAsJsonAsync(
+            "/api/pack-projects/composer/preview",
+            new PreviewPackCompositionCommand([agent.Resource, modelProfile.Resource, modelProvider.Resource, runtimeProfile.Resource]));
+        previewResponse.EnsureSuccessStatusCode();
+        preview = await previewResponse.Content.ReadFromJsonAsync<PackCompositionPreview>();
+        Assert.IsNotNull(preview);
+        Assert.HasCount(4, preview.Resources);
+        Assert.IsEmpty(preview.Bindings);
+
+        var createResponse = await client.PostAsJsonAsync("/api/pack-projects", new CreatePackProjectFromWorkspaceCommand
+        {
+            Publisher = "local",
+            Name = $"dotnet-pack-{Guid.NewGuid():N}",
+            Version = "0.1.0",
+            DisplayName = "Pack .NET",
+            Resources = [agent.Resource, modelProfile.Resource, modelProvider.Resource, runtimeProfile.Resource]
+        });
+        Assert.AreEqual(HttpStatusCode.Created, createResponse.StatusCode);
+        var project = await createResponse.Content.ReadFromJsonAsync<PackProjectResource>();
+        Assert.IsNotNull(project);
+        Assert.AreEqual(PackProjectSourceKind.WorkspaceSnapshot, project.Definition.SourceKind);
+        Assert.HasCount(4, project.Definition.SourceResources);
+        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ResourceKinds.ModelProfile && resource.Name == "reasoning-default"));
+        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ResourceKinds.ModelProvider && resource.Name == "ollama-local"));
+        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ResourceKinds.RuntimeProfile && resource.Name == "maf-default"));
+    }
+
+    [TestMethod]
     public async Task ArchiveReaderRejectsParentTraversal()
     {
         await using var archive = CreateZip(new Dictionary<string, string>
@@ -398,6 +463,7 @@ public sealed class PackTests
         Assert.AreEqual(HttpStatusCode.Created, forkResponse.StatusCode, await forkResponse.Content.ReadAsStringAsync());
         var project = await forkResponse.Content.ReadFromJsonAsync<PackProjectResource>();
         Assert.IsNotNull(project);
+        Assert.IsNotNull(project.Definition.Origin);
         Assert.AreEqual("agentstration", project.Definition.Origin.Publisher);
         Assert.AreEqual(PackAudience.Personal, project.Definition.Audience);
         Assert.AreEqual(PackPurpose.Sample, project.Definition.Purpose);

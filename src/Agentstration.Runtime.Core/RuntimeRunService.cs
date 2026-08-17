@@ -71,7 +71,8 @@ public sealed class RuntimeRunService(
                 Input = input,
                 Execution = execution,
                 Origin = origin,
-                Initiator = initiator
+                Initiator = initiator,
+                Scope = scope
             },
             Status = new RuntimeRunStatus
             {

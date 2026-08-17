@@ -17,6 +17,9 @@ internal sealed class PackEndpoints : IManagementEndpoint
         group.MapPost("/packs/{publisher}/{name}/source", AttachSourceAsync);
         group.MapPost("/packs/{publisher}/{name}/fork", ForkAsync);
         group.MapDelete("/packs/{publisher}/{name}", UninstallAsync);
+        group.MapGet("/pack-projects/composer/resources", ListCompositionResourcesAsync);
+        group.MapPost("/pack-projects/composer/preview", PreviewCompositionAsync);
+        group.MapPost("/pack-projects", CreateProjectFromWorkspaceAsync);
         group.MapGet("/pack-projects", ListProjectsAsync);
         group.MapGet("/pack-projects/{projectId:guid}", GetProjectAsync);
         group.MapPut("/pack-projects/{projectId:guid}", UpdateProjectAsync);
@@ -159,6 +162,21 @@ internal sealed class PackEndpoints : IManagementEndpoint
 
     private static Task<IResult> ListProjectsAsync(PackAuthoringService service, CancellationToken token) =>
         ManagementHttp.ExecuteAsync(async () => Results.Ok((await service.ListProjectsAsync(token)).Select(value => value.Value)));
+
+    private static Task<IResult> ListCompositionResourcesAsync(PackCompositionService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.ListResourcesAsync(token)));
+
+    private static Task<IResult> PreviewCompositionAsync(PreviewPackCompositionCommand command, PackCompositionService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.PreviewAsync(command, token)));
+
+    private static Task<IResult> CreateProjectFromWorkspaceAsync(CreatePackProjectFromWorkspaceCommand command, HttpResponse response, PackCompositionService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var project = await service.CreateProjectAsync(command, token);
+            response.Headers.ETag = project.ETag;
+            response.Headers.Location = $"/api/pack-projects/{project.Value.Uid:D}";
+            return Results.Created(response.Headers.Location, project.Value);
+        });
 
     private static Task<IResult> GetProjectAsync(Guid projectId, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
         ManagementHttp.ExecuteAsync(async () =>

@@ -54,10 +54,27 @@ else
                 <label>Tags<input @bind="tags" @bind:after="MarkDirty" placeholder="local, experimental" /></label>
             </div>
             <dl class="resource-details studio-origin">
-                <dt>Forked from</dt><dd><code>@project.Value.Definition.Origin.Publisher/@project.Value.Definition.Origin.Name</code> · @project.Value.Definition.Origin.Version</dd>
+                @if (project.Value.Definition.Origin is { } origin)
+                {
+                    <dt>Forked from</dt><dd><code>@origin.Publisher/@origin.Name</code> · @origin.Version</dd>
+                }
+                else
+                {
+                    <dt>Source</dt><dd>Workspace resource snapshot</dd>
+                    <dt>Resources</dt><dd>@project.Value.Definition.SourceResources.Count</dd>
+                }
                 <dt>Source hash</dt><dd><code>@ShortHash(project.Value.Definition.SourceArtifact.Sha256)</code></dd>
                 <dt>Revision</dt><dd>@project.Value.Definition.Revision</dd>
             </dl>
+            @if (project.Value.Definition.SourceResources.Count > 0)
+            {
+                <div class="studio-source-resources">
+                    @foreach (var resource in project.Value.Definition.SourceResources)
+                    {
+                        <span><code>@resource.Kind/@resource.Name</code><small>@(resource.ExplicitlySelected ? "Selected" : "Dependency")</small></span>
+                    }
+                </div>
+            }
             @if (message is not null) { <p class="@(hasError ? "error-panel" : "studio-message")" role="status">@message</p> }
         </div>
 
@@ -92,6 +109,13 @@ else
                                         @foreach (var profile in modelProfiles)
                                         {
                                             <option value="@BindingValue(profile.Name, ResourceNamespace.Parse(profile.Namespace))">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option>
+                                        }
+                                    }
+                                    else if (binding.TargetKind == PackBindingTargetKind.ModelProvider)
+                                    {
+                                        @foreach (var provider in modelProviders)
+                                        {
+                                            <option value="@BindingValue(provider.Name, ResourceNamespace.Default)">@provider.Properties.DisplayName — default/@provider.Name</option>
                                         }
                                     }
                                     else
@@ -151,6 +175,7 @@ else
     private PackProjectBuildResource? selectedBuild;
     private PackInstallationPreview? preview;
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
+    private IReadOnlyList<ModelProviderResponse> modelProviders = [];
     private IReadOnlyList<SecretResponse> secrets = [];
     private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
     private AgentstrationApiException? error;
@@ -289,8 +314,12 @@ else
             if (binding.TargetAvailable && binding.Target is not null)
                 bindingSelections[binding.Name] = BindingValue(binding.Target.Name, binding.Target.Namespace ?? ResourceNamespace.Default);
         }
-        modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
-        secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProfile))
+            modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProvider))
+            modelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(cancellation.Token);
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
+            secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
     }
     private string? SelectedBinding(string name) => bindingSelections.GetValueOrDefault(name);
     private void BindingChanged(string name, ChangeEventArgs args) => bindingSelections[name] = args.Value?.ToString() ?? string.Empty;
@@ -301,7 +330,7 @@ else
         if (parts.Length != 2) throw new InvalidOperationException("The selected Pack binding is invalid.");
         return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
     }
-    private static string BindingKindLabel(PackBindingTargetKind kind) => kind == PackBindingTargetKind.Secret ? "Secret" : "Model profile";
+    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model provider", _ => "Model profile" };
     private string PreviewMessage(string buildVersion) => preview?.CanInstall == true
         ? $"Build {buildVersion} is ready for this workspace."
         : preview?.AlreadyInstalled == true

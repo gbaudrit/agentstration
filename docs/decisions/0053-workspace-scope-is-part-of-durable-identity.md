@@ -1,4 +1,4 @@
-# ADR-0050: Workspace scope is part of durable identity
+# ADR-0053: Workspace scope is part of durable identity
 
 ## Status
 

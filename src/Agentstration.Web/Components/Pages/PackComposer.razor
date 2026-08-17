@@ -1,0 +1,320 @@
+@page "/pack-projects/new"
+@implements IDisposable
+@inject IPacksClient Client
+@inject NavigationManager Navigation
+
+<PageTitle>Create Pack Project · Agentstration</PageTitle>
+<PageHeader Title="Create a Pack from workspace resources" Description="Select existing resources, review their dependency closure and create an immutable Pack Project source snapshot.">
+    <Actions>
+        <a class="button-secondary" href="/packs">Cancel</a>
+        <button class="button-primary" disabled="@(!CanCreate || creating)" @onclick="CreateAsync">@(creating ? "Creating…" : "Create Pack Project")</button>
+    </Actions>
+</PageHeader>
+
+@if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else if (loading)
+{
+    <LoadingState Message="Loading workspace resources…" />
+}
+else
+{
+    <section class="composer-summary" aria-label="Pack composition summary">
+        <article><span>Selected</span><strong>@SelectedCount</strong><small>explicit resources</small></article>
+        <article><span>Pack contents</span><strong>@(preview?.Resources.Count.ToString() ?? "—")</strong><small>including dependencies</small></article>
+        <article><span>Bindings</span><strong>@(preview?.Bindings.Count.ToString() ?? "—")</strong><small>environment-specific resources</small></article>
+        <article><span>Validation</span><strong>@ValidationLabel</strong><small>@ValidationDetail</small></article>
+    </section>
+
+    <article class="panel composer-metadata">
+        <div class="panel-header"><div><p class="eyebrow">Pack identity</p><h2>Project metadata</h2></div></div>
+        <div class="composer-fields">
+            <label><span>Publisher</span><input @bind="publisher" autocomplete="off" spellcheck="false" /></label>
+            <label><span>Name</span><input @bind="name" autocomplete="off" spellcheck="false" /></label>
+            <label><span>Version</span><input @bind="version" autocomplete="off" spellcheck="false" /></label>
+            <label><span>Display name</span><input @bind="displayName" /></label>
+            <label><span>Audience</span><select @bind="audience"><option value="@PackAudience.Universal">Universal</option><option value="@PackAudience.Personal">Personal</option><option value="@PackAudience.Professional">Professional</option></select></label>
+            <label><span>Purpose</span><select @bind="purpose"><option value="@PackPurpose.Standard">Standard</option><option value="@PackPurpose.Sample">Sample</option><option value="@PackPurpose.Template">Template</option></select></label>
+            <label><span>Categories</span><input @bind="categories" placeholder="automation, support" /></label>
+            <label><span>Tags</span><input @bind="tags" placeholder="local, experimental" /></label>
+            <label class="wide"><span>Description</span><textarea rows="3" @bind="description"></textarea></label>
+        </div>
+    </article>
+
+    <section class="composer-transfer" aria-label="Pack resource composition">
+        <article class="panel composer-catalog">
+            <div class="panel-header">
+                <div><p class="eyebrow">Workspace inventory</p><h2>Available resources</h2></div>
+                <span>@AvailableResources.Count result(s)</span>
+            </div>
+            <div class="composer-filters">
+                <label><span>Search</span><input type="search" @bind="search" @bind:event="oninput" placeholder="Name or description" /></label>
+                <label><span>Kind</span><select @bind="kindFilter"><option value="">All kinds</option>@foreach (var kind in Kinds) { <option value="@kind">@kind</option> }</select></label>
+                <label><span>Availability</span><select @bind="availabilityFilter"><option value="">All resources</option><option value="selectable">Selectable</option><option value="binding">Binding only</option><option value="unsupported">Not supported</option></select></label>
+            </div>
+            @if (AvailableResources.Count == 0)
+            {
+                <EmptyState Title="No available resources" Message="Change the filters, remove a resource from the Pack, or create a workspace resource first." />
+            }
+            else
+            {
+                <div class="composer-resource-list">
+                    @foreach (var item in AvailableResources)
+                    {
+                        var selectable = item.Availability == PackCompositionAvailability.Selectable;
+                        <div class="composer-resource @(!selectable ? "unavailable" : null)" @key="item.Resource.Address">
+                            <div class="composer-resource-main">
+                                <div class="composer-resource-heading"><span class="composer-kind">@item.Resource.Kind</span><strong>@item.DisplayName</strong></div>
+                                <div class="composer-resource-copy">
+                                    <small><code>@item.Resource.Namespace/@item.Resource.Name</code>@if (!string.IsNullOrWhiteSpace(item.Version)) { <text> · @item.Version</text> }</small>
+                                    @if (!string.IsNullOrWhiteSpace(item.Description)) { <small>@item.Description</small> }
+                                    @if (!string.IsNullOrWhiteSpace(item.AvailabilityReason)) { <small class="composer-reason">@item.AvailabilityReason</small> }
+                                </div>
+                            </div>
+                            <span class="composer-resource-actions">
+                                <StatusBadge Text="@AvailabilityLabel(item)" Status="@AvailabilityTone(item)" />
+                                @if (selectable)
+                                {
+                                    <button class="composer-add" type="button" aria-label="Add @item.DisplayName to Pack" @onclick="() => AddAsync(item)">Add <span aria-hidden="true">→</span></button>
+                                }
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+        </article>
+
+        <article class="panel composer-preview">
+            <div class="panel-header">
+                <div><p class="eyebrow">Pack composition</p><h2>Selected contents</h2></div>
+                <span class="composer-live-status" aria-live="polite">
+                    @if (reviewing) { <span class="composer-spinner" aria-hidden="true"></span><text> Reviewing…</text> }
+                    else if (preview is not null) { <StatusBadge Text="@ValidationLabel" Status="@(preview.CanCreate ? UiStatus.Success : UiStatus.Warning)" /> }
+                </span>
+            </div>
+            @if (SelectedCount == 0)
+            {
+                <div class="composer-empty"><span>→</span><p>Add resources from the workspace inventory. Dependencies and bindings will be reviewed automatically.</p></div>
+            }
+            else
+            {
+                @if (preview is { Issues.Count: > 0 })
+                {
+                    <div class="composer-issues">@foreach (var issue in preview.Issues) { <p class="@(issue.Severity == PackCompositionIssueSeverity.Error ? "error" : "warning")"><strong>@issue.Code</strong> @issue.Message</p> }</div>
+                }
+                @if (ExplicitPackResources.Count > 0)
+                {
+                    <section class="composer-content-group" aria-labelledby="explicit-selection-heading">
+                        <div class="composer-group-header">
+                            <div><h3 id="explicit-selection-heading">Your selection</h3><p>Resources you chose directly.</p></div>
+                            <span>@ExplicitPackResources.Count</span>
+                        </div>
+                        <div class="composer-selection-list">
+                        @foreach (var resource in ExplicitPackResources)
+                        {
+                            var remainsRequired = IsRequiredByOtherSelection(resource);
+                            <div class="composer-selected-resource explicit" @key="resource.Resource.Address">
+                                <div class="composer-resource-main">
+                                    <div class="composer-resource-heading"><span class="composer-kind">@resource.Resource.Kind</span><strong>@resource.DisplayName</strong></div>
+                                    <div class="composer-resource-copy">
+                                        <small>Explicit selection · <code>@resource.Resource.Namespace/@resource.Resource.Name</code></small>
+                                        @if (!string.IsNullOrWhiteSpace(resource.Path)) { <small>@resource.Path</small> }
+                                        @if (remainsRequired) { <small class="composer-inclusion-reason">@InclusionReason(resource)</small> }
+                                    </div>
+                                </div>
+                                <button class="composer-remove" type="button" aria-label="@(remainsRequired ? $"Leave {resource.DisplayName} as a dependency" : $"Remove {resource.DisplayName} from Pack")" @onclick="() => RemoveAsync(resource.Resource.Address)">
+                                    @(remainsRequired ? "Leave as dependency" : "Remove") <span aria-hidden="true">←</span>
+                                </button>
+                            </div>
+                        }
+                        </div>
+                    </section>
+                }
+                @if (AutomaticPackResources.Count > 0)
+                {
+                    <section class="composer-content-group automatic" aria-labelledby="automatic-selection-heading">
+                        <div class="composer-group-header">
+                            <div><h3 id="automatic-selection-heading">Included automatically</h3><p>Required by your direct selections.</p></div>
+                            <span>@AutomaticPackResources.Count</span>
+                        </div>
+                        <div class="composer-selection-list">
+                        @foreach (var resource in AutomaticPackResources)
+                        {
+                            <div class="composer-selected-resource dependency" @key="resource.Resource.Address">
+                                <div class="composer-resource-main">
+                                    <div class="composer-resource-heading"><span class="composer-kind">@resource.Resource.Kind</span><strong>@resource.DisplayName</strong></div>
+                                    <div class="composer-resource-copy">
+                                        <small>Required dependency · <code>@resource.Resource.Namespace/@resource.Resource.Name</code></small>
+                                        @if (!string.IsNullOrWhiteSpace(resource.Path)) { <small>@resource.Path</small> }
+                                        <small class="composer-inclusion-reason">@InclusionReason(resource)</small>
+                                    </div>
+                                </div>
+                                <button class="composer-pin" type="button" aria-label="Keep @resource.DisplayName explicitly in Pack" @onclick="() => PinAsync(resource)">Keep explicitly</button>
+                            </div>
+                        }
+                        </div>
+                    </section>
+                }
+                @if (preview is not null)
+                {
+                    <h3>External bindings</h3>
+                    @if (preview.Bindings.Count == 0) { <p class="muted">No environment-specific resource binding is required.</p> }
+                    else
+                    {
+                        <div class="composer-preview-list bindings">
+                            @foreach (var binding in preview.Bindings)
+                            {
+                                <div><span class="composer-kind">@BindingLabel(binding.TargetKind)</span><span><strong>@binding.Name</strong><small>@binding.WorkspaceResource.Name · used by @string.Join(", ", binding.UsedBy.Select(value => value.Name))</small></span></div>
+                            }
+                        </div>
+                    }
+                }
+            }
+        </article>
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly HashSet<ResourceAddress> selected = [];
+    private CancellationTokenSource? previewCancellation;
+    private IReadOnlyList<PackCompositionCatalogItem> resources = [];
+    private PackCompositionPreview? preview;
+    private AgentstrationApiException? error;
+    private string search = string.Empty;
+    private string kindFilter = string.Empty;
+    private string availabilityFilter = string.Empty;
+    private string publisher = "local";
+    private string name = string.Empty;
+    private string version = "0.1.0";
+    private string displayName = string.Empty;
+    private string? description;
+    private string categories = string.Empty;
+    private string tags = string.Empty;
+    private PackAudience audience = PackAudience.Universal;
+    private PackPurpose purpose = PackPurpose.Standard;
+    private bool loading = true;
+    private bool creating;
+    private bool reviewing;
+
+    private IReadOnlyList<string> Kinds => resources.Select(item => item.Resource.Kind).Distinct(StringComparer.Ordinal).Order().ToArray();
+    private IReadOnlyList<PackCompositionCatalogItem> FilteredResources => resources.Where(item =>
+        (string.IsNullOrWhiteSpace(search) || item.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) || item.Resource.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || (item.Description?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+        && (kindFilter.Length == 0 || item.Resource.Kind == kindFilter)
+        && (availabilityFilter.Length == 0 || availabilityFilter == "selectable" && item.Availability == PackCompositionAvailability.Selectable || availabilityFilter == "binding" && item.Availability == PackCompositionAvailability.BindingOnly || availabilityFilter == "unsupported" && item.Availability == PackCompositionAvailability.Unsupported)).ToArray();
+    private IReadOnlyList<PackCompositionCatalogItem> AvailableResources => FilteredResources.Where(item => !IsIncluded(item.Resource.Address)).ToArray();
+    private IReadOnlyList<PackCompositionPreviewResource> DisplayedPackResources => preview?.Resources ?? resources
+        .Where(IsSelected)
+        .Select(item => new PackCompositionPreviewResource(item.Resource, item.DisplayName, string.Empty, true, []))
+        .ToArray();
+    private IReadOnlyList<PackCompositionPreviewResource> ExplicitPackResources => DisplayedPackResources.Where(item => item.ExplicitlySelected).ToArray();
+    private IReadOnlyList<PackCompositionPreviewResource> AutomaticPackResources => DisplayedPackResources.Where(item => !item.ExplicitlySelected).ToArray();
+    private int SelectedCount => selected.Count;
+    private bool CanCreate => preview?.CanCreate == true && !reviewing && !creating && !string.IsNullOrWhiteSpace(publisher) && !string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(version);
+    private string ValidationLabel => reviewing ? "Reviewing" : preview is null ? "Empty" : preview.CanCreate ? "Ready" : "Blocked";
+    private string ValidationDetail => reviewing ? "Updating dependencies" : preview is null ? "Add a resource" : preview.Issues.Count == 0 ? "No issue" : $"{preview.Issues.Count} issue(s)";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { resources = await Client.GetCompositionResourcesAsync(cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private bool IsSelected(PackCompositionCatalogItem item) => selected.Contains(item.Resource.Address);
+    private bool IsIncluded(ResourceAddress address) => selected.Contains(address) || preview?.Resources.Any(item => item.Resource.Address == address) == true;
+    private async Task AddAsync(PackCompositionCatalogItem item)
+    {
+        if (item.Availability != PackCompositionAvailability.Selectable || !selected.Add(item.Resource.Address)) return;
+        await RefreshPreviewAsync();
+    }
+    private async Task RemoveAsync(ResourceAddress address)
+    {
+        if (!selected.Remove(address)) return;
+        await RefreshPreviewAsync();
+    }
+    private async Task PinAsync(PackCompositionPreviewResource resource)
+    {
+        if (!selected.Add(resource.Resource.Address)) return;
+        await RefreshPreviewAsync();
+    }
+    private async Task RefreshPreviewAsync()
+    {
+        previewCancellation?.Cancel();
+        previewCancellation?.Dispose();
+        previewCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
+        var requestCancellation = previewCancellation;
+        if (SelectedCount == 0) { preview = null; reviewing = false; return; }
+        reviewing = true; error = null;
+        try { preview = await Client.PreviewCompositionAsync(new(Selections()), requestCancellation.Token); }
+        catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested) { }
+        catch (AgentstrationApiException exception) when (!requestCancellation.IsCancellationRequested) { error = exception; }
+        finally { if (ReferenceEquals(previewCancellation, requestCancellation)) reviewing = false; }
+    }
+    private async Task CreateAsync()
+    {
+        if (!CanCreate) return;
+        creating = true; error = null;
+        try
+        {
+            var project = await Client.CreateProjectFromWorkspaceAsync(new()
+            {
+                Publisher = publisher.Trim(), Name = name.Trim(), Version = version.Trim(), DisplayName = Empty(displayName), Description = Empty(description),
+                Audience = audience, Purpose = purpose, Categories = Split(categories), Tags = Split(tags), Resources = Selections()
+            }, cancellation.Token);
+            Navigation.NavigateTo($"/pack-projects/{project.Value.Uid:D}");
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { creating = false; }
+    }
+    private PackCompositionResourceKey[] Selections() => resources.Where(IsSelected).Select(item => item.Resource).ToArray();
+    private bool IsRequiredByOtherSelection(PackCompositionPreviewResource resource) => InclusionPaths(resource).Count > 0;
+    private string InclusionReason(PackCompositionPreviewResource resource)
+    {
+        var paths = InclusionPaths(resource);
+        return paths.Count switch
+        {
+            0 => "Included by the dependency closure.",
+            1 => $"Required by {paths[0]}.",
+            _ => $"Required by {paths[0]} and {paths.Count - 1} other selection(s)."
+        };
+    }
+    private IReadOnlyList<string> InclusionPaths(PackCompositionPreviewResource target)
+    {
+        if (preview is null) return [];
+        var resourcesByAddress = preview.Resources.ToDictionary(item => item.Resource.Address);
+        var paths = new List<string>();
+        foreach (var root in preview.Resources.Where(item => item.ExplicitlySelected && item.Resource.Address != target.Resource.Address))
+        {
+            var path = FindDependencyPath(root, target.Resource.Address, resourcesByAddress, []);
+            if (path is not null) paths.Add(string.Join(" → ", path.Select(ResourceLabel)));
+        }
+        return paths.Distinct(StringComparer.Ordinal).ToArray();
+    }
+    private static IReadOnlyList<PackCompositionPreviewResource>? FindDependencyPath(
+        PackCompositionPreviewResource current,
+        ResourceAddress target,
+        IReadOnlyDictionary<ResourceAddress, PackCompositionPreviewResource> resourcesByAddress,
+        HashSet<ResourceAddress> visited)
+    {
+        if (!visited.Add(current.Resource.Address)) return null;
+        foreach (var dependency in current.Dependencies.Where(item => item.Mode == PackCompositionDependencyMode.Include))
+        {
+            if (dependency.Target.Address == target) return [current];
+            if (!resourcesByAddress.TryGetValue(dependency.Target.Address, out var next)) continue;
+            var nested = FindDependencyPath(next, target, resourcesByAddress, new HashSet<ResourceAddress>(visited));
+            if (nested is not null) return [current, .. nested];
+        }
+        return null;
+    }
+    private static string ResourceLabel(PackCompositionPreviewResource resource) => $"{resource.Resource.Kind} {resource.DisplayName}";
+    private static string AvailabilityLabel(PackCompositionCatalogItem item) => item.Availability switch { PackCompositionAvailability.Selectable => item.Status, PackCompositionAvailability.BindingOnly => "Binding only", _ => "Not supported" };
+    private static UiStatus AvailabilityTone(PackCompositionCatalogItem item) => item.Availability switch { PackCompositionAvailability.Selectable => UiStatus.Success, PackCompositionAvailability.BindingOnly => UiStatus.Info, _ => UiStatus.Neutral };
+    private static string BindingLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model provider", _ => "Model profile" };
+    private static string? Empty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static IReadOnlyList<string> Split(string value) => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    public void Dispose() { previewCancellation?.Cancel(); previewCancellation?.Dispose(); cancellation.Cancel(); cancellation.Dispose(); }
+}

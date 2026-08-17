@@ -15,10 +15,10 @@ public sealed class WorkspaceRuntimeRunExecutionScope(
         if (principal?.Status != PrincipalStatus.Active || workspace?.Status != WorkspaceStatus.Active)
             throw Denied();
 
-        var context = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value);
+        var requestContext = new RequestContext(scope.PrincipalId, scope.TenantId, scope.WorkspaceId.Value);
         try
         {
-            await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken);
+            await authorization.EnsurePermissionAsync(requestContext, AuthorizationPermissions.RunsExecute, cancellationToken);
         }
         catch (AuthorizationDeniedException)
         {

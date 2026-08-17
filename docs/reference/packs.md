@@ -131,6 +131,23 @@ Selections are stored against the stable `publisher/name` Pack identity and surv
 
 A Secret binding stores only the Secret resource namespace and name. Secret values remain in the selected Vault and are never included in the archive, preview, installed Pack, or browser state. Deleting a selected target makes the binding unavailable and blocks a required installation until a replacement is chosen.
 
+## Creating a Pack from workspace resources
+
+The Console exposes **Create from workspace** from the Packs page. The Composer lists the resources visible in the current workspace and distinguishes three states:
+
+- `Agent`, `Flow`, `Entry`, `ModelProfile`, `ModelProvider`, and `RuntimeProfile` resources are selectable;
+- an unselected Model Profile or Model Provider referenced by selected content becomes an installation binding;
+- Secrets are always binding targets and their values are never copied;
+- vaults and tools remain visible but unsupported.
+
+The Composer uses a two-panel workspace: available resources remain on the left and Pack contents move to the right. A resource appears in only one panel. The right panel separates **Your selection** from **Included automatically** and explains the dependency path responsible for every automatic inclusion. Every action recomputes the complete dependency closure; there is no separate review action to forget.
+
+Removing a direct selection drops it from the Pack only when no other selected resource requires it. Otherwise the action is labelled **Leave as dependency**, and the resource moves to the automatic group instead of appearing to disappear and return. **Keep explicitly** promotes an automatic dependency to a direct selection so that it remains when its current parent is later removed. For example, adding an Entry displays its Flow and the Agents used by that Flow with paths such as `Required by Entry X → Flow main`. An Agent's Model Profile remains a binding until that profile is added to the Pack; the included profile's provider follows the same rule. Provider credentials always remain Secret bindings. Runtime Profiles are selected explicitly because they are associated with deployments rather than Agent definitions. Missing or unsupported dependencies block creation and are shown progressively before any artifact is written.
+
+Creating the project takes an immutable snapshot of the reviewed resources, generates a validated source archive, and records both explicitly selected resources and automatically included dependencies. The original workspace resources remain unchanged. Later edits in the workspace do not silently alter that project revision; create another project or refresh the composition explicitly in a future authoring increment.
+
+The first increment accepts resources from the default workspace namespace. A Pack built from the resulting project installs into its normal identity-derived namespace, so the source resources and installed copy do not conflict.
+
 ## V1 lifecycle
 
 ```text
@@ -169,7 +186,13 @@ POST   /api/packs
 GET    /api/packs
 GET    /api/packs/{publisher}/{name}
 DELETE /api/packs/{publisher}/{name}
+
+GET    /api/pack-projects/composer/resources
+POST   /api/pack-projects/composer/preview
+POST   /api/pack-projects
 ```
+
+The Composer catalog endpoint returns the current workspace inventory and each resource's authoring availability. Preview accepts selected resource keys and returns the dependency closure, generated binding requirements, archive paths, and validation issues. Project creation accepts the Pack coordinate, presentation metadata, and the same selection; the server recomputes validation rather than trusting a previous browser preview.
 
 `POST /api/packs/preview` and `POST /api/packs` accept a ZIP body with `Content-Type: application/zip` or `application/octet-stream`. Preview performs the complete archive and resource validation, reports existing-resource conflicts, and makes no changes. `X-Pack-File-Name` records a display-safe local source name. Compressed input is limited to 8 MiB; the reader permits at most 128 files, 4 MiB per expanded file, and 16 MiB total expanded content. Absolute paths, parent traversal, duplicate paths, and symbolic links are rejected.
 

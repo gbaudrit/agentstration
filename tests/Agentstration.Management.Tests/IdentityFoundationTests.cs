@@ -126,6 +126,24 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
+    public void ExplicitSystemScopeIsGlobalAndRestoresTheWorkspaceFallback()
+    {
+        var accessor = new CurrentRequestContext();
+        var fallback = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        accessor.Initialize(fallback);
+
+        using (accessor.PushSystem())
+        {
+            Assert.AreEqual(ControlPlaneAccessMode.System, accessor.AccessMode);
+            Assert.IsFalse(accessor.IsInitialized);
+            Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
+        }
+
+        Assert.AreEqual(ControlPlaneAccessMode.Workspace, accessor.AccessMode);
+        Assert.AreEqual(fallback, accessor.Current);
+    }
+
+    [TestMethod]
     public async Task WorkspaceCreationDoesNotRequireAResourceGroup()
     {
         await using var fixture = await IdentityFixture.CreateAsync();

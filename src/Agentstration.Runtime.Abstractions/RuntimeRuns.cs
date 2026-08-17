@@ -55,6 +55,7 @@ public sealed record RuntimeRunProperties
     public required RuntimeExecutionOptions Execution { get; init; }
     public RuntimeRunOrigin Origin { get; init; } = RuntimeRunOrigin.Api;
     public string Initiator { get; init; } = "local-user";
+    public RuntimeRunScope? Scope { get; init; }
 }
 
 public sealed record RuntimeToolCall
@@ -137,17 +138,17 @@ public interface IRuntimeRunQueue
     IAsyncEnumerable<RuntimeRunQueueItem> ReadAllAsync(CancellationToken cancellationToken);
 }
 
+public interface IRuntimeRunExecutionScope
+{
+    ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken);
+    IDisposable Enter(RuntimeRunScope scope);
+}
+
 public interface IRuntimeRunCancellationRegistry
 {
     CancellationToken Register(RuntimeRunKey key, CancellationToken stoppingToken);
     bool Cancel(RuntimeRunKey key);
     void Complete(RuntimeRunKey key);
-}
-
-public interface IRuntimeRunExecutionScope
-{
-    ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken);
-    IDisposable Enter(RuntimeRunScope scope);
 }
 
 public sealed class RuntimeRunNotFoundException(string runId) : Exception($"Runtime run '{runId}' was not found.");

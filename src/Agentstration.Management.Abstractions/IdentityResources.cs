@@ -139,6 +139,7 @@ public interface IRequestContextInitializer
 public interface IRequestContextScopeFactory
 {
     IDisposable Push(RequestContext context);
+    IDisposable PushSystem();
 }
 
 public interface IPrincipalResolver

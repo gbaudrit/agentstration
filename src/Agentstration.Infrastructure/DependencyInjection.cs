@@ -147,14 +147,17 @@ public static class DependencyInjection
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, FlowPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, EntryPackResourceHandler>();
+        services.AddSingleton<IPackWorkspaceResourceCatalog, WorkspacePackResourceCatalog>();
         services.AddSingleton<PackManagementService>();
         services.AddSingleton<PackAuthoringService>();
+        services.AddSingleton<PackCompositionService>();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
         runtimeConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "runtime-plane.db")}";
         services.AddSqliteRuntimeRuns(runtimeConnectionString);
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
+        services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         workPlaneConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "work-plane.db")}";
         services.AddSqliteWorkPlane(workPlaneConnectionString);
         services.AddSingleton<IArtifactStore>(_ => new FileSystemArtifactStore(Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "artifacts")));

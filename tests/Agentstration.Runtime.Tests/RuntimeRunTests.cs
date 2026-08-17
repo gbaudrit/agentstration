@@ -35,6 +35,7 @@ public sealed class RuntimeRunTests
         Assert.AreEqual(3L, created.Value.Properties.Agent.Version);
         Assert.AreEqual("Optimize this query.", created.Value.Properties.Input.Messages[0].Content);
         Assert.AreEqual(RuntimeRunOrigin.Console, created.Value.Properties.Origin);
+        Assert.AreEqual(TestScope, created.Value.Properties.Scope);
         var missingVersion = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference(fixture.AgentId, 2), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
         Assert.AreEqual("agent_version_not_found", missingVersion.Code);
         var invalidReference = await Assert.ThrowsAsync<RuntimeRunValidationException>(() => fixture.Service.CreateAsync(TestScope, new RuntimeAgentReference("", 1), input, new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "api", default));
@@ -61,6 +62,20 @@ public sealed class RuntimeRunTests
         Assert.IsTrue(events.Any(item => item.Kind == RuntimeRunEventKind.ResponseDelta));
         Assert.IsTrue(events.Any(item => item.Kind == RuntimeRunEventKind.StepCompleted && item.Step == "Model profile resolved"));
         Assert.AreEqual(RuntimeRunEventKind.RunCompleted, events[^1].Kind);
+    }
+
+    [TestMethod]
+    public async Task RuntimeRunScopeIsImmutable()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var created = await fixture.CreateRunAsync();
+        var changedScope = TestScope with { WorkspaceId = new(Guid.NewGuid()) };
+
+        var mutation = await Assert.ThrowsAsync<RuntimeRunConcurrencyException>(() => fixture.Store.UpdateAsync(
+            created.Value with { Scope = changedScope, Properties = created.Value.Properties with { Scope = changedScope } },
+            created.ETag,
+            default));
+        StringAssert.Contains(mutation.Message, "scope is immutable");
     }
 
     [TestMethod]
@@ -328,6 +343,10 @@ public sealed class RuntimeRunTests
         Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);
         var created = await createdResponse.Content.ReadFromJsonAsync<RuntimeRun>();
         Assert.IsNotNull(created);
+        var current = factory.Services.GetRequiredService<ICurrentRequestContext>().Current;
+        Assert.AreEqual(new RuntimeRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId), created.Properties.Scope);
+        Assert.AreEqual(current.PrincipalId.ToString("D"), created.Properties.Initiator);
+        Assert.IsNull(typeof(CreateRuntimeRunRequest).GetProperty("Initiator"));
 
         RuntimeRun? completed = null;
         for (var attempt = 0; attempt < 50; attempt++)
@@ -512,6 +531,17 @@ public sealed class RuntimeRunTests
         };
     }
 
+    private sealed class TestRuntimeRunExecutionScope : IRuntimeRunExecutionScope
+    {
+        public ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public IDisposable Enter(RuntimeRunScope scope) => new EmptyScope();
+
+        private sealed class EmptyScope : IDisposable
+        {
+            public void Dispose() { }
+        }
+    }
+
     private sealed class TestRuntimeRunQueue : IRuntimeRunQueue
     {
         public List<RuntimeRunQueueItem> Enqueued { get; } = [];
@@ -557,13 +587,6 @@ public sealed class RuntimeRunTests
 
         public Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(Agentstration.Resources.WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<RuntimeRunEvent>>(Events);
-    }
-
-    private sealed class TestRuntimeRunExecutionScope : IRuntimeRunExecutionScope
-    {
-        public ValueTask ValidateAsync(RuntimeRunScope scope, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public IDisposable Enter(RuntimeRunScope scope) => new Scope();
-        private sealed class Scope : IDisposable { public void Dispose() { } }
     }
 
     private static RuntimeRunScope TestScope { get; } = new(
