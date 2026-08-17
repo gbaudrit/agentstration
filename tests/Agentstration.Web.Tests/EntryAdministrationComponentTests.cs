@@ -93,7 +93,7 @@ public sealed class EntryAdministrationComponentTests
     }
 
     [TestMethod]
-    public async Task WorkspaceEditorPublishesRequestedPackEntryWithItsNamespace()
+    public async Task DashboardEditorPublishesRequestedPackEntryWithItsNamespace()
     {
         using var context = new BunitContext();
         var client = new FakeEntryAdministrationApiClient();
@@ -102,29 +102,28 @@ public sealed class EntryAdministrationComponentTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/workspaces?entry=main&entryNamespace=agentstration.daily-life-assistant");
         var rendered = context.Render<Workspaces>();
 
-        Assert.IsTrue(rendered.Markup.Contains("ready to be added to Personal", StringComparison.Ordinal));
-        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish workspace", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish Dashboard", StringComparison.Ordinal)).ClickAsync(new());
 
-        Assert.IsNotNull(client.SavedWorkspace);
-        Assert.IsTrue(client.SavedWorkspace.Entries.Any(value => value.EntryResourceId == new EntryId("main", @namespace)));
+        Assert.IsNotNull(client.SavedDashboard);
+        Assert.IsTrue(client.SavedDashboard.Entries.Any(value => value.EntryResourceId == new EntryId("main", @namespace)));
     }
 
     [TestMethod]
-    public async Task WorkspaceEditorKeepsExactlyOnePrimaryEntryWhenPublishing()
+    public async Task DashboardEditorKeepsExactlyOnePrimaryEntryWhenPublishing()
     {
         using var context = new BunitContext();
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var rendered = context.Render<Workspaces>();
 
-        var roles = rendered.FindAll("[data-testid='workspace-entry-role']");
+        var roles = rendered.FindAll("[data-testid='dashboard-entry-role']");
         Assert.HasCount(2, roles);
         await roles[1].ChangeAsync(new ChangeEventArgs { Value = "Primary" });
-        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish workspace", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish Dashboard", StringComparison.Ordinal)).ClickAsync(new());
 
-        Assert.IsNotNull(client.SavedWorkspace);
-        Assert.HasCount(1, client.SavedWorkspace.Entries.Where(value => value.Role == WorkspaceEntryRole.Primary));
-        Assert.AreEqual("secondary", ResourceName(client.SavedWorkspace.Entries.Single(value => value.Role == WorkspaceEntryRole.Primary).EntryResourceId.Value));
+        Assert.IsNotNull(client.SavedDashboard);
+        Assert.HasCount(1, client.SavedDashboard.Entries.Where(value => value.Role == DashboardItemRole.Primary));
+        Assert.AreEqual("secondary", ResourceName(client.SavedDashboard.Entries.Single(value => value.Role == DashboardItemRole.Primary).EntryResourceId.Value));
     }
 
     private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
@@ -140,7 +139,7 @@ public sealed class EntryAdministrationComponentTests
         public Agentstration.Resources.ResourceNamespace RequestedNamespace { get; private set; }
         public Agentstration.Resources.ResourceNamespace RequestedDependencyNamespace { get; private set; }
         public EntryDraft? SavedEntry { get; private set; }
-        public WorkplaceWorkspaceDraft? SavedWorkspace { get; private set; }
+        public WorkplaceDashboardDraft? SavedDashboard { get; private set; }
 
         public Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<EntryDraftResponse>>([]);
         public Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken)
@@ -199,16 +198,26 @@ public sealed class EntryAdministrationComponentTests
                 Id = new(WorkspaceResourceId),
                 Name = "personal",
                 DisplayName = "Personal",
-                UpdatedAt = Now,
-                Entries = [new() { EntryResourceId = EntryId("primary"), Role = WorkspaceEntryRole.Primary, Order = 0 }, new() { EntryResourceId = EntryId("secondary"), Role = WorkspaceEntryRole.Standard, Order = 10 }]
+                UpdatedAt = Now
             };
-            var published = new WorkplaceWorkspace { Id = new(WorkspaceResourceId), Name = "personal", DisplayName = "Personal", Entries = draft.Entries, Version = 2, PublishedAt = Now };
+            var published = new WorkplaceWorkspace { Id = new(WorkspaceResourceId), Name = "personal", DisplayName = "Personal", Version = 2, PublishedAt = Now };
             return Task.FromResult<IReadOnlyList<WorkplaceWorkspaceDraftResponse>>([new(draft, published)]);
         }
 
         public Task<WorkplaceWorkspaceDraftResponse> GetWorkspaceAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken) { SavedWorkspace = draft with { Revision = 2, UpdatedAt = Now }; return Task.FromResult(SavedWorkspace); }
-        public Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken) => Task.FromResult(new WorkplaceWorkspace { Id = new(WorkspaceResourceId), Name = name, DisplayName = "Personal", Entries = SavedWorkspace?.Entries ?? [], PublishedAt = Now });
+        public Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken) => Task.FromResult(draft);
+        public Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken)
+        {
+            var entries = new DashboardEntryReference[] { new() { EntryResourceId = EntryId("primary"), Role = DashboardItemRole.Primary, Order = 0 }, new() { EntryResourceId = EntryId("secondary"), Role = DashboardItemRole.Standard, Order = 10 } };
+            var draft = new WorkplaceDashboardDraft { Id = new("home"), WorkspaceId = new(WorkspaceResourceId), Name = "home", DisplayName = "Personal", IsDefault = true, Entries = entries, UpdatedAt = Now };
+            var published = new WorkplaceDashboard { Id = new("home"), WorkspaceId = new(WorkspaceResourceId), Name = "home", DisplayName = "Personal", IsDefault = true, Entries = entries, PublishedAt = Now };
+            return Task.FromResult<IReadOnlyList<WorkplaceDashboardDraftResponse>>([new(draft, published)]);
+        }
+        public async Task<WorkplaceDashboardDraftResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken) => (await GetDashboardsAsync(workspaceName, cancellationToken)).Single();
+        public Task<WorkplaceDashboardDraft> SaveDashboardAsync(WorkplaceDashboardDraft draft, CancellationToken cancellationToken) { SavedDashboard = draft with { Revision = 2, UpdatedAt = Now }; return Task.FromResult(SavedDashboard); }
+        public Task<WorkplaceDashboard> PublishDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken) => Task.FromResult(new WorkplaceDashboard { Id = SavedDashboard!.Id, WorkspaceId = SavedDashboard.WorkspaceId, Name = SavedDashboard.Name, DisplayName = SavedDashboard.DisplayName, IsDefault = SavedDashboard.IsDefault, Entries = SavedDashboard.Entries, PublishedAt = Now });
+        public Task DeleteDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken) => Task.CompletedTask;
 
         private static EntryId EntryId(string name, Agentstration.Resources.ResourceNamespace @namespace = default) => new(name, @namespace);
         private static EntryResource PublishedEntry(string name, Agentstration.Resources.ResourceNamespace @namespace = default) => new()

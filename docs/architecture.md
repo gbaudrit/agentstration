@@ -376,6 +376,7 @@ In explicit Development mode, standalone startup creates or repairs the developm
 - ADR-0021: standalone Workplace and Work API hosts
 - ADR-0022: Interaction as durable conversation and FlowRun continuation
 - ADR-0023: Console supervision of WorkTasks through Work API
+- ADR-0049: Workplace Dashboards own Entry composition
 - ADR-0024: Entries always target executable Flows
 - ADR-0026: out-of-process model-provider extensions through AEP
 - ADR-0027: AEP tool contributions resolve to MCP

@@ -4,6 +4,8 @@ A **Pack** is a versioned unit for distributing and installing a coherent set of
 
 A Pack declares a `personal`, `professional`, or `universal` audience. Audience drives discovery and presentation only; it does not create a separate Pack kind, installation lifecycle, runtime, or security boundary. Legacy manifests without the field default to `universal`.
 
+Installing a Pack makes its namespaced published Entries available for explicit Dashboard selection. Installation never exposes an Entry automatically in the default Dashboard, and Pack-owned Entry definitions remain read-only from Dashboard composition.
+
 A Pack also declares a `sample`, `template`, or `standard` purpose. Samples demonstrate a capability, templates are intended to be forked, and standard Packs have no special usage designation. Legacy manifests default to `standard`.
 
 ```mermaid
