@@ -11,6 +11,7 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Local;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -19,6 +20,40 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class AgentFrameworkRuntimeFactoryTests
 {
+    [TestMethod]
+    public void FlowOrchestrationMapsToolApprovalRequestsAndResponsesAsConfirmations()
+    {
+        var approval = new ToolApprovalRequestContent(
+            "approval-1",
+            new FunctionCallContent("call-1", "delete_record", new Dictionary<string, object?>()));
+        var envelope = new TestApprovalEnvelope(approval);
+        var port = RequestPort.Create<TestApprovalEnvelope, TestApprovalResponse>("approval-port");
+        var request = ExternalRequest.Create(port, envelope, "request-1");
+
+        var description = AgentFrameworkFlowOrchestrationEngine.DescribeInteraction(request, "ignored");
+        Assert.AreEqual(InputRequestType.Confirmation, description.Type);
+        StringAssert.Contains(description.Prompt, "Approve");
+
+        var input = new InputRequest
+        {
+            Id = "input-1",
+            RunId = "run-1",
+            RuntimeRequestId = request.RequestId,
+            Prompt = description.Prompt,
+            Type = description.Type,
+            CreatedAt = DateTimeOffset.UtcNow,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+            Status = InputRequestStatus.Answered,
+            Response = new(DateTimeOffset.UtcNow, JsonSerializer.SerializeToElement(true), "principal-1")
+        };
+        var response = AgentFrameworkFlowOrchestrationEngine.CreateResponse(request, input);
+
+        Assert.IsTrue(response.TryGetDataAs<TestApprovalResponse>(out var wrapped));
+        var approvalResponse = wrapped!.Messages.SelectMany(message => message.Contents)
+            .OfType<ToolApprovalResponseContent>().Single();
+        Assert.IsTrue(approvalResponse.Approved);
+    }
+
     [TestMethod]
     public void FlowOrchestrationMapsMafExecutorIdentityToInternalParticipantId()
     {
@@ -391,6 +426,14 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 "Ready",
                 null));
         }
+    }
+
+    private sealed record TestApprovalResponse(IList<ChatMessage> Messages);
+
+    private sealed record TestApprovalEnvelope(ToolApprovalRequestContent Approval) : IExternalRequestEnvelope
+    {
+        public AIContent GetInnerRequestContent() => Approval;
+        public object CreateResponse(IList<ChatMessage> messages) => new TestApprovalResponse(messages);
     }
 
     private sealed class RecordingResolver(IChatClient client) : IChatClientResolver

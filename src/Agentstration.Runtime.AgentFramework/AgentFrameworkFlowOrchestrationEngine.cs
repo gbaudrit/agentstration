@@ -97,10 +97,11 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                     var prompt = sourceState is not null
                         ? sourceState.Active?.Content.ToString()
                         : null;
+                    var interactionDescription = DescribeInteraction(interaction.Request, prompt);
                     yield return new FlowExternalInputRequested(
                         interaction.Request.RequestId,
-                        string.IsNullOrWhiteSpace(prompt) ? "Additional input is required to continue this execution." : prompt,
-                        InputRequestType.Text,
+                        interactionDescription.Prompt,
+                        interactionDescription.Type,
                         [],
                         source?.Id,
                         new DurableRuntimeStateReference(
@@ -361,13 +362,20 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
             $"The orchestration emitted an event for an unknown participant (agent '{agentId ?? "<null>"}', executor '{executorId}').");
     }
 
-    private static ExternalResponse CreateResponse(ExternalRequest request, InputRequest input)
+    internal static ExternalResponse CreateResponse(ExternalRequest request, InputRequest input)
     {
         var value = input.Response!.Value;
         var text = value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : value.GetRawText();
         if (request.TryGetDataAs<IExternalRequestEnvelope>(out var envelope) && envelope is not null)
         {
-            IList<ChatMessage> messages = [new ChatMessage(ChatRole.User, text)];
+            var inner = envelope.GetInnerRequestContent();
+            AIContent? approvalResponse = value.ValueKind is JsonValueKind.True or JsonValueKind.False
+                && inner is ToolApprovalRequestContent approval
+                    ? approval.CreateResponse(value.GetBoolean())
+                    : null;
+            IList<ChatMessage> messages = approvalResponse is null
+                ? [new ChatMessage(ChatRole.User, text)]
+                : [new ChatMessage(ChatRole.User, [approvalResponse])];
             return request.CreateResponse(envelope.CreateResponse(messages));
         }
         if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
@@ -377,6 +385,18 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         if (request.IsDataOfType<List<ChatMessage>>())
             return request.CreateResponse(new List<ChatMessage> { new(ChatRole.User, text) });
         return request.CreateResponse(text);
+    }
+
+    internal static InteractionDescription DescribeInteraction(ExternalRequest request, string? participantPrompt)
+    {
+        if (request.TryGetDataAs<IExternalRequestEnvelope>(out var envelope)
+            && envelope?.GetInnerRequestContent() is ToolApprovalRequestContent)
+            return new(InputRequestType.Confirmation, "Approve the requested tool operation?");
+        return new(
+            InputRequestType.Text,
+            string.IsNullOrWhiteSpace(participantPrompt)
+                ? "Additional input is required to continue this execution."
+                : participantPrompt);
     }
 
     private static string NormalizeExecutorId(string value) =>
@@ -428,6 +448,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
             : input.GetRawText();
 
     private sealed record BuiltWorkflow(Workflow Workflow, ResolvedParticipant? Manager);
+    internal sealed record InteractionDescription(InputRequestType Type, string Prompt);
     private sealed record ResolvedParticipant(
         string Id,
         ResolvedRuntimeAgent Resolution,
