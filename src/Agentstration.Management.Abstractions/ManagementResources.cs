@@ -82,6 +82,7 @@ public sealed record PackDefinition
 public enum PackBindingTargetKind
 {
     [JsonStringEnumMemberName("modelProfile")] ModelProfile,
+    [JsonStringEnumMemberName("modelProvider")] ModelProvider,
     [JsonStringEnumMemberName("secret")] Secret
 }
 
