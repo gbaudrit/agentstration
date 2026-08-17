@@ -421,6 +421,58 @@ public sealed class FlowTests
     }
 
     [TestMethod]
+    public async Task InteractiveOrchestrationSurvivesReconstructionAndRecoversAnAnsweredRun()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+            "interactive-run", null, "1.0.0", true,
+            new OrchestrationFlowDefinition(
+                [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
+                new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
+        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        var expressions = new FlowExpressionParser();
+        var firstQueue = new TestFlowRunQueue();
+        var firstService = new FlowRunService(
+            fixture.Repository, firstQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), TimeProvider.System);
+        using var input = JsonDocument.Parse("""{"prompt":"Need a name"}""");
+
+        var pending = await firstService.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
+            "tester", "interactive-correlation", input.RootElement, TestScope, default);
+        await firstService.ExecuteAsync(pending.Value.Id, default);
+
+        var waiting = (await firstService.GetAsync(pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.WaitingForInput, waiting.Status);
+        Assert.AreEqual(7, waiting.RuntimeBindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
+        Assert.IsNotNull(waiting.RuntimeState);
+        var request = (await firstService.ListInputsAsync(waiting.Id, InputRequestStatus.Pending, default)).Single();
+
+        var lostQueue = new TestFlowRunQueue();
+        var reconstructed = new FlowRunService(
+            fixture.Repository, lostQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), TimeProvider.System);
+        await reconstructed.RespondAsync(waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Ada"), "principal-1", default);
+        await Assert.ThrowsExactlyAsync<FlowConcurrencyException>(() => reconstructed.RespondAsync(
+            waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Grace"), "principal-2", default));
+
+        var recoveryQueue = new TestFlowRunQueue();
+        var recovered = new FlowRunService(
+            fixture.Repository, recoveryQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), TimeProvider.System);
+        await recovered.InitializeAsync(default);
+        Assert.IsTrue(recoveryQueue.Enqueued.Any(item => item.RunId == waiting.Id));
+        await recovered.ExecuteAsync(waiting.Id, default);
+
+        var completed = (await recovered.GetAsync(waiting.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
+        Assert.AreEqual("Ada", completed.Output!.Value.GetProperty("finalOutput").GetString());
+        Assert.AreEqual(7, completed.RuntimeBindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
+    }
+
+    [TestMethod]
     public async Task FlowRunApiCreatesAndListsRunsFromTheSameContract()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
@@ -826,6 +878,51 @@ public sealed class FlowTests
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             yield break;
         }
+    }
+
+    private sealed class SuspendingOrchestrationEngine : IFlowOrchestrationEngine
+    {
+        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
+            FlowOrchestrationExecutionRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var bindings = request.RuntimeBindings is { Count: > 0 }
+                ? request.RuntimeBindings
+                :
+                [
+                    Binding("agent-a", 7),
+                    Binding("agent-b", 4)
+                ];
+            yield return new FlowRuntimeBindingsResolved(bindings);
+            if (request.AnsweredInput?.Response is null)
+            {
+                yield return new FlowExternalInputRequested(
+                    "runtime-request-1", "What is your name?", InputRequestType.Text, [], "agent-a",
+                    new DurableRuntimeStateReference("test-runtime", "state-1", DateTimeOffset.UtcNow));
+                yield break;
+            }
+            Assert.AreEqual(7, bindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
+            var answer = request.AnsweredInput.Response.Value.GetString()!;
+            var participant = new FlowParticipantResult(
+                "agent-a", [new(1, answer)], JsonSerializer.SerializeToElement(answer), "agent-a", 7,
+                "default", "Deterministic", [], null);
+            yield return new FlowParticipantCompleted(participant);
+            yield return new FlowExecutionCompleted(new FlowOrchestrationResult(
+                FlowOrchestrationStrategy.Handoff, JsonSerializer.SerializeToElement(answer), [participant]));
+            await Task.CompletedTask;
+        }
+
+        private static RuntimeExecutionBinding Binding(string participant, long generation) => new()
+        {
+            ParticipantId = participant,
+            AgentNamespace = ResourceNamespace.Default,
+            AgentResourceId = participant,
+            AgentGeneration = generation,
+            DeploymentId = $"deployment-{participant}-{generation}",
+            RevisionId = $"revision-{participant}-{generation}",
+            RuntimeProfileName = "local",
+            ModelProfileName = "default"
+        };
     }
 
     [TestMethod]

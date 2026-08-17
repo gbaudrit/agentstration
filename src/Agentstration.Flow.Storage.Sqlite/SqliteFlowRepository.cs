@@ -45,6 +45,7 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     private const string RunKind = "run";
     private const string DraftKind = "draft";
     private const string RunEventKind = "runEvent";
+    private const string InputRequestKind = "inputRequest";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
@@ -236,6 +237,50 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         return documents.Select(document => Deserialize<FlowRunEvent>(document)).Where(runEvent => runEvent.Sequence > afterSequence).ToArray();
     }
 
+    public async Task<StoredInputRequest> CreateInputRequestAsync(InputRequest request, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        var document = Document(InputRequestKey(request.RunId, request.Id), InputRequestKind, new FlowId(request.RunId), request.Id, request, now);
+        context.Documents.Add(document);
+        await SaveCreateAsync(context, cancellationToken);
+        return new StoredInputRequest(request, document.ETag, now);
+    }
+
+    public async Task<StoredInputRequest?> GetInputRequestAsync(string runId, string requestId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == InputRequestKey(runId, requestId), cancellationToken);
+        return document is null ? null : ToInputRequest(document);
+    }
+
+    public async Task<IReadOnlyList<StoredInputRequest>> ListInputRequestsAsync(string runId, InputRequestStatus? status, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await context.Documents.AsNoTracking()
+            .Where(value => value.Kind == InputRequestKind && value.FlowId == runId)
+            .OrderBy(value => value.UpdatedAt)
+            .ToArrayAsync(cancellationToken);
+        var requests = documents.Select(ToInputRequest);
+        if (status is not null) requests = requests.Where(value => value.Value.Status == status);
+        return requests.ToArray();
+    }
+
+    public async Task<StoredInputRequest> UpdateInputRequestAsync(InputRequest request, string expectedETag, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == InputRequestKey(request.RunId, request.Id), cancellationToken)
+            ?? throw new FlowRunNotFoundException(request.RunId);
+        if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal))
+            throw new FlowConcurrencyException("The Input Request was modified concurrently.");
+        var now = timeProvider.GetUtcNow();
+        document.Payload = JsonSerializer.Serialize(request, JsonOptions);
+        document.ETag = NewETag();
+        document.UpdatedAt = now;
+        await SaveUpdateAsync(context, cancellationToken);
+        return new StoredInputRequest(request, document.ETag, now);
+    }
+
     private static FlowDocument Document<T>(string key, string kind, FlowId id, string? version, T value, DateTimeOffset now) => new()
     {
         Key = key,
@@ -251,12 +296,14 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
     private static StoredFlowVersion ToVersion(FlowDocument document) => new(Deserialize<FlowVersion>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowRun ToRun(FlowDocument document) => new(Deserialize<FlowRun>(document), document.ETag, document.UpdatedAt);
     private static StoredFlowDraft ToDraft(FlowDocument document) => new(Deserialize<FlowDraft>(document), document.ETag, document.UpdatedAt);
+    private static StoredInputRequest ToInputRequest(FlowDocument document) => new(Deserialize<InputRequest>(document), document.ETag, document.UpdatedAt);
     private static T Deserialize<T>(FlowDocument document) => JsonSerializer.Deserialize<T>(document.Payload, JsonOptions) ?? throw new InvalidOperationException($"Stored Flow resource '{document.Key}' is invalid.");
     private static string DefinitionKey(FlowId id) => $"flow:{id.Namespace.Value}:{id.Value}";
     private static string VersionKey(FlowId id, string version) => $"flow:{id.Namespace.Value}:{id.Value}:version:{version}";
     private static string RunKey(string id) => $"run:{id}";
     private static string DraftKey(FlowId id) => $"flow:{id.Namespace.Value}:{id.Value}:draft";
     private static string RunEventKey(string runId, long sequence) => $"run:{runId}:event:{sequence:D12}";
+    private static string InputRequestKey(string runId, string requestId) => $"run:{runId}:input:{requestId}";
     private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
 
     private static async Task EnsureNamespaceSchemaAsync(FlowDbContext context, CancellationToken cancellationToken)

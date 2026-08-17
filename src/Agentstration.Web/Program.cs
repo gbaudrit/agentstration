@@ -98,6 +98,7 @@ builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
 builder.Services.AddHostedService<LocalWorkExecutionWorker>();
 builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
 builder.Services.AddHostedService<FlowRunExecutionWorker>();
+builder.Services.AddHostedService<FlowRunRecoveryWorker>();
 
 var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 builder.Logging.AddOpenTelemetry(logging =>

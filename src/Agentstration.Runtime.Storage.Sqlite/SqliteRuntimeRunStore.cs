@@ -9,6 +9,7 @@ public sealed class RuntimeRunDbContext(DbContextOptions<RuntimeRunDbContext> op
 {
     internal DbSet<RuntimeRunDocument> Runs => Set<RuntimeRunDocument>();
     internal DbSet<RuntimeRunEventDocument> Events => Set<RuntimeRunEventDocument>();
+    internal DbSet<RuntimeExecutionStateDocument> ExecutionStates => Set<RuntimeExecutionStateDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,7 +27,26 @@ public sealed class RuntimeRunDbContext(DbContextOptions<RuntimeRunDbContext> op
         runEvent.HasKey(value => new { value.RunId, value.Sequence });
         runEvent.Property(value => value.RunId).HasMaxLength(64);
         runEvent.HasIndex(value => new { value.RunId, value.Sequence });
+
+        var executionState = modelBuilder.Entity<RuntimeExecutionStateDocument>();
+        executionState.ToTable("RuntimeExecutionStates");
+        executionState.HasKey(value => new { value.RunId, value.RuntimeType, value.StateId });
+        executionState.Property(value => value.RunId).HasMaxLength(160);
+        executionState.Property(value => value.RuntimeType).HasMaxLength(64);
+        executionState.Property(value => value.StateId).HasMaxLength(256);
+        executionState.Property(value => value.ParentStateId).HasMaxLength(256);
+        executionState.HasIndex(value => new { value.RunId, value.RuntimeType, value.CreatedAt });
     }
+}
+
+internal sealed class RuntimeExecutionStateDocument
+{
+    public required string RunId { get; set; }
+    public required string RuntimeType { get; set; }
+    public required string StateId { get; set; }
+    public string? ParentStateId { get; set; }
+    public required string Payload { get; set; }
+    public long CreatedAt { get; set; }
 }
 
 internal sealed class RuntimeRunDocument
@@ -57,6 +77,20 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
         await RemoveLegacyScopeColumnAsync(context, cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS RuntimeExecutionStates (
+                RunId TEXT NOT NULL,
+                RuntimeType TEXT NOT NULL,
+                StateId TEXT NOT NULL,
+                ParentStateId TEXT NULL,
+                Payload TEXT NOT NULL,
+                CreatedAt INTEGER NOT NULL,
+                CONSTRAINT PK_RuntimeExecutionStates PRIMARY KEY (RunId, RuntimeType, StateId)
+            );
+            CREATE INDEX IF NOT EXISTS IX_RuntimeExecutionStates_RunId_RuntimeType_CreatedAt
+                ON RuntimeExecutionStates (RunId, RuntimeType, CreatedAt);
+            """, cancellationToken);
     }
 
     public async Task<StoredRuntimeRun> CreateAsync(RuntimeRun run, CancellationToken cancellationToken)
@@ -205,6 +239,71 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
     }
 }
 
+public sealed class SqliteRuntimeExecutionStateStore(
+    IDbContextFactory<RuntimeRunDbContext> contextFactory) : IRuntimeExecutionStateStore
+{
+    public async Task StoreAsync(RuntimeExecutionState state, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var existing = await context.ExecutionStates.SingleOrDefaultAsync(value =>
+            value.RunId == state.RunId && value.RuntimeType == state.RuntimeType && value.StateId == state.StateId,
+            cancellationToken);
+        if (existing is null)
+        {
+            context.ExecutionStates.Add(new RuntimeExecutionStateDocument
+            {
+                RunId = state.RunId,
+                RuntimeType = state.RuntimeType,
+                StateId = state.StateId,
+                ParentStateId = state.ParentStateId,
+                Payload = state.Payload.GetRawText(),
+                CreatedAt = state.CreatedAt.UtcTicks
+            });
+        }
+        else
+        {
+            existing.ParentStateId = state.ParentStateId;
+            existing.Payload = state.Payload.GetRawText();
+        }
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<RuntimeExecutionState?> GetAsync(string runId, string runtimeType, string stateId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var value = await context.ExecutionStates.AsNoTracking().SingleOrDefaultAsync(state =>
+            state.RunId == runId && state.RuntimeType == runtimeType && state.StateId == stateId,
+            cancellationToken);
+        return value is null ? null : ToState(value);
+    }
+
+    public async Task<IReadOnlyList<RuntimeExecutionState>> ListAsync(string runId, string runtimeType, string? parentStateId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = context.ExecutionStates.AsNoTracking().Where(state => state.RunId == runId && state.RuntimeType == runtimeType);
+        if (parentStateId is not null) query = query.Where(state => state.ParentStateId == parentStateId);
+        var values = await query.OrderBy(state => state.CreatedAt).ToArrayAsync(cancellationToken);
+        return values.Select(ToState).ToArray();
+    }
+
+    public async Task DeleteAsync(string runId, string? runtimeType, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = context.ExecutionStates.Where(state => state.RunId == runId);
+        if (runtimeType is not null) query = query.Where(state => state.RuntimeType == runtimeType);
+        context.ExecutionStates.RemoveRange(await query.ToArrayAsync(cancellationToken));
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static RuntimeExecutionState ToState(RuntimeExecutionStateDocument value) => new(
+        value.RunId,
+        value.RuntimeType,
+        value.StateId,
+        JsonSerializer.Deserialize<JsonElement>(value.Payload),
+        new DateTimeOffset(value.CreatedAt, TimeSpan.Zero),
+        value.ParentStateId);
+}
+
 public static class SqliteRuntimeRunServiceCollectionExtensions
 {
     public static IServiceCollection AddSqliteRuntimeRuns(this IServiceCollection services, string connectionString)
@@ -212,6 +311,7 @@ public static class SqliteRuntimeRunServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         services.AddDbContextFactory<RuntimeRunDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IRuntimeRunStore, SqliteRuntimeRunStore>();
+        services.AddSingleton<IRuntimeExecutionStateStore, SqliteRuntimeExecutionStateStore>();
         return services;
     }
 }

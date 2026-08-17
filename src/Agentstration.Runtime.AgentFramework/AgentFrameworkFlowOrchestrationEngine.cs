@@ -14,16 +14,24 @@ namespace Agentstration.Runtime.AgentFramework;
 public sealed class AgentFrameworkFlowOrchestrationEngine(
     IRuntimeAgentResolver agentResolver,
     IToolCatalog tools,
-    AgentFrameworkRuntimeFactory agentFactory) : IFlowOrchestrationEngine
+    AgentFrameworkRuntimeFactory agentFactory,
+    IRuntimeExecutionStateStore? executionStates = null,
+    TimeProvider? timeProvider = null) : IFlowOrchestrationEngine
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly TimeProvider timeProvider = timeProvider ?? TimeProvider.System;
 
     public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
         FlowOrchestrationExecutionRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var participants = await ResolveParticipantsAsync(request.Definition.Participants, cancellationToken);
+        var references = request.Definition.Pattern is MagenticOrchestrationPattern magentic
+            ? request.Definition.Participants.Concat([magentic.Manager]).ToArray()
+            : request.Definition.Participants;
+        var participants = await ResolveParticipantsAsync(references, request.RuntimeBindings, cancellationToken);
+        var bindings = references.Select(reference => participants[reference.Id].Binding).ToArray();
+        yield return new FlowRuntimeBindingsResolved(bindings);
         var built = await BuildWorkflowAsync(request.Definition, participants, cancellationToken);
         var actorsByExecutorId = MapExecutors(built.Workflow, participants, built.Manager);
         var states = request.Definition.Participants.ToDictionary(
@@ -35,13 +43,31 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         List<ChatMessage>? finalMessages = null;
         var unsupportedOutputTypes = new HashSet<string>(StringComparer.Ordinal);
 
-        var initialMessages = new List<ChatMessage> { new(ChatRole.User, Prompt(request.Input)) };
-        await using var run = await InProcessExecution.RunStreamingAsync(
-            built.Workflow,
-            initialMessages,
-            request.RunId,
-            cancellationToken);
-        await run.TrySendMessageAsync(new TurnToken(emitEvents: true));
+        CheckpointManager? checkpointManager = null;
+        if (executionStates is not null)
+            checkpointManager = CheckpointManager.CreateJson(new AgentFrameworkCheckpointStore(executionStates, timeProvider));
+        await using var run = request.RuntimeState is null
+            ? checkpointManager is null
+                ? await InProcessExecution.RunStreamingAsync(
+                    built.Workflow,
+                    new List<ChatMessage> { new(ChatRole.User, Prompt(request.Input)) },
+                    request.RunId,
+                    cancellationToken)
+                : await InProcessExecution.RunStreamingAsync(
+                    built.Workflow,
+                    new List<ChatMessage> { new(ChatRole.User, Prompt(request.Input)) },
+                    checkpointManager,
+                    request.RunId,
+                    cancellationToken)
+            : checkpointManager is null
+                ? throw new FlowValidationException("flow_runtime_state_store_unavailable", "Durable runtime state storage is required to resume this orchestration.")
+                : await InProcessExecution.ResumeStreamingAsync(
+                    built.Workflow,
+                    new CheckpointInfo(request.RunId, request.RuntimeState.StateId),
+                    checkpointManager,
+                    cancellationToken);
+        if (request.RuntimeState is null)
+            await run.TrySendMessageAsync(new TurnToken(emitEvents: true));
 
         await foreach (var workflowEvent in run.WatchStreamAsync(cancellationToken))
         {
@@ -52,10 +78,36 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                         "flow_orchestration_framework_failed",
                         error.Exception?.GetBaseException().Message ?? "Microsoft Agent Framework reported an orchestration failure.");
 
-                case RequestInfoEvent:
-                    throw new FlowValidationException(
-                        "flow_orchestration_interaction_unsupported",
-                        "This orchestration requested an interactive response, but interactive execution is not enabled.");
+                case RequestInfoEvent interaction:
+                    if (request.AnsweredInput?.Response is not null
+                        && string.Equals(request.AnsweredInput.RuntimeRequestId, interaction.Request.RequestId, StringComparison.Ordinal))
+                    {
+                        await run.SendResponseAsync(CreateResponse(interaction.Request, request.AnsweredInput));
+                        break;
+                    }
+                    if (checkpointManager is null || run.LastCheckpoint is null)
+                        throw new FlowValidationException(
+                            "flow_orchestration_interaction_not_durable",
+                            "The orchestration requested external input before durable runtime state was available.");
+                    var sourceState = states.Values
+                        .Where(value => value.Active is not null)
+                        .OrderByDescending(value => value.Active!.Turn)
+                        .FirstOrDefault();
+                    var source = sourceState is null ? null : new WorkflowActor(sourceState.Participant.Id, false);
+                    var prompt = sourceState is not null
+                        ? sourceState.Active?.Content.ToString()
+                        : null;
+                    yield return new FlowExternalInputRequested(
+                        interaction.Request.RequestId,
+                        string.IsNullOrWhiteSpace(prompt) ? "Additional input is required to continue this execution." : prompt,
+                        InputRequestType.Text,
+                        [],
+                        source?.Id,
+                        new DurableRuntimeStateReference(
+                            AgentFrameworkCheckpointStore.RuntimeType,
+                            run.LastCheckpoint.CheckpointId,
+                            timeProvider.GetUtcNow()));
+                    yield break;
 
                 case AgentResponseUpdateEvent update:
                     var actor = ResolveActor(update.Update.AgentId, update.ExecutorId, participants, built.Manager, actorsByExecutorId);
@@ -176,21 +228,41 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
 
     private async Task<IReadOnlyDictionary<string, ResolvedParticipant>> ResolveParticipantsAsync(
         IReadOnlyList<FlowTargetReference> references,
+        IReadOnlyList<RuntimeExecutionBinding>? persistedBindings,
         CancellationToken cancellationToken)
     {
         var participants = new Dictionary<string, ResolvedParticipant>(StringComparer.Ordinal);
         foreach (var reference in references)
         {
-            var resolved = await agentResolver.ResolveLatestAsync(
-                reference.Id,
-                reference.Namespace ?? Agentstration.Resources.ResourceNamespace.Default,
-                cancellationToken);
-            if (!resolved.Ready)
+            var @namespace = reference.Namespace ?? Agentstration.Resources.ResourceNamespace.Default;
+            var binding = persistedBindings?.SingleOrDefault(value => string.Equals(value.ParticipantId, reference.Id, StringComparison.Ordinal));
+            var resolved = binding is null
+                ? await agentResolver.ResolveLatestAsync(reference.Id, @namespace, cancellationToken)
+                : await agentResolver.ResolveAsync(new RuntimeAgentReference(binding.AgentResourceId, binding.AgentGeneration)
+                {
+                    Namespace = binding.AgentNamespace
+                }, cancellationToken);
+            if (binding is null && !resolved.Ready)
                 throw new FlowValidationException("flow_participant_not_ready", $"Agent '{reference.Id}' is not ready: {resolved.Error ?? resolved.State}.");
+            if (binding is not null && (resolved.Generation != binding.AgentGeneration
+                || !string.Equals(resolved.RevisionId, binding.RevisionId, StringComparison.Ordinal)
+                || !string.Equals(resolved.DeploymentId, binding.DeploymentId, StringComparison.Ordinal)))
+                throw new FlowValidationException("flow_runtime_binding_mismatch", $"The exact runtime binding for participant '{reference.Id}' is no longer available.");
             if (!string.Equals(resolved.Definition.Handler, agentFactory.Handler, StringComparison.Ordinal))
                 throw new FlowValidationException("flow_participant_handler_unsupported", $"Agent '{reference.Id}' does not use the supported runtime handler.");
             var agent = await agentFactory.CreateAgentAsync(resolved.Definition, new AgentRuntimeContext(tools), cancellationToken);
-            participants.Add(reference.Id, new ResolvedParticipant(reference.Id, resolved, agent));
+            var effectiveBinding = binding ?? new RuntimeExecutionBinding
+            {
+                ParticipantId = reference.Id,
+                AgentNamespace = @namespace,
+                AgentResourceId = resolved.AgentName,
+                AgentGeneration = resolved.Generation,
+                DeploymentId = resolved.DeploymentId,
+                RevisionId = resolved.RevisionId,
+                RuntimeProfileName = resolved.RuntimeProfileName,
+                ModelProfileName = resolved.ModelProfileName
+            };
+            participants.Add(reference.Id, new ResolvedParticipant(reference.Id, resolved, agent, effectiveBinding));
         }
         return participants;
     }
@@ -224,7 +296,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                     .AddParticipants(Ordered(definition, participants))
                     .Build(), null);
             case MagenticOrchestrationPattern magentic:
-                var manager = (await ResolveParticipantsAsync([magentic.Manager], cancellationToken))[magentic.Manager.Id];
+                var manager = participants[magentic.Manager.Id];
                 if (manager.Resolution.Definition.EffectiveToolNames.Count > 0)
                     throw new FlowValidationException(
                         "flow_magentic_manager_tools_unsupported",
@@ -289,6 +361,24 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
             $"The orchestration emitted an event for an unknown participant (agent '{agentId ?? "<null>"}', executor '{executorId}').");
     }
 
+    private static ExternalResponse CreateResponse(ExternalRequest request, InputRequest input)
+    {
+        var value = input.Response!.Value;
+        var text = value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : value.GetRawText();
+        if (request.TryGetDataAs<IExternalRequestEnvelope>(out var envelope) && envelope is not null)
+        {
+            IList<ChatMessage> messages = [new ChatMessage(ChatRole.User, text)];
+            return request.CreateResponse(envelope.CreateResponse(messages));
+        }
+        if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            return request.CreateResponse(value.GetBoolean());
+        if (request.IsDataOfType<ChatMessage>())
+            return request.CreateResponse(new ChatMessage(ChatRole.User, text));
+        if (request.IsDataOfType<List<ChatMessage>>())
+            return request.CreateResponse(new List<ChatMessage> { new(ChatRole.User, text) });
+        return request.CreateResponse(text);
+    }
+
     private static string NormalizeExecutorId(string value) =>
         new(value.Select(character => char.IsLetterOrDigit(character) || character == '_' ? character : '_').ToArray());
 
@@ -298,8 +388,8 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         ResolvedParticipant? manager)
     {
         var actorsByAgent = new Dictionary<AIAgent, WorkflowActor>(ReferenceEqualityComparer.Instance);
-        foreach (var participant in participants.Values) actorsByAgent.Add(participant.Agent, new(participant.Id, false));
-        if (manager is not null) actorsByAgent.Add(manager.Agent, new(manager.Id, true));
+        foreach (var participant in participants.Values)
+            actorsByAgent.Add(participant.Agent, new(participant.Id, manager?.Id == participant.Id));
         var result = new Dictionary<string, WorkflowActor>(StringComparer.Ordinal);
         foreach (var binding in workflow.ReflectExecutors())
             if (binding.Value.RawValue is AIAgent agent && actorsByAgent.TryGetValue(agent, out var actor))
@@ -338,7 +428,11 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
             : input.GetRawText();
 
     private sealed record BuiltWorkflow(Workflow Workflow, ResolvedParticipant? Manager);
-    private sealed record ResolvedParticipant(string Id, ResolvedRuntimeAgent Resolution, AIAgent Agent);
+    private sealed record ResolvedParticipant(
+        string Id,
+        ResolvedRuntimeAgent Resolution,
+        AIAgent Agent,
+        RuntimeExecutionBinding Binding);
     private sealed record WorkflowActor(string Id, bool IsManager);
 
     private sealed class ParticipantState(ResolvedParticipant participant)

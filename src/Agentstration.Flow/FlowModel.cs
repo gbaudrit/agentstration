@@ -20,7 +20,7 @@ public enum FlowRoutingStrategy { Deterministic, Capabilities, Semantic, Llm, Hy
 public enum FlowNodeKind { Input, Agent, Router, Condition, Transform, Output, Failure, Flow, Function, ExternalCall, HumanApproval, Custom }
 public enum FlowOrchestrationStrategy { Sequential, Concurrent, Handoff, GroupChat, Magentic }
 public enum FlowCompositionMode { Sequential, Concurrent, Custom }
-public enum FlowRunStatus { Pending, Running, Succeeded, Failed, Cancelled, TimedOut }
+public enum FlowRunStatus { Pending, Running, WaitingForInput, Succeeded, Failed, Cancelled, TimedOut }
 public enum FlowRunTrigger { Manual, Api, WorkItem, Flow, Schedule, Event }
 public enum FlowStepRunStatus { NotStarted, Running, Succeeded, Failed, Skipped, Cancelled }
 public enum FlowRunEventType
@@ -36,7 +36,52 @@ public enum FlowRunEventType
     FlowRunCancelled,
     FlowRunTimedOut,
     ParticipantTurnStarted,
-    ParticipantTurnCompleted
+    ParticipantTurnCompleted,
+    InputRequested,
+    InputReceived,
+    InputExpired,
+    FlowRunResumed
+}
+
+public enum InputRequestType { Text, Choice, Confirmation }
+public enum InputRequestStatus { Pending, Answered, Expired, Cancelled }
+
+public sealed record RuntimeExecutionBinding
+{
+    public required string ParticipantId { get; init; }
+    public required ResourceNamespace AgentNamespace { get; init; }
+    public required string AgentResourceId { get; init; }
+    public required long AgentGeneration { get; init; }
+    public required string DeploymentId { get; init; }
+    public required string RevisionId { get; init; }
+    public required string RuntimeProfileName { get; init; }
+    public required string ModelProfileName { get; init; }
+}
+
+public sealed record DurableRuntimeStateReference(
+    string RuntimeType,
+    string StateId,
+    DateTimeOffset CreatedAt);
+
+public sealed record InputResponse(
+    DateTimeOffset ReceivedAt,
+    JsonElement Value,
+    string PrincipalId);
+
+public sealed record InputRequest
+{
+    public required string Id { get; init; }
+    public required string RunId { get; init; }
+    public string? Source { get; init; }
+    public required string RuntimeRequestId { get; init; }
+    public required string Prompt { get; init; }
+    public InputRequestType Type { get; init; } = InputRequestType.Text;
+    public required DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? ExpiresAt { get; init; }
+    public InputRequestStatus Status { get; init; } = InputRequestStatus.Pending;
+    public IReadOnlyList<string> Options { get; init; } = [];
+    public JsonElement? Schema { get; init; }
+    public InputResponse? Response { get; init; }
 }
 
 public sealed record FlowTargetReference(FlowTargetKind Kind, string Id, string? Version = null, ResourceNamespace? Namespace = null)
@@ -250,6 +295,10 @@ public sealed record FlowRun
     public FlowRunError? Error { get; init; }
     public required FlowVersion DefinitionSnapshot { get; init; }
     public IReadOnlyList<FlowStepRun> Steps { get; init; } = [];
+    public IReadOnlyList<RuntimeExecutionBinding> RuntimeBindings { get; init; } = [];
+    public DurableRuntimeStateReference? RuntimeState { get; init; }
+    public string? ExecutionLeaseId { get; init; }
+    public DateTimeOffset? ExecutionLeaseExpiresAt { get; init; }
 }
 
 public static class FlowRunStatusExtensions

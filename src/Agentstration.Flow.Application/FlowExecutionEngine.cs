@@ -7,7 +7,10 @@ public sealed record FlowOrchestrationExecutionRequest(
     string RunId,
     OrchestrationFlowDefinition Definition,
     JsonElement Input,
-    string CorrelationId);
+    string CorrelationId,
+    IReadOnlyList<RuntimeExecutionBinding>? RuntimeBindings = null,
+    DurableRuntimeStateReference? RuntimeState = null,
+    InputRequest? AnsweredInput = null);
 
 public abstract record FlowExecutionEvent;
 
@@ -20,6 +23,16 @@ public sealed record FlowParticipantTurnCompleted(string ParticipantId, int Turn
 public sealed record FlowParticipantCompleted(FlowParticipantResult Result) : FlowExecutionEvent;
 
 public sealed record FlowExecutionCompleted(FlowOrchestrationResult Result) : FlowExecutionEvent;
+
+public sealed record FlowRuntimeBindingsResolved(IReadOnlyList<RuntimeExecutionBinding> Bindings) : FlowExecutionEvent;
+
+public sealed record FlowExternalInputRequested(
+    string RuntimeRequestId,
+    string Prompt,
+    InputRequestType Type,
+    IReadOnlyList<string> Options,
+    string? Source,
+    DurableRuntimeStateReference RuntimeState) : FlowExecutionEvent;
 
 public interface IFlowOrchestrationEngine
 {
