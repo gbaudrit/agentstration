@@ -1,5 +1,5 @@
 <div class="orchestration-editor-grid">
-    <section class="panel orchestration-configuration">
+    <fieldset class="panel orchestration-configuration" disabled="@IsReadOnly">
         <div class="panel-header"><h2>Participants</h2><span>@Model.ParticipantIds.Count selected</span></div>
         @if (Agents.Count == 0)
         {
@@ -71,21 +71,22 @@
                 <div class="form-columns"><label>Maximum rounds<InputNumber @bind-Value="Model.MaximumRounds" /></label><label>Maximum stalls<InputNumber @bind-Value="Model.MaximumStalls" /></label><label>Maximum resets<InputNumber @bind-Value="Model.MaximumResets" /></label></div>
                 break;
         }
-    </section>
+    </fieldset>
     <section class="panel orchestration-preview-panel">
         <div class="panel-header"><h2>Execution preview</h2><StatusBadge Text="@Label(Model.Strategy)" Status="UiStatus.Info" /></div>
-        <OrchestrationPreview Model="Model" />
-        <p class="muted">This preview represents the declared strategy. Runtime implementation details remain internal.</p>
+        <OrchestrationPreview Model="Model" Agents="Agents" />
     </section>
 </div>
 
 @code {
     [Parameter, EditorRequired] public OrchestrationEditorModel Model { get; set; } = null!;
     [Parameter] public IReadOnlyList<AgentSummary> Agents { get; set; } = [];
+    [Parameter] public bool IsReadOnly { get; set; }
     private IEnumerable<AgentSummary> AvailableManagers => Agents.Where(agent => !Model.ParticipantIds.Contains(agent.Id, StringComparer.Ordinal));
 
     private void ToggleParticipant(string id, ChangeEventArgs eventArgs)
     {
+        if (IsReadOnly) return;
         if (eventArgs.Value is true && !Model.ParticipantIds.Contains(id, StringComparer.Ordinal)) Model.ParticipantIds.Add(id);
         else if (eventArgs.Value is false) Model.ParticipantIds.Remove(id);
         Model.Handoffs.RemoveAll(route => !Model.ParticipantIds.Contains(route.From, StringComparer.Ordinal) || !Model.ParticipantIds.Contains(route.To, StringComparer.Ordinal));
@@ -95,14 +96,16 @@
 
     private void Move(string id, int offset)
     {
+        if (IsReadOnly) return;
         var index = Model.ParticipantIds.IndexOf(id); var target = index + offset;
         if (index < 0 || target < 0 || target >= Model.ParticipantIds.Count) return;
         Model.ParticipantIds.RemoveAt(index); Model.ParticipantIds.Insert(target, id);
     }
 
-    private void StrategyChanged() => Model.EnsureStrategyDefaults();
+    private void StrategyChanged() { if (!IsReadOnly) Model.EnsureStrategyDefaults(); }
     private void AddRoute()
     {
+        if (IsReadOnly) return;
         if (Model.ParticipantIds.Count >= 2) Model.Handoffs.Add(new FlowHandoffEditorRoute(Model.ParticipantIds[0], Model.ParticipantIds[1]));
     }
     private static string Label(FlowOrchestrationStrategy strategy) => strategy switch { FlowOrchestrationStrategy.GroupChat => "Group chat", _ => strategy.ToString() };

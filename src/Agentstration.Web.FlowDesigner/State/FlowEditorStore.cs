@@ -1,5 +1,7 @@
 using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
+using Agentstration.Resources;
+using Agentstration.Web.FlowDesigner.Backend;
 
 namespace Agentstration.Web.FlowDesigner.State;
 
@@ -21,7 +23,7 @@ public sealed record FlowDesignerDocument(IReadOnlyList<FlowDesignerNode> Nodes,
 
 public sealed record FlowEditorState
 {
-    public FlowDraft? Draft { get; init; }
+    public FlowDesignerResource? Resource { get; init; }
     public FlowDesignerDocument Diagram { get; init; } = new([], []);
     public FlowEditorSelection Selection { get; init; } = new();
     public IReadOnlyList<FlowValidationIssue> Issues { get; init; } = [];
@@ -32,6 +34,9 @@ public sealed record FlowEditorState
     public string? ETag { get; init; }
     public string SourceText { get; init; } = string.Empty;
     public string? SourceError { get; init; }
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public string? PublishedVersion { get; init; }
+    public bool IsReadOnly { get; init; }
 }
 
 public interface IFlowEditorCommand { FlowGraphDefinition Apply(FlowGraphDefinition definition); }
@@ -162,20 +167,23 @@ public sealed class FlowEditorStore
     public bool CanUndo => undo.Count > 0;
     public bool CanRedo => redo.Count > 0;
 
-    public void Load(FlowDraftResponse response, string source)
+    public void Load(FlowDesignerLoadResult result, FlowDesignerTarget target)
     {
         undo.Clear(); redo.Clear();
-        State = new FlowEditorState { Draft = response.Value, Diagram = FlowDesignerDocument.From(response.Value.Definition), ETag = response.ETag, LocalRevision = response.Value.Revision, SourceText = source, SaveState = FlowSaveState.Saved };
+        State = new FlowEditorState { Resource = result.Resource, Diagram = FlowDesignerDocument.From(result.Resource.Definition), ETag = result.ETag, LocalRevision = result.Resource.DraftRevision ?? 0, SourceText = result.Source, SaveState = FlowSaveState.Saved, Namespace = target.Namespace, PublishedVersion = result.PublishedVersion, IsReadOnly = result.IsReadOnly || target.IsReadOnly };
         Changed();
     }
+
+    public void Load(FlowDraftResponse response, string source) => Load(FlowDesignerLoadResult.FromDraft(response, source), new FlowDesignerTarget(ResourceNamespace.Default, response.Value.FlowId.Value));
 
     public Task DispatchAsync(IFlowEditorCommand command, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var draft = State.Draft ?? throw new InvalidOperationException("The editor has not loaded a Draft.");
-        undo.Push(draft.Definition); redo.Clear();
-        var definition = command.Apply(draft.Definition);
-        State = State with { Draft = draft with { Definition = definition }, Diagram = FlowDesignerDocument.From(definition), IsDirty = true, SaveState = FlowSaveState.UnsavedChanges, LocalRevision = State.LocalRevision + 1, SourceError = null };
+        if (State.IsReadOnly) throw new InvalidOperationException("A published namespaced Flow is read-only.");
+        var resource = State.Resource ?? throw new InvalidOperationException("The editor has not loaded a Flow definition.");
+        undo.Push(resource.Definition); redo.Clear();
+        var definition = command.Apply(resource.Definition);
+        State = State with { Resource = resource with { Definition = definition }, Diagram = FlowDesignerDocument.From(definition), IsDirty = true, SaveState = FlowSaveState.UnsavedChanges, LocalRevision = State.LocalRevision + 1, SourceError = null };
         Changed(); return Task.CompletedTask;
     }
 
@@ -186,9 +194,9 @@ public sealed class FlowEditorStore
     public void SetSource(string source, string? error = null) { State = State with { SourceText = source, SourceError = error, IsDirty = error is null || State.IsDirty }; Changed(); }
     public void MarkSaving() { State = State with { SaveState = FlowSaveState.Saving }; Changed(); }
     public void MarkSaveFailed() { State = State with { SaveState = FlowSaveState.SaveFailed }; Changed(); }
-    public void MarkSaved(FlowDraftResponse response, string source) { State = State with { Draft = response.Value, Diagram = FlowDesignerDocument.From(response.Value.Definition), ETag = response.ETag, LocalRevision = response.Value.Revision, SourceText = source, IsDirty = false, SaveState = FlowSaveState.Saved, SourceError = null }; Changed(); }
-    public void Undo() { if (!undo.TryPop(out var definition) || State.Draft is null) return; redo.Push(State.Draft.Definition); ReplaceHistory(definition); }
-    public void Redo() { if (!redo.TryPop(out var definition) || State.Draft is null) return; undo.Push(State.Draft.Definition); ReplaceHistory(definition); }
-    private void ReplaceHistory(FlowGraphDefinition definition) { State = State with { Draft = State.Draft! with { Definition = definition }, Diagram = FlowDesignerDocument.From(definition), IsDirty = true, SaveState = FlowSaveState.UnsavedChanges }; Changed(); }
+    public void MarkSaved(FlowDraftResponse response, string source) { State = State with { Resource = new(response.Value.FlowId, response.Value.DisplayName, response.Value.Description, response.Value.Tags, response.Value.Definition, response.Value.Revision), Diagram = FlowDesignerDocument.From(response.Value.Definition), ETag = response.ETag, LocalRevision = response.Value.Revision, SourceText = source, IsDirty = false, SaveState = FlowSaveState.Saved, SourceError = null }; Changed(); }
+    public void Undo() { if (!undo.TryPop(out var definition) || State.Resource is null || State.IsReadOnly) return; redo.Push(State.Resource.Definition); ReplaceHistory(definition); }
+    public void Redo() { if (!redo.TryPop(out var definition) || State.Resource is null || State.IsReadOnly) return; undo.Push(State.Resource.Definition); ReplaceHistory(definition); }
+    private void ReplaceHistory(FlowGraphDefinition definition) { State = State with { Resource = State.Resource! with { Definition = definition }, Diagram = FlowDesignerDocument.From(definition), IsDirty = true, SaveState = FlowSaveState.UnsavedChanges }; Changed(); }
     private void Changed() => StateChanged?.Invoke(this, EventArgs.Empty);
 }

@@ -561,6 +561,12 @@ public sealed class FlowTests
         CollectionAssert.AreEqual(new[] { "sql-expert", "dotnet-expert" }, routing.Destinations.Select(target => target.Id).ToArray());
         Assert.AreEqual("dotnet-expert", routing.Fallback?.Id);
 
+        var current = await client.GetFromJsonAsync<FlowResponse>("/api/flows/designer-api-flow", JsonOptions);
+        Assert.IsNotNull(current);
+        Assert.IsNotNull(current.Graph);
+        Assert.AreEqual("input", current.Graph.EntryStep);
+        Assert.AreEqual(version.Graph.Steps.Count, current.Graph.Steps.Count);
+
         using var recreateResponse = await client.PostAsync("/api/flows/designer-api-flow/versions/1.0.0/draft", null);
         Assert.AreEqual(HttpStatusCode.OK, recreateResponse.StatusCode);
         var recreated = await recreateResponse.Content.ReadFromJsonAsync<FlowDraftResponse>(JsonOptions);

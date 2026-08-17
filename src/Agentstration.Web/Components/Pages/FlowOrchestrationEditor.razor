@@ -1,4 +1,6 @@
 @page "/flows/{FlowId}/orchestration"
+@page "/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration"
+@using Agentstration.Resources
 @implements IDisposable
 @inject IFlowApiClient Client
 @inject IManagementApiClient Management
@@ -15,29 +17,37 @@ else if (model is null)
 }
 else
 {
-    <PageHeader Title="@model.Name" Description="Edit participants and execution strategy without exposing runtime implementation details.">
-        <Actions><a class="button-secondary" href="/flows/@Uri.EscapeDataString(FlowId)">Flow details</a></Actions>
+    <PageHeader Title="@model.Name" Description="@(IsReadOnly ? "Inspect the published participants and execution strategy." : "Edit participants and execution strategy without exposing runtime implementation details.")">
+        <Actions><a class="button-secondary" href="@DetailsUrl">Flow details</a></Actions>
     </PageHeader>
+    @if (IsReadOnly)
+    {
+        <p class="muted"><span class="read-only-badge">Read only</span> Namespace <code>@FlowResourceNamespace.Value</code> · Published version <strong>@publishedVersion</strong></p>
+    }
     <EditForm Model="model" OnValidSubmit="SaveAsync">
-        <article class="panel orchestration-metadata">
+        <fieldset class="panel orchestration-metadata" disabled="@IsReadOnly">
             <div class="form-columns"><label>Technical name<input value="@model.Name" readonly /></label><label>Current definition version<InputText @bind-Value="model.Version" /></label></div>
             <label>Description<InputTextArea @bind-Value="model.Description" /></label>
             <label class="check-option"><InputCheckbox @bind-Value="model.Enabled" /> Enabled</label>
-        </article>
-        <OrchestrationDefinitionEditor Model="model" Agents="agents" />
+        </fieldset>
+        <OrchestrationDefinitionEditor Model="model" Agents="agents" IsReadOnly="@IsReadOnly" />
         @if (error is not null) { <p class="error-panel orchestration-message">@error</p> }
         @if (message is not null) { <p class="success-panel orchestration-message">@message</p> }
-        <div class="orchestration-actions">
-            <span class="save-state">ETag protected · @(saving ? "Saving…" : "Ready")</span>
-            <button type="submit" class="button-secondary" disabled="@saving">Save</button>
-            <label>Publish version<input @bind="publishVersion" /></label>
-            <button type="button" class="button-primary" disabled="@saving" @onclick="PublishAsync">Publish and activate</button>
-        </div>
+        @if (!IsReadOnly)
+        {
+            <div class="orchestration-actions">
+                <span class="save-state">ETag protected · @(saving ? "Saving…" : "Ready")</span>
+                <button type="submit" class="button-secondary" disabled="@saving">Save</button>
+                <label>Publish version<input @bind="publishVersion" /></label>
+                <button type="button" class="button-primary" disabled="@saving" @onclick="PublishAsync">Publish and activate</button>
+            </div>
+        }
     </EditForm>
 }
 
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
+    [Parameter] public string? FlowNamespace { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private OrchestrationEditorModel? model;
     private IReadOnlyList<AgentSummary> agents = [];
@@ -47,20 +57,42 @@ else
     private string? message;
     private bool loading = true;
     private bool saving;
+    private string? publishedVersion;
+    private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
+    private bool IsReadOnly => !FlowResourceNamespace.IsDefault;
+    private string DetailsUrl => IsReadOnly
+        ? $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows/{Uri.EscapeDataString(FlowId)}"
+        : $"/flows/{Uri.EscapeDataString(FlowId)}";
 
     protected override async Task OnParametersSetAsync()
     {
         try
         {
             loading = true; error = null;
-            var flowTask = Client.GetFlowSnapshotAsync(FlowId, cancellation.Token);
             var agentsTask = Management.GetAgentsAsync(cancellation.Token);
-            await Task.WhenAll(flowTask, agentsTask);
-            var snapshot = await flowTask;
-            model = OrchestrationEditorModel.From(snapshot.Value);
-            etag = snapshot.ETag;
-            agents = await agentsTask;
-            publishVersion = snapshot.Value.ActiveVersion is null ? snapshot.Value.Version : NextVersion(snapshot.Value.Version);
+            if (IsReadOnly)
+            {
+                var flow = await Client.GetFlowAsync(FlowResourceNamespace, FlowId, cancellation.Token);
+                if (string.IsNullOrWhiteSpace(flow.ActiveVersion))
+                    throw new InvalidOperationException($"Namespaced Flow '{FlowResourceNamespace.Value}/{FlowId}' has no active published version.");
+                var version = await Client.GetFlowVersionAsync(FlowResourceNamespace, FlowId, flow.ActiveVersion, cancellation.Token);
+                if (version.Definition is not OrchestrationFlowDefinition)
+                    throw new InvalidOperationException($"Published version {version.Version} is not an orchestration Flow.");
+                model = OrchestrationEditorModel.From(flow with { Version = version.Version, Definition = version.Definition, Description = version.Description });
+                publishedVersion = version.Version;
+                etag = null;
+                agents = await agentsTask;
+            }
+            else
+            {
+                var flowTask = Client.GetFlowSnapshotAsync(FlowId, cancellation.Token);
+                await Task.WhenAll(flowTask, agentsTask);
+                var snapshot = await flowTask;
+                model = OrchestrationEditorModel.From(snapshot.Value);
+                etag = snapshot.ETag;
+                agents = await agentsTask;
+                publishVersion = snapshot.Value.ActiveVersion is null ? snapshot.Value.Version : NextVersion(snapshot.Value.Version);
+            }
         }
         catch (Exception exception) { error = exception.Message; model = null; }
         finally { loading = false; }
@@ -68,7 +100,7 @@ else
 
     private async Task SaveAsync()
     {
-        if (model is null || etag is null) return;
+        if (IsReadOnly || model is null || etag is null) return;
         try
         {
             saving = true; error = null; message = null;
@@ -87,6 +119,7 @@ else
 
     private async Task PublishAsync()
     {
+        if (IsReadOnly) return;
         await SaveAsync();
         if (error is not null || model is null) return;
         try

@@ -28,7 +28,7 @@ else
     <FlowRunTimeline Events="events" IsLive="@(!run.Status.IsTerminal())" />
     <section class="designer-layout run-layout">
         <div>
-            <FlowGraph Nodes="FlowGraphNode.From(run)" SelectedName="selected?.StepName" OnSelected="SelectStep" />
+            <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep" />
             <article class="panel io-panel"><div class="panel-header"><h2>Run input and output</h2></div><div class="io-grid"><div><span class="field-label">Input</span><pre>@Pretty(run.Input)</pre></div><div><span class="field-label">Output</span><pre>@Pretty(run.Output)</pre></div></div></article>
         </div>
         <article class="panel inspector step-inspector">
@@ -57,6 +57,7 @@ else
     private Microsoft.AspNetCore.SignalR.Client.HubConnection? hub;
     private long lastSequence;
     private int streamingRenderScheduled;
+    private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", "Flow topology") : FlowTopologyProjector.Project(run, events);
 
     protected override async Task OnParametersSetAsync()
     {
