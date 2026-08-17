@@ -6,8 +6,10 @@ using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
 using Agentstration.Flow.Storage.Abstractions;
 using Agentstration.Flow.Storage.Sqlite;
+using Agentstration.Infrastructure.Flows;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -483,9 +485,11 @@ public sealed class FlowTests
                 new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
         await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
         var expressions = new FlowExpressionParser();
+        var cancellations = new TestCancellationRegistry();
+        var events = new NullFlowRunEventSink();
         var runs = new FlowRunService(
-            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new TestAgentExecutor(),
-            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            fixture.Repository, new TestFlowRunQueue(), cancellations, new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, events,
             new TestFlowRunExecutionScope(), TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"Need input"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
@@ -496,12 +500,25 @@ public sealed class FlowTests
         Assert.AreEqual(1, active.ActiveRunCount);
         Assert.AreEqual(1, active.WaitingForInputCount);
         Assert.AreEqual(0, active.HistoricalRunCount);
+        Assert.AreEqual(FlowRunStatus.WaitingForInput, active.ActiveRuns.Single().Status);
+        Assert.AreEqual(1, active.ActiveRuns.Single().PendingInputRequestCount);
 
-        await runs.ForceTerminateRevisionRunsAsync("revision-agent-a-7", default);
+        var executionStates = new TestRuntimeExecutionStateStore();
+        await executionStates.StoreAsync(new RuntimeExecutionState(
+            pending.Value.Id, "maf", "checkpoint-1", JsonSerializer.SerializeToElement(new { state = "waiting" }), Now), default);
+        var retention = new AgentRevisionRunRetention(
+            new FlowRevisionRetentionService(fixture.Repository, cancellations, events, TimeProvider.System),
+            executionStates);
+        await retention.ForceTerminateAsync("revision-agent-a-7", default);
 
-        var failed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
-        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
-        Assert.AreEqual("agent_revision_force_purged", failed.Error?.Code);
+        var cancelled = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Cancelled, cancelled.Status);
+        Assert.AreEqual("runtime_dependency_force_purged", cancelled.Error?.Code);
+        Assert.AreEqual(InputRequestStatus.Cancelled,
+            (await runs.ListInputsAsync(pending.Value.Id, null, default)).Single().Value.Status);
+        Assert.IsNull(await executionStates.GetAsync(pending.Value.Id, "maf", "checkpoint-1", default));
+        Assert.IsTrue((await runs.ListEventsAsync(pending.Value.Id, 0, default))
+            .Any(runEvent => runEvent.Type == FlowRunEventType.FlowRunCancelled));
         var historical = await runs.GetRevisionUsageAsync("revision-agent-a-7", default);
         Assert.AreEqual(0, historical.ActiveRunCount);
         Assert.AreEqual(1, historical.HistoricalRunCount);
@@ -995,6 +1012,44 @@ public sealed class FlowTests
         private DateTimeOffset current = initial;
         public override DateTimeOffset GetUtcNow() => current;
         public void Advance(TimeSpan duration) => current += duration;
+    }
+
+    private sealed class TestRuntimeExecutionStateStore : IRuntimeExecutionStateStore
+    {
+        private readonly Dictionary<(string RunId, string RuntimeType, string StateId), RuntimeExecutionState> states = [];
+
+        public Task StoreAsync(RuntimeExecutionState state, CancellationToken cancellationToken)
+        {
+            states[(state.RunId, state.RuntimeType, state.StateId)] = state;
+            return Task.CompletedTask;
+        }
+
+        public Task<RuntimeExecutionState?> GetAsync(
+            string runId,
+            string runtimeType,
+            string stateId,
+            CancellationToken cancellationToken)
+        {
+            states.TryGetValue((runId, runtimeType, stateId), out var state);
+            return Task.FromResult(state);
+        }
+
+        public Task<IReadOnlyList<RuntimeExecutionState>> ListAsync(
+            string runId,
+            string runtimeType,
+            string? parentStateId,
+            CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RuntimeExecutionState>>(
+                states.Values.Where(state => state.RunId == runId
+                    && state.RuntimeType == runtimeType
+                    && (parentStateId is null || state.ParentStateId == parentStateId)).ToArray());
+
+        public Task DeleteAsync(string runId, string? runtimeType, CancellationToken cancellationToken)
+        {
+            foreach (var key in states.Keys.Where(key => key.RunId == runId
+                         && (runtimeType is null || key.RuntimeType == runtimeType)).ToArray())
+                states.Remove(key);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class SuspendingOrchestrationEngine : IFlowOrchestrationEngine

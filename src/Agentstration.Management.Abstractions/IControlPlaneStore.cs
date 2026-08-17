@@ -12,7 +12,13 @@ public sealed record AgentRevisionRunUsage(
     int ActiveRunCount,
     int WaitingForInputCount,
     int HistoricalRunCount,
-    IReadOnlyList<string> ActiveRunIds);
+    IReadOnlyList<string> ActiveRunIds,
+    IReadOnlyList<AgentRevisionRunImpact> ActiveRuns);
+
+public sealed record AgentRevisionRunImpact(
+    string RunId,
+    string Status,
+    int PendingInputRequestCount);
 
 public interface IAgentRevisionRunRetention
 {

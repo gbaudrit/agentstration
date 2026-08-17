@@ -94,5 +94,9 @@ internal sealed class PurgeAgentRevisionEndpoint : IManagementEndpoint
             impact.RunUsage.ActiveRunCount,
             impact.RunUsage.WaitingForInputCount,
             impact.RunUsage.HistoricalRunCount,
-            impact.RunUsage.ActiveRunIds));
+            impact.RunUsage.ActiveRunIds,
+            impact.RunUsage.ActiveRuns.Select(run => new AgentRevisionRunImpactResponse(
+                run.RunId,
+                run.Status,
+                run.PendingInputRequestCount)).ToArray()));
 }

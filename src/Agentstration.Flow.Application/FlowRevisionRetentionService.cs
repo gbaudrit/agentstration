@@ -13,6 +13,7 @@ public sealed class FlowRevisionRetentionService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(revisionId);
         var active = new List<string>();
+        var activeRuns = new List<FlowRevisionRunImpact>();
         var waiting = 0;
         var historical = 0;
         var skip = 0;
@@ -27,12 +28,15 @@ public sealed class FlowRevisionRetentionService(
                 {
                     active.Add(run.Value.Id);
                     if (run.Value.Status == FlowRunStatus.WaitingForInput) waiting++;
+                    var pendingInputs = await repository.ListInputRequestsAsync(
+                        run.Value.Id, InputRequestStatus.Pending, cancellationToken);
+                    activeRuns.Add(new(run.Value.Id, run.Value.Status, pendingInputs.Count));
                 }
             }
             skip += page.Items.Count;
             if (!page.HasMore || page.Items.Count == 0) break;
         }
-        return new(revisionId, active.Count, waiting, historical, active);
+        return new(revisionId, active.Count, waiting, historical, active, activeRuns);
     }
 
     public async Task<FlowRevisionUsage> ForceTerminateAsync(string revisionId, CancellationToken cancellationToken)
@@ -47,26 +51,28 @@ public sealed class FlowRevisionRetentionService(
                 if (stored is null || stored.Value.Status.IsTerminal()) continue;
                 var now = timeProvider.GetUtcNow();
                 var error = new FlowRunError(
-                    "agent_revision_force_purged",
+                    "runtime_dependency_force_purged",
                     "The agent revision required to resume this Flow Run was force-purged.",
                     revisionId);
-                var steps = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.Running
-                    ? step with { Status = FlowStepRunStatus.Failed, CompletedAt = now, Error = error }
+                var steps = stored.Value.Steps.Select(step => step.Status is FlowStepRunStatus.NotStarted or FlowStepRunStatus.Running
+                    ? step with { Status = FlowStepRunStatus.Cancelled, CompletedAt = now, Error = error }
                     : step).ToArray();
                 await repository.UpdateRunAsync(stored.Value with
                 {
-                    Status = FlowRunStatus.Failed,
+                    Status = FlowRunStatus.Cancelled,
                     CompletedAt = now,
                     Error = error,
                     Steps = steps,
                     ExecutionLeaseId = null,
                     ExecutionLeaseExpiresAt = null
                 }, stored.ETag, cancellationToken);
+                foreach (var input in await repository.ListInputRequestsAsync(runId, InputRequestStatus.Pending, cancellationToken))
+                    await repository.UpdateInputRequestAsync(input.Value with { Status = InputRequestStatus.Cancelled }, input.ETag, cancellationToken);
                 var runEvent = await repository.AppendRunEventAsync(new FlowRunEvent(
                     runId,
                     0,
-                    FlowRunEventType.FlowRunFailed,
-                    steps.FirstOrDefault(step => step.Status == FlowStepRunStatus.Failed)?.StepName,
+                    FlowRunEventType.FlowRunCancelled,
+                    steps.FirstOrDefault(step => step.Status == FlowStepRunStatus.Cancelled)?.StepName,
                     JsonSerializer.SerializeToElement(error),
                     now), cancellationToken);
                 await eventSink.PublishAsync(runEvent, cancellationToken);

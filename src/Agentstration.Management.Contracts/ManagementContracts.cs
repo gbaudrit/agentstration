@@ -17,7 +17,12 @@ public sealed record AgentRevisionRunUsageResponse(
     int ActiveRunCount,
     int WaitingForInputCount,
     int HistoricalRunCount,
-    IReadOnlyList<string> ActiveRunIds);
+    IReadOnlyList<string> ActiveRunIds,
+    IReadOnlyList<AgentRevisionRunImpactResponse> ActiveRuns);
+public sealed record AgentRevisionRunImpactResponse(
+    string RunId,
+    string Status,
+    int PendingInputRequestCount);
 public sealed record AgentRevisionPurgeImpactResponse(
     string Namespace,
     string AgentName,

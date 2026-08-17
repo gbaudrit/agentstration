@@ -70,7 +70,13 @@ public sealed record FlowRevisionUsage(
     int ActiveRunCount,
     int WaitingForInputCount,
     int HistoricalRunCount,
-    IReadOnlyList<string> ActiveRunIds);
+    IReadOnlyList<string> ActiveRunIds,
+    IReadOnlyList<FlowRevisionRunImpact> ActiveRuns);
+
+public sealed record FlowRevisionRunImpact(
+    string RunId,
+    FlowRunStatus Status,
+    int PendingInputRequestCount);
 
 public sealed class InputRequestAlreadyResolvedException(string requestId)
     : Exception($"Input Request '{requestId}' has already been resolved.");
