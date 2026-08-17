@@ -71,7 +71,7 @@ public sealed class PacksComponentTests
         Assert.AreEqual("1", rendered.FindAll(".composer-summary strong")[0].TextContent);
         Assert.IsTrue(rendered.FindAll(".composer-selected-resource").Any(resource => resource.TextContent.Contains("Daily Assistant", StringComparison.Ordinal)));
         Assert.IsTrue(rendered.Markup.Contains("model-reasoning", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Markup.Contains("Binding only", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.FindAll("button").Any(button => button.GetAttribute("aria-label") == "Add Reasoning to Pack"));
 
         await rendered.Find(".composer-remove").ClickAsync(new());
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Add resources from the workspace inventory", StringComparison.Ordinal)));
@@ -140,7 +140,7 @@ public sealed class PacksComponentTests
         ([
             new() { Resource = new(ResourceKinds.Entry, "daily-assistant"), DisplayName = "Daily Assistant", Status = "Published" },
             new() { Resource = new(ResourceKinds.Agent, "concierge"), DisplayName = "Concierge", Status = "Accepted" },
-            new() { Resource = new(ResourceKinds.ModelProfile, "reasoning"), DisplayName = "Reasoning", Availability = PackCompositionAvailability.BindingOnly, AvailabilityReason = "Converted to a binding." }
+            new() { Resource = new(ResourceKinds.ModelProfile, "reasoning"), DisplayName = "Reasoning" }
         ]);
         public Task<PackCompositionPreview> PreviewCompositionAsync(PreviewPackCompositionCommand command, CancellationToken cancellationToken)
         {

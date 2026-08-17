@@ -31,12 +31,13 @@ public sealed partial class PackCompositionService(
         var selected = command.Resources
             .DistinctBy(resource => resource.Address)
             .ToArray();
+        var selectedAddresses = selected.Select(resource => resource.Address).ToHashSet();
 
         if (selected.Length == 0)
             issues.Add(new("pack_composition_empty", "Select at least one resource for the Pack.", PackCompositionIssueSeverity.Error));
 
         foreach (var resource in selected)
-            await IncludeAsync(resource, true, included, bindingUsages, visiting, issues, cancellationToken);
+            await IncludeAsync(resource, true, selectedAddresses, included, bindingUsages, visiting, issues, cancellationToken);
 
         var bindingNames = CreateBindingNames(bindingUsages);
         var resources = included.Values
@@ -153,6 +154,7 @@ public sealed partial class PackCompositionService(
     private async Task IncludeAsync(
         PackCompositionResourceKey resource,
         bool explicitlySelected,
+        IReadOnlySet<ResourceAddress> explicitlySelectedResources,
         IDictionary<ResourceAddress, (PackCompositionResourceSnapshot Snapshot, bool Explicit)> included,
         IDictionary<ResourceAddress, BindingUsage> bindings,
         ISet<ResourceAddress> visiting,
@@ -189,11 +191,16 @@ public sealed partial class PackCompositionService(
         {
             if (dependency.Mode == PackCompositionDependencyMode.Include)
             {
-                await IncludeAsync(dependency.Target, false, included, bindings, visiting, issues, cancellationToken);
+                await IncludeAsync(dependency.Target, false, explicitlySelectedResources, included, bindings, visiting, issues, cancellationToken);
                 continue;
             }
             if (dependency.Mode == PackCompositionDependencyMode.Binding && dependency.BindingTargetKind is { } targetKind)
             {
+                if (explicitlySelectedResources.Contains(dependency.Target.Address))
+                {
+                    await IncludeAsync(dependency.Target, false, explicitlySelectedResources, included, bindings, visiting, issues, cancellationToken);
+                    continue;
+                }
                 var target = await catalog.GetAsync(dependency.Target, cancellationToken);
                 if (target is null)
                 {
@@ -220,7 +227,12 @@ public sealed partial class PackCompositionService(
         var used = new HashSet<string>(StringComparer.Ordinal);
         foreach (var pair in bindings.OrderBy(value => value.Key.Kind, StringComparer.Ordinal).ThenBy(value => value.Key.Name, StringComparer.Ordinal))
         {
-            var prefix = pair.Value.TargetKind == PackBindingTargetKind.Secret ? "secret" : "model";
+            var prefix = pair.Value.TargetKind switch
+            {
+                PackBindingTargetKind.Secret => "secret",
+                PackBindingTargetKind.ModelProvider => "provider",
+                _ => "model"
+            };
             var baseName = Slug($"{prefix}-{pair.Value.Resource.Name}");
             var name = baseName;
             var suffix = 1;
@@ -252,11 +264,20 @@ public sealed partial class PackCompositionService(
 
     private static string ResourcePath(PackCompositionResourceKey resource)
     {
-        var directory = resource.Kind switch { ResourceKinds.Agent => "agents", ResourceKinds.Flow => "flows", ResourceKinds.Entry => "entries", _ => $"{resource.Kind.ToLowerInvariant()}s" };
+        var directory = resource.Kind switch
+        {
+            ResourceKinds.Agent => "agents",
+            ResourceKinds.Flow => "flows",
+            ResourceKinds.Entry => "entries",
+            ResourceKinds.ModelProfile => "model-profiles",
+            ResourceKinds.ModelProvider => "model-providers",
+            ResourceKinds.RuntimeProfile => "runtime-profiles",
+            _ => $"{resource.Kind.ToLowerInvariant()}s"
+        };
         return $"{directory}/{resource.Name}.json";
     }
-    private static int KindOrder(string kind) => kind switch { ResourceKinds.Agent => 10, ResourceKinds.Flow => 20, ResourceKinds.Entry => 30, _ => 100 };
-    private static string BindingLabel(PackBindingTargetKind kind) => kind == PackBindingTargetKind.Secret ? "Secret" : "Model Profile";
+    private static int KindOrder(string kind) => kind switch { ResourceKinds.ModelProvider => 10, ResourceKinds.RuntimeProfile => 20, ResourceKinds.ModelProfile => 30, ResourceKinds.Agent => 40, ResourceKinds.Flow => 50, ResourceKinds.Entry => 60, _ => 100 };
+    private static string BindingLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model Provider", _ => "Model Profile" };
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static IReadOnlyList<string> Clean(IEnumerable<string> values) => values.Select(value => value.Trim()).Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     private static string Slug(string value)

@@ -165,6 +165,13 @@ else
                                                     <option value="@BindingValue(profile.Name, ResourceNamespace.Parse(profile.Namespace))">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name · @profile.Properties.Provider.Name / @profile.Properties.Model.Name</option>
                                                 }
                                             }
+                                            else if (binding.TargetKind == PackBindingTargetKind.ModelProvider)
+                                            {
+                                                @foreach (var provider in modelProviders)
+                                                {
+                                                    <option value="@BindingValue(provider.Name, ResourceNamespace.Default)">@provider.Properties.DisplayName — default/@provider.Name · @provider.Properties.ProviderType</option>
+                                                }
+                                            }
                                             else
                                             {
                                                 @foreach (var secret in secrets)
@@ -238,6 +245,7 @@ else
     private AgentstrationApiException? error;
     private PackInstallationPreview? preview;
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
+    private IReadOnlyList<ModelProviderResponse> modelProviders = [];
     private IReadOnlyList<SecretResponse> secrets = [];
     private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
     private byte[]? archive;
@@ -327,8 +335,12 @@ else
             }
             if (preview.Bindings.Count > 0)
             {
-                modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
-                secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProfile))
+                    modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProvider))
+                    modelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
+                    secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
             }
         }
         catch (AgentstrationApiException exception) { installError = exception.Message; }
@@ -440,7 +452,7 @@ else
         if (parts.Length != 2) throw new InvalidOperationException("The selected Pack binding is invalid.");
         return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
     }
-    private static string BindingKindLabel(PackBindingTargetKind kind) => kind == PackBindingTargetKind.Secret ? "Secret" : "Model profile";
+    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model provider", _ => "Model profile" };
     private static string PurposeLabel(PackPurpose purpose) => purpose switch { PackPurpose.Sample => "SAMPLE", PackPurpose.Template => "TEMPLATE", _ => "STANDARD" };
     private static string AudienceLabel(PackAudience audience) => audience switch { PackAudience.Personal => "Personal", PackAudience.Professional => "Professional", _ => "Universal" };
     private static string StateLabel(InstalledPackState state) => state switch { InstalledPackState.Installing => "Installing", InstalledPackState.Installed => "Installed", InstalledPackState.Uninstalling => "Uninstalling", InstalledPackState.Failed => "Failed", _ => "Degraded" };

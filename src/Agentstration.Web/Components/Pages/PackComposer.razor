@@ -310,7 +310,7 @@ else
     private static string ResourceLabel(PackCompositionPreviewResource resource) => $"{resource.Resource.Kind} {resource.DisplayName}";
     private static string AvailabilityLabel(PackCompositionCatalogItem item) => item.Availability switch { PackCompositionAvailability.Selectable => item.Status, PackCompositionAvailability.BindingOnly => "Binding only", _ => "Not supported" };
     private static UiStatus AvailabilityTone(PackCompositionCatalogItem item) => item.Availability switch { PackCompositionAvailability.Selectable => UiStatus.Success, PackCompositionAvailability.BindingOnly => UiStatus.Info, _ => UiStatus.Neutral };
-    private static string BindingLabel(PackBindingTargetKind kind) => kind == PackBindingTargetKind.Secret ? "Secret" : "Model profile";
+    private static string BindingLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model provider", _ => "Model profile" };
     private static string? Empty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static IReadOnlyList<string> Split(string value) => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     public void Dispose() { previewCancellation?.Cancel(); previewCancellation?.Dispose(); cancellation.Cancel(); cancellation.Dispose(); }
