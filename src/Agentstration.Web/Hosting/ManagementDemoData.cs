@@ -74,11 +74,19 @@ public static class ManagementDemoData
             }, cancellationToken);
         }
 
-        await EnsureAgentAsync(agents, store, "dotnet-expert", "Specialized agent for .NET, C#, ASP.NET Core, and runtime diagnostics.", "Focus on .NET and C#. Provide safe, practical guidance.", ["dotnet", "csharp", "aspnet"], cancellationToken);
-        await EnsureAgentAsync(agents, store, "sql-expert", "Specialized agent for SQL query performance and database diagnostics.", "Focus on SQL performance and read-only diagnostics.", ["sql", "database", "query-performance"], cancellationToken);
+        await EnsureAgentAsync(agents, store, "dotnet-expert", "Specialized agent for .NET, C#, ASP.NET Core, and runtime diagnostics.", "Focus on .NET and C#. Provide safe, practical guidance.", ["dotnet", "csharp", "aspnet"], [], cancellationToken);
+        await EnsureAgentAsync(agents, store, "sql-expert", "Specialized agent for SQL query performance and database diagnostics.", "Focus on SQL performance and read-only diagnostics.", ["sql", "database", "query-performance"], [], cancellationToken);
     }
 
-    private static async Task EnsureAgentAsync(AgentManagementService management, IControlPlaneStore store, string name, string description, string instructions, IReadOnlyCollection<string> capabilities, CancellationToken cancellationToken)
+    internal static async Task EnsureAgentAsync(
+        AgentManagementService management,
+        IControlPlaneStore store,
+        string name,
+        string description,
+        string instructions,
+        IReadOnlyCollection<string> capabilities,
+        IReadOnlyCollection<string> toolNames,
+        CancellationToken cancellationToken)
     {
         var agent = await management.GetAgentAsync(name, cancellationToken);
         if (agent is null)
@@ -99,6 +107,7 @@ public static class ManagementDemoData
                     Description = description,
                     Instructions = instructions,
                     ModelProfile = new ResourceReference("reasoning-default"),
+                    Tools = toolNames.Select(toolName => new ResourceReference(toolName)).ToArray(),
                     Behaviors = capabilities.ToArray()
                 }
             }, null, true, cancellationToken);

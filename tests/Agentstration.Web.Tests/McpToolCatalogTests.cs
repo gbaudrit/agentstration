@@ -52,6 +52,22 @@ public sealed class McpToolCatalogTests
         }
     }
 
+    [TestMethod]
+    public async Task ApprovalGovernanceExposesAnApprovalRequiredAiFunction()
+    {
+        await using var host = new WebApplicationFactory<global::Program>();
+        var provider = Provider();
+        var tool = Tool(provider.Metadata.Name) with
+        {
+            Definition = Tool(provider.Metadata.Name).Definition with { RequiresApproval = true }
+        };
+        var catalog = new McpToolCatalog(new FakeStore(provider, tool), Adapter(host));
+
+        var runtime = (await catalog.ResolveAsync([tool.Metadata.Name])).Single();
+
+        Assert.IsInstanceOfType<ApprovalRequiredAIFunction>(runtime.GetService(typeof(AITool)));
+    }
+
     private static ToolProviderAdapter Adapter(WebApplicationFactory<global::Program> host)
     {
         var configuration = new ConfigurationBuilder().Build();
@@ -73,7 +89,10 @@ public sealed class McpToolCatalogTests
         Metadata = new ResourceMetadata { Name = "local.list_workspaces" },
         Definition = new ToolResourceProperties
         {
-            DisplayName = "List workspaces", Provider = new ResourceReference(providerId), ExternalId = "list_workspaces", Enabled = true,
+            DisplayName = "List workspaces",
+            Provider = new ResourceReference(providerId),
+            ExternalId = "list_workspaces",
+            Enabled = true,
             Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch },
             Schema = new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object" }) }
         }

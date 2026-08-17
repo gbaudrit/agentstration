@@ -11,9 +11,9 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Local;
 using Agentstration.Runtime.Storage.Sqlite;
-using Microsoft.Data.Sqlite;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -142,6 +142,72 @@ public sealed class AgentFrameworkRuntimeFactoryTests
 
                 Assert.AreEqual("APPROVED_OK", resumedEvents.OfType<FlowExecutionCompleted>().Single().Result.FinalOutput.GetString());
             }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task ApprovalRequiredAiFunctionProducesARealMafExternalRequest()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-maf-approval-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton(TimeProvider.System);
+            services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")};Pooling=False");
+            await using var provider = services.BuildServiceProvider();
+            var states = provider.GetRequiredService<IRuntimeExecutionStateStore>();
+            await provider.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
+            using var chatClient = new RecordingChatClient
+            {
+                ResponseFactory = (_, _, options) =>
+                {
+                    var tool = options?.Tools?.Single(value => value.Name == ApprovalTool.ToolName)
+                        ?? throw new InvalidOperationException("The governed tool was not exposed to the Agent.");
+                    Assert.IsInstanceOfType<ApprovalRequiredAIFunction>(tool);
+                    return new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                    [
+                        new FunctionCallContent(
+                            "hash-call-1",
+                            tool.Name,
+                            new Dictionary<string, object?> { ["text"] = "durable approval" })
+                    ]));
+                }
+            };
+            var factory = new AgentFrameworkRuntimeFactory(
+                new RecordingResolver(chatClient),
+                NullLoggerFactory.Instance,
+                new GenAiObservabilityOptions());
+            var engine = new AgentFrameworkFlowOrchestrationEngine(
+                new RecordingAgentResolver([ApprovalTool.ResourceId]),
+                new ApprovalToolCatalog(),
+                factory,
+                states);
+            var events = new List<FlowExecutionEvent>();
+
+            await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+                "run-real-approval",
+                new OrchestrationFlowDefinition(
+                    [new FlowTargetReference(FlowTargetKind.Agent, "approval-agent")],
+                    new SequentialOrchestrationPattern()),
+                JsonSerializer.SerializeToElement(new { payload = "durable approval" }),
+                "correlation-real-approval")))
+            {
+                events.Add(item);
+            }
+
+            var requested = events.OfType<FlowExternalInputRequested>().Single();
+            Assert.AreEqual(InputRequestType.Confirmation, requested.Type);
+            Assert.IsNotNull(await states.GetAsync(
+                "run-real-approval",
+                requested.RuntimeState.RuntimeType,
+                requested.RuntimeState.StateId,
+                default));
         }
         finally
         {
@@ -495,7 +561,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         DefinitionHash = "hash"
     };
 
-    private sealed class RecordingAgentResolver : IRuntimeAgentResolver
+    private sealed class RecordingAgentResolver(IReadOnlyCollection<string>? effectiveToolNames = null) : IRuntimeAgentResolver
     {
         private readonly Dictionary<string, Guid> agentIds = new(StringComparer.Ordinal);
         public List<ResourceNamespace> ResolvedNamespaces { get; } = [];
@@ -514,7 +580,11 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 agentId = Guid.NewGuid();
                 agentIds.Add(resourceId, agentId);
             }
-            var definition = Definition(resourceId) with { AgentId = agentId };
+            var definition = Definition(resourceId) with
+            {
+                AgentId = agentId,
+                EffectiveToolNames = effectiveToolNames ?? []
+            };
             return Task.FromResult(new ResolvedRuntimeAgent(
                 definition.AgentId,
                 resourceId,
@@ -528,6 +598,34 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 "Ready",
                 null));
         }
+    }
+
+    private sealed class ApprovalToolCatalog : IToolCatalog
+    {
+        public ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(
+            IEnumerable<string> toolIds,
+            CancellationToken cancellationToken = default)
+        {
+            CollectionAssert.AreEqual(new[] { ApprovalTool.ResourceId }, toolIds.ToArray());
+            return ValueTask.FromResult<IReadOnlyCollection<IAgentTool>>([new ApprovalTool()]);
+        }
+    }
+
+    private sealed class ApprovalTool : IAgentTool
+    {
+        public const string ResourceId = "utilities.hash.compute";
+        public const string ToolName = "hash_compute";
+        private readonly ApprovalRequiredAIFunction function = new(AIFunctionFactory.Create(
+            (string text) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text))).ToLowerInvariant(),
+            ToolName,
+            "Compute SHA-256 after approval."));
+
+        public string Id => ResourceId;
+        public string Name => ToolName;
+        public string? Description => "Compute SHA-256 after approval.";
+        public ValueTask<JsonElement?> InvokeAsync(JsonElement? arguments, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("MAF must request approval before invoking this tool.");
+        public object? GetService(Type serviceType) => serviceType.IsInstanceOfType(function) ? function : null;
     }
 
     private sealed record TestApprovalResponse(IList<ChatMessage> Messages);

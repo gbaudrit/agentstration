@@ -3,6 +3,7 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Management.Abstractions;
 using Agentstration.Runtime.Abstractions;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -161,7 +162,10 @@ public sealed class ToolProviderAdapter(
     private static IAgentTool Wrap(ToolResource resource, McpClientTool native)
     {
         if (!string.IsNullOrWhiteSpace(resource.Definition.Description)) native = native.WithDescription(resource.Definition.Description);
-        return new McpAgentTool(resource.Metadata.Name, resource.Definition.Description ?? native.Description, native);
+        AITool exposed = resource.Definition.RequiresApproval
+            ? new ApprovalRequiredAIFunction(native)
+            : native;
+        return new McpAgentTool(resource.Metadata.Name, resource.Definition.Description ?? native.Description, native, exposed);
     }
 }
 
@@ -190,7 +194,7 @@ public sealed class McpToolCatalog(IControlPlaneStore store, ToolProviderAdapter
     }
 }
 
-internal sealed class McpAgentTool(string id, string? description, McpClientTool native) : IAgentTool
+internal sealed class McpAgentTool(string id, string? description, McpClientTool native, AITool exposed) : IAgentTool
 {
     public string Id { get; } = id;
     public string Name => native.Name;
@@ -200,7 +204,7 @@ internal sealed class McpAgentTool(string id, string? description, McpClientTool
         var values = arguments is { ValueKind: JsonValueKind.Object } ? arguments.Value.EnumerateObject().ToDictionary(value => value.Name, value => (object?)value.Value.Clone(), StringComparer.Ordinal) : new Dictionary<string, object?>();
         return JsonSerializer.SerializeToElement(await native.InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments(values), cancellationToken));
     }
-    public object? GetService(Type serviceType) => serviceType.IsInstanceOfType(native) ? native : null;
+    public object? GetService(Type serviceType) => serviceType.IsInstanceOfType(exposed) ? exposed : null;
 }
 
 public sealed class ToolResolutionException(string code, string message, Exception? innerException = null) : Exception(message, innerException) { public string Code { get; } = code; }

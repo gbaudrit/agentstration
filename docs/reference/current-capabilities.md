@@ -76,7 +76,9 @@ The Management Plane persists `Agentstration.Tools/toolProviders` and the `Agent
 
 AEP itself is staged as an autonomous repository under `aep/`, with protocol `2026-08-01`, canonical discovery at `/.well-known/aep`, versioned capability descriptors, a reusable validator and tracing client, a headless CLI, a generic sample, and a standalone Blazor Inspector. Agentstration uses local project references during extraction and can switch to versioned packages with `UseLocalAepProjects=false` after publication.
 
-The Tools Console separates Providers and Catalog, displays provider status and schemas, and defaults every newly discovered tool to disabled. The Agent editor assigns canonical Tool resource IDs and warns when an existing assignment is unavailable. Runtime resolution requires provider enabled, tool enabled, tool available, and assignment before passing the official MCP `AITool` to MAF.
+The Tools Console separates Providers and Catalog, displays provider status, schemas, and whether approval is required, and defaults every newly discovered tool to disabled. The Agent editor assigns canonical Tool resource IDs and warns when an existing assignment is unavailable. Runtime resolution requires provider enabled, tool enabled, tool available, and assignment before passing the official MCP `AITool` to MAF. Tools governed with `requiresApproval` become MAF `ApprovalRequiredAIFunction` values, so approval pauses are persisted as ordinary durable Flow input requests.
+
+When the AppHost Utilities extension is available, standalone sample data includes `demo-interactive-input` version 1.3.0. The Flow console initializes its Run dialog from the resource's `agentstration.io/sample-input` metadata, so this sample starts with a reproducible `payload` value. Its first agent calls the real `hash_compute` MCP tool through AEP, waits for explicit approval, then resumes from the persisted MAF checkpoint and continues to the next agent. No demonstration orchestration engine is involved.
 
 ## Work, Flow, Run, and Agent
 

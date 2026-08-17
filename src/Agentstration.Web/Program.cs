@@ -188,6 +188,8 @@ await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.L
 if (app.Services.GetRequiredService<ICurrentRequestContext>().IsInitialized)
 {
     await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+    if (!app.Environment.IsEnvironment("Testing"))
+        await InteractiveFlowDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
     await WorkplaceDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
     await DemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
 }

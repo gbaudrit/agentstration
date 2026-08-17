@@ -56,7 +56,7 @@ else
     private IReadOnlyList<FlowGraphNode> GraphNodes => flow is null ? [] : FlowGraphNode.From(flow.Definition);
     protected override async Task OnParametersSetAsync(){flow=await Client.GetFlowAsync(FlowResourceNamespace,FlowId,cancellation.Token);versions=await Client.GetFlowVersionsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runs=await Client.GetFlowRunsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runVersion=flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";}
     private void SelectNode(string name)=>selectedNode=name;
-    private void OpenRun(){activeTab="Runs";showRun=true;error=null;}
+    private void OpenRun(){activeTab="Runs";showRun=true;error=null;if(flow?.Metadata.TryGetValue("agentstration.io/sample-input",out var sampleInput)==true)inputJson=sampleInput;}
     private async Task SubmitRunAsync(){try{submitting=true;error=null;using var document=JsonDocument.Parse(inputJson);var run=await Client.CreateFlowRunAsync(FlowResourceNamespace,FlowId,new CreateFlowRunRequest(document.RootElement.Clone(),runVersion,deployment,FlowRunTrigger.Manual),cancellation.Token);Navigation.NavigateTo($"/flow-runs/{run.Id}");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}
     public void Dispose(){cancellation.Cancel();cancellation.Dispose();}
 }
