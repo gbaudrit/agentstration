@@ -1,12 +1,13 @@
 using System.Text.Json;
 using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
+using Agentstration.Resources;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.Components;
 using Agentstration.Web.FlowDesigner.State;
+using Blazor.Diagrams.Core.Geometry;
 using Bunit;
 using Bunit.JSInterop;
-using Blazor.Diagrams.Core.Geometry;
 using Microsoft.Extensions.DependencyInjection;
 using FlowDesignerComponent = Agentstration.Web.FlowDesigner.Components.FlowDesigner;
 
@@ -27,16 +28,21 @@ public sealed class FlowDesignerReadOnlyTests
         context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
             .SetResult(new Rectangle(0, 0, 1024, 768));
 
+        var @namespace = new ResourceNamespace("pack.sample");
         var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
             .Add(component => component.ResourceId, "sample")
-            .Add(component => component.IsReadOnly, true));
+            .Add(component => component.Namespace, @namespace));
 
-        var save = rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Save");
-        var publish = rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Publish");
-        Assert.IsTrue(save.HasAttribute("disabled"));
-        Assert.IsTrue(publish.HasAttribute("disabled"));
+        Assert.IsFalse(rendered.FindAll("button").Any(button => button.TextContent.Trim() is "Save" or "Publish" or "Run draft"));
         Assert.AreEqual(0, backend.SaveCount);
         StringAssert.Contains(rendered.Markup, "Read only");
+        StringAssert.Contains(rendered.Markup, "pack.sample");
+        StringAssert.Contains(rendered.Markup, "Published version 2.1.0");
+        Assert.AreEqual(@namespace, backend.LoadedTarget?.Namespace);
+
+        rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Definition").Click();
+        var applyYaml = rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Apply valid YAML");
+        Assert.IsTrue(applyYaml.HasAttribute("disabled"));
     }
 
     private sealed class ResourceProviderStub : IFlowDesignerResourceProvider
@@ -49,13 +55,19 @@ public sealed class FlowDesignerReadOnlyTests
     {
         private readonly FlowDraftResponse draft = CreateDraft();
         public int SaveCount { get; private set; }
-        public Task<FlowDraftResponse> GetDraftAsync(string resourceId, CancellationToken cancellationToken) => Task.FromResult(draft);
-        public Task<FlowSourceResponse> GetSourceAsync(string resourceId, CancellationToken cancellationToken) => Task.FromResult(new FlowSourceResponse("entryStep: input", "yaml", 1));
-        public Task<FlowDraftResponse> SaveDraftAsync(string resourceId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) { SaveCount++; return Task.FromResult(draft); }
-        public Task<FlowDraftResponse> ReplaceSourceAsync(string resourceId, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<FlowValidationResponse> ValidateAsync(string resourceId, CancellationToken cancellationToken) => Task.FromResult(new FlowValidationResponse(true, []));
-        public Task<FlowVersionResponse> PublishAsync(string resourceId, PublishFlowDraftRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<FlowRun> RunDraftAsync(string resourceId, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public FlowDesignerTarget? LoadedTarget { get; private set; }
+        public Task<FlowDesignerLoadResult> LoadAsync(FlowDesignerTarget target, CancellationToken cancellationToken)
+        {
+            LoadedTarget = target;
+            var value = draft.Value;
+            return Task.FromResult(new FlowDesignerLoadResult(new(value.FlowId, value.DisplayName, value.Description, value.Tags, value.Definition), "entryStep: input", PublishedVersion: "2.1.0"));
+        }
+        public Task<FlowSourceResponse> GetSourceAsync(FlowDesignerTarget target, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowDraftResponse> SaveDraftAsync(FlowDesignerTarget target, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) { SaveCount++; return Task.FromResult(draft); }
+        public Task<FlowDraftResponse> ReplaceSourceAsync(FlowDesignerTarget target, ReplaceFlowSourceRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowValidationResponse> ValidateAsync(FlowDesignerTarget target, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowVersionResponse> PublishAsync(FlowDesignerTarget target, PublishFlowDraftRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowRun> RunDraftAsync(FlowDesignerTarget target, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         private static FlowDraftResponse CreateDraft()
         {

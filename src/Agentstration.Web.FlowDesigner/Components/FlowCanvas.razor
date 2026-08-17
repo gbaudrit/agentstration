@@ -1,6 +1,12 @@
 @implements IDisposable
 
 <div class="flow-diagram-canvas" role="application" aria-label="Flow diagram">
+    <div class="flow-zoom-controls" role="group" aria-label="Diagram zoom controls">
+        <button type="button" @onclick="ZoomOut" aria-label="Zoom out">−</button>
+        <span aria-live="polite">@ZoomPercent%</span>
+        <button type="button" @onclick="ZoomIn" aria-label="Zoom in">+</button>
+        <button type="button" @onclick="Center">Fit</button>
+    </div>
     <CascadingValue Value="diagram" IsFixed="true">
         <DiagramCanvas />
     </CascadingValue>
@@ -17,6 +23,7 @@
     private long renderedFitRevision = -1;
     private bool rebuilding;
     private bool fitAfterRender;
+    private int ZoomPercent => (int)Math.Round(diagram.Zoom * 100);
 
     [Parameter, EditorRequired] public FlowDesignerDocument Document { get; set; } = new([], []);
     [Parameter] public long Revision { get; set; }
@@ -31,6 +38,7 @@
     {
         diagram.RegisterComponent<FlowDiagramNode, FlowNodeWidget>();
         diagram.ContainerChanged += OnContainerChanged;
+        diagram.ZoomChanged += OnZoomChanged;
         diagram.SelectionChanged += OnSelectionChanged;
         diagram.Links.Added += OnLinkAdded;
         diagram.Links.Removed += OnLinkRemoved;
@@ -61,6 +69,14 @@
         fitAfterRender = true;
         TryFit();
     }
+
+    public void ZoomIn() => SetZoom(diagram.Zoom + 0.15);
+
+    public void ZoomOut() => SetZoom(diagram.Zoom - 0.15);
+
+    private void SetZoom(double zoom) => diagram.SetZoom(Math.Clamp(zoom, 0.25, 2.5));
+
+    private void OnZoomChanged() => _ = InvokeAsync(StateHasChanged);
 
     private void Rebuild()
     {
@@ -153,6 +169,7 @@
     public void Dispose()
     {
         diagram.ContainerChanged -= OnContainerChanged;
+        diagram.ZoomChanged -= OnZoomChanged;
         diagram.SelectionChanged -= OnSelectionChanged;
         diagram.Links.Added -= OnLinkAdded;
         diagram.Links.Removed -= OnLinkRemoved;
