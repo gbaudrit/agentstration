@@ -14,7 +14,9 @@ using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Application.Tests;
 
@@ -617,6 +619,106 @@ public sealed class FlowTests
     }
 
     [TestMethod]
+    public async Task FlowRunInputApiSupportsEveryInteractionTypeConflictAndExpiration()
+    {
+        var clock = new AdvancingTimeProvider(new DateTimeOffset(2026, 8, 17, 8, 0, 0, TimeSpan.Zero));
+        var queue = new TestFlowRunQueue();
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IFlowRunQueue>();
+                services.RemoveAll<IFlowOrchestrationEngine>();
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton<IFlowRunQueue>(queue);
+                services.AddSingleton<IFlowOrchestrationEngine, TypedSuspendingOrchestrationEngine>();
+                services.AddSingleton<TimeProvider>(clock);
+            });
+        });
+        using var client = factory.CreateClient();
+        var definition = new CreateFlowRequest("interactive-api-flow", "Interactive API", "1.0.0", true,
+            new OrchestrationFlowDefinition(
+                [
+                    new FlowTargetReference(FlowTargetKind.Agent, "sql-expert"),
+                    new FlowTargetReference(FlowTargetKind.Agent, "dotnet-expert")
+                ],
+                new SequentialOrchestrationPattern()));
+        Assert.AreEqual(HttpStatusCode.Created,
+            (await client.PostAsJsonAsync("/api/flows", definition, JsonOptions)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Created,
+            (await client.PostAsJsonAsync("/api/flows/interactive-api-flow/versions", new CreateFlowVersionRequest("1.0.0"))).StatusCode);
+        var service = factory.Services.GetRequiredService<FlowRunService>();
+        var principalId = factory.Services.GetRequiredService<ICurrentRequestContext>().Current.PrincipalId.ToString("D");
+
+        var cases = new[]
+        {
+            new InteractionApiCase("text", InputRequestType.Text, Array.Empty<string>(), JsonSerializer.SerializeToElement("Ada"), JsonSerializer.SerializeToElement("")),
+            new InteractionApiCase("choice", InputRequestType.Choice, new[] { "red", "blue" }, JsonSerializer.SerializeToElement("blue"), JsonSerializer.SerializeToElement("green")),
+            new InteractionApiCase("confirmation", InputRequestType.Confirmation, Array.Empty<string>(), JsonSerializer.SerializeToElement(true), JsonSerializer.SerializeToElement("yes"))
+        };
+
+        foreach (var interaction in cases)
+        {
+            using var input = JsonDocument.Parse($$"""{"kind":"{{interaction.Kind}}"}""");
+            using var createResponse = await client.PostAsJsonAsync("/api/flows/interactive-api-flow/runs",
+                new CreateFlowRunRequest(input.RootElement.Clone()), JsonOptions);
+            Assert.AreEqual(HttpStatusCode.Accepted, createResponse.StatusCode);
+            var run = await createResponse.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
+            Assert.IsNotNull(run);
+            await service.ExecuteAsync(run.Id, default);
+
+            var pending = await client.GetFromJsonAsync<InputRequest[]>(
+                $"/api/flowRuns/{run.Id}/inputs?status=Pending", JsonOptions);
+            Assert.IsNotNull(pending);
+            Assert.HasCount(1, pending);
+            var request = pending[0];
+            Assert.AreEqual(interaction.Type, request.Type);
+            CollectionAssert.AreEqual(interaction.Options.ToArray(), request.Options.ToArray());
+            using var detailResponse = await client.GetAsync($"/api/flowRuns/{run.Id}/inputs/{request.Id}");
+            Assert.AreEqual(HttpStatusCode.OK, detailResponse.StatusCode);
+            Assert.IsNotNull(detailResponse.Headers.ETag);
+
+            using var invalidResponse = await client.PostAsJsonAsync(
+                $"/api/flowRuns/{run.Id}/inputs/{request.Id}/response",
+                new SubmitInputResponseRequest(interaction.InvalidValue), JsonOptions);
+            Assert.AreEqual(HttpStatusCode.BadRequest, invalidResponse.StatusCode);
+
+            using var acceptedResponse = await client.PostAsJsonAsync(
+                $"/api/flowRuns/{run.Id}/inputs/{request.Id}/response",
+                new SubmitInputResponseRequest(interaction.ValidValue), JsonOptions);
+            Assert.AreEqual(HttpStatusCode.Accepted, acceptedResponse.StatusCode);
+            var answered = await acceptedResponse.Content.ReadFromJsonAsync<InputRequest>(JsonOptions);
+            Assert.AreEqual(InputRequestStatus.Answered, answered!.Status);
+            Assert.AreEqual(principalId, answered.Response!.PrincipalId);
+
+            using var duplicateResponse = await client.PostAsJsonAsync(
+                $"/api/flowRuns/{run.Id}/inputs/{request.Id}/response",
+                new SubmitInputResponseRequest(interaction.ValidValue), JsonOptions);
+            Assert.AreEqual(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
+        }
+
+        using var expiringInput = JsonDocument.Parse("""{"kind":"text"}""");
+        var expiringCreate = await client.PostAsJsonAsync("/api/flows/interactive-api-flow/runs",
+            new CreateFlowRunRequest(expiringInput.RootElement.Clone()), JsonOptions);
+        var expiringRun = await expiringCreate.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
+        await service.ExecuteAsync(expiringRun!.Id, default);
+        var expiringRequest = (await client.GetFromJsonAsync<InputRequest[]>(
+            $"/api/flowRuns/{expiringRun.Id}/inputs?status=Pending", JsonOptions))!.Single();
+        clock.Advance(TimeSpan.FromDays(8));
+
+        using var expiredResponse = await client.PostAsJsonAsync(
+            $"/api/flowRuns/{expiringRun.Id}/inputs/{expiringRequest.Id}/response",
+            new SubmitInputResponseRequest(JsonSerializer.SerializeToElement("too late")), JsonOptions);
+        Assert.AreEqual(HttpStatusCode.BadRequest, expiredResponse.StatusCode);
+        var expired = await client.GetFromJsonAsync<InputRequest>(
+            $"/api/flowRuns/{expiringRun.Id}/inputs/{expiringRequest.Id}", JsonOptions);
+        Assert.AreEqual(InputRequestStatus.Expired, expired!.Status);
+        var timedOut = await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{expiringRun.Id}", JsonOptions);
+        Assert.AreEqual(FlowRunStatus.TimedOut, timedOut!.Status);
+    }
+
+    [TestMethod]
     public void FlowRunConsoleUsesDistinctRouteFromApi()
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
@@ -1095,6 +1197,39 @@ public sealed class FlowTests
             RuntimeProfileName = "local",
             ModelProfileName = "default"
         };
+    }
+
+    private sealed record InteractionApiCase(
+        string Kind,
+        InputRequestType Type,
+        IReadOnlyList<string> Options,
+        JsonElement ValidValue,
+        JsonElement InvalidValue);
+
+    private sealed class TypedSuspendingOrchestrationEngine : IFlowOrchestrationEngine
+    {
+        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
+            FlowOrchestrationExecutionRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var kind = request.Input.GetProperty("kind").GetString();
+            var type = kind switch
+            {
+                "choice" => InputRequestType.Choice,
+                "confirmation" => InputRequestType.Confirmation,
+                _ => InputRequestType.Text
+            };
+            var options = type == InputRequestType.Choice ? new[] { "red", "blue" } : [];
+            yield return new FlowExternalInputRequested(
+                $"runtime-{request.RunId}",
+                $"Provide a {kind} response",
+                type,
+                options,
+                "sql-expert",
+                new DurableRuntimeStateReference("test-runtime", $"state-{request.RunId}", DateTimeOffset.UtcNow));
+            await Task.CompletedTask;
+        }
     }
 
     [TestMethod]
