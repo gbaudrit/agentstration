@@ -126,6 +126,19 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual("secondary", ResourceName(client.SavedDashboard.Entries.Single(value => value.Role == DashboardItemRole.Primary).EntryResourceId.Value));
     }
 
+    [TestMethod]
+    public void DashboardEditorCreatesAnEmptyDraftWhenWorkspaceHasNoDashboard()
+    {
+        using var context = new BunitContext();
+        var client = new FakeEntryAdministrationApiClient { HasDashboard = false };
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+
+        var rendered = context.Render<Workspaces>();
+
+        Assert.IsTrue(rendered.Markup.Contains("New Dashboard", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Find("input[type='checkbox']").HasAttribute("checked"));
+    }
+
     private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
 
     private sealed class FakeEntryAdministrationApiClient : IEntryAdministrationApiClient
@@ -140,6 +153,7 @@ public sealed class EntryAdministrationComponentTests
         public Agentstration.Resources.ResourceNamespace RequestedDependencyNamespace { get; private set; }
         public EntryDraft? SavedEntry { get; private set; }
         public WorkplaceDashboardDraft? SavedDashboard { get; private set; }
+        public bool HasDashboard { get; init; } = true;
 
         public Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<EntryDraftResponse>>([]);
         public Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken)
@@ -209,6 +223,7 @@ public sealed class EntryAdministrationComponentTests
         public Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken)
         {
+            if (!HasDashboard) return Task.FromResult<IReadOnlyList<WorkplaceDashboardDraftResponse>>([]);
             var entries = new DashboardEntryReference[] { new() { EntryResourceId = EntryId("primary"), Role = DashboardItemRole.Primary, Order = 0 }, new() { EntryResourceId = EntryId("secondary"), Role = DashboardItemRole.Standard, Order = 10 } };
             var draft = new WorkplaceDashboardDraft { Id = new("home"), WorkspaceId = new(WorkspaceResourceId), Name = "home", DisplayName = "Personal", IsDefault = true, Entries = entries, UpdatedAt = Now };
             var published = new WorkplaceDashboard { Id = new("home"), WorkspaceId = new(WorkspaceResourceId), Name = "home", DisplayName = "Personal", IsDefault = true, Entries = entries, PublishedAt = Now };
