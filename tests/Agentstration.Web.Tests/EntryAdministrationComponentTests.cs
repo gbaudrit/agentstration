@@ -139,6 +139,24 @@ public sealed class EntryAdministrationComponentTests
         Assert.IsTrue(rendered.Find("input[type='checkbox']").HasAttribute("checked"));
     }
 
+    [TestMethod]
+    public async Task DashboardEditorCreatesAndPublishesTheFirstWorkspace()
+    {
+        using var context = new BunitContext();
+        var client = new FakeEntryAdministrationApiClient { HasWorkspace = false };
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var rendered = context.Render<Workspaces>();
+
+        await rendered.Find("[data-testid='workspace-name']").ChangeAsync(new ChangeEventArgs { Value = "personal" });
+        await rendered.Find("[data-testid='workspace-display-name']").ChangeAsync(new ChangeEventArgs { Value = "Personal workspace" });
+        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Create Workspace", StringComparison.Ordinal)).ClickAsync(new());
+
+        Assert.IsNotNull(client.SavedWorkspace);
+        Assert.AreEqual("personal", client.SavedWorkspace.Name);
+        Assert.AreEqual("personal", client.PublishedWorkspaceName);
+        Assert.IsTrue(rendered.Markup.Contains("Dashboard composition", StringComparison.Ordinal));
+    }
+
     private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
 
     private sealed class FakeEntryAdministrationApiClient : IEntryAdministrationApiClient
@@ -154,6 +172,9 @@ public sealed class EntryAdministrationComponentTests
         public EntryDraft? SavedEntry { get; private set; }
         public WorkplaceDashboardDraft? SavedDashboard { get; private set; }
         public bool HasDashboard { get; init; } = true;
+        public bool HasWorkspace { get; set; } = true;
+        public WorkplaceWorkspaceDraft? SavedWorkspace { get; private set; }
+        public string? PublishedWorkspaceName { get; private set; }
 
         public Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<EntryDraftResponse>>([]);
         public Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken)
@@ -207,6 +228,7 @@ public sealed class EntryAdministrationComponentTests
 
         public Task<IReadOnlyList<WorkplaceWorkspaceDraftResponse>> GetWorkspacesAsync(CancellationToken cancellationToken)
         {
+            if (!HasWorkspace) return Task.FromResult<IReadOnlyList<WorkplaceWorkspaceDraftResponse>>([]);
             var draft = new WorkplaceWorkspaceDraft
             {
                 Id = new(WorkspaceResourceId),
@@ -219,8 +241,17 @@ public sealed class EntryAdministrationComponentTests
         }
 
         public Task<WorkplaceWorkspaceDraftResponse> GetWorkspaceAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken) => Task.FromResult(draft);
-        public Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken)
+        {
+            HasWorkspace = true;
+            SavedWorkspace = draft with { Revision = 1, UpdatedAt = Now };
+            return Task.FromResult(SavedWorkspace);
+        }
+        public Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken)
+        {
+            PublishedWorkspaceName = name;
+            return Task.FromResult(new WorkplaceWorkspace { Id = new(name), Name = name, DisplayName = SavedWorkspace?.DisplayName ?? name, PublishedAt = Now });
+        }
         public Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken)
         {
             if (!HasDashboard) return Task.FromResult<IReadOnlyList<WorkplaceDashboardDraftResponse>>([]);
