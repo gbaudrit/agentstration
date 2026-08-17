@@ -62,8 +62,18 @@ public sealed record FlowRunExecutionOptions
 {
     public TimeSpan OrchestrationTimeout { get; init; } = TimeSpan.FromMinutes(10);
     public TimeSpan InputRequestTimeout { get; init; } = TimeSpan.FromDays(7);
-    public TimeSpan ExecutionLeaseDuration { get; init; } = TimeSpan.FromMinutes(2);
+    public TimeSpan ExecutionLeaseDuration { get; init; } = TimeSpan.FromMinutes(15);
 }
+
+public sealed record FlowRevisionUsage(
+    string RevisionId,
+    int ActiveRunCount,
+    int WaitingForInputCount,
+    int HistoricalRunCount,
+    IReadOnlyList<string> ActiveRunIds);
+
+public sealed class InputRequestAlreadyResolvedException(string requestId)
+    : Exception($"Input Request '{requestId}' has already been resolved.");
 
 public sealed class FlowRunService(
     IFlowRepository repository,
@@ -84,9 +94,9 @@ public sealed class FlowRunService(
         ? new()
         : executionOptions.OrchestrationTimeout > TimeSpan.Zero
           && executionOptions.InputRequestTimeout > TimeSpan.Zero
-          && executionOptions.ExecutionLeaseDuration > TimeSpan.Zero
+          && executionOptions.ExecutionLeaseDuration > executionOptions.OrchestrationTimeout
             ? executionOptions
-            : throw new ArgumentOutOfRangeException(nameof(executionOptions), "Execution, input, and lease timeouts must be positive.");
+            : throw new ArgumentOutOfRangeException(nameof(executionOptions), "Execution and input timeouts must be positive, and the execution lease must exceed the orchestration timeout.");
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flow");
     public static readonly Meter Meter = new("Agentstration.Flow");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");
@@ -273,7 +283,7 @@ public sealed class FlowRunService(
         var stored = await repository.GetInputRequestAsync(runId, requestId, cancellationToken)
             ?? throw new FlowValidationException("input_request_not_found", $"Input Request '{requestId}' was not found.");
         if (stored.Value.Status != InputRequestStatus.Pending)
-            throw new FlowConcurrencyException("The Input Request has already been resolved.");
+            throw new InputRequestAlreadyResolvedException(requestId);
         var now = timeProvider.GetUtcNow();
         if (stored.Value.ExpiresAt <= now)
         {
@@ -281,11 +291,19 @@ public sealed class FlowRunService(
             throw new FlowValidationException("input_request_expired", "The Input Request has expired.");
         }
         ValidateInputResponse(stored.Value, value);
-        var answered = await repository.UpdateInputRequestAsync(stored.Value with
+        StoredInputRequest answered;
+        try
         {
-            Status = InputRequestStatus.Answered,
-            Response = new InputResponse(now, value.Clone(), string.IsNullOrWhiteSpace(principalId) ? "local-user" : principalId)
-        }, stored.ETag, cancellationToken);
+            answered = await repository.UpdateInputRequestAsync(stored.Value with
+            {
+                Status = InputRequestStatus.Answered,
+                Response = new InputResponse(now, value.Clone(), string.IsNullOrWhiteSpace(principalId) ? "local-user" : principalId)
+            }, stored.ETag, cancellationToken);
+        }
+        catch (FlowConcurrencyException)
+        {
+            throw new InputRequestAlreadyResolvedException(requestId);
+        }
         await EmitAsync(runId, FlowRunEventType.InputReceived, stored.Value.Source,
             JsonSerializer.SerializeToElement(new { requestId, principalId = answered.Value.Response!.PrincipalId }), cancellationToken);
         await queue.EnqueueAsync(new(runId, run.Value.Scope), cancellationToken);
@@ -303,6 +321,14 @@ public sealed class FlowRunService(
             if (expired is not null) await ExpireInputAsync(run, expired, now, cancellationToken);
         }
     }
+
+    public async Task<FlowRevisionUsage> GetRevisionUsageAsync(string revisionId, CancellationToken cancellationToken)
+        => await RevisionRetention().GetUsageAsync(revisionId, cancellationToken);
+
+    public async Task<FlowRevisionUsage> ForceTerminateRevisionRunsAsync(string revisionId, CancellationToken cancellationToken)
+        => await RevisionRetention().ForceTerminateAsync(revisionId, cancellationToken);
+
+    private FlowRevisionRetentionService RevisionRetention() => new(repository, cancellations, eventSink, timeProvider);
 
     public async Task<StoredFlowRun> CancelAsync(string runId, CancellationToken cancellationToken)
     {
@@ -729,7 +755,15 @@ public sealed class FlowRunService(
         if (finalOutput is null) throw new FlowValidationException("flow_output_missing", "The Flow completed without reaching an Output step.");
         var now = timeProvider.GetUtcNow();
         var finalSteps = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.NotStarted ? step with { Status = FlowStepRunStatus.Skipped, CompletedAt = now } : step).ToArray();
-        await SaveAsync(stored, stored.Value with { Status = FlowRunStatus.Succeeded, Output = finalOutput.Value.Clone(), CompletedAt = now, Steps = finalSteps }, stoppingToken);
+        await SaveAsync(stored, stored.Value with
+        {
+            Status = FlowRunStatus.Succeeded,
+            Output = finalOutput.Value.Clone(),
+            CompletedAt = now,
+            Steps = finalSteps,
+            ExecutionLeaseId = null,
+            ExecutionLeaseExpiresAt = null
+        }, stoppingToken);
         RecordCompletion(stored.Value.CreatedAt, now, stored.Value.DefinitionState);
         await EmitAsync(stored.Value.Id, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
     }

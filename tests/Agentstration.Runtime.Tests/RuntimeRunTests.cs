@@ -23,6 +23,47 @@ namespace Agentstration.Runtime.Tests;
 public sealed class RuntimeRunTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    [TestMethod]
+    public async Task OpaqueRuntimeExecutionStateSurvivesStoreReconstruction()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-state-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var databasePath = Path.Combine(directory, "runtime.db");
+        try
+        {
+            static ServiceProvider Provider(string path)
+            {
+                var services = new ServiceCollection();
+                services.AddSingleton(TimeProvider.System);
+                services.AddSqliteRuntimeRuns($"Data Source={path}");
+                return services.BuildServiceProvider();
+            }
+
+            await using (var first = Provider(databasePath))
+            {
+                await first.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
+                await first.GetRequiredService<IRuntimeExecutionStateStore>().StoreAsync(new(
+                    "run-opaque", "maf", "checkpoint-2", JsonSerializer.SerializeToElement(new { opaque = "payload" }),
+                    new DateTimeOffset(2026, 8, 17, 8, 0, 0, TimeSpan.Zero), "checkpoint-1"), default);
+            }
+
+            await using (var second = Provider(databasePath))
+            {
+                await second.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
+                var restored = await second.GetRequiredService<IRuntimeExecutionStateStore>()
+                    .GetAsync("run-opaque", "maf", "checkpoint-2", default);
+                Assert.IsNotNull(restored);
+                Assert.AreEqual("checkpoint-1", restored.ParentStateId);
+                Assert.AreEqual("payload", restored.Payload.GetProperty("opaque").GetString());
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
     [TestMethod]
     public async Task CreatePreservesPayloadAndRequiresExactAgentVersion()
     {

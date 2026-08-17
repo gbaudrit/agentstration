@@ -3,6 +3,28 @@ using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
+public sealed record AgentRevisionRetentionOptions
+{
+    public int RetainLatestPerAgent { get; init; } = 3;
+    public TimeSpan MinimumAge { get; init; } = TimeSpan.FromDays(30);
+}
+
+public sealed record AgentRevisionPurgeImpact(
+    ResourceNamespace Namespace,
+    string AgentName,
+    string RevisionName,
+    long AgentGeneration,
+    bool ProtectedByRetentionPolicy,
+    IReadOnlyList<string> ProtectionReasons,
+    string? DeploymentName,
+    AgentRevisionRunUsage RunUsage);
+
+public sealed class AgentRevisionPurgeBlockedException(AgentRevisionPurgeImpact impact)
+    : Exception($"Agent revision '{impact.RevisionName}' cannot be purged while it is protected or used by active runs.")
+{
+    public AgentRevisionPurgeImpact Impact { get; } = impact;
+}
+
 public sealed class AgentManagementService(
     IControlPlaneStore store,
     IAgentResourceQueries agentQueries,
@@ -11,7 +33,10 @@ public sealed class AgentManagementService(
     IManagementEventPublisher eventBus,
     IModelProfileReferenceValidator modelProfiles,
     TimeProvider timeProvider,
-    IEnumerable<IManagementResourceDeletionGuard> deletionGuards)
+    IEnumerable<IManagementResourceDeletionGuard> deletionGuards,
+    IAgentRevisionRunRetention revisionRunRetention,
+    ISecurityAuditWriter audit,
+    AgentRevisionRetentionOptions revisionRetentionOptions)
 {
     public Task InitializeAsync(CancellationToken cancellationToken) => store.InitializeAsync(cancellationToken);
 
@@ -105,6 +130,79 @@ public sealed class AgentManagementService(
             CreatedAt = timeProvider.GetUtcNow(),
             ProvisioningState = ProvisioningState.Succeeded
         }, cancellationToken);
+    }
+
+    public async Task<AgentRevisionPurgeImpact> GetRevisionPurgeImpactAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        string revisionName,
+        CancellationToken cancellationToken)
+    {
+        var key = new ResourceKey(ResourceKinds.AgentRevision, revisionName, @namespace);
+        var revision = await store.GetAsync<AgentRevision>(key, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(key);
+        if (!string.Equals(revision.Value.AgentName, agentName, StringComparison.Ordinal))
+            throw new ControlPlaneResourceNotFoundException(key);
+        var revisions = (await store.ListAsync<AgentRevision>(@namespace, ResourceKinds.AgentRevision, 0, 1000, cancellationToken))
+            .Where(value => value.Value.AgentUid == revision.Value.AgentUid)
+            .OrderByDescending(value => value.Value.AgentVersion)
+            .ToArray();
+        var reasons = new List<string>();
+        if (revisions.Take(Math.Max(0, revisionRetentionOptions.RetainLatestPerAgent)).Any(value => value.Value.Metadata.Name == revisionName))
+            reasons.Add("retain_latest");
+        if (timeProvider.GetUtcNow() - revision.Value.CreatedAt < revisionRetentionOptions.MinimumAge)
+            reasons.Add("minimum_age");
+        var deployment = await agentQueries.FindDeploymentByRevisionAsync(@namespace, revisionName, cancellationToken);
+        var usage = await revisionRunRetention.GetUsageAsync(revisionName, cancellationToken);
+        return new(@namespace, agentName, revisionName, revision.Value.AgentVersion, reasons.Count > 0, reasons,
+            deployment?.Value.Metadata.Name, usage);
+    }
+
+    public async Task<AgentRevisionPurgeImpact> PurgeRevisionAsync(
+        ResourceNamespace @namespace,
+        string agentName,
+        string revisionName,
+        string? ifMatch,
+        bool force,
+        CancellationToken cancellationToken)
+    {
+        var impact = await GetRevisionPurgeImpactAsync(@namespace, agentName, revisionName, cancellationToken);
+        if (!force && (impact.ProtectedByRetentionPolicy || impact.RunUsage.ActiveRunCount > 0))
+            throw new AgentRevisionPurgeBlockedException(impact);
+
+        try
+        {
+            if (force && impact.RunUsage.ActiveRunCount > 0)
+            {
+                await revisionRunRetention.ForceTerminateAsync(revisionName, cancellationToken);
+                var remaining = await revisionRunRetention.GetUsageAsync(revisionName, cancellationToken);
+                if (remaining.ActiveRunCount > 0)
+                    throw new ControlPlaneConcurrencyException("Some Flow Runs still use the revision after forced termination.");
+            }
+
+            var deployment = await agentQueries.FindDeploymentByRevisionAsync(@namespace, revisionName, cancellationToken);
+            if (deployment is not null)
+            {
+                if (deployment.Value.DesiredState != DesiredAgentState.Stopped)
+                    deployment = await StopAsync(deployment, cancellationToken);
+                deployment = await ReconcileAsync(deployment, cancellationToken);
+                await store.DeleteAsync(new(ResourceKinds.AgentDeployment, deployment.Value.Metadata.Name, @namespace), deployment.ETag, cancellationToken);
+            }
+
+            var revision = await store.GetAsync<AgentRevision>(new(ResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.AgentRevision, revisionName, @namespace));
+            await store.DeleteAsync(new(ResourceKinds.AgentRevision, revisionName, @namespace), ifMatch ?? revision.ETag, cancellationToken);
+            await audit.WriteAsync(new(
+                force ? SecurityAuditActions.AgentRevisionForcePurged : SecurityAuditActions.AgentRevisionPurged,
+                ReasonCode: $"active-runs:{impact.RunUsage.ActiveRunCount}"), cancellationToken);
+            return impact;
+        }
+        catch when (force)
+        {
+            await audit.WriteAsync(new(SecurityAuditActions.AgentRevisionForcePurged, SecurityAuditOutcome.Failed,
+                ReasonCode: "force-purge-failed"), CancellationToken.None);
+            throw;
+        }
     }
 
     public async Task<StoredResource<AgentDeployment>> CreateDeploymentAsync(string name, string revisionName, AgentDeploymentSpec spec, CancellationToken cancellationToken)

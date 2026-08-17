@@ -19,6 +19,7 @@ public static class ManagementEndpoints
         GetAgentEndpoint.Map(group);
         DeleteAgentEndpoint.Map(group);
         CreateAgentRevisionEndpoint.Map(group);
+        PurgeAgentRevisionEndpoint.Map(group);
         CreateDeploymentEndpoint.Map(group);
         GetDeploymentEndpoint.Map(group);
         StartDeploymentEndpoint.Map(group);

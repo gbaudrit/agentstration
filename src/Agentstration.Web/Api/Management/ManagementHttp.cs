@@ -10,6 +10,18 @@ internal static class ManagementHttp
         try { return await action(); }
         catch (ControlPlaneResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
         catch (ControlPlaneConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
+        catch (AgentRevisionPurgeBlockedException exception)
+        {
+            var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+            {
+                Type = "https://agentstration.dev/problems/agent-revision-purge-blocked",
+                Title = "agent_revision_purge_blocked",
+                Status = StatusCodes.Status409Conflict,
+                Detail = exception.Message
+            };
+            problem.Extensions["impact"] = exception.Impact;
+            return Results.Problem(problem);
+        }
         catch (PackNotFoundException exception) { return Results.Problem(statusCode: 404, title: "pack_not_found", detail: exception.Message); }
         catch (KeyNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
         catch (PackValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }

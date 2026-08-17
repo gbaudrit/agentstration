@@ -353,6 +353,7 @@ In explicit Development mode, standalone startup creates or repairs the developm
 20. **Delivered Pack distribution increment:** Packs are versioned Management/distribution artifacts above ordinary resources, never execution primitives; local ZIP validation, namespace-scoped coordinated installation, provenance, inventory, compensation, and safe uninstall are executable offline.
 21. **Delivered Pack authoring increment:** newly installed sources are content-addressed, installed Packs can be forked into workspace-owned Pack Projects, source and fork coexist in identity-derived namespaces, unchanged revisions build identical immutable archives, and stored builds can be previewed, downloaded, installed, or explicitly reinstalled in the current Workspace without a download/upload loop. Pack Flows preserve editable graph definitions.
 22. **Delivered Pack bindings increment:** Pack manifests declare logical Model Profile and Secret requirements, installation resolves them to workspace resources without copying Secret values, and selections persist by Pack identity across uninstall and reinstall.
+23. **Delivered durable interactive execution increment:** Flow Runs persist exact participant revision/deployment bindings and opaque runtime checkpoints, expose durable input requests through REST and Workplace pending actions, recover through at-least-once leases, expire unanswered requests, and protect live revisions with impact-aware normal and forced purge operations. See ADR-0049.
 
 ## ADR catalog
 
@@ -396,3 +397,5 @@ In explicit Development mode, standalone startup creates or repairs the developm
 - ADR-0045: append-only Management security audit
 - ADR-0046: transferable Platform administration
 - ADR-0047: explicit external identity links
+- ADR-0048: durable Flow Run execution scope
+- ADR-0049: durable interactive Flow execution and exact runtime identity

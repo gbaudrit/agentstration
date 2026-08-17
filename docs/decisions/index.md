@@ -78,3 +78,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 46. [ADR-0046 — Platform administration is explicitly transferable](0046-platform-administration-is-explicitly-transferable.md)
 47. [ADR-0047 — External identities are explicitly linked to Principals](0047-external-identities-are-explicitly-linked-to-principals.md)
 48. [ADR-0048 — FlowRuns carry a durable execution scope](0048-flow-runs-carry-a-durable-execution-scope.md)
+49. [ADR-0049 — Durable interactive Flow execution preserves exact runtime identity](0049-durable-interactive-flow-execution.md)

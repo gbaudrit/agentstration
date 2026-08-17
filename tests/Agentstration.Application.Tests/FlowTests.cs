@@ -454,7 +454,7 @@ public sealed class FlowTests
             new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
             new TestFlowRunExecutionScope(), TimeProvider.System);
         await reconstructed.RespondAsync(waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Ada"), "principal-1", default);
-        await Assert.ThrowsExactlyAsync<FlowConcurrencyException>(() => reconstructed.RespondAsync(
+        await Assert.ThrowsExactlyAsync<InputRequestAlreadyResolvedException>(() => reconstructed.RespondAsync(
             waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Grace"), "principal-2", default));
 
         var recoveryQueue = new TestFlowRunQueue();
@@ -470,6 +470,99 @@ public sealed class FlowTests
         Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
         Assert.AreEqual("Ada", completed.Output!.Value.GetProperty("finalOutput").GetString());
         Assert.AreEqual(7, completed.RuntimeBindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
+    }
+
+    [TestMethod]
+    public async Task RevisionUsageDistinguishesActiveAndHistoricalRunsAndForceTerminationIsExplicit()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+            "revision-retention", null, "1.0.0", true,
+            new OrchestrationFlowDefinition(
+                [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
+                new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
+        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(
+            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), TimeProvider.System);
+        using var input = JsonDocument.Parse("""{"prompt":"Need input"}""");
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
+            "tester", "retention-correlation", input.RootElement, TestScope, default);
+        await runs.ExecuteAsync(pending.Value.Id, default);
+
+        var active = await runs.GetRevisionUsageAsync("revision-agent-a-7", default);
+        Assert.AreEqual(1, active.ActiveRunCount);
+        Assert.AreEqual(1, active.WaitingForInputCount);
+        Assert.AreEqual(0, active.HistoricalRunCount);
+
+        await runs.ForceTerminateRevisionRunsAsync("revision-agent-a-7", default);
+
+        var failed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
+        Assert.AreEqual("agent_revision_force_purged", failed.Error?.Code);
+        var historical = await runs.GetRevisionUsageAsync("revision-agent-a-7", default);
+        Assert.AreEqual(0, historical.ActiveRunCount);
+        Assert.AreEqual(1, historical.HistoricalRunCount);
+    }
+
+    [TestMethod]
+    public async Task ConcurrentWorkersClaimARunOnlyOnce()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+            "single-claim", null, "1.0.0", true, new DirectFlowDefinition(new(FlowTargetKind.Agent, "agent-a"))), default);
+        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        var expressions = new FlowExpressionParser();
+        var executor = new ConcurrentTrackingAgentExecutor();
+        FlowRunService Worker() => new(
+            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), executor,
+            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), TimeProvider.System);
+        var first = Worker();
+        var second = Worker();
+        using var input = JsonDocument.Parse("""{"prompt":"once"}""");
+        var pending = await first.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
+            "tester", "single-claim", input.RootElement, TestScope, default);
+
+        await Task.WhenAll(first.ExecuteAsync(pending.Value.Id, default), second.ExecuteAsync(pending.Value.Id, default));
+
+        Assert.AreEqual(1, executor.ExecutionCount);
+        var completed = (await first.GetAsync(pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
+        Assert.IsNull(completed.ExecutionLeaseId);
+    }
+
+    [TestMethod]
+    public async Task PendingInputExpiresDeterministicallyAndTimesOutTheRun()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+            "input-timeout", null, "1.0.0", true,
+            new OrchestrationFlowDefinition(
+                [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
+                new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
+        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        var clock = new AdvancingTimeProvider(new DateTimeOffset(2026, 8, 17, 8, 0, 0, TimeSpan.Zero));
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(
+            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), clock,
+            new FlowRunExecutionOptions { InputRequestTimeout = TimeSpan.FromMinutes(1) });
+        using var input = JsonDocument.Parse("""{"prompt":"Wait"}""");
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
+            "tester", "input-timeout", input.RootElement, TestScope, default);
+        await runs.ExecuteAsync(pending.Value.Id, default);
+        clock.Advance(TimeSpan.FromMinutes(2));
+
+        await runs.ExpireDueInputsAsync(default);
+
+        var timedOut = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.TimedOut, timedOut.Status);
+        Assert.AreEqual("input_request_timed_out", timedOut.Error?.Code);
+        Assert.AreEqual(InputRequestStatus.Expired, (await runs.ListInputsAsync(pending.Value.Id, null, default)).Single().Value.Status);
     }
 
     [TestMethod]
@@ -878,6 +971,30 @@ public sealed class FlowTests
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             yield break;
         }
+    }
+
+    private sealed class ConcurrentTrackingAgentExecutor : IFlowAgentExecutor
+    {
+        private int executionCount;
+        public int ExecutionCount => executionCount;
+
+        public async Task<FlowAgentExecutionResult> ExecuteAsync(
+            FlowTargetReference target,
+            JsonElement input,
+            string correlationId,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref executionCount);
+            await Task.Delay(100, cancellationToken);
+            return new(JsonSerializer.SerializeToElement("done"), target.Id, 1, "default", "Test", null, [], []);
+        }
+    }
+
+    private sealed class AdvancingTimeProvider(DateTimeOffset initial) : TimeProvider
+    {
+        private DateTimeOffset current = initial;
+        public override DateTimeOffset GetUtcNow() => current;
+        public void Advance(TimeSpan duration) => current += duration;
     }
 
     private sealed class SuspendingOrchestrationEngine : IFlowOrchestrationEngine

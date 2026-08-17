@@ -379,6 +379,7 @@ public static class FlowEndpoints
         try { return await action(); }
         catch (FlowNotFoundException exception) { return Results.Problem(statusCode: 404, title: "flow_not_found", detail: exception.Message); }
         catch (FlowRunNotFoundException exception) { return Results.Problem(statusCode: 404, title: "flow_run_not_found", detail: exception.Message); }
+        catch (InputRequestAlreadyResolvedException exception) { return Results.Problem(statusCode: 409, title: "input_request_already_resolved", detail: exception.Message); }
         catch (FlowConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
         catch (FlowValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
         catch (ArgumentException exception) { return Results.Problem(statusCode: 400, title: "validation_failed", detail: exception.Message); }

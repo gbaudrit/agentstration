@@ -22,6 +22,8 @@ public static class SecurityAuditActions
     public const string ExternalIdentityUnlinked = "external-identity.unlinked";
     public const string WorkspaceMembershipSet = "workspace-membership.set";
     public const string WorkspaceMembershipRemoved = "workspace-membership.removed";
+    public const string AgentRevisionPurged = "agent-revision.purged";
+    public const string AgentRevisionForcePurged = "agent-revision.force-purged";
 }
 
 public sealed record SecurityAuditEvent(
