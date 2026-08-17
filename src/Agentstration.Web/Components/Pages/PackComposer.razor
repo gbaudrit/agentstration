@@ -65,13 +65,14 @@ else
                     {
                         var selectable = item.Availability == PackCompositionAvailability.Selectable;
                         <div class="composer-resource @(!selectable ? "unavailable" : null)" @key="item.Resource.Address">
-                            <span class="composer-kind">@item.Resource.Kind</span>
-                            <span class="composer-resource-copy">
-                                <strong>@item.DisplayName</strong>
-                                <small><code>@item.Resource.Namespace/@item.Resource.Name</code>@if (!string.IsNullOrWhiteSpace(item.Version)) { <text> · @item.Version</text> }</small>
-                                @if (!string.IsNullOrWhiteSpace(item.Description)) { <small>@item.Description</small> }
-                                @if (!string.IsNullOrWhiteSpace(item.AvailabilityReason)) { <small class="composer-reason">@item.AvailabilityReason</small> }
-                            </span>
+                            <div class="composer-resource-main">
+                                <div class="composer-resource-heading"><span class="composer-kind">@item.Resource.Kind</span><strong>@item.DisplayName</strong></div>
+                                <div class="composer-resource-copy">
+                                    <small><code>@item.Resource.Namespace/@item.Resource.Name</code>@if (!string.IsNullOrWhiteSpace(item.Version)) { <text> · @item.Version</text> }</small>
+                                    @if (!string.IsNullOrWhiteSpace(item.Description)) { <small>@item.Description</small> }
+                                    @if (!string.IsNullOrWhiteSpace(item.AvailabilityReason)) { <small class="composer-reason">@item.AvailabilityReason</small> }
+                                </div>
+                            </div>
                             <span class="composer-resource-actions">
                                 <StatusBadge Text="@AvailabilityLabel(item)" Status="@AvailabilityTone(item)" />
                                 @if (selectable)
@@ -115,13 +116,14 @@ else
                         {
                             var remainsRequired = IsRequiredByOtherSelection(resource);
                             <div class="composer-selected-resource explicit" @key="resource.Resource.Address">
-                                <span class="composer-kind">@resource.Resource.Kind</span>
-                                <span class="composer-resource-copy">
-                                    <strong>@resource.DisplayName</strong>
-                                    <small>Explicit selection · <code>@resource.Resource.Namespace/@resource.Resource.Name</code></small>
-                                    @if (!string.IsNullOrWhiteSpace(resource.Path)) { <small>@resource.Path</small> }
-                                    @if (remainsRequired) { <small class="composer-inclusion-reason">@InclusionReason(resource)</small> }
-                                </span>
+                                <div class="composer-resource-main">
+                                    <div class="composer-resource-heading"><span class="composer-kind">@resource.Resource.Kind</span><strong>@resource.DisplayName</strong></div>
+                                    <div class="composer-resource-copy">
+                                        <small>Explicit selection · <code>@resource.Resource.Namespace/@resource.Resource.Name</code></small>
+                                        @if (!string.IsNullOrWhiteSpace(resource.Path)) { <small>@resource.Path</small> }
+                                        @if (remainsRequired) { <small class="composer-inclusion-reason">@InclusionReason(resource)</small> }
+                                    </div>
+                                </div>
                                 <button class="composer-remove" type="button" aria-label="@(remainsRequired ? $"Leave {resource.DisplayName} as a dependency" : $"Remove {resource.DisplayName} from Pack")" @onclick="() => RemoveAsync(resource.Resource.Address)">
                                     @(remainsRequired ? "Leave as dependency" : "Remove") <span aria-hidden="true">←</span>
                                 </button>
@@ -141,13 +143,14 @@ else
                         @foreach (var resource in AutomaticPackResources)
                         {
                             <div class="composer-selected-resource dependency" @key="resource.Resource.Address">
-                                <span class="composer-kind">@resource.Resource.Kind</span>
-                                <span class="composer-resource-copy">
-                                    <strong>@resource.DisplayName</strong>
-                                    <small>Required dependency · <code>@resource.Resource.Namespace/@resource.Resource.Name</code></small>
-                                    @if (!string.IsNullOrWhiteSpace(resource.Path)) { <small>@resource.Path</small> }
-                                    <small class="composer-inclusion-reason">@InclusionReason(resource)</small>
-                                </span>
+                                <div class="composer-resource-main">
+                                    <div class="composer-resource-heading"><span class="composer-kind">@resource.Resource.Kind</span><strong>@resource.DisplayName</strong></div>
+                                    <div class="composer-resource-copy">
+                                        <small>Required dependency · <code>@resource.Resource.Namespace/@resource.Resource.Name</code></small>
+                                        @if (!string.IsNullOrWhiteSpace(resource.Path)) { <small>@resource.Path</small> }
+                                        <small class="composer-inclusion-reason">@InclusionReason(resource)</small>
+                                    </div>
+                                </div>
                                 <button class="composer-pin" type="button" aria-label="Keep @resource.DisplayName explicitly in Pack" @onclick="() => PinAsync(resource)">Keep explicitly</button>
                             </div>
                         }
