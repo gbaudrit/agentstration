@@ -32,11 +32,11 @@ public sealed class WorkplaceUxTests
         using var context = new BunitContext();
         var primary = context.Render<PrimaryEntryContainer>(parameters => parameters.AddChildContent<EntryRenderer>(entry => entry
             .Add(value => value.Definition, PromptDefinition())
-            .Add(value => value.Role, WorkspaceEntryRole.Primary)
+            .Add(value => value.Role, DashboardItemRole.Primary)
             .Add(value => value.OnSubmit, _ => Task.CompletedTask)));
         var standard = context.Render<EntryRenderer>(parameters => parameters
             .Add(value => value.Definition, PromptDefinition())
-            .Add(value => value.Role, WorkspaceEntryRole.Standard)
+            .Add(value => value.Role, DashboardItemRole.Standard)
             .Add(value => value.OnSubmit, _ => Task.CompletedTask));
 
         Assert.IsTrue(primary.Markup.Contains("What would you like to accomplish?", StringComparison.Ordinal));
@@ -148,7 +148,7 @@ public sealed class WorkplaceUxTests
         },
         ResolvedTarget = new EntryResolvedTarget("report", "1.0.0"),
         Behavior = new EntryBehavior(),
-        ApiVersion = WorkplaceApiVersions.V20260805,
+        ApiVersion = WorkplaceApiVersions.CoreV1,
         Type = WorkResourceTypes.Entries
     };
 }

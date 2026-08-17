@@ -17,7 +17,7 @@ public sealed class WorkplaceHostTests
         });
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/notifications");
+        using var response = await client.GetAsync("/w/personal/notifications");
         var html = await response.Content.ReadAsStringAsync();
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);

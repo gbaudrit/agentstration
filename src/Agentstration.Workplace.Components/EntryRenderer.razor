@@ -15,7 +15,7 @@
 
 @code {
     [Parameter, EditorRequired] public required EntryResource Definition { get; set; }
-    [Parameter] public WorkspaceEntryRole Role { get; set; } = WorkspaceEntryRole.Standard;
+    [Parameter] public DashboardItemRole Role { get; set; } = DashboardItemRole.Standard;
     [Parameter, EditorRequired] public required EventCallback<IReadOnlyDictionary<string, JsonElement>> OnSubmit { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public bool Busy { get; set; }
