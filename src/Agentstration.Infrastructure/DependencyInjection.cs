@@ -16,6 +16,7 @@ using Agentstration.Infrastructure.Ingestion;
 using Agentstration.Infrastructure.Missions;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.Persistence;
+using Agentstration.Infrastructure.Work;
 using Agentstration.Infrastructure.Workflows;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
@@ -169,7 +170,8 @@ public static class DependencyInjection
         services.AddSingleton<IManagementResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
         services.AddSingleton<IFlowDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
         services.AddSingleton<EntryAdministrationService>();
-        services.AddSingleton<WorkspaceAdministrationService>();
+        services.AddSingleton<IWorkplaceContext, CurrentWorkplaceContext>();
+        services.AddSingleton<DashboardAdministrationService>();
         services.AddSingleton<IFlowRunQueue, LocalFlowRunQueue>();
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();

@@ -158,21 +158,12 @@ public sealed class WorkplaceApiTests
             Assert.AreEqual("Unpublished name", workplaceAfterPublish?.DisplayName);
             Assert.IsFalse(string.IsNullOrWhiteSpace(workplaceAfterPublish?.ResolvedTarget.Version));
 
-            var workspaceDraft = await client.GetFromJsonAsync<WorkplaceWorkspaceDraftResponse>("/api/management/workspaces/personal");
-            Assert.IsNotNull(workspaceDraft?.Published);
-            using var workspaceSaved = await client.PutAsJsonAsync("/api/management/workspaces/personal", workspaceDraft!.Value with { DisplayName = "Unpublished workspace" });
-            workspaceSaved.EnsureSuccessStatusCode();
-            var workspaceBeforePublish = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse>("/api/workspaces/personal");
-            Assert.AreNotEqual("Unpublished workspace", workspaceBeforePublish?.DisplayName);
-            using var workspacePublished = await client.PostAsync("/api/management/workspaces/personal/publish", null);
-            workspacePublished.EnsureSuccessStatusCode();
-            var workspaceAfterPublish = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse>("/api/workspaces/personal");
-            Assert.AreEqual("Unpublished workspace", workspaceAfterPublish?.DisplayName);
-            Assert.AreEqual(1, workspaceAfterPublish?.Entries.Count(value => value.Role == WorkspaceEntryRole.Primary));
+            var defaultDashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>("/api/workspaces/personal/dashboard");
+            Assert.AreEqual(1, defaultDashboard?.Entries.Count(value => value.Role == DashboardItemRole.Primary));
 
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/personal/entries/universal-request/interactions",
-                new CreateInteractionRequest("personal", new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement("Explain records briefly.") }));
+                new CreateInteractionRequest(new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement("Explain records briefly.") }));
             submittedResponse.EnsureSuccessStatusCode();
             var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
             Assert.IsNotNull(submitted?.Task);
@@ -207,7 +198,7 @@ public sealed class WorkplaceApiTests
             using var client = factory.CreateClient();
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/personal/entries/quick-answer/interactions",
-                new CreateInteractionRequest("personal", new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement("Remember this idea.") }));
+                new CreateInteractionRequest(new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement("Remember this idea.") }));
             submittedResponse.EnsureSuccessStatusCode();
             var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
             Assert.IsNotNull(submitted);
@@ -248,7 +239,7 @@ public sealed class WorkplaceApiTests
             using var client = factory.CreateClient();
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/personal/entries/prepare-report/interactions",
-                new CreateInteractionRequest("personal", new Dictionary<string, JsonElement>
+                new CreateInteractionRequest(new Dictionary<string, JsonElement>
                 {
                     ["request"] = JsonSerializer.SerializeToElement("Prepare a monthly report about sales performance.")
                 }));
@@ -367,7 +358,7 @@ public sealed class WorkplaceApiTests
 
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/personal/entries/guided-request/interactions",
-                new CreateInteractionRequest("personal", new Dictionary<string, JsonElement>
+                new CreateInteractionRequest(new Dictionary<string, JsonElement>
                 {
                     ["request"] = JsonSerializer.SerializeToElement("Summarize the standalone Workplace increment")
                 }));

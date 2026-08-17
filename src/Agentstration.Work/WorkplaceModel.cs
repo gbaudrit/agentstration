@@ -7,21 +7,21 @@ namespace Agentstration.Work;
 
 public static class WorkplaceApiVersions
 {
-    public const string V20260805 = "2026-08-05";
+    public const string CoreV1 = "agentstration.io/v1";
 }
 
 public static class WorkResourceTypes
 {
-    public const string Workspaces = "Agentstration.Work/workspaces";
+    public const string Dashboards = "Agentstration.Work/dashboards";
     public const string Entries = "Agentstration.Work/entries";
 }
 
-public readonly record struct WorkplaceWorkspaceId(string Value, ResourceNamespace Namespace = default)
+public readonly record struct EntryId(string Value, ResourceNamespace Namespace = default)
 {
     public override string ToString() => Value;
 }
 
-public readonly record struct EntryId(string Value, ResourceNamespace Namespace = default)
+public readonly record struct DashboardId(string Value)
 {
     public override string ToString() => Value;
 }
@@ -45,7 +45,7 @@ public readonly record struct WorkTaskActivityId(Guid Value) { public static Wor
 public readonly record struct WorkTaskResultId(Guid Value) { public static WorkTaskResultId New() => new(Guid.NewGuid()); public override string ToString() => Value.ToString(); }
 public readonly record struct WorkTaskArtifactId(Guid Value) { public static WorkTaskArtifactId New() => new(Guid.NewGuid()); public override string ToString() => Value.ToString(); }
 
-public enum WorkspaceEntryRole { Primary, Featured, Standard }
+public enum DashboardItemRole { Primary, Featured, Standard }
 public enum EntryPresentationKind { Prompt, Form, Conversation, Action, FileDrop }
 public enum EntryFieldType { Prompt, Text, Textarea, Number, Boolean, Choice, MultiChoice, Date, DateTime, File, Files, EntityPicker, ResourcePicker, Secret, Conversation }
 public enum EntryFieldRole { Standard, PrimaryInput }
@@ -62,33 +62,39 @@ public enum WorkTaskActivityType { TaskCreated, TaskStarted, TaskPaused, TaskRes
 public enum WorkNotificationKind { ActionRequired, TaskCompleted, TaskFailed, Information }
 public enum WorkTaskResultKind { Text, Structured, Table, Json, Status }
 
-public sealed record WorkspaceEntryReference
+public sealed record DashboardEntryReference
 {
     public required EntryId EntryResourceId { get; init; }
-    public WorkspaceEntryRole Role { get; init; } = WorkspaceEntryRole.Standard;
+    public DashboardItemRole Role { get; init; } = DashboardItemRole.Standard;
     public int Order { get; init; }
 }
 
-public sealed record WorkplaceWorkspace
+public sealed record WorkplaceDashboard
 {
-    public required WorkplaceWorkspaceId Id { get; init; }
+    public required DashboardId Id { get; init; }
+    public required WorkspaceId WorkspaceId { get; init; }
     public required string Name { get; init; }
-    public string Type { get; init; } = WorkResourceTypes.Workspaces;
-    public string ApiVersion { get; init; } = WorkplaceApiVersions.V20260805;
+    public string Type { get; init; } = WorkResourceTypes.Dashboards;
+    public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
-    public IReadOnlyList<WorkspaceEntryReference> Entries { get; init; } = [];
+    public bool IsDefault { get; init; }
+    public IReadOnlyList<DashboardEntryReference> Entries { get; init; } = [];
     public int Version { get; init; } = 1;
     public DateTimeOffset PublishedAt { get; init; }
 }
 
-public sealed record WorkplaceWorkspaceDraft
+public sealed record WorkplaceDashboardDraft
 {
-    public required WorkplaceWorkspaceId Id { get; init; }
+    public required DashboardId Id { get; init; }
+    public required WorkspaceId WorkspaceId { get; init; }
     public required string Name { get; init; }
+    public string Type { get; init; } = WorkResourceTypes.Dashboards;
+    public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
-    public IReadOnlyList<WorkspaceEntryReference> Entries { get; init; } = [];
+    public bool IsDefault { get; init; }
+    public IReadOnlyList<DashboardEntryReference> Entries { get; init; } = [];
     public long Revision { get; init; } = 1;
     public DateTimeOffset UpdatedAt { get; init; }
 }
@@ -133,10 +139,11 @@ public sealed record EntryBehavior(TaskCreationMode TaskCreationMode = TaskCreat
 
 public sealed record EntryDraft
 {
+    public required WorkspaceId WorkspaceId { get; init; }
     public required EntryId Id { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Entries;
-    public string ApiVersion { get; init; } = WorkplaceApiVersions.V20260805;
+    public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required EntryPresentation Presentation { get; init; }
@@ -149,10 +156,11 @@ public sealed record EntryDraft
 
 public sealed record EntryResource
 {
+    public required WorkspaceId WorkspaceId { get; init; }
     public required EntryId Id { get; init; }
     public required string Name { get; init; }
     public string Type { get; init; } = WorkResourceTypes.Entries;
-    public string ApiVersion { get; init; } = WorkplaceApiVersions.V20260805;
+    public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required EntryPresentation Presentation { get; init; }
@@ -165,7 +173,7 @@ public sealed record EntryResource
 public sealed record EntryDependency(string ResourceId, string ResourceType, string Relationship);
 
 public sealed record ConversationMessage(
-    Guid Id, WorkplaceWorkspaceId WorkspaceId, InteractionId InteractionId, WorkTaskId? WorkTaskId,
+    Guid Id, WorkspaceId WorkspaceId, InteractionId InteractionId, WorkTaskId? WorkTaskId,
     ConversationRole Role, string Content, DateTimeOffset CreatedAt, string? AgentResourceId = null,
     IReadOnlyList<WorkAttachment>? Attachments = null, PendingActionId? PendingActionId = null,
     IReadOnlyDictionary<string, string>? Metadata = null);
@@ -175,7 +183,7 @@ public sealed record PendingActionResponse(IReadOnlyDictionary<string, JsonEleme
 public sealed record PendingAction
 {
     public required PendingActionId Id { get; init; }
-    public required WorkplaceWorkspaceId WorkspaceId { get; init; }
+    public required WorkspaceId WorkspaceId { get; init; }
     public required InteractionId InteractionId { get; init; }
     public WorkTaskId? WorkTaskId { get; init; }
     public string? FlowRunId { get; init; }
@@ -194,24 +202,24 @@ public sealed record PendingAction
 }
 
 public sealed record WorkTaskActivity(
-    WorkTaskActivityId Id, WorkplaceWorkspaceId WorkspaceId, WorkTaskId WorkTaskId,
+    WorkTaskActivityId Id, WorkspaceId WorkspaceId, WorkTaskId WorkTaskId,
     WorkTaskActivityType Type, string Title, string? Description, DateTimeOffset CreatedAt,
     WorkActorKind ActorKind, string? FlowRunId = null, IReadOnlyDictionary<string, string>? Metadata = null);
 
 public sealed record WorkTaskResult(
-    WorkTaskResultId Id, WorkplaceWorkspaceId WorkspaceId, WorkTaskId WorkTaskId, string? FlowRunId,
+    WorkTaskResultId Id, WorkspaceId WorkspaceId, WorkTaskId WorkTaskId, string? FlowRunId,
     WorkTaskResultKind Kind, string Title, JsonElement Content, DateTimeOffset CreatedAt, int Sequence = 1);
 
 public sealed record ArtifactReference(string StorageKey, string ContentType, long Length);
 public sealed record ArtifactContent(string Name, string ContentType, Stream Content);
 public sealed record WorkTaskArtifact(
-    WorkTaskArtifactId Id, WorkplaceWorkspaceId WorkspaceId, WorkTaskId WorkTaskId, string? FlowRunId,
+    WorkTaskArtifactId Id, WorkspaceId WorkspaceId, WorkTaskId WorkTaskId, string? FlowRunId,
     string Name, string ContentType, long Length, string StorageKey, DateTimeOffset CreatedAt, int Sequence = 1);
 
 public sealed record WorkNotification
 {
     public required WorkNotificationId Id { get; init; }
-    public required WorkplaceWorkspaceId WorkspaceId { get; init; }
+    public required WorkspaceId WorkspaceId { get; init; }
     public required WorkNotificationKind Kind { get; init; }
     public required string Title { get; init; }
     public required string Message { get; init; }
@@ -227,7 +235,7 @@ public sealed record WorkNotification
 public sealed record WorkplaceInteraction
 {
     public required InteractionId Id { get; init; }
-    public required WorkplaceWorkspaceId WorkspaceId { get; init; }
+    public required WorkspaceId WorkspaceId { get; init; }
     public required EntryId EntryId { get; init; }
     public InteractionStatus Status { get; init; } = InteractionStatus.Active;
     public required DateTimeOffset StartedAt { get; init; }
@@ -262,7 +270,7 @@ public sealed record ShowErrorAction(string Title, string? Description) : Workpl
 
 public sealed record WorkTask(
     WorkTaskId Id,
-    WorkplaceWorkspaceId WorkspaceId,
+    WorkspaceId WorkspaceId,
     EntryId EntryId,
     InteractionId InteractionId,
     string Title,
@@ -280,30 +288,16 @@ public sealed record WorkTask(
 
 public static class WorkplaceValidation
 {
-    public static void Validate(WorkplaceWorkspace workspace)
+    public static void Validate(WorkplaceDashboard dashboard)
     {
-        ArgumentNullException.ThrowIfNull(workspace);
-        ValidateName(workspace.Id.Value, "workspace_id_invalid");
-        if (!string.Equals(workspace.Id.Value, workspace.Name, StringComparison.Ordinal))
-            throw new WorkValidationException("workspace_identity_mismatch", "Workspace id and name must match.");
-        if (string.IsNullOrWhiteSpace(workspace.DisplayName)) throw new WorkValidationException("workspace_display_name_required", "A Workspace display name is required.");
-        if (workspace.Entries.Count(reference => reference.Role == WorkspaceEntryRole.Primary) > 1)
-            throw new WorkValidationException("workspace_primary_entry_conflict", "A Workspace can expose at most one Primary Entry.");
-        if (workspace.Entries.Select(value => value.EntryResourceId).Distinct().Count() != workspace.Entries.Count)
-            throw new WorkValidationException("workspace_entry_duplicate", "A Workspace cannot reference the same Entry more than once.");
+        ArgumentNullException.ThrowIfNull(dashboard);
+        ValidateDashboard(dashboard.Id, dashboard.WorkspaceId, dashboard.Name, dashboard.DisplayName, dashboard.Entries);
     }
 
-    public static void Validate(WorkplaceWorkspaceDraft workspace)
+    public static void Validate(WorkplaceDashboardDraft dashboard)
     {
-        ArgumentNullException.ThrowIfNull(workspace);
-        ValidateName(workspace.Id.Value, "workspace_id_invalid");
-        if (!string.Equals(workspace.Id.Value, workspace.Name, StringComparison.Ordinal))
-            throw new WorkValidationException("workspace_identity_mismatch", "Workspace id and name must match.");
-        if (string.IsNullOrWhiteSpace(workspace.DisplayName)) throw new WorkValidationException("workspace_display_name_required", "A Workspace display name is required.");
-        if (workspace.Entries.Count(reference => reference.Role == WorkspaceEntryRole.Primary) > 1)
-            throw new WorkValidationException("workspace_primary_entry_conflict", "A Workspace can expose at most one Primary Entry.");
-        if (workspace.Entries.Select(value => value.EntryResourceId).Distinct().Count() != workspace.Entries.Count)
-            throw new WorkValidationException("workspace_entry_duplicate", "A Workspace cannot reference the same Entry more than once.");
+        ArgumentNullException.ThrowIfNull(dashboard);
+        ValidateDashboard(dashboard.Id, dashboard.WorkspaceId, dashboard.Name, dashboard.DisplayName, dashboard.Entries);
     }
 
     public static void Validate(EntryResource entry)
@@ -360,6 +354,26 @@ public static class WorkplaceValidation
             throw new WorkValidationException("entry_suggestions_invalid", "Entry suggestions require unique non-empty labels and values.");
         var primary = presentation.Fields.Count(field => field.Role == EntryFieldRole.PrimaryInput);
         if (primary != 1) throw new WorkValidationException("entry_primary_input_required", "An Entry requires exactly one primary input field.");
+    }
+
+    private static void ValidateDashboard(
+        DashboardId id,
+        WorkspaceId workspaceId,
+        string name,
+        string displayName,
+        IReadOnlyList<DashboardEntryReference> entries)
+    {
+        if (workspaceId.Value == Guid.Empty)
+            throw new WorkValidationException("workspace_id_invalid", "A canonical Workspace id is required.");
+        ValidateName(id.Value, "dashboard_id_invalid");
+        if (!string.Equals(id.Value, name, StringComparison.Ordinal))
+            throw new WorkValidationException("dashboard_identity_mismatch", "Dashboard id and name must match.");
+        if (string.IsNullOrWhiteSpace(displayName))
+            throw new WorkValidationException("dashboard_display_name_required", "A Dashboard display name is required.");
+        if (entries.Count(reference => reference.Role == DashboardItemRole.Primary) > 1)
+            throw new WorkValidationException("dashboard_primary_entry_conflict", "A Dashboard can expose at most one Primary Entry.");
+        if (entries.Select(value => value.EntryResourceId).Distinct().Count() != entries.Count)
+            throw new WorkValidationException("dashboard_entry_duplicate", "A Dashboard cannot reference the same Entry more than once.");
     }
 
     public static void ValidateBinding(EntryBinding binding)

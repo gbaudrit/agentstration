@@ -3,6 +3,15 @@ using System.Text.Json.Serialization;
 
 namespace Agentstration.Resources;
 
+/// <summary>
+/// Identifies the canonical Management Workspace across module boundaries.
+/// </summary>
+public readonly record struct WorkspaceId(Guid Value)
+{
+    public static WorkspaceId New() => new(Guid.NewGuid());
+    public override string ToString() => Value.ToString("D");
+}
+
 [JsonConverter(typeof(ResourceNamespaceJsonConverter))]
 public readonly struct ResourceNamespace : IEquatable<ResourceNamespace>
 {

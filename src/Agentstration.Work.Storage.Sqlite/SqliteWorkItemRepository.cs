@@ -10,8 +10,8 @@ namespace Agentstration.Work.Storage.Sqlite;
 public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbContext(options)
 {
     internal DbSet<WorkItemDocument> WorkItems => Set<WorkItemDocument>();
-    internal DbSet<WorkplaceWorkspaceDocument> Workspaces => Set<WorkplaceWorkspaceDocument>();
-    internal DbSet<WorkplaceWorkspaceDraftDocument> WorkspaceDrafts => Set<WorkplaceWorkspaceDraftDocument>();
+    internal DbSet<WorkplaceDashboardDocument> Dashboards => Set<WorkplaceDashboardDocument>();
+    internal DbSet<WorkplaceDashboardDraftDocument> DashboardDrafts => Set<WorkplaceDashboardDraftDocument>();
     internal DbSet<EntryDocument> Entries => Set<EntryDocument>();
     internal DbSet<EntryDraftDocument> EntryDrafts => Set<EntryDraftDocument>();
     internal DbSet<InteractionDocument> Interactions => Set<InteractionDocument>();
@@ -51,29 +51,24 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.HasIndex(value => new { value.WorkspaceId, value.AnchorTaskId, value.UpdatedAt });
         item.HasIndex(value => value.FlowRunId);
 
-        var workspace = modelBuilder.Entity<WorkplaceWorkspaceDocument>();
-        workspace.ToTable("WorkplaceWorkspaces");
-        workspace.HasKey(value => value.Id);
-        workspace.Property(value => value.Id).HasMaxLength(512);
-        workspace.Property(value => value.Name).HasMaxLength(128);
-
-        var workspaceDraft = modelBuilder.Entity<WorkplaceWorkspaceDraftDocument>();
-        workspaceDraft.ToTable("WorkplaceWorkspaceDrafts");
-        workspaceDraft.HasKey(value => value.Id);
-        workspaceDraft.Property(value => value.Id).HasMaxLength(512);
-        workspaceDraft.Property(value => value.Name).HasMaxLength(128);
+        ConfigureDashboard(modelBuilder.Entity<WorkplaceDashboardDocument>(), "WorkplaceDashboards");
+        ConfigureDashboard(modelBuilder.Entity<WorkplaceDashboardDraftDocument>(), "WorkplaceDashboardDrafts");
 
         var entry = modelBuilder.Entity<EntryDocument>();
         entry.ToTable("Entries");
         entry.HasKey(value => value.Id);
-        entry.Property(value => value.Id).HasMaxLength(512);
+        entry.Property(value => value.Id).HasMaxLength(768);
+        entry.Property(value => value.WorkspaceId).HasMaxLength(36);
         entry.Property(value => value.Name).HasMaxLength(128);
+        entry.HasIndex(value => new { value.WorkspaceId, value.Name });
 
         var entryDraft = modelBuilder.Entity<EntryDraftDocument>();
         entryDraft.ToTable("EntryDrafts");
         entryDraft.HasKey(value => value.Id);
-        entryDraft.Property(value => value.Id).HasMaxLength(512);
+        entryDraft.Property(value => value.Id).HasMaxLength(768);
+        entryDraft.Property(value => value.WorkspaceId).HasMaxLength(36);
         entryDraft.Property(value => value.Name).HasMaxLength(128);
+        entryDraft.HasIndex(value => new { value.WorkspaceId, value.Name });
 
         var interaction = modelBuilder.Entity<InteractionDocument>();
         interaction.ToTable("Interactions");
@@ -101,6 +96,17 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         entity.Property(value => value.WorkTaskId).HasMaxLength(36); entity.HasIndex(value => new { value.WorkspaceId, value.InteractionId, value.CreatedAt });
     }
 
+    private static void ConfigureDashboard<T>(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<T> entity, string table)
+        where T : class, IWorkplaceDashboardDocument
+    {
+        entity.ToTable(table);
+        entity.HasKey(value => value.Id);
+        entity.Property(value => value.Id).HasMaxLength(768);
+        entity.Property(value => value.WorkspaceId).HasMaxLength(512);
+        entity.Property(value => value.Name).HasMaxLength(128);
+        entity.HasIndex(value => new { value.WorkspaceId, value.Name }).IsUnique();
+    }
+
     private static void ConfigurePendingAction(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<PendingActionDocument> entity)
     {
         entity.ToTable("PendingActions"); entity.HasKey(value => value.Id); entity.Property(value => value.WorkspaceId).HasMaxLength(512);
@@ -124,16 +130,26 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
     }
 }
 
-internal sealed class WorkplaceWorkspaceDocument
+internal interface IWorkplaceDashboardDocument
+{
+    string Id { get; set; }
+    string WorkspaceId { get; set; }
+    string Name { get; set; }
+    string Payload { get; set; }
+}
+
+internal sealed class WorkplaceDashboardDocument : IWorkplaceDashboardDocument
 {
     public required string Id { get; set; }
+    public required string WorkspaceId { get; set; }
     public required string Name { get; set; }
     public required string Payload { get; set; }
 }
 
-internal sealed class WorkplaceWorkspaceDraftDocument
+internal sealed class WorkplaceDashboardDraftDocument : IWorkplaceDashboardDocument
 {
     public required string Id { get; set; }
+    public required string WorkspaceId { get; set; }
     public required string Name { get; set; }
     public required string Payload { get; set; }
 }
@@ -141,6 +157,7 @@ internal sealed class WorkplaceWorkspaceDraftDocument
 internal sealed class EntryDocument
 {
     public required string Id { get; set; }
+    public required string WorkspaceId { get; set; }
     public required string Name { get; set; }
     public required string Payload { get; set; }
 }
@@ -148,6 +165,7 @@ internal sealed class EntryDocument
 internal sealed class EntryDraftDocument
 {
     public required string Id { get; set; }
+    public required string WorkspaceId { get; set; }
     public required string Name { get; set; }
     public required string Payload { get; set; }
 }
@@ -238,52 +256,6 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
-        await WorkNamespaceSchema.EnsureAsync(context, cancellationToken);
-        await context.Database.ExecuteSqlRawAsync(
-            "CREATE TABLE IF NOT EXISTS WorkplaceWorkspaceDrafts (Id TEXT NOT NULL CONSTRAINT PK_WorkplaceWorkspaceDrafts PRIMARY KEY, Name TEXT NOT NULL, Payload TEXT NOT NULL);",
-            cancellationToken);
-        await context.Database.ExecuteSqlRawAsync(
-            "CREATE TABLE IF NOT EXISTS EntryDrafts (Id TEXT NOT NULL CONSTRAINT PK_EntryDrafts PRIMARY KEY, Name TEXT NOT NULL, Payload TEXT NOT NULL);",
-            cancellationToken);
-        await context.Database.ExecuteSqlRawAsync(
-            """
-            CREATE TABLE IF NOT EXISTS WorkplaceWorkspaces (
-                Id TEXT NOT NULL CONSTRAINT PK_WorkplaceWorkspaces PRIMARY KEY,
-                Name TEXT NOT NULL,
-                Payload TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS Entries (
-                Id TEXT NOT NULL CONSTRAINT PK_Entries PRIMARY KEY,
-                Name TEXT NOT NULL,
-                Payload TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS Interactions (
-                Id TEXT NOT NULL CONSTRAINT PK_Interactions PRIMARY KEY,
-                WorkspaceId TEXT NOT NULL,
-                EntryId TEXT NOT NULL,
-                Status TEXT NOT NULL,
-                LastActivityAt INTEGER NOT NULL,
-                Version INTEGER NOT NULL,
-                Payload TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS IX_Interactions_WorkspaceId_LastActivityAt ON Interactions (WorkspaceId, LastActivityAt);
-            CREATE TABLE IF NOT EXISTS ConversationMessages (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, InteractionId TEXT NOT NULL, WorkTaskId TEXT NULL, CreatedAt TEXT NOT NULL, Payload TEXT NOT NULL);
-            CREATE INDEX IF NOT EXISTS IX_ConversationMessages_WorkspaceId_InteractionId_CreatedAt ON ConversationMessages (WorkspaceId, InteractionId, CreatedAt);
-            CREATE TABLE IF NOT EXISTS PendingActions (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, InteractionId TEXT NOT NULL, WorkTaskId TEXT NULL, Status TEXT NOT NULL, ResumeTokenHash TEXT NOT NULL, CreatedAt TEXT NOT NULL, Version INTEGER NOT NULL, Payload TEXT NOT NULL);
-            CREATE UNIQUE INDEX IF NOT EXISTS IX_PendingActions_ResumeTokenHash ON PendingActions (ResumeTokenHash);
-            CREATE INDEX IF NOT EXISTS IX_PendingActions_WorkspaceId_Status ON PendingActions (WorkspaceId, Status);
-            CREATE INDEX IF NOT EXISTS IX_PendingActions_InteractionId_CreatedAt ON PendingActions (InteractionId, CreatedAt);
-            CREATE TABLE IF NOT EXISTS WorkNotifications (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, Kind TEXT NOT NULL, CreatedAt TEXT NOT NULL, ReadAt TEXT NULL, Version INTEGER NOT NULL, Payload TEXT NOT NULL);
-            CREATE INDEX IF NOT EXISTS IX_WorkNotifications_WorkspaceId_CreatedAt ON WorkNotifications (WorkspaceId, CreatedAt);
-            CREATE INDEX IF NOT EXISTS IX_WorkNotifications_WorkspaceId_ReadAt ON WorkNotifications (WorkspaceId, ReadAt);
-            CREATE TABLE IF NOT EXISTS WorkTaskActivities (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, WorkTaskId TEXT NOT NULL, CreatedAt TEXT NOT NULL, Payload TEXT NOT NULL);
-            CREATE INDEX IF NOT EXISTS IX_WorkTaskActivities_WorkspaceId_WorkTaskId_CreatedAt ON WorkTaskActivities (WorkspaceId, WorkTaskId, CreatedAt);
-            CREATE TABLE IF NOT EXISTS WorkTaskResults (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, WorkTaskId TEXT NOT NULL, CreatedAt TEXT NOT NULL, Payload TEXT NOT NULL);
-            CREATE INDEX IF NOT EXISTS IX_WorkTaskResults_WorkspaceId_WorkTaskId_CreatedAt ON WorkTaskResults (WorkspaceId, WorkTaskId, CreatedAt);
-            CREATE TABLE IF NOT EXISTS WorkTaskArtifacts (Id TEXT NOT NULL PRIMARY KEY, WorkspaceId TEXT NOT NULL, WorkTaskId TEXT NOT NULL, CreatedAt TEXT NOT NULL, Payload TEXT NOT NULL);
-            CREATE INDEX IF NOT EXISTS IX_WorkTaskArtifacts_WorkspaceId_WorkTaskId_CreatedAt ON WorkTaskArtifacts (WorkspaceId, WorkTaskId, CreatedAt);
-            """,
-            cancellationToken);
         await EnsureOperationalColumnsAsync(context, cancellationToken);
     }
 
@@ -477,91 +449,150 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
-        await WorkNamespaceSchema.EnsureAsync(context, cancellationToken);
+        await WorkDashboardSchema.EnsureAsync(context, cancellationToken);
+        await WorkEntrySchema.EnsureAsync(context, cancellationToken);
     }
 
-    public async Task UpsertWorkspaceAsync(WorkplaceWorkspace workspace, CancellationToken cancellationToken)
+    public async Task UpsertDashboardAsync(WorkplaceDashboard dashboard, CancellationToken cancellationToken)
     {
-        WorkplaceValidation.Validate(workspace);
+        WorkplaceValidation.Validate(dashboard);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var key = StorageKey(workspace.Id.Namespace, workspace.Id.Value);
-        var document = await context.Workspaces.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
-        if (document is null) context.Workspaces.Add(new WorkplaceWorkspaceDocument { Id = key, Name = workspace.Name, Payload = JsonSerializer.Serialize(workspace, JsonOptions) });
-        else { document.Name = workspace.Name; document.Payload = JsonSerializer.Serialize(workspace, JsonOptions); }
+        await UpsertDashboardAsync(context, dashboard, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<WorkplaceWorkspace>> ListWorkspacesAsync(CancellationToken cancellationToken)
+    public async Task ReplaceDefaultDashboardAsync(WorkplaceDashboard dashboard, CancellationToken cancellationToken)
     {
+        WorkplaceValidation.Validate(dashboard);
+        if (!dashboard.IsDefault) throw new ArgumentException("The replacement Dashboard must be marked as default.", nameof(dashboard));
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payloads = await context.Workspaces.AsNoTracking().OrderBy(value => value.Name).Select(value => value.Payload).ToArrayAsync(cancellationToken);
-        return payloads.Select(Deserialize<WorkplaceWorkspace>).ToArray();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var workspaceKey = dashboard.WorkspaceId.ToString();
+        var documents = await context.Dashboards.Where(value => value.WorkspaceId == workspaceKey).ToArrayAsync(cancellationToken);
+        foreach (var document in documents)
+        {
+            var current = Deserialize<WorkplaceDashboard>(document.Payload);
+            if (current.Id == dashboard.Id || !current.IsDefault) continue;
+            var demoted = current with
+            {
+                IsDefault = false,
+                Version = checked(current.Version + 1),
+                PublishedAt = dashboard.PublishedAt
+            };
+            document.Payload = JsonSerializer.Serialize(demoted, JsonOptions);
+        }
+        await UpsertDashboardAsync(context, dashboard, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task<WorkplaceWorkspace?> GetWorkspaceAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkplaceDashboard>> ListDashboardsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var key = StorageKey(workspaceId.Namespace, workspaceId.Value);
-        var payload = await context.Workspaces.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
-        return payload is null ? null : Deserialize<WorkplaceWorkspace>(payload);
+        var workspaceKey = workspaceId.ToString();
+        var payloads = await context.Dashboards.AsNoTracking()
+            .Where(value => value.WorkspaceId == workspaceKey)
+            .OrderBy(value => value.Name)
+            .Select(value => value.Payload)
+            .ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<WorkplaceDashboard>).ToArray();
     }
 
-    public async Task UpsertWorkspaceDraftAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken)
+    public async Task<WorkplaceDashboard?> GetDashboardAsync(WorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var key = DashboardStorageKey(workspaceId, dashboardId);
+        var payload = await context.Dashboards.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<WorkplaceDashboard>(payload);
+    }
+
+    public async Task DeleteDashboardAsync(WorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Dashboards.SingleOrDefaultAsync(value => value.Id == DashboardStorageKey(workspaceId, dashboardId), cancellationToken);
+        if (document is null) return;
+        context.Dashboards.Remove(document);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpsertDashboardDraftAsync(WorkplaceDashboardDraft draft, CancellationToken cancellationToken)
     {
         WorkplaceValidation.Validate(draft);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var key = StorageKey(draft.Id.Namespace, draft.Id.Value);
-        var document = await context.WorkspaceDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
-        if (document is null) context.WorkspaceDrafts.Add(new WorkplaceWorkspaceDraftDocument { Id = key, Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
-        else { document.Name = draft.Name; document.Payload = JsonSerializer.Serialize(draft, JsonOptions); }
+        var key = DashboardStorageKey(draft.WorkspaceId, draft.Id);
+        var workspaceKey = draft.WorkspaceId.ToString();
+        var document = await context.DashboardDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        if (document is null)
+            context.DashboardDrafts.Add(new WorkplaceDashboardDraftDocument { Id = key, WorkspaceId = workspaceKey, Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
+        else
+        {
+            document.Name = draft.Name;
+            document.Payload = JsonSerializer.Serialize(draft, JsonOptions);
+        }
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<WorkplaceWorkspaceDraft>> ListWorkspaceDraftsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkplaceDashboardDraft>> ListDashboardDraftsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payloads = await context.WorkspaceDrafts.AsNoTracking().OrderBy(value => value.Name).Select(value => value.Payload).ToArrayAsync(cancellationToken);
-        return payloads.Select(Deserialize<WorkplaceWorkspaceDraft>).ToArray();
+        var workspaceKey = workspaceId.ToString();
+        var payloads = await context.DashboardDrafts.AsNoTracking()
+            .Where(value => value.WorkspaceId == workspaceKey)
+            .OrderBy(value => value.Name)
+            .Select(value => value.Payload)
+            .ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<WorkplaceDashboardDraft>).ToArray();
     }
 
-    public async Task<WorkplaceWorkspaceDraft?> GetWorkspaceDraftAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken)
+    public async Task<WorkplaceDashboardDraft?> GetDashboardDraftAsync(WorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var key = StorageKey(workspaceId.Namespace, workspaceId.Value);
-        var payload = await context.WorkspaceDrafts.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
-        return payload is null ? null : Deserialize<WorkplaceWorkspaceDraft>(payload);
+        var payload = await context.DashboardDrafts.AsNoTracking()
+            .Where(value => value.Id == DashboardStorageKey(workspaceId, dashboardId))
+            .Select(value => value.Payload)
+            .SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<WorkplaceDashboardDraft>(payload);
+    }
+
+    public async Task DeleteDashboardDraftAsync(WorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.DashboardDrafts.SingleOrDefaultAsync(value => value.Id == DashboardStorageKey(workspaceId, dashboardId), cancellationToken);
+        if (document is null) return;
+        context.DashboardDrafts.Remove(document);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpsertEntryAsync(EntryResource entry, CancellationToken cancellationToken)
     {
         WorkplaceValidation.Validate(entry);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var key = StorageKey(entry.Id.Namespace, entry.Id.Value);
+        var key = EntryStorageKey(entry.WorkspaceId, entry.Id);
         var document = await context.Entries.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
-        if (document is null) context.Entries.Add(new EntryDocument { Id = key, Name = entry.Name, Payload = JsonSerializer.Serialize(entry, JsonOptions) });
+        if (document is null) context.Entries.Add(new EntryDocument { Id = key, WorkspaceId = entry.WorkspaceId.ToString(), Name = entry.Name, Payload = JsonSerializer.Serialize(entry, JsonOptions) });
         else { document.Name = entry.Name; document.Payload = JsonSerializer.Serialize(entry, JsonOptions); }
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<EntryResource>> ListEntriesAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<EntryResource>> ListEntriesAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payloads = await context.Entries.AsNoTracking().OrderBy(value => value.Name).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        var payloads = await context.Entries.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString()).OrderBy(value => value.Name).Select(value => value.Payload).ToArrayAsync(cancellationToken);
         return payloads.Select(Deserialize<EntryResource>).ToArray();
     }
 
-    public async Task<EntryResource?> GetEntryAsync(EntryId entryId, CancellationToken cancellationToken)
+    public async Task<EntryResource?> GetEntryAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var key = StorageKey(entryId.Namespace, entryId.Value);
+        var key = EntryStorageKey(workspaceId, entryId);
         var payload = await context.Entries.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<EntryResource>(payload);
     }
 
-    public async Task DeleteEntryAsync(EntryId entryId, CancellationToken cancellationToken)
+    public async Task DeleteEntryAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var key = StorageKey(entryId.Namespace, entryId.Value);
+        var key = EntryStorageKey(workspaceId, entryId);
         var document = await context.Entries.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
         if (document is not null)
         {
@@ -574,32 +605,32 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     {
         WorkplaceValidation.Validate(draft);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var key = StorageKey(draft.Id.Namespace, draft.Id.Value);
+        var key = EntryStorageKey(draft.WorkspaceId, draft.Id);
         var document = await context.EntryDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
-        if (document is null) context.EntryDrafts.Add(new EntryDraftDocument { Id = key, Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
+        if (document is null) context.EntryDrafts.Add(new EntryDraftDocument { Id = key, WorkspaceId = draft.WorkspaceId.ToString(), Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
         else { document.Name = draft.Name; document.Payload = JsonSerializer.Serialize(draft, JsonOptions); }
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<EntryDraft>> ListEntryDraftsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<EntryDraft>> ListEntryDraftsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payloads = await context.EntryDrafts.AsNoTracking().OrderBy(value => value.Name).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        var payloads = await context.EntryDrafts.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString()).OrderBy(value => value.Name).Select(value => value.Payload).ToArrayAsync(cancellationToken);
         return payloads.Select(Deserialize<EntryDraft>).ToArray();
     }
 
-    public async Task<EntryDraft?> GetEntryDraftAsync(EntryId entryId, CancellationToken cancellationToken)
+    public async Task<EntryDraft?> GetEntryDraftAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var key = StorageKey(entryId.Namespace, entryId.Value);
+        var key = EntryStorageKey(workspaceId, entryId);
         var payload = await context.EntryDrafts.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<EntryDraft>(payload);
     }
 
-    public async Task DeleteEntryDraftAsync(EntryId entryId, CancellationToken cancellationToken)
+    public async Task DeleteEntryDraftAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var key = StorageKey(entryId.Namespace, entryId.Value);
+        var key = EntryStorageKey(workspaceId, entryId);
         var document = await context.EntryDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
         if (document is not null)
         {
@@ -608,10 +639,10 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         }
     }
 
-    public async Task<bool> HasEntryInteractionsAsync(EntryId entryId, CancellationToken cancellationToken)
+    public async Task<bool> HasEntryInteractionsAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payloads = await context.Interactions.AsNoTracking().Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        var payloads = await context.Interactions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
         return payloads.Select(Deserialize<WorkplaceInteraction>).Any(value => value.EntryId == entryId);
     }
 
@@ -623,20 +654,20 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         catch (DbUpdateException exception) { throw new WorkplaceConcurrencyException(exception.InnerException?.Message ?? exception.Message); }
     }
 
-    public async Task<WorkplaceInteraction?> GetInteractionAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
+    public async Task<WorkplaceInteraction?> GetInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payload = await context.Interactions.AsNoTracking()
-            .Where(value => value.Id == interactionId.ToString() && value.WorkspaceId == workspaceId.Value)
+            .Where(value => value.Id == interactionId.ToString() && value.WorkspaceId == workspaceId.ToString())
             .Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<WorkplaceInteraction>(payload);
     }
 
-    public async Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkplaceWorkspaceId workspaceId, int take, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkspaceId workspaceId, int take, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payloads = await context.Interactions.AsNoTracking()
-            .Where(value => value.WorkspaceId == workspaceId.Value)
+            .Where(value => value.WorkspaceId == workspaceId.ToString())
             .OrderByDescending(value => value.LastActivityAt)
             .Take(Math.Clamp(take, 1, 100))
             .Select(value => value.Payload)
@@ -648,7 +679,7 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     {
         if (interaction.Version <= expectedVersion) throw new WorkplaceConcurrencyException("The Interaction version must increase before it is saved.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.Interactions.SingleOrDefaultAsync(value => value.Id == interaction.Id.ToString() && value.WorkspaceId == interaction.WorkspaceId.Value, cancellationToken)
+        var document = await context.Interactions.SingleOrDefaultAsync(value => value.Id == interaction.Id.ToString() && value.WorkspaceId == interaction.WorkspaceId.ToString(), cancellationToken)
             ?? throw new KeyNotFoundException($"Interaction '{interaction.Id}' was not found in Workspace '{interaction.WorkspaceId}'.");
         if (document.Version != expectedVersion) throw new WorkplaceConcurrencyException("The supplied Interaction version is stale.");
         document.Status = interaction.Status;
@@ -662,42 +693,42 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     public async Task AddMessageAsync(ConversationMessage message, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        context.ConversationMessages.Add(new ConversationMessageDocument { Id = message.Id.ToString(), WorkspaceId = message.WorkspaceId.Value, InteractionId = message.InteractionId.ToString(), WorkTaskId = message.WorkTaskId?.ToString(), CreatedAt = message.CreatedAt, Payload = JsonSerializer.Serialize(message, JsonOptions) });
+        context.ConversationMessages.Add(new ConversationMessageDocument { Id = message.Id.ToString(), WorkspaceId = message.WorkspaceId.ToString(), InteractionId = message.InteractionId.ToString(), WorkTaskId = message.WorkTaskId?.ToString(), CreatedAt = message.CreatedAt, Payload = JsonSerializer.Serialize(message, JsonOptions) });
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payloads = await context.ConversationMessages.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.InteractionId == interactionId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        var payloads = await context.ConversationMessages.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString() && value.InteractionId == interactionId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
         return payloads.Select(Deserialize<ConversationMessage>).OrderBy(value => value.CreatedAt).ToArray();
     }
 
     public async Task CreatePendingActionAsync(PendingAction action, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        context.PendingActions.Add(new PendingActionDocument { Id = action.Id.ToString(), WorkspaceId = action.WorkspaceId.Value, InteractionId = action.InteractionId.ToString(), WorkTaskId = action.WorkTaskId?.ToString(), Status = action.Status, ResumeTokenHash = action.ResumeTokenHash, CreatedAt = action.CreatedAt, Version = action.Version, Payload = JsonSerializer.Serialize(action, JsonOptions) });
+        context.PendingActions.Add(new PendingActionDocument { Id = action.Id.ToString(), WorkspaceId = action.WorkspaceId.ToString(), InteractionId = action.InteractionId.ToString(), WorkTaskId = action.WorkTaskId?.ToString(), Status = action.Status, ResumeTokenHash = action.ResumeTokenHash, CreatedAt = action.CreatedAt, Version = action.Version, Payload = JsonSerializer.Serialize(action, JsonOptions) });
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<PendingAction?> GetPendingActionAsync(WorkplaceWorkspaceId workspaceId, PendingActionId actionId, CancellationToken cancellationToken)
+    public async Task<PendingAction?> GetPendingActionAsync(WorkspaceId workspaceId, PendingActionId actionId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payload = await context.PendingActions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.Id == actionId.ToString()).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        var payload = await context.PendingActions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString() && value.Id == actionId.ToString()).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<PendingAction>(payload);
     }
 
-    public async Task<IReadOnlyList<PendingAction>> ListPendingActionsAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<PendingAction>> ListPendingActionsAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var payloads = await context.PendingActions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.InteractionId == interactionId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        var payloads = await context.PendingActions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString() && value.InteractionId == interactionId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
         return payloads.Select(Deserialize<PendingAction>).OrderBy(value => value.CreatedAt).ToArray();
     }
 
     public async Task SavePendingActionAsync(PendingAction action, long expectedVersion, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var document = await context.PendingActions.SingleOrDefaultAsync(value => value.WorkspaceId == action.WorkspaceId.Value && value.Id == action.Id.ToString(), cancellationToken) ?? throw new KeyNotFoundException($"Pending action '{action.Id}' was not found.");
+        var document = await context.PendingActions.SingleOrDefaultAsync(value => value.WorkspaceId == action.WorkspaceId.ToString() && value.Id == action.Id.ToString(), cancellationToken) ?? throw new KeyNotFoundException($"Pending action '{action.Id}' was not found.");
         if (document.Version != expectedVersion) throw new WorkplaceConcurrencyException("The PendingAction version is stale.");
         document.Status = action.Status; document.Version = action.Version; document.Payload = JsonSerializer.Serialize(action, JsonOptions);
         await context.SaveChangesAsync(cancellationToken);
@@ -706,63 +737,63 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     public async Task AddActivityAsync(WorkTaskActivity activity, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        context.WorkTaskActivities.Add(new WorkTaskActivityDocument { Id = activity.Id.ToString(), WorkspaceId = activity.WorkspaceId.Value, WorkTaskId = activity.WorkTaskId.ToString(), CreatedAt = activity.CreatedAt, Payload = JsonSerializer.Serialize(activity, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
+        context.WorkTaskActivities.Add(new WorkTaskActivityDocument { Id = activity.Id.ToString(), WorkspaceId = activity.WorkspaceId.ToString(), WorkTaskId = activity.WorkTaskId.ToString(), CreatedAt = activity.CreatedAt, Payload = JsonSerializer.Serialize(activity, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payloads = await context.WorkTaskActivities.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.WorkTaskId == taskId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkTaskActivity>).OrderBy(value => value.CreatedAt).ToArray();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payloads = await context.WorkTaskActivities.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString() && value.WorkTaskId == taskId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkTaskActivity>).OrderBy(value => value.CreatedAt).ToArray();
     }
 
     public async Task AddResultAsync(WorkTaskResult result, CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); context.WorkTaskResults.Add(new WorkTaskResultDocument { Id = result.Id.ToString(), WorkspaceId = result.WorkspaceId.Value, WorkTaskId = result.WorkTaskId.ToString(), CreatedAt = result.CreatedAt, Payload = JsonSerializer.Serialize(result, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); context.WorkTaskResults.Add(new WorkTaskResultDocument { Id = result.Id.ToString(), WorkspaceId = result.WorkspaceId.ToString(), WorkTaskId = result.WorkTaskId.ToString(), CreatedAt = result.CreatedAt, Payload = JsonSerializer.Serialize(result, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payloads = await context.WorkTaskResults.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.WorkTaskId == taskId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkTaskResult>).OrderBy(value => value.CreatedAt).ToArray();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payloads = await context.WorkTaskResults.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString() && value.WorkTaskId == taskId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkTaskResult>).OrderBy(value => value.CreatedAt).ToArray();
     }
 
     public async Task AddArtifactAsync(WorkTaskArtifact artifact, CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); context.WorkTaskArtifacts.Add(new WorkTaskArtifactDocument { Id = artifact.Id.ToString(), WorkspaceId = artifact.WorkspaceId.Value, WorkTaskId = artifact.WorkTaskId.ToString(), CreatedAt = artifact.CreatedAt, Payload = JsonSerializer.Serialize(artifact, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); context.WorkTaskArtifacts.Add(new WorkTaskArtifactDocument { Id = artifact.Id.ToString(), WorkspaceId = artifact.WorkspaceId.ToString(), WorkTaskId = artifact.WorkTaskId.ToString(), CreatedAt = artifact.CreatedAt, Payload = JsonSerializer.Serialize(artifact, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payloads = await context.WorkTaskArtifacts.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.WorkTaskId == taskId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkTaskArtifact>).OrderBy(value => value.CreatedAt).ToArray();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payloads = await context.WorkTaskArtifacts.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString() && value.WorkTaskId == taskId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkTaskArtifact>).OrderBy(value => value.CreatedAt).ToArray();
     }
 
-    public async Task<WorkTaskArtifact?> GetArtifactAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, WorkTaskArtifactId artifactId, CancellationToken cancellationToken)
+    public async Task<WorkTaskArtifact?> GetArtifactAsync(WorkspaceId workspaceId, WorkTaskId taskId, WorkTaskArtifactId artifactId, CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payload = await context.WorkTaskArtifacts.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.WorkTaskId == taskId.ToString() && value.Id == artifactId.ToString()).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken); return payload is null ? null : Deserialize<WorkTaskArtifact>(payload);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payload = await context.WorkTaskArtifacts.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString() && value.WorkTaskId == taskId.ToString() && value.Id == artifactId.ToString()).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken); return payload is null ? null : Deserialize<WorkTaskArtifact>(payload);
     }
 
     public async Task CreateNotificationAsync(WorkNotification notification, CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); context.WorkNotifications.Add(new WorkNotificationDocument { Id = notification.Id.ToString(), WorkspaceId = notification.WorkspaceId.Value, Kind = notification.Kind, CreatedAt = notification.CreatedAt, ReadAt = notification.ReadAt, Version = notification.Version, Payload = JsonSerializer.Serialize(notification, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); context.WorkNotifications.Add(new WorkNotificationDocument { Id = notification.Id.ToString(), WorkspaceId = notification.WorkspaceId.ToString(), Kind = notification.Kind, CreatedAt = notification.CreatedAt, ReadAt = notification.ReadAt, Version = notification.Version, Payload = JsonSerializer.Serialize(notification, JsonOptions) }); await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<WorkNotification>> ListNotificationsAsync(WorkplaceWorkspaceId workspaceId, bool? unreadOnly, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkNotification>> ListNotificationsAsync(WorkspaceId workspaceId, bool? unreadOnly, CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var query = context.WorkNotifications.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value); if (unreadOnly == true) query = query.Where(value => value.ReadAt == null); var payloads = await query.Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkNotification>).OrderByDescending(value => value.CreatedAt).ToArray();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var query = context.WorkNotifications.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString()); if (unreadOnly == true) query = query.Where(value => value.ReadAt == null); var payloads = await query.Select(value => value.Payload).ToArrayAsync(cancellationToken); return payloads.Select(Deserialize<WorkNotification>).OrderByDescending(value => value.CreatedAt).ToArray();
     }
 
-    public async Task<WorkNotification?> GetNotificationAsync(WorkplaceWorkspaceId workspaceId, WorkNotificationId notificationId, CancellationToken cancellationToken)
+    public async Task<WorkNotification?> GetNotificationAsync(WorkspaceId workspaceId, WorkNotificationId notificationId, CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payload = await context.WorkNotifications.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.Id == notificationId.ToString()).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken); return payload is null ? null : Deserialize<WorkNotification>(payload);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var payload = await context.WorkNotifications.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString() && value.Id == notificationId.ToString()).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken); return payload is null ? null : Deserialize<WorkNotification>(payload);
     }
 
     public async Task SaveNotificationAsync(WorkNotification notification, long expectedVersion, CancellationToken cancellationToken)
     {
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var document = await context.WorkNotifications.SingleOrDefaultAsync(value => value.WorkspaceId == notification.WorkspaceId.Value && value.Id == notification.Id.ToString(), cancellationToken) ?? throw new KeyNotFoundException($"Notification '{notification.Id}' was not found."); if (document.Version != expectedVersion) throw new WorkplaceConcurrencyException("The notification version is stale."); document.ReadAt = notification.ReadAt; document.Version = notification.Version; document.Payload = JsonSerializer.Serialize(notification, JsonOptions); await context.SaveChangesAsync(cancellationToken);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken); var document = await context.WorkNotifications.SingleOrDefaultAsync(value => value.WorkspaceId == notification.WorkspaceId.ToString() && value.Id == notification.Id.ToString(), cancellationToken) ?? throw new KeyNotFoundException($"Notification '{notification.Id}' was not found."); if (document.Version != expectedVersion) throw new WorkplaceConcurrencyException("The notification version is stale."); document.ReadAt = notification.ReadAt; document.Version = notification.Version; document.Payload = JsonSerializer.Serialize(notification, JsonOptions); await context.SaveChangesAsync(cancellationToken);
     }
 
     private static InteractionDocument ToDocument(WorkplaceInteraction interaction) => new()
     {
         Id = interaction.Id.ToString(),
-        WorkspaceId = interaction.WorkspaceId.Value,
+        WorkspaceId = interaction.WorkspaceId.ToString(),
         EntryId = interaction.EntryId.Value,
         Status = interaction.Status,
         LastActivityAt = interaction.LastActivityAt,
@@ -772,17 +803,51 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
 
     private static T Deserialize<T>(string payload) => JsonSerializer.Deserialize<T>(payload, JsonOptions)
         ?? throw new InvalidOperationException($"Stored {typeof(T).Name} document is invalid.");
+    private static async Task UpsertDashboardAsync(WorkDbContext context, WorkplaceDashboard dashboard, CancellationToken cancellationToken)
+    {
+        var key = DashboardStorageKey(dashboard.WorkspaceId, dashboard.Id);
+        var workspaceKey = dashboard.WorkspaceId.ToString();
+        var document = await context.Dashboards.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        if (document is null)
+            context.Dashboards.Add(new WorkplaceDashboardDocument { Id = key, WorkspaceId = workspaceKey, Name = dashboard.Name, Payload = JsonSerializer.Serialize(dashboard, JsonOptions) });
+        else
+        {
+            document.Name = dashboard.Name;
+            document.Payload = JsonSerializer.Serialize(dashboard, JsonOptions);
+        }
+    }
+    private static string DashboardStorageKey(WorkspaceId workspaceId, DashboardId dashboardId) =>
+        $"{workspaceId}:{dashboardId.Value}";
+    private static string EntryStorageKey(WorkspaceId workspaceId, EntryId entryId) =>
+        $"{workspaceId}:{StorageKey(entryId.Namespace, entryId.Value)}";
     private static string StorageKey(ResourceNamespace @namespace, string name) => $"{@namespace.Value}:{name}";
 }
 
-internal static class WorkNamespaceSchema
+internal static class WorkDashboardSchema
 {
     public static async Task EnsureAsync(WorkDbContext context, CancellationToken cancellationToken)
     {
-        await context.Database.ExecuteSqlRawAsync("UPDATE WorkplaceWorkspaces SET Id = 'default:' || Id WHERE instr(Id, ':') = 0;", cancellationToken);
-        await context.Database.ExecuteSqlRawAsync("UPDATE WorkplaceWorkspaceDrafts SET Id = 'default:' || Id WHERE instr(Id, ':') = 0;", cancellationToken);
-        await context.Database.ExecuteSqlRawAsync("UPDATE Entries SET Id = 'default:' || Id WHERE instr(Id, ':') = 0;", cancellationToken);
-        await context.Database.ExecuteSqlRawAsync("UPDATE EntryDrafts SET Id = 'default:' || Id WHERE instr(Id, ':') = 0;", cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE TABLE IF NOT EXISTS WorkplaceDashboards (Id TEXT NOT NULL CONSTRAINT PK_WorkplaceDashboards PRIMARY KEY, WorkspaceId TEXT NOT NULL, Name TEXT NOT NULL, Payload TEXT NOT NULL);",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_WorkplaceDashboards_WorkspaceId_Name ON WorkplaceDashboards (WorkspaceId, Name);",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE TABLE IF NOT EXISTS WorkplaceDashboardDrafts (Id TEXT NOT NULL CONSTRAINT PK_WorkplaceDashboardDrafts PRIMARY KEY, WorkspaceId TEXT NOT NULL, Name TEXT NOT NULL, Payload TEXT NOT NULL);",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_WorkplaceDashboardDrafts_WorkspaceId_Name ON WorkplaceDashboardDrafts (WorkspaceId, Name);",
+            cancellationToken);
+    }
+}
+
+internal static class WorkEntrySchema
+{
+    public static async Task EnsureAsync(WorkDbContext context, CancellationToken cancellationToken)
+    {
+        await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_Entries_WorkspaceId_Name ON Entries (WorkspaceId, Name);", cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_EntryDrafts_WorkspaceId_Name ON EntryDrafts (WorkspaceId, Name);", cancellationToken);
     }
 }
 

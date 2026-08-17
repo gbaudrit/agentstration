@@ -1,20 +1,21 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Application.Work;
 
-public sealed record SubmitEntryCommand(WorkplaceWorkspaceId WorkspaceId, EntryId EntryId, IReadOnlyDictionary<string, JsonElement> Values, IReadOnlyList<WorkAttachment>? Attachments = null);
+public sealed record SubmitEntryCommand(WorkspaceId WorkspaceId, EntryId EntryId, IReadOnlyDictionary<string, JsonElement> Values, IReadOnlyList<WorkAttachment>? Attachments = null);
 public sealed record EntrySubmission(WorkplaceInteraction Interaction, WorkplaceAction Action, WorkTask? Task);
 public sealed record PendingActionResolution(PendingAction PendingAction, WorkplaceAction NextAction, WorkplaceInteraction Interaction, WorkTask? Task);
 public sealed record ConversationContextMessage(Guid Id, ConversationRole Role, string Content, DateTimeOffset CreatedAt);
 public sealed record ContinuationResultReference(WorkTaskResultId Id, string Title, string? FlowRunId, int Sequence);
 public sealed record ContinuationArtifactReference(WorkTaskArtifactId Id, string Name, string? FlowRunId, int Sequence);
 public sealed record InteractionContinuationContext(
-    WorkplaceWorkspaceId WorkspaceId,
+    WorkspaceId WorkspaceId,
     InteractionId InteractionId,
     WorkTaskId? CurrentTaskId,
     string? LastFlowRunId,
@@ -31,7 +32,7 @@ public interface IWorkplaceEventSink
     Task PublishAsync(WorkplaceEventContract workplaceEvent, CancellationToken cancellationToken);
 }
 
-public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemService workItems, TimeProvider timeProvider, IEnumerable<IWorkplaceEventSink> eventSinks)
+public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemService workItems, TimeProvider timeProvider, IEnumerable<IWorkplaceEventSink> eventSinks, IWorkplaceContext context)
 {
     private const string WorkspaceMetadata = "workplace.workspaceId";
     private const string EntryMetadata = "workplace.entryId";
@@ -44,26 +45,34 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
     private long eventSequence;
 
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
-    public Task<IReadOnlyList<WorkplaceWorkspace>> ListWorkspacesAsync(CancellationToken cancellationToken) => repository.ListWorkspacesAsync(cancellationToken);
-    public Task<IReadOnlyList<EntryResource>> ListEntriesAsync(CancellationToken cancellationToken) => repository.ListEntriesAsync(cancellationToken);
-    public Task UpsertWorkspaceAsync(WorkplaceWorkspace workspace, CancellationToken cancellationToken) => repository.UpsertWorkspaceAsync(workspace, cancellationToken);
+    public Task<IReadOnlyList<WorkplaceDashboard>> ListDashboardsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken) => repository.ListDashboardsAsync(workspaceId, cancellationToken);
+    public Task<IReadOnlyList<EntryResource>> ListEntriesAsync(WorkspaceId workspaceId, CancellationToken cancellationToken) => repository.ListEntriesAsync(workspaceId, cancellationToken);
+    public Task<IReadOnlyList<EntryResource>> ListEntriesAsync(CancellationToken cancellationToken) => ListEntriesAsync(context.WorkspaceId, cancellationToken);
     public Task UpsertEntryAsync(EntryResource entry, CancellationToken cancellationToken) => repository.UpsertEntryAsync(entry, cancellationToken);
 
-    public async Task<WorkplaceWorkspace> GetWorkspaceAsync(WorkplaceWorkspaceId id, CancellationToken cancellationToken) => await repository.GetWorkspaceAsync(id, cancellationToken) ?? throw new KeyNotFoundException($"Workspace '{id}' was not found.");
-    public async Task<EntryResource> GetEntryAsync(EntryId id, CancellationToken cancellationToken) => await repository.GetEntryAsync(id, cancellationToken) ?? throw new KeyNotFoundException($"Entry '{id}' was not found.");
+    public async Task<WorkplaceDashboard> GetDashboardAsync(WorkspaceId workspaceId, DashboardId id, CancellationToken cancellationToken) =>
+        await repository.GetDashboardAsync(workspaceId, id, cancellationToken)
+        ?? throw new KeyNotFoundException($"Dashboard '{id}' was not found in Workspace '{workspaceId}'.");
+    public async Task<WorkplaceDashboard> GetDefaultDashboardAsync(WorkspaceId workspaceId, CancellationToken cancellationToken) =>
+        (await repository.ListDashboardsAsync(workspaceId, cancellationToken)).SingleOrDefault(value => value.IsDefault)
+        ?? throw new KeyNotFoundException($"Workspace '{workspaceId}' has no default Dashboard.");
+    public async Task<EntryResource> GetEntryAsync(WorkspaceId workspaceId, EntryId id, CancellationToken cancellationToken) => await repository.GetEntryAsync(workspaceId, id, cancellationToken) ?? throw new KeyNotFoundException($"Entry '{id}' was not found in Workspace '{workspaceId}'.");
+    public Task<EntryResource> GetEntryAsync(EntryId id, CancellationToken cancellationToken) => GetEntryAsync(context.WorkspaceId, id, cancellationToken);
 
-    public async Task<IReadOnlyList<EntryResource>> ResolveEntriesAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<EntryResource>> ResolveEntriesAsync(WorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken)
     {
-        var workspace = await GetWorkspaceAsync(workspaceId, cancellationToken); var entries = new List<EntryResource>(workspace.Entries.Count);
-        foreach (var reference in workspace.Entries.OrderBy(value => value.Order)) entries.Add(await GetEntryAsync(reference.EntryResourceId, cancellationToken));
+        var dashboard = await GetDashboardAsync(workspaceId, dashboardId, cancellationToken);
+        var entries = new List<EntryResource>(dashboard.Entries.Count);
+        foreach (var reference in dashboard.Entries.OrderBy(value => value.Order)) entries.Add(await GetEntryAsync(workspaceId, reference.EntryResourceId, cancellationToken));
         return entries;
     }
 
     public async Task<EntrySubmission> SubmitAsync(SubmitEntryCommand command, CancellationToken cancellationToken)
     {
-        var workspace = await GetWorkspaceAsync(command.WorkspaceId, cancellationToken);
-        if (!workspace.Entries.Any(reference => reference.EntryResourceId == command.EntryId)) throw new WorkValidationException("entry_not_in_workspace", "The Entry is not exposed by the selected Workspace.");
-        var entry = await GetEntryAsync(command.EntryId, cancellationToken); WorkplaceValidation.ValidateSubmission(entry, command.Values);
+        var dashboards = await repository.ListDashboardsAsync(command.WorkspaceId, cancellationToken);
+        if (!dashboards.Any(dashboard => dashboard.Entries.Any(reference => reference.EntryResourceId == command.EntryId)))
+            throw new WorkValidationException("entry_not_in_workspace", "The Entry is not exposed by a published Dashboard in the selected Workspace.");
+        var entry = await GetEntryAsync(command.WorkspaceId, command.EntryId, cancellationToken); WorkplaceValidation.ValidateSubmission(entry, command.Values);
         var now = timeProvider.GetUtcNow(); var interaction = new WorkplaceInteraction { Id = InteractionId.New(), WorkspaceId = command.WorkspaceId, EntryId = command.EntryId, StartedAt = now, LastActivityAt = now, InputValues = command.Values.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal), Attachments = command.Attachments ?? [] };
         await repository.CreateInteractionAsync(interaction, cancellationToken);
         var initialMessage = new ConversationMessage(Guid.NewGuid(), command.WorkspaceId, interaction.Id, null, ConversationRole.User, Instruction(entry, command.Values), now, Attachments: command.Attachments);
@@ -102,7 +111,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         return await CreateTaskAsync(interaction, entry, command.Values, command.Attachments, 1, cancellationToken);
     }
 
-    public async Task<PendingActionResolution> RespondAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, PendingActionId pendingActionId, string resumeToken, IReadOnlyDictionary<string, JsonElement> values, CancellationToken cancellationToken)
+    public async Task<PendingActionResolution> RespondAsync(WorkspaceId workspaceId, InteractionId interactionId, PendingActionId pendingActionId, string resumeToken, IReadOnlyDictionary<string, JsonElement> values, CancellationToken cancellationToken)
     {
         var interaction = await GetInteractionAsync(workspaceId, interactionId, cancellationToken);
         var action = await repository.GetPendingActionAsync(workspaceId, pendingActionId, cancellationToken) ?? throw new KeyNotFoundException($"PendingAction '{pendingActionId}' was not found in Workspace '{workspaceId}'.");
@@ -128,7 +137,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
 
         if (action.ResumeStep == 10)
         {
-            var guidedEntry = await GetEntryAsync(interaction.EntryId, cancellationToken);
+            var guidedEntry = await GetEntryAsync(interaction.WorkspaceId, interaction.EntryId, cancellationToken);
             var guidedValues = interaction.InputValues.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal);
             foreach (var value in values) guidedValues[value.Key] = value.Value.Clone();
             var guidedSubmission = await CreateTaskAsync(interaction with { Messages = [.. interaction.Messages, message] }, guidedEntry, guidedValues, interaction.Attachments, interaction.Version, cancellationToken);
@@ -143,7 +152,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
             await repository.SaveInteractionAsync(interaction, interaction.Version - 1, cancellationToken); await PublishAsync(new PendingActionResolvedEvent(EventId(), workspaceId.Value, Sequence(), now, action.Id.Value), cancellationToken); return new PendingActionResolution(resolved, cancelled, interaction, null);
         }
 
-        var entry = await GetEntryAsync(interaction.EntryId, cancellationToken); var merged = interaction.InputValues.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal);
+        var entry = await GetEntryAsync(interaction.WorkspaceId, interaction.EntryId, cancellationToken); var merged = interaction.InputValues.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal);
         foreach (var pending in await repository.ListPendingActionsAsync(workspaceId, interactionId, cancellationToken)) if (pending.Response is not null) foreach (var value in pending.Response.Values) merged[value.Key] = value.Value.Clone();
         var submission = await CreateTaskAsync(interaction with { Messages = [.. interaction.Messages, message] }, entry, merged, interaction.Attachments, interaction.Version, cancellationToken);
         resolved = await LinkPendingActionAsync(resolved, submission.Task, cancellationToken);
@@ -151,12 +160,12 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         return new PendingActionResolution(resolved, submission.Action, submission.Interaction, submission.Task);
     }
 
-    public async Task<WorkplaceInteraction> GetInteractionAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) => await repository.GetInteractionAsync(workspaceId, interactionId, cancellationToken) ?? throw new KeyNotFoundException($"Interaction '{interactionId}' was not found in Workspace '{workspaceId}'.");
-    public Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkplaceWorkspaceId workspaceId, int take, CancellationToken cancellationToken) => repository.ListInteractionsAsync(workspaceId, take, cancellationToken);
-    public Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) => repository.ListMessagesAsync(workspaceId, interactionId, cancellationToken);
-    public Task<IReadOnlyList<PendingAction>> ListPendingActionsAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) => repository.ListPendingActionsAsync(workspaceId, interactionId, cancellationToken);
+    public async Task<WorkplaceInteraction> GetInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) => await repository.GetInteractionAsync(workspaceId, interactionId, cancellationToken) ?? throw new KeyNotFoundException($"Interaction '{interactionId}' was not found in Workspace '{workspaceId}'.");
+    public Task<IReadOnlyList<WorkplaceInteraction>> ListInteractionsAsync(WorkspaceId workspaceId, int take, CancellationToken cancellationToken) => repository.ListInteractionsAsync(workspaceId, take, cancellationToken);
+    public Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) => repository.ListMessagesAsync(workspaceId, interactionId, cancellationToken);
+    public Task<IReadOnlyList<PendingAction>> ListPendingActionsAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken) => repository.ListPendingActionsAsync(workspaceId, interactionId, cancellationToken);
 
-    public async Task<MessageContinuation> AddMessageAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, string content, CancellationToken cancellationToken)
+    public async Task<MessageContinuation> AddMessageAsync(WorkspaceId workspaceId, InteractionId interactionId, string content, CancellationToken cancellationToken)
     {
         var interaction = await GetInteractionAsync(workspaceId, interactionId, cancellationToken);
         if (string.IsNullOrWhiteSpace(content)) throw new WorkValidationException("message_required", "A message is required.");
@@ -166,7 +175,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         var message = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, interaction.TaskId, ConversationRole.User, content.Trim(), now);
         await repository.AddMessageAsync(message, cancellationToken);
         await PublishAsync(new MessageAddedEvent(EventId(), workspaceId.Value, Sequence(), now, message), cancellationToken);
-        var entry = await GetEntryAsync(interaction.EntryId, cancellationToken);
+        var entry = await GetEntryAsync(interaction.WorkspaceId, interaction.EntryId, cancellationToken);
         if (!entry.Behavior.AllowConversation || entry.Behavior.Conversation?.Enabled == false) throw new WorkTransitionException("conversation_disabled", "This Entry does not allow conversational continuation.");
 
         if (entry.Behavior.TaskCreationMode == TaskCreationMode.Never)
@@ -189,7 +198,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         var context = await BuildContinuationContextAsync(interaction, message, cancellationToken);
         var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [WorkspaceMetadata] = workspaceId.Value,
+            [WorkspaceMetadata] = workspaceId.ToString(),
             [EntryMetadata] = interaction.EntryId.Value,
             [InteractionMetadata] = interaction.Id.ToString(),
             [TaskMetadata] = interaction.TaskId.Value.ToString(),
@@ -220,7 +229,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         return new MessageContinuation(message, processing, action, task);
     }
 
-    public async Task<WorkTask> GetTaskAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
+    public async Task<WorkTask> GetTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
     {
         var anchor = (await workItems.GetAsync(taskId.ToWorkItemId(), cancellationToken))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         RequireWorkspace(anchor, workspaceId);
@@ -228,12 +237,12 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         return ProjectTask(anchor, LatestExecution(anchor, continuations.Items.Select(value => value.Value).ToArray()), taskId);
     }
 
-    public async Task<(WorkplaceWorkspaceId WorkspaceId, WorkTask Task)> GetOperationalTaskAsync(WorkTaskId taskId, CancellationToken cancellationToken)
+    public async Task<(WorkspaceId WorkspaceId, WorkTask Task)> GetOperationalTaskAsync(WorkTaskId taskId, CancellationToken cancellationToken)
     {
         var anchor = (await workItems.GetAsync(taskId.ToWorkItemId(), cancellationToken))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         if (!anchor.Metadata.TryGetValue(WorkspaceMetadata, out var workspaceId) || string.IsNullOrWhiteSpace(workspaceId) || anchor.Metadata.ContainsKey(TaskMetadata))
             throw new KeyNotFoundException($"Task '{taskId}' was not found.");
-        var workspace = new WorkplaceWorkspaceId(workspaceId);
+        var workspace = new WorkspaceId(Guid.Parse(workspaceId));
         return (workspace, await GetTaskAsync(workspace, taskId, cancellationToken));
     }
 
@@ -259,10 +268,10 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         return new OperationalWorkTaskPage(tasks, Math.Max(0, anchors.TotalCount));
     }
 
-    public async Task<IReadOnlyList<WorkTask>> ListTasksAsync(WorkplaceWorkspaceId workspaceId, WorkTaskStatus? status, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkTask>> ListTasksAsync(WorkspaceId workspaceId, WorkTaskStatus? status, CancellationToken cancellationToken)
     {
         var page = await workItems.QueryAsync(new WorkItemQuery(Take: 500), cancellationToken);
-        var items = page.Items.Select(value => value.Value).Where(value => value.Metadata.TryGetValue(WorkspaceMetadata, out var workspace) && workspace == workspaceId.Value).ToArray();
+        var items = page.Items.Select(value => value.Value).Where(value => value.Metadata.TryGetValue(WorkspaceMetadata, out var workspace) && workspace == workspaceId.ToString()).ToArray();
         return items.Where(value => !value.Metadata.ContainsKey(TaskMetadata))
             .Select(anchor => ProjectTask(anchor, LatestExecution(anchor, items), WorkTaskId.FromWorkItem(anchor.Id)))
             .Where(task => status is null || task.Status == status)
@@ -270,23 +279,23 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
             .ToArray();
     }
 
-    public async Task<WorkTask> PauseTaskAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { var current = await GetCurrentExecutionAsync(workspaceId, taskId, token); await workItems.PauseAsync(current.Id, token); return await GetTaskAsync(workspaceId, taskId, token); }
-    public async Task<WorkTask> ResumeTaskAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { var current = await GetCurrentExecutionAsync(workspaceId, taskId, token); await workItems.ResumeAsync(current.Id, token); return await GetTaskAsync(workspaceId, taskId, token); }
-    public async Task<WorkTask> CancelTaskAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { var current = await GetCurrentExecutionAsync(workspaceId, taskId, token); await workItems.CancelAsync(current.Id, null, token); return await GetTaskAsync(workspaceId, taskId, token); }
-    public Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListActivitiesAsync(workspaceId, taskId, token);
-    public Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListResultsAsync(workspaceId, taskId, token);
-    public Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListArtifactsAsync(workspaceId, taskId, token);
-    public async Task<WorkTaskArtifact> GetArtifactAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, WorkTaskArtifactId artifactId, CancellationToken token) => await repository.GetArtifactAsync(workspaceId, taskId, artifactId, token) ?? throw new KeyNotFoundException($"Artifact '{artifactId}' was not found in Workspace '{workspaceId}'.");
-    public Task<IReadOnlyList<WorkNotification>> ListNotificationsAsync(WorkplaceWorkspaceId workspaceId, bool? unreadOnly, CancellationToken token) => repository.ListNotificationsAsync(workspaceId, unreadOnly, token);
-    public async Task<int> UnreadCountAsync(WorkplaceWorkspaceId workspaceId, CancellationToken token) => (await repository.ListNotificationsAsync(workspaceId, true, token)).Count;
-    public async Task<WorkNotification> MarkNotificationReadAsync(WorkplaceWorkspaceId workspaceId, WorkNotificationId id, CancellationToken token) { var value = await repository.GetNotificationAsync(workspaceId, id, token) ?? throw new KeyNotFoundException($"Notification '{id}' was not found."); if (value.ReadAt is not null) return value; var updated = value with { ReadAt = timeProvider.GetUtcNow(), Version = value.Version + 1 }; await repository.SaveNotificationAsync(updated, value.Version, token); await PublishAsync(new NotificationUpdatedEvent(EventId(), workspaceId.Value, Sequence(), updated.ReadAt.Value, updated), token); return updated; }
-    public async Task MarkAllNotificationsReadAsync(WorkplaceWorkspaceId workspaceId, CancellationToken token) { foreach (var value in await repository.ListNotificationsAsync(workspaceId, true, token)) await MarkNotificationReadAsync(workspaceId, value.Id, token); await PublishAsync(new UnreadNotificationCountChangedEvent(EventId(), workspaceId.Value, Sequence(), timeProvider.GetUtcNow(), 0), token); }
+    public async Task<WorkTask> PauseTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { var current = await GetCurrentExecutionAsync(workspaceId, taskId, token); await workItems.PauseAsync(current.Id, token); return await GetTaskAsync(workspaceId, taskId, token); }
+    public async Task<WorkTask> ResumeTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { var current = await GetCurrentExecutionAsync(workspaceId, taskId, token); await workItems.ResumeAsync(current.Id, token); return await GetTaskAsync(workspaceId, taskId, token); }
+    public async Task<WorkTask> CancelTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { var current = await GetCurrentExecutionAsync(workspaceId, taskId, token); await workItems.CancelAsync(current.Id, null, token); return await GetTaskAsync(workspaceId, taskId, token); }
+    public Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListActivitiesAsync(workspaceId, taskId, token);
+    public Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListResultsAsync(workspaceId, taskId, token);
+    public Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) => repository.ListArtifactsAsync(workspaceId, taskId, token);
+    public async Task<WorkTaskArtifact> GetArtifactAsync(WorkspaceId workspaceId, WorkTaskId taskId, WorkTaskArtifactId artifactId, CancellationToken token) => await repository.GetArtifactAsync(workspaceId, taskId, artifactId, token) ?? throw new KeyNotFoundException($"Artifact '{artifactId}' was not found in Workspace '{workspaceId}'.");
+    public Task<IReadOnlyList<WorkNotification>> ListNotificationsAsync(WorkspaceId workspaceId, bool? unreadOnly, CancellationToken token) => repository.ListNotificationsAsync(workspaceId, unreadOnly, token);
+    public async Task<int> UnreadCountAsync(WorkspaceId workspaceId, CancellationToken token) => (await repository.ListNotificationsAsync(workspaceId, true, token)).Count;
+    public async Task<WorkNotification> MarkNotificationReadAsync(WorkspaceId workspaceId, WorkNotificationId id, CancellationToken token) { var value = await repository.GetNotificationAsync(workspaceId, id, token) ?? throw new KeyNotFoundException($"Notification '{id}' was not found."); if (value.ReadAt is not null) return value; var updated = value with { ReadAt = timeProvider.GetUtcNow(), Version = value.Version + 1 }; await repository.SaveNotificationAsync(updated, value.Version, token); await PublishAsync(new NotificationUpdatedEvent(EventId(), workspaceId.Value, Sequence(), updated.ReadAt.Value, updated), token); return updated; }
+    public async Task MarkAllNotificationsReadAsync(WorkspaceId workspaceId, CancellationToken token) { foreach (var value in await repository.ListNotificationsAsync(workspaceId, true, token)) await MarkNotificationReadAsync(workspaceId, value.Id, token); await PublishAsync(new UnreadNotificationCountChangedEvent(EventId(), workspaceId.Value, Sequence(), timeProvider.GetUtcNow(), 0), token); }
 
     public static WorkplaceAction CurrentAction(WorkTask task) => task.Status switch { WorkTaskStatus.ActionRequired => new RespondAction("A response is required."), WorkTaskStatus.Failed => new ShowErrorAction(task.Error?.Code ?? "Task failed", task.Error?.Message), WorkTaskStatus.Completed => new ShowResultAction("Result", task.Result?.Contents.FirstOrDefault()?.Text, task.Result?.Contents.FirstOrDefault()?.Structured), _ => new RespondAction("Agentstration is working on your request.") };
 
     private async Task<EntrySubmission> CreateTaskAsync(WorkplaceInteraction interaction, EntryResource entry, IReadOnlyDictionary<string, JsonElement> values, IReadOnlyList<WorkAttachment>? attachments, long expectedInteractionVersion, CancellationToken token)
     {
-        var metadata = new Dictionary<string, string>(StringComparer.Ordinal) { [WorkspaceMetadata] = interaction.WorkspaceId.Value, [EntryMetadata] = interaction.EntryId.Value, [InteractionMetadata] = interaction.Id.ToString() };
+        var metadata = new Dictionary<string, string>(StringComparer.Ordinal) { [WorkspaceMetadata] = interaction.WorkspaceId.ToString(), [EntryMetadata] = interaction.EntryId.Value, [InteractionMetadata] = interaction.Id.ToString() };
         var inputs = values.Select(value => new WorkInput(Structured: JsonSerializer.SerializeToElement(new { name = value.Key, value = value.Value }))).ToArray();
         WorkTask? task = null;
         CreateTaskAction? action = null;
@@ -352,7 +361,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         return linked;
     }
 
-    private async Task<WorkItem> GetCurrentExecutionAsync(WorkplaceWorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token)
+    private async Task<WorkItem> GetCurrentExecutionAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token)
     {
         var anchor = (await workItems.GetAsync(taskId.ToWorkItemId(), token))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         RequireWorkspace(anchor, workspaceId);
@@ -385,7 +394,7 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         return projected with { Title = anchor.Title ?? anchor.Instruction, Description = anchor.Description, CreatedAt = anchor.CreatedAt };
     }
 
-    private async Task CreateNotificationAsync(WorkplaceWorkspaceId workspaceId, WorkNotificationKind kind, string title, string message, InteractionId? interactionId, WorkTaskId? taskId, PendingActionId? actionId, string? url, CancellationToken token)
+    private async Task CreateNotificationAsync(WorkspaceId workspaceId, WorkNotificationKind kind, string title, string message, InteractionId? interactionId, WorkTaskId? taskId, PendingActionId? actionId, string? url, CancellationToken token)
     {
         var notification = new WorkNotification { Id = WorkNotificationId.New(), WorkspaceId = workspaceId, Kind = kind, Title = title, Message = message, CreatedAt = timeProvider.GetUtcNow(), InteractionId = interactionId, WorkTaskId = taskId, PendingActionId = actionId, ActionUrl = url }; await repository.CreateNotificationAsync(notification, token); await PublishAsync(new NotificationCreatedEvent(EventId(), workspaceId.Value, Sequence(), notification.CreatedAt, notification), token); await PublishAsync(new UnreadNotificationCountChangedEvent(EventId(), workspaceId.Value, Sequence(), notification.CreatedAt, await UnreadCountAsync(workspaceId, token)), token);
     }
@@ -395,8 +404,8 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
     private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
     private static bool TokenMatches(string token, string expectedHash) { var actual = Encoding.ASCII.GetBytes(HashToken(token)); var expected = Encoding.ASCII.GetBytes(expectedHash); return actual.Length == expected.Length && CryptographicOperations.FixedTimeEquals(actual, expected); }
     private static string Instruction(EntryResource entry, IReadOnlyDictionary<string, JsonElement> values) { var primary = entry.Presentation.Fields.SingleOrDefault(field => field.Role == EntryFieldRole.PrimaryInput); if (primary is not null && values.TryGetValue(primary.Name, out var request) && request.ValueKind == JsonValueKind.String) return request.GetString()!.Trim(); var text = string.Join(Environment.NewLine, values.Where(value => value.Value.ValueKind == JsonValueKind.String).Select(value => $"{value.Key}: {value.Value.GetString()}")); return string.IsNullOrWhiteSpace(text) ? entry.DisplayName : text; }
-    private static void RequireWorkspace(WorkItem item, WorkplaceWorkspaceId workspaceId) { if (!item.Metadata.TryGetValue(WorkspaceMetadata, out var actual) || actual != workspaceId.Value) throw new KeyNotFoundException($"Task '{item.Id}' was not found in Workspace '{workspaceId}'."); }
-    internal static WorkTask ToTask(WorkItem item, WorkTaskId? publicId = null) { if (!item.Metadata.TryGetValue(WorkspaceMetadata, out var workspaceId) || !item.Metadata.TryGetValue(EntryMetadata, out var entryId) || !item.Metadata.TryGetValue(InteractionMetadata, out var interactionId) || !Guid.TryParse(interactionId, out var interactionGuid)) throw new InvalidOperationException($"Work item '{item.Id}' is not a Workplace Task."); item.Metadata.TryGetValue(FlowRunMetadata, out var flowRunId); if (flowRunId is null) item.Result?.Metadata.TryGetValue(FlowRunMetadata, out flowRunId); return new WorkTask(publicId ?? WorkTaskId.FromWorkItem(item.Id), new(workspaceId), new(entryId), new(interactionGuid), item.Title ?? item.Instruction, item.Description, ToTaskStatus(item.Status), item.CreatedAt, item.UpdatedAt, flowRunId, item.Messages, item.Interactions, item.Result?.Artifacts ?? [], item.Result, item.Error, item.Version); }
+    private static void RequireWorkspace(WorkItem item, WorkspaceId workspaceId) { if (!item.Metadata.TryGetValue(WorkspaceMetadata, out var actual) || actual != workspaceId.ToString()) throw new KeyNotFoundException($"Task '{item.Id}' was not found in Workspace '{workspaceId}'."); }
+    internal static WorkTask ToTask(WorkItem item, WorkTaskId? publicId = null) { if (!item.Metadata.TryGetValue(WorkspaceMetadata, out var workspaceId) || !Guid.TryParse(workspaceId, out var workspaceGuid) || !item.Metadata.TryGetValue(EntryMetadata, out var entryId) || !item.Metadata.TryGetValue(InteractionMetadata, out var interactionId) || !Guid.TryParse(interactionId, out var interactionGuid)) throw new InvalidOperationException($"Work item '{item.Id}' is not a Workplace Task."); item.Metadata.TryGetValue(FlowRunMetadata, out var flowRunId); if (flowRunId is null) item.Result?.Metadata.TryGetValue(FlowRunMetadata, out flowRunId); return new WorkTask(publicId ?? WorkTaskId.FromWorkItem(item.Id), new(workspaceGuid), new(entryId), new(interactionGuid), item.Title ?? item.Instruction, item.Description, ToTaskStatus(item.Status), item.CreatedAt, item.UpdatedAt, flowRunId, item.Messages, item.Interactions, item.Result?.Artifacts ?? [], item.Result, item.Error, item.Version); }
     internal static WorkTaskStatus ToTaskStatus(WorkItemStatus status) => status switch { WorkItemStatus.Pending or WorkItemStatus.Queued => WorkTaskStatus.Pending, WorkItemStatus.Running => WorkTaskStatus.Running, WorkItemStatus.WaitingForInput or WorkItemStatus.WaitingForApproval => WorkTaskStatus.ActionRequired, WorkItemStatus.Paused => WorkTaskStatus.Paused, WorkItemStatus.Completed => WorkTaskStatus.Completed, WorkItemStatus.Failed => WorkTaskStatus.Failed, WorkItemStatus.Cancelled => WorkTaskStatus.Cancelled, _ => throw new ArgumentOutOfRangeException(nameof(status), status, null) };
     public static PendingActionContract ToContract(PendingAction value) => new(value.Id.Value, value.WorkspaceId.Value, value.InteractionId.Value, value.WorkTaskId?.Value, value.FlowRunId, value.Kind, value.Status, value.Title, value.Description, value.Fields, value.CreatedAt, value.ExpiresAt, value.ResolvedAt, value.Version);
     private async Task PublishAsync(WorkplaceEventContract value, CancellationToken token) { foreach (var sink in eventSinks) await sink.PublishAsync(value, token); }

@@ -1,4 +1,4 @@
-@page "/tasks/{TaskId:guid}"
+@page "/w/{WorkspaceName}/tasks/{TaskId:guid}"
 @implements IDisposable
 @inject IWorkplaceApiClient Api
 @inject WorkplaceRealtimeClient Realtime
@@ -9,7 +9,7 @@ else if (error is not null) { <ServiceUnavailableState Message="@error" OnRetry=
 else if (task is not null)
 {
     <div class="task-page-heading">
-        <div><a class="back-link" href="/tasks">← Tasks</a><p class="eyebrow">Task</p><h1>@task.Title</h1>@if (!string.IsNullOrWhiteSpace(task.Description)){<p>@task.Description</p>}</div>
+        <div><a class="back-link" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks")">← Tasks</a><p class="eyebrow">Task</p><h1>@task.Title</h1>@if (!string.IsNullOrWhiteSpace(task.Description)){<p>@task.Description</p>}</div>
         <div class="task-heading-status"><RealtimeStatus Connected="@(Realtime.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)" /><TaskStatusBadge Value="task.Status" /></div>
     </div>
     <div class="task-actions">
@@ -32,6 +32,7 @@ else if (task is not null)
 
 @code {
     [Parameter] public Guid TaskId { get; set; }
+    [Parameter] public string WorkspaceName { get; set; } = string.Empty;
     private readonly CancellationTokenSource lifetime = new();
     private IDisposable? realtimeSubscription;
     private WorkTaskResponse? task;
@@ -53,15 +54,15 @@ else if (task is not null)
                 _ = InvokeAsync(RefreshAsync);
         });
         Realtime.StateChanged += HandleRealtimeStateChanged;
-        try { var workspace = await Api.GetWorkspaceAsync("personal", lifetime.Token); await Realtime.StartAsync(workspace.Id, 0, lifetime.Token); }
+        try { var workspace = await Api.GetWorkspaceAsync(WorkspaceName, lifetime.Token); await Realtime.StartAsync(workspace.Id.ToString("D"), 0, lifetime.Token); }
         catch when (!lifetime.IsCancellationRequested) { }
         await RefreshAsync();
     }
-    private async Task RefreshAsync(){loading=task is null;error=null;try{task=await Api.GetTaskAsync("personal",TaskId,lifetime.Token);interaction=await Api.GetInteractionAsync("personal",task.InteractionId,lifetime.Token);messages=await Api.ListMessagesAsync("personal",task.InteractionId,lifetime.Token);activities=await Api.ListActivitiesAsync("personal",TaskId,lifetime.Token);results=await Api.ListResultsAsync("personal",TaskId,lifetime.Token);artifacts=await Api.ListArtifactsAsync("personal",TaskId,lifetime.Token);}catch when(!lifetime.IsCancellationRequested){error="This task could not be loaded from the local Work API.";}finally{loading=false;}}
-    private Task ContinueAsync(string content) => interaction is null ? Task.CompletedTask : ExecuteCommandAsync(() => Api.AddMessageAsync("personal", interaction.Id, content, lifetime.Token), "Your follow-up could not be sent. Please try again.");
-    private Task PauseAsync() => ExecuteCommandAsync(() => Api.PauseTaskAsync("personal", TaskId, lifetime.Token), "This task could not be paused. Refresh its state and try again.");
-    private Task ResumeAsync() => ExecuteCommandAsync(() => Api.ResumeTaskAsync("personal", TaskId, lifetime.Token), "This task could not be resumed. Refresh its state and try again.");
-    private Task CancelAsync() => ExecuteCommandAsync(() => Api.CancelTaskAsync("personal", TaskId, lifetime.Token), "This task could not be cancelled. Refresh its state and try again.");
+    private async Task RefreshAsync(){loading=task is null;error=null;try{task=await Api.GetTaskAsync(WorkspaceName,TaskId,lifetime.Token);interaction=await Api.GetInteractionAsync(WorkspaceName,task.InteractionId,lifetime.Token);messages=await Api.ListMessagesAsync(WorkspaceName,task.InteractionId,lifetime.Token);activities=await Api.ListActivitiesAsync(WorkspaceName,TaskId,lifetime.Token);results=await Api.ListResultsAsync(WorkspaceName,TaskId,lifetime.Token);artifacts=await Api.ListArtifactsAsync(WorkspaceName,TaskId,lifetime.Token);}catch when(!lifetime.IsCancellationRequested){error="This task could not be loaded from the local Work API.";}finally{loading=false;}}
+    private Task ContinueAsync(string content) => interaction is null ? Task.CompletedTask : ExecuteCommandAsync(() => Api.AddMessageAsync(WorkspaceName, interaction.Id, content, lifetime.Token), "Your follow-up could not be sent. Please try again.");
+    private Task PauseAsync() => ExecuteCommandAsync(() => Api.PauseTaskAsync(WorkspaceName, TaskId, lifetime.Token), "This task could not be paused. Refresh its state and try again.");
+    private Task ResumeAsync() => ExecuteCommandAsync(() => Api.ResumeTaskAsync(WorkspaceName, TaskId, lifetime.Token), "This task could not be resumed. Refresh its state and try again.");
+    private Task CancelAsync() => ExecuteCommandAsync(() => Api.CancelTaskAsync(WorkspaceName, TaskId, lifetime.Token), "This task could not be cancelled. Refresh its state and try again.");
     private async Task ExecuteCommandAsync(Func<Task> command, string failureMessage)
     {
         if (busy) return;
@@ -74,6 +75,6 @@ else if (task is not null)
     {
         if (state == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected) _ = InvokeAsync(RefreshAsync);
     }
-    private string ArtifactUrl(WorkTaskArtifact value)=>Api.GetArtifactContentUri("personal",TaskId,value.Id.Value).ToString();
+    private string ArtifactUrl(WorkTaskArtifact value)=>Api.GetArtifactContentUri(WorkspaceName,TaskId,value.Id.Value).ToString();
     public void Dispose(){Realtime.StateChanged-=HandleRealtimeStateChanged;realtimeSubscription?.Dispose();lifetime.Cancel();lifetime.Dispose();GC.SuppressFinalize(this);}
 }

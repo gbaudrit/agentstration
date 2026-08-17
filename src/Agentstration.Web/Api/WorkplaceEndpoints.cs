@@ -15,7 +15,13 @@ public static class WorkplaceEndpoints
     public static IEndpointRouteBuilder MapAgentstrationWorkplaceApi(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/workplace/workspaces", ListWorkspacesAsync);
-        endpoints.MapGet("/api/workspaces/{workspaceName}", GetWorkspaceAsync);
+        var workspaces = endpoints.MapGroup("/api/workspaces/{workspaceName}")
+            .RequireAuthorization(AgentstrationPolicies.Authenticated)
+            .AddEndpointFilter(RequireCurrentWorkspaceAsync);
+        workspaces.MapGet("", GetWorkspaceAsync);
+        workspaces.MapGet("/dashboards", ListDashboardsAsync);
+        workspaces.MapGet("/dashboards/{dashboardName}", GetDashboardAsync);
+        workspaces.MapGet("/dashboard", GetDefaultDashboardAsync);
         endpoints.MapGet("/api/entries", ListEntriesAsync);
         endpoints.MapGet("/api/entries/{entryName}", GetEntryAsync);
         endpoints.MapGet("/api/management/entries", ListEntryDraftsAsync);
@@ -30,12 +36,14 @@ public static class WorkplaceEndpoints
         endpoints.MapGet("/api/management/entries/{entryName}/dependencies", GetEntryDependenciesAsync);
         endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}/dependencies", GetNamespacedEntryDependenciesAsync);
         endpoints.MapGet("/api/resources", ListResourcesAsync);
-        endpoints.MapGet("/api/management/workspaces", ListWorkspaceDraftsAsync);
-        endpoints.MapGet("/api/management/workspaces/{workspaceName}", GetWorkspaceDraftAsync);
-        endpoints.MapPut("/api/management/workspaces/{workspaceName}", PutWorkspaceDraftAsync);
-        endpoints.MapPost("/api/management/workspaces/{workspaceName}/publish", PublishWorkspaceDraftAsync);
-        endpoints.MapPost("/api/entries/{entryName}/interactions", SubmitEntryCompatibilityAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
-        var workspaces = endpoints.MapGroup("/api/workspaces/{workspaceName}").RequireAuthorization(AgentstrationPolicies.Authenticated);
+        var dashboardManagement = endpoints.MapGroup("/api/management/workspaces/{workspaceName}/dashboards")
+            .RequireAuthorization(AgentstrationPolicies.WorkspaceAdmin)
+            .AddEndpointFilter(RequireCurrentWorkspaceAsync);
+        dashboardManagement.MapGet("", ListDashboardDraftsAsync);
+        dashboardManagement.MapGet("/{dashboardName}", GetDashboardDraftAsync);
+        dashboardManagement.MapPut("/{dashboardName}", PutDashboardDraftAsync);
+        dashboardManagement.MapPost("/{dashboardName}/publish", PublishDashboardDraftAsync);
+        dashboardManagement.MapDelete("/{dashboardName}", DeleteDashboardAsync);
         workspaces.MapPost("/entries/{entryName}/interactions", SubmitEntryAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         workspaces.MapPost("/namespaces/{namespace}/entries/{entryName}/interactions", SubmitNamespacedEntryAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         workspaces.MapGet("/interactions", ListInteractionsAsync);
@@ -60,15 +68,31 @@ public static class WorkplaceEndpoints
         return endpoints;
     }
 
-    public static async Task<IResult> ListWorkspacesAsync(WorkplaceService service, CancellationToken token) => Results.Ok((await service.ListWorkspacesAsync(token)).Select(ToResponse));
-    private static Task<IResult> GetWorkspaceAsync(string workspaceName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetWorkspaceAsync(WorkspaceId(workspaceName), token))));
+    public static async Task<IResult> ListWorkspacesAsync(IdentityExperienceService service, CancellationToken token)
+    {
+        var context = await service.GetContextAsync(token);
+        return Results.Ok(context.AvailableWorkspaces.Where(value => value.Id == context.Context.WorkspaceId).Select(value => new WorkplaceWorkspaceResponse(value.Id, value.Name, value.DisplayName)));
+    }
+    private static async Task<IResult> GetWorkspaceAsync(string workspaceName, IIdentityStore store, ICurrentRequestContext context, CancellationToken token)
+    {
+        if (!Guid.TryParse(workspaceName, out var workspaceId)) return Results.NotFound();
+        var workspace = await store.GetWorkspaceAsync(context.Current.TenantId, workspaceId, token);
+        return workspace is null ? Results.NotFound() : Results.Ok(new WorkplaceWorkspaceResponse(workspace.Id, workspace.Name, workspace.DisplayName));
+    }
+    private static Task<IResult> ListDashboardsAsync(string workspaceName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok((await service.ListDashboardsAsync(WorkspaceId(workspaceName), token)).Select(ToResponse)));
+    private static Task<IResult> GetDashboardAsync(string workspaceName, string dashboardName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetDashboardAsync(WorkspaceId(workspaceName), DashboardResourceId(dashboardName), token))));
+    private static Task<IResult> GetDefaultDashboardAsync(string workspaceName, WorkplaceService service, DashboardAdministrationService administration, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var workspaceId = WorkspaceId(workspaceName);
+        try { return Results.Ok(ToResponse(await service.GetDefaultDashboardAsync(workspaceId, token))); }
+        catch (KeyNotFoundException) { return Results.Ok(ToResponse(await administration.EnsureHomeAsync(workspaceId, token))); }
+    });
     private static async Task<IResult> ListEntriesAsync(WorkplaceService service, CancellationToken token) => Results.Ok((await service.ListEntriesAsync(token)).Select(ToResponse));
     private static Task<IResult> GetEntryAsync(string entryName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetEntryAsync(EntryResourceId(entryName), token))));
     private static Task<IResult> GetNamespacedEntryAsync(string @namespace, string entryName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetEntryAsync(NamespacedEntryId(@namespace, entryName), token))));
-    private static Task<IResult> SubmitEntryCompatibilityAsync(string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(ParseWorkspaceId(request.WorkspaceId), EntryResourceId(entryName), request, service, token);
     private static Task<IResult> SubmitEntryAsync(string workspaceName, string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(WorkspaceId(workspaceName), EntryResourceId(entryName), request, service, token);
     private static Task<IResult> SubmitNamespacedEntryAsync(string workspaceName, string @namespace, string entryName, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => SubmitCoreAsync(WorkspaceId(workspaceName), NamespacedEntryId(@namespace, entryName), request, service, token);
-    private static Task<IResult> SubmitCoreAsync(WorkplaceWorkspaceId workspaceId, EntryId entryId, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> SubmitCoreAsync(WorkspaceId workspaceId, EntryId entryId, CreateInteractionRequest request, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () =>
     {
         var attachments = request.Attachments?.Select(WorkEndpoints.ToWorkAttachment).ToArray(); var result = await service.SubmitAsync(new SubmitEntryCommand(workspaceId, entryId, request.Values, attachments), token);
         return Results.Created($"/api/workspaces/{WorkspaceName(workspaceId)}/interactions/{result.Interaction.Id}", new EntrySubmissionResponse(ToResponse(result.Interaction), result.Action, result.Task is null ? null : ToResponse(result.Task)));
@@ -101,8 +125,8 @@ public static class WorkplaceEndpoints
     private static Task<IResult> MarkReadAsync(string workspaceName, Guid notificationId, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(await service.MarkNotificationReadAsync(WorkspaceId(workspaceName), new(notificationId), token)));
     private static Task<IResult> MarkAllReadAsync(string workspaceName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => { await service.MarkAllNotificationsReadAsync(WorkspaceId(workspaceName), token); return Results.NoContent(); });
 
-    private static WorkplaceWorkspaceResponse ToResponse(WorkplaceWorkspace value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Entries.Select(reference => new WorkspaceEntryReferenceResponse(reference.EntryResourceId.Value, reference.Role, reference.Order) { Namespace = reference.EntryResourceId.Namespace }).ToArray(), value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
-    private static EntryResponse ToResponse(EntryResource value) => new(value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
+    private static WorkplaceDashboardResponse ToResponse(WorkplaceDashboard value) => new(value.Id.Value, value.WorkspaceId.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.IsDefault, value.Entries.Select(reference => new DashboardEntryReferenceResponse(reference.EntryResourceId.Value, reference.Role, reference.Order) { Namespace = reference.EntryResourceId.Namespace }).ToArray(), value.Version, value.PublishedAt);
+    private static EntryResponse ToResponse(EntryResource value) => new(value.WorkspaceId.Value, value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
 
     private static async Task<IResult> ListEntryDraftsAsync(EntryAdministrationService service, WorkplaceService workplace, CancellationToken token)
     {
@@ -182,41 +206,80 @@ public static class WorkplaceEndpoints
         return Results.Problem(statusCode: 400, title: "resource_kind_not_supported", detail: "Only Agent and Flow resources can be selected for an Entry.");
     }
 
-    private static async Task<IResult> ListWorkspaceDraftsAsync(WorkspaceAdministrationService service, WorkplaceService workplace, CancellationToken token)
+    private static async Task<IResult> ListDashboardDraftsAsync(string workspaceName, DashboardAdministrationService service, WorkplaceService workplace, CancellationToken token)
     {
-        var values = new List<WorkplaceWorkspaceDraftResponse>();
-        foreach (var draft in await service.ListAsync(token))
+        var workspaceId = WorkspaceId(workspaceName);
+        if ((await service.ListAsync(workspaceId, token)).Count == 0)
+            await service.EnsureHomeAsync(workspaceId, token);
+        var values = new List<WorkplaceDashboardDraftResponse>();
+        foreach (var draft in await service.ListAsync(workspaceId, token))
         {
-            WorkplaceWorkspace? published = null;
-            try { published = await workplace.GetWorkspaceAsync(draft.Id, token); } catch (KeyNotFoundException) { }
-            values.Add(new WorkplaceWorkspaceDraftResponse(draft, published));
+            WorkplaceDashboard? published = null;
+            try { published = await workplace.GetDashboardAsync(workspaceId, draft.Id, token); } catch (KeyNotFoundException) { }
+            values.Add(new WorkplaceDashboardDraftResponse(draft, published));
         }
         return Results.Ok(values);
     }
 
-    private static Task<IResult> GetWorkspaceDraftAsync(string workspaceName, WorkspaceAdministrationService service, WorkplaceService workplace, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> GetDashboardDraftAsync(string workspaceName, string dashboardName, DashboardAdministrationService service, WorkplaceService workplace, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var draft = await service.GetAsync(WorkspaceId(workspaceName), token);
-        WorkplaceWorkspace? published = null;
-        try { published = await workplace.GetWorkspaceAsync(draft.Id, token); } catch (KeyNotFoundException) { }
-        return Results.Ok(new WorkplaceWorkspaceDraftResponse(draft, published));
+        var workspaceId = WorkspaceId(workspaceName);
+        var draft = await service.GetAsync(workspaceId, DashboardResourceId(dashboardName), token);
+        WorkplaceDashboard? published = null;
+        try { published = await workplace.GetDashboardAsync(workspaceId, draft.Id, token); } catch (KeyNotFoundException) { }
+        return Results.Ok(new WorkplaceDashboardDraftResponse(draft, published));
     });
 
-    private static Task<IResult> PutWorkspaceDraftAsync(string workspaceName, WorkplaceWorkspaceDraft draft, WorkspaceAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> PutDashboardDraftAsync(string workspaceName, string dashboardName, WorkplaceDashboardDraft draft, DashboardAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
     {
-        if (!string.Equals(draft.Name, workspaceName, StringComparison.Ordinal) || draft.Id != WorkspaceId(workspaceName))
-            throw new WorkValidationException("workspace_identity_mismatch", "The Workspace route, name and resource id must match.");
+        var workspaceId = WorkspaceId(workspaceName);
+        var dashboardId = DashboardResourceId(dashboardName);
+        if (draft.WorkspaceId != workspaceId || draft.Id != dashboardId || !string.Equals(draft.Name, dashboardName, StringComparison.Ordinal))
+            throw new WorkValidationException("dashboard_identity_mismatch", "The Dashboard route, Workspace, name and resource id must match.");
         return Results.Ok(await service.SaveAsync(draft, token));
     });
 
-    private static Task<IResult> PublishWorkspaceDraftAsync(string workspaceName, WorkspaceAdministrationService service, CancellationToken token) =>
-        ExecuteAsync(async () => Results.Ok(await service.PublishAsync(WorkspaceId(workspaceName), token)));
+    private static Task<IResult> PublishDashboardDraftAsync(string workspaceName, string dashboardName, DashboardAdministrationService service, CancellationToken token) =>
+        ExecuteAsync(async () => Results.Ok(await service.PublishAsync(WorkspaceId(workspaceName), DashboardResourceId(dashboardName), token)));
+
+    private static Task<IResult> DeleteDashboardAsync(string workspaceName, string dashboardName, DashboardAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        await service.DeleteAsync(WorkspaceId(workspaceName), DashboardResourceId(dashboardName), token);
+        return Results.NoContent();
+    });
     private static InteractionResponse ToResponse(WorkplaceInteraction value) => new(value.Id.Value, value.WorkspaceId.Value, value.EntryId.Value, value.Status, value.StartedAt, value.LastActivityAt, value.InputValues, value.Attachments, value.Messages, value.PendingActionId?.Value, value.TaskId?.Value, value.ImmediateResult, value.Version, value.LastFlowRunId, value.LastTriggerMessageId);
     private static WorkTaskResponse ToResponse(WorkTask value) => new(value.Id.Value, value.WorkspaceId.Value, value.EntryId.Value, value.InteractionId.Value, value.Title, value.Description, value.Status, value.CreatedAt, value.UpdatedAt, value.FlowRunId, value.Conversation, value.Activities, value.Artifacts, value.Result, value.Error, WorkplaceService.CurrentAction(value), value.Version);
-    private static WorkplaceWorkspaceId ParseWorkspaceId(string value) => WorkspaceId(value);
-    private static WorkplaceWorkspaceId WorkspaceId(string name) => new(name);
+    private static WorkspaceId WorkspaceId(string value) => new(Guid.Parse(value));
+    private static DashboardId DashboardResourceId(string name) => new(name);
     private static EntryId EntryResourceId(string name) => new(name);
     private static EntryId NamespacedEntryId(string @namespace, string name) => new(name, ResourceNamespace.Parse(@namespace));
-    private static string WorkspaceName(WorkplaceWorkspaceId id) => id.Value;
+    private static string WorkspaceName(WorkspaceId id) => id.ToString();
+    private static async ValueTask<object?> RequireCurrentWorkspaceAsync(EndpointFilterInvocationContext invocation, EndpointFilterDelegate next)
+    {
+        var routeValue = invocation.HttpContext.Request.RouteValues["workspaceName"]?.ToString();
+        var requestContext = invocation.HttpContext.RequestServices.GetRequiredService<ICurrentRequestContext>();
+        var store = invocation.HttpContext.RequestServices.GetRequiredService<IIdentityStore>();
+        var workspace = await store.GetWorkspaceAsync(
+            requestContext.Current.TenantId,
+            requestContext.Current.WorkspaceId,
+            invocation.HttpContext.RequestAborted);
+        if (workspace is null ||
+            (!string.Equals(routeValue, workspace.Name, StringComparison.OrdinalIgnoreCase) &&
+             (!Guid.TryParse(routeValue, out var workspaceId) || workspaceId != workspace.Id)))
+            return Results.NotFound();
+
+        // Keep application handlers identifier-based while allowing stable, readable Workspace routes.
+        var workspaceIdValue = workspace.Id.ToString("D");
+        invocation.HttpContext.Request.RouteValues["workspaceName"] = workspaceIdValue;
+        for (var index = 0; index < invocation.Arguments.Count; index++)
+        {
+            if (invocation.Arguments[index] is string argument && string.Equals(argument, routeValue, StringComparison.Ordinal))
+            {
+                invocation.Arguments[index] = workspaceIdValue;
+                break;
+            }
+        }
+        return await next(invocation);
+    }
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action) { try { return await action(); } catch (KeyNotFoundException exception) { return Results.Problem(statusCode: 404, title: "workplace_resource_not_found", detail: exception.Message); } catch (WorkValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); } catch (WorkTransitionException exception) { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); } catch (WorkplaceConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); } }
 }
