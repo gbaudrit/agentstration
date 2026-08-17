@@ -8,6 +8,7 @@
 <PageHeader Title="Packs" Description="Install and govern versioned bundles of Agentstration resources. Packs distribute configuration; they are not runtime execution units.">
     <Actions>
         <button class="button-secondary" disabled="@loading" @onclick="LoadAsync">Refresh</button>
+        <a class="button-secondary" href="/pack-projects/new">Create from workspace</a>
         <button class="button-primary" @onclick="OpenInstall">Install local Pack</button>
     </Actions>
 </PageHeader>

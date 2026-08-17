@@ -89,7 +89,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Module | Current responsibility | Planned extension |
 |---|---|---|
 | Management plane | canonical declarative agent and model-profile resources, typed references, desired state, generations, provisioning status, lifecycle events, deterministic revisions, deployments, ETag API | operations, policies, connections, identities, manifest import |
-| Pack distribution | local ZIP importer, retained source artifacts, Pack Projects, deterministic builds, direct current-Workspace installation, logical Model Profile/Secret bindings retained by Pack identity, coordinated six-kind lifecycle, provenance, compensation, and modification-safe uninstall; no Runtime primitive | contained-resource authoring, fully scoped cross-Workspace install, dependency resolution, signatures, Gallery, and publisher verification |
+| Pack distribution | local ZIP importer, retained source artifacts, Pack Projects, workspace-resource Composer with dependency closure, deterministic builds, direct current-Workspace installation, logical Model Profile/Secret bindings retained by Pack identity, coordinated six-kind lifecycle, provenance, compensation, and modification-safe uninstall; no Runtime primitive | broader contained-resource authoring, fully scoped cross-Workspace install, dependency resolution, signatures, Gallery, and publisher verification |
 | Control storage | SQLite JSON resources with indexed metadata and optimistic concurrency | richer relational projections and migrations |
 | Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, MAF `ChatClientAgent`, in-process/shared-host provisioning, registry, reconciliation | provider-native token/tool streaming, sessions, dedicated hosts, containers, remote and Foundry adapters |
 | Model providers | SQLite-backed provider declarations with ETag CRUD and usage protection, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | credentials/connections, additional AEP extensions, cached discovery |
@@ -353,6 +353,7 @@ In explicit Development mode, standalone startup creates or repairs the developm
 20. **Delivered Pack distribution increment:** Packs are versioned Management/distribution artifacts above ordinary resources, never execution primitives; local ZIP validation, namespace-scoped coordinated installation, provenance, inventory, compensation, and safe uninstall are executable offline.
 21. **Delivered Pack authoring increment:** newly installed sources are content-addressed, installed Packs can be forked into workspace-owned Pack Projects, source and fork coexist in identity-derived namespaces, unchanged revisions build identical immutable archives, and stored builds can be previewed, downloaded, installed, or explicitly reinstalled in the current Workspace without a download/upload loop. Pack Flows preserve editable graph definitions.
 22. **Delivered Pack bindings increment:** Pack manifests declare logical Model Profile and Secret requirements, installation resolves them to workspace resources without copying Secret values, and selections persist by Pack identity across uninstall and reinstall.
+23. **Delivered Pack composition increment:** the Console catalogs current workspace resources, previews the complete Entry/Flow/Agent dependency closure, converts environment-specific Model Profile references into logical bindings, and creates a validated immutable Pack Project source snapshot without mutating the selected resources.
 
 ## ADR catalog
 
@@ -394,6 +395,7 @@ In explicit Development mode, standalone startup creates or repairs the developm
 - ADR-0042: authentication and authorization boundaries
 - ADR-0043: trusted Console API session propagation
 - ADR-0044: durable Identity schema and Data Protection key material
+- ADR-0049: Pack Projects can originate from reviewed workspace snapshots
 - ADR-0045: append-only Management security audit
 - ADR-0046: transferable Platform administration
 - ADR-0047: explicit external identity links

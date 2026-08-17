@@ -23,6 +23,43 @@ namespace Agentstration.Management.Tests;
 public sealed class PackTests
 {
     [TestMethod]
+    public async Task ComposerCreatesProjectFromWorkspaceCatalog()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+
+        var catalog = await client.GetFromJsonAsync<PackCompositionCatalogItem[]>("/api/pack-projects/composer/resources")
+            ?? throw new AssertFailedException("The Pack Composer catalog response was empty.");
+        var agent = catalog.Single(item => item.Resource.Kind == ResourceKinds.Agent && item.Resource.Name == "dotnet-expert");
+        Assert.AreEqual(PackCompositionAvailability.Selectable, agent.Availability);
+        Assert.IsTrue(catalog.Any(item => item.Resource.Kind == ResourceKinds.ModelProfile && item.Availability == PackCompositionAvailability.BindingOnly));
+
+        var previewResponse = await client.PostAsJsonAsync(
+            "/api/pack-projects/composer/preview",
+            new PreviewPackCompositionCommand([agent.Resource]));
+        previewResponse.EnsureSuccessStatusCode();
+        var preview = await previewResponse.Content.ReadFromJsonAsync<PackCompositionPreview>();
+        Assert.IsNotNull(preview);
+        Assert.IsTrue(preview.CanCreate);
+        Assert.AreEqual("dotnet-expert", preview.Resources.Single().Resource.Name);
+        Assert.AreEqual(PackBindingTargetKind.ModelProfile, preview.Bindings.Single().TargetKind);
+
+        var createResponse = await client.PostAsJsonAsync("/api/pack-projects", new CreatePackProjectFromWorkspaceCommand
+        {
+            Publisher = "local",
+            Name = $"dotnet-pack-{Guid.NewGuid():N}",
+            Version = "0.1.0",
+            DisplayName = "Pack .NET",
+            Resources = [agent.Resource]
+        });
+        Assert.AreEqual(HttpStatusCode.Created, createResponse.StatusCode);
+        var project = await createResponse.Content.ReadFromJsonAsync<PackProjectResource>();
+        Assert.IsNotNull(project);
+        Assert.AreEqual(PackProjectSourceKind.WorkspaceSnapshot, project.Definition.SourceKind);
+        Assert.AreEqual("dotnet-expert", project.Definition.SourceResources.Single().Name);
+    }
+
+    [TestMethod]
     public async Task ArchiveReaderRejectsParentTraversal()
     {
         await using var archive = CreateZip(new Dictionary<string, string>
@@ -398,6 +435,7 @@ public sealed class PackTests
         Assert.AreEqual(HttpStatusCode.Created, forkResponse.StatusCode, await forkResponse.Content.ReadAsStringAsync());
         var project = await forkResponse.Content.ReadFromJsonAsync<PackProjectResource>();
         Assert.IsNotNull(project);
+        Assert.IsNotNull(project.Definition.Origin);
         Assert.AreEqual("agentstration", project.Definition.Origin.Publisher);
         Assert.AreEqual(PackAudience.Personal, project.Definition.Audience);
         Assert.AreEqual(PackPurpose.Sample, project.Definition.Purpose);

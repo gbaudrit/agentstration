@@ -15,6 +15,12 @@ public interface IPacksClient
     Task UninstallAsync(string publisher, string name, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<InstalledPackResource>> AttachSourceAsync(string publisher, string name, byte[] archive, string fileName, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PackCompositionCatalogItem>> GetCompositionResourcesAsync(CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Pack composition.");
+    Task<PackCompositionPreview> PreviewCompositionAsync(PreviewPackCompositionCommand command, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Pack composition.");
+    Task<ResourceSnapshot<PackProjectResource>> CreateProjectFromWorkspaceAsync(CreatePackProjectFromWorkspaceCommand command, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Pack composition.");
     Task<IReadOnlyList<PackProjectResource>> GetProjectsAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<PackProjectResource>> GetProjectAsync(Guid projectId, CancellationToken cancellationToken);
     Task<ResourceSnapshot<PackProjectResource>> UpdateProjectAsync(Guid projectId, UpdatePackProjectCommand command, string etag, CancellationToken cancellationToken);
@@ -73,6 +79,23 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
     public async Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsJsonAsync($"{Path(publisher, name)}/fork", command, cancellationToken);
+        return await ReadResourceAsync<PackProjectResource>(response, "Pack Project", cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PackCompositionCatalogItem>> GetCompositionResourcesAsync(CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<PackCompositionCatalogItem[]>(httpClient, "api/pack-projects/composer/resources", cancellationToken);
+
+    public async Task<PackCompositionPreview> PreviewCompositionAsync(PreviewPackCompositionCommand command, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync("api/pack-projects/composer/preview", command, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<PackCompositionPreview>(cancellationToken)
+            ?? throw Empty("Pack composition preview");
+    }
+
+    public async Task<ResourceSnapshot<PackProjectResource>> CreateProjectFromWorkspaceAsync(CreatePackProjectFromWorkspaceCommand command, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync("api/pack-projects", command, cancellationToken);
         return await ReadResourceAsync<PackProjectResource>(response, "Pack Project", cancellationToken);
     }
 

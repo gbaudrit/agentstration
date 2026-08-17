@@ -146,8 +146,10 @@ public static class DependencyInjection
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, FlowPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, EntryPackResourceHandler>();
+        services.AddSingleton<IPackWorkspaceResourceCatalog, WorkspacePackResourceCatalog>();
         services.AddSingleton<PackManagementService>();
         services.AddSingleton<PackAuthoringService>();
+        services.AddSingleton<PackCompositionService>();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
         runtimeConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "runtime-plane.db")}";
