@@ -6,13 +6,21 @@ Entry authoring and Entry execution are deliberately different contracts. The Co
 
 Agent bindings are normalized through hidden, system-managed Direct Agent Flows. Workplace renders these Entries exactly like Flow-bound Entries and submits through the same Work API. Work API creates a WorkItem and FlowRun in both cases; the Flow engine invokes the Agent and maps its output into the existing Work result and Workplace action contracts. Workplace does not receive the administrative binding or any provider/runtime object.
 
-The primary input is declared explicitly with `EntryFieldRole.PrimaryInput`; it is unrelated to the Workspace's Primary Entry role. The latter remains exclusively on `WorkspaceEntryReference`.
+The primary input is declared explicitly with `EntryFieldRole.PrimaryInput`; it is unrelated to a Dashboard's Primary presentation role. The latter remains exclusively on `DashboardEntryReference`.
+
+## Workspace and Dashboard
+
+Workspace is the functional boundary for Interactions, Tasks, Conversations, Notifications, and Dashboards. Dashboard is the UX composition of namespaced Entry references, roles, and order. Entry remains independent from every Dashboard that displays it, and its published `ResolvedTarget` remains an immutable Flow reference.
+
+`home` is only the default seeded Dashboard (`IsDefault = true`), and `personal` is only a Workspace name. Neither name activates engine behavior. Workplace routes make both selections explicit with `/w/{workspace}/d/{dashboard}`; `/` resolves the configured default Workspace and then its default Dashboard. Switching Dashboard does not move or filter Workspace work state.
+
+Pack installation only makes namespaced published Entries available for explicit Dashboard selection. It does not add them to Home.
 
 Entry dependency inspection exposes both the administration binding and the resolved Flow. Agent and user Flow deletion are rejected while a published Entry references them, and a system-managed Direct Agent Flow cannot be deleted independently.
 
 ## Iteration 3 UX
 
-The third increment turns the existing functional vertical into one continuous end-user journey without changing its boundaries. Home is organized around a visually emphasized Primary Entry, followed by configured Standard Entries, then the current Interaction, recent Tasks, and attention-first notifications. Primary is a Workspace presentation role only: `EntryRenderer` remains the single generic Prompt/Form renderer and `PrimaryEntryContainer` supplies visual emphasis without introducing a new business type.
+The third increment turns the existing functional vertical into one continuous end-user journey without changing its boundaries. A Dashboard is organized around an optional visually emphasized Primary Entry, followed by Featured and Standard Entries, then the current Interaction, recent Tasks, and attention-first notifications. Primary is a Dashboard presentation role only: `EntryRenderer` remains the single generic Prompt/Form renderer and `PrimaryEntryContainer` supplies visual emphasis without introducing a new business type.
 
 ## Iteration 4 durable conversation
 
@@ -117,7 +125,7 @@ The client reconnects automatically, explicitly rejoins its Workspace group, and
 
 Workplace deliberately reuses the Console design system from `Agentstration.Web.Components`: typography, tokens, panels, buttons, badges, empty/loading/error states, brand lockup, responsive breakpoints, sidebar, top bar, and compact mobile composition. Workplace keeps end-user vocabulary and navigation (`Home`, `Tasks`, `Notifications`) while matching the Console visual language.
 
-The home view renders the Primary Entry as the central intention surface, configured Standard Entries as secondary shortcuts, PendingAction panels in the active conversation, inline and recent Tasks, and an attention-first notification summary. Task detail exposes conversation, functional progression, readable results, deliverables, and conditional pause/resume/cancel actions. Flow Run and runtime implementation details are not part of the default Workplace presentation.
+The Dashboard view renders an optional Primary Entry as the central intention surface, configured Featured and Standard Entries, PendingAction panels in the active conversation, inline and recent Tasks, and an attention-first notification summary. Task detail exposes conversation, functional progression, readable results, deliverables, and conditional pause/resume/cancel actions. Flow Run and runtime implementation details are not part of the default Workplace presentation.
 
 ## Validation
 

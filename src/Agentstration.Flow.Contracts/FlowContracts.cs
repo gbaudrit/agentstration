@@ -10,7 +10,7 @@ public sealed record CreateFlowRequest(string Name, string? Description, string 
 }
 public sealed record UpdateFlowRequest(string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null);
 public sealed record CreateFlowVersionRequest(string Version, bool Activate = true);
-public sealed record FlowResponse(string Id, string Name, string? Description, string Version, bool Enabled, string? ActiveVersion, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)
+public sealed record FlowResponse(string Id, string Name, string? Description, string Version, bool Enabled, string? ActiveVersion, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, FlowGraphDefinition? Graph = null)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
 }

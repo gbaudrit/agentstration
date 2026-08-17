@@ -13,6 +13,7 @@ using Agentstration.Web.Components;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Console;
 using Agentstration.Web.Features.Flows.Designer;
+using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.Security;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -183,6 +184,7 @@ public sealed class ApiClientTests
         var flow = new FlowResponse(flowId.Value, flowId.Value, null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), now, now);
         var draft = new FlowDraftResponse(new FlowDraft
         {
+            WorkspaceId = TestWorkspaceId,
             Id = "draft-universal-router",
             FlowId = flowId,
             DisplayName = "Universal router",
@@ -196,20 +198,23 @@ public sealed class ApiClientTests
             requests.Add($"{request.Method} {request.RequestUri!.AbsolutePath}");
             if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath.EndsWith("/draft", StringComparison.Ordinal))
                 return new HttpResponseMessage(HttpStatusCode.NotFound) { Content = JsonContent.Create(new { title = "flow_draft_not_found", status = 404 }) };
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath.EndsWith("/draft/source", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new FlowSourceResponse("entryStep: input", "yaml", 1)) };
             if (request.Method == HttpMethod.Get)
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) };
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(draft) };
         }))
         { BaseAddress = new Uri("http://localhost/") };
 
-        var actual = await new FlowDesignerBackend(new FlowApiClient(httpClient)).GetDraftAsync(flowId.Value, default);
+        var actual = await new FlowDesignerBackend(new FlowApiClient(httpClient)).LoadAsync(new(ResourceNamespace.Default, flowId.Value), default);
 
-        Assert.AreEqual(flowId, actual.Value.FlowId);
+        Assert.AreEqual(flowId, actual.Resource.FlowId);
         CollectionAssert.AreEqual(new[]
         {
             "GET /api/flows/universal-router/draft",
             "GET /api/flows/universal-router",
-            "POST /api/flows/universal-router/versions/1.0.0/draft"
+            "POST /api/flows/universal-router/versions/1.0.0/draft",
+            "GET /api/flows/universal-router/draft/source"
         }, requests);
     }
 
@@ -267,6 +272,7 @@ public sealed class ApiClientTests
                 "/api/flows" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new FlowPageResponse([summary], null)) },
                 "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) },
                 "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new[] { version }) },
+                "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions/0.1.0" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(version) },
                 "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/runs" => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new FlowRunPageResponse([], null)) },
                 _ => new HttpResponseMessage(HttpStatusCode.NotFound)
             };
@@ -277,6 +283,7 @@ public sealed class ApiClientTests
         var listed = await client.GetFlowsAsync(default);
         _ = await client.GetFlowAsync(@namespace, summary.Id, default);
         _ = await client.GetFlowVersionsAsync(@namespace, summary.Id, default);
+        _ = await client.GetFlowVersionAsync(@namespace, summary.Id, summary.Version, default);
         _ = await client.GetFlowRunsAsync(@namespace, summary.Id, default);
 
         Assert.HasCount(1, listed);
@@ -287,8 +294,65 @@ public sealed class ApiClientTests
             "/api/flows?allNamespaces=true&top=100",
             "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game",
             "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions",
+            "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/versions/0.1.0",
             "/api/namespaces/agentstration.who-am-i/flows/who-am-i-game/runs?top=200"
         }, requests);
+    }
+
+    [TestMethod]
+    public async Task FlowDesignerLoadsNamespacedPublishedGraphWithoutDraftCallsAndRejectsMutations()
+    {
+        var now = new DateTimeOffset(2026, 8, 15, 12, 0, 0, TimeSpan.Zero);
+        var @namespace = new ResourceNamespace("pack.sample");
+        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
+        var flow = new FlowResponse("sample", "Pack sample", null, "1.2.0", true, "1.2.0", definition, new Dictionary<string, string>(), now, now) { Namespace = @namespace };
+        var version = new FlowVersionResponse("sample", "1.2.0", null, definition, new Dictionary<string, string>(), now, graph) { Namespace = @namespace };
+        var requests = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add($"{request.Method} {request.RequestUri!.AbsolutePath}");
+            return request.RequestUri.AbsolutePath.EndsWith("/versions/1.2.0", StringComparison.Ordinal)
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(version) }
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var backend = new FlowDesignerBackend(new FlowApiClient(httpClient));
+        var target = new FlowDesignerTarget(@namespace, "sample");
+
+        var loaded = await backend.LoadAsync(target, default);
+
+        Assert.AreEqual("1.2.0", loaded.PublishedVersion);
+        StringAssert.Contains(loaded.Source, "entryStep: input");
+        CollectionAssert.AreEqual(new[]
+        {
+            "GET /api/namespaces/pack.sample/flows/sample",
+            "GET /api/namespaces/pack.sample/flows/sample/versions/1.2.0"
+        }, requests);
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => backend.SaveDraftAsync(target, new("Sample", null, null, graph), string.Empty, default));
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => backend.ReplaceSourceAsync(target, new("entryStep: input"), string.Empty, default));
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => backend.PublishAsync(target, new("1.3.0"), default));
+        using var input = JsonDocument.Parse("{}");
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => backend.RunDraftAsync(target, new(input.RootElement.Clone()), default));
+        Assert.HasCount(2, requests);
+    }
+
+    [TestMethod]
+    public async Task FlowDesignerReportsLegacyNamespacedVersionWithoutGraph()
+    {
+        var now = new DateTimeOffset(2026, 8, 15, 12, 0, 0, TimeSpan.Zero);
+        var @namespace = new ResourceNamespace("pack.legacy");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-id"));
+        var flow = new FlowResponse("legacy", "Legacy", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), now, now) { Namespace = @namespace };
+        var version = new FlowVersionResponse("legacy", "1.0.0", null, definition, new Dictionary<string, string>(), now) { Namespace = @namespace };
+        using var httpClient = new HttpClient(new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/versions/1.0.0", StringComparison.Ordinal)
+            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(version) }
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(flow) }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => new FlowDesignerBackend(new FlowApiClient(httpClient)).LoadAsync(new(@namespace, "legacy"), default));
+
+        StringAssert.Contains(exception.Message, "legacy Flow version without a Graph");
     }
 
     [TestMethod]
@@ -445,6 +509,36 @@ public sealed class ApiClientTests
         Assert.AreEqual("aspire", providers[0].Properties.ManagementMode);
         Assert.AreEqual("qwen3:4b", models[0].Name);
         Assert.AreEqual("4B", models[0].Metadata["parameterSize"]);
+    }
+
+    [TestMethod]
+    public async Task ModelManagementClientsPreserveNamespaceInResourceRequests()
+    {
+        var requests = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add(request.RequestUri!.PathAndQuery);
+            object response = request.RequestUri.AbsolutePath switch
+            {
+                var path when path.Contains("modelproviders", StringComparison.Ordinal) => new ValueResponse<AvailableModelResponse>([]),
+                var path when path.Contains("modelprofiles", StringComparison.Ordinal) => new ModelProfileUsagesResponse([], 0),
+                _ => new RuntimeProfileUsagesResponse([], 0)
+            };
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var resourceNamespace = new ResourceNamespace("team-a");
+
+        _ = await new ModelProvidersApiClient(httpClient).GetProviderModelsAsync(resourceNamespace, "shared", default);
+        _ = await new ModelProfilesApiClient(httpClient).GetModelProfileUsagesAsync(resourceNamespace, "shared", default);
+        _ = await new RuntimeProfilesApiClient(httpClient).GetRuntimeProfileUsagesAsync(resourceNamespace, "shared", default);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            "/api/modelproviders/shared/models?resourceNamespace=team-a",
+            "/api/modelprofiles/shared/usages?resourceNamespace=team-a",
+            "/api/runtimeprofiles/shared/usages?resourceNamespace=team-a"
+        }, requests);
     }
 
     [TestMethod]
@@ -761,6 +855,8 @@ public sealed class ApiClientTests
 
     private static RuntimeRun CreateRun(string id) => new()
     {
+        WorkspaceId = TestWorkspaceId,
+        Scope = new RuntimeRunScope(Guid.Empty, TestWorkspaceId, Guid.Empty),
         Id = id,
         Name = id,
         Properties = new RuntimeRunProperties
@@ -774,6 +870,7 @@ public sealed class ApiClientTests
 
     private static RuntimeRunEvent RunEvent(long sequence, RuntimeRunEventKind kind, string? content = null, RuntimeRunState? state = null) => new()
     {
+        WorkspaceId = TestWorkspaceId,
         Sequence = sequence,
         EventId = Guid.NewGuid(),
         RunId = "run-test",
@@ -782,6 +879,8 @@ public sealed class ApiClientTests
         Content = content,
         State = state
     };
+
+    private static readonly Agentstration.Resources.WorkspaceId TestWorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
 
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory) : HttpMessageHandler
     {

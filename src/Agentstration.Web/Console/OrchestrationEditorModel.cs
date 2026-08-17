@@ -30,6 +30,11 @@ public sealed class OrchestrationEditorModel
         if (ParticipantIds.Distinct(StringComparer.Ordinal).Count() != ParticipantIds.Count)
             throw new InvalidOperationException("Each participant can only be selected once.");
 
+        return CreatePreviewDefinition();
+    }
+
+    public OrchestrationFlowDefinition CreatePreviewDefinition()
+    {
         var participants = ParticipantIds
             .Select(id => new FlowTargetReference(FlowTargetKind.Agent, id))
             .ToArray();

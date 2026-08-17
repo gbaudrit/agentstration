@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Flow;
+using Agentstration.Resources;
 
 namespace Agentstration.Work;
 
@@ -44,6 +45,7 @@ public sealed class WorkTransitionException(string code, string message) : Inval
 
 public sealed record WorkItemSnapshot(
     WorkItemId Id,
+    WorkspaceId WorkspaceId,
     string Type,
     string? Title,
     string Instruction,

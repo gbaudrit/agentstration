@@ -270,6 +270,7 @@ public sealed partial class PackManagementService
         return kind switch
         {
             PackBindingTargetKind.ModelProfile => await store.GetAsync<ModelProfileResource>(new(ResourceKinds.ModelProfile, target.Name, @namespace), cancellationToken) is not null,
+            PackBindingTargetKind.ModelProvider => await store.GetAsync<ModelProviderResource>(new(ResourceKinds.ModelProvider, target.Name, @namespace), cancellationToken) is not null,
             PackBindingTargetKind.Secret => await store.GetAsync<SecretResource>(new(ResourceKinds.Secret, target.Name, @namespace), cancellationToken) is not null,
             _ => false
         };

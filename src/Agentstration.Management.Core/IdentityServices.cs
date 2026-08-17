@@ -8,8 +8,8 @@ public sealed class LocalBootstrapOptions
     public const string DevelopmentSubject = "local-operator";
     public string TenantName { get; set; } = "local";
     public string TenantDisplayName { get; set; } = "Local organization";
-    public string WorkspaceName { get; set; } = "default";
-    public string WorkspaceDisplayName { get; set; } = "Default workspace";
+    public string WorkspaceName { get; set; } = "personal";
+    public string WorkspaceDisplayName { get; set; } = "Personal";
     public string PrincipalDisplayName { get; set; } = "Local operator";
     public string ExternalIdentityIssuer { get; set; } = DevelopmentIssuer;
     public string ExternalIdentitySubject { get; set; } = DevelopmentSubject;
@@ -17,17 +17,29 @@ public sealed class LocalBootstrapOptions
 
 public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestContextInitializer, IRequestContextScopeFactory
 {
-    private readonly AsyncLocal<RequestContext?> ambient = new();
+    private readonly AsyncLocal<AmbientRequestContext?> ambient = new();
     private RequestContext? fallback;
-    public bool IsInitialized => ambient.Value is not null || fallback is not null;
-    public RequestContext Current => ambient.Value ?? fallback ?? throw new InvalidOperationException("The request context has not been initialized.");
+    public bool IsInitialized => AccessMode == ControlPlaneAccessMode.Workspace;
+    public ControlPlaneAccessMode AccessMode => ambient.Value?.AccessMode
+        ?? (fallback is null ? ControlPlaneAccessMode.Unavailable : ControlPlaneAccessMode.Workspace);
+    public RequestContext Current => ambient.Value switch
+    {
+        { AccessMode: ControlPlaneAccessMode.Workspace, Context: not null } value => value.Context,
+        { AccessMode: ControlPlaneAccessMode.System } => throw new InvalidOperationException("System operations do not have a workspace request context."),
+        _ => fallback ?? throw new InvalidOperationException("The request context has not been initialized.")
+    };
     public void Initialize(RequestContext context) => fallback = context;
-    public IDisposable Push(RequestContext context)
+    public IDisposable Push(RequestContext context) => Push(new AmbientRequestContext(ControlPlaneAccessMode.Workspace, context));
+    public IDisposable PushSystem() => Push(new AmbientRequestContext(ControlPlaneAccessMode.System, null));
+
+    private IDisposable Push(AmbientRequestContext context)
     {
         var previous = ambient.Value;
         ambient.Value = context;
         return new Scope(() => ambient.Value = previous);
     }
+
+    private sealed record AmbientRequestContext(ControlPlaneAccessMode AccessMode, RequestContext? Context);
 
     private sealed class Scope(Action dispose) : IDisposable
     {
@@ -54,7 +66,6 @@ public sealed class ExternalIdentityPrincipalResolver(IIdentityStore store) : IP
 
 public sealed class InitialPrincipalProvisioner(
     IIdentityStore store,
-    IResourceScopeMigrator resourceMigrator,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
     LocalBootstrapOptions options) : IInitialPrincipalProvisioner
@@ -90,7 +101,6 @@ public sealed class InitialPrincipalProvisioner(
             ?? throw new InvalidOperationException("The Owner role could not be initialized.");
         await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), tenant.Id, principal.Id, PrincipalType.User, owner.Id, AuthorizationScopes.Workspace(workspace.Id)), cancellationToken);
         await store.AddPlatformAdministratorAsync(new PlatformAdministrator(principal.Id, now), cancellationToken);
-        await resourceMigrator.BackfillUnscopedResourcesAsync(tenant.Id, workspace.Id, cancellationToken);
         await audit.WriteAsync(new(
             SecurityAuditActions.PlatformAdministratorGranted,
             ActorPrincipalId: principal.Id,
@@ -302,7 +312,6 @@ public sealed class PlatformAuthorizationService(IIdentityStore store) : IPlatfo
 public sealed class LocalEnvironmentBootstrapper(
     IIdentityStore store,
     IRequestContextInitializer contextInitializer,
-    IResourceScopeMigrator resourceMigrator,
     TimeProvider timeProvider,
     LocalBootstrapOptions options) : ILocalEnvironmentBootstrapper
 {
@@ -352,7 +361,6 @@ public sealed class LocalEnvironmentBootstrapper(
             await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), tenant.Id, principal.Id, PrincipalType.User, owner.Id, tenantScope), cancellationToken);
 
         contextInitializer.Initialize(new RequestContext(principal.Id, tenant.Id, workspace.Id));
-        await resourceMigrator.BackfillUnscopedResourcesAsync(tenant.Id, workspace.Id, cancellationToken);
     }
 }
 

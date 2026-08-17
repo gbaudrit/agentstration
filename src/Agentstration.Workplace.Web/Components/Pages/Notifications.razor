@@ -1,4 +1,4 @@
-@page "/notifications"
+@page "/w/{WorkspaceName}/notifications"
 @implements IDisposable
 @inject IWorkplaceApiClient Api
 
@@ -19,6 +19,7 @@ else
 }
 
 @code {
+    [Parameter] public string WorkspaceName { get; set; } = string.Empty;
     private readonly CancellationTokenSource lifetime = new();
     private IReadOnlyList<WorkNotification> items = [];
     private bool loading = true;
@@ -31,20 +32,20 @@ else
     {
         loading = true;
         error = null;
-        try { items = await Api.ListNotificationsAsync("personal", false, lifetime.Token); }
+        try { items = await Api.ListNotificationsAsync(WorkspaceName, false, lifetime.Token); }
         catch when (!lifetime.IsCancellationRequested) { error = "Notifications could not be loaded from the local Work API."; }
         finally { loading = false; }
     }
 
-    private Task ReadAsync(WorkNotificationId id) => ExecuteAsync(() => Api.MarkNotificationReadAsync("personal", id.Value, lifetime.Token));
-    private Task ReadAllAsync() => ExecuteAsync(() => Api.MarkAllNotificationsReadAsync("personal", lifetime.Token));
+    private Task ReadAsync(WorkNotificationId id) => ExecuteAsync(() => Api.MarkNotificationReadAsync(WorkspaceName, id.Value, lifetime.Token));
+    private Task ReadAllAsync() => ExecuteAsync(() => Api.MarkAllNotificationsReadAsync(WorkspaceName, lifetime.Token));
 
     private async Task ExecuteAsync(Func<Task> action)
     {
         if (busy) return;
         busy = true;
         error = null;
-        try { await action(); items = await Api.ListNotificationsAsync("personal", false, lifetime.Token); }
+        try { await action(); items = await Api.ListNotificationsAsync(WorkspaceName, false, lifetime.Token); }
         catch when (!lifetime.IsCancellationRequested) { error = "Notifications could not be updated. Please try again."; }
         finally { busy = false; }
     }

@@ -49,8 +49,11 @@ public sealed class ModelProviderManagementService(
     }
 
     public async Task<StoredResource<ModelProviderResource>> PutAsync(string name, ModelProviderProperties definition, string? ifMatch, CancellationToken cancellationToken)
+        => await PutAsync(ResourceNamespace.Default, name, definition, ifMatch, cancellationToken);
+
+    public async Task<StoredResource<ModelProviderResource>> PutAsync(ResourceNamespace @namespace, string name, ModelProviderProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
+        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
         await ValidateCredentialAsync(existing.Value.Namespace, definition.Credential, cancellationToken);
         return await store.PutAsync(existing.Value with
         {
@@ -70,14 +73,20 @@ public sealed class ModelProviderManagementService(
     }
 
     public async Task<ModelProviderView> GetViewRequiredAsync(string name, CancellationToken cancellationToken)
+        => await GetViewRequiredAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    public async Task<ModelProviderView> GetViewRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        var stored = await GetAsync(name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
+        var stored = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
         return await InspectAsync(ToConfiguration(stored.Value), false, cancellationToken);
     }
 
     public async Task<IReadOnlyList<DiscoveredModel>> ListModelsAsync(string name, CancellationToken cancellationToken)
+        => await ListModelsAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    public async Task<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        var provider = await GetConfigurationRequiredAsync(name, cancellationToken);
+        var provider = await GetConfigurationRequiredAsync(@namespace, name, cancellationToken);
         var discovery = FindDiscovery(provider.ProviderType) ?? throw new ModelProviderUnavailableException(name, "No discovery adapter is registered in this host.");
         var health = await discovery.GetHealthAsync(provider, cancellationToken);
         if (!string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase)) throw new ModelProviderUnavailableException(name, health.Details);
@@ -86,10 +95,15 @@ public sealed class ModelProviderManagementService(
     }
 
     public Task<ModelProviderView> GetStatusAsync(string name, CancellationToken cancellationToken) => GetViewRequiredAsync(name, cancellationToken);
+    public Task<ModelProviderView> GetStatusAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => GetViewRequiredAsync(@namespace, name, cancellationToken);
 
     public async Task<IReadOnlyList<ModelProviderUsage>> GetUsagesAsync(string providerName, CancellationToken cancellationToken) =>
+        await GetUsagesAsync(ResourceNamespace.Default, providerName, cancellationToken);
+
+    public async Task<IReadOnlyList<ModelProviderUsage>> GetUsagesAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
         (await store.ListAllAsync<ModelProfileResource>(ResourceKinds.ModelProfile, cancellationToken))
-            .Where(profile => profile.Value.Definition.Provider.Name == providerName)
+            .Where(profile => profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ResourceKinds.ModelProvider).Namespace == @namespace
+                && profile.Value.Definition.Provider.Name == providerName)
             .Select(profile => new ModelProviderUsage(profile.Value.Kind, profile.Value.Metadata.Name, profile.Value.Definition.DisplayName))
             .ToArray();
 
@@ -104,6 +118,8 @@ public sealed class ModelProviderManagementService(
     public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
     {
         _ = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
+        var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
+        if (usages.Count > 0) throw new ModelProviderInUseException(name, usages);
         await store.DeleteAsync(new(ResourceKinds.ModelProvider, name, @namespace), ifMatch, cancellationToken);
     }
 
@@ -121,9 +137,12 @@ public sealed class ModelProviderManagementService(
         return new(provider, health, models, timeProvider.GetUtcNow());
     }
 
-    private async Task<ModelProviderConfiguration> GetConfigurationRequiredAsync(string name, CancellationToken cancellationToken)
+    public async Task<ModelProviderConfiguration> GetConfigurationRequiredAsync(string name, CancellationToken cancellationToken)
+        => await GetConfigurationRequiredAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    public async Task<ModelProviderConfiguration> GetConfigurationRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        var resource = await GetAsync(name, cancellationToken) ?? throw new ModelProviderConfigurationNotFoundException(name);
+        var resource = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderConfigurationNotFoundException(name);
         return ToConfiguration(resource.Value);
     }
 
@@ -156,6 +175,7 @@ public sealed class ModelProviderManagementService(
     private static ModelProviderConfiguration ToConfiguration(ModelProviderResource resource) => new()
     {
         Uid = resource.Uid,
+        Namespace = resource.Namespace,
         Name = resource.Metadata.Name,
         ProviderType = resource.Definition.ProviderType,
         Endpoint = resource.Definition.Endpoint,
@@ -187,7 +207,7 @@ public sealed class ModelProviderManagementService(
 
 public sealed class ModelProfileManagementService(
     IControlPlaneStore store,
-    IModelProviderConfigurationStore providerConfigurations,
+    ModelProviderManagementService providerConfigurations,
     IEnumerable<IModelProviderDiscovery> discoveries,
     IEnumerable<IModelProviderOptionsValidator> optionsValidators) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
 {
@@ -195,15 +215,18 @@ public sealed class ModelProfileManagementService(
     public async Task<StoredResource<ModelProfileResource>> CreateAsync(ModelProfileResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        await ValidateDefinitionAsync(resource.Definition, cancellationToken);
+        await ValidateDefinitionAsync(resource.Namespace, resource.Definition, cancellationToken);
         if (await GetAsync(resource.Namespace, resource.Metadata.Name, cancellationToken) is not null) throw new ControlPlaneConcurrencyException($"Model profile '{resource.Address}' already exists.");
         return await store.PutAsync(resource with { Generation = 1, Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded } }, null, true, cancellationToken);
     }
 
     public async Task<StoredResource<ModelProfileResource>> PutAsync(string name, ModelProfileProperties definition, string? ifMatch, CancellationToken cancellationToken)
+        => await PutAsync(ResourceNamespace.Default, name, definition, ifMatch, cancellationToken);
+
+    public async Task<StoredResource<ModelProfileResource>> PutAsync(ResourceNamespace @namespace, string name, ModelProfileProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {
-        await ValidateDefinitionAsync(definition, cancellationToken);
-        var existing = await GetAsync(name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, name));
+        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, name, @namespace));
+        await ValidateDefinitionAsync(existing.Value.Namespace, definition, cancellationToken);
         return await store.PutAsync(existing.Value with
         {
             Generation = checked(existing.Value.Generation + 1),
@@ -227,19 +250,26 @@ public sealed class ModelProfileManagementService(
     public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
     {
         _ = await GetAsync(@namespace, name, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, name, @namespace));
+        var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
+        if (usages.Count > 0) throw new ModelProfileInUseException(name, usages);
         await store.DeleteAsync(new(ResourceKinds.ModelProfile, name, @namespace), ifMatch, cancellationToken);
     }
 
     public async Task<IReadOnlyList<ModelProfileUsage>> GetUsagesAsync(string profileName, CancellationToken cancellationToken) =>
+        await GetUsagesAsync(ResourceNamespace.Default, profileName, cancellationToken);
+
+    public async Task<IReadOnlyList<ModelProfileUsage>> GetUsagesAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) =>
         (await store.ListAllAsync<AgentResource>(ResourceKinds.Agent, cancellationToken))
-            .Where(agent => agent.Value.Definition.ModelProfile.Name == profileName)
+            .Where(agent => agent.Value.Definition.ModelProfile.Resolve(agent.Value.Namespace, ResourceKinds.ModelProfile).Namespace == @namespace
+                && agent.Value.Definition.ModelProfile.Name == profileName)
             .Select(agent => new ModelProfileUsage(agent.Value.Kind, agent.Value.Metadata.Name, agent.Value.Definition.DisplayName))
             .ToArray();
 
     public async Task<ModelProfileResolution> ResolveAsync(ModelProfileResource profile, CancellationToken cancellationToken)
     {
         ModelProviderConfiguration provider;
-        try { provider = await providerConfigurations.GetRequiredAsync(profile.Definition.Provider.Name, cancellationToken); }
+        var providerAddress = profile.Definition.Provider.Resolve(profile.Namespace, ResourceKinds.ModelProvider);
+        try { provider = await providerConfigurations.GetConfigurationRequiredAsync(providerAddress.Namespace, providerAddress.Name, cancellationToken); }
         catch (ModelProviderResolutionException) { return new(profile, null, new("unavailable", "Provider not found."), null, "unavailable", ["The referenced provider does not exist."]); }
         var discovery = discoveries.SingleOrDefault(candidate => candidate.CanHandle(provider.ProviderType));
         if (discovery is null) return new(profile, provider, new("unknown", "No discovery adapter."), null, "unknown", ["No provider discovery adapter is registered."]);
@@ -273,19 +303,21 @@ public sealed class ModelProfileManagementService(
     public async Task ValidateReferenceAsync(ResourceReference profileReference, CancellationToken cancellationToken)
     {
         if (profileReference.WorkspaceRef is not null) throw Invalid("definition.modelProfileRef.workspaceRef", "Cross-workspace references are not enabled in this installation.");
-        var profile = await GetAsync(profileReference.Name, cancellationToken) ?? throw Invalid("definition.modelProfileRef.name", "The referenced model profile does not exist.");
-        await ValidateDefinitionAsync(profile.Value.Definition, cancellationToken);
+        var profileNamespace = profileReference.Namespace ?? ResourceNamespace.Default;
+        var profile = await GetAsync(profileNamespace, profileReference.Name, cancellationToken) ?? throw Invalid("definition.modelProfileRef.name", "The referenced model profile does not exist.");
+        await ValidateDefinitionAsync(profile.Value.Namespace, profile.Value.Definition, cancellationToken);
     }
 
     Task IModelProfileReferenceValidator.ValidateAsync(ResourceReference profileReference, CancellationToken cancellationToken) => ValidateReferenceAsync(profileReference, cancellationToken);
 
-    private async Task ValidateDefinitionAsync(ModelProfileProperties definition, CancellationToken cancellationToken)
+    private async Task ValidateDefinitionAsync(ResourceNamespace ownerNamespace, ModelProfileProperties definition, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.DisplayName);
         if (definition.Provider.WorkspaceRef is not null) throw Invalid("definition.provider.workspaceRef", "Cross-workspace references are not enabled in this installation.");
         ModelProviderConfiguration provider;
-        try { provider = await providerConfigurations.GetRequiredAsync(definition.Provider.Name, cancellationToken); }
+        var providerAddress = definition.Provider.Resolve(ownerNamespace, ResourceKinds.ModelProvider);
+        try { provider = await providerConfigurations.GetConfigurationRequiredAsync(providerAddress.Namespace, providerAddress.Name, cancellationToken); }
         catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }
         if (!provider.Capabilities.Contains("chat", StringComparer.OrdinalIgnoreCase)) throw Invalid("definition.provider.name", "The referenced model provider does not support chat.");
         if (string.IsNullOrWhiteSpace(definition.Model.Name)) throw Invalid("definition.model.name", "A model name is required.");

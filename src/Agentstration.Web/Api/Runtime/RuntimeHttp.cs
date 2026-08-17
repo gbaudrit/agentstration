@@ -1,10 +1,17 @@
-using Agentstration.Runtime.Abstractions;
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Web.Api.Runtime;
 
 internal static class RuntimeHttp
 {
+    public static RuntimeRunScope CurrentScope(ICurrentRequestContext context)
+    {
+        var current = context.Current;
+        return new RuntimeRunScope(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId);
+    }
+
     public static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
     {
         try { return await action(); }

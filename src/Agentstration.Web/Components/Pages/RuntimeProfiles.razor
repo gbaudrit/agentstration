@@ -13,8 +13,8 @@ else if (profiles.Count == 0) { <EmptyState Title="No runtime profiles" Message=
 else
 {
     <DataGrid TItem="RuntimeProfileSummaryResponse" Items="profiles">
-        <Header><tr><th>Profile</th><th>Runtime</th><th>Session</th><th>Streaming</th><th>Usage</th><th></th></tr></Header>
-        <Row Context="profile"><tr><td><strong>@profile.Properties.DisplayName</strong><br /><code>@profile.Name</code></td><td><code>@profile.Properties.RuntimeType</code></td><td>@profile.Properties.Execution.SessionMode</td><td>@profile.Properties.Execution.Streaming</td><td>@profile.UsageCount deployment(s)</td><td><a class="text-button" href="@Url(profile)">Open</a></td></tr></Row>
+        <Header><tr><th>Profile</th><th>Namespace</th><th>Runtime</th><th>Session</th><th>Streaming</th><th>Usage</th><th></th></tr></Header>
+        <Row Context="profile"><tr><td><strong>@profile.Properties.DisplayName</strong><br /><code>@profile.Name</code></td><td><code>@profile.Namespace</code></td><td><code>@profile.Properties.RuntimeType</code></td><td>@profile.Properties.Execution.SessionMode</td><td>@profile.Properties.Execution.Streaming</td><td>@profile.UsageCount deployment(s)</td><td><a class="text-button" href="@Url(profile)">Open</a></td></tr></Row>
     </DataGrid>
 }
 
@@ -24,6 +24,6 @@ else
     private AgentstrationApiException? error;
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync() { error = null; try { profiles = await Client.GetRuntimeProfilesAsync(cancellation.Token); } catch (AgentstrationApiException exception) { error = exception; } }
-    private static string Url(RuntimeProfileSummaryResponse profile) => $"/runtimeprofiles/{Uri.EscapeDataString(profile.Name)}";
+    private static string Url(RuntimeProfileSummaryResponse profile) => $"/runtimeprofiles/{Uri.EscapeDataString(profile.Name)}?namespace={Uri.EscapeDataString(profile.Namespace)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

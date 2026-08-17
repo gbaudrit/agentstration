@@ -45,7 +45,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
 
         CheckpointManager? checkpointManager = null;
         if (executionStates is not null)
-            checkpointManager = CheckpointManager.CreateJson(new AgentFrameworkCheckpointStore(executionStates, timeProvider));
+            checkpointManager = CheckpointManager.CreateJson(new AgentFrameworkCheckpointStore(executionStates, request.WorkspaceId, timeProvider));
         await using var run = request.RuntimeState is null
             ? checkpointManager is null
                 ? await InProcessExecution.RunStreamingAsync(

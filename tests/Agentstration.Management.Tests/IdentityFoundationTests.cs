@@ -126,6 +126,24 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
+    public void ExplicitSystemScopeIsGlobalAndRestoresTheWorkspaceFallback()
+    {
+        var accessor = new CurrentRequestContext();
+        var fallback = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        accessor.Initialize(fallback);
+
+        using (accessor.PushSystem())
+        {
+            Assert.AreEqual(ControlPlaneAccessMode.System, accessor.AccessMode);
+            Assert.IsFalse(accessor.IsInitialized);
+            Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
+        }
+
+        Assert.AreEqual(ControlPlaneAccessMode.Workspace, accessor.AccessMode);
+        Assert.AreEqual(fallback, accessor.Current);
+    }
+
+    [TestMethod]
     public async Task WorkspaceCreationDoesNotRequireAResourceGroup()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
@@ -176,21 +194,6 @@ public sealed class IdentityFoundationTests
 
         await store.UpdatePrincipalAsync(first with { Email = "after@example.test" }, default);
         Assert.AreEqual(first.Id, (await resolver.ResolveAsync("https://issuer-a.test", "same-subject", default))?.Id);
-    }
-
-    [TestMethod]
-    public async Task ExistingIdentityRowsMigrateToExternalIdentityAndWorkspaceMembership()
-    {
-        await using var fixture = await IdentityFixture.CreateAsync();
-        var context = fixture.Context.Current;
-        await fixture.ExecuteSqlAsync("DROP TABLE WorkspaceMemberships; DROP TABLE ExternalIdentities; UPDATE Users SET ExternalSubject = 'legacy-subject';");
-
-        await fixture.Services.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);
-
-        var store = fixture.Services.GetRequiredService<IIdentityStore>();
-        var identity = await store.FindExternalIdentityAsync(LocalBootstrapOptions.DevelopmentIssuer, "legacy-subject", default);
-        Assert.AreEqual(context.PrincipalId, identity?.PrincipalId);
-        Assert.IsNotNull(await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, default));
     }
 
     private static RuntimeProfileResource Profile(string id, RequestContext context) => new()

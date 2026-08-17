@@ -139,6 +139,7 @@ public interface IRequestContextInitializer
 public interface IRequestContextScopeFactory
 {
     IDisposable Push(RequestContext context);
+    IDisposable PushSystem();
 }
 
 public interface IPrincipalResolver
@@ -240,11 +241,6 @@ public interface IIdentityStore
     Task<IReadOnlyList<RoleAssignment>> ListRoleAssignmentsAsync(Guid tenantId, Guid principalId, CancellationToken cancellationToken);
     Task AddRoleAssignmentAsync(RoleAssignment roleAssignment, CancellationToken cancellationToken);
     Task RemoveRoleAssignmentAsync(Guid roleAssignmentId, CancellationToken cancellationToken);
-}
-
-public interface IResourceScopeMigrator
-{
-    Task BackfillUnscopedResourcesAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken);
 }
 
 public sealed class AuthorizationDeniedException(string permission)

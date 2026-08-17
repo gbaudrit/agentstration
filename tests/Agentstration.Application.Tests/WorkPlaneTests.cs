@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flow;
+using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -19,6 +20,7 @@ namespace Agentstration.Application.Tests;
 public sealed class WorkPlaneTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly WorkspaceId WorkplaceId = new(Guid.Parse("22222222-2222-2222-2222-222222222222"));
 
     [TestMethod]
     public void WorkItemCreationValidatesRequiredData()
@@ -28,30 +30,32 @@ public sealed class WorkPlaneTests
         Assert.AreEqual(WorkItemStatus.Pending, item.Status);
         Assert.AreEqual(1, item.Version);
         Assert.AreEqual("WorkItemSubmitted", item.History.Single().Type);
-        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), "", "instruction", Now));
-        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), "analysis", "", Now));
-        Assert.Throws<WorkValidationException>(() => WorkItem.Create(new WorkItemId(Guid.Empty), "analysis", "instruction", Now));
+        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), WorkplaceId, "", "instruction", Now));
+        Assert.Throws<WorkValidationException>(() => WorkItem.Create(WorkItemId.New(), WorkplaceId, "analysis", "", Now));
+        Assert.Throws<WorkValidationException>(() => WorkItem.Create(new WorkItemId(Guid.Empty), WorkplaceId, "analysis", "instruction", Now));
     }
 
     [TestMethod]
     public void WorkplaceResourcesEnforcePrimaryEntryAndDeterministicFieldRules()
     {
         var entryId = new EntryId("request");
-        var duplicatePrimary = new WorkplaceWorkspace
+        var duplicatePrimary = new WorkplaceDashboard
         {
-            Id = new WorkplaceWorkspaceId("personal"),
-            Name = "personal",
-            DisplayName = "Personal",
+            Id = new DashboardId("home"),
+            WorkspaceId = WorkplaceId,
+            Name = "home",
+            DisplayName = "Home",
             Entries =
             [
-                new WorkspaceEntryReference { EntryResourceId = entryId, Role = WorkspaceEntryRole.Primary },
-                new WorkspaceEntryReference { EntryResourceId = new EntryId(entryId.Value + "-two"), Role = WorkspaceEntryRole.Primary }
+                new DashboardEntryReference { EntryResourceId = entryId, Role = DashboardItemRole.Primary },
+                new DashboardEntryReference { EntryResourceId = new EntryId(entryId.Value + "-two"), Role = DashboardItemRole.Primary }
             ]
         };
         Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(duplicatePrimary));
 
         var entry = new EntryResource
         {
+            WorkspaceId = WorkplaceId,
             Id = entryId,
             Name = "request",
             DisplayName = "Request",
@@ -76,6 +80,7 @@ public sealed class WorkPlaneTests
 
         var draft = new EntryDraft
         {
+            WorkspaceId = WorkplaceId,
             Id = entryId,
             Name = "request",
             DisplayName = "Request",
@@ -109,23 +114,99 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public void DashboardValidationAllowsNoPrimaryAndNamespacedEntriesButRejectsDuplicates()
+    {
+        var packEntry = new EntryId("weather", new ResourceNamespace("daily-life"));
+        var dashboard = new WorkplaceDashboard
+        {
+            Id = new("home"),
+            WorkspaceId = WorkplaceId,
+            Name = "home",
+            DisplayName = "Home",
+            IsDefault = true,
+            Entries =
+            [
+                new() { EntryResourceId = packEntry, Role = DashboardItemRole.Featured },
+                new() { EntryResourceId = new EntryId("summary"), Role = DashboardItemRole.Standard, Order = 10 }
+            ]
+        };
+
+        WorkplaceValidation.Validate(dashboard);
+        var error = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(dashboard with
+        {
+            Entries = [dashboard.Entries[0], dashboard.Entries[0] with { Order = 20 }]
+        }));
+        Assert.AreEqual("dashboard_entry_duplicate", error.Code);
+    }
+
+    [TestMethod]
+    public async Task DashboardAdministrationMaintainsOneDefaultAndAllowsEntryReuse()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var workspaceId = WorkplaceId;
+        var entry = new EntryResource
+        {
+            WorkspaceId = workspaceId,
+            Id = new("request"),
+            Name = "request",
+            DisplayName = "Request",
+            Presentation = new EntryPresentation { Fields = [new() { Name = "request", Type = EntryFieldType.Prompt, Required = true, Role = EntryFieldRole.PrimaryInput }] },
+            ResolvedTarget = new("router", "1.0.0"),
+            PublishedAt = Now
+        };
+        await fixture.Workplace.UpsertEntryAsync(entry, default);
+        var service = new DashboardAdministrationService(fixture.Workplace, TimeProvider.System);
+        var home = await service.SaveAsync(new WorkplaceDashboardDraft
+        {
+            Id = new("home"),
+            WorkspaceId = workspaceId,
+            Name = "home",
+            DisplayName = "Home",
+            IsDefault = true,
+            Entries = [new() { EntryResourceId = entry.Id, Role = DashboardItemRole.Primary }]
+        }, default);
+        await service.PublishAsync(workspaceId, home.Id, default);
+        var travel = await service.SaveAsync(new WorkplaceDashboardDraft
+        {
+            Id = new("travel"),
+            WorkspaceId = workspaceId,
+            Name = "travel",
+            DisplayName = "Travel",
+            IsDefault = true,
+            Entries = [new() { EntryResourceId = entry.Id, Role = DashboardItemRole.Featured }]
+        }, default);
+        await service.PublishAsync(workspaceId, travel.Id, default);
+
+        var published = await fixture.Workplace.ListDashboardsAsync(workspaceId, default);
+        Assert.HasCount(2, published);
+        Assert.AreEqual("travel", published.Single(value => value.IsDefault).Name);
+        Assert.IsTrue(published.All(value => value.Entries.Single().EntryResourceId == entry.Id));
+        var drafts = await fixture.Workplace.ListDashboardDraftsAsync(workspaceId, default);
+        Assert.AreEqual("travel", drafts.Single(value => value.IsDefault).Name);
+
+        await service.SaveAsync(travel with { IsDefault = false }, default);
+        var error = await Assert.ThrowsAsync<WorkValidationException>(() => service.PublishAsync(workspaceId, travel.Id, default));
+        Assert.AreEqual("dashboard_default_required", error.Code);
+    }
+
+    [TestMethod]
     public void WorkItemSupportsInputAndApprovalLifecycle()
     {
         var item = CreatePending();
         var executionId = WorkExecutionId.New();
         item.MarkQueued(executionId, null, Guid.NewGuid(), Now.AddSeconds(1));
         Assert.AreEqual(WorkItemStatus.Queued, item.Status);
-        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), item.Id, executionId, Now.AddSeconds(2), "sql-expert"));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), item.WorkspaceId, item.Id, executionId, Now.AddSeconds(2), "sql-expert"));
         Assert.AreEqual(WorkItemStatus.Running, item.Status);
-        item.ApplyRuntimeEvent(new WorkExecutionInputRequested(Guid.NewGuid(), item.Id, executionId, Now.AddSeconds(3), "Which database?"));
+        item.ApplyRuntimeEvent(new WorkExecutionInputRequested(Guid.NewGuid(), item.WorkspaceId, item.Id, executionId, Now.AddSeconds(3), "Which database?"));
         Assert.AreEqual(WorkItemStatus.WaitingForInput, item.Status);
         item.ProvideInput(new WorkInput("SQL Server"), "requester-1", Guid.NewGuid(), Now.AddSeconds(4));
         Assert.AreEqual(WorkItemStatus.Running, item.Status);
-        item.ApplyRuntimeEvent(new WorkExecutionApprovalRequested(Guid.NewGuid(), item.Id, executionId, Now.AddSeconds(5), "Apply the recommendation?"));
+        item.ApplyRuntimeEvent(new WorkExecutionApprovalRequested(Guid.NewGuid(), item.WorkspaceId, item.Id, executionId, Now.AddSeconds(5), "Apply the recommendation?"));
         Assert.AreEqual(WorkItemStatus.WaitingForApproval, item.Status);
         item.SubmitApproval(WorkApprovalDecision.Approved, "requester-1", "Approved", Guid.NewGuid(), Now.AddSeconds(6));
         Assert.AreEqual(WorkItemStatus.Running, item.Status);
-        item.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), item.Id, executionId, Now.AddSeconds(7), Result("Done")));
+        item.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), item.WorkspaceId, item.Id, executionId, Now.AddSeconds(7), Result("Done")));
         Assert.AreEqual(WorkItemStatus.Completed, item.Status);
         Assert.AreEqual("Done", item.Result!.Contents.Single().Text);
         Assert.Throws<WorkTransitionException>(() => item.Cancel(null, Guid.NewGuid(), Now.AddSeconds(8)));
@@ -143,13 +224,13 @@ public sealed class WorkPlaneTests
         Assert.Throws<WorkTransitionException>(() => pending.MarkQueued(WorkExecutionId.New(), null, Guid.NewGuid(), Now.AddSeconds(2)));
 
         var rejected = Running();
-        rejected.ApplyRuntimeEvent(new WorkExecutionApprovalRequested(Guid.NewGuid(), rejected.Id, rejected.CurrentExecutionId!.Value, Now.AddSeconds(3), "Approve?"));
+        rejected.ApplyRuntimeEvent(new WorkExecutionApprovalRequested(Guid.NewGuid(), rejected.WorkspaceId, rejected.Id, rejected.CurrentExecutionId!.Value, Now.AddSeconds(3), "Approve?"));
         rejected.SubmitApproval(WorkApprovalDecision.Rejected, "requester", "No", Guid.NewGuid(), Now.AddSeconds(4));
         Assert.AreEqual(WorkItemStatus.Failed, rejected.Status);
         Assert.AreEqual("approval_rejected", rejected.Error!.Code);
 
         var failed = Running();
-        failed.ApplyRuntimeEvent(new WorkExecutionFailed(Guid.NewGuid(), failed.Id, failed.CurrentExecutionId!.Value, Now.AddSeconds(3),
+        failed.ApplyRuntimeEvent(new WorkExecutionFailed(Guid.NewGuid(), failed.WorkspaceId, failed.Id, failed.CurrentExecutionId!.Value, Now.AddSeconds(3),
             new WorkError("model_timeout", "Timed out", WorkErrorCategory.Timeout, true, Now.AddSeconds(3), failed.CurrentExecutionId)));
         Assert.AreEqual(WorkItemStatus.Failed, failed.Status);
         Assert.Throws<WorkTransitionException>(() => failed.Cancel(null, Guid.NewGuid(), Now.AddSeconds(4)));
@@ -159,7 +240,7 @@ public sealed class WorkPlaneTests
     public void DuplicateRuntimeEventIsIdempotent()
     {
         var item = Running();
-        var completed = new WorkExecutionCompleted(Guid.NewGuid(), item.Id, item.CurrentExecutionId!.Value, Now.AddSeconds(3), Result("Once"));
+        var completed = new WorkExecutionCompleted(Guid.NewGuid(), item.WorkspaceId, item.Id, item.CurrentExecutionId!.Value, Now.AddSeconds(3), Result("Once"));
         Assert.IsTrue(item.ApplyRuntimeEvent(completed));
         var version = item.Version;
         Assert.IsFalse(item.ApplyRuntimeEvent(completed));
@@ -190,22 +271,22 @@ public sealed class WorkPlaneTests
     {
         await using var fixture = await WorkFixture.CreateAsync();
         var service = fixture.Service;
-        var created = await service.SubmitAsync(new SubmitWorkItemCommand("analysis", "Analyze this", RequesterIdentity: "requester-1"), default);
+        var created = await service.SubmitAsync(new SubmitWorkItemCommand(WorkplaceId, "analysis", "Analyze this", RequesterIdentity: "requester-1"), default);
 
         Assert.AreEqual(WorkItemStatus.Queued, created.Value.Status);
         Assert.AreEqual(created.Value.Id, fixture.Gateway.Request!.WorkItemId);
         Assert.AreEqual(TestWorkExecutionScopeAccessor.Scope, fixture.Gateway.Request.ExecutionScope);
         Assert.IsTrue(fixture.Gateway.Confirmed);
         var executionId = created.Value.CurrentExecutionId!.Value;
-        await service.ApplyExecutionEventAsync(new WorkExecutionStarted(Guid.NewGuid(), created.Value.Id, executionId, Now, "dotnet-expert"), default);
-        var completedEvent = new WorkExecutionCompleted(Guid.NewGuid(), created.Value.Id, executionId, Now.AddSeconds(1), Result("Analysis complete"));
+        await service.ApplyExecutionEventAsync(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, created.Value.Id, executionId, Now, "dotnet-expert"), default);
+        var completedEvent = new WorkExecutionCompleted(Guid.NewGuid(), WorkplaceId, created.Value.Id, executionId, Now.AddSeconds(1), Result("Analysis complete"));
         var completed = await service.ApplyExecutionEventAsync(completedEvent, default);
         var duplicate = await service.ApplyExecutionEventAsync(completedEvent, default);
 
         Assert.AreEqual(WorkItemStatus.Completed, completed.Value.Status);
         Assert.AreEqual("Analysis complete", completed.Value.Result!.Contents.Single().Text);
         Assert.AreEqual(completed.Value.Version, duplicate.Value.Version);
-        Assert.AreEqual(WorkItemStatus.Completed, (await fixture.Repository.GetAsync(created.Value.Id, default))!.Value.Status);
+        Assert.AreEqual(WorkItemStatus.Completed, (await fixture.Repository.GetAsync(WorkplaceId, created.Value.Id, default))!.Value.Status);
     }
 
     [TestMethod]
@@ -217,16 +298,53 @@ public sealed class WorkPlaneTests
         await fixture.Repository.CreateAsync(first, default);
         await fixture.Repository.CreateAsync(second, default);
 
-        var page = await fixture.Repository.QueryAsync(new WorkItemQuery(Take: 1, Type: "analysis"), default);
+        var page = await fixture.Repository.QueryAsync(new WorkItemQuery(WorkplaceId, Take: 1, Type: "analysis"), default);
         Assert.AreEqual(1, page.Items.Count);
         Assert.AreEqual("analysis", page.Items.Single().Value.Type);
 
-        var copyA = (await fixture.Repository.GetAsync(first.Id, default))!.Value;
-        var copyB = (await fixture.Repository.GetAsync(first.Id, default))!.Value;
+        var copyA = (await fixture.Repository.GetAsync(WorkplaceId, first.Id, default))!.Value;
+        var copyB = (await fixture.Repository.GetAsync(WorkplaceId, first.Id, default))!.Value;
         copyA.AddMessage("first update", "a", Guid.NewGuid(), Now.AddMinutes(1));
         await fixture.Repository.SaveAsync(copyA, 1, default);
         copyB.AddMessage("stale update", "b", Guid.NewGuid(), Now.AddMinutes(2));
         await Assert.ThrowsAsync<WorkItemConcurrencyException>(() => fixture.Repository.SaveAsync(copyB, 1, default));
+    }
+
+    [TestMethod]
+    public async Task SqliteStorageAllowsTheSameWorkItemIdInDifferentWorkspaces()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var id = WorkItemId.New();
+        var otherWorkspaceId = new WorkspaceId(Guid.NewGuid());
+        await fixture.Repository.CreateAsync(WorkItem.Create(id, WorkplaceId, "analysis", "First", Now), default);
+        await fixture.Repository.CreateAsync(WorkItem.Create(id, otherWorkspaceId, "question", "Second", Now), default);
+
+        Assert.AreEqual("analysis", (await fixture.Repository.GetAsync(WorkplaceId, id, default))?.Value.Type);
+        Assert.AreEqual("question", (await fixture.Repository.GetAsync(otherWorkspaceId, id, default))?.Value.Type);
+        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(WorkplaceId), default)).Items);
+        Assert.HasCount(1, (await fixture.Repository.QueryAsync(new WorkItemQuery(otherWorkspaceId), default)).Items);
+    }
+
+    [TestMethod]
+    public async Task FileSystemArtifactsCannotBeReadFromAnotherWorkspace()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-artifacts-{Guid.NewGuid():N}");
+        try
+        {
+            var store = new FileSystemArtifactStore(directory);
+            await using var content = new MemoryStream("workspace-owned"u8.ToArray());
+            var reference = await store.SaveAsync(WorkplaceId, new ArtifactContent("result.txt", "text/plain", content), default);
+
+            await using var readable = await store.OpenReadAsync(WorkplaceId, reference, default);
+            using var reader = new StreamReader(readable);
+            Assert.AreEqual("workspace-owned", await reader.ReadToEndAsync(default));
+            await Assert.ThrowsAsync<DirectoryNotFoundException>(() =>
+                store.OpenReadAsync(new WorkspaceId(Guid.NewGuid()), reference, default));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
     }
 
     [TestMethod]
@@ -242,12 +360,12 @@ public sealed class WorkPlaneTests
         await fixture.Workplace.UpsertEntryDraftAsync(first, default);
         await fixture.Workplace.UpsertEntryDraftAsync(second, default);
 
-        Assert.AreEqual(firstNamespace, (await fixture.Workplace.GetEntryDraftAsync(first.Id, default))?.Id.Namespace);
-        Assert.AreEqual(secondNamespace, (await fixture.Workplace.GetEntryDraftAsync(second.Id, default))?.Id.Namespace);
-        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(new EntryId(entryName), default));
-        await fixture.Workplace.DeleteEntryDraftAsync(first.Id, default);
-        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(first.Id, default));
-        Assert.IsNotNull(await fixture.Workplace.GetEntryDraftAsync(second.Id, default));
+        Assert.AreEqual(firstNamespace, (await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, first.Id, default))?.Id.Namespace);
+        Assert.AreEqual(secondNamespace, (await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, second.Id, default))?.Id.Namespace);
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, new EntryId(entryName), default));
+        await fixture.Workplace.DeleteEntryDraftAsync(WorkplaceId, first.Id, default);
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, first.Id, default));
+        Assert.IsNotNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, second.Id, default));
     }
 
     [TestMethod]
@@ -328,12 +446,13 @@ public sealed class WorkPlaneTests
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
-        var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>($"/api/workplace/workspaces?api-version={WorkplaceApiVersions.V20260805}");
+        var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
         var workspace = workspaces!.Single(value => value.Name == "personal");
-        Assert.AreEqual(WorkspaceEntryRole.Primary, workspace.Entries.Single(value => value.Role == WorkspaceEntryRole.Primary).Role);
+        var workspaceRoute = workspace.Id.ToString("D");
+        var dashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>($"/api/workspaces/{workspaceRoute}/dashboard");
+        Assert.AreEqual(DashboardItemRole.Primary, dashboard!.Entries.Single(value => value.Role == DashboardItemRole.Primary).Role);
 
-        using var submittedResponse = await client.PostAsJsonAsync("/api/entries/universal-request/interactions", new CreateInteractionRequest(
-            workspace.Id,
+        using var submittedResponse = await client.PostAsJsonAsync($"/api/workspaces/{workspaceRoute}/entries/universal-request/interactions", new CreateInteractionRequest(
             new Dictionary<string, System.Text.Json.JsonElement> { ["request"] = System.Text.Json.JsonSerializer.SerializeToElement("Explain dependency injection in .NET") }));
         Assert.AreEqual(HttpStatusCode.Created, submittedResponse.StatusCode);
         var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
@@ -343,7 +462,7 @@ public sealed class WorkPlaneTests
         WorkTaskResponse? task = null;
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            task = await client.GetFromJsonAsync<WorkTaskResponse>($"/api/workspaces/personal/tasks/{submitted.Task.Id}");
+            task = await client.GetFromJsonAsync<WorkTaskResponse>($"/api/workspaces/{workspaceRoute}/tasks/{submitted.Task.Id}");
             if (task?.Status is WorkTaskStatus.Completed or WorkTaskStatus.Failed) break;
             await Task.Delay(25);
         }
@@ -356,14 +475,14 @@ public sealed class WorkPlaneTests
     }
 
     private static WorkItem CreatePending(string type = "analysis", string? requester = "requester-1") =>
-        WorkItem.Create(WorkItemId.New(), type, "Perform the requested work", Now, requesterIdentity: requester);
+        WorkItem.Create(WorkItemId.New(), WorkplaceId, type, "Perform the requested work", Now, requesterIdentity: requester);
 
     private static WorkItem Running()
     {
         var item = CreatePending();
         var executionId = WorkExecutionId.New();
         item.MarkQueued(executionId, null, Guid.NewGuid(), Now.AddSeconds(1));
-        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), item.Id, executionId, Now.AddSeconds(2), "agent-1"));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), item.WorkspaceId, item.Id, executionId, Now.AddSeconds(2), "agent-1"));
         return item;
     }
 
@@ -398,7 +517,7 @@ public sealed class WorkPlaneTests
         await using var fixture = await WorkFixture.CreateAsync(withExecutionScope: false);
 
         var exception = await Assert.ThrowsExactlyAsync<WorkValidationException>(() => fixture.Service.SubmitAsync(
-            new SubmitWorkItemCommand("flow", "Run", Flow: new FlowReference(new FlowId("main"))), default));
+            new SubmitWorkItemCommand(WorkplaceId, "flow", "Run", Flow: new FlowReference(new FlowId("main"))), default));
 
         Assert.AreEqual("work_execution_scope_required", exception.Code);
         Assert.IsNull(fixture.Gateway.Request);
@@ -408,7 +527,7 @@ public sealed class WorkPlaneTests
     {
         public static FlowRunScope Scope { get; } = new(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            new(Guid.Parse("22222222-2222-2222-2222-222222222222")),
             Guid.Parse("33333333-3333-3333-3333-333333333333"));
 
         public FlowRunScope Current => Scope;
@@ -416,6 +535,7 @@ public sealed class WorkPlaneTests
 
     private static EntryDraft Entry(EntryId id) => new()
     {
+        WorkspaceId = WorkplaceId,
         Id = id,
         Name = id.Value,
         DisplayName = id.Value,

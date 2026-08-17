@@ -27,6 +27,8 @@ dotnet run --project src/Agentstration.Web
 
 Open the operations Console at `http://localhost:5100`. A fresh installation redirects to `/bootstrap`, where you create the first local administrator; no default username or password exists. The bootstrap also creates the initial organization and workspace and then becomes inaccessible.
 
+> Schema note: workspace scope is part of the durable identity of Management, Runtime, Flow, and Work resources. Databases created before this schema must be deleted and reseeded; no in-place migration is provided.
+
 For the standalone end-user Workplace and its Work API, follow the [local installation guide](docs/getting-started/local-installation.md).
 
 ## Documentation

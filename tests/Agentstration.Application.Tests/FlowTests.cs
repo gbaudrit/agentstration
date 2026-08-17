@@ -114,18 +114,18 @@ public sealed class FlowTests
     public async Task FlowServicePersistsVersionsResolvesActiveAndEnforcesConcurrency()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand("technical-router", "Routes work", "1.0.0", true,
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand("technical-router", "Routes work", "1.0.0", true,
             new RoutingFlowDefinition(FlowRoutingStrategy.Capabilities, [new FlowTargetReference(FlowTargetKind.Agent, "technical-expert")])), default);
-        var published = await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
-        var precise = await fixture.Service.GetVersionAsync(created.Value.Id, "1.0.0", default);
-        var resolved = await fixture.Service.ResolveAsync(new FlowReference(created.Value.Id), default);
+        var published = await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
+        var precise = await fixture.Service.GetVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", default);
+        var resolved = await fixture.Service.ResolveAsync(TestScope.WorkspaceId, new FlowReference(created.Value.Id), default);
 
         Assert.AreEqual(JsonSerializer.Serialize(published.Value, JsonOptions), JsonSerializer.Serialize(precise!.Value, JsonOptions));
         Assert.AreEqual("1.0.0", resolved.Version);
-        Assert.AreEqual("1.0.0", (await fixture.Service.GetAsync(created.Value.Id, default))!.Value.ActiveVersion);
-        await Assert.ThrowsAsync<FlowConcurrencyException>(() => fixture.Service.UpdateAsync(created.Value.Id,
+        Assert.AreEqual("1.0.0", (await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default))!.Value.ActiveVersion);
+        await Assert.ThrowsAsync<FlowConcurrencyException>(() => fixture.Service.UpdateAsync(TestScope.WorkspaceId, created.Value.Id,
             new UpdateFlowCommand("Changed", "1.1.0", true, created.Value.Definition), "\"stale\"", default));
-        await Assert.ThrowsAsync<FlowConcurrencyException>(() => fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default));
+        await Assert.ThrowsAsync<FlowConcurrencyException>(() => fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default));
     }
 
     [TestMethod]
@@ -136,26 +136,26 @@ public sealed class FlowTests
         var secondNamespace = new ResourceNamespace("team-b");
         var command = new CreateFlowCommand("router", "Routes work", "1.0.0", true,
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant")));
-        var first = await fixture.Service.CreateAsync(command, firstNamespace, default);
-        var second = await fixture.Service.CreateAsync(command, secondNamespace, default);
-        await fixture.Service.PublishVersionAsync(first.Value.Id, "1.0.0", true, default);
-        await fixture.Service.PublishVersionAsync(second.Value.Id, "1.0.0", true, default);
+        var first = await fixture.Service.CreateAsync(TestScope.WorkspaceId, command, firstNamespace, default);
+        var second = await fixture.Service.CreateAsync(TestScope.WorkspaceId, command, secondNamespace, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, first.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, second.Value.Id, "1.0.0", true, default);
 
-        Assert.AreEqual(firstNamespace, (await fixture.Service.GetAsync(new FlowId("router", firstNamespace), default))?.Value.Id.Namespace);
-        Assert.AreEqual(secondNamespace, (await fixture.Service.GetAsync(new FlowId("router", secondNamespace), default))?.Value.Id.Namespace);
-        Assert.IsNull(await fixture.Service.GetAsync(new FlowId("router"), default));
-        Assert.AreEqual(firstNamespace, (await fixture.Service.ResolveAsync(new FlowReference(new FlowId("router")), firstNamespace, default)).FlowId.Namespace);
-        Assert.AreEqual(secondNamespace, (await fixture.Service.ResolveAsync(new FlowReference(new FlowId("router")), secondNamespace, default)).FlowId.Namespace);
+        Assert.AreEqual(firstNamespace, (await fixture.Service.GetAsync(TestScope.WorkspaceId, new FlowId("router", firstNamespace), default))?.Value.Id.Namespace);
+        Assert.AreEqual(secondNamespace, (await fixture.Service.GetAsync(TestScope.WorkspaceId, new FlowId("router", secondNamespace), default))?.Value.Id.Namespace);
+        Assert.IsNull(await fixture.Service.GetAsync(TestScope.WorkspaceId, new FlowId("router"), default));
+        Assert.AreEqual(firstNamespace, (await fixture.Service.ResolveAsync(TestScope.WorkspaceId, new FlowReference(new FlowId("router")), firstNamespace, default)).FlowId.Namespace);
+        Assert.AreEqual(secondNamespace, (await fixture.Service.ResolveAsync(TestScope.WorkspaceId, new FlowReference(new FlowId("router")), secondNamespace, default)).FlowId.Namespace);
     }
 
     [TestMethod]
     public void WorkItemCanReferenceAnExactFlowVersionWithoutEmbeddingDefinition()
     {
         var reference = new FlowReference(new FlowId("technical-router"), "1.0.0", false);
-        var item = WorkItem.Create(WorkItemId.New(), "question", "Help me", Now, flow: reference);
+        var item = WorkItem.Create(WorkItemId.New(), TestScope.WorkspaceId, "question", "Help me", Now, flow: reference);
         var restored = WorkItem.Restore(item.ToSnapshot());
         Assert.AreEqual(reference, restored.Flow);
-        Assert.Throws<FlowValidationException>(() => WorkItem.Create(WorkItemId.New(), "question", "Help", Now,
+        Assert.Throws<FlowValidationException>(() => WorkItem.Create(WorkItemId.New(), TestScope.WorkspaceId, "question", "Help", Now,
             flow: new FlowReference(new FlowId("technical-router"), "1.0.0", true)));
     }
 
@@ -228,13 +228,13 @@ public sealed class FlowTests
     public async Task FlowRunExecutesPublishedSnapshotAndPersistsDiagnosticSteps()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand("routing-run", "Routes SQL", "1.0.0", true,
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand("routing-run", "Routes SQL", "1.0.0", true,
             new RoutingFlowDefinition(FlowRoutingStrategy.Deterministic,
             [
                 new FlowTargetReference(FlowTargetKind.Agent, "dotnet-expert"),
                 new FlowTargetReference(FlowTargetKind.Agent, "sql-expert")
             ])), default);
-        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var queue = new TestFlowRunQueue();
         var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(
@@ -255,8 +255,8 @@ public sealed class FlowTests
         Assert.AreEqual(pending.Value.Id, queue.Enqueued.Single().RunId);
         Assert.AreEqual(TestScope, queue.Enqueued.Single().Scope);
 
-        await runs.ExecuteAsync(pending.Value.Id, default);
-        var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
         Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
         Assert.AreEqual("1.0.0", completed.DefinitionSnapshot.Version);
         CollectionAssert.AreEqual(new[] { "Input", "Router", "Agent", "Output" }, completed.Steps.Select(step => step.StepName).ToArray());
@@ -267,21 +267,24 @@ public sealed class FlowTests
         Assert.AreEqual("Deterministic", agent.Provider);
         Assert.AreEqual(12, agent.Usage!.InputTokens);
         Assert.AreEqual("done", completed.Output!.Value.GetString());
-        Assert.AreEqual(1, (await runs.ListAsync(created.Value.Id, FlowRunStatus.Succeeded, 0, 20, default)).Items.Count);
+        Assert.AreEqual(1, (await runs.ListAsync(created.Value.Id, FlowRunStatus.Succeeded, 0, 20, TestScope, default)).Items.Count);
     }
 
     [TestMethod]
     public async Task FlowRunsAreIsolatedByTheirDurableWorkspaceScope()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand("scoped-run", null, "1.0.0", true,
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand("scoped-run", null, "1.0.0", true,
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
-        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
             new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions,
             new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
-        var otherScope = TestScope with { WorkspaceId = Guid.Parse("44444444-4444-4444-4444-444444444444") };
+        var otherScope = TestScope with { WorkspaceId = new(Guid.Parse("44444444-4444-4444-4444-444444444444")) };
+        var otherFlow = await fixture.Service.CreateAsync(otherScope.WorkspaceId, new CreateFlowCommand("scoped-run", null, "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
+        await fixture.Service.PublishVersionAsync(otherScope.WorkspaceId, otherFlow.Value.Id, "1.0.0", true, default);
         using var input = JsonDocument.Parse("""{"prompt":"test"}""");
 
         var own = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "own", input.RootElement, TestScope, default);
@@ -298,9 +301,9 @@ public sealed class FlowTests
     public async Task FlowRunAuthorizationIsRevalidatedBeforeExecution()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand("revoked-run", null, "1.0.0", true,
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand("revoked-run", null, "1.0.0", true,
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
-        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var expressions = new FlowExpressionParser();
         var agent = new TrackingAgentExecutor();
         var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
@@ -309,9 +312,9 @@ public sealed class FlowTests
         using var input = JsonDocument.Parse("""{"prompt":"test"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "revoked", input.RootElement, TestScope, default);
 
-        await runs.ExecuteAsync(pending.Value.Id, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
 
-        var failed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        var failed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
         Assert.AreEqual(FlowRunStatus.Failed, failed.Status);
         Assert.AreEqual("flow_run_authorization_denied", failed.Error?.Code);
         Assert.AreEqual(0, agent.ExecutionCount);
@@ -321,9 +324,9 @@ public sealed class FlowTests
     public async Task FlowRunExecutionScopeCannotBeChangedAfterCreation()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand("immutable-scope", null, "1.0.0", true,
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand("immutable-scope", null, "1.0.0", true,
             new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"))), default);
-        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(),
             new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions,
@@ -340,7 +343,7 @@ public sealed class FlowTests
     public async Task OrchestrationFlowUsesNeutralEngineAndPersistsParticipantProgress()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
             "orchestration-run",
             "Coordinates agents",
             "1.0.0",
@@ -351,7 +354,7 @@ public sealed class FlowTests
                     new FlowTargetReference(FlowTargetKind.Agent, "reviewer")
                 ],
                 new SequentialOrchestrationPattern())), new ResourceNamespace("daily-life-assistant"), default);
-        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var queue = new TestFlowRunQueue();
         var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(
@@ -368,9 +371,9 @@ public sealed class FlowTests
         using var input = JsonDocument.Parse("""{"prompt":"Investigate"}""");
 
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "orchestration-correlation", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(pending.Value.Id, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
 
-        var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
         Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
         CollectionAssert.AreEqual(
             new[] { "Input", "researcher", "reviewer", "Output" },
@@ -378,7 +381,7 @@ public sealed class FlowTests
         Assert.IsTrue(completed.Steps.All(step => step.Status == FlowStepRunStatus.Succeeded));
         Assert.AreEqual("reviewed", completed.Output!.Value.GetProperty("finalOutput").GetString());
         Assert.HasCount(2, completed.Output.Value.GetProperty("participants").EnumerateArray().ToArray());
-        var events = await runs.ListEventsAsync(completed.Id, 0, default);
+        var events = await runs.ListEventsAsync(TestScope, completed.Id, 0, default);
         Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.StepOutputDelta));
         Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.ParticipantTurnStarted));
         Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.ParticipantTurnCompleted));
@@ -388,7 +391,7 @@ public sealed class FlowTests
     public async Task OrchestrationFlowTimeoutPersistsAnExplicitTerminalState()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
             "orchestration-timeout",
             "Times out a stalled orchestration",
             "1.0.0",
@@ -399,7 +402,7 @@ public sealed class FlowTests
                     new FlowTargetReference(FlowTargetKind.Agent, "agent-b")
                 ],
                 new SequentialOrchestrationPattern())), default);
-        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(
             fixture.Repository,
@@ -416,24 +419,24 @@ public sealed class FlowTests
         using var input = JsonDocument.Parse("""{"prompt":"Wait"}""");
 
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", "timeout-correlation", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(pending.Value.Id, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
 
-        var timedOut = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        var timedOut = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
         Assert.AreEqual(FlowRunStatus.TimedOut, timedOut.Status);
         Assert.AreEqual("flow_run_timed_out", timedOut.Error!.Code);
-        Assert.IsTrue((await runs.ListEventsAsync(timedOut.Id, 0, default)).Any(item => item.Type == FlowRunEventType.FlowRunTimedOut));
+        Assert.IsTrue((await runs.ListEventsAsync(TestScope, timedOut.Id, 0, default)).Any(item => item.Type == FlowRunEventType.FlowRunTimedOut));
     }
 
     [TestMethod]
     public async Task InteractiveOrchestrationSurvivesReconstructionAndRecoversAnAnsweredRun()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
             "interactive-run", null, "1.0.0", true,
             new OrchestrationFlowDefinition(
                 [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
                 new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
-        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var expressions = new FlowExpressionParser();
         var firstQueue = new TestFlowRunQueue();
         var firstService = new FlowRunService(
@@ -444,22 +447,22 @@ public sealed class FlowTests
 
         var pending = await firstService.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
             "tester", "interactive-correlation", input.RootElement, TestScope, default);
-        await firstService.ExecuteAsync(pending.Value.Id, default);
+        await firstService.ExecuteAsync(new(pending.Value.Id, TestScope), default);
 
-        var waiting = (await firstService.GetAsync(pending.Value.Id, default))!.Value;
+        var waiting = (await firstService.GetAsync(pending.Value.Id, TestScope, default))!.Value;
         Assert.AreEqual(FlowRunStatus.WaitingForInput, waiting.Status);
         Assert.AreEqual(7, waiting.RuntimeBindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
         Assert.IsNotNull(waiting.RuntimeState);
-        var request = (await firstService.ListInputsAsync(waiting.Id, InputRequestStatus.Pending, default)).Single();
+        var request = (await firstService.ListInputsAsync(waiting.Id, InputRequestStatus.Pending, TestScope, default)).Single();
 
         var lostQueue = new TestFlowRunQueue();
         var reconstructed = new FlowRunService(
             fixture.Repository, lostQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
             new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
             new TestFlowRunExecutionScope(), TimeProvider.System);
-        await reconstructed.RespondAsync(waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Ada"), "principal-1", default);
+        await reconstructed.RespondAsync(waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Ada"), "principal-1", TestScope, default);
         await Assert.ThrowsExactlyAsync<InputRequestAlreadyResolvedException>(() => reconstructed.RespondAsync(
-            waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Grace"), "principal-2", default));
+            waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Grace"), "principal-2", TestScope, default));
 
         var recoveryQueue = new TestFlowRunQueue();
         var recovered = new FlowRunService(
@@ -468,9 +471,9 @@ public sealed class FlowTests
             new TestFlowRunExecutionScope(), TimeProvider.System);
         await recovered.InitializeAsync(default);
         Assert.IsTrue(recoveryQueue.Enqueued.Any(item => item.RunId == waiting.Id));
-        await recovered.ExecuteAsync(waiting.Id, default);
+        await recovered.ExecuteAsync(new(waiting.Id, TestScope), default);
 
-        var completed = (await recovered.GetAsync(waiting.Id, default))!.Value;
+        var completed = (await recovered.GetAsync(waiting.Id, TestScope, default))!.Value;
         Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
         Assert.AreEqual("Ada", completed.Output!.Value.GetProperty("finalOutput").GetString());
         Assert.AreEqual(7, completed.RuntimeBindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
@@ -480,12 +483,12 @@ public sealed class FlowTests
     public async Task RevisionUsageDistinguishesActiveAndHistoricalRunsAndForceTerminationIsExplicit()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
             "revision-retention", null, "1.0.0", true,
             new OrchestrationFlowDefinition(
                 [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
                 new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
-        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var expressions = new FlowExpressionParser();
         var cancellations = new TestCancellationRegistry();
         var events = new NullFlowRunEventSink();
@@ -496,7 +499,7 @@ public sealed class FlowTests
         using var input = JsonDocument.Parse("""{"prompt":"Need input"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
             "tester", "retention-correlation", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(pending.Value.Id, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
 
         var active = await runs.GetRevisionUsageAsync("revision-agent-a-7", default);
         Assert.AreEqual(1, active.ActiveRunCount);
@@ -507,19 +510,19 @@ public sealed class FlowTests
 
         var executionStates = new TestRuntimeExecutionStateStore();
         await executionStates.StoreAsync(new RuntimeExecutionState(
-            pending.Value.Id, "maf", "checkpoint-1", JsonSerializer.SerializeToElement(new { state = "waiting" }), Now), default);
+            TestScope.WorkspaceId, pending.Value.Id, "maf", "checkpoint-1", JsonSerializer.SerializeToElement(new { state = "waiting" }), Now), default);
         var retention = new AgentRevisionRunRetention(
             new FlowRevisionRetentionService(fixture.Repository, cancellations, events, TimeProvider.System),
             executionStates);
         await retention.ForceTerminateAsync("revision-agent-a-7", default);
 
-        var cancelled = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        var cancelled = (await runs.GetAsync(pending.Value.Id, TestScope, default))!.Value;
         Assert.AreEqual(FlowRunStatus.Cancelled, cancelled.Status);
         Assert.AreEqual("runtime_dependency_force_purged", cancelled.Error?.Code);
         Assert.AreEqual(InputRequestStatus.Cancelled,
-            (await runs.ListInputsAsync(pending.Value.Id, null, default)).Single().Value.Status);
-        Assert.IsNull(await executionStates.GetAsync(pending.Value.Id, "maf", "checkpoint-1", default));
-        Assert.IsTrue((await runs.ListEventsAsync(pending.Value.Id, 0, default))
+            (await runs.ListInputsAsync(pending.Value.Id, null, TestScope, default)).Single().Value.Status);
+        Assert.IsNull(await executionStates.GetAsync(TestScope.WorkspaceId, pending.Value.Id, "maf", "checkpoint-1", default));
+        Assert.IsTrue((await runs.ListEventsAsync(TestScope, pending.Value.Id, 0, default))
             .Any(runEvent => runEvent.Type == FlowRunEventType.FlowRunCancelled));
         var historical = await runs.GetRevisionUsageAsync("revision-agent-a-7", default);
         Assert.AreEqual(0, historical.ActiveRunCount);
@@ -530,9 +533,9 @@ public sealed class FlowTests
     public async Task ConcurrentWorkersClaimARunOnlyOnce()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
             "single-claim", null, "1.0.0", true, new DirectFlowDefinition(new(FlowTargetKind.Agent, "agent-a"))), default);
-        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var expressions = new FlowExpressionParser();
         var executor = new ConcurrentTrackingAgentExecutor();
         FlowRunService Worker() => new(
@@ -545,10 +548,10 @@ public sealed class FlowTests
         var pending = await first.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
             "tester", "single-claim", input.RootElement, TestScope, default);
 
-        await Task.WhenAll(first.ExecuteAsync(pending.Value.Id, default), second.ExecuteAsync(pending.Value.Id, default));
+        await Task.WhenAll(first.ExecuteAsync(new(pending.Value.Id, TestScope), default), second.ExecuteAsync(new(pending.Value.Id, TestScope), default));
 
         Assert.AreEqual(1, executor.ExecutionCount);
-        var completed = (await first.GetAsync(pending.Value.Id, default))!.Value;
+        var completed = (await first.GetAsync(pending.Value.Id, TestScope, default))!.Value;
         Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
         Assert.IsNull(completed.ExecutionLeaseId);
     }
@@ -557,12 +560,12 @@ public sealed class FlowTests
     public async Task PendingInputExpiresDeterministicallyAndTimesOutTheRun()
     {
         await using var fixture = await FlowFixture.CreateAsync();
-        var created = await fixture.Service.CreateAsync(new CreateFlowCommand(
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
             "input-timeout", null, "1.0.0", true,
             new OrchestrationFlowDefinition(
                 [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
                 new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
-        await fixture.Service.PublishVersionAsync(created.Value.Id, "1.0.0", true, default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var clock = new AdvancingTimeProvider(new DateTimeOffset(2026, 8, 17, 8, 0, 0, TimeSpan.Zero));
         var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(
@@ -573,15 +576,15 @@ public sealed class FlowTests
         using var input = JsonDocument.Parse("""{"prompt":"Wait"}""");
         var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
             "tester", "input-timeout", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(pending.Value.Id, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
         clock.Advance(TimeSpan.FromMinutes(2));
 
         await runs.ExpireDueInputsAsync(default);
 
-        var timedOut = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        var timedOut = (await runs.GetAsync(pending.Value.Id, TestScope, default))!.Value;
         Assert.AreEqual(FlowRunStatus.TimedOut, timedOut.Status);
         Assert.AreEqual("input_request_timed_out", timedOut.Error?.Code);
-        Assert.AreEqual(InputRequestStatus.Expired, (await runs.ListInputsAsync(pending.Value.Id, null, default)).Single().Value.Status);
+        Assert.AreEqual(InputRequestStatus.Expired, (await runs.ListInputsAsync(pending.Value.Id, null, TestScope, default)).Single().Value.Status);
     }
 
     [TestMethod]
@@ -602,7 +605,7 @@ public sealed class FlowTests
         Assert.AreEqual("1.0.0", run.FlowVersion);
         Assert.AreEqual(3, run.Steps.Count);
         var requestContext = factory.Services.GetRequiredService<ICurrentRequestContext>().Current;
-        Assert.AreEqual(new FlowRunScope(requestContext.TenantId, requestContext.WorkspaceId, requestContext.PrincipalId), run.Scope);
+        Assert.AreEqual(new FlowRunScope(requestContext.TenantId, new(requestContext.WorkspaceId), requestContext.PrincipalId), run.Scope);
         var principal = await factory.Services.GetRequiredService<IIdentityStore>().GetPrincipalAsync(requestContext.PrincipalId, default);
         Assert.AreEqual(principal?.DisplayName, run.StartedBy);
         Assert.IsNull(typeof(CreateFlowRunRequest).GetProperty("StartedBy"));
@@ -649,7 +652,9 @@ public sealed class FlowTests
         Assert.AreEqual(HttpStatusCode.Created,
             (await client.PostAsJsonAsync("/api/flows/interactive-api-flow/versions", new CreateFlowVersionRequest("1.0.0"))).StatusCode);
         var service = factory.Services.GetRequiredService<FlowRunService>();
-        var principalId = factory.Services.GetRequiredService<ICurrentRequestContext>().Current.PrincipalId.ToString("D");
+        var current = factory.Services.GetRequiredService<ICurrentRequestContext>().Current;
+        var principalId = current.PrincipalId.ToString("D");
+        var apiScope = new FlowRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId);
 
         var cases = new[]
         {
@@ -666,7 +671,7 @@ public sealed class FlowTests
             Assert.AreEqual(HttpStatusCode.Accepted, createResponse.StatusCode);
             var run = await createResponse.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
             Assert.IsNotNull(run);
-            await service.ExecuteAsync(run.Id, default);
+            await service.ExecuteAsync(new(run.Id, apiScope), default);
 
             var pending = await client.GetFromJsonAsync<InputRequest[]>(
                 $"/api/flowRuns/{run.Id}/inputs?status=Pending", JsonOptions);
@@ -702,7 +707,7 @@ public sealed class FlowTests
         var expiringCreate = await client.PostAsJsonAsync("/api/flows/interactive-api-flow/runs",
             new CreateFlowRunRequest(expiringInput.RootElement.Clone()), JsonOptions);
         var expiringRun = await expiringCreate.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
-        await service.ExecuteAsync(expiringRun!.Id, default);
+        await service.ExecuteAsync(new(expiringRun!.Id, apiScope), default);
         var expiringRequest = (await client.GetFromJsonAsync<InputRequest[]>(
             $"/api/flowRuns/{expiringRun.Id}/inputs?status=Pending", JsonOptions))!.Single();
         clock.Advance(TimeSpan.FromDays(8));
@@ -825,6 +830,12 @@ public sealed class FlowTests
         CollectionAssert.AreEqual(new[] { "sql-expert", "dotnet-expert" }, routing.Destinations.Select(target => target.Id).ToArray());
         Assert.AreEqual("dotnet-expert", routing.Fallback?.Id);
 
+        var current = await client.GetFromJsonAsync<FlowResponse>("/api/flows/designer-api-flow", JsonOptions);
+        Assert.IsNotNull(current);
+        Assert.IsNotNull(current.Graph);
+        Assert.AreEqual("input", current.Graph.EntryStep);
+        Assert.AreEqual(version.Graph.Steps.Count, current.Graph.Steps.Count);
+
         using var recreateResponse = await client.PostAsync("/api/flows/designer-api-flow/versions/1.0.0/draft", null);
         Assert.AreEqual(HttpStatusCode.OK, recreateResponse.StatusCode);
         var recreated = await recreateResponse.Content.ReadFromJsonAsync<FlowDraftResponse>(JsonOptions);
@@ -861,21 +872,21 @@ public sealed class FlowTests
             ]
         };
         var now = TimeProvider.System.GetUtcNow();
-        var draft = new FlowDraft { Id = "typed-draft", FlowId = new("typed-run"), DisplayName = "Typed run", Definition = graph, CreatedAt = now, UpdatedAt = now };
+        var draft = new FlowDraft { WorkspaceId = TestScope.WorkspaceId, Id = "typed-draft", FlowId = new("typed-run"), DisplayName = "Typed run", Definition = graph, CreatedAt = now, UpdatedAt = now };
         var queue = new TestFlowRunQueue();
         var expressionEngine = new FlowExpressionParser();
         var runs = new FlowRunService(fixture.Repository, queue, new TestCancellationRegistry(), new TestAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressionEngine, expressionEngine, new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
         using var input = JsonDocument.Parse("""{"prompt":"Review this query"}""");
 
         var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "typed-correlation", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(pending.Value.Id, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
 
-        var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
         Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
         CollectionAssert.AreEqual(new[] { "input", "transform", "condition", "router", "agent", "output" }, completed.Steps.Where(step => step.Status == FlowStepRunStatus.Succeeded).Select(step => step.StepName).ToArray());
         Assert.AreEqual(FlowStepRunStatus.Skipped, completed.Steps.Single(step => step.StepName == "failure").Status);
         Assert.AreEqual("done", completed.Output!.Value.GetProperty("result").GetString());
-        var events = await runs.ListEventsAsync(completed.Id, 0, default);
+        var events = await runs.ListEventsAsync(TestScope, completed.Id, 0, default);
         Assert.IsTrue(events.Count >= 15);
         Assert.AreEqual(FlowRunEventType.FlowRunCreated, events[0].Type);
         Assert.AreEqual(FlowRunEventType.FlowRunCompleted, events[^1].Type);
@@ -893,15 +904,15 @@ public sealed class FlowTests
             Transitions = []
         };
         var now = TimeProvider.System.GetUtcNow();
-        var draft = new FlowDraft { Id = "failing-draft", FlowId = new("failing-run"), DisplayName = "Failing run", Definition = graph, CreatedAt = now, UpdatedAt = now };
+        var draft = new FlowDraft { WorkspaceId = TestScope.WorkspaceId, Id = "failing-draft", FlowId = new("failing-run"), DisplayName = "Failing run", Definition = graph, CreatedAt = now, UpdatedAt = now };
         var expressions = new FlowExpressionParser();
         var runs = new FlowRunService(fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new FailingAgentExecutor(), new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(), new TestFlowRunExecutionScope(), TimeProvider.System);
         using var input = JsonDocument.Parse("{}");
 
         var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", "failing-correlation", input.RootElement, TestScope, default);
-        await runs.ExecuteAsync(pending.Value.Id, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
 
-        var completed = (await runs.GetAsync(pending.Value.Id, default))!.Value;
+        var completed = (await runs.GetAsync(TestScope.WorkspaceId, pending.Value.Id, default))!.Value;
         Assert.AreEqual(FlowRunStatus.Failed, completed.Status);
         Assert.AreEqual("agent_step_failed", completed.Error?.Code);
         Assert.AreEqual("simulated agent failure", completed.Error?.Message);
@@ -952,7 +963,7 @@ public sealed class FlowTests
         async Task<RoutingFlowDefinition> SnapshotAsync(string id, FlowGraphDefinition graph)
         {
             var now = TimeProvider.System.GetUtcNow();
-            var draft = new FlowDraft { Id = $"{id}-draft", FlowId = new(id), DisplayName = id, Definition = graph, CreatedAt = now, UpdatedAt = now };
+            var draft = new FlowDraft { WorkspaceId = TestScope.WorkspaceId, Id = $"{id}-draft", FlowId = new(id), DisplayName = id, Definition = graph, CreatedAt = now, UpdatedAt = now };
             using var input = JsonDocument.Parse("{}");
             var pending = await runs.CreateDraftAsync(draft, FlowRunTrigger.Manual, "tester", id, input.RootElement, TestScope, default);
             return Assert.IsInstanceOfType<RoutingFlowDefinition>(pending.Value.DefinitionSnapshot.Definition);
@@ -960,7 +971,7 @@ public sealed class FlowTests
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static FlowResource Definition(string name, FlowDefinition definition) => new(new FlowId(name), name, null, "1.0.0", true, null, definition, new Dictionary<string, string>(), Now, Now);
+    private static FlowResource Definition(string name, FlowDefinition definition) => new(TestScope.WorkspaceId, new FlowId(name), name, null, "1.0.0", true, null, definition, new Dictionary<string, string>(), Now, Now);
 
     private sealed class FlowFixture : IAsyncDisposable
     {
@@ -1010,13 +1021,13 @@ public sealed class FlowTests
         public IDisposable Enter(FlowRunScope scope) => throw new AssertFailedException("A denied scope must not be entered.");
     }
 
-    private static FlowRunScope TestScope { get; } = new(Guid.Parse("11111111-1111-1111-1111-111111111111"), Guid.Parse("22222222-2222-2222-2222-222222222222"), Guid.Parse("33333333-3333-3333-3333-333333333333"));
+    private static FlowRunScope TestScope { get; } = new(Guid.Parse("11111111-1111-1111-1111-111111111111"), new(Guid.Parse("22222222-2222-2222-2222-222222222222")), Guid.Parse("33333333-3333-3333-3333-333333333333"));
 
     private sealed class TestCancellationRegistry : IFlowRunCancellationRegistry
     {
-        public CancellationToken Register(string runId, CancellationToken stoppingToken) => stoppingToken;
-        public bool Cancel(string runId) => true;
-        public void Complete(string runId) { }
+        public CancellationToken Register(FlowRunKey run, CancellationToken stoppingToken) => stoppingToken;
+        public bool Cancel(FlowRunKey run) => true;
+        public void Complete(FlowRunKey run) { }
     }
 
     private sealed class TestAgentExecutor : IFlowAgentExecutor
@@ -1118,36 +1129,40 @@ public sealed class FlowTests
 
     private sealed class TestRuntimeExecutionStateStore : IRuntimeExecutionStateStore
     {
-        private readonly Dictionary<(string RunId, string RuntimeType, string StateId), RuntimeExecutionState> states = [];
+        private readonly Dictionary<(WorkspaceId WorkspaceId, string RunId, string RuntimeType, string StateId), RuntimeExecutionState> states = [];
 
         public Task StoreAsync(RuntimeExecutionState state, CancellationToken cancellationToken)
         {
-            states[(state.RunId, state.RuntimeType, state.StateId)] = state;
+            states[(state.WorkspaceId, state.RunId, state.RuntimeType, state.StateId)] = state;
             return Task.CompletedTask;
         }
 
         public Task<RuntimeExecutionState?> GetAsync(
+            WorkspaceId workspaceId,
             string runId,
             string runtimeType,
             string stateId,
             CancellationToken cancellationToken)
         {
-            states.TryGetValue((runId, runtimeType, stateId), out var state);
+            states.TryGetValue((workspaceId, runId, runtimeType, stateId), out var state);
             return Task.FromResult(state);
         }
 
         public Task<IReadOnlyList<RuntimeExecutionState>> ListAsync(
+            WorkspaceId workspaceId,
             string runId,
             string runtimeType,
             string? parentStateId,
             CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RuntimeExecutionState>>(
-                states.Values.Where(state => state.RunId == runId
+                states.Values.Where(state => state.WorkspaceId == workspaceId
+                    && state.RunId == runId
                     && state.RuntimeType == runtimeType
                     && (parentStateId is null || state.ParentStateId == parentStateId)).ToArray());
 
-        public Task DeleteAsync(string runId, string? runtimeType, CancellationToken cancellationToken)
+        public Task DeleteAsync(WorkspaceId workspaceId, string runId, string? runtimeType, CancellationToken cancellationToken)
         {
-            foreach (var key in states.Keys.Where(key => key.RunId == runId
+            foreach (var key in states.Keys.Where(key => key.WorkspaceId == workspaceId
+                         && key.RunId == runId
                          && (runtimeType is null || key.RuntimeType == runtimeType)).ToArray())
                 states.Remove(key);
             return Task.CompletedTask;

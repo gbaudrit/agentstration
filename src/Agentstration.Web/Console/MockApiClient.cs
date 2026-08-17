@@ -5,6 +5,7 @@ using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Components.Models;
@@ -13,6 +14,11 @@ namespace Agentstration.Web.Console;
 
 public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiClient, IRuntimeApiClient, IFlowApiClient, IAgentstrationEventStream
 {
+    private static readonly WorkspaceId MockWorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+    private static readonly RuntimeRunScope MockRuntimeScope = new(
+        Guid.Parse("22222222-2222-2222-2222-222222222222"),
+        MockWorkspaceId,
+        Guid.Parse("33333333-3333-3333-3333-333333333333"));
     private readonly Dictionary<string, ResourceSnapshot<AgentResource>> agents = CreateAgents();
     private readonly Dictionary<string, RuntimeRun> runs = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<RuntimeRunEvent>> runEvents = new(StringComparer.Ordinal);
@@ -87,6 +93,8 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         var id = $"run-{Guid.NewGuid():N}";
         var run = new RuntimeRun
         {
+            WorkspaceId = MockWorkspaceId,
+            Scope = MockRuntimeScope,
             Id = id,
             Name = id,
             Properties = new RuntimeRunProperties
@@ -95,7 +103,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
                 Input = request.Input,
                 Execution = request.Execution,
                 Origin = request.Origin,
-                Initiator = request.Initiator ?? "local-user"
+                Initiator = "local-user"
             },
             Status = new RuntimeRunStatus
             {
@@ -181,8 +189,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
             Agent = source.Properties.Agent,
             Input = source.Properties.Input,
             Execution = source.Properties.Execution,
-            Origin = source.Properties.Origin,
-            Initiator = source.Properties.Initiator
+            Origin = source.Properties.Origin
         }, cancellationToken);
     }
 
@@ -269,6 +276,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         var values = runEvents[runId];
         var runEvent = new RuntimeRunEvent
         {
+            WorkspaceId = MockWorkspaceId,
             Sequence = values.Count + 1,
             EventId = Guid.NewGuid(),
             RunId = runId,

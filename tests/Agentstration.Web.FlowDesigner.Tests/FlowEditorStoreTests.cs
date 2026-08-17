@@ -1,5 +1,7 @@
 using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
+using Agentstration.Resources;
+using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.State;
 
 namespace Agentstration.Web.FlowDesigner.Tests;
@@ -17,7 +19,7 @@ public sealed class FlowEditorStoreTests
             Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "output" }],
             Transitions = [new("input-output", "input", "completed", "output")]
         };
-        var draft = new FlowDraft { Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
+        var draft = new FlowDraft { WorkspaceId = WorkspaceId, Id = "editor-draft", FlowId = new("editor"), DisplayName = "Editor", Definition = definition, CreatedAt = now, UpdatedAt = now };
         var store = new FlowEditorStore();
         store.Load(new FlowDraftResponse(draft, "\"etag-1\""), "entryStep: input");
 
@@ -26,13 +28,13 @@ public sealed class FlowEditorStoreTests
 
         Assert.IsTrue(store.State.IsDirty);
         Assert.AreEqual(3, store.State.Diagram.Nodes.Count);
-        Assert.AreEqual(new FlowNodePosition(240, 320), store.State.Draft!.Definition.Designer.NodePositions["transform"]);
+        Assert.AreEqual(new FlowNodePosition(240, 320), store.State.Resource!.Definition.Designer.NodePositions["transform"]);
         store.Undo();
-        Assert.AreEqual(new FlowNodePosition(100, 200), store.State.Draft.Definition.Designer.NodePositions["transform"]);
+        Assert.AreEqual(new FlowNodePosition(100, 200), store.State.Resource.Definition.Designer.NodePositions["transform"]);
         store.Undo();
-        Assert.IsFalse(store.State.Draft.Definition.Steps.Any(step => step.Name == "transform"));
+        Assert.IsFalse(store.State.Resource.Definition.Steps.Any(step => step.Name == "transform"));
         store.Redo();
-        Assert.IsTrue(store.State.Draft.Definition.Steps.Any(step => step.Name == "transform"));
+        Assert.IsTrue(store.State.Resource.Definition.Steps.Any(step => step.Name == "transform"));
     }
 
     [TestMethod]
@@ -73,4 +75,18 @@ public sealed class FlowEditorStoreTests
         Assert.AreEqual("Horizontal", horizontal.Designer.PreferredLayout);
         Assert.AreEqual("Vertical", vertical.Designer.PreferredLayout);
     }
+
+    [TestMethod]
+    public async Task PublishedNamespacedDocumentRejectsCommands()
+    {
+        var definition = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] };
+        var store = new FlowEditorStore();
+        store.Load(new FlowDesignerLoadResult(new(new("sample"), "Sample", null, new Dictionary<string, string>(), definition), "entryStep: input", PublishedVersion: "1.0.0"), new(new ResourceNamespace("pack.sample"), "sample"));
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => store.DispatchAsync(new MoveStepCommand("input", new(10, 10))));
+        Assert.IsFalse(store.State.IsDirty);
+        Assert.IsTrue(store.State.IsReadOnly);
+    }
+
+    private static readonly Agentstration.Resources.WorkspaceId WorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
 }

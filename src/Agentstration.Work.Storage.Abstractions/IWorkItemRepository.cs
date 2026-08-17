@@ -1,3 +1,4 @@
+using Agentstration.Resources;
 using Agentstration.Work;
 
 namespace Agentstration.Work.Storage.Abstractions;
@@ -6,6 +7,7 @@ public enum WorkItemSortField { CreatedAt, UpdatedAt }
 public enum WorkItemSortDirection { Ascending, Descending }
 
 public sealed record WorkItemQuery(
+    WorkspaceId WorkspaceId,
     int Skip = 0,
     int Take = 50,
     WorkItemStatus? Status = null,
@@ -16,7 +18,6 @@ public sealed record WorkItemQuery(
     DateTimeOffset? CreatedTo = null,
     WorkItemSortField SortBy = WorkItemSortField.CreatedAt,
     WorkItemSortDirection SortDirection = WorkItemSortDirection.Descending,
-    string? WorkspaceId = null,
     string? InteractionId = null,
     string? EntryId = null,
     string? AnchorTaskId = null,
@@ -34,7 +35,7 @@ public interface IWorkItemRepository
 {
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredWorkItem> CreateAsync(WorkItem workItem, CancellationToken cancellationToken);
-    Task<StoredWorkItem?> GetAsync(WorkItemId id, CancellationToken cancellationToken);
+    Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken);
     Task<StoredWorkItem> SaveAsync(WorkItem workItem, long expectedVersion, CancellationToken cancellationToken);
     Task<WorkItemPage> QueryAsync(WorkItemQuery query, CancellationToken cancellationToken);
 }

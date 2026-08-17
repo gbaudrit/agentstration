@@ -77,10 +77,12 @@ public interface IEntryAdministrationApiClient
         @namespace.IsDefault ? GetDependenciesAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");
     Task<IReadOnlyList<ResourcePickerItem>> GetResourcesAsync(EntryBindingKind kind, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken);
-    Task<IReadOnlyList<WorkplaceWorkspaceDraftResponse>> GetWorkspacesAsync(CancellationToken cancellationToken);
-    Task<WorkplaceWorkspaceDraftResponse> GetWorkspaceAsync(string name, CancellationToken cancellationToken);
-    Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken);
-    Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken);
+    Task<WorkplaceDashboardDraftResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken);
+    Task<WorkplaceDashboardDraft> SaveDashboardAsync(WorkplaceDashboardDraft draft, CancellationToken cancellationToken);
+    Task<WorkplaceDashboard> PublishDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken);
+    Task DeleteDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken);
 }
 
 public interface IFlowApiClient
@@ -96,6 +98,8 @@ public interface IFlowApiClient
     Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetFlowVersionsAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
+    async Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId, string version, CancellationToken cancellationToken) =>
+        (await GetFlowVersionsAsync(@namespace, flowId, cancellationToken)).Single(value => string.Equals(value.Version, version, StringComparison.Ordinal));
     Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetFlowRunsAsync(flowId, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Flows.");
@@ -280,21 +284,28 @@ public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpCli
 
     public async Task<IReadOnlyList<EntryResponse>> GetPublishedEntriesAsync(CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<EntryResponse[]>(httpClient, "api/entries", cancellationToken);
-    public async Task<IReadOnlyList<WorkplaceWorkspaceDraftResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) =>
-        await ApiResponse.ReadAsync<WorkplaceWorkspaceDraftResponse[]>(httpClient, "api/management/workspaces", cancellationToken);
-    public Task<WorkplaceWorkspaceDraftResponse> GetWorkspaceAsync(string name, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<WorkplaceWorkspaceDraftResponse>(httpClient, $"api/management/workspaces/{Uri.EscapeDataString(name)}", cancellationToken);
-    public async Task<WorkplaceWorkspaceDraft> SaveWorkspaceAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<WorkplaceWorkspaceResponse[]>(httpClient, "api/workplace/workspaces", cancellationToken);
+    public async Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<WorkplaceDashboardDraftResponse[]>(httpClient, $"api/management/workspaces/{Uri.EscapeDataString(workspaceName)}/dashboards", cancellationToken);
+    public Task<WorkplaceDashboardDraftResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<WorkplaceDashboardDraftResponse>(httpClient, $"api/management/workspaces/{Uri.EscapeDataString(workspaceName)}/dashboards/{Uri.EscapeDataString(dashboardName)}", cancellationToken);
+    public async Task<WorkplaceDashboardDraft> SaveDashboardAsync(WorkplaceDashboardDraft draft, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PutAsJsonAsync($"api/management/workspaces/{Uri.EscapeDataString(draft.Name)}", draft, cancellationToken);
+        using var response = await httpClient.PutAsJsonAsync($"api/management/workspaces/{draft.WorkspaceId.Value:D}/dashboards/{Uri.EscapeDataString(draft.Name)}", draft, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
-        return await response.Content.ReadFromJsonAsync<WorkplaceWorkspaceDraft>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty Workspace draft.", Guid.NewGuid().ToString("N"));
+        return await response.Content.ReadFromJsonAsync<WorkplaceDashboardDraft>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty Dashboard draft.", Guid.NewGuid().ToString("N"));
     }
-    public async Task<WorkplaceWorkspace> PublishWorkspaceAsync(string name, CancellationToken cancellationToken)
+    public async Task<WorkplaceDashboard> PublishDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync($"api/management/workspaces/{Uri.EscapeDataString(name)}/publish", null, cancellationToken);
+        using var response = await httpClient.PostAsync($"api/management/workspaces/{Uri.EscapeDataString(workspaceName)}/dashboards/{Uri.EscapeDataString(dashboardName)}/publish", null, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
-        return await response.Content.ReadFromJsonAsync<WorkplaceWorkspace>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty published Workspace.", Guid.NewGuid().ToString("N"));
+        return await response.Content.ReadFromJsonAsync<WorkplaceDashboard>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty published Dashboard.", Guid.NewGuid().ToString("N"));
+    }
+    public async Task DeleteDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.DeleteAsync($"api/management/workspaces/{Uri.EscapeDataString(workspaceName)}/dashboards/{Uri.EscapeDataString(dashboardName)}", cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
     }
 }
 
@@ -350,6 +361,9 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
 
     public async Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<FlowVersionResponse[]>(httpClient, $"{FlowPath(@namespace, flowId)}/versions", cancellationToken);
+
+    public Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId, string version, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<FlowVersionResponse>(httpClient, $"{FlowPath(@namespace, flowId)}/versions/{Uri.EscapeDataString(version)}", cancellationToken);
 
     public async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken)
     {

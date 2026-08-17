@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Workplace.Components;
 using Bunit;
@@ -32,11 +33,11 @@ public sealed class WorkplaceUxTests
         using var context = new BunitContext();
         var primary = context.Render<PrimaryEntryContainer>(parameters => parameters.AddChildContent<EntryRenderer>(entry => entry
             .Add(value => value.Definition, PromptDefinition())
-            .Add(value => value.Role, WorkspaceEntryRole.Primary)
+            .Add(value => value.Role, DashboardItemRole.Primary)
             .Add(value => value.OnSubmit, _ => Task.CompletedTask)));
         var standard = context.Render<EntryRenderer>(parameters => parameters
             .Add(value => value.Definition, PromptDefinition())
-            .Add(value => value.Role, WorkspaceEntryRole.Standard)
+            .Add(value => value.Role, DashboardItemRole.Standard)
             .Add(value => value.OnSubmit, _ => Task.CompletedTask));
 
         Assert.IsTrue(primary.Markup.Contains("What would you like to accomplish?", StringComparison.Ordinal));
@@ -89,7 +90,7 @@ public sealed class WorkplaceUxTests
     public void ResolvedPendingAnswerAndSuccessiveOutputsRemainReadableInTheThread()
     {
         using var context = new BunitContext();
-        var workspaceId = new WorkplaceWorkspaceId("personal");
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var interactionId = InteractionId.New();
         var taskId = new WorkTaskId(Guid.NewGuid());
         var answer = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.User, "style: concise", DateTimeOffset.UtcNow, PendingActionId: PendingActionId.New());
@@ -120,7 +121,7 @@ public sealed class WorkplaceUxTests
     public void ProgressAndArtifactsExposeFunctionalInformationWithoutStorageDetails()
     {
         using var context = new BunitContext();
-        var workspaceId = new WorkplaceWorkspaceId("personal");
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var taskId = new WorkTaskId(Guid.NewGuid());
         var activity = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.TaskStarted, "Generating report", "Building the requested content.", DateTimeOffset.UtcNow, WorkActorKind.System);
         var progress = context.Render<TaskProgressTimeline>(parameters => parameters.Add(value => value.Activities, [activity]).Add(value => value.Status, WorkTaskStatus.Running));
@@ -135,6 +136,7 @@ public sealed class WorkplaceUxTests
 
     private static EntryResource PromptDefinition() => new()
     {
+        WorkspaceId = new(Guid.Parse("22222222-2222-2222-2222-222222222222")),
         Id = new EntryId("prepare-report"),
         Name = "prepare-report",
         DisplayName = "Prepare a report",
@@ -148,7 +150,7 @@ public sealed class WorkplaceUxTests
         },
         ResolvedTarget = new EntryResolvedTarget("report", "1.0.0"),
         Behavior = new EntryBehavior(),
-        ApiVersion = WorkplaceApiVersions.V20260805,
+        ApiVersion = WorkplaceApiVersions.CoreV1,
         Type = WorkResourceTypes.Entries
     };
 }

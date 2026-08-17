@@ -123,14 +123,14 @@ public sealed record PackResourceEnvelope<T>
     public T Definition { get; init; } = default!;
 }
 
-public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinitionValidator graphValidator, TimeProvider timeProvider) : IPackResourceHandler
+public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinitionValidator graphValidator, TimeProvider timeProvider, ICurrentRequestContext requestContext) : IPackResourceHandler
 {
     public string Kind => ResourceKinds.Flow;
     public int InstallOrder => 50;
     public async Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
     {
         var value = Parse(resource); var now = timeProvider.GetUtcNow();
-        FlowValidator.Validate(new(new(resource.Name), resource.Name, value.Definition.Description, value.Definition.Version, value.Definition.Enabled, null, value.Definition.Spec, value.Definition.Metadata, now, now, value.Definition.DisplayName, value.Definition.Graph));
+        FlowValidator.Validate(new(CurrentWorkspaceId(), new(resource.Name), resource.Name, value.Definition.Description, value.Definition.Version, value.Definition.Enabled, null, value.Definition.Spec, value.Definition.Metadata, now, now, value.Definition.DisplayName, value.Definition.Graph));
         if (value.Definition.Graph is not null)
         {
             var validation = await graphValidator.ValidateAsync(value.Definition.Graph, new(ResolveResources: false), cancellationToken);
@@ -138,17 +138,19 @@ public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinition
             if (error is not null) throw new FlowValidationException(error.Code, error.Message);
         }
     }
-    public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(new(name, @namespace), cancellationToken) is not null;
+    public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(CurrentWorkspaceId(), new(name, @namespace), cancellationToken) is not null;
     public async Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, ResourceNamespace @namespace, string packVersion, CancellationToken cancellationToken)
     {
         var value = Parse(resource); var definition = value.Definition;
-        var stored = await service.CreateAsync(new(resource.Name, definition.Description, definition.Version, definition.Enabled, definition.Spec, PackProvenance.Add(definition.Metadata, pack, packVersion), definition.Graph, definition.DisplayName), @namespace, cancellationToken);
+        var workspaceId = CurrentWorkspaceId();
+        var stored = await service.CreateAsync(workspaceId, new(resource.Name, definition.Description, definition.Version, definition.Enabled, definition.Spec, PackProvenance.Add(definition.Metadata, pack, packVersion), definition.Graph, definition.DisplayName), @namespace, cancellationToken);
         var flowId = new FlowId(resource.Name, @namespace);
-        if (definition.Publish) { _ = await service.PublishVersionAsync(flowId, definition.Version, definition.Activate, cancellationToken); stored = (await service.GetAsync(flowId, cancellationToken))!; }
+        if (definition.Publish) { _ = await service.PublishVersionAsync(workspaceId, flowId, definition.Version, definition.Activate, cancellationToken); stored = (await service.GetAsync(workspaceId, flowId, cancellationToken))!; }
         return new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = stored.ETag };
     }
-    public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAsync(new(name, @namespace), cancellationToken))?.ETag;
-    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(new(resource.Name, resource.Namespace), resource.VersionToken, cancellationToken);
+    public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAsync(CurrentWorkspaceId(), new(name, @namespace), cancellationToken))?.ETag;
+    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(CurrentWorkspaceId(), new(resource.Name, resource.Namespace), resource.VersionToken, cancellationToken);
+    private WorkspaceId CurrentWorkspaceId() => new(requestContext.Current.WorkspaceId);
     private static PackResourceEnvelope<PackFlowDefinition> Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<PackResourceEnvelope<PackFlowDefinition>>(resource.Manifest.GetRawText());
 }
 
@@ -162,27 +164,28 @@ public sealed record PackEntryDefinition
     public bool Publish { get; init; } = true;
 }
 
-public sealed class EntryPackResourceHandler(EntryAdministrationService service, IWorkplaceRepository repository, TimeProvider timeProvider) : IPackResourceHandler
+public sealed class EntryPackResourceHandler(EntryAdministrationService service, IWorkplaceRepository repository, TimeProvider timeProvider, ICurrentRequestContext requestContext) : IPackResourceHandler
 {
     public string Kind => ResourceKinds.Entry;
     public int InstallOrder => 60;
     public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken)
     {
-        var value = Parse(resource); WorkplaceValidation.Validate(ToDraft(resource.Name, ResourceNamespace.Default, value.Definition, timeProvider.GetUtcNow())); return Task.CompletedTask;
+        var value = Parse(resource); WorkplaceValidation.Validate(ToDraft(CurrentWorkspaceId(), resource.Name, ResourceNamespace.Default, value.Definition, timeProvider.GetUtcNow())); return Task.CompletedTask;
     }
-    public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await repository.GetEntryDraftAsync(new(name, @namespace), cancellationToken) is not null || await repository.GetEntryAsync(new(name, @namespace), cancellationToken) is not null;
+    public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await repository.GetEntryDraftAsync(CurrentWorkspaceId(), new(name, @namespace), cancellationToken) is not null || await repository.GetEntryAsync(CurrentWorkspaceId(), new(name, @namespace), cancellationToken) is not null;
     public async Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, ResourceNamespace @namespace, string packVersion, CancellationToken cancellationToken)
     {
-        var definition = Parse(resource).Definition; var saved = await service.SaveAsync(ToDraft(resource.Name, @namespace, definition, timeProvider.GetUtcNow()), cancellationToken);
-        var published = definition.Publish ? await service.PublishAsync(saved.Id, cancellationToken) : null;
+        var workspaceId = CurrentWorkspaceId(); var definition = Parse(resource).Definition; var saved = await service.SaveAsync(ToDraft(workspaceId, resource.Name, @namespace, definition, timeProvider.GetUtcNow()), cancellationToken);
+        var published = definition.Publish ? await service.PublishAsync(workspaceId, saved.Id, cancellationToken) : null;
         return new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = $"{saved.Revision}:{published?.Version ?? 0}" };
     }
     public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        var id = new EntryId(name, @namespace); var draft = await repository.GetEntryDraftAsync(id, cancellationToken); if (draft is null) return null;
-        var published = await repository.GetEntryAsync(id, cancellationToken); return $"{draft.Revision}:{published?.Version ?? 0}";
+        var workspaceId = CurrentWorkspaceId(); var id = new EntryId(name, @namespace); var draft = await repository.GetEntryDraftAsync(workspaceId, id, cancellationToken); if (draft is null) return null;
+        var published = await repository.GetEntryAsync(workspaceId, id, cancellationToken); return $"{draft.Revision}:{published?.Version ?? 0}";
     }
-    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(new(resource.Name, resource.Namespace), cancellationToken);
+    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(CurrentWorkspaceId(), new(resource.Name, resource.Namespace), cancellationToken);
     private static PackResourceEnvelope<PackEntryDefinition> Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<PackResourceEnvelope<PackEntryDefinition>>(resource.Manifest.GetRawText());
-    private static EntryDraft ToDraft(string name, ResourceNamespace @namespace, PackEntryDefinition definition, DateTimeOffset now) => new() { Id = new(name, @namespace), Name = name, DisplayName = definition.DisplayName ?? name, Description = definition.Description, Presentation = definition.Presentation, Binding = definition.Binding, Behavior = definition.Behavior, UpdatedAt = now };
+    private WorkspaceId CurrentWorkspaceId() => new(requestContext.Current.WorkspaceId);
+    private static EntryDraft ToDraft(WorkspaceId workspaceId, string name, ResourceNamespace @namespace, PackEntryDefinition definition, DateTimeOffset now) => new() { WorkspaceId = workspaceId, Id = new(name, @namespace), Name = name, DisplayName = definition.DisplayName ?? name, Description = definition.Description, Presentation = definition.Presentation, Binding = definition.Binding, Behavior = definition.Behavior, UpdatedAt = now };
 }

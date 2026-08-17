@@ -1,11 +1,15 @@
 @page "/flows/{FlowId}/designer"
+@page "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+@using Agentstration.Resources
 @rendermode InteractiveServer
 
 <PageTitle>Flow Designer · Agentstration</PageTitle>
 <div class="flow-designer-page">
-    <Agentstration.Web.FlowDesigner.Components.FlowDesigner ResourceId="@FlowId" />
+    <Agentstration.Web.FlowDesigner.Components.FlowDesigner ResourceId="@FlowId" Namespace="@DesignerNamespace" />
 </div>
 
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
+    [Parameter] public string? FlowNamespace { get; set; }
+    private ResourceNamespace DesignerNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
 }

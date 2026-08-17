@@ -104,6 +104,7 @@ public sealed record FlowGraphDefinition
 
 public sealed record FlowDraft
 {
+    public required Agentstration.Resources.WorkspaceId WorkspaceId { get; init; }
     public required string Id { get; init; }
     public required FlowId FlowId { get; init; }
     public required string DisplayName { get; init; }

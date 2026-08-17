@@ -2,6 +2,7 @@ using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 
@@ -23,13 +24,13 @@ public sealed class EntryTargetResolver(
         };
     }
 
-    public async Task<IReadOnlyList<EntryDependency>> GetDependenciesAsync(EntryId entryId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<EntryDependency>> GetDependenciesAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
     {
         var dependencies = new List<EntryDependency>();
-        var draft = await workplace.GetEntryDraftAsync(entryId, cancellationToken);
+        var draft = await workplace.GetEntryDraftAsync(workspaceId, entryId, cancellationToken);
         if (draft is not null)
             dependencies.Add(new EntryDependency(draft.Binding.ResourceId, draft.Binding.Kind.ToString(), "DependsOn"));
-        var published = await workplace.GetEntryAsync(entryId, cancellationToken);
+        var published = await workplace.GetEntryAsync(workspaceId, entryId, cancellationToken);
         if (published is not null)
             dependencies.Add(new EntryDependency(published.ResolvedTarget.FlowResourceId, "Flow", "ResolvedTarget"));
         return dependencies.DistinctBy(value => (value.ResourceId, value.Relationship)).ToArray();
@@ -40,11 +41,11 @@ public sealed class EntryTargetResolver(
         var resourceId = draft.Binding.ResourceId;
         var targetNamespace = draft.Binding.Namespace ?? draft.Id.Namespace;
         var flowId = FlowIdFrom(resourceId, targetNamespace);
-        var stored = await flows.GetAsync(flowId, cancellationToken)
+        var stored = await flows.GetAsync(draft.WorkspaceId, flowId, cancellationToken)
             ?? throw new KeyNotFoundException($"Flow '{resourceId}' was not found.");
         var version = stored.Value.ActiveVersion
             ?? throw new WorkValidationException("entry_flow_not_published", $"Flow '{resourceId}' has no active published version.");
-        var resolved = await flows.ResolveAsync(new FlowReference(flowId, version, UseActiveVersion: false, targetNamespace), draft.Id.Namespace, cancellationToken);
+        var resolved = await flows.ResolveAsync(draft.WorkspaceId, new FlowReference(flowId, version, UseActiveVersion: false, targetNamespace), draft.Id.Namespace, cancellationToken);
         ValidateFlowInputs(draft, resolved);
         return new EntryResolvedTarget(resourceId, version) { Namespace = targetNamespace };
     }
@@ -72,19 +73,19 @@ public sealed class EntryTargetResolver(
             ["sourceAgentResourceId"] = resourceId,
             ["sourceAgentGeneration"] = agent.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture)
         };
-        var current = await flows.GetAsync(flowId, cancellationToken);
+        var current = await flows.GetAsync(draft.WorkspaceId, flowId, cancellationToken);
         if (current is null)
         {
-            await flows.CreateAsync(new CreateFlowCommand(flowId.Value, $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", version, true, definition, metadata), draft.Id.Namespace, cancellationToken);
+            await flows.CreateAsync(draft.WorkspaceId, new CreateFlowCommand(flowId.Value, $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", version, true, definition, metadata), draft.Id.Namespace, cancellationToken);
         }
         else if (!string.Equals(current.Value.Version, version, StringComparison.Ordinal))
         {
-            await flows.UpdateAsync(flowId, new UpdateFlowCommand(
+            await flows.UpdateAsync(draft.WorkspaceId, flowId, new UpdateFlowCommand(
                 $"System-managed direct invocation for {agent.Value.Definition.DisplayName}.", version, true, definition, metadata), current.ETag, cancellationToken);
         }
 
-        if (await flows.GetVersionAsync(flowId, version, cancellationToken) is null)
-            await flows.PublishVersionAsync(flowId, version, activate: true, cancellationToken);
+        if (await flows.GetVersionAsync(draft.WorkspaceId, flowId, version, cancellationToken) is null)
+            await flows.PublishVersionAsync(draft.WorkspaceId, flowId, version, activate: true, cancellationToken);
         return new EntryResolvedTarget(flowId.Value, version) { Namespace = draft.Id.Namespace };
     }
 

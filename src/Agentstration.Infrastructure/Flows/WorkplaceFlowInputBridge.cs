@@ -22,13 +22,12 @@ public sealed class WorkplaceFlowInputProjectionSink(
 
     public async Task PublishRequestedAsync(FlowRun run, InputRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(run.WorkplaceWorkspaceId)
-            || !Guid.TryParse(run.InteractionId, out var interactionId))
+        if (!Guid.TryParse(run.InteractionId, out var interactionId))
             return;
 
         try
         {
-            var workspaceId = new WorkplaceWorkspaceId(run.WorkplaceWorkspaceId);
+            var workspaceId = run.WorkspaceId;
             var interaction = await repository.GetInteractionAsync(workspaceId, new(interactionId), cancellationToken);
             if (interaction is null) return;
 
@@ -85,11 +84,11 @@ public sealed class WorkplaceFlowInputProjectionSink(
 
             if (action.WorkTaskId is { } workTaskId)
             {
-                var stored = await workItems.GetAsync(workTaskId.ToWorkItemId(), cancellationToken);
+                var stored = await workItems.GetAsync(workspaceId, workTaskId.ToWorkItemId(), cancellationToken);
                 if (stored?.Value is { Status: WorkItemStatus.Running, CurrentExecutionId: { } executionId })
                 {
                     await workItems.ApplyExecutionEventAsync(new WorkExecutionInputRequested(
-                        Guid.NewGuid(), stored.Value.Id, executionId, now, request.Prompt), cancellationToken);
+                        Guid.NewGuid(), workspaceId, stored.Value.Id, executionId, now, request.Prompt), cancellationToken);
                 }
             }
 
@@ -188,12 +187,12 @@ public sealed class WorkplaceFlowInputResponder(FlowRunService flowRuns, WorkIte
         var value = action.Kind == PendingActionKind.ConfirmationRequired
             ? values["confirmed"]
             : values["response"];
-        await flowRuns.RespondAsync(action.FlowRunId!, action.ExternalInputRequestId!, value, principalId, cancellationToken);
+        await flowRuns.RespondAsync(action.FlowRunId!, action.ExternalInputRequestId!, value, principalId, action.WorkspaceId, cancellationToken);
         if (action.WorkTaskId is { } taskId)
         {
-            var stored = await workItems.GetAsync(taskId.ToWorkItemId(), cancellationToken);
+            var stored = await workItems.GetAsync(action.WorkspaceId, taskId.ToWorkItemId(), cancellationToken);
             if (stored?.Value.Status == WorkItemStatus.WaitingForInput)
-                await workItems.ProvideInputAsync(stored.Value.Id, new WorkInput(Structured: value.Clone()), principalId, cancellationToken);
+                await workItems.ProvideInputAsync(action.WorkspaceId, stored.Value.Id, new WorkInput(Structured: value.Clone()), principalId, cancellationToken);
         }
     }
 }

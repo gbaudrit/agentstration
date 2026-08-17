@@ -16,13 +16,36 @@ else
     </nav>
     @if (activeTab == "Overview")
     {
-        <section class="metric-grid flow-metrics"><MetricCard Label="Current version" Value="@flow.Version" Detail="@(flow.ActiveVersion is null ? "Not published" : $"Active {flow.ActiveVersion}")" Status="UiStatus.Info" /><MetricCard Label="Status" Value="@Status" Detail="Immutable versions" Status="@(flow.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="@(IsOrchestration ? "Participants" : "Steps")" Value="@(IsOrchestration ? Orchestration!.Participants.Count.ToString() : GraphNodes.Count.ToString())" Detail="@(IsOrchestration ? Orchestration!.Strategy.ToString() : "Entry: Input")" Status="UiStatus.Neutral" /><MetricCard Label="Recent runs" Value="@runs.Count.ToString()" Detail="@($"{runs.Count(x => x.Status == FlowRunStatus.Succeeded)} succeeded")" Status="UiStatus.Success" /></section>
+        <section class="metric-grid flow-metrics"><MetricCard Label="Current version" Value="@flow.Version" Detail="@(flow.ActiveVersion is null ? "Not published" : $"Active {flow.ActiveVersion}")" Status="UiStatus.Info" /><MetricCard Label="Status" Value="@Status" Detail="Immutable versions" Status="@(flow.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="@(IsOrchestration ? "Participants" : "Steps")" Value="@TopologyNodeCount.ToString()" Detail="@(IsOrchestration ? Orchestration!.Strategy.ToString() : Topology.Layout)" Status="UiStatus.Neutral" /><MetricCard Label="Recent runs" Value="@runs.Count.ToString()" Detail="@($"{runs.Count(x => x.Status == FlowRunStatus.Succeeded)} succeeded")" Status="UiStatus.Success" /></section>
         <article class="panel definition-grid"><div><span class="field-label">Display name</span><strong>@flow.Name</strong></div><div><span class="field-label">Resource name</span><code>@flow.Id</code></div><div><span class="field-label">Namespace</span><code>@FlowResourceNamespace.Value</code></div><div><span class="field-label">Kind</span><strong>@flow.Definition.Kind</strong></div>@if(IsOrchestration){<div><span class="field-label">Strategy</span><strong>@Orchestration!.Strategy</strong></div><div><span class="field-label">Participants</span><strong>@string.Join(", ", Orchestration.Participants.Select(x => x.Id))</strong></div>}<div><span class="field-label">Execution profile</span><strong>local</strong></div><div><span class="field-label">Last publication</span><strong>@(versions.FirstOrDefault()?.PublishedAt.LocalDateTime.ToString("g") ?? "—")</strong></div></article>
-        @if (!FlowResourceNamespace.IsDefault) { <p class="muted">This Flow is managed by its namespaced source. It can be inspected and run here; direct editing is available for workspace Flows.</p> }
+        @if (!FlowResourceNamespace.IsDefault)
+        {
+            <p class="muted">
+                This Flow is managed by namespace <code>@FlowResourceNamespace.Value</code>.
+                Its active published version can be inspected in the
+                <a href="@EditorUrl" data-enhance-nav="false">@(IsOrchestration ? "read-only orchestration view" : "read-only Flow Designer")</a>
+                and run here. Editing remains available only for workspace Flows.
+            </p>
+        }
     }
     else if (activeTab == "Designer")
     {
-        <div class="toolbar"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@EditorLabel</a></div>@if(IsOrchestration){<section class="designer-layout"><OrchestrationPreview Model="@OrchestrationEditorModel.From(flow)" /><article class="panel inspector"><div class="panel-header"><h2>Orchestration</h2></div><dl class="details-list"><dt>Strategy</dt><dd>@Orchestration!.Strategy</dd><dt>Participants</dt><dd>@Orchestration.Participants.Count</dd></dl><p class="muted">Open the orchestration editor to change participants, ordering and strategy parameters.</p></article></section>}else{<section class="designer-layout"><FlowGraph Nodes="GraphNodes" SelectedName="selectedNode" OnSelected="SelectNode" /><article class="panel inspector"><div class="panel-header"><h2>Step properties</h2></div>@if(selectedNode is null){<p class="muted">Select a step in the graph.</p>}else{<label>Name<input value="@selectedNode" readonly /></label><label>Type<input value="@GraphNodes.First(x => x.Name == selectedNode).Type" readonly /></label><p class="muted">Open the full Designer to edit the Draft, transitions, mappings and YAML source.</p>}</article></section>}
+        <div class="toolbar"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@EditorLabel</a></div>
+        <section class="designer-layout">
+            <FlowTopologyViewer Graph="Topology" SelectedKey="selectedNode" SelectedKeyChanged="SelectNode" />
+            <article class="panel inspector">
+                <div class="panel-header"><h2>@(IsOrchestration ? "Orchestration topology" : "Step properties")</h2></div>
+                @if (SelectedTopologyNode is null)
+                {
+                    <p class="muted">Select a node in the graph.</p>
+                }
+                else
+                {
+                    <dl class="details-list"><dt>Name</dt><dd>@SelectedTopologyNode.Label</dd><dt>Type</dt><dd>@SelectedTopologyNode.Type</dd>@if(SelectedTopologyNode.Subtitle is not null){<dt>Role / target</dt><dd>@SelectedTopologyNode.Subtitle</dd>}@if(SelectedTopologyNode.IsInitial){<dt>Entry</dt><dd>Initial participant</dd>}</dl>
+                    <p class="muted">Open the full editor to change the definition and its execution parameters.</p>
+                }
+            </article>
+        </section>
     }
     else if (activeTab == "Runs")
     {
@@ -42,18 +65,30 @@ else
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
     private static readonly string[] Tabs = ["Overview", "Designer", "Runs", "Deployments"];
-    private static readonly string[] NamespacedTabs = ["Overview", "Runs", "Deployments"];
     private readonly CancellationTokenSource cancellation = new();
     private FlowResponse? flow; private IReadOnlyList<FlowVersionResponse> versions=[]; private IReadOnlyList<FlowRun> runs=[];
     private string activeTab="Overview", inputJson="{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}", deployment="local", runVersion=""; private string? selectedNode,error; private bool showRun,submitting;
     private string Status => flow?.ActiveVersion is not null ? "Published" : "Draft";
     private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
-    private IReadOnlyList<string> AvailableTabs => FlowResourceNamespace.IsDefault ? Tabs : NamespacedTabs;
+    private IReadOnlyList<string> AvailableTabs => Tabs;
     private OrchestrationFlowDefinition? Orchestration => flow?.Definition as OrchestrationFlowDefinition;
     private bool IsOrchestration => Orchestration is not null;
-    private string EditorUrl => IsOrchestration ? $"/flows/{Uri.EscapeDataString(FlowId)}/orchestration" : $"/flows/{Uri.EscapeDataString(FlowId)}/designer";
-    private string EditorLabel => IsOrchestration ? "Open orchestration editor" : "Open Flow Designer";
-    private IReadOnlyList<FlowGraphNode> GraphNodes => flow is null ? [] : FlowGraphNode.From(flow.Definition);
+    private string EditorUrl
+    {
+        get
+        {
+            var suffix = IsOrchestration ? "orchestration" : "designer";
+            return FlowResourceNamespace.IsDefault
+                ? $"/flows/{Uri.EscapeDataString(FlowId)}/{suffix}"
+                : $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows/{Uri.EscapeDataString(FlowId)}/{suffix}";
+        }
+    }
+    private string EditorLabel => IsOrchestration
+        ? FlowResourceNamespace.IsDefault ? "Open orchestration editor" : "View orchestration"
+        : FlowResourceNamespace.IsDefault ? "Open Flow Designer" : "View in Flow Designer";
+    private FlowTopologyGraph Topology => flow is null ? new([], [], "horizontal", "Flow topology") : FlowTopologyProjector.Project(flow.Definition, flow.Graph);
+    private FlowTopologyNode? SelectedTopologyNode => Topology.FindBySelection(selectedNode);
+    private int TopologyNodeCount => Topology.Nodes.Count(node => node.Type is not "input" and not "output" and not "conversation" and not "manager");
     protected override async Task OnParametersSetAsync(){flow=await Client.GetFlowAsync(FlowResourceNamespace,FlowId,cancellation.Token);versions=await Client.GetFlowVersionsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runs=await Client.GetFlowRunsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runVersion=flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";}
     private void SelectNode(string name)=>selectedNode=name;
     private void OpenRun(){activeTab="Runs";showRun=true;error=null;if(flow?.Metadata.TryGetValue("agentstration.io/sample-input",out var sampleInput)==true)inputJson=sampleInput;}

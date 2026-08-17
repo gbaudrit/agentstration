@@ -1,9 +1,11 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Agentstration.Resources;
 
 namespace Agentstration.Flow.Application;
 
 public sealed record FlowOrchestrationExecutionRequest(
+    WorkspaceId WorkspaceId,
     string RunId,
     OrchestrationFlowDefinition Definition,
     JsonElement Input,

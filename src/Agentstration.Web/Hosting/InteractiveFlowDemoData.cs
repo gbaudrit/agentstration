@@ -1,3 +1,4 @@
+using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
@@ -24,6 +25,7 @@ public static class InteractiveFlowDemoData
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         var configuration = services.GetRequiredService<IConfiguration>();
+        var workspaceId = services.GetRequiredService<IWorkplaceContext>().WorkspaceId;
         if (!Uri.TryCreate(
                 configuration["Agentstration:Extensions:Agentstration.Extensions.Utilities:Endpoint"],
                 UriKind.Absolute,
@@ -126,10 +128,10 @@ public static class InteractiveFlowDemoData
                 new FlowTargetReference(FlowTargetKind.Agent, "dotnet-expert")
             ],
             new SequentialOrchestrationPattern());
-        var flow = await flows.GetAsync(new FlowId(FlowName), cancellationToken);
+        var flow = await flows.GetAsync(workspaceId, new FlowId(FlowName), cancellationToken);
         if (flow is null)
         {
-            flow = await flows.CreateAsync(new CreateFlowCommand(
+            flow = await flows.CreateAsync(workspaceId, new CreateFlowCommand(
                 FlowName,
                 "Calls a real AEP tool, pauses for approval, then resumes from the persisted MAF checkpoint.",
                 Version,
@@ -137,9 +139,10 @@ public static class InteractiveFlowDemoData
                 definition,
                 Metadata()), cancellationToken);
         }
-        else if (await flows.GetVersionAsync(flow.Value.Id, Version, cancellationToken) is null)
+        else if (await flows.GetVersionAsync(workspaceId, flow.Value.Id, Version, cancellationToken) is null)
         {
             flow = await flows.UpdateAsync(
+                workspaceId,
                 flow.Value.Id,
                 new UpdateFlowCommand(
                     "Calls a real AEP tool, pauses for approval, then resumes from the persisted MAF checkpoint.",
@@ -151,8 +154,8 @@ public static class InteractiveFlowDemoData
                 cancellationToken);
         }
 
-        if (await flows.GetVersionAsync(flow.Value.Id, Version, cancellationToken) is null)
-            await flows.PublishVersionAsync(flow.Value.Id, Version, true, cancellationToken, "Provides a reproducible console input and requires real MAF tool approval through the Utilities AEP extension.");
+        if (await flows.GetVersionAsync(workspaceId, flow.Value.Id, Version, cancellationToken) is null)
+            await flows.PublishVersionAsync(workspaceId, flow.Value.Id, Version, true, cancellationToken, "Provides a reproducible console input and requires real MAF tool approval through the Utilities AEP extension.");
     }
 
     private static IReadOnlyDictionary<string, string> Metadata() => new Dictionary<string, string>

@@ -23,6 +23,25 @@ Use Workflow when the application owns the path. Use Orchestration when agents o
 - Draft Runs store the exact draft revision and graph snapshot used for execution.
 - Cancellation and terminal states belong to Flow, independently of Runtime agent Runs.
 
+## Console topology
+
+The Console visualizer represents the declared execution topology rather than forcing every Flow into a sequence. Workflow transitions retain their event and condition labels. Routing displays candidate branches, Concurrent orchestration uses fan-out and fan-in, Handoff displays its directed routes, Group Chat uses a shared-conversation hub, and Magentic keeps its dedicated manager visually distinct from participants.
+
+Definition diagrams and Run diagrams answer different questions:
+
+- declared edges describe every route allowed by the immutable definition snapshot;
+- observed edges highlight a transition or participant transfer that occurred in the Run;
+- inactive edges identify alternatives that were available but not selected;
+- node status and turn counts describe execution state without exposing MAF executor identifiers or internal manager traffic.
+
+The visual projection remains provider-neutral. MAF-specific workflow events are normalized into the same Flow step and participant events used by the durable FlowRun contract before the Console sees them.
+
+### Namespaced published definitions
+
+Flows installed from a Pack remain owned by their namespace. Their active published version can be opened from the Flow details page in the same Designer and orchestration views as workspace Flows, but those views are read-only: navigation, zoom, node selection, topology, source, participants, and strategy remain available while Draft creation, autosave, Save, Publish, and Draft Runs are disabled. The Designer reads the immutable active version directly and renders its graph as canonical YAML without materializing a workspace Draft.
+
+A legacy published Workflow version without a stored `FlowGraphDefinition` cannot be reconstructed safely. The Designer reports that case explicitly instead of creating or inferring a Draft. Workspace Flow authoring retains its existing editable Draft behavior.
+
 ## Direct
 
 A Direct Flow invokes exactly one Agent target. It is appropriate for stable bindings such as “all SQL review requests go to `sql-expert`”. The target must be an Agent; Direct cannot target another Flow.

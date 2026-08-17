@@ -23,6 +23,7 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class AgentFrameworkRuntimeFactoryTests
 {
+    private static readonly WorkspaceId TestWorkspaceId = new(Guid.Parse("22222222-2222-2222-2222-222222222222"));
     [TestMethod]
     public void FlowOrchestrationMapsToolApprovalRequestsAndResponsesAsConfirmations()
     {
@@ -39,6 +40,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
 
         var input = new InputRequest
         {
+            WorkspaceId = TestWorkspaceId,
             Id = "input-1",
             RunId = "run-1",
             RuntimeRequestId = request.RequestId,
@@ -100,13 +102,13 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                     firstProvider.GetRequiredService<IRuntimeExecutionStateStore>());
 
                 await foreach (var item in firstEngine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
-                    "run-maf-resume", definition, JsonSerializer.SerializeToElement(new { prompt = "Delete it" }), "correlation-1")))
+                    TestWorkspaceId, "run-maf-resume", definition, JsonSerializer.SerializeToElement(new { prompt = "Delete it" }), "correlation-1")))
                     initialEvents.Add(item);
                 suspended = initialEvents.OfType<FlowExternalInputRequested>().Single();
                 bindings = initialEvents.OfType<FlowRuntimeBindingsResolved>().Single().Bindings;
                 Assert.AreEqual(InputRequestType.Confirmation, suspended.Type);
                 Assert.IsNotNull(await firstProvider.GetRequiredService<IRuntimeExecutionStateStore>().GetAsync(
-                    "run-maf-resume", suspended.RuntimeState.RuntimeType, suspended.RuntimeState.StateId, default));
+                    TestWorkspaceId, "run-maf-resume", suspended.RuntimeState.RuntimeType, suspended.RuntimeState.StateId, default));
             }
 
             await using (var secondProvider = StateProvider(databasePath))
@@ -124,6 +126,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                     secondProvider.GetRequiredService<IRuntimeExecutionStateStore>());
                 var answer = new InputRequest
                 {
+                    WorkspaceId = TestWorkspaceId,
                     Id = "input-1",
                     RunId = "run-maf-resume",
                     RuntimeRequestId = suspended.RuntimeRequestId,
@@ -136,7 +139,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 };
                 var resumedEvents = new List<FlowExecutionEvent>();
                 await foreach (var item in resumedEngine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
-                    "run-maf-resume", definition, JsonSerializer.SerializeToElement(new { prompt = "Delete it" }),
+                    TestWorkspaceId, "run-maf-resume", definition, JsonSerializer.SerializeToElement(new { prompt = "Delete it" }),
                     "correlation-1", bindings, suspended.RuntimeState, answer)))
                     resumedEvents.Add(item);
 
@@ -191,6 +194,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             var events = new List<FlowExecutionEvent>();
 
             await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+                TestWorkspaceId,
                 "run-real-approval",
                 new OrchestrationFlowDefinition(
                     [new FlowTargetReference(FlowTargetKind.Agent, "approval-agent")],
@@ -204,6 +208,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             var requested = events.OfType<FlowExternalInputRequested>().Single();
             Assert.AreEqual(InputRequestType.Confirmation, requested.Type);
             Assert.IsNotNull(await states.GetAsync(
+                TestWorkspaceId,
                 "run-real-approval",
                 requested.RuntimeState.RuntimeType,
                 requested.RuntimeState.StateId,
@@ -257,6 +262,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         var events = new List<FlowExecutionEvent>();
 
         await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+            TestWorkspaceId,
             "run-1",
             definition,
             JsonSerializer.SerializeToElement(new { prompt = "Discuss" }),
@@ -415,6 +421,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             pattern);
         var events = new List<FlowExecutionEvent>();
         await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+            TestWorkspaceId,
             "run-pattern",
             definition,
             JsonSerializer.SerializeToElement(new { prompt = "Discuss" }),

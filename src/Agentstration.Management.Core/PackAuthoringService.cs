@@ -253,7 +253,7 @@ public sealed partial class PackAuthoringService(
     private static bool IsManifest(string path) => path.Replace('\\', '/') is "pack.yaml" or "pack.yml" or "pack.json";
     private static string BuildFileName(PackProjectProperties value) => $"{value.Publisher}-{value.PackName}-{value.Version}.pack.zip";
 
-    private static void ValidateCoordinate(string publisher, string name, string version)
+    internal static void ValidateCoordinate(string publisher, string name, string version)
     {
         if (!NameRegex().IsMatch(publisher) || !NameRegex().IsMatch(name)) throw new PackValidationException("pack_project_identity_invalid", "Pack Project publisher and name must use lowercase ASCII letters, digits or '-' and start with a letter or digit.");
         if (!VersionRegex().IsMatch(version)) throw new PackValidationException("pack_project_version_invalid", "Pack Project versions must use Semantic Versioning.");

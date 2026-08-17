@@ -70,6 +70,7 @@ public sealed record InputResponse(
 
 public sealed record InputRequest
 {
+    public required WorkspaceId WorkspaceId { get; init; }
     public required string Id { get; init; }
     public required string RunId { get; init; }
     public string? Source { get; init; }
@@ -202,6 +203,7 @@ public sealed record CompositeFlowDefinition(
 }
 
 public sealed record FlowResource(
+    WorkspaceId WorkspaceId,
     FlowId Id,
     string Name,
     string? Description,
@@ -216,6 +218,7 @@ public sealed record FlowResource(
     FlowGraphDefinition? Graph = null);
 
 public sealed record FlowVersion(
+    WorkspaceId WorkspaceId,
     FlowId FlowId,
     string Version,
     string? Description,
@@ -227,8 +230,9 @@ public sealed record FlowVersion(
     string? ReleaseNotes = null);
 
 public sealed record FlowRunError(string Code, string Message, string? Details = null);
-public sealed record FlowRunScope(Guid TenantId, Guid WorkspaceId, Guid PrincipalId);
-public sealed record FlowRunEvent(string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp);
+public sealed record FlowRunScope(Guid TenantId, WorkspaceId WorkspaceId, Guid PrincipalId);
+public readonly record struct FlowRunKey(WorkspaceId WorkspaceId, string RunId);
+public sealed record FlowRunEvent(WorkspaceId WorkspaceId, string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp);
 public sealed record FlowStepRunUsage(int? InputTokens = null, int? OutputTokens = null);
 public sealed record FlowParticipantTurnResult(int Turn, string Content);
 public sealed record FlowParticipantResult(
@@ -269,6 +273,7 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
+    public required WorkspaceId WorkspaceId { get; init; }
     public required string Id { get; init; }
     public required FlowId FlowId { get; init; }
     public required string FlowVersion { get; init; }
@@ -285,9 +290,8 @@ public sealed record FlowRun
     public string? ParentFlowRunId { get; init; }
     public string? InteractionId { get; init; }
     public string? WorkTaskId { get; init; }
-    public string? WorkplaceWorkspaceId { get; init; }
     public string? TriggerMessageId { get; init; }
-    public FlowRunScope? Scope { get; init; }
+    public required FlowRunScope Scope { get; init; }
     public required JsonElement Input { get; init; }
     public JsonElement? Output { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }

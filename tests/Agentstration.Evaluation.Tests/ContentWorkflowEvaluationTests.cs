@@ -9,8 +9,8 @@ using Agentstration.Contracts;
 using Agentstration.Domain;
 using Agentstration.Evaluation;
 using Agentstration.Infrastructure.Agents;
-using Agentstration.Runtime.Local;
 using Agentstration.Infrastructure.Persistence;
+using Agentstration.Runtime.Local;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 
