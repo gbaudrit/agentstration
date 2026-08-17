@@ -93,16 +93,19 @@ public sealed class EntryAdministrationService(
     {
         _ = await repository.GetEntryDraftAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException($"Entry draft '{id}' was not found.");
-        var exposedBy = (await repository.ListWorkspacesAsync(cancellationToken))
-            .Where(workspace => workspace.Entries.Any(reference => reference.EntryResourceId == id))
-            .Select(workspace => workspace.Name)
-            .ToArray();
-        var draftedBy = (await repository.ListWorkspaceDraftsAsync(cancellationToken))
-            .Where(workspace => workspace.Entries.Any(reference => reference.EntryResourceId == id))
-            .Select(workspace => workspace.Name)
-            .ToArray();
-        if (exposedBy.Length > 0 || draftedBy.Length > 0)
-            throw new WorkValidationException("entry_in_use", $"Entry '{id}' is referenced by Workplace workspace configuration.");
+        var exposedBy = new List<string>();
+        var draftedBy = new List<string>();
+        foreach (var workspace in await repository.ListWorkspacesAsync(cancellationToken))
+        {
+            exposedBy.AddRange((await repository.ListDashboardsAsync(workspace.Id, cancellationToken))
+                .Where(dashboard => dashboard.Entries.Any(reference => reference.EntryResourceId == id))
+                .Select(dashboard => $"{workspace.Name}/{dashboard.Name}"));
+            draftedBy.AddRange((await repository.ListDashboardDraftsAsync(workspace.Id, cancellationToken))
+                .Where(dashboard => dashboard.Entries.Any(reference => reference.EntryResourceId == id))
+                .Select(dashboard => $"{workspace.Name}/{dashboard.Name}"));
+        }
+        if (exposedBy.Count > 0 || draftedBy.Count > 0)
+            throw new WorkValidationException("entry_in_use", $"Entry '{id}' is referenced by a Workplace Dashboard.");
         if (await repository.HasEntryInteractionsAsync(id, cancellationToken))
             throw new WorkValidationException("entry_in_use", $"Entry '{id}' has durable interactions and cannot be deleted.");
         await repository.DeleteEntryAsync(id, cancellationToken);

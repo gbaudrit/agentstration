@@ -3,7 +3,10 @@ using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Application.Work;
 
-public sealed class WorkspaceAdministrationService(IWorkplaceRepository repository, TimeProvider timeProvider)
+public sealed class WorkspaceAdministrationService(
+    IWorkplaceRepository repository,
+    DashboardAdministrationService dashboards,
+    TimeProvider timeProvider)
 {
     public Task<IReadOnlyList<WorkplaceWorkspaceDraft>> ListAsync(CancellationToken cancellationToken) => repository.ListWorkspaceDraftsAsync(cancellationToken);
 
@@ -23,17 +26,18 @@ public sealed class WorkspaceAdministrationService(IWorkplaceRepository reposito
     {
         var draft = await GetAsync(id, cancellationToken);
         WorkplaceValidation.Validate(draft);
-        foreach (var reference in draft.Entries)
-            _ = await repository.GetEntryAsync(reference.EntryResourceId, cancellationToken)
-                ?? throw new WorkValidationException("workspace_entry_not_published", $"Entry '{reference.EntryResourceId}' is not published.");
         var previous = await repository.GetWorkspaceAsync(id, cancellationToken);
         var published = new WorkplaceWorkspace
         {
-            Id = draft.Id, Name = draft.Name,
-            DisplayName = draft.DisplayName, Description = draft.Description, Entries = draft.Entries,
-            Version = previous is null ? 1 : checked(previous.Version + 1), PublishedAt = timeProvider.GetUtcNow()
+            Id = draft.Id,
+            Name = draft.Name,
+            DisplayName = draft.DisplayName,
+            Description = draft.Description,
+            Version = previous is null ? 1 : checked(previous.Version + 1),
+            PublishedAt = timeProvider.GetUtcNow()
         };
         await repository.UpsertWorkspaceAsync(published, cancellationToken);
+        await dashboards.EnsureHomeAsync(published, cancellationToken);
         return published;
     }
 }

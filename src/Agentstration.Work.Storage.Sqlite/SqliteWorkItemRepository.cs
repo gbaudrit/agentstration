@@ -12,6 +12,8 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
     internal DbSet<WorkItemDocument> WorkItems => Set<WorkItemDocument>();
     internal DbSet<WorkplaceWorkspaceDocument> Workspaces => Set<WorkplaceWorkspaceDocument>();
     internal DbSet<WorkplaceWorkspaceDraftDocument> WorkspaceDrafts => Set<WorkplaceWorkspaceDraftDocument>();
+    internal DbSet<WorkplaceDashboardDocument> Dashboards => Set<WorkplaceDashboardDocument>();
+    internal DbSet<WorkplaceDashboardDraftDocument> DashboardDrafts => Set<WorkplaceDashboardDraftDocument>();
     internal DbSet<EntryDocument> Entries => Set<EntryDocument>();
     internal DbSet<EntryDraftDocument> EntryDrafts => Set<EntryDraftDocument>();
     internal DbSet<InteractionDocument> Interactions => Set<InteractionDocument>();
@@ -63,6 +65,9 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         workspaceDraft.Property(value => value.Id).HasMaxLength(512);
         workspaceDraft.Property(value => value.Name).HasMaxLength(128);
 
+        ConfigureDashboard(modelBuilder.Entity<WorkplaceDashboardDocument>(), "WorkplaceDashboards");
+        ConfigureDashboard(modelBuilder.Entity<WorkplaceDashboardDraftDocument>(), "WorkplaceDashboardDrafts");
+
         var entry = modelBuilder.Entity<EntryDocument>();
         entry.ToTable("Entries");
         entry.HasKey(value => value.Id);
@@ -101,6 +106,17 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         entity.Property(value => value.WorkTaskId).HasMaxLength(36); entity.HasIndex(value => new { value.WorkspaceId, value.InteractionId, value.CreatedAt });
     }
 
+    private static void ConfigureDashboard<T>(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<T> entity, string table)
+        where T : class, IWorkplaceDashboardDocument
+    {
+        entity.ToTable(table);
+        entity.HasKey(value => value.Id);
+        entity.Property(value => value.Id).HasMaxLength(768);
+        entity.Property(value => value.WorkspaceId).HasMaxLength(512);
+        entity.Property(value => value.Name).HasMaxLength(128);
+        entity.HasIndex(value => new { value.WorkspaceId, value.Name }).IsUnique();
+    }
+
     private static void ConfigurePendingAction(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<PendingActionDocument> entity)
     {
         entity.ToTable("PendingActions"); entity.HasKey(value => value.Id); entity.Property(value => value.WorkspaceId).HasMaxLength(512);
@@ -134,6 +150,30 @@ internal sealed class WorkplaceWorkspaceDocument
 internal sealed class WorkplaceWorkspaceDraftDocument
 {
     public required string Id { get; set; }
+    public required string Name { get; set; }
+    public required string Payload { get; set; }
+}
+
+internal interface IWorkplaceDashboardDocument
+{
+    string Id { get; set; }
+    string WorkspaceId { get; set; }
+    string Name { get; set; }
+    string Payload { get; set; }
+}
+
+internal sealed class WorkplaceDashboardDocument : IWorkplaceDashboardDocument
+{
+    public required string Id { get; set; }
+    public required string WorkspaceId { get; set; }
+    public required string Name { get; set; }
+    public required string Payload { get; set; }
+}
+
+internal sealed class WorkplaceDashboardDraftDocument : IWorkplaceDashboardDocument
+{
+    public required string Id { get; set; }
+    public required string WorkspaceId { get; set; }
     public required string Name { get; set; }
     public required string Payload { get; set; }
 }
@@ -238,6 +278,7 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await WorkDashboardSchema.EnsureAsync(context, cancellationToken);
         await WorkNamespaceSchema.EnsureAsync(context, cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             "CREATE TABLE IF NOT EXISTS WorkplaceWorkspaceDrafts (Id TEXT NOT NULL CONSTRAINT PK_WorkplaceWorkspaceDrafts PRIMARY KEY, Name TEXT NOT NULL, Payload TEXT NOT NULL);",
@@ -477,6 +518,7 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await WorkDashboardSchema.EnsureAsync(context, cancellationToken);
         await WorkNamespaceSchema.EnsureAsync(context, cancellationToken);
     }
 
@@ -530,6 +572,116 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         var key = StorageKey(workspaceId.Namespace, workspaceId.Value);
         var payload = await context.WorkspaceDrafts.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
         return payload is null ? null : Deserialize<WorkplaceWorkspaceDraft>(payload);
+    }
+
+    public async Task UpsertDashboardAsync(WorkplaceDashboard dashboard, CancellationToken cancellationToken)
+    {
+        WorkplaceValidation.Validate(dashboard);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await UpsertDashboardAsync(context, dashboard, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ReplaceDefaultDashboardAsync(WorkplaceDashboard dashboard, CancellationToken cancellationToken)
+    {
+        WorkplaceValidation.Validate(dashboard);
+        if (!dashboard.IsDefault) throw new ArgumentException("The replacement Dashboard must be marked as default.", nameof(dashboard));
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var workspaceKey = StorageKey(dashboard.WorkspaceId.Namespace, dashboard.WorkspaceId.Value);
+        var documents = await context.Dashboards.Where(value => value.WorkspaceId == workspaceKey).ToArrayAsync(cancellationToken);
+        foreach (var document in documents)
+        {
+            var current = Deserialize<WorkplaceDashboard>(document.Payload);
+            if (current.Id == dashboard.Id || !current.IsDefault) continue;
+            var demoted = current with
+            {
+                IsDefault = false,
+                Version = checked(current.Version + 1),
+                PublishedAt = dashboard.PublishedAt
+            };
+            document.Payload = JsonSerializer.Serialize(demoted, JsonOptions);
+        }
+        await UpsertDashboardAsync(context, dashboard, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkplaceDashboard>> ListDashboardsAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var workspaceKey = StorageKey(workspaceId.Namespace, workspaceId.Value);
+        var payloads = await context.Dashboards.AsNoTracking()
+            .Where(value => value.WorkspaceId == workspaceKey)
+            .OrderBy(value => value.Name)
+            .Select(value => value.Payload)
+            .ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<WorkplaceDashboard>).ToArray();
+    }
+
+    public async Task<WorkplaceDashboard?> GetDashboardAsync(WorkplaceWorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var key = DashboardStorageKey(workspaceId, dashboardId);
+        var payload = await context.Dashboards.AsNoTracking().Where(value => value.Id == key).Select(value => value.Payload).SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<WorkplaceDashboard>(payload);
+    }
+
+    public async Task DeleteDashboardAsync(WorkplaceWorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Dashboards.SingleOrDefaultAsync(value => value.Id == DashboardStorageKey(workspaceId, dashboardId), cancellationToken);
+        if (document is null) return;
+        context.Dashboards.Remove(document);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpsertDashboardDraftAsync(WorkplaceDashboardDraft draft, CancellationToken cancellationToken)
+    {
+        WorkplaceValidation.Validate(draft);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var key = DashboardStorageKey(draft.WorkspaceId, draft.Id);
+        var workspaceKey = StorageKey(draft.WorkspaceId.Namespace, draft.WorkspaceId.Value);
+        var document = await context.DashboardDrafts.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        if (document is null)
+            context.DashboardDrafts.Add(new WorkplaceDashboardDraftDocument { Id = key, WorkspaceId = workspaceKey, Name = draft.Name, Payload = JsonSerializer.Serialize(draft, JsonOptions) });
+        else
+        {
+            document.Name = draft.Name;
+            document.Payload = JsonSerializer.Serialize(draft, JsonOptions);
+        }
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkplaceDashboardDraft>> ListDashboardDraftsAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var workspaceKey = StorageKey(workspaceId.Namespace, workspaceId.Value);
+        var payloads = await context.DashboardDrafts.AsNoTracking()
+            .Where(value => value.WorkspaceId == workspaceKey)
+            .OrderBy(value => value.Name)
+            .Select(value => value.Payload)
+            .ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<WorkplaceDashboardDraft>).ToArray();
+    }
+
+    public async Task<WorkplaceDashboardDraft?> GetDashboardDraftAsync(WorkplaceWorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payload = await context.DashboardDrafts.AsNoTracking()
+            .Where(value => value.Id == DashboardStorageKey(workspaceId, dashboardId))
+            .Select(value => value.Payload)
+            .SingleOrDefaultAsync(cancellationToken);
+        return payload is null ? null : Deserialize<WorkplaceDashboardDraft>(payload);
+    }
+
+    public async Task DeleteDashboardDraftAsync(WorkplaceWorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.DashboardDrafts.SingleOrDefaultAsync(value => value.Id == DashboardStorageKey(workspaceId, dashboardId), cancellationToken);
+        if (document is null) return;
+        context.DashboardDrafts.Remove(document);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpsertEntryAsync(EntryResource entry, CancellationToken cancellationToken)
@@ -772,7 +924,41 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
 
     private static T Deserialize<T>(string payload) => JsonSerializer.Deserialize<T>(payload, JsonOptions)
         ?? throw new InvalidOperationException($"Stored {typeof(T).Name} document is invalid.");
+    private static async Task UpsertDashboardAsync(WorkDbContext context, WorkplaceDashboard dashboard, CancellationToken cancellationToken)
+    {
+        var key = DashboardStorageKey(dashboard.WorkspaceId, dashboard.Id);
+        var workspaceKey = StorageKey(dashboard.WorkspaceId.Namespace, dashboard.WorkspaceId.Value);
+        var document = await context.Dashboards.SingleOrDefaultAsync(value => value.Id == key, cancellationToken);
+        if (document is null)
+            context.Dashboards.Add(new WorkplaceDashboardDocument { Id = key, WorkspaceId = workspaceKey, Name = dashboard.Name, Payload = JsonSerializer.Serialize(dashboard, JsonOptions) });
+        else
+        {
+            document.Name = dashboard.Name;
+            document.Payload = JsonSerializer.Serialize(dashboard, JsonOptions);
+        }
+    }
+    private static string DashboardStorageKey(WorkplaceWorkspaceId workspaceId, DashboardId dashboardId) =>
+        $"{StorageKey(workspaceId.Namespace, workspaceId.Value)}:{dashboardId.Value}";
     private static string StorageKey(ResourceNamespace @namespace, string name) => $"{@namespace.Value}:{name}";
+}
+
+internal static class WorkDashboardSchema
+{
+    public static async Task EnsureAsync(WorkDbContext context, CancellationToken cancellationToken)
+    {
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE TABLE IF NOT EXISTS WorkplaceDashboards (Id TEXT NOT NULL CONSTRAINT PK_WorkplaceDashboards PRIMARY KEY, WorkspaceId TEXT NOT NULL, Name TEXT NOT NULL, Payload TEXT NOT NULL);",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_WorkplaceDashboards_WorkspaceId_Name ON WorkplaceDashboards (WorkspaceId, Name);",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE TABLE IF NOT EXISTS WorkplaceDashboardDrafts (Id TEXT NOT NULL CONSTRAINT PK_WorkplaceDashboardDrafts PRIMARY KEY, WorkspaceId TEXT NOT NULL, Name TEXT NOT NULL, Payload TEXT NOT NULL);",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_WorkplaceDashboardDrafts_WorkspaceId_Name ON WorkplaceDashboardDrafts (WorkspaceId, Name);",
+            cancellationToken);
+    }
 }
 
 internal static class WorkNamespaceSchema

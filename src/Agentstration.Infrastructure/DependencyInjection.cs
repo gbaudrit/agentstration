@@ -169,6 +169,7 @@ public static class DependencyInjection
         services.AddSingleton<IManagementResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
         services.AddSingleton<IFlowDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
         services.AddSingleton<EntryAdministrationService>();
+        services.AddSingleton<DashboardAdministrationService>();
         services.AddSingleton<WorkspaceAdministrationService>();
         services.AddSingleton<IFlowRunQueue, LocalFlowRunQueue>();
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();

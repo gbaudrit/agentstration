@@ -11,6 +11,15 @@ public interface IWorkplaceRepository
     Task UpsertWorkspaceDraftAsync(WorkplaceWorkspaceDraft draft, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkplaceWorkspaceDraft>> ListWorkspaceDraftsAsync(CancellationToken cancellationToken);
     Task<WorkplaceWorkspaceDraft?> GetWorkspaceDraftAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken);
+    Task UpsertDashboardAsync(WorkplaceDashboard dashboard, CancellationToken cancellationToken);
+    Task ReplaceDefaultDashboardAsync(WorkplaceDashboard dashboard, CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkplaceDashboard>> ListDashboardsAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken);
+    Task<WorkplaceDashboard?> GetDashboardAsync(WorkplaceWorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken);
+    Task DeleteDashboardAsync(WorkplaceWorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken);
+    Task UpsertDashboardDraftAsync(WorkplaceDashboardDraft draft, CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkplaceDashboardDraft>> ListDashboardDraftsAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken);
+    Task<WorkplaceDashboardDraft?> GetDashboardDraftAsync(WorkplaceWorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken);
+    Task DeleteDashboardDraftAsync(WorkplaceWorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken);
     Task UpsertEntryAsync(EntryResource entry, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryResource>> ListEntriesAsync(CancellationToken cancellationToken);
     Task<EntryResource?> GetEntryAsync(EntryId entryId, CancellationToken cancellationToken);

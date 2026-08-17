@@ -45,24 +45,35 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
 
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
     public Task<IReadOnlyList<WorkplaceWorkspace>> ListWorkspacesAsync(CancellationToken cancellationToken) => repository.ListWorkspacesAsync(cancellationToken);
+    public Task<IReadOnlyList<WorkplaceDashboard>> ListDashboardsAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken) => repository.ListDashboardsAsync(workspaceId, cancellationToken);
     public Task<IReadOnlyList<EntryResource>> ListEntriesAsync(CancellationToken cancellationToken) => repository.ListEntriesAsync(cancellationToken);
     public Task UpsertWorkspaceAsync(WorkplaceWorkspace workspace, CancellationToken cancellationToken) => repository.UpsertWorkspaceAsync(workspace, cancellationToken);
     public Task UpsertEntryAsync(EntryResource entry, CancellationToken cancellationToken) => repository.UpsertEntryAsync(entry, cancellationToken);
 
     public async Task<WorkplaceWorkspace> GetWorkspaceAsync(WorkplaceWorkspaceId id, CancellationToken cancellationToken) => await repository.GetWorkspaceAsync(id, cancellationToken) ?? throw new KeyNotFoundException($"Workspace '{id}' was not found.");
+    public async Task<WorkplaceDashboard> GetDashboardAsync(WorkplaceWorkspaceId workspaceId, DashboardId id, CancellationToken cancellationToken) =>
+        await repository.GetDashboardAsync(workspaceId, id, cancellationToken)
+        ?? throw new KeyNotFoundException($"Dashboard '{id}' was not found in Workspace '{workspaceId}'.");
+    public async Task<WorkplaceDashboard> GetDefaultDashboardAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken) =>
+        (await repository.ListDashboardsAsync(workspaceId, cancellationToken)).SingleOrDefault(value => value.IsDefault)
+        ?? throw new KeyNotFoundException($"Workspace '{workspaceId}' has no default Dashboard.");
     public async Task<EntryResource> GetEntryAsync(EntryId id, CancellationToken cancellationToken) => await repository.GetEntryAsync(id, cancellationToken) ?? throw new KeyNotFoundException($"Entry '{id}' was not found.");
 
-    public async Task<IReadOnlyList<EntryResource>> ResolveEntriesAsync(WorkplaceWorkspaceId workspaceId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<EntryResource>> ResolveEntriesAsync(WorkplaceWorkspaceId workspaceId, DashboardId dashboardId, CancellationToken cancellationToken)
     {
-        var workspace = await GetWorkspaceAsync(workspaceId, cancellationToken); var entries = new List<EntryResource>(workspace.Entries.Count);
-        foreach (var reference in workspace.Entries.OrderBy(value => value.Order)) entries.Add(await GetEntryAsync(reference.EntryResourceId, cancellationToken));
+        _ = await GetWorkspaceAsync(workspaceId, cancellationToken);
+        var dashboard = await GetDashboardAsync(workspaceId, dashboardId, cancellationToken);
+        var entries = new List<EntryResource>(dashboard.Entries.Count);
+        foreach (var reference in dashboard.Entries.OrderBy(value => value.Order)) entries.Add(await GetEntryAsync(reference.EntryResourceId, cancellationToken));
         return entries;
     }
 
     public async Task<EntrySubmission> SubmitAsync(SubmitEntryCommand command, CancellationToken cancellationToken)
     {
-        var workspace = await GetWorkspaceAsync(command.WorkspaceId, cancellationToken);
-        if (!workspace.Entries.Any(reference => reference.EntryResourceId == command.EntryId)) throw new WorkValidationException("entry_not_in_workspace", "The Entry is not exposed by the selected Workspace.");
+        _ = await GetWorkspaceAsync(command.WorkspaceId, cancellationToken);
+        var dashboards = await repository.ListDashboardsAsync(command.WorkspaceId, cancellationToken);
+        if (!dashboards.Any(dashboard => dashboard.Entries.Any(reference => reference.EntryResourceId == command.EntryId)))
+            throw new WorkValidationException("entry_not_in_workspace", "The Entry is not exposed by a published Dashboard in the selected Workspace.");
         var entry = await GetEntryAsync(command.EntryId, cancellationToken); WorkplaceValidation.ValidateSubmission(entry, command.Values);
         var now = timeProvider.GetUtcNow(); var interaction = new WorkplaceInteraction { Id = InteractionId.New(), WorkspaceId = command.WorkspaceId, EntryId = command.EntryId, StartedAt = now, LastActivityAt = now, InputValues = command.Values.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal), Attachments = command.Attachments ?? [] };
         await repository.CreateInteractionAsync(interaction, cancellationToken);
