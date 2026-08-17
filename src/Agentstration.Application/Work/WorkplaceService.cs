@@ -31,7 +31,18 @@ public interface IWorkplaceEventSink
     Task PublishAsync(WorkplaceEventContract workplaceEvent, CancellationToken cancellationToken);
 }
 
-public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemService workItems, TimeProvider timeProvider, IEnumerable<IWorkplaceEventSink> eventSinks)
+public interface IWorkplaceExternalInputResponder
+{
+    bool CanRespond(PendingAction action);
+    Task RespondAsync(PendingAction action, IReadOnlyDictionary<string, JsonElement> values, string principalId, CancellationToken cancellationToken);
+}
+
+public sealed class WorkplaceService(
+    IWorkplaceRepository repository,
+    WorkItemService workItems,
+    TimeProvider timeProvider,
+    IEnumerable<IWorkplaceEventSink> eventSinks,
+    IEnumerable<IWorkplaceExternalInputResponder> externalInputResponders)
 {
     private const string WorkspaceMetadata = "workplace.workspaceId";
     private const string EntryMetadata = "workplace.entryId";
@@ -102,7 +113,23 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         return await CreateTaskAsync(interaction, entry, command.Values, command.Attachments, 1, cancellationToken);
     }
 
-    public async Task<PendingActionResolution> RespondAsync(WorkplaceWorkspaceId workspaceId, InteractionId interactionId, PendingActionId pendingActionId, string resumeToken, IReadOnlyDictionary<string, JsonElement> values, CancellationToken cancellationToken)
+    public Task<PendingActionResolution> RespondAsync(
+        WorkplaceWorkspaceId workspaceId,
+        InteractionId interactionId,
+        PendingActionId pendingActionId,
+        string resumeToken,
+        IReadOnlyDictionary<string, JsonElement> values,
+        CancellationToken cancellationToken) =>
+        RespondAsync(workspaceId, interactionId, pendingActionId, resumeToken, values, "workplace-user", cancellationToken);
+
+    public async Task<PendingActionResolution> RespondAsync(
+        WorkplaceWorkspaceId workspaceId,
+        InteractionId interactionId,
+        PendingActionId pendingActionId,
+        string resumeToken,
+        IReadOnlyDictionary<string, JsonElement> values,
+        string principalId,
+        CancellationToken cancellationToken)
     {
         var interaction = await GetInteractionAsync(workspaceId, interactionId, cancellationToken);
         var action = await repository.GetPendingActionAsync(workspaceId, pendingActionId, cancellationToken) ?? throw new KeyNotFoundException($"PendingAction '{pendingActionId}' was not found in Workspace '{workspaceId}'.");
@@ -111,10 +138,35 @@ public sealed class WorkplaceService(IWorkplaceRepository repository, WorkItemSe
         var now = timeProvider.GetUtcNow(); if (action.ExpiresAt is not null && action.ExpiresAt <= now) { var expired = action with { Status = PendingActionStatus.Expired, ResolvedAt = now, Version = action.Version + 1 }; await repository.SavePendingActionAsync(expired, action.Version, cancellationToken); throw new WorkTransitionException("pending_action_expired", "The PendingAction has expired."); }
         if (!TokenMatches(resumeToken, action.ResumeTokenHash)) throw new WorkValidationException("resume_token_invalid", "The resume token is invalid for this Workspace action.");
         ValidatePendingResponse(action, values);
+        if (action.ExternalInputRequestId is not null)
+        {
+            var responder = externalInputResponders.SingleOrDefault(value => value.CanRespond(action))
+                ?? throw new WorkTransitionException("external_input_responder_unavailable", "The runtime input responder is not available.");
+            await responder.RespondAsync(action, values, principalId, cancellationToken);
+        }
         var resolved = action with { Status = PendingActionStatus.Completed, ResolvedAt = now, Response = new PendingActionResponse(values.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal), now), ResumeTokenHash = HashToken($"used:{Guid.NewGuid():N}"), Version = action.Version + 1 };
         await repository.SavePendingActionAsync(resolved, action.Version, cancellationToken);
         var message = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, interaction.TaskId, ConversationRole.User, ResponseText(action, values), now, PendingActionId: action.Id);
         await repository.AddMessageAsync(message, cancellationToken); await PublishAsync(new MessageAddedEvent(EventId(), workspaceId.Value, Sequence(), now, message), cancellationToken);
+
+        if (action.ExternalInputRequestId is not null)
+        {
+            var next = new RespondAction("Thanks. The workflow is continuing with your response.");
+            interaction = interaction with
+            {
+                Status = InteractionStatus.Processing,
+                PendingActionId = null,
+                ImmediateResult = next,
+                LastActivityAt = now,
+                Messages = [.. interaction.Messages, message],
+                Version = interaction.Version + 1
+            };
+            await repository.SaveInteractionAsync(interaction, interaction.Version - 1, cancellationToken);
+            await PublishAsync(new PendingActionResolvedEvent(EventId(), workspaceId.Value, Sequence(), now, action.Id.Value, action.WorkTaskId?.Value), cancellationToken);
+            await PublishInteractionAsync(interaction, cancellationToken);
+            var task = action.WorkTaskId is null ? null : await GetTaskAsync(workspaceId, action.WorkTaskId.Value, cancellationToken);
+            return new PendingActionResolution(resolved, next, interaction, task);
+        }
 
         if (action.ResumeStep == 1)
         {

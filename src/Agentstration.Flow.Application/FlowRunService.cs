@@ -53,6 +53,11 @@ public sealed class NullFlowRunEventSink : IFlowRunEventSink
     public Task PublishAsync(FlowRunEvent runEvent, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+public interface IFlowInputRequestSink
+{
+    Task PublishRequestedAsync(FlowRun run, InputRequest request, CancellationToken cancellationToken);
+}
+
 public sealed record FlowRunExecutionOptions
 {
     public TimeSpan OrchestrationTimeout { get; init; } = TimeSpan.FromMinutes(10);
@@ -71,7 +76,8 @@ public sealed class FlowRunService(
     IFlowRunEventSink eventSink,
     IFlowRunExecutionScope executionScope,
     TimeProvider timeProvider,
-    FlowRunExecutionOptions? executionOptions = null)
+    FlowRunExecutionOptions? executionOptions = null,
+    IFlowInputRequestSink? inputRequestSink = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly FlowRunExecutionOptions executionOptions = executionOptions is null
@@ -94,6 +100,11 @@ public sealed class FlowRunService(
         var now = timeProvider.GetUtcNow();
         foreach (var run in page.Items)
         {
+            if (run.Value.Status == FlowRunStatus.WaitingForInput && inputRequestSink is not null)
+            {
+                foreach (var request in await repository.ListInputRequestsAsync(run.Value.Id, InputRequestStatus.Pending, cancellationToken))
+                    await inputRequestSink.PublishRequestedAsync(run.Value, request.Value, cancellationToken);
+            }
             var recoverable = run.Value.Status == FlowRunStatus.Pending
                 || run.Value.Status == FlowRunStatus.Running && run.Value.ExecutionLeaseExpiresAt <= now
                 || run.Value.Status == FlowRunStatus.WaitingForInput
@@ -111,7 +122,7 @@ public sealed class FlowRunService(
         string? correlationId,
         JsonElement input,
         CancellationToken cancellationToken)
-        => await CreateAsync(flowId, version, deploymentResourceId, trigger, startedBy, correlationId, input, null, null, null, null, null, cancellationToken);
+        => await CreateAsync(flowId, version, deploymentResourceId, trigger, startedBy, correlationId, input, null, null, null, null, null, null, cancellationToken);
 
     public Task<StoredFlowRun> CreateAsync(
         FlowId flowId,
@@ -123,7 +134,7 @@ public sealed class FlowRunService(
         JsonElement input,
         FlowRunScope scope,
         CancellationToken cancellationToken) =>
-        CreateAsync(flowId, version, deploymentResourceId, trigger, startedBy, correlationId, input, null, null, null, null, scope, cancellationToken);
+        CreateAsync(flowId, version, deploymentResourceId, trigger, startedBy, correlationId, input, null, null, null, null, null, scope, cancellationToken);
 
     public async Task<StoredFlowRun> CreateAsync(
         FlowId flowId,
@@ -137,6 +148,7 @@ public sealed class FlowRunService(
         string? interactionId,
         string? workTaskId,
         string? triggerMessageId,
+        string? workplaceWorkspaceId,
         FlowRunScope? scope,
         CancellationToken cancellationToken)
     {
@@ -155,6 +167,7 @@ public sealed class FlowRunService(
             ParentFlowRunId = parentFlowRunId,
             InteractionId = interactionId,
             WorkTaskId = workTaskId,
+            WorkplaceWorkspaceId = workplaceWorkspaceId,
             TriggerMessageId = triggerMessageId,
             Scope = scope,
             Input = input.Clone(),
@@ -548,6 +561,8 @@ public sealed class FlowRunService(
                     }, runToken);
                     await EmitAsync(stored.Value.Id, FlowRunEventType.InputRequested, input.Source,
                         JsonSerializer.SerializeToElement(new { inputRequest.Id, inputRequest.Prompt, inputRequest.Type, inputRequest.ExpiresAt }), runToken);
+                    if (inputRequestSink is not null)
+                        await inputRequestSink.PublishRequestedAsync(stored.Value, inputRequest, runToken);
                     suspended = true;
                     break;
                 case FlowParticipantTurnStarted turn:

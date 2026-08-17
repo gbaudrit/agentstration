@@ -175,6 +175,8 @@ public static class DependencyInjection
         services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
         services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();
         services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();
+        services.AddSingleton<IFlowInputRequestSink, WorkplaceFlowInputProjectionSink>();
+        services.AddSingleton<IWorkplaceExternalInputResponder, WorkplaceFlowInputResponder>();
         services.AddSingleton<IFlowAgentExecutor, ManagedFlowAgentExecutor>();
         services.AddSingleton<AgentFrameworkFlowOrchestrationEngine>();
         services.AddSingleton<IFlowOrchestrationEngine, ManagedFlowOrchestrationEngine>();

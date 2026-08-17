@@ -179,6 +179,7 @@ public sealed record PendingAction
     public required InteractionId InteractionId { get; init; }
     public WorkTaskId? WorkTaskId { get; init; }
     public string? FlowRunId { get; init; }
+    public string? ExternalInputRequestId { get; init; }
     public required PendingActionKind Kind { get; init; }
     public PendingActionStatus Status { get; init; } = PendingActionStatus.Pending;
     public required string Title { get; init; }

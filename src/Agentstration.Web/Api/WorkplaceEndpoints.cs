@@ -82,9 +82,10 @@ public static class WorkplaceEndpoints
         return Results.Accepted($"/api/workspaces/{workspaceName}/interactions/{interactionId}", new AddConversationMessageResponse(result.Message, ToResponse(result.Interaction), result.Action, result.Task is null ? null : ToResponse(result.Task)));
     });
     private static Task<IResult> GetPendingActionsAsync(string workspaceName, Guid interactionId, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok((await service.ListPendingActionsAsync(WorkspaceId(workspaceName), new(interactionId), token)).Select(WorkplaceService.ToContract)));
-    private static Task<IResult> RespondPendingActionAsync(string workspaceName, Guid interactionId, Guid pendingActionId, PendingActionResponseRequest request, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> RespondPendingActionAsync(string workspaceName, Guid interactionId, Guid pendingActionId, PendingActionResponseRequest request, HttpContext context, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var result = await service.RespondAsync(WorkspaceId(workspaceName), new(interactionId), new(pendingActionId), request.ResumeToken, request.Values, token);
+        var principalId = context.Features.Get<ResolvedPrincipalFeature>()?.Principal.Id.ToString("D") ?? "workplace-user";
+        var result = await service.RespondAsync(WorkspaceId(workspaceName), new(interactionId), new(pendingActionId), request.ResumeToken, request.Values, principalId, token);
         return Results.Ok(new PendingActionResolutionResponse(WorkplaceService.ToContract(result.PendingAction), result.NextAction, ToResponse(result.Interaction), result.Task is null ? null : ToResponse(result.Task)));
     });
     private static Task<IResult> ListTasksAsync(string workspaceName, WorkTaskStatus? status, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(new WorkTaskPageResponse((await service.ListTasksAsync(WorkspaceId(workspaceName), status, token)).Select(ToResponse).ToArray())));

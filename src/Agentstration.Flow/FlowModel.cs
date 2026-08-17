@@ -285,6 +285,7 @@ public sealed record FlowRun
     public string? ParentFlowRunId { get; init; }
     public string? InteractionId { get; init; }
     public string? WorkTaskId { get; init; }
+    public string? WorkplaceWorkspaceId { get; init; }
     public string? TriggerMessageId { get; init; }
     public FlowRunScope? Scope { get; init; }
     public required JsonElement Input { get; init; }
