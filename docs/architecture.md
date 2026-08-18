@@ -357,6 +357,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 22. **Delivered Pack bindings increment:** Pack manifests declare logical Model Profile and Secret requirements, installation resolves them to workspace resources without copying Secret values, and selections persist by Pack identity across uninstall and reinstall.
 23. **Delivered Pack composition increment:** the Console catalogs current workspace resources, previews the complete Entry/Flow/Agent dependency closure, converts environment-specific Model Profile references into logical bindings, and creates a validated immutable Pack Project source snapshot without mutating the selected resources.
 24. **Delivered durable interactive execution increment:** Flow Runs persist exact participant revision/deployment bindings and opaque runtime checkpoints, expose durable input requests through REST and Workplace pending actions, recover through at-least-once leases, expire unanswered requests, and protect live revisions with impact-aware normal and forced purge operations. See ADR-0054.
+25. **Delivered Entry-driven Workplace presentation increment:** Entry configures participant, progress, Task, and Result presentation while Workplace composes existing durable Work primitives into one conversation timeline. Flow and Runtime remain presentation-neutral. See ADR-0055.
 
 ## ADR catalog
 
@@ -381,6 +382,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0022: Interaction as durable conversation and FlowRun continuation
 - ADR-0023: Console supervision of WorkTasks through Work API
 - ADR-0049: Workplace Dashboards own Entry composition
+- ADR-0055: Entry owns Workplace execution presentation
 - ADR-0024: Entries always target executable Flows
 - ADR-0026: out-of-process model-provider extensions through AEP
 - ADR-0027: AEP tool contributions resolve to MCP

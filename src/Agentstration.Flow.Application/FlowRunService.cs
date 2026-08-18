@@ -53,6 +53,15 @@ public sealed class NullFlowRunEventSink : IFlowRunEventSink
     public Task PublishAsync(FlowRunEvent runEvent, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+public sealed class CompositeFlowRunEventSink(IReadOnlyList<IFlowRunEventSink> sinks) : IFlowRunEventSink
+{
+    public async Task PublishAsync(FlowRunEvent runEvent, CancellationToken cancellationToken)
+    {
+        foreach (var sink in sinks)
+            await sink.PublishAsync(runEvent, cancellationToken);
+    }
+}
+
 public interface IFlowInputRequestSink
 {
     Task PublishRequestedAsync(FlowRun run, InputRequest request, CancellationToken cancellationToken);

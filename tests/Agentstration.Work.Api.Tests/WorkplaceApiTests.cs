@@ -296,7 +296,7 @@ public sealed class WorkplaceApiTests
             var messages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/messages");
             var storedMessages = messages ?? [];
             Assert.IsTrue(storedMessages.Any(value => value.Content == "Make it shorter and suitable for executives."));
-            Assert.IsTrue(storedMessages.Any(value => value.Role == ConversationRole.Agentstration && value.Content.Contains("Executive version is ready", StringComparison.Ordinal)));
+            Assert.IsTrue(storedMessages.Any(value => value.Role == ConversationRole.Agentstration && value.Content == outputs.Results[1].Content.GetString()), "The conversation must carry the user-facing result instead of a duplicate readiness message.");
             var history = await client.GetFromJsonAsync<InteractionPageResponse>("/api/workspaces/personal/interactions?take=10");
             Assert.IsTrue(history!.Value.Any(value => value.Id == submitted.Interaction.Id));
 

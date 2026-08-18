@@ -71,6 +71,10 @@ public sealed class WorkPlaneTests
             ResolvedTarget = new EntryResolvedTarget("router", "1.0.0")
         };
         WorkplaceValidation.Validate(entry);
+        Assert.AreEqual(EntryParticipantVisibility.Hidden, entry.Presentation.Participants.Visibility);
+        Assert.AreEqual(EntryProgressVisibility.Compact, entry.Presentation.Progress.Visibility);
+        Assert.AreEqual(EntryTaskDisplay.Auto, entry.Presentation.Task.Display);
+        Assert.AreEqual(EntryResultDisplay.Auto, entry.Presentation.Results.Display);
         Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateSubmission(entry, new Dictionary<string, System.Text.Json.JsonElement>()));
         Assert.Throws<WorkValidationException>(() => WorkplaceValidation.ValidateSubmission(entry, new Dictionary<string, System.Text.Json.JsonElement>
         {
@@ -96,6 +100,11 @@ public sealed class WorkPlaneTests
         };
         var optionError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(draft));
         Assert.AreEqual("entry_field_options_invalid", optionError.Code);
+        var presentationError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(entry with
+        {
+            Presentation = entry.Presentation with { Task = new((EntryTaskDisplay)99) }
+        }));
+        Assert.AreEqual("entry_execution_presentation_invalid", presentationError.Code);
         var primaryError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(draft with
         {
             Presentation = draft.Presentation with

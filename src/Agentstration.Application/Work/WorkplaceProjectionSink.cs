@@ -69,18 +69,21 @@ public sealed class WorkplaceProjectionSink(
         var artifact = new WorkTaskArtifact(WorkTaskArtifactId.New(), workspaceId, taskId, flowRunId, artifactName, reference.ContentType, reference.Length, reference.StorageKey, snapshot.UpdatedAt, resultSequence);
         await repository.AddArtifactAsync(artifact, token); await EmitAsync(new TaskArtifactAddedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, new(artifact.Id.Value, artifact.WorkTaskId.Value, artifact.FlowRunId, artifact.Name, artifact.ContentType, artifact.Length, artifact.CreatedAt, artifact.Sequence)), token);
         if (flowRunId is not null) await EmitAsync(new FlowRunCompletedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, interactionId.Value, taskId.Value, flowRunId), token);
-        await CompleteInteractionAsync(workspaceId, interactionId, taskId, flowRunId, resultTitle, snapshot.UpdatedAt, token);
+        await CompleteInteractionAsync(workspaceId, interactionId, taskId, flowRunId, resultTitle, ConversationText(content, structured), snapshot.UpdatedAt, token);
         await NotifyAsync(workspaceId, WorkNotificationKind.TaskCompleted, resultSequence == 1 ? "Task completed" : "New version ready", $"{resultTitle} and its deliverable are ready.", taskId, snapshot.UpdatedAt, token);
     }
 
-    private async Task CompleteInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, string? flowRunId, string resultTitle, DateTimeOffset now, CancellationToken token)
+    private async Task CompleteInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, string? flowRunId, string resultTitle, string? conversationText, DateTimeOffset now, CancellationToken token)
     {
         var interaction = await repository.GetInteractionAsync(workspaceId, interactionId, token);
         if (interaction is null || interaction.Status == InteractionStatus.Closed) return;
-        var message = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.Agentstration, $"{resultTitle} is ready. You can ask for another version or continue with a follow-up.", now);
+        var messageText = string.IsNullOrWhiteSpace(conversationText)
+            ? $"{resultTitle} is ready. You can ask for another version or continue with a follow-up."
+            : conversationText;
+        var message = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.Agentstration, messageText, now);
         await repository.AddMessageAsync(message, token);
         await EmitAsync(new MessageAddedEvent(Id(), workspaceId.Value, Next(), now, message), token);
-        var updated = interaction with { Status = InteractionStatus.Idle, LastFlowRunId = flowRunId ?? interaction.LastFlowRunId, LastActivityAt = now, ImmediateResult = new ShowResultAction(resultTitle, null), Messages = [.. interaction.Messages, message], Version = interaction.Version + 1 };
+        var updated = interaction with { Status = InteractionStatus.Idle, LastFlowRunId = flowRunId ?? interaction.LastFlowRunId, LastActivityAt = now, ImmediateResult = new ShowResultAction(resultTitle, conversationText), Messages = [.. interaction.Messages, message], Version = interaction.Version + 1 };
         try
         {
             await repository.SaveInteractionAsync(updated, interaction.Version, token);
@@ -124,4 +127,14 @@ public sealed class WorkplaceProjectionSink(
     }
     private static WorkActorKind Actor(WorkTaskActivityType type) => type is WorkTaskActivityType.TaskPaused or WorkTaskActivityType.TaskResumed or WorkTaskActivityType.TaskCancelled ? WorkActorKind.User : WorkActorKind.Agentstration;
     private static string Title(WorkTaskActivityType type) => type switch { WorkTaskActivityType.TaskCreated => "Task created", WorkTaskActivityType.TaskStarted => "Work started", WorkTaskActivityType.TaskPaused => "Task paused", WorkTaskActivityType.TaskResumed => "Task resumed", WorkTaskActivityType.TaskCancelled => "Task cancelled", WorkTaskActivityType.ActionRequired => "Action required", WorkTaskActivityType.TaskCompleted => "Task completed", WorkTaskActivityType.TaskFailed => "Task failed", _ => type.ToString() };
+    private static string? ConversationText(WorkResultContent? content, JsonElement structured)
+    {
+        if (!string.IsNullOrWhiteSpace(content?.Text)) return content.Text;
+        if (structured.ValueKind == JsonValueKind.String) return structured.GetString();
+        if (structured.ValueKind == JsonValueKind.Object
+            && structured.TryGetProperty("finalOutput", out var finalOutput)
+            && finalOutput.ValueKind == JsonValueKind.String)
+            return finalOutput.GetString();
+        return null;
+    }
 }

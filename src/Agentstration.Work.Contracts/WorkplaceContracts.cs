@@ -25,7 +25,10 @@ public sealed record ResourcePickerItem(string ResourceId, string Name, string? 
 }
 public sealed record CreateInteractionRequest(IReadOnlyDictionary<string, JsonElement> Values, IReadOnlyList<WorkAttachmentRequest>? Attachments = null);
 public sealed record EntrySubmissionResponse(InteractionResponse Interaction, WorkplaceAction Action, WorkTaskResponse? Task);
-public sealed record InteractionResponse(Guid Id, Guid WorkspaceId, string EntryId, InteractionStatus Status, DateTimeOffset StartedAt, DateTimeOffset LastActivityAt, IReadOnlyDictionary<string, JsonElement> InputValues, IReadOnlyList<WorkAttachment> Attachments, IReadOnlyList<ConversationMessage> Messages, Guid? PendingActionId, Guid? TaskId, WorkplaceAction? ImmediateResult, long Version, string? LastFlowRunId = null, Guid? LastTriggerMessageId = null);
+public sealed record InteractionResponse(Guid Id, Guid WorkspaceId, string EntryId, InteractionStatus Status, DateTimeOffset StartedAt, DateTimeOffset LastActivityAt, IReadOnlyDictionary<string, JsonElement> InputValues, IReadOnlyList<WorkAttachment> Attachments, IReadOnlyList<ConversationMessage> Messages, Guid? PendingActionId, Guid? TaskId, WorkplaceAction? ImmediateResult, long Version, string? LastFlowRunId = null, Guid? LastTriggerMessageId = null)
+{
+    public ResourceNamespace EntryNamespace { get; init; } = ResourceNamespace.Default;
+}
 public sealed record AddConversationMessageRequest(string Content);
 public sealed record AddConversationMessageResponse(ConversationMessage Message, InteractionResponse Interaction, WorkplaceAction Action, WorkTaskResponse? Task);
 public sealed record PendingActionResponseRequest(string ResumeToken, IReadOnlyDictionary<string, JsonElement> Values);

@@ -107,6 +107,7 @@ public sealed class WorkplaceUxTests
         var rendered = context.Render<InteractionView>(parameters => parameters
             .Add(value => value.Messages, [answer])
             .Add(value => value.Status, InteractionStatus.Idle)
+            .Add(value => value.Presentation, new EntryPresentation { Results = new(EntryResultDisplay.Visible) })
             .Add(value => value.Results, results)
             .Add(value => value.Artifacts, artifacts)
             .Add(value => value.ArtifactContentUrl, value => $"/artifacts/{value.Id}"));
@@ -115,6 +116,70 @@ public sealed class WorkplaceUxTests
         Assert.AreEqual(2, rendered.FindAll(".task-result").Count);
         Assert.AreEqual(2, rendered.FindAll(".artifact-card").Count);
         Assert.IsFalse(rendered.Markup.Contains("hidden-1", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void CompactDefaultsHideParticipantMechanicsAndDuplicateTextResults()
+    {
+        using var context = new BunitContext();
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        var interactionId = InteractionId.New();
+        var taskId = new WorkTaskId(Guid.NewGuid());
+        var participant = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.Agentstration, "Participant detail", DateTimeOffset.UtcNow, "agent-a", Metadata: new Dictionary<string, string> { ["participantId"] = "alice" });
+        var summary = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.Agentstration, "Final answer", DateTimeOffset.UtcNow.AddSeconds(1));
+        var text = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Text, "Text", JsonSerializer.SerializeToElement("Final answer"), DateTimeOffset.UtcNow.AddSeconds(2));
+        var structured = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Table, "Comparison", JsonSerializer.SerializeToElement(new { rows = 2 }), DateTimeOffset.UtcNow.AddSeconds(3));
+
+        var rendered = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.Messages, [participant, summary])
+            .Add(value => value.Results, [text, structured])
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+
+        Assert.IsFalse(rendered.Markup.Contains("Participant detail", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("Final answer", StringComparison.Ordinal));
+        Assert.AreEqual(1, rendered.FindAll(".task-result").Count);
+        Assert.IsTrue(rendered.Markup.Contains("Comparison", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void VisibleParticipantsAreAttributedInsideTheUnifiedTimeline()
+    {
+        using var context = new BunitContext();
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        var message = new ConversationMessage(Guid.NewGuid(), workspaceId, InteractionId.New(), null, ConversationRole.Agentstration, "Is it a real person?", DateTimeOffset.UtcNow, "alice-agent", Metadata: new Dictionary<string, string> { ["participantId"] = "alice-player" });
+        var rendered = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.Presentation, new EntryPresentation { Participants = new(EntryParticipantVisibility.Visible) })
+            .Add(value => value.Messages, [message])
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+
+        Assert.IsTrue(rendered.Markup.Contains("Alice Player", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("Is it a real person?", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void MessagesActivitiesResultsAndArtifactsAreOrderedAsOneTimeline()
+    {
+        using var context = new BunitContext();
+        var now = new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero);
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        var interactionId = InteractionId.New();
+        var taskId = new WorkTaskId(Guid.NewGuid());
+        var message = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.User, "Compare these options", now);
+        var activity = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.TaskStarted, "Comparing options", null, now.AddSeconds(1), WorkActorKind.Agentstration);
+        var result = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Table, "Comparison table", JsonSerializer.SerializeToElement(new { rows = 3 }), now.AddSeconds(2));
+        var artifact = new WorkTaskArtifact(WorkTaskArtifactId.New(), workspaceId, taskId, "run-1", "comparison.csv", "text/csv", 32, "private-key", now.AddSeconds(3));
+        var rendered = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.Presentation, new EntryPresentation { Progress = new(EntryProgressVisibility.Detailed) })
+            .Add(value => value.Messages, [message])
+            .Add(value => value.Activities, [activity])
+            .Add(value => value.Results, [result])
+            .Add(value => value.Artifacts, [artifact])
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+
+        var markup = rendered.Markup;
+        Assert.IsTrue(markup.IndexOf("Compare these options", StringComparison.Ordinal) < markup.IndexOf("Comparing options", StringComparison.Ordinal));
+        Assert.IsTrue(markup.IndexOf("Comparing options", StringComparison.Ordinal) < markup.IndexOf("Comparison table", StringComparison.Ordinal));
+        Assert.IsTrue(markup.IndexOf("Comparison table", StringComparison.Ordinal) < markup.IndexOf("comparison.csv", StringComparison.Ordinal));
     }
 
     [TestMethod]

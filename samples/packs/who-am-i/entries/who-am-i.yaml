@@ -11,6 +11,14 @@ definition:
     icon: gamepad
     allowAttachments: false
     allowVoiceInput: false
+    participants:
+      visibility: visible
+    progress:
+      visibility: hidden
+    task:
+      display: hidden
+    results:
+      display: auto
     suggestions:
       - label: Start a game
         value: Explain the rules and start a new game.

@@ -5,6 +5,7 @@ using Agentstration.Application.Workflows;
 using Agentstration.Flow.Application;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
+using Agentstration.Infrastructure.Flows;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
@@ -88,7 +89,13 @@ builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSignalR();
 builder.Services.AddAgentstrationLocalIdentity(identityConnectionString, dataProtectionKeysPath);
-builder.Services.AddSingleton<IFlowRunEventSink, SignalRFlowRunEventSink>();
+builder.Services.AddSingleton<SignalRFlowRunEventSink>();
+builder.Services.AddSingleton<WorkplaceFlowConversationProjectionSink>();
+builder.Services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRunEventSink(
+[
+    provider.GetRequiredService<WorkplaceFlowConversationProjectionSink>(),
+    provider.GetRequiredService<SignalRFlowRunEventSink>()
+]));
 builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>();
 builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);
 builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
