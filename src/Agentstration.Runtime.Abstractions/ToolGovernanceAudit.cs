@@ -9,8 +9,11 @@ public sealed record ToolGovernanceAuditQuery
     public required string RunId { get; init; }
     public long AfterSequence { get; init; }
     public int Limit { get; init; } = 100;
+    public string? ToolCallId { get; init; }
+    public string? InvocationId { get; init; }
     public string? ToolId { get; init; }
     public string? HookId { get; init; }
+    public long? ResourceGeneration { get; init; }
     public ToolExecutionHookEvaluationKind? Decision { get; init; }
 }
 

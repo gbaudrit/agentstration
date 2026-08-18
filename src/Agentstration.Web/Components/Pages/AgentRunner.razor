@@ -117,7 +117,7 @@ else
                 {
                     var tools = state.Events.Where(item => item.ToolCall is not null).Select(item => item.ToolCall!).GroupBy(tool => tool.Id).Select(group => group.Last()).ToArray();
                     @if (tools.Length == 0) { <EmptyState Title="No tool calls" Message="This run has not reported a tool invocation." /> }
-                    else { @foreach (var tool in tools) { <details><summary>@tool.Name · @tool.State</summary><pre>@tool.Arguments</pre><pre>@(tool.Error ?? tool.Result)</pre></details> } }
+                    else { @foreach (var tool in tools) { <details><summary>@tool.Name · @tool.State</summary><p><a class="text-button" href="@GovernanceUrl(state.Run.Id, tool)">Inspect governance decision</a></p><pre>@tool.Arguments</pre><pre>@(tool.Error ?? tool.Result)</pre></details> } }
                 }
                 else if (activeTab == "Trace")
                 {
@@ -321,6 +321,7 @@ else
     private static string ShortId(string id) => id.Length > 13 ? id[..13] : id;
     private static string PromptPreview(RuntimeRun run) { var value = run.Properties.Input.Messages.LastOrDefault(message => message.Role == RuntimeMessageRole.User)?.Content ?? "—"; return value.Length > 60 ? $"{value[..60]}…" : value; }
     private static string Duration(RuntimeRun run) { var start = run.Status.StartedAt ?? run.Status.CreatedAt; var end = run.Status.CompletedAt; return end is null ? "Live" : (end.Value - start).ToString("g"); }
+    private static string GovernanceUrl(string runId, RuntimeToolCall tool) => $"/tool-governance/runtime/{Uri.EscapeDataString(runId)}?toolCallId={Uri.EscapeDataString(tool.Id)}&invocationId={Uri.EscapeDataString(tool.InvocationId)}";
     private static CreateRuntimeRunRequest ToRequest(RuntimeRun run) => new() { Agent = run.Properties.Agent, Input = run.Properties.Input, Execution = run.Properties.Execution, Origin = run.Properties.Origin };
 
     public void Dispose()

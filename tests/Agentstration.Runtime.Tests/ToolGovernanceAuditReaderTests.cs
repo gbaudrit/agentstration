@@ -27,6 +27,15 @@ public sealed class ToolGovernanceAuditReaderTests
             await runtimeRuns.AppendEventAsync(RuntimeEvent(3, "attempt-3", "other", Evaluation("local:audit", null, null, ToolExecutionHookEvaluationKind.Allowed)), default);
             var reader = new ToolGovernanceAuditReader(runtimeRuns, flowRuns);
 
+            var invalid = await Assert.ThrowsExactlyAsync<ToolGovernanceAuditValidationException>(() => reader.ListAsync(new ToolGovernanceAuditQuery
+            {
+                OwnerKind = ToolExecutionOwnerKind.RuntimeRun,
+                WorkspaceId = Workspace,
+                RunId = "runtime-run",
+                ResourceGeneration = 0
+            }));
+            Assert.AreEqual("invalid_resource_generation", invalid.Code);
+
             var first = await reader.ListAsync(new ToolGovernanceAuditQuery
             {
                 OwnerKind = ToolExecutionOwnerKind.RuntimeRun,
@@ -48,6 +57,9 @@ public sealed class ToolGovernanceAuditReaderTests
                 WorkspaceId = Workspace,
                 RunId = "runtime-run",
                 AfterSequence = first.NextSequence!.Value,
+                ToolCallId = "logical-call",
+                InvocationId = "attempt-2",
+                ResourceGeneration = 4,
                 Decision = ToolExecutionHookEvaluationKind.Denied
             });
 

@@ -50,6 +50,27 @@ public interface IAgentRunnerRuntimeClient : IRuntimeApiClient
     Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string agentName, long generation, CancellationToken cancellationToken);
 }
 
+public sealed record ToolGovernanceAuditFilters
+{
+    public string? ToolCallId { get; init; }
+    public string? InvocationId { get; init; }
+    public string? ToolId { get; init; }
+    public string? HookId { get; init; }
+    public long? ResourceGeneration { get; init; }
+    public ToolExecutionHookEvaluationKind? Decision { get; init; }
+}
+
+public interface IToolGovernanceAuditClient
+{
+    Task<ToolGovernanceAuditPage> GetAsync(
+        ToolExecutionOwnerKind ownerKind,
+        string runId,
+        long afterSequence,
+        int limit,
+        ToolGovernanceAuditFilters filters,
+        CancellationToken cancellationToken);
+}
+
 public interface IWorkApiClient
 {
     Task<IReadOnlyList<WorkSummary>> GetWorkItemsAsync(CancellationToken cancellationToken);
@@ -613,6 +634,48 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
     }
 
     private sealed record HealthResponse(string Status);
+}
+
+public sealed class ToolGovernanceAuditApiClient(HttpClient httpClient) : IToolGovernanceAuditClient
+{
+    public Task<ToolGovernanceAuditPage> GetAsync(
+        ToolExecutionOwnerKind ownerKind,
+        string runId,
+        long afterSequence,
+        int limit,
+        ToolGovernanceAuditFilters filters,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(filters);
+        var owner = ownerKind switch
+        {
+            ToolExecutionOwnerKind.RuntimeRun => "runtime",
+            ToolExecutionOwnerKind.FlowRun => "flow",
+            _ => throw new ArgumentOutOfRangeException(nameof(ownerKind))
+        };
+        var query = new List<string>
+        {
+            $"afterSequence={afterSequence.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"limit={limit.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+        };
+        Add(query, "toolCallId", filters.ToolCallId);
+        Add(query, "invocationId", filters.InvocationId);
+        Add(query, "toolId", filters.ToolId);
+        Add(query, "hookId", filters.HookId);
+        if (filters.ResourceGeneration is { } generation)
+            query.Add($"resourceGeneration={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+        if (filters.Decision is { } decision)
+            query.Add($"decision={Uri.EscapeDataString(decision.ToString().ToLowerInvariant())}");
+        return ApiResponse.ReadAsync<ToolGovernanceAuditPage>(
+            httpClient,
+            $"api/tool-governance/{owner}/{Uri.EscapeDataString(runId)}?{string.Join('&', query)}",
+            cancellationToken);
+    }
+
+    private static void Add(List<string> query, string name, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value)) query.Add($"{name}={Uri.EscapeDataString(value)}");
+    }
 }
 
 internal static class ApiResponse

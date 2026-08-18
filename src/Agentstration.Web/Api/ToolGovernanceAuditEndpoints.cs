@@ -19,8 +19,11 @@ public static class ToolGovernanceAuditEndpoints
         string runId,
         long? afterSequence,
         int? limit,
+        string? toolCallId,
+        string? invocationId,
         string? toolId,
         string? hookId,
+        long? resourceGeneration,
         string? decision,
         IToolGovernanceAuditReader reader,
         ICurrentRequestContext requestContext,
@@ -35,8 +38,11 @@ public static class ToolGovernanceAuditEndpoints
                 RunId = runId,
                 AfterSequence = afterSequence ?? 0,
                 Limit = limit ?? 100,
+                ToolCallId = NullIfWhiteSpace(toolCallId),
+                InvocationId = NullIfWhiteSpace(invocationId),
                 ToolId = NullIfWhiteSpace(toolId),
                 HookId = NullIfWhiteSpace(hookId),
+                ResourceGeneration = resourceGeneration,
                 Decision = ParseDecision(decision)
             };
             return Results.Ok(await reader.ListAsync(query, cancellationToken));

@@ -56,6 +56,7 @@ public static class WebConsoleServiceCollectionExtensions
             new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"), provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
 
         AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi);
+        AddClient<ToolGovernanceAuditApiClient, IToolGovernanceAuditClient>(services, configured.RuntimeApi);
 
         // Agent and model management always use the canonical HTTP APIs so that
         // edits and Runtime activation observe the same persisted generations and

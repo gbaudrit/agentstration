@@ -106,10 +106,14 @@ public sealed class ToolGovernanceAuditReader(
     }
 
     private static bool Matches(ToolGovernanceAuditRecord record, ToolGovernanceAuditQuery query) =>
-        (query.ToolId is null || string.Equals(record.ToolId, query.ToolId, StringComparison.Ordinal))
+        (query.ToolCallId is null || string.Equals(record.ToolCallId, query.ToolCallId, StringComparison.Ordinal))
+        && (query.InvocationId is null || string.Equals(record.InvocationId, query.InvocationId, StringComparison.Ordinal))
+        && (query.ToolId is null || string.Equals(record.ToolId, query.ToolId, StringComparison.Ordinal))
         && (query.HookId is null || record.Evaluations.Any(evaluation =>
             string.Equals(evaluation.Hook.Id, query.HookId, StringComparison.Ordinal)
             || string.Equals(evaluation.Hook.ResourceId, query.HookId, StringComparison.Ordinal)))
+        && (query.ResourceGeneration is null || record.Evaluations.Any(evaluation =>
+            evaluation.Hook.ResourceGeneration == query.ResourceGeneration))
         && (query.Decision is null || record.Evaluations.Any(evaluation => evaluation.Decision == query.Decision));
 
     private static void Validate(ToolGovernanceAuditQuery query)
@@ -121,6 +125,10 @@ public sealed class ToolGovernanceAuditReader(
             throw new ToolGovernanceAuditValidationException("invalid_after_sequence", "afterSequence must be zero or greater.");
         if (query.Limit is < 1 or > 200)
             throw new ToolGovernanceAuditValidationException("invalid_limit", "limit must be between 1 and 200.");
+        if (query.ResourceGeneration is <= 0)
+            throw new ToolGovernanceAuditValidationException(
+                "invalid_resource_generation",
+                "resourceGeneration must be greater than zero.");
     }
 
     private static string RequiredString(JsonElement payload, string name) =>

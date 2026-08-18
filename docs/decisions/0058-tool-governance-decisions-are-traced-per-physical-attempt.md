@@ -36,4 +36,5 @@ The trace describes the policy actually evaluated for an attempt. It is not a fr
 - Updating a HookResource may legitimately produce a different trace on the next physical attempt.
 - Post-invocation notifications remain lifecycle behavior and do not rewrite the pre-invocation governance decision.
 - A workspace-scoped read model queries the existing Runtime and Flow journals by owner and Run, with sequence pagination and Tool, Hook or decision filters. It does not create a second audit store.
-- A dedicated Console view, cross-Run indexing, retention controls, cryptographic integrity and capture of transformed payloads remain future work.
+- The Console exposes a Run-scoped Tool Governance view with deep links to logical calls and physical invocations. It displays only the safe audit contract.
+- Cross-Run indexing, retention controls, cryptographic integrity and capture of transformed payloads remain future work.

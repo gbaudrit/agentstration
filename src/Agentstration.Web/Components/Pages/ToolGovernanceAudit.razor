@@ -1,0 +1,202 @@
+@page "/tool-governance/{Owner}/{RunId}"
+@implements IDisposable
+@inject IToolGovernanceAuditClient Client
+
+<PageTitle>Tool Governance · Agentstration</PageTitle>
+<PageHeader Title="Tool Governance" Description="Durable pre-invocation decisions for one Run.">
+    <Actions><a class="button-secondary" href="@BackUrl">Back to Run</a></Actions>
+</PageHeader>
+
+<section class="panel governance-context">
+    <div><span>Owner</span><strong>@OwnerLabel</strong></div>
+    <div><span>Run</span><code>@RunId</code></div>
+    <div><span>Safety</span><strong>No Tool payloads</strong></div>
+</section>
+
+<section class="panel governance-filters">
+    <div class="panel-header"><div><p class="eyebrow">Audit filters</p><h2>Physical attempts</h2></div></div>
+    <div class="filter-grid">
+        <label><span>Logical Tool call</span><input @bind="toolCallId" placeholder="ToolCallId" /></label>
+        <label><span>Physical invocation</span><input @bind="invocationId" placeholder="InvocationId" /></label>
+        <label><span>Tool</span><input @bind="toolId" placeholder="Tool resource ID" /></label>
+        <label><span>Hook</span><input @bind="hookId" placeholder="Hook or resource ID" /></label>
+        <label><span>Resource generation</span><input @bind="resourceGeneration" inputmode="numeric" placeholder="Any generation" /></label>
+        <label><span>Decision</span><select @bind="decision"><option value="">All decisions</option><option value="Allowed">Allowed</option><option value="Denied">Denied</option><option value="Failed">Failed</option></select></label>
+    </div>
+    <div class="button-row"><button class="button-primary" @onclick="ApplyAsync" disabled="@loading">Apply filters</button><button class="button-secondary" @onclick="ClearAsync" disabled="@loading">Clear</button></div>
+    @if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+</section>
+
+@if (loading && records.Count == 0)
+{
+    <LoadingState Message="Loading Tool governance audit…" />
+}
+else if (records.Count == 0)
+{
+    <EmptyState Title="No governance decisions" Message="No physical Tool attempt matches these filters." />
+}
+else
+{
+    <section class="governance-records" aria-label="Tool governance decisions">
+        @foreach (var record in records)
+        {
+            <article class="panel governance-record" id="invocation-@record.InvocationId">
+                <header>
+                    <div><p class="eyebrow">Sequence @record.Sequence · @record.Timestamp.LocalDateTime.ToString("G")</p><h2>@record.ToolName</h2></div>
+                    <StatusBadge Text="@OverallDecision(record).ToString()" Status="@DecisionTone(OverallDecision(record))" />
+                </header>
+                <dl class="governance-identities">
+                    <dt>Logical call</dt><dd><code>@record.ToolCallId</code></dd>
+                    <dt>Physical invocation</dt><dd><code>@record.InvocationId</code></dd>
+                    <dt>Tool resource</dt><dd><code>@record.ToolId</code></dd>
+                    <dt>Provider</dt><dd><code>@(record.ProviderId ?? "—")</code></dd>
+                    <dt>Agent</dt><dd><code>@(record.AgentId ?? "—")</code></dd>
+                    <dt>Correlation</dt><dd><code>@(record.CorrelationId ?? "—")</code></dd>
+                </dl>
+                @if (record.Evaluations.Count == 0)
+                {
+                    <p class="muted">No hook matched this physical attempt. The empty governance decision was persisted before provider invocation.</p>
+                }
+                else
+                {
+                    <DataGrid TItem="ToolExecutionHookEvaluation" Items="record.Evaluations">
+                        <Header><tr><th>Order</th><th>Hook</th><th>Source</th><th>Resource generation</th><th>Decision</th><th>Code</th></tr></Header>
+                        <Row Context="evaluation"><tr><td>@evaluation.Hook.Order</td><td><code>@evaluation.Hook.Id</code>@if (evaluation.Hook.ResourceId is not null) { <small>@evaluation.Hook.ResourceId</small> }</td><td>@evaluation.Hook.Source</td><td>@(evaluation.Hook.ResourceGeneration?.ToString() ?? "—")</td><td><StatusBadge Text="@evaluation.Decision.ToString()" Status="@DecisionTone(evaluation.Decision)" /></td><td><code>@(evaluation.Code ?? "—")</code></td></tr></Row>
+                    </DataGrid>
+                }
+            </article>
+        }
+    </section>
+    @if (nextSequence is not null)
+    {
+        <div class="load-more"><button class="button-secondary" @onclick="LoadMoreAsync" disabled="@loading">@(loading ? "Loading…" : "Load more")</button></div>
+    }
+}
+
+@code {
+    [Parameter] public string Owner { get; set; } = string.Empty;
+    [Parameter] public string RunId { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "toolCallId")] public string? RequestedToolCallId { get; set; }
+    [SupplyParameterFromQuery(Name = "invocationId")] public string? RequestedInvocationId { get; set; }
+    [SupplyParameterFromQuery(Name = "toolId")] public string? RequestedToolId { get; set; }
+    [SupplyParameterFromQuery(Name = "hookId")] public string? RequestedHookId { get; set; }
+    [SupplyParameterFromQuery(Name = "resourceGeneration")] public long? RequestedResourceGeneration { get; set; }
+    [SupplyParameterFromQuery(Name = "decision")] public string? RequestedDecision { get; set; }
+
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly List<ToolGovernanceAuditRecord> records = [];
+    private ToolExecutionOwnerKind ownerKind;
+    private long? nextSequence;
+    private string? toolCallId;
+    private string? invocationId;
+    private string? toolId;
+    private string? hookId;
+    private string resourceGeneration = string.Empty;
+    private string decision = string.Empty;
+    private string? error;
+    private bool loading;
+    private string OwnerLabel => ownerKind == ToolExecutionOwnerKind.FlowRun ? "Flow Run" : "Runtime Run";
+    private string BackUrl => ownerKind == ToolExecutionOwnerKind.FlowRun
+        ? $"/flow-runs/{Uri.EscapeDataString(RunId)}"
+        : $"/runs/{Uri.EscapeDataString(RunId)}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        ownerKind = Owner.ToLowerInvariant() switch
+        {
+            "runtime" or "runtimerun" => ToolExecutionOwnerKind.RuntimeRun,
+            "flow" or "flowrun" => ToolExecutionOwnerKind.FlowRun,
+            _ => ToolExecutionOwnerKind.Unspecified
+        };
+        toolCallId = RequestedToolCallId;
+        invocationId = RequestedInvocationId;
+        toolId = RequestedToolId;
+        hookId = RequestedHookId;
+        resourceGeneration = RequestedResourceGeneration?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+        decision = Enum.TryParse<ToolExecutionHookEvaluationKind>(RequestedDecision, ignoreCase: true, out var requestedDecision)
+            ? requestedDecision.ToString()
+            : string.Empty;
+        await LoadAsync(append: false);
+    }
+
+    private Task ApplyAsync() => LoadAsync(append: false);
+
+    private async Task ClearAsync()
+    {
+        toolCallId = invocationId = toolId = hookId = null;
+        resourceGeneration = decision = string.Empty;
+        await LoadAsync(append: false);
+    }
+
+    private Task LoadMoreAsync() => LoadAsync(append: true);
+
+    private async Task LoadAsync(bool append)
+    {
+        error = null;
+        if (ownerKind == ToolExecutionOwnerKind.Unspecified)
+        {
+            records.Clear();
+            error = "Unknown audit owner. Use runtime or flow.";
+            return;
+        }
+        long? generation = null;
+        if (!string.IsNullOrWhiteSpace(resourceGeneration)
+            && (!long.TryParse(resourceGeneration, out var parsed) || parsed <= 0))
+        {
+            error = "Resource generation must be a positive integer.";
+            return;
+        }
+        else if (!string.IsNullOrWhiteSpace(resourceGeneration)) generation = long.Parse(resourceGeneration, System.Globalization.CultureInfo.InvariantCulture);
+
+        loading = true;
+        try
+        {
+            var page = await Client.GetAsync(
+                ownerKind,
+                RunId,
+                append ? nextSequence ?? 0 : 0,
+                50,
+                new ToolGovernanceAuditFilters
+                {
+                    ToolCallId = NullIfWhiteSpace(toolCallId),
+                    InvocationId = NullIfWhiteSpace(invocationId),
+                    ToolId = NullIfWhiteSpace(toolId),
+                    HookId = NullIfWhiteSpace(hookId),
+                    ResourceGeneration = generation,
+                    Decision = Enum.TryParse<ToolExecutionHookEvaluationKind>(decision, ignoreCase: true, out var parsedDecision) ? parsedDecision : null
+                },
+                cancellation.Token);
+            if (!append) records.Clear();
+            records.AddRange(page.Items);
+            nextSequence = page.NextSequence;
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or ArgumentException)
+        {
+            if (!append) records.Clear();
+            error = exception.Message;
+        }
+        finally { loading = false; }
+    }
+
+    private static ToolExecutionHookEvaluationKind OverallDecision(ToolGovernanceAuditRecord record) =>
+        record.Evaluations.Any(value => value.Decision == ToolExecutionHookEvaluationKind.Denied)
+            ? ToolExecutionHookEvaluationKind.Denied
+            : record.Evaluations.Any(value => value.Decision == ToolExecutionHookEvaluationKind.Failed)
+                ? ToolExecutionHookEvaluationKind.Failed
+                : ToolExecutionHookEvaluationKind.Allowed;
+
+    private static UiStatus DecisionTone(ToolExecutionHookEvaluationKind decisionKind) => decisionKind switch
+    {
+        ToolExecutionHookEvaluationKind.Allowed => UiStatus.Success,
+        ToolExecutionHookEvaluationKind.Denied => UiStatus.Warning,
+        _ => UiStatus.Danger
+    };
+
+    private static string? NullIfWhiteSpace(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

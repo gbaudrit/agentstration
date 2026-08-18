@@ -27,7 +27,7 @@ public sealed class ToolGovernanceAuditEndpointTests
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync(
-            "/api/tool-governance/runtime/run-1?afterSequence=4&limit=25&toolId=lookup&hookId=managed%3Aguard&decision=denied");
+            "/api/tool-governance/runtime/run-1?afterSequence=4&limit=25&toolCallId=logical-call&invocationId=attempt-2&toolId=lookup&hookId=managed%3Aguard&resourceGeneration=7&decision=denied");
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, await response.Content.ReadAsStringAsync());
         Assert.IsNotNull(reader.Query);
@@ -35,8 +35,11 @@ public sealed class ToolGovernanceAuditEndpointTests
         Assert.AreEqual("run-1", reader.Query.RunId);
         Assert.AreEqual(4L, reader.Query.AfterSequence);
         Assert.AreEqual(25, reader.Query.Limit);
+        Assert.AreEqual("logical-call", reader.Query.ToolCallId);
+        Assert.AreEqual("attempt-2", reader.Query.InvocationId);
         Assert.AreEqual("lookup", reader.Query.ToolId);
         Assert.AreEqual("managed:guard", reader.Query.HookId);
+        Assert.AreEqual(7L, reader.Query.ResourceGeneration);
         Assert.AreEqual(ToolExecutionHookEvaluationKind.Denied, reader.Query.Decision);
         Assert.AreNotEqual(Guid.Empty, reader.Query.WorkspaceId.Value);
         var body = await response.Content.ReadAsStringAsync();
