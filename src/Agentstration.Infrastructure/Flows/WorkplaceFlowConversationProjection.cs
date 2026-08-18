@@ -22,7 +22,8 @@ public sealed class WorkplaceFlowConversationProjectionSink(
 
     public async Task PublishAsync(FlowRunEvent runEvent, CancellationToken cancellationToken)
     {
-        if (runEvent.Type is not (FlowRunEventType.ParticipantTurnCompleted
+        if (runEvent.Type is not (FlowRunEventType.ParticipantTurnStarted
+            or FlowRunEventType.ParticipantTurnCompleted
             or FlowRunEventType.InputRequested
             or FlowRunEventType.FlowRunCompleted))
             return;
@@ -36,6 +37,10 @@ public sealed class WorkplaceFlowConversationProjectionSink(
             if (interaction is null) return;
 
             var events = await flows.ListRunEventsAsync(runEvent.WorkspaceId, runEvent.RunId, 0, cancellationToken);
+            var taskId = Guid.TryParse(stored.Value.WorkTaskId, out var taskGuid) ? new WorkTaskId(taskGuid) : interaction.TaskId;
+            if (taskId is { } projectedTaskId)
+                await ProjectActivitiesAsync(runEvent, projectedTaskId, events, cancellationToken);
+
             var messages = await workplace.ListMessagesAsync(runEvent.WorkspaceId, interactionId, cancellationToken);
             var projected = messages
                 .Select(message => message.Metadata?.GetValueOrDefault("flowEventSequence"))
@@ -66,7 +71,7 @@ public sealed class WorkplaceFlowConversationProjectionSink(
                     DeterministicGuid($"{runEvent.WorkspaceId}:{runEvent.RunId}:{completed.Sequence}"),
                     runEvent.WorkspaceId,
                     interactionId,
-                    Guid.TryParse(stored.Value.WorkTaskId, out var taskGuid) ? new WorkTaskId(taskGuid) : interaction.TaskId,
+                    taskId,
                     ConversationRole.Agentstration,
                     content.Trim(),
                     completed.Timestamp,
@@ -90,6 +95,47 @@ public sealed class WorkplaceFlowConversationProjectionSink(
         catch (Exception exception)
         {
             logger.LogError(exception, "Could not project participant turns for Flow Run {FlowRunId} into Workplace", runEvent.RunId);
+        }
+    }
+
+    private async Task ProjectActivitiesAsync(
+        FlowRunEvent runEvent,
+        WorkTaskId taskId,
+        IReadOnlyList<FlowRunEvent> events,
+        CancellationToken cancellationToken)
+    {
+        var activities = await workplace.ListActivitiesAsync(runEvent.WorkspaceId, taskId, cancellationToken);
+        var projected = activities
+            .Select(activity => activity.Metadata?.GetValueOrDefault("flowEventSequence"))
+            .Where(value => value is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var turn in events
+            .Where(value => value.Type is FlowRunEventType.ParticipantTurnStarted or FlowRunEventType.ParticipantTurnCompleted)
+            .OrderBy(value => value.Sequence))
+        {
+            var marker = turn.Sequence.ToString(CultureInfo.InvariantCulture);
+            if (projected.Contains(marker) || string.IsNullOrWhiteSpace(turn.StepId)) continue;
+            var started = turn.Type == FlowRunEventType.ParticipantTurnStarted;
+            var activity = new WorkTaskActivity(
+                new WorkTaskActivityId(DeterministicGuid($"activity:{runEvent.WorkspaceId}:{runEvent.RunId}:{turn.Sequence}")),
+                runEvent.WorkspaceId,
+                taskId,
+                started ? WorkTaskActivityType.ProgressStarted : WorkTaskActivityType.ProgressCompleted,
+                started ? "Preparing a response" : "Response prepared",
+                null,
+                turn.Timestamp,
+                WorkActorKind.Agentstration,
+                runEvent.RunId,
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["participantId"] = turn.StepId,
+                    ["flowEventSequence"] = marker
+                });
+            await workplace.AddActivityAsync(activity, cancellationToken);
+            foreach (var sink in eventSinks)
+                await sink.PublishAsync(new TaskActivityAddedEvent(EventId(), runEvent.WorkspaceId.Value, Sequence(), turn.Timestamp, activity), cancellationToken);
+            projected.Add(marker);
         }
     }
 

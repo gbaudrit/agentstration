@@ -1,7 +1,7 @@
 <article class="timeline-activity activity-@Activity.Type.ToString().ToLowerInvariant()">
     <span class="activity-marker"><UiIcon Name="@Icon" /></span>
     <div>
-        <strong>@Activity.Title</strong>
+        <strong>@Title</strong>
         @if (!string.IsNullOrWhiteSpace(Activity.Description)) { <p>@Activity.Description</p> }
         <time datetime="@Activity.CreatedAt.ToString("O")">@Activity.CreatedAt.ToLocalTime().ToString("HH:mm")</time>
     </div>
@@ -9,11 +9,22 @@
 
 @code {
     [Parameter, EditorRequired] public required WorkTaskActivity Activity { get; set; }
+    [Parameter] public EntryParticipantVisibility ParticipantVisibility { get; set; } = EntryParticipantVisibility.Hidden;
+    private string Title => ParticipantVisibility == EntryParticipantVisibility.Visible
+        && Activity.Metadata?.GetValueOrDefault("participantId") is { Length: > 0 } participant
+            ? Activity.Type switch
+            {
+                WorkTaskActivityType.ProgressStarted => $"{Humanize(participant)} is preparing a response",
+                WorkTaskActivityType.ProgressCompleted => $"{Humanize(participant)} responded",
+                _ => Activity.Title
+            }
+            : Activity.Title;
     private string Icon => Activity.Type switch
     {
         WorkTaskActivityType.TaskFailed => "warning",
         WorkTaskActivityType.ActionRequired => "info",
-        WorkTaskActivityType.TaskStarted => "sparkle",
+        WorkTaskActivityType.TaskStarted or WorkTaskActivityType.ProgressStarted => "sparkle",
         _ => "check"
     };
+    private static string Humanize(string value) => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('-', ' ').Replace('_', ' '));
 }

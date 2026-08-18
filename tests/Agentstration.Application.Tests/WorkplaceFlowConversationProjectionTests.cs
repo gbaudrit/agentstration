@@ -16,7 +16,7 @@ namespace Agentstration.Application.Tests;
 public sealed class WorkplaceFlowConversationProjectionTests
 {
     [TestMethod]
-    public async Task CompletedParticipantTurnIsProjectedOnceAsAttributedConversationMessage()
+    public async Task ParticipantTurnIsProjectedOnceAsFunctionalActivitiesAndAttributedMessage()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"agentstration-participant-projection-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
@@ -80,12 +80,13 @@ public sealed class WorkplaceFlowConversationProjectionTests
                     }
                 ]
             }, default);
-            await flows.AppendRunEventAsync(new(workspaceId, "run-1", 0, FlowRunEventType.ParticipantTurnStarted, "alice-player", JsonSerializer.SerializeToElement(new { turn = 1 }), now), default);
+            var started = await flows.AppendRunEventAsync(new(workspaceId, "run-1", 0, FlowRunEventType.ParticipantTurnStarted, "alice-player", JsonSerializer.SerializeToElement(new { turn = 1 }), now), default);
             await flows.AppendRunEventAsync(new(workspaceId, "run-1", 0, FlowRunEventType.StepOutputDelta, "alice-player", JsonSerializer.SerializeToElement(new { content = "Is it " }), now.AddSeconds(1)), default);
             await flows.AppendRunEventAsync(new(workspaceId, "run-1", 0, FlowRunEventType.StepOutputDelta, "alice-player", JsonSerializer.SerializeToElement(new { content = "a real person?" }), now.AddSeconds(2)), default);
             var completed = await flows.AppendRunEventAsync(new(workspaceId, "run-1", 0, FlowRunEventType.ParticipantTurnCompleted, "alice-player", JsonSerializer.SerializeToElement(new { turn = 1 }), now.AddSeconds(3)), default);
             var sink = new WorkplaceFlowConversationProjectionSink(flows, workplace, [], NullLogger<WorkplaceFlowConversationProjectionSink>.Instance);
 
+            await sink.PublishAsync(started, default);
             await sink.PublishAsync(completed, default);
             await sink.PublishAsync(completed, default);
 
@@ -94,6 +95,13 @@ public sealed class WorkplaceFlowConversationProjectionTests
             Assert.AreEqual("Is it a real person?", messages[0].Content);
             Assert.AreEqual("alice-agent", messages[0].AgentResourceId);
             Assert.AreEqual("alice-player", messages[0].Metadata?["participantId"]);
+            var activities = await workplace.ListActivitiesAsync(workspaceId, taskId, default);
+            Assert.HasCount(2, activities);
+            Assert.AreEqual(WorkTaskActivityType.ProgressStarted, activities[0].Type);
+            Assert.AreEqual("Preparing a response", activities[0].Title);
+            Assert.AreEqual(WorkTaskActivityType.ProgressCompleted, activities[1].Type);
+            Assert.AreEqual("Response prepared", activities[1].Title);
+            Assert.IsTrue(activities.All(activity => activity.Metadata?["participantId"] == "alice-player"));
         }
         finally
         {

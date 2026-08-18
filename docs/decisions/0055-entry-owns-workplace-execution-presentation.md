@@ -17,6 +17,8 @@ Workplace builds a presentation-only unified timeline from existing `Conversatio
 
 In conversation mode, a PendingAction is rendered as an Agentstration turn with inline text, choice, or confirmation controls rather than as an operations panel. Compact progress shows the current functional activity and suppresses lifecycle markers already conveyed by the pending action, final answer, result, or artifact; detailed progress retains the full activity history.
 
+Participant turn boundaries are projected durably as generic `ProgressStarted` and `ProgressCompleted` WorkTaskActivities. Work stores functional labels and participant correlation metadata, never Flow node names or orchestration details. Workplace keeps the generic labels when participants are hidden and composes participant-aware labels only when `Entry.presentation.participants.visibility` is `visible`.
+
 The user-facing synthesis is carried by a ConversationMessage. Workplace renders a WorkTaskResult automatically only when it adds structured information beyond that synthesis, and it projects only artifacts explicitly declared by WorkResult. A textual result is not converted into a synthetic downloadable artifact.
 
 ## Consequences

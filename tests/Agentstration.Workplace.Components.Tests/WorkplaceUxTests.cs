@@ -193,6 +193,38 @@ public sealed class WorkplaceUxTests
     }
 
     [TestMethod]
+    public void ParticipantProgressUsesEntryVisibilityWithoutExposingFlowTopology()
+    {
+        using var context = new BunitContext();
+        var now = new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero);
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        var taskId = new WorkTaskId(Guid.NewGuid());
+        var metadata = new Dictionary<string, string> { ["participantId"] = "alice-player" };
+        var started = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.ProgressStarted, "Preparing a response", null, now, WorkActorKind.Agentstration, "run-1", metadata);
+        var completed = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.ProgressCompleted, "Response prepared", null, now.AddSeconds(1), WorkActorKind.Agentstration, "run-1", metadata);
+
+        var hidden = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.Presentation, new EntryPresentation { Progress = new(EntryProgressVisibility.Detailed) })
+            .Add(value => value.Activities, [started, completed])
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+        Assert.IsTrue(hidden.Markup.Contains("Preparing a response", StringComparison.Ordinal));
+        Assert.IsTrue(hidden.Markup.Contains("Response prepared", StringComparison.Ordinal));
+        Assert.IsFalse(hidden.Markup.Contains("Alice Player", StringComparison.Ordinal));
+
+        var visible = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.Presentation, new EntryPresentation
+            {
+                Participants = new(EntryParticipantVisibility.Visible),
+                Progress = new(EntryProgressVisibility.Detailed)
+            })
+            .Add(value => value.Activities, [started, completed])
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+        Assert.IsTrue(visible.Markup.Contains("Alice Player is preparing a response", StringComparison.Ordinal));
+        Assert.IsTrue(visible.Markup.Contains("Alice Player responded", StringComparison.Ordinal));
+        Assert.IsFalse(visible.Markup.Contains("StepRun", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void MessagesActivitiesResultsAndArtifactsAreOrderedAsOneTimeline()
     {
         using var context = new BunitContext();

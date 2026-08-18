@@ -62,7 +62,7 @@ public enum PendingActionKind { InputRequired, ConfirmationRequired, ChoiceRequi
 public enum PendingActionStatus { Pending, Completed, Cancelled, Expired }
 public enum ConversationRole { User, Agentstration, System }
 public enum WorkActorKind { User, Agentstration, System }
-public enum WorkTaskActivityType { TaskCreated, TaskStarted, TaskPaused, TaskResumed, TaskCancelled, ActionRequired, ActionResolved, ResultProduced, ArtifactProduced, TaskCompleted, TaskFailed }
+public enum WorkTaskActivityType { TaskCreated, TaskStarted, ProgressStarted, ProgressCompleted, TaskPaused, TaskResumed, TaskCancelled, ActionRequired, ActionResolved, ResultProduced, ArtifactProduced, TaskCompleted, TaskFailed }
 public enum WorkNotificationKind { ActionRequired, TaskCompleted, TaskFailed, Information }
 public enum WorkTaskResultKind { Text, Structured, Table, Json, Status }
 
