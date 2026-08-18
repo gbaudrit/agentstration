@@ -44,4 +44,4 @@ This decision supersedes only the native-invocation portions of ADR-0027 and ADR
 - Provider cancellation and diagnostics cross the boundary unchanged.
 - `RuntimeToolCall` and Flow Run events expose started, completed, failed and cancelled Tool attempts without storing arguments or results by default.
 - Replays keep one logical Runtime Tool Call while incrementing its physical attempt count; this remains an at-least-once record, not an idempotency guarantee.
-- Configurable hooks, DLP/PII, quotas, redaction, generic policies, input/output mutation, automatic retries and exactly-once effects remain future work.
+- The local ordered Runtime hook chain is specified by ADR-0056. Configurable Hook resources, DLP/PII, quotas, redaction, generic policies, input/output mutation, automatic retries and exactly-once effects remain future work.

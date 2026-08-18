@@ -90,6 +90,285 @@ public sealed class ToolExecutionLifecycleTests
     }
 
     [TestMethod]
+    public async Task HooksRunInStableOrderAndUnwindAfterInvocation()
+    {
+        var calls = new List<string>();
+        var hooks = new IToolExecutionHook[]
+        {
+            SequenceHook("z", 10, calls),
+            SequenceHook("b", 0, calls),
+            SequenceHook("a", 0, calls)
+        };
+        var pipeline = new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) =>
+            {
+                calls.Add("invoke");
+                return ValueTask.FromResult<JsonElement?>(null);
+            }),
+            hooks,
+            [],
+            new AdvancingTimeProvider());
+
+        await pipeline.ExecuteAsync(Context(), default);
+
+        CollectionAssert.AreEqual(
+            new[] { "before:a", "before:b", "before:z", "invoke", "after:z:succeeded", "after:b:succeeded", "after:a:succeeded" },
+            calls);
+    }
+
+    [TestMethod]
+    public async Task DenyingHookShortCircuitsProviderAndIsProjectedDistinctly()
+    {
+        var providerCalls = 0;
+        var calls = new List<string>();
+        var lifecycle = new RecordingSink();
+        var store = new ProjectionRuntimeRunStore(Run());
+        var hooks = new IToolExecutionHook[]
+        {
+            SequenceHook("audit", 0, calls),
+            new DelegateHook(
+                "deny-local",
+                10,
+                (_, _) =>
+                {
+                    calls.Add("before:deny-local");
+                    return ValueTask.FromResult(ToolExecutionHookDecision.Deny("local_policy_denied", "Local policy denied this Tool call."));
+                },
+                (_, outcome, _) =>
+                {
+                    calls.Add($"after:deny-local:{outcome.Kind.ToString().ToLowerInvariant()}");
+                    return ValueTask.CompletedTask;
+                }),
+            SequenceHook("never", 20, calls)
+        };
+        var pipeline = new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) =>
+            {
+                providerCalls++;
+                return ValueTask.FromResult<JsonElement?>(null);
+            }),
+            hooks,
+            [lifecycle, new RuntimeToolExecutionEventSink(new RuntimeRunStateManager(store, TimeProvider.System))],
+            new AdvancingTimeProvider());
+
+        var exception = await Assert.ThrowsExactlyAsync<ToolExecutionDeniedException>(
+            () => pipeline.ExecuteAsync(Context(), default).AsTask());
+
+        Assert.AreEqual("deny-local", exception.HookId);
+        Assert.AreEqual("local_policy_denied", exception.Code);
+        Assert.AreEqual(0, providerCalls);
+        CollectionAssert.AreEqual(
+            new[] { "before:audit", "before:deny-local", "after:deny-local:denied", "after:audit:denied" },
+            calls);
+        var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(lifecycle.Events[^1]);
+        Assert.AreEqual(ToolExecutionFailureKind.Denied, failed.FailureKind);
+        Assert.AreEqual("local_policy_denied", failed.ErrorCode);
+        var projected = store.Current.Value.Status.ToolCalls[0];
+        Assert.AreEqual(ToolExecutionFailureKind.Denied, projected.FailureKind);
+        Assert.AreEqual("local_policy_denied", projected.ErrorCode);
+    }
+
+    [TestMethod]
+    public async Task AfterHookFailureFailsGovernedCallAfterProviderEffect()
+    {
+        var lifecycle = new RecordingSink();
+        var providerCalls = 0;
+        var terminalCalls = 0;
+        var failingHook = new DelegateHook(
+            "terminal-failure",
+            10,
+            null,
+            (_, _, _) => ValueTask.FromException(new InvalidOperationException("terminal hook failed")));
+        var observingHook = new DelegateHook(
+            "terminal-observer",
+            0,
+            null,
+            (_, _, _) =>
+            {
+                terminalCalls++;
+                return ValueTask.CompletedTask;
+            });
+        var pipeline = new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) =>
+            {
+                providerCalls++;
+                return ValueTask.FromResult<JsonElement?>(null);
+            }),
+            [failingHook, observingHook],
+            [lifecycle],
+            new AdvancingTimeProvider());
+
+        var exception = await Assert.ThrowsExactlyAsync<ToolExecutionHookException>(
+            () => pipeline.ExecuteAsync(Context(), default).AsTask());
+
+        Assert.AreEqual("terminal-failure", exception.HookId);
+        Assert.AreEqual("after-invoke", exception.Phase);
+        Assert.AreEqual(1, providerCalls);
+        Assert.AreEqual(1, terminalCalls);
+        Assert.HasCount(2, lifecycle.Events);
+        var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(lifecycle.Events[^1]);
+        Assert.AreEqual(ToolExecutionFailureKind.Hook, failed.FailureKind);
+        Assert.AreEqual("tool_execution_hook_failed", failed.ErrorCode);
+    }
+
+    [TestMethod]
+    public async Task BeforeHookFailureIsClassifiedAndShortCircuitsProvider()
+    {
+        var providerCalls = 0;
+        var lifecycle = new RecordingSink();
+        var hook = new DelegateHook(
+            "broken-before",
+            0,
+            (_, _) => ValueTask.FromException<ToolExecutionHookDecision>(new InvalidOperationException("hook diagnostic")),
+            null);
+        var pipeline = new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) =>
+            {
+                providerCalls++;
+                return ValueTask.FromResult<JsonElement?>(null);
+            }),
+            [hook],
+            [lifecycle],
+            new AdvancingTimeProvider());
+
+        var exception = await Assert.ThrowsExactlyAsync<ToolExecutionHookException>(
+            () => pipeline.ExecuteAsync(Context(), default).AsTask());
+
+        Assert.AreEqual("broken-before", exception.HookId);
+        Assert.AreEqual("before-invoke", exception.Phase);
+        Assert.AreEqual("hook diagnostic", exception.InnerException?.Message);
+        Assert.AreEqual(0, providerCalls);
+        var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(lifecycle.Events[^1]);
+        Assert.AreEqual(ToolExecutionFailureKind.Hook, failed.FailureKind);
+    }
+
+    [TestMethod]
+    public async Task HookCancellationIsNotWrappedAndReachesTerminalHooks()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        ToolExecutionOutcome? terminal = null;
+        var hook = new DelegateHook(
+            "cancelled-before",
+            0,
+            (_, token) => ValueTask.FromCanceled<ToolExecutionHookDecision>(token),
+            (_, outcome, _) =>
+            {
+                terminal = outcome;
+                return ValueTask.CompletedTask;
+            });
+        var lifecycle = new RecordingSink();
+        var providerCalls = 0;
+        var pipeline = new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) =>
+            {
+                providerCalls++;
+                return ValueTask.FromResult<JsonElement?>(null);
+            }),
+            [hook],
+            [lifecycle],
+            new AdvancingTimeProvider());
+
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(
+            () => pipeline.ExecuteAsync(Context(), cancellation.Token).AsTask());
+
+        Assert.IsNotNull(terminal);
+        Assert.AreEqual(0, providerCalls);
+        Assert.AreEqual(ToolExecutionOutcomeKind.Cancelled, terminal.Kind);
+        var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(lifecycle.Events[^1]);
+        Assert.AreEqual(ToolExecutionFailureKind.Cancelled, failed.FailureKind);
+    }
+
+    [TestMethod]
+    public async Task TerminalHookFailureDoesNotMaskProviderException()
+    {
+        var expected = new ProviderDiagnosticException("provider diagnostic");
+        var hook = new DelegateHook(
+            "broken-terminal",
+            0,
+            null,
+            (_, _, _) => ValueTask.FromException(new InvalidOperationException("terminal diagnostic")));
+        var pipeline = new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) => ValueTask.FromException<JsonElement?>(expected)),
+            [hook],
+            [],
+            new AdvancingTimeProvider());
+
+        var actual = await Assert.ThrowsExactlyAsync<ProviderDiagnosticException>(
+            () => pipeline.ExecuteAsync(Context(), default).AsTask());
+
+        Assert.AreSame(expected, actual);
+        var terminalError = actual.Data["Agentstration.ToolExecutionTerminalHookError"]?.ToString();
+        Assert.IsNotNull(terminalError);
+        Assert.Contains("broken-terminal", terminalError, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public async Task HooksRunAgainForEachPhysicalAtLeastOnceAttempt()
+    {
+        var beforeCalls = 0;
+        var hook = new DelegateHook(
+            "counter",
+            0,
+            (_, _) =>
+            {
+                beforeCalls++;
+                return ValueTask.FromResult(ToolExecutionHookDecision.Allowed);
+            },
+            null);
+        var pipeline = new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) => ValueTask.FromResult<JsonElement?>(null)),
+            [hook],
+            [],
+            new AdvancingTimeProvider());
+
+        await pipeline.ExecuteAsync(Context() with { InvocationId = "attempt-1" }, default);
+        await pipeline.ExecuteAsync(Context() with { InvocationId = "attempt-2" }, default);
+
+        Assert.AreEqual(2, beforeCalls);
+    }
+
+    [TestMethod]
+    public void DuplicateHookIdsAreRejectedDeterministically()
+    {
+        var hooks = new IToolExecutionHook[]
+        {
+            new DelegateHook("duplicate", 0, null, null),
+            new DelegateHook("duplicate", 10, null, null)
+        };
+
+        _ = Assert.ThrowsExactly<InvalidOperationException>(() => new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) => ValueTask.FromResult<JsonElement?>(null)),
+            hooks,
+            [],
+            TimeProvider.System));
+    }
+
+    [TestMethod]
+    public async Task DependencyInjectionComposesLocallyRegisteredHooks()
+    {
+        var hookCalls = 0;
+        var services = new ServiceCollection();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IToolInvoker>(new DelegateInvoker((_, _) => ValueTask.FromResult<JsonElement?>(null)));
+        services.AddSingleton<IToolExecutionHook>(new DelegateHook(
+            "local-hook",
+            0,
+            (_, _) =>
+            {
+                hookCalls++;
+                return ValueTask.FromResult(ToolExecutionHookDecision.Allowed);
+            },
+            null));
+        services.AddSingleton<IToolExecutionPipeline, ToolExecutionPipeline>();
+        await using var provider = services.BuildServiceProvider();
+
+        await provider.GetRequiredService<IToolExecutionPipeline>().ExecuteAsync(Context(), default);
+
+        Assert.AreEqual(1, hookCalls);
+    }
+
+    [TestMethod]
     public async Task RuntimeProjectionKeepsOneLogicalCallAndTracksPhysicalAttempts()
     {
         var context = Context() with { InvocationId = "attempt-1" };
@@ -259,6 +538,41 @@ public sealed class ToolExecutionLifecycleTests
     {
         public ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
             invoke(context, cancellationToken);
+    }
+
+    private static IToolExecutionHook SequenceHook(string id, int order, List<string> calls) => new DelegateHook(
+        id,
+        order,
+        (_, _) =>
+        {
+            calls.Add($"before:{id}");
+            return ValueTask.FromResult(ToolExecutionHookDecision.Allowed);
+        },
+        (_, outcome, _) =>
+        {
+            calls.Add($"after:{id}:{outcome.Kind.ToString().ToLowerInvariant()}");
+            return ValueTask.CompletedTask;
+        });
+
+    private sealed class DelegateHook(
+        string id,
+        int order,
+        Func<ToolExecutionContext, CancellationToken, ValueTask<ToolExecutionHookDecision>>? before,
+        Func<ToolExecutionContext, ToolExecutionOutcome, CancellationToken, ValueTask>? after) : IToolExecutionHook
+    {
+        public string Id { get; } = id;
+        public int Order { get; } = order;
+
+        public ValueTask<ToolExecutionHookDecision> BeforeInvokeAsync(
+            ToolExecutionContext context,
+            CancellationToken cancellationToken = default) =>
+            before?.Invoke(context, cancellationToken) ?? ValueTask.FromResult(ToolExecutionHookDecision.Allowed);
+
+        public ValueTask AfterInvokeAsync(
+            ToolExecutionContext context,
+            ToolExecutionOutcome outcome,
+            CancellationToken cancellationToken = default) =>
+            after?.Invoke(context, outcome, cancellationToken) ?? ValueTask.CompletedTask;
     }
 
     private sealed class AdvancingTimeProvider : TimeProvider

@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Resources;
 
 namespace Agentstration.Runtime.Abstractions;
@@ -299,11 +300,83 @@ public sealed record ToolExecutionFailed(
     TimeSpan Duration,
     string ErrorType,
     string ErrorMessage,
-    bool Cancelled) : ToolExecutionLifecycleEvent(Context, Timestamp);
+    bool Cancelled) : ToolExecutionLifecycleEvent(Context, Timestamp)
+{
+    public ToolExecutionFailureKind FailureKind { get; init; } = Cancelled
+        ? ToolExecutionFailureKind.Cancelled
+        : ToolExecutionFailureKind.Provider;
+    public string? ErrorCode { get; init; }
+}
 
 public interface IToolExecutionEventSink
 {
     ValueTask PublishAsync(ToolExecutionLifecycleEvent executionEvent, CancellationToken cancellationToken = default);
+}
+
+public enum ToolExecutionHookDecisionKind { Allow, Deny }
+public enum ToolExecutionOutcomeKind { Succeeded, Failed, Cancelled, Denied }
+[JsonConverter(typeof(JsonStringEnumConverter<ToolExecutionFailureKind>))]
+public enum ToolExecutionFailureKind { Provider, Hook, Denied, Cancelled }
+
+public sealed record ToolExecutionHookDecision
+{
+    private ToolExecutionHookDecision(ToolExecutionHookDecisionKind kind, string? code, string? message)
+    {
+        Kind = kind;
+        Code = code;
+        Message = message;
+    }
+
+    public ToolExecutionHookDecisionKind Kind { get; }
+    public string? Code { get; }
+    public string? Message { get; }
+    public static ToolExecutionHookDecision Allowed { get; } = new(ToolExecutionHookDecisionKind.Allow, null, null);
+
+    public static ToolExecutionHookDecision Deny(string code, string message)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        return new(ToolExecutionHookDecisionKind.Deny, code, message);
+    }
+}
+
+public sealed record ToolExecutionOutcome(
+    ToolExecutionOutcomeKind Kind,
+    DateTimeOffset Timestamp,
+    TimeSpan Duration,
+    string? ErrorType = null,
+    string? ErrorCode = null,
+    string? ErrorMessage = null);
+
+public interface IToolExecutionHook
+{
+    string Id { get; }
+    int Order => 0;
+
+    ValueTask<ToolExecutionHookDecision> BeforeInvokeAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        ValueTask.FromResult(ToolExecutionHookDecision.Allowed);
+
+    ValueTask AfterInvokeAsync(
+        ToolExecutionContext context,
+        ToolExecutionOutcome outcome,
+        CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+}
+
+public sealed class ToolExecutionDeniedException(string hookId, string code, string message) : Exception(message)
+{
+    public string HookId { get; } = hookId;
+    public string Code { get; } = code;
+}
+
+public sealed class ToolExecutionHookException(
+    string hookId,
+    string phase,
+    Exception innerException) : Exception($"Tool execution hook '{hookId}' failed during '{phase}'.", innerException)
+{
+    public string HookId { get; } = hookId;
+    public string Phase { get; } = phase;
 }
 
 public sealed class UnavailableToolExecutionPipeline : IToolExecutionPipeline

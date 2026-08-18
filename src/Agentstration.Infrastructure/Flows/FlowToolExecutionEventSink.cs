@@ -61,6 +61,7 @@ public sealed class FlowToolExecutionEventSink(
                 ToolExecutionStarted => "running",
                 ToolExecutionCompleted => "succeeded",
                 ToolExecutionFailed failed when failed.Cancelled => "cancelled",
+                ToolExecutionFailed failed when failed.FailureKind == ToolExecutionFailureKind.Denied => "denied",
                 ToolExecutionFailed => "failed",
                 _ => "unknown"
             },
@@ -71,6 +72,8 @@ public sealed class FlowToolExecutionEventSink(
                 _ => (double?)null
             },
             ErrorType = (executionEvent as ToolExecutionFailed)?.ErrorType,
+            ErrorCode = (executionEvent as ToolExecutionFailed)?.ErrorCode,
+            FailureKind = (executionEvent as ToolExecutionFailed)?.FailureKind.ToString(),
             Error = (executionEvent as ToolExecutionFailed)?.ErrorMessage
         });
     }

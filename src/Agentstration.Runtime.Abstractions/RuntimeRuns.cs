@@ -74,6 +74,8 @@ public sealed record RuntimeToolCall
     public string? Arguments { get; init; }
     public string? Result { get; init; }
     public string? Error { get; init; }
+    public ToolExecutionFailureKind? FailureKind { get; init; }
+    public string? ErrorCode { get; init; }
     public string? CorrelationId { get; init; }
 }
 

@@ -151,7 +151,9 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
                 failed.Timestamp,
                 failed.Duration,
                 failed.Cancelled ? RuntimeRunState.Cancelled : RuntimeRunState.Failed,
-                failed.ErrorMessage),
+                failed.ErrorMessage,
+                failed.FailureKind,
+                failed.ErrorCode),
             _ => throw new ArgumentOutOfRangeException(nameof(executionEvent))
         };
     }
@@ -162,7 +164,9 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         DateTimeOffset completedAt,
         TimeSpan duration,
         RuntimeRunState state,
-        string? error) => new()
+        string? error,
+        ToolExecutionFailureKind? failureKind = null,
+        string? errorCode = null) => new()
     {
         Id = context.ToolCallId,
         InvocationId = context.InvocationId,
@@ -176,6 +180,8 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         ProviderId = context.ToolProviderId,
         ExternalToolId = context.ExternalToolId,
         Error = error,
+        FailureKind = failureKind,
+        ErrorCode = errorCode,
         CorrelationId = context.CorrelationId
     };
 
@@ -192,6 +198,7 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         ToolExecutionStarted => "Tool call started",
         ToolExecutionCompleted => "Tool call completed",
         ToolExecutionFailed failed when failed.Cancelled => "Tool call cancelled",
+        ToolExecutionFailed failed when failed.FailureKind == ToolExecutionFailureKind.Denied => "Tool call denied",
         ToolExecutionFailed => "Tool call failed",
         _ => throw new ArgumentOutOfRangeException(nameof(executionEvent))
     };
