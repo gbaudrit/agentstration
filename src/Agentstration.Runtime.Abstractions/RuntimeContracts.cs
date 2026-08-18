@@ -241,8 +241,11 @@ public interface IToolCatalog
     ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default);
 }
 
+public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun }
+
 public sealed record ToolExecutionScope
 {
+    public ToolExecutionOwnerKind OwnerKind { get; init; }
     public Guid? TenantId { get; init; }
     public WorkspaceId? WorkspaceId { get; init; }
     public Guid? PrincipalId { get; init; }
@@ -253,6 +256,7 @@ public sealed record ToolExecutionScope
 
 public sealed record ToolExecutionContext
 {
+    public ToolExecutionOwnerKind OwnerKind { get; init; }
     public required string ToolCallId { get; init; }
     public required string InvocationId { get; init; }
     public required string ToolId { get; init; }
@@ -274,6 +278,32 @@ public sealed record ToolExecutionContext
 public interface IToolExecutionPipeline
 {
     ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
+}
+
+public abstract record ToolExecutionLifecycleEvent(
+    ToolExecutionContext Context,
+    DateTimeOffset Timestamp);
+
+public sealed record ToolExecutionStarted(
+    ToolExecutionContext Context,
+    DateTimeOffset Timestamp) : ToolExecutionLifecycleEvent(Context, Timestamp);
+
+public sealed record ToolExecutionCompleted(
+    ToolExecutionContext Context,
+    DateTimeOffset Timestamp,
+    TimeSpan Duration) : ToolExecutionLifecycleEvent(Context, Timestamp);
+
+public sealed record ToolExecutionFailed(
+    ToolExecutionContext Context,
+    DateTimeOffset Timestamp,
+    TimeSpan Duration,
+    string ErrorType,
+    string ErrorMessage,
+    bool Cancelled) : ToolExecutionLifecycleEvent(Context, Timestamp);
+
+public interface IToolExecutionEventSink
+{
+    ValueTask PublishAsync(ToolExecutionLifecycleEvent executionEvent, CancellationToken cancellationToken = default);
 }
 
 public sealed class UnavailableToolExecutionPipeline : IToolExecutionPipeline

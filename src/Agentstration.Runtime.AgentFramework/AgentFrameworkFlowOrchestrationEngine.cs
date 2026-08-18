@@ -281,12 +281,14 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
     private static ToolExecutionScope ToolScope(FlowOrchestrationExecutionRequest request) => request.Scope is null
         ? new ToolExecutionScope
         {
+            OwnerKind = ToolExecutionOwnerKind.FlowRun,
             WorkspaceId = request.WorkspaceId,
             ExecutionId = request.RunId,
             CorrelationId = request.CorrelationId
         }
         : new ToolExecutionScope
         {
+            OwnerKind = ToolExecutionOwnerKind.FlowRun,
             TenantId = request.Scope.TenantId,
             WorkspaceId = request.Scope.WorkspaceId,
             PrincipalId = request.Scope.PrincipalId,

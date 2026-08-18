@@ -24,6 +24,8 @@ Agent / MAF
   -> MCP tools/call
 ```
 
+The pipeline emits provider-neutral lifecycle facts before invocation and after completion, failure, or cancellation. Runtime Runs project a logical `RuntimeToolCall`; Flow Runs append Tool Call events to their own journal. `ToolCallId` identifies the logical call across replay, while `InvocationId` and the projected attempt number distinguish physical attempts. Arguments and provider results are not durably projected by default. These lifecycle sinks are observability ports only and are not the future configurable hooks/policies layer.
+
 `requiresApproval` remains a native Tool policy. Agentstration wraps its own function adapter in MAF `ApprovalRequiredAIFunction`, preserving durable `RequestInfoEvent` → `InputRequest` → `WaitingForInput` → checkpoint resume behavior. After approval, the resumed invocation still enters the Agentstration pipeline. The boundary carries logical Tool Call and physical invocation identities plus the available Tenant, Workspace, Principal, Run, Agent, revision, correlation and argument context. It provides foundations for later audit, policy and hook work; it does not implement hooks, automatic retries, provider idempotency or exactly-once effects.
 
 STDIO environment values are not persisted. `environmentReferences` maps child-process variable names to host configuration keys, resolved only when connecting. OAuth, a durable secret store, scheduled polling, MCP Resources and MCP Prompts are outside this iteration.

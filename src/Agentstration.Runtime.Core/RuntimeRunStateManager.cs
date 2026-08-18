@@ -65,6 +65,7 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         string? step = null,
         string? content = null,
         RuntimeRunState? state = null,
+        RuntimeToolCall? toolCall = null,
         CancellationToken cancellationToken = default) =>
         runs.AppendEventAsync(new RuntimeRunEvent
         {
@@ -76,8 +77,124 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
             Message = message,
             Step = step,
             Content = content,
-            State = state
+            State = state,
+            ToolCall = toolCall
         }, cancellationToken);
+
+    public async Task<RuntimeToolCall> ProjectToolCallAsync(
+        WorkspaceId workspaceId,
+        string runId,
+        ToolExecutionLifecycleEvent executionEvent,
+        CancellationToken cancellationToken)
+    {
+        for (var retry = 0; ; retry++)
+        {
+            var current = await RequiredAsync(workspaceId, runId, cancellationToken);
+            var existing = current.Value.Status.ToolCalls.FirstOrDefault(call =>
+                string.Equals(call.Id, executionEvent.Context.ToolCallId, StringComparison.Ordinal));
+            var projected = Project(existing, executionEvent);
+            var calls = current.Value.Status.ToolCalls
+                .Where(call => !string.Equals(call.Id, projected.Id, StringComparison.Ordinal))
+                .Append(projected)
+                .ToArray();
+            try
+            {
+                await runs.UpdateAsync(
+                    current.Value with { Status = current.Value.Status with { ToolCalls = calls } },
+                    current.ETag,
+                    cancellationToken);
+                await AppendEventAsync(
+                    workspaceId,
+                    runId,
+                    EventKind(executionEvent),
+                    EventMessage(executionEvent),
+                    state: projected.State,
+                    toolCall: projected,
+                    cancellationToken: cancellationToken);
+                return projected;
+            }
+            catch (RuntimeRunConcurrencyException) when (retry < 2)
+            {
+                // Reload and merge with the concurrent Runtime Run projection.
+            }
+        }
+    }
+
+    private static RuntimeToolCall Project(RuntimeToolCall? current, ToolExecutionLifecycleEvent executionEvent)
+    {
+        var context = executionEvent.Context;
+        return executionEvent switch
+        {
+            ToolExecutionStarted started => new RuntimeToolCall
+            {
+                Id = context.ToolCallId,
+                InvocationId = context.InvocationId,
+                ToolId = context.ToolId,
+                Name = context.ToolName,
+                State = RuntimeRunState.Running,
+                Attempt = (current?.Attempt ?? 0) + 1,
+                StartedAt = started.Timestamp,
+                ProviderId = context.ToolProviderId,
+                ExternalToolId = context.ExternalToolId,
+                CorrelationId = context.CorrelationId
+            },
+            ToolExecutionCompleted completed => Terminal(
+                current,
+                completed.Context,
+                completed.Timestamp,
+                completed.Duration,
+                RuntimeRunState.Succeeded,
+                null),
+            ToolExecutionFailed failed => Terminal(
+                current,
+                failed.Context,
+                failed.Timestamp,
+                failed.Duration,
+                failed.Cancelled ? RuntimeRunState.Cancelled : RuntimeRunState.Failed,
+                failed.ErrorMessage),
+            _ => throw new ArgumentOutOfRangeException(nameof(executionEvent))
+        };
+    }
+
+    private static RuntimeToolCall Terminal(
+        RuntimeToolCall? current,
+        ToolExecutionContext context,
+        DateTimeOffset completedAt,
+        TimeSpan duration,
+        RuntimeRunState state,
+        string? error) => new()
+    {
+        Id = context.ToolCallId,
+        InvocationId = context.InvocationId,
+        ToolId = context.ToolId,
+        Name = context.ToolName,
+        State = state,
+        Attempt = Math.Max(1, current?.Attempt ?? 0),
+        StartedAt = current?.StartedAt ?? completedAt - duration,
+        CompletedAt = completedAt,
+        DurationMilliseconds = duration.TotalMilliseconds,
+        ProviderId = context.ToolProviderId,
+        ExternalToolId = context.ExternalToolId,
+        Error = error,
+        CorrelationId = context.CorrelationId
+    };
+
+    private static RuntimeRunEventKind EventKind(ToolExecutionLifecycleEvent executionEvent) => executionEvent switch
+    {
+        ToolExecutionStarted => RuntimeRunEventKind.ToolCallStarted,
+        ToolExecutionCompleted => RuntimeRunEventKind.ToolCallCompleted,
+        ToolExecutionFailed => RuntimeRunEventKind.ToolCallFailed,
+        _ => throw new ArgumentOutOfRangeException(nameof(executionEvent))
+    };
+
+    private static string EventMessage(ToolExecutionLifecycleEvent executionEvent) => executionEvent switch
+    {
+        ToolExecutionStarted => "Tool call started",
+        ToolExecutionCompleted => "Tool call completed",
+        ToolExecutionFailed failed when failed.Cancelled => "Tool call cancelled",
+        ToolExecutionFailed => "Tool call failed",
+        _ => throw new ArgumentOutOfRangeException(nameof(executionEvent))
+    };
 
     private async Task<StoredRuntimeRun> RequiredAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) =>
         await runs.GetAsync(workspaceId, runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);

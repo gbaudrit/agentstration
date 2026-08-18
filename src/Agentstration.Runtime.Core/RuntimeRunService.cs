@@ -209,6 +209,7 @@ public sealed class RuntimeRunService(
                     new AgentExecutionOptions { Streaming = stored.Value.Properties.Execution.Streaming },
                     new ToolExecutionScope
                     {
+                        OwnerKind = ToolExecutionOwnerKind.RuntimeRun,
                         TenantId = stored.Value.Scope.TenantId,
                         WorkspaceId = workspaceId,
                         PrincipalId = stored.Value.Scope.PrincipalId,

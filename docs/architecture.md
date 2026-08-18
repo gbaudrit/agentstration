@@ -357,6 +357,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 22. **Delivered Pack bindings increment:** Pack manifests declare logical Model Profile and Secret requirements, installation resolves them to workspace resources without copying Secret values, and selections persist by Pack identity across uninstall and reinstall.
 23. **Delivered Pack composition increment:** the Console catalogs current workspace resources, previews the complete Entry/Flow/Agent dependency closure, converts environment-specific Model Profile references into logical bindings, and creates a validated immutable Pack Project source snapshot without mutating the selected resources.
 24. **Delivered durable interactive execution increment:** Flow Runs persist exact participant revision/deployment bindings and opaque runtime checkpoints, expose durable input requests through REST and Workplace pending actions, recover through at-least-once leases, expire unanswered requests, and protect live revisions with impact-aware normal and forced purge operations. See ADR-0054.
+25. **Delivered governed Tool lifecycle projection:** the provider-neutral Tool execution pipeline emits started/completed/failed-or-cancelled facts. Runtime Runs project one `RuntimeToolCall` per logical call with physical attempt identity and count; Flow Runs append the same lifecycle to their durable journal. Arguments and results remain excluded from durable projections by default. See ADR-0055.
 
 ## ADR catalog
 

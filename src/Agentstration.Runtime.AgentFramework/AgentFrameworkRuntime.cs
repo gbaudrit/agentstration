@@ -79,6 +79,7 @@ public sealed class AgentFrameworkRuntimeFactory(
         long? generation,
         ToolExecutionScope? scope) => new()
     {
+        OwnerKind = scope?.OwnerKind ?? ToolExecutionOwnerKind.Unspecified,
         ToolCallId = "pending",
         InvocationId = "pending",
         ToolId = "pending",
