@@ -111,12 +111,28 @@
         if (latest.Type == WorkTaskActivityType.ArtifactProduced && Artifacts.Count > 0) return [];
         return [latest];
     }
+    private static readonly TimeSpan AutoTaskDuration = TimeSpan.FromMinutes(1);
+
     private bool ShowTask(WorkTaskResponse task) => Presentation.Task.Display switch
     {
         EntryTaskDisplay.Visible => true,
         EntryTaskDisplay.Hidden => false,
-        _ => task.Status is WorkTaskStatus.Paused or WorkTaskStatus.Failed or WorkTaskStatus.Cancelled
+        _ => IsMaterialTask(task)
     };
+    private bool IsMaterialTask(WorkTaskResponse task)
+    {
+        if (task.Status is WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused or WorkTaskStatus.Failed or WorkTaskStatus.Cancelled)
+            return true;
+
+        var lastObservedAt = Activities.Select(value => value.CreatedAt)
+            .Concat(Results.Select(value => value.CreatedAt))
+            .Concat(Artifacts.Select(value => value.CreatedAt))
+            .Append(task.UpdatedAt)
+            .Max();
+        var completedMilestones = Activities.Count(value => value.Type == WorkTaskActivityType.ProgressCompleted);
+        var deliverables = Results.Count + Artifacts.Count;
+        return lastObservedAt - task.CreatedAt >= AutoTaskDuration || completedMilestones >= 2 || deliverables >= 2;
+    }
     private bool ShowResult(WorkTaskResult result) => Presentation.Results.Display switch
     {
         EntryResultDisplay.Visible => true,

@@ -5,11 +5,12 @@
 else
 {
     <ol class="task-progress" aria-label="Task progress">
-        @foreach (var activity in Activities.OrderBy(value => value.CreatedAt))
+        @foreach (var activity in TimelineActivities)
         {
-            <li class="progress-step"><span class="progress-marker"><UiIcon Name="check" /></span><div><strong>@activity.Title</strong>@if (!string.IsNullOrWhiteSpace(activity.Description)){<p>@activity.Description</p>}<time datetime="@activity.CreatedAt.ToString("O")">@activity.CreatedAt.ToLocalTime().ToString("HH:mm")</time></div></li>
+            var state = State(activity);
+            <li class="progress-step @state" aria-current="@(state == "current" ? "step" : null)"><span class="progress-marker">@if (state == "completed") { <UiIcon Name="check" /> }</span><div><strong>@activity.Title</strong>@if (!string.IsNullOrWhiteSpace(activity.Description)){<p>@activity.Description</p>}<time datetime="@activity.CreatedAt.ToString("O")">@activity.CreatedAt.ToLocalTime().ToString("HH:mm")</time></div></li>
         }
-        @if (Status is WorkTaskStatus.Running or WorkTaskStatus.Pending)
+        @if ((Status is WorkTaskStatus.Running or WorkTaskStatus.Pending) && !TimelineActivities.Any(IsCurrent))
         {
             <li class="progress-step current" aria-current="step"><span class="progress-marker"></span><div><strong>In progress</strong><p>Agentstration is working on the next step.</p></div></li>
         }
@@ -19,4 +20,51 @@ else
 @code {
     [Parameter] public IReadOnlyList<WorkTaskActivity> Activities { get; set; } = [];
     [Parameter] public WorkTaskStatus Status { get; set; }
+
+    private IReadOnlyList<WorkTaskActivity> TimelineActivities
+    {
+        get
+        {
+            var projected = new List<WorkTaskActivity?>();
+            var pendingStarts = new Dictionary<string, Stack<int>>(StringComparer.Ordinal);
+            foreach (var activity in Activities.OrderBy(value => value.CreatedAt).ThenBy(value => value.Id.Value))
+            {
+                var key = ProgressKey(activity);
+                if (activity.Type == WorkTaskActivityType.ProgressStarted)
+                {
+                    if (!pendingStarts.TryGetValue(key, out var indexes)) pendingStarts[key] = indexes = new();
+                    indexes.Push(projected.Count);
+                    projected.Add(activity);
+                    continue;
+                }
+
+                if (activity.Type == WorkTaskActivityType.ProgressCompleted
+                    && pendingStarts.TryGetValue(key, out var starts)
+                    && starts.TryPop(out var startedIndex))
+                    projected[startedIndex] = null;
+                projected.Add(activity);
+            }
+
+            return projected.OfType<WorkTaskActivity>().ToArray();
+        }
+    }
+
+    private bool IsCurrent(WorkTaskActivity activity) => (activity.Type == WorkTaskActivityType.ProgressStarted
+            && Status is WorkTaskStatus.Running or WorkTaskStatus.Pending)
+        || activity.Type == WorkTaskActivityType.ActionRequired && Status == WorkTaskStatus.ActionRequired
+        || activity.Type == WorkTaskActivityType.TaskPaused && Status == WorkTaskStatus.Paused
+        || (activity.Type == WorkTaskActivityType.TaskStarted
+            && Status is WorkTaskStatus.Running or WorkTaskStatus.Pending
+            && ReferenceEquals(activity, TimelineActivities.LastOrDefault()));
+
+    private string State(WorkTaskActivity activity) => IsCurrent(activity) ? "current"
+        : activity.Type is WorkTaskActivityType.TaskFailed or WorkTaskActivityType.TaskCancelled ? "terminal"
+        : "completed";
+
+    private static string ProgressKey(WorkTaskActivity activity) => string.Concat(
+        activity.FlowRunId,
+        "\u001f",
+        activity.Metadata?.GetValueOrDefault("participantId"),
+        "\u001f",
+        activity.Metadata?.GetValueOrDefault("participantTurn"));
 }

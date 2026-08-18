@@ -67,6 +67,13 @@ public sealed class WorkplaceFlowConversationProjectionSink(
                 if (string.IsNullOrWhiteSpace(content)) continue;
 
                 var binding = stored.Value.RuntimeBindings.FirstOrDefault(value => string.Equals(value.ParticipantId, completed.StepId, StringComparison.Ordinal));
+                var messageMetadata = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["flowRunId"] = runEvent.RunId,
+                    ["participantId"] = completed.StepId,
+                    ["flowEventSequence"] = marker
+                };
+                if (ParticipantTurn(completed) is { } participantTurn) messageMetadata["participantTurn"] = participantTurn;
                 var message = new ConversationMessage(
                     DeterministicGuid($"{runEvent.WorkspaceId}:{runEvent.RunId}:{completed.Sequence}"),
                     runEvent.WorkspaceId,
@@ -76,12 +83,7 @@ public sealed class WorkplaceFlowConversationProjectionSink(
                     content.Trim(),
                     completed.Timestamp,
                     binding?.AgentResourceId,
-                    Metadata: new Dictionary<string, string>(StringComparer.Ordinal)
-                    {
-                        ["flowRunId"] = runEvent.RunId,
-                        ["participantId"] = completed.StepId,
-                        ["flowEventSequence"] = marker
-                    });
+                    Metadata: messageMetadata);
                 await workplace.AddMessageAsync(message, cancellationToken);
                 foreach (var sink in eventSinks)
                     await sink.PublishAsync(new MessageAddedEvent(EventId(), runEvent.WorkspaceId.Value, Sequence(), completed.Timestamp, message), cancellationToken);
@@ -117,6 +119,12 @@ public sealed class WorkplaceFlowConversationProjectionSink(
             var marker = turn.Sequence.ToString(CultureInfo.InvariantCulture);
             if (projected.Contains(marker) || string.IsNullOrWhiteSpace(turn.StepId)) continue;
             var started = turn.Type == FlowRunEventType.ParticipantTurnStarted;
+            var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["participantId"] = turn.StepId,
+                ["flowEventSequence"] = marker
+            };
+            if (ParticipantTurn(turn) is { } participantTurn) metadata["participantTurn"] = participantTurn;
             var activity = new WorkTaskActivity(
                 new WorkTaskActivityId(DeterministicGuid($"activity:{runEvent.WorkspaceId}:{runEvent.RunId}:{turn.Sequence}")),
                 runEvent.WorkspaceId,
@@ -127,17 +135,19 @@ public sealed class WorkplaceFlowConversationProjectionSink(
                 turn.Timestamp,
                 WorkActorKind.Agentstration,
                 runEvent.RunId,
-                new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    ["participantId"] = turn.StepId,
-                    ["flowEventSequence"] = marker
-                });
+                metadata);
             await workplace.AddActivityAsync(activity, cancellationToken);
             foreach (var sink in eventSinks)
                 await sink.PublishAsync(new TaskActivityAddedEvent(EventId(), runEvent.WorkspaceId.Value, Sequence(), turn.Timestamp, activity), cancellationToken);
             projected.Add(marker);
         }
     }
+
+    private static string? ParticipantTurn(FlowRunEvent runEvent) => runEvent.Payload is { ValueKind: System.Text.Json.JsonValueKind.Object } payload
+        && payload.TryGetProperty("turn", out var turn)
+        && turn.TryGetInt32(out var value)
+            ? value.ToString(CultureInfo.InvariantCulture)
+            : null;
 
     private static string Content(FlowRunEvent runEvent)
     {

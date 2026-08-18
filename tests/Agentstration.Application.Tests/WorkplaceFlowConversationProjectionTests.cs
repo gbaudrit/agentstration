@@ -102,6 +102,7 @@ public sealed class WorkplaceFlowConversationProjectionTests
             Assert.AreEqual(WorkTaskActivityType.ProgressCompleted, activities[1].Type);
             Assert.AreEqual("Response prepared", activities[1].Title);
             Assert.IsTrue(activities.All(activity => activity.Metadata?["participantId"] == "alice-player"));
+            Assert.IsTrue(activities.All(activity => activity.Metadata?["participantTurn"] == "1"));
         }
         finally
         {
