@@ -118,7 +118,7 @@ public sealed class LocalWorkExecutionWorker(
         {
             var stored = await workItems.GetAsync(workspaceId, workItemId, cancellationToken);
             if (stored is null || stored.Value.Status is WorkItemStatus.Cancelled or WorkItemStatus.Completed or WorkItemStatus.Failed) return false;
-            if (stored.Value.Status != WorkItemStatus.Paused) return true;
+            if (stored.Value.Status is not (WorkItemStatus.Paused or WorkItemStatus.WaitingForInput or WorkItemStatus.WaitingForApproval)) return true;
             await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
         }
     }

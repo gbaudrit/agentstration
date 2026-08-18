@@ -1,5 +1,6 @@
 using System.Net;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
 using Agentstration.Management.Abstractions;
@@ -213,6 +214,10 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         Task.FromException<FlowRun>(new KeyNotFoundException($"Simulated Flow Run '{runId}' was not found."));
     public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
         Result<IReadOnlyList<FlowRunEvent>>([], cancellationToken);
+    public Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken) =>
+        Result<IReadOnlyList<InputRequest>>([], cancellationToken);
+    public Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken) =>
+        Task.FromException<InputRequest>(new NotSupportedException("Simulated Flow Run inputs are not supported."));
     public Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) =>
         Task.FromException<FlowRun>(new NotSupportedException("Simulated Flow Runs are not supported."));
     public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) =>

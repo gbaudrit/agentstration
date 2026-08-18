@@ -137,6 +137,7 @@ public static class DependencyInjection
         services.AddSingleton<IAgentDeploymentProvisioner, SharedHostAgentProvisioner>();
         services.AddSingleton<IAgentDeploymentReconciler, LocalAgentDeploymentReconciler>();
         services.AddSingleton<IAgentRouter, AgentFrameworkAgentRouter>();
+        services.AddSingleton(new AgentRevisionRetentionOptions());
         services.AddSingleton<AgentManagementService>();
         services.AddSingleton<AgentExecutionCoordinator>();
         services.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
@@ -182,6 +183,10 @@ public static class DependencyInjection
         services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
         services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();
         services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();
+        services.AddSingleton<IFlowInputRequestSink, WorkplaceFlowInputProjectionSink>();
+        services.AddSingleton<IWorkplaceExternalInputResponder, WorkplaceFlowInputResponder>();
+        services.AddSingleton<FlowRevisionRetentionService>();
+        services.AddSingleton<IAgentRevisionRunRetention, AgentRevisionRunRetention>();
         services.AddSingleton<IFlowAgentExecutor, ManagedFlowAgentExecutor>();
         services.AddSingleton<AgentFrameworkFlowOrchestrationEngine>();
         services.AddSingleton<IFlowOrchestrationEngine, ManagedFlowOrchestrationEngine>();

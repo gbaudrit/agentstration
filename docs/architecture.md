@@ -95,7 +95,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Model providers | SQLite-backed provider declarations with ETag CRUD and usage protection, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | credentials/connections, additional AEP extensions, cached discovery |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
-| Flows | typed graph drafts, typed orchestration authoring, immutable versions, durable Runs, visual editors and SignalR replay | checkpoints and long-running interactive steps |
+| Flows | typed graph drafts, typed orchestration authoring, immutable versions, durable Runs, opaque SQLite-backed runtime state, interactive input suspension/recovery, visual editors and SignalR replay | distributed dispatch, arbitrary graph waits, HumanApproval nodes, and provider-level effect idempotency |
 | Flow storage | independent readable JSON documents, ETags, active/current definition separation | migrations, indirect reference projections |
 | Identity | local accounts, Principal mapping, Workspace memberships/RBAC, bootstrap, account security, append-only security audit | external-account provisioning/linking, recovery, workload authentication |
 | Workspaces | workspace and inbox lifecycle | teams, organizations, policies |
@@ -295,7 +295,7 @@ Agent tool reference: Agentstration.Tools/tools/{name}
   -> Runtime.AgentFramework -> MAF agent tool invocation -> MCP tools/call
 ```
 
-AEP owns extension identity, presentation metadata, server declarations, and the mapping from a lightweight contribution to MCP. It deliberately carries no tool schema, invocation payload, result, or operational MCP error. MCP remains authoritative for `tools/list`, schema/annotations, `tools/call`, results, and protocol failures. Agentstration owns persistent `ToolProviderResource` and `ToolResource` documents, discovery state, assignment by canonical resource ID, enablement, and future policy. Direct external MCP is a ToolProvider and does not pass through AEP. The catalog is independent of MAF; the Runtime adapter consumes its provider-neutral `IAgentTool` and reuses the official SDK's native `AITool` when available.
+AEP owns extension identity, presentation metadata, server declarations, and the mapping from a lightweight contribution to MCP. It deliberately carries no tool schema, invocation payload, result, or operational MCP error. MCP remains authoritative for `tools/list`, schema/annotations, `tools/call`, results, and protocol failures. Agentstration owns persistent `ToolProviderResource` and `ToolResource` documents, discovery state, assignment by canonical resource ID, enablement, and approval policy. Direct external MCP is a ToolProvider and does not pass through AEP. The catalog is independent of MAF; the Runtime adapter consumes its provider-neutral `IAgentTool` and reuses the official SDK's native `AITool` when available. A governed tool marked `requiresApproval` is exposed as an `ApprovalRequiredAIFunction`; MAF's external request then follows the durable `InputRequest` suspension and resume path.
 
 Discovery is performed on provider create/update and by an explicit refresh operation. It materializes new tools as disabled, updates provider-owned metadata while preserving administrator enablement, marks disappeared tools unavailable without deleting them, and restores availability if they reappear. Runtime usability requires provider enabled, tool enabled, tool available, and an Agent assignment.
 
@@ -356,6 +356,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 21. **Delivered Pack authoring increment:** newly installed sources are content-addressed, installed Packs can be forked into workspace-owned Pack Projects, source and fork coexist in identity-derived namespaces, unchanged revisions build identical immutable archives, and stored builds can be previewed, downloaded, installed, or explicitly reinstalled in the current Workspace without a download/upload loop. Pack Flows preserve editable graph definitions.
 22. **Delivered Pack bindings increment:** Pack manifests declare logical Model Profile and Secret requirements, installation resolves them to workspace resources without copying Secret values, and selections persist by Pack identity across uninstall and reinstall.
 23. **Delivered Pack composition increment:** the Console catalogs current workspace resources, previews the complete Entry/Flow/Agent dependency closure, converts environment-specific Model Profile references into logical bindings, and creates a validated immutable Pack Project source snapshot without mutating the selected resources.
+24. **Delivered durable interactive execution increment:** Flow Runs persist exact participant revision/deployment bindings and opaque runtime checkpoints, expose durable input requests through REST and Workplace pending actions, recover through at-least-once leases, expire unanswered requests, and protect live revisions with impact-aware normal and forced purge operations. See ADR-0054.
 
 ## ADR catalog
 
@@ -397,7 +398,12 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0042: authentication and authorization boundaries
 - ADR-0043: trusted Console API session propagation
 - ADR-0044: durable Identity schema and Data Protection key material
-- ADR-0049: Pack Projects can originate from reviewed workspace snapshots
+- ADR-0051: Pack Projects can originate from reviewed workspace snapshots
 - ADR-0045: append-only Management security audit
 - ADR-0046: transferable Platform administration
 - ADR-0047: explicit external identity links
+- ADR-0048: durable Flow Run execution scope
+- ADR-0050: explicit background Control Plane access
+- ADR-0052: Pack composition distinguishes contained model configuration from bindings
+- ADR-0053: Workspace scope is part of durable identity
+- ADR-0054: durable interactive Flow execution and exact runtime identity

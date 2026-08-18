@@ -132,6 +132,23 @@ public interface IRuntimeRunStore
     Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken);
 }
 
+public sealed record RuntimeExecutionState(
+    WorkspaceId WorkspaceId,
+    string RunId,
+    string RuntimeType,
+    string StateId,
+    JsonElement Payload,
+    DateTimeOffset CreatedAt,
+    string? ParentStateId = null);
+
+public interface IRuntimeExecutionStateStore
+{
+    Task StoreAsync(RuntimeExecutionState state, CancellationToken cancellationToken);
+    Task<RuntimeExecutionState?> GetAsync(WorkspaceId workspaceId, string runId, string runtimeType, string stateId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RuntimeExecutionState>> ListAsync(WorkspaceId workspaceId, string runId, string runtimeType, string? parentStateId, CancellationToken cancellationToken);
+    Task DeleteAsync(WorkspaceId workspaceId, string runId, string? runtimeType, CancellationToken cancellationToken);
+}
+
 public interface IRuntimeRunQueue
 {
     ValueTask EnqueueAsync(RuntimeRunQueueItem item, CancellationToken cancellationToken);

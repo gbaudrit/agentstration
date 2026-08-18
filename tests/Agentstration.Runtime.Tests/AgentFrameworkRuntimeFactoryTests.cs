@@ -10,8 +10,12 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Local;
+using Agentstration.Runtime.Storage.Sqlite;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Workflows;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Runtime.Tests;
@@ -19,6 +23,204 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class AgentFrameworkRuntimeFactoryTests
 {
+    private static readonly WorkspaceId TestWorkspaceId = new(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+    [TestMethod]
+    public void FlowOrchestrationMapsToolApprovalRequestsAndResponsesAsConfirmations()
+    {
+        var approval = new ToolApprovalRequestContent(
+            "approval-1",
+            new FunctionCallContent("call-1", "delete_record", new Dictionary<string, object?>()));
+        var envelope = new TestApprovalEnvelope(approval);
+        var port = RequestPort.Create<TestApprovalEnvelope, TestApprovalResponse>("approval-port");
+        var request = ExternalRequest.Create(port, envelope, "request-1");
+
+        var description = AgentFrameworkFlowOrchestrationEngine.DescribeInteraction(request, "ignored");
+        Assert.AreEqual(InputRequestType.Confirmation, description.Type);
+        StringAssert.Contains(description.Prompt, "Approve");
+
+        var input = new InputRequest
+        {
+            WorkspaceId = TestWorkspaceId,
+            Id = "input-1",
+            RunId = "run-1",
+            RuntimeRequestId = request.RequestId,
+            Prompt = description.Prompt,
+            Type = description.Type,
+            CreatedAt = DateTimeOffset.UtcNow,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+            Status = InputRequestStatus.Answered,
+            Response = new(DateTimeOffset.UtcNow, JsonSerializer.SerializeToElement(true), "principal-1")
+        };
+        var response = AgentFrameworkFlowOrchestrationEngine.CreateResponse(request, input);
+
+        Assert.IsTrue(response.TryGetDataAs<TestApprovalResponse>(out var wrapped));
+        var approvalResponse = wrapped!.Messages.SelectMany(message => message.Contents)
+            .OfType<ToolApprovalResponseContent>().Single();
+        Assert.IsTrue(approvalResponse.Approved);
+    }
+
+    [TestMethod]
+    public async Task MafApprovalRequestResumesFromSqliteAfterCompleteReconstruction()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-maf-resume-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var databasePath = Path.Combine(directory, "runtime.db");
+        try
+        {
+            static ServiceProvider StateProvider(string path)
+            {
+                var services = new ServiceCollection();
+                services.AddSingleton(TimeProvider.System);
+                services.AddSqliteRuntimeRuns($"Data Source={path};Pooling=False");
+                return services.BuildServiceProvider();
+            }
+
+            var definition = new OrchestrationFlowDefinition(
+                [new FlowTargetReference(FlowTargetKind.Agent, "agent-1")],
+                new SequentialOrchestrationPattern());
+            var initialEvents = new List<FlowExecutionEvent>();
+            var agentResolver = new RecordingAgentResolver();
+            FlowExternalInputRequested suspended;
+            IReadOnlyList<RuntimeExecutionBinding> bindings;
+
+            await using (var firstProvider = StateProvider(databasePath))
+            {
+                await firstProvider.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
+                using var requestingClient = new RecordingChatClient
+                {
+                    ResponseFactory = (_, _, _) => new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                    [
+                        new ToolApprovalRequestContent(
+                            "approval-1",
+                            new FunctionCallContent("call-1", "delete_record", new Dictionary<string, object?>()))
+                    ]))
+                };
+                var factory = new AgentFrameworkRuntimeFactory(
+                    new RecordingResolver(requestingClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions());
+                var firstEngine = new AgentFrameworkFlowOrchestrationEngine(
+                    agentResolver, new EmptyToolCatalog(), factory,
+                    firstProvider.GetRequiredService<IRuntimeExecutionStateStore>());
+
+                await foreach (var item in firstEngine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+                    TestWorkspaceId, "run-maf-resume", definition, JsonSerializer.SerializeToElement(new { prompt = "Delete it" }), "correlation-1")))
+                    initialEvents.Add(item);
+                suspended = initialEvents.OfType<FlowExternalInputRequested>().Single();
+                bindings = initialEvents.OfType<FlowRuntimeBindingsResolved>().Single().Bindings;
+                Assert.AreEqual(InputRequestType.Confirmation, suspended.Type);
+                Assert.IsNotNull(await firstProvider.GetRequiredService<IRuntimeExecutionStateStore>().GetAsync(
+                    TestWorkspaceId, "run-maf-resume", suspended.RuntimeState.RuntimeType, suspended.RuntimeState.StateId, default));
+            }
+
+            await using (var secondProvider = StateProvider(databasePath))
+            {
+                await secondProvider.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
+                using var resumedClient = new RecordingChatClient
+                {
+                    ResponseFactory = (_, _, _) =>
+                        new ChatResponse(new ChatMessage(ChatRole.Assistant, "APPROVED_OK"))
+                };
+                var factory = new AgentFrameworkRuntimeFactory(
+                    new RecordingResolver(resumedClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions());
+                var resumedEngine = new AgentFrameworkFlowOrchestrationEngine(
+                    agentResolver, new EmptyToolCatalog(), factory,
+                    secondProvider.GetRequiredService<IRuntimeExecutionStateStore>());
+                var answer = new InputRequest
+                {
+                    WorkspaceId = TestWorkspaceId,
+                    Id = "input-1",
+                    RunId = "run-maf-resume",
+                    RuntimeRequestId = suspended.RuntimeRequestId,
+                    Prompt = suspended.Prompt,
+                    Type = InputRequestType.Confirmation,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+                    Status = InputRequestStatus.Answered,
+                    Response = new(DateTimeOffset.UtcNow, JsonSerializer.SerializeToElement(true), "principal-1")
+                };
+                var resumedEvents = new List<FlowExecutionEvent>();
+                await foreach (var item in resumedEngine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+                    TestWorkspaceId, "run-maf-resume", definition, JsonSerializer.SerializeToElement(new { prompt = "Delete it" }),
+                    "correlation-1", bindings, suspended.RuntimeState, answer)))
+                    resumedEvents.Add(item);
+
+                Assert.AreEqual("APPROVED_OK", resumedEvents.OfType<FlowExecutionCompleted>().Single().Result.FinalOutput.GetString());
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task ApprovalRequiredAiFunctionProducesARealMafExternalRequest()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-maf-approval-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton(TimeProvider.System);
+            services.AddSqliteRuntimeRuns($"Data Source={Path.Combine(directory, "runtime.db")};Pooling=False");
+            await using var provider = services.BuildServiceProvider();
+            var states = provider.GetRequiredService<IRuntimeExecutionStateStore>();
+            await provider.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
+            using var chatClient = new RecordingChatClient
+            {
+                ResponseFactory = (_, _, options) =>
+                {
+                    var tool = options?.Tools?.Single(value => value.Name == ApprovalTool.ToolName)
+                        ?? throw new InvalidOperationException("The governed tool was not exposed to the Agent.");
+                    Assert.IsInstanceOfType<ApprovalRequiredAIFunction>(tool);
+                    return new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                    [
+                        new FunctionCallContent(
+                            "hash-call-1",
+                            tool.Name,
+                            new Dictionary<string, object?> { ["text"] = "durable approval" })
+                    ]));
+                }
+            };
+            var factory = new AgentFrameworkRuntimeFactory(
+                new RecordingResolver(chatClient),
+                NullLoggerFactory.Instance,
+                new GenAiObservabilityOptions());
+            var engine = new AgentFrameworkFlowOrchestrationEngine(
+                new RecordingAgentResolver([ApprovalTool.ResourceId]),
+                new ApprovalToolCatalog(),
+                factory,
+                states);
+            var events = new List<FlowExecutionEvent>();
+
+            await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+                TestWorkspaceId,
+                "run-real-approval",
+                new OrchestrationFlowDefinition(
+                    [new FlowTargetReference(FlowTargetKind.Agent, "approval-agent")],
+                    new SequentialOrchestrationPattern()),
+                JsonSerializer.SerializeToElement(new { payload = "durable approval" }),
+                "correlation-real-approval")))
+            {
+                events.Add(item);
+            }
+
+            var requested = events.OfType<FlowExternalInputRequested>().Single();
+            Assert.AreEqual(InputRequestType.Confirmation, requested.Type);
+            Assert.IsNotNull(await states.GetAsync(
+                TestWorkspaceId,
+                "run-real-approval",
+                requested.RuntimeState.RuntimeType,
+                requested.RuntimeState.StateId,
+                default));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [TestMethod]
     public void FlowOrchestrationMapsMafExecutorIdentityToInternalParticipantId()
     {
@@ -60,6 +262,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         var events = new List<FlowExecutionEvent>();
 
         await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+            TestWorkspaceId,
             "run-1",
             definition,
             JsonSerializer.SerializeToElement(new { prompt = "Discuss" }),
@@ -218,6 +421,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             pattern);
         var events = new List<FlowExecutionEvent>();
         await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+            TestWorkspaceId,
             "run-pattern",
             definition,
             JsonSerializer.SerializeToElement(new { prompt = "Discuss" }),
@@ -364,8 +568,9 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         DefinitionHash = "hash"
     };
 
-    private sealed class RecordingAgentResolver : IRuntimeAgentResolver
+    private sealed class RecordingAgentResolver(IReadOnlyCollection<string>? effectiveToolNames = null) : IRuntimeAgentResolver
     {
+        private readonly Dictionary<string, Guid> agentIds = new(StringComparer.Ordinal);
         public List<ResourceNamespace> ResolvedNamespaces { get; } = [];
 
         public Task<ResolvedRuntimeAgent> ResolveAsync(RuntimeAgentReference reference, CancellationToken cancellationToken) =>
@@ -377,7 +582,16 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         public Task<ResolvedRuntimeAgent> ResolveLatestAsync(string resourceId, ResourceNamespace @namespace, CancellationToken cancellationToken)
         {
             ResolvedNamespaces.Add(@namespace);
-            var definition = Definition(resourceId);
+            if (!agentIds.TryGetValue(resourceId, out var agentId))
+            {
+                agentId = Guid.NewGuid();
+                agentIds.Add(resourceId, agentId);
+            }
+            var definition = Definition(resourceId) with
+            {
+                AgentId = agentId,
+                EffectiveToolNames = effectiveToolNames ?? []
+            };
             return Task.FromResult(new ResolvedRuntimeAgent(
                 definition.AgentId,
                 resourceId,
@@ -391,6 +605,42 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 "Ready",
                 null));
         }
+    }
+
+    private sealed class ApprovalToolCatalog : IToolCatalog
+    {
+        public ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(
+            IEnumerable<string> toolIds,
+            CancellationToken cancellationToken = default)
+        {
+            CollectionAssert.AreEqual(new[] { ApprovalTool.ResourceId }, toolIds.ToArray());
+            return ValueTask.FromResult<IReadOnlyCollection<IAgentTool>>([new ApprovalTool()]);
+        }
+    }
+
+    private sealed class ApprovalTool : IAgentTool
+    {
+        public const string ResourceId = "utilities.hash.compute";
+        public const string ToolName = "hash_compute";
+        private readonly ApprovalRequiredAIFunction function = new(AIFunctionFactory.Create(
+            (string text) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text))).ToLowerInvariant(),
+            ToolName,
+            "Compute SHA-256 after approval."));
+
+        public string Id => ResourceId;
+        public string Name => ToolName;
+        public string? Description => "Compute SHA-256 after approval.";
+        public ValueTask<JsonElement?> InvokeAsync(JsonElement? arguments, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("MAF must request approval before invoking this tool.");
+        public object? GetService(Type serviceType) => serviceType.IsInstanceOfType(function) ? function : null;
+    }
+
+    private sealed record TestApprovalResponse(IList<ChatMessage> Messages);
+
+    private sealed record TestApprovalEnvelope(ToolApprovalRequestContent Approval) : IExternalRequestEnvelope
+    {
+        public AIContent GetInnerRequestContent() => Approval;
+        public object CreateResponse(IList<ChatMessage> messages) => new TestApprovalResponse(messages);
     }
 
     private sealed class RecordingResolver(IChatClient client) : IChatClientResolver

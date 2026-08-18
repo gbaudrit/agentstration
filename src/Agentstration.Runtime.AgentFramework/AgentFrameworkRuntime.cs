@@ -29,10 +29,17 @@ public sealed class AgentFrameworkRuntimeFactory(
         var chatClient = await chatClients.ResolveAsync(definition.ModelProfileName, cancellationToken);
         AIAgent agent = new ChatClientAgent(
             chatClient,
-            instructions: definition.EffectiveInstructions,
-            name: definition.AgentKey,
-            description: definition.Description,
-            tools: tools);
+            new ChatClientAgentOptions
+            {
+                Id = definition.AgentId.ToString("N"),
+                Name = definition.AgentKey,
+                Description = definition.Description,
+                ChatOptions = new Microsoft.Extensions.AI.ChatOptions
+                {
+                    Instructions = definition.EffectiveInstructions,
+                    Tools = tools
+                }
+            });
         return Observe(agent, observability.Enabled);
     }
 

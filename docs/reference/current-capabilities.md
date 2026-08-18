@@ -76,7 +76,9 @@ The Management Plane persists `Agentstration.Tools/toolProviders` and the `Agent
 
 AEP itself is staged as an autonomous repository under `aep/`, with protocol `2026-08-01`, canonical discovery at `/.well-known/aep`, versioned capability descriptors, a reusable validator and tracing client, a headless CLI, a generic sample, and a standalone Blazor Inspector. Agentstration uses local project references during extraction and can switch to versioned packages with `UseLocalAepProjects=false` after publication.
 
-The Tools Console separates Providers and Catalog, displays provider status and schemas, and defaults every newly discovered tool to disabled. The Agent editor assigns canonical Tool resource IDs and warns when an existing assignment is unavailable. Runtime resolution requires provider enabled, tool enabled, tool available, and assignment before passing the official MCP `AITool` to MAF.
+The Tools Console separates Providers and Catalog, displays provider status, schemas, and whether approval is required, and defaults every newly discovered tool to disabled. The Agent editor assigns canonical Tool resource IDs and warns when an existing assignment is unavailable. Runtime resolution requires provider enabled, tool enabled, tool available, and assignment before passing the official MCP `AITool` to MAF. Tools governed with `requiresApproval` become MAF `ApprovalRequiredAIFunction` values, so approval pauses are persisted as ordinary durable Flow input requests.
+
+When the AppHost Utilities extension is available, standalone sample data includes `demo-interactive-input` version 1.3.0. The Flow console initializes its Run dialog from the resource's `agentstration.io/sample-input` metadata, so this sample starts with a reproducible `payload` value. Its first agent calls the real `hash_compute` MCP tool through AEP, waits for explicit approval, then resumes from the persisted MAF checkpoint and continues to the next agent. No demonstration orchestration engine is involved.
 
 ## Work, Flow, Run, and Agent
 
@@ -105,7 +107,7 @@ Runtime
 Agents
 ```
 
-The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. Its local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary.
+The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. Its local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary. Orchestration Runs can suspend durably for text, choice, or confirmation input, survive process reconstruction through opaque SQLite-backed MAF checkpoints, and resume with the exact Flow snapshot and Agent revisions selected at first execution.
 
 The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework. The existing ingestion, memory, mission, REST, Razor, and MCP verticals remain available as product capabilities.
 
@@ -423,6 +425,6 @@ This baseline is intentionally offline and cost-free. LLM-as-judge quality evalu
 
 ## Current boundaries
 
-This is a product foundation, not a production multi-tenant release. Pack dependency resolution, updates, signatures and Gallery access, parallel Flow scheduling, loops, waits, approvals, subflows, semantic/LLM routing, checkpoints, durable distributed Work dispatch, authorization coverage outside the first Management/identity vertical, external-only identity provisioning, external artifact storage, execution recovery, retries, advanced connection providers, revision traffic splitting, dedicated process/container hosting, Foundry bindings, and runtime session storage remain planned.
+This is a product foundation, not a production multi-tenant release. Pack dependency resolution, updates, signatures and Gallery access, parallel Flow scheduling, loops, arbitrary graph waits, HumanApproval nodes, subflows, semantic/LLM routing, durable distributed Work dispatch, authorization coverage outside the first Management/identity vertical, external-only identity provisioning, external artifact storage, general retry policies, provider-level tool idempotency, revision traffic splitting, dedicated process/container hosting, Foundry bindings, and runtime session storage remain planned. Interactive orchestration recovery is implemented for the standalone SQLite/MAF path; it provides at-least-once execution and does not claim exactly-once external effects.
 
 See [architecture](../architecture.md), [decisions](../decisions/index.md), [security](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/SECURITY.md), and [contributing](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/CONTRIBUTING.md).

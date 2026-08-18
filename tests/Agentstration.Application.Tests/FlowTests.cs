@@ -6,13 +6,17 @@ using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
 using Agentstration.Flow.Storage.Abstractions;
 using Agentstration.Flow.Storage.Sqlite;
+using Agentstration.Infrastructure.Flows;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Work;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Application.Tests;
 
@@ -424,6 +428,166 @@ public sealed class FlowTests
     }
 
     [TestMethod]
+    public async Task InteractiveOrchestrationSurvivesReconstructionAndRecoversAnAnsweredRun()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+            "interactive-run", null, "1.0.0", true,
+            new OrchestrationFlowDefinition(
+                [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
+                new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
+        var expressions = new FlowExpressionParser();
+        var firstQueue = new TestFlowRunQueue();
+        var firstService = new FlowRunService(
+            fixture.Repository, firstQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), TimeProvider.System);
+        using var input = JsonDocument.Parse("""{"prompt":"Need a name"}""");
+
+        var pending = await firstService.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
+            "tester", "interactive-correlation", input.RootElement, TestScope, default);
+        await firstService.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+
+        var waiting = (await firstService.GetAsync(pending.Value.Id, TestScope, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.WaitingForInput, waiting.Status);
+        Assert.AreEqual(7, waiting.RuntimeBindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
+        Assert.IsNotNull(waiting.RuntimeState);
+        var request = (await firstService.ListInputsAsync(waiting.Id, InputRequestStatus.Pending, TestScope, default)).Single();
+
+        var lostQueue = new TestFlowRunQueue();
+        var reconstructed = new FlowRunService(
+            fixture.Repository, lostQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), TimeProvider.System);
+        await reconstructed.RespondAsync(waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Ada"), "principal-1", TestScope, default);
+        await Assert.ThrowsExactlyAsync<InputRequestAlreadyResolvedException>(() => reconstructed.RespondAsync(
+            waiting.Id, request.Value.Id, JsonSerializer.SerializeToElement("Grace"), "principal-2", TestScope, default));
+
+        var recoveryQueue = new TestFlowRunQueue();
+        var recovered = new FlowRunService(
+            fixture.Repository, recoveryQueue, new TestCancellationRegistry(), new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), TimeProvider.System);
+        await recovered.InitializeAsync(default);
+        Assert.IsTrue(recoveryQueue.Enqueued.Any(item => item.RunId == waiting.Id));
+        await recovered.ExecuteAsync(new(waiting.Id, TestScope), default);
+
+        var completed = (await recovered.GetAsync(waiting.Id, TestScope, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
+        Assert.AreEqual("Ada", completed.Output!.Value.GetProperty("finalOutput").GetString());
+        Assert.AreEqual(7, completed.RuntimeBindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
+    }
+
+    [TestMethod]
+    public async Task RevisionUsageDistinguishesActiveAndHistoricalRunsAndForceTerminationIsExplicit()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+            "revision-retention", null, "1.0.0", true,
+            new OrchestrationFlowDefinition(
+                [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
+                new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
+        var expressions = new FlowExpressionParser();
+        var cancellations = new TestCancellationRegistry();
+        var events = new NullFlowRunEventSink();
+        var runs = new FlowRunService(
+            fixture.Repository, new TestFlowRunQueue(), cancellations, new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, events,
+            new TestFlowRunExecutionScope(), TimeProvider.System);
+        using var input = JsonDocument.Parse("""{"prompt":"Need input"}""");
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
+            "tester", "retention-correlation", input.RootElement, TestScope, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+
+        var active = await runs.GetRevisionUsageAsync("revision-agent-a-7", default);
+        Assert.AreEqual(1, active.ActiveRunCount);
+        Assert.AreEqual(1, active.WaitingForInputCount);
+        Assert.AreEqual(0, active.HistoricalRunCount);
+        Assert.AreEqual(FlowRunStatus.WaitingForInput, active.ActiveRuns.Single().Status);
+        Assert.AreEqual(1, active.ActiveRuns.Single().PendingInputRequestCount);
+
+        var executionStates = new TestRuntimeExecutionStateStore();
+        await executionStates.StoreAsync(new RuntimeExecutionState(
+            TestScope.WorkspaceId, pending.Value.Id, "maf", "checkpoint-1", JsonSerializer.SerializeToElement(new { state = "waiting" }), Now), default);
+        var retention = new AgentRevisionRunRetention(
+            new FlowRevisionRetentionService(fixture.Repository, cancellations, events, TimeProvider.System),
+            executionStates);
+        await retention.ForceTerminateAsync("revision-agent-a-7", default);
+
+        var cancelled = (await runs.GetAsync(pending.Value.Id, TestScope, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Cancelled, cancelled.Status);
+        Assert.AreEqual("runtime_dependency_force_purged", cancelled.Error?.Code);
+        Assert.AreEqual(InputRequestStatus.Cancelled,
+            (await runs.ListInputsAsync(pending.Value.Id, null, TestScope, default)).Single().Value.Status);
+        Assert.IsNull(await executionStates.GetAsync(TestScope.WorkspaceId, pending.Value.Id, "maf", "checkpoint-1", default));
+        Assert.IsTrue((await runs.ListEventsAsync(TestScope, pending.Value.Id, 0, default))
+            .Any(runEvent => runEvent.Type == FlowRunEventType.FlowRunCancelled));
+        var historical = await runs.GetRevisionUsageAsync("revision-agent-a-7", default);
+        Assert.AreEqual(0, historical.ActiveRunCount);
+        Assert.AreEqual(1, historical.HistoricalRunCount);
+    }
+
+    [TestMethod]
+    public async Task ConcurrentWorkersClaimARunOnlyOnce()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+            "single-claim", null, "1.0.0", true, new DirectFlowDefinition(new(FlowTargetKind.Agent, "agent-a"))), default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
+        var expressions = new FlowExpressionParser();
+        var executor = new ConcurrentTrackingAgentExecutor();
+        FlowRunService Worker() => new(
+            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), executor,
+            new UnsupportedFlowOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), TimeProvider.System);
+        var first = Worker();
+        var second = Worker();
+        using var input = JsonDocument.Parse("""{"prompt":"once"}""");
+        var pending = await first.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
+            "tester", "single-claim", input.RootElement, TestScope, default);
+
+        await Task.WhenAll(first.ExecuteAsync(new(pending.Value.Id, TestScope), default), second.ExecuteAsync(new(pending.Value.Id, TestScope), default));
+
+        Assert.AreEqual(1, executor.ExecutionCount);
+        var completed = (await first.GetAsync(pending.Value.Id, TestScope, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.Succeeded, completed.Status);
+        Assert.IsNull(completed.ExecutionLeaseId);
+    }
+
+    [TestMethod]
+    public async Task PendingInputExpiresDeterministicallyAndTimesOutTheRun()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+            "input-timeout", null, "1.0.0", true,
+            new OrchestrationFlowDefinition(
+                [new(FlowTargetKind.Agent, "agent-a"), new(FlowTargetKind.Agent, "agent-b")],
+                new HandoffOrchestrationPattern("agent-a", [new("agent-a", "agent-b")]))), default);
+        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
+        var clock = new AdvancingTimeProvider(new DateTimeOffset(2026, 8, 17, 8, 0, 0, TimeSpan.Zero));
+        var expressions = new FlowExpressionParser();
+        var runs = new FlowRunService(
+            fixture.Repository, new TestFlowRunQueue(), new TestCancellationRegistry(), new TestAgentExecutor(),
+            new SuspendingOrchestrationEngine(), expressions, expressions, new NullFlowRunEventSink(),
+            new TestFlowRunExecutionScope(), clock,
+            new FlowRunExecutionOptions { InputRequestTimeout = TimeSpan.FromMinutes(1) });
+        using var input = JsonDocument.Parse("""{"prompt":"Wait"}""");
+        var pending = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual,
+            "tester", "input-timeout", input.RootElement, TestScope, default);
+        await runs.ExecuteAsync(new(pending.Value.Id, TestScope), default);
+        clock.Advance(TimeSpan.FromMinutes(2));
+
+        await runs.ExpireDueInputsAsync(default);
+
+        var timedOut = (await runs.GetAsync(pending.Value.Id, TestScope, default))!.Value;
+        Assert.AreEqual(FlowRunStatus.TimedOut, timedOut.Status);
+        Assert.AreEqual("input_request_timed_out", timedOut.Error?.Code);
+        Assert.AreEqual(InputRequestStatus.Expired, (await runs.ListInputsAsync(pending.Value.Id, null, TestScope, default)).Single().Value.Status);
+    }
+
+    [TestMethod]
     public async Task FlowRunApiCreatesAndListsRunsFromTheSameContract()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
@@ -455,6 +619,108 @@ public sealed class FlowTests
             .ToArray();
         Assert.Contains("/api/flowRuns/{runId}", routes);
         Assert.DoesNotContain("/flowRuns/{runId}", routes);
+    }
+
+    [TestMethod]
+    public async Task FlowRunInputApiSupportsEveryInteractionTypeConflictAndExpiration()
+    {
+        var clock = new AdvancingTimeProvider(new DateTimeOffset(2026, 8, 17, 8, 0, 0, TimeSpan.Zero));
+        var queue = new TestFlowRunQueue();
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IFlowRunQueue>();
+                services.RemoveAll<IFlowOrchestrationEngine>();
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton<IFlowRunQueue>(queue);
+                services.AddSingleton<IFlowOrchestrationEngine, TypedSuspendingOrchestrationEngine>();
+                services.AddSingleton<TimeProvider>(clock);
+            });
+        });
+        using var client = factory.CreateClient();
+        var definition = new CreateFlowRequest("interactive-api-flow", "Interactive API", "1.0.0", true,
+            new OrchestrationFlowDefinition(
+                [
+                    new FlowTargetReference(FlowTargetKind.Agent, "sql-expert"),
+                    new FlowTargetReference(FlowTargetKind.Agent, "dotnet-expert")
+                ],
+                new SequentialOrchestrationPattern()));
+        Assert.AreEqual(HttpStatusCode.Created,
+            (await client.PostAsJsonAsync("/api/flows", definition, JsonOptions)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Created,
+            (await client.PostAsJsonAsync("/api/flows/interactive-api-flow/versions", new CreateFlowVersionRequest("1.0.0"))).StatusCode);
+        var service = factory.Services.GetRequiredService<FlowRunService>();
+        var current = factory.Services.GetRequiredService<ICurrentRequestContext>().Current;
+        var principalId = current.PrincipalId.ToString("D");
+        var apiScope = new FlowRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId);
+
+        var cases = new[]
+        {
+            new InteractionApiCase("text", InputRequestType.Text, Array.Empty<string>(), JsonSerializer.SerializeToElement("Ada"), JsonSerializer.SerializeToElement("")),
+            new InteractionApiCase("choice", InputRequestType.Choice, new[] { "red", "blue" }, JsonSerializer.SerializeToElement("blue"), JsonSerializer.SerializeToElement("green")),
+            new InteractionApiCase("confirmation", InputRequestType.Confirmation, Array.Empty<string>(), JsonSerializer.SerializeToElement(true), JsonSerializer.SerializeToElement("yes"))
+        };
+
+        foreach (var interaction in cases)
+        {
+            using var input = JsonDocument.Parse($$"""{"kind":"{{interaction.Kind}}"}""");
+            using var createResponse = await client.PostAsJsonAsync("/api/flows/interactive-api-flow/runs",
+                new CreateFlowRunRequest(input.RootElement.Clone()), JsonOptions);
+            Assert.AreEqual(HttpStatusCode.Accepted, createResponse.StatusCode);
+            var run = await createResponse.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
+            Assert.IsNotNull(run);
+            await service.ExecuteAsync(new(run.Id, apiScope), default);
+
+            var pending = await client.GetFromJsonAsync<InputRequest[]>(
+                $"/api/flowRuns/{run.Id}/inputs?status=Pending", JsonOptions);
+            Assert.IsNotNull(pending);
+            Assert.HasCount(1, pending);
+            var request = pending[0];
+            Assert.AreEqual(interaction.Type, request.Type);
+            CollectionAssert.AreEqual(interaction.Options.ToArray(), request.Options.ToArray());
+            using var detailResponse = await client.GetAsync($"/api/flowRuns/{run.Id}/inputs/{request.Id}");
+            Assert.AreEqual(HttpStatusCode.OK, detailResponse.StatusCode);
+            Assert.IsNotNull(detailResponse.Headers.ETag);
+
+            using var invalidResponse = await client.PostAsJsonAsync(
+                $"/api/flowRuns/{run.Id}/inputs/{request.Id}/response",
+                new SubmitInputResponseRequest(interaction.InvalidValue), JsonOptions);
+            Assert.AreEqual(HttpStatusCode.BadRequest, invalidResponse.StatusCode);
+
+            using var acceptedResponse = await client.PostAsJsonAsync(
+                $"/api/flowRuns/{run.Id}/inputs/{request.Id}/response",
+                new SubmitInputResponseRequest(interaction.ValidValue), JsonOptions);
+            Assert.AreEqual(HttpStatusCode.Accepted, acceptedResponse.StatusCode);
+            var answered = await acceptedResponse.Content.ReadFromJsonAsync<InputRequest>(JsonOptions);
+            Assert.AreEqual(InputRequestStatus.Answered, answered!.Status);
+            Assert.AreEqual(principalId, answered.Response!.PrincipalId);
+
+            using var duplicateResponse = await client.PostAsJsonAsync(
+                $"/api/flowRuns/{run.Id}/inputs/{request.Id}/response",
+                new SubmitInputResponseRequest(interaction.ValidValue), JsonOptions);
+            Assert.AreEqual(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
+        }
+
+        using var expiringInput = JsonDocument.Parse("""{"kind":"text"}""");
+        var expiringCreate = await client.PostAsJsonAsync("/api/flows/interactive-api-flow/runs",
+            new CreateFlowRunRequest(expiringInput.RootElement.Clone()), JsonOptions);
+        var expiringRun = await expiringCreate.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
+        await service.ExecuteAsync(new(expiringRun!.Id, apiScope), default);
+        var expiringRequest = (await client.GetFromJsonAsync<InputRequest[]>(
+            $"/api/flowRuns/{expiringRun.Id}/inputs?status=Pending", JsonOptions))!.Single();
+        clock.Advance(TimeSpan.FromDays(8));
+
+        using var expiredResponse = await client.PostAsJsonAsync(
+            $"/api/flowRuns/{expiringRun.Id}/inputs/{expiringRequest.Id}/response",
+            new SubmitInputResponseRequest(JsonSerializer.SerializeToElement("too late")), JsonOptions);
+        Assert.AreEqual(HttpStatusCode.BadRequest, expiredResponse.StatusCode);
+        var expired = await client.GetFromJsonAsync<InputRequest>(
+            $"/api/flowRuns/{expiringRun.Id}/inputs/{expiringRequest.Id}", JsonOptions);
+        Assert.AreEqual(InputRequestStatus.Expired, expired!.Status);
+        var timedOut = await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{expiringRun.Id}", JsonOptions);
+        Assert.AreEqual(FlowRunStatus.TimedOut, timedOut!.Status);
     }
 
     [TestMethod]
@@ -834,6 +1100,150 @@ public sealed class FlowTests
         {
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             yield break;
+        }
+    }
+
+    private sealed class ConcurrentTrackingAgentExecutor : IFlowAgentExecutor
+    {
+        private int executionCount;
+        public int ExecutionCount => executionCount;
+
+        public async Task<FlowAgentExecutionResult> ExecuteAsync(
+            FlowTargetReference target,
+            JsonElement input,
+            string correlationId,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref executionCount);
+            await Task.Delay(100, cancellationToken);
+            return new(JsonSerializer.SerializeToElement("done"), target.Id, 1, "default", "Test", null, [], []);
+        }
+    }
+
+    private sealed class AdvancingTimeProvider(DateTimeOffset initial) : TimeProvider
+    {
+        private DateTimeOffset current = initial;
+        public override DateTimeOffset GetUtcNow() => current;
+        public void Advance(TimeSpan duration) => current += duration;
+    }
+
+    private sealed class TestRuntimeExecutionStateStore : IRuntimeExecutionStateStore
+    {
+        private readonly Dictionary<(WorkspaceId WorkspaceId, string RunId, string RuntimeType, string StateId), RuntimeExecutionState> states = [];
+
+        public Task StoreAsync(RuntimeExecutionState state, CancellationToken cancellationToken)
+        {
+            states[(state.WorkspaceId, state.RunId, state.RuntimeType, state.StateId)] = state;
+            return Task.CompletedTask;
+        }
+
+        public Task<RuntimeExecutionState?> GetAsync(
+            WorkspaceId workspaceId,
+            string runId,
+            string runtimeType,
+            string stateId,
+            CancellationToken cancellationToken)
+        {
+            states.TryGetValue((workspaceId, runId, runtimeType, stateId), out var state);
+            return Task.FromResult(state);
+        }
+
+        public Task<IReadOnlyList<RuntimeExecutionState>> ListAsync(
+            WorkspaceId workspaceId,
+            string runId,
+            string runtimeType,
+            string? parentStateId,
+            CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RuntimeExecutionState>>(
+                states.Values.Where(state => state.WorkspaceId == workspaceId
+                    && state.RunId == runId
+                    && state.RuntimeType == runtimeType
+                    && (parentStateId is null || state.ParentStateId == parentStateId)).ToArray());
+
+        public Task DeleteAsync(WorkspaceId workspaceId, string runId, string? runtimeType, CancellationToken cancellationToken)
+        {
+            foreach (var key in states.Keys.Where(key => key.WorkspaceId == workspaceId
+                         && key.RunId == runId
+                         && (runtimeType is null || key.RuntimeType == runtimeType)).ToArray())
+                states.Remove(key);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class SuspendingOrchestrationEngine : IFlowOrchestrationEngine
+    {
+        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
+            FlowOrchestrationExecutionRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var bindings = request.RuntimeBindings is { Count: > 0 }
+                ? request.RuntimeBindings
+                :
+                [
+                    Binding("agent-a", 7),
+                    Binding("agent-b", 4)
+                ];
+            yield return new FlowRuntimeBindingsResolved(bindings);
+            if (request.AnsweredInput?.Response is null)
+            {
+                yield return new FlowExternalInputRequested(
+                    "runtime-request-1", "What is your name?", InputRequestType.Text, [], "agent-a",
+                    new DurableRuntimeStateReference("test-runtime", "state-1", DateTimeOffset.UtcNow));
+                yield break;
+            }
+            Assert.AreEqual(7, bindings.Single(binding => binding.ParticipantId == "agent-a").AgentGeneration);
+            var answer = request.AnsweredInput.Response.Value.GetString()!;
+            var participant = new FlowParticipantResult(
+                "agent-a", [new(1, answer)], JsonSerializer.SerializeToElement(answer), "agent-a", 7,
+                "default", "Deterministic", [], null);
+            yield return new FlowParticipantCompleted(participant);
+            yield return new FlowExecutionCompleted(new FlowOrchestrationResult(
+                FlowOrchestrationStrategy.Handoff, JsonSerializer.SerializeToElement(answer), [participant]));
+            await Task.CompletedTask;
+        }
+
+        private static RuntimeExecutionBinding Binding(string participant, long generation) => new()
+        {
+            ParticipantId = participant,
+            AgentNamespace = ResourceNamespace.Default,
+            AgentResourceId = participant,
+            AgentGeneration = generation,
+            DeploymentId = $"deployment-{participant}-{generation}",
+            RevisionId = $"revision-{participant}-{generation}",
+            RuntimeProfileName = "local",
+            ModelProfileName = "default"
+        };
+    }
+
+    private sealed record InteractionApiCase(
+        string Kind,
+        InputRequestType Type,
+        IReadOnlyList<string> Options,
+        JsonElement ValidValue,
+        JsonElement InvalidValue);
+
+    private sealed class TypedSuspendingOrchestrationEngine : IFlowOrchestrationEngine
+    {
+        public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
+            FlowOrchestrationExecutionRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var kind = request.Input.GetProperty("kind").GetString();
+            var type = kind switch
+            {
+                "choice" => InputRequestType.Choice,
+                "confirmation" => InputRequestType.Confirmation,
+                _ => InputRequestType.Text
+            };
+            var options = type == InputRequestType.Choice ? new[] { "red", "blue" } : [];
+            yield return new FlowExternalInputRequested(
+                $"runtime-{request.RunId}",
+                $"Provide a {kind} response",
+                type,
+                options,
+                "sql-expert",
+                new DurableRuntimeStateReference("test-runtime", $"state-{request.RunId}", DateTimeOffset.UtcNow));
+            await Task.CompletedTask;
         }
     }
 

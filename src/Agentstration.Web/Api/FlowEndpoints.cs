@@ -50,6 +50,9 @@ public static class FlowEndpoints
         runs.MapGet("/{runId}", GetRunAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         runs.MapGet("/{runId}/events", ObserveRunAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         runs.MapGet("/{runId}/eventHistory", ListRunEventsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        runs.MapGet("/{runId}/inputs", ListInputsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        runs.MapGet("/{runId}/inputs/{inputId}", GetInputAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        runs.MapPost("/{runId}/inputs/{inputId}/response", RespondToInputAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         runs.MapPost("/{runId}/cancel", CancelRunAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         return endpoints;
     }
@@ -240,6 +243,37 @@ public static class FlowEndpoints
     private static Task<IResult> CancelRunAsync(string runId, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
         Results.Ok((await service.CancelAsync(runId, CurrentScope(requestContext), token)).Value));
 
+    private static Task<IResult> ListInputsAsync(string runId, InputRequestStatus? status, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var scope = CurrentScope(requestContext);
+        var inputs = await service.ListInputsAsync(runId, status, scope, token);
+        return Results.Ok(inputs.Select(value => value.Value));
+    });
+
+    private static Task<IResult> GetInputAsync(string runId, string inputId, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var scope = CurrentScope(requestContext);
+        var input = await service.GetInputAsync(runId, inputId, scope, token)
+            ?? throw new FlowValidationException("input_request_not_found", $"Input Request '{inputId}' was not found.");
+        response.Headers.ETag = input.ETag;
+        return Results.Ok(input.Value);
+    });
+
+    private static Task<IResult> RespondToInputAsync(
+        string runId,
+        string inputId,
+        SubmitInputResponseRequest body,
+        HttpContext context,
+        FlowRunService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var scope = CurrentScope(requestContext);
+        var principal = context.Features.Get<ResolvedPrincipalFeature>()?.Principal.Id.ToString("D")
+            ?? requestContext.Current.PrincipalId.ToString("D");
+        return Results.Accepted($"/api/flowRuns/{runId}", (await service.RespondAsync(runId, inputId, body.Value, principal, scope, token)).Value);
+    });
+
     private static Task<IResult> CreateDraftAsync(CreateFlowDraftRequest body, HttpResponse response, FlowDraftService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         var stored = await service.CreateAsync(CurrentWorkspace(requestContext), new CreateFlowDraftCommand(body.Name, body.DisplayName, body.Description, body.Tags, body.Template), token);
@@ -354,6 +388,7 @@ public static class FlowEndpoints
         try { return await action(); }
         catch (FlowNotFoundException exception) { return Results.Problem(statusCode: 404, title: "flow_not_found", detail: exception.Message); }
         catch (FlowRunNotFoundException exception) { return Results.Problem(statusCode: 404, title: "flow_run_not_found", detail: exception.Message); }
+        catch (InputRequestAlreadyResolvedException exception) { return Results.Problem(statusCode: 409, title: "input_request_already_resolved", detail: exception.Message); }
         catch (FlowConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
         catch (FlowValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
         catch (ArgumentException exception) { return Results.Problem(statusCode: 400, title: "validation_failed", detail: exception.Message); }

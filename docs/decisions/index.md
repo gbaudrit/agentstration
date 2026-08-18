@@ -83,3 +83,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 51. [ADR-0051 — Pack Projects can originate from reviewed workspace snapshots](0051-pack-projects-from-workspace-snapshots.md)
 52. [ADR-0052 — Pack composition distinguishes contained model configuration from bindings](0052-pack-composition-distinguishes-contained-model-configuration-from-bindings.md)
 53. [ADR-0053 — Workspace scope is part of durable identity](0053-workspace-scope-is-part-of-durable-identity.md)
+54. [ADR-0054 — Durable interactive Flow execution preserves exact runtime identity](0054-durable-interactive-flow-execution.md)

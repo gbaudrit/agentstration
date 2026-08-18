@@ -7,6 +7,25 @@ public interface IManagementResourceDeletionGuard
     Task ValidateDeleteAsync(ResourceKey key, CancellationToken cancellationToken);
 }
 
+public sealed record AgentRevisionRunUsage(
+    string RevisionName,
+    int ActiveRunCount,
+    int WaitingForInputCount,
+    int HistoricalRunCount,
+    IReadOnlyList<string> ActiveRunIds,
+    IReadOnlyList<AgentRevisionRunImpact> ActiveRuns);
+
+public sealed record AgentRevisionRunImpact(
+    string RunId,
+    string Status,
+    int PendingInputRequestCount);
+
+public interface IAgentRevisionRunRetention
+{
+    Task<AgentRevisionRunUsage> GetUsageAsync(string revisionName, CancellationToken cancellationToken);
+    Task<AgentRevisionRunUsage> ForceTerminateAsync(string revisionName, CancellationToken cancellationToken);
+}
+
 public sealed record StoredResource<T>(T Value, string ETag, DateTimeOffset UpdatedAt) where T : Resource;
 
 public interface IControlPlaneStore

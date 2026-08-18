@@ -300,6 +300,7 @@ public sealed record ToolResourceProperties
     public string? Description { get; init; }
     public ToolTypeReference? ToolType { get; init; }
     public bool Enabled { get; init; } = true;
+    public bool RequiresApproval { get; init; }
     public IReadOnlyDictionary<string, JsonElement> Metadata { get; init; } = new Dictionary<string, JsonElement>();
     public ResourceReference? Provider { get; init; }
     public string? ExternalId { get; init; }

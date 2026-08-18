@@ -8,6 +8,7 @@ public sealed record StoredFlowVersion(FlowVersion Value, string ETag, DateTimeO
 public sealed record FlowPage(IReadOnlyList<StoredFlow> Items, bool HasMore);
 public sealed record StoredFlowRun(FlowRun Value, string ETag, DateTimeOffset UpdatedAt);
 public sealed record StoredFlowDraft(FlowDraft Value, string ETag, DateTimeOffset UpdatedAt);
+public sealed record StoredInputRequest(InputRequest Value, string ETag, DateTimeOffset UpdatedAt);
 public sealed record FlowRunPage(IReadOnlyList<StoredFlowRun> Items, bool HasMore);
 
 public interface IFlowRepository
@@ -25,6 +26,7 @@ public interface IFlowRepository
     Task<StoredFlowRun> CreateRunAsync(FlowRun run, CancellationToken cancellationToken);
     Task<StoredFlowRun?> GetRunAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken);
     Task<FlowRunPage> ListRunsAsync(WorkspaceId workspaceId, FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(int skip, int take, CancellationToken cancellationToken);
     Task<StoredFlowRun> UpdateRunAsync(FlowRun run, string expectedETag, CancellationToken cancellationToken);
     Task<StoredFlowDraft> CreateDraftAsync(FlowDraft draft, CancellationToken cancellationToken);
@@ -32,6 +34,10 @@ public interface IFlowRepository
     Task<StoredFlowDraft> UpdateDraftAsync(FlowDraft draft, string expectedETag, CancellationToken cancellationToken);
     Task<FlowRunEvent> AppendRunEventAsync(FlowRunEvent runEvent, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRunEvent>> ListRunEventsAsync(WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken);
+    Task<StoredInputRequest> CreateInputRequestAsync(InputRequest request, CancellationToken cancellationToken);
+    Task<StoredInputRequest?> GetInputRequestAsync(WorkspaceId workspaceId, string runId, string requestId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<StoredInputRequest>> ListInputRequestsAsync(WorkspaceId workspaceId, string runId, InputRequestStatus? status, CancellationToken cancellationToken);
+    Task<StoredInputRequest> UpdateInputRequestAsync(InputRequest request, string expectedETag, CancellationToken cancellationToken);
 }
 
 public sealed class FlowConcurrencyException(string message) : Exception(message);

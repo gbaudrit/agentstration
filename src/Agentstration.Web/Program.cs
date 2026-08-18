@@ -98,6 +98,7 @@ builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
 builder.Services.AddHostedService<LocalWorkExecutionWorker>();
 builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
 builder.Services.AddHostedService<FlowRunExecutionWorker>();
+builder.Services.AddHostedService<FlowRunRecoveryWorker>();
 
 var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 builder.Logging.AddOpenTelemetry(logging =>
@@ -187,6 +188,8 @@ await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.L
 if (app.Services.GetRequiredService<ICurrentRequestContext>().IsInitialized)
 {
     await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+    if (!app.Environment.IsEnvironment("Testing"))
+        await InteractiveFlowDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
     await WorkplaceDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
     await DemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
 }

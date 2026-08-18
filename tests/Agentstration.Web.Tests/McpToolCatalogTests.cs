@@ -3,6 +3,7 @@ using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools.Mcp;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
@@ -16,7 +17,7 @@ public sealed class McpToolCatalogTests
     [TestMethod]
     public async Task GenericHttpProviderDiscoversAndInvokesOfficialMcpTool()
     {
-        await using var host = new WebApplicationFactory<global::Program>();
+        await using var host = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         var provider = Provider();
         var tool = Tool(provider.Metadata.Name);
         var adapter = Adapter(host);
@@ -35,7 +36,7 @@ public sealed class McpToolCatalogTests
     [TestMethod]
     public async Task GovernanceBlocksDisabledProviderToolAndUnavailableTool()
     {
-        await using var host = new WebApplicationFactory<global::Program>();
+        await using var host = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         var adapter = Adapter(host);
         var provider = Provider();
         var tool = Tool(provider.Metadata.Name);
@@ -50,6 +51,22 @@ public sealed class McpToolCatalogTests
             var error = await Assert.ThrowsAsync<ToolResolutionException>(async () => await catalog.ResolveAsync([currentTool.Metadata.Name]));
             Assert.AreEqual(code, error.Code);
         }
+    }
+
+    [TestMethod]
+    public async Task ApprovalGovernanceExposesAnApprovalRequiredAiFunction()
+    {
+        await using var host = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        var provider = Provider();
+        var tool = Tool(provider.Metadata.Name) with
+        {
+            Definition = Tool(provider.Metadata.Name).Definition with { RequiresApproval = true }
+        };
+        var catalog = new McpToolCatalog(new FakeStore(provider, tool), Adapter(host));
+
+        var runtime = (await catalog.ResolveAsync([tool.Metadata.Name])).Single();
+
+        Assert.IsInstanceOfType<ApprovalRequiredAIFunction>(runtime.GetService(typeof(AITool)));
     }
 
     private static ToolProviderAdapter Adapter(WebApplicationFactory<global::Program> host)
@@ -73,7 +90,10 @@ public sealed class McpToolCatalogTests
         Metadata = new ResourceMetadata { Name = "local.list_workspaces" },
         Definition = new ToolResourceProperties
         {
-            DisplayName = "List workspaces", Provider = new ResourceReference(providerId), ExternalId = "list_workspaces", Enabled = true,
+            DisplayName = "List workspaces",
+            Provider = new ResourceReference(providerId),
+            ExternalId = "list_workspaces",
+            Enabled = true,
             Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch },
             Schema = new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object" }) }
         }

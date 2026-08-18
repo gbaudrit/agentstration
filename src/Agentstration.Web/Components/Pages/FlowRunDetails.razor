@@ -25,6 +25,34 @@ else
     {
         <article class="panel run-error"><strong>@run.Error.Code</strong><p>@run.Error.Message</p><code>@run.Error.Details</code></article>
     }
+    @if (pendingInput is not null)
+    {
+        <article class="panel input-request-panel">
+            <div class="panel-header"><h2>Input needed</h2><span>Waiting for your response</span></div>
+            <p>@pendingInput.Prompt</p>
+            @if (pendingInput.Type == InputRequestType.Text)
+            {
+                <input @bind="responseText" placeholder="Type your response" disabled="@submittingInput" />
+                <button class="button-primary" @onclick="SubmitTextAsync" disabled="@(submittingInput || string.IsNullOrWhiteSpace(responseText))">Send response</button>
+            }
+            else if (pendingInput.Type == InputRequestType.Choice)
+            {
+                <select @bind="selectedChoice" disabled="@submittingInput">
+                    <option value="">Select an option</option>
+                    @foreach (var option in pendingInput.Options) { <option value="@option">@option</option> }
+                </select>
+                <button class="button-primary" @onclick="SubmitChoiceAsync" disabled="@(submittingInput || string.IsNullOrWhiteSpace(selectedChoice))">Continue</button>
+            }
+            else
+            {
+                <div class="button-row">
+                    <button class="button-primary" @onclick="() => SubmitConfirmationAsync(true)" disabled="@submittingInput">Confirm</button>
+                    <button class="button-secondary" @onclick="() => SubmitConfirmationAsync(false)" disabled="@submittingInput">Decline</button>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(inputError)) { <p class="validation-error">@inputError</p> }
+        </article>
+    }
     <FlowRunTimeline Events="events" IsLive="@(!run.Status.IsTerminal())" />
     <section class="designer-layout run-layout">
         <div>
@@ -53,15 +81,21 @@ else
     private readonly List<FlowRunEvent> events = [];
     private readonly HashSet<long> eventSequences = [];
     private FlowRun? run;
+    private InputRequest? pendingInput;
     private FlowStepRun? selected;
     private Microsoft.AspNetCore.SignalR.Client.HubConnection? hub;
     private long lastSequence;
     private int streamingRenderScheduled;
+    private string responseText = string.Empty;
+    private string selectedChoice = string.Empty;
+    private string? inputError;
+    private bool submittingInput;
     private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", "Flow topology") : FlowTopologyProjector.Project(run, events);
 
     protected override async Task OnParametersSetAsync()
     {
         run = await Client.GetFlowRunAsync(RunId, cancellation.Token);
+        await RefreshInputAsync();
         selected = run.Steps.FirstOrDefault();
         events.Clear();
         eventSequences.Clear();
@@ -111,7 +145,34 @@ else
     private async Task RefreshRunAsync()
     {
         run = await Client.GetFlowRunAsync(RunId, cancellation.Token);
+        await RefreshInputAsync();
         if (selected is not null) selected = run.Steps.FirstOrDefault(value => value.StepName == selected.StepName);
+    }
+
+    private async Task RefreshInputAsync()
+    {
+        pendingInput = run?.Status == FlowRunStatus.WaitingForInput
+            ? (await Client.GetFlowRunInputsAsync(RunId, cancellation.Token)).FirstOrDefault()
+            : null;
+    }
+
+    private Task SubmitTextAsync() => SubmitInputAsync(JsonSerializer.SerializeToElement(responseText));
+    private Task SubmitChoiceAsync() => SubmitInputAsync(JsonSerializer.SerializeToElement(selectedChoice));
+    private Task SubmitConfirmationAsync(bool value) => SubmitInputAsync(JsonSerializer.SerializeToElement(value));
+
+    private async Task SubmitInputAsync(JsonElement value)
+    {
+        if (pendingInput is null) return;
+        try
+        {
+            submittingInput = true;
+            inputError = null;
+            await Client.RespondToFlowRunInputAsync(RunId, pendingInput.Id, value, cancellation.Token);
+            pendingInput = null;
+            await RefreshRunAsync();
+        }
+        catch (Exception exception) { inputError = exception.Message; }
+        finally { submittingInput = false; }
     }
 
     private void ScheduleStreamingRender()

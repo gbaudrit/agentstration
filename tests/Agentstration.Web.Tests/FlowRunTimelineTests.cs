@@ -72,6 +72,23 @@ public sealed class FlowRunTimelineTests
         Assert.Contains("Flow run timed out", rendered.Markup, StringComparison.Ordinal);
     }
 
+    [TestMethod]
+    public void InteractiveLifecycleRendersAsSemanticActivity()
+    {
+        using var context = new BunitContext();
+        var now = DateTimeOffset.UtcNow;
+        var rendered = context.Render<FlowRunTimeline>(parameters => parameters.Add(value => value.Events, new[]
+        {
+            Event(1, FlowRunEventType.InputRequested, "agent-1", new { prompt = "Continue?" }, now),
+            Event(2, FlowRunEventType.InputReceived, "agent-1", null, now),
+            Event(3, FlowRunEventType.FlowRunResumed, null, null, now)
+        }));
+
+        Assert.Contains("Response requested", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains("Response received", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains("Flow run resumed", rendered.Markup, StringComparison.Ordinal);
+    }
+
     private static FlowRunEvent Event(long sequence, FlowRunEventType type, string? stepId, object? payload, DateTimeOffset timestamp) =>
         new(new(Guid.Parse("11111111-1111-1111-1111-111111111111")), "run-1", sequence, type, stepId, payload is null ? null : JsonSerializer.SerializeToElement(payload), timestamp);
 }

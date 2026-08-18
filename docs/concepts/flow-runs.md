@@ -13,3 +13,19 @@ A newly submitted Run stores the canonical Management `TenantId`, `WorkspaceId`,
 Before starting a queued Run, the worker reloads the Principal and Workspace and re-evaluates the current `runs/execute` permission. It then installs the matching request context only for that execution. A permission revoked after submission therefore prevents execution, and Management resource resolution remains isolated to the Run's Workspace. Run list, detail, event, and cancellation APIs apply the same complete scope and do not reveal cross-Workspace records.
 
 Legacy Runs without this scope fail closed when execution is attempted.
+
+## Interactive suspension and recovery
+
+An orchestration may request external text, a choice, or a confirmation. Agentstration persists that request independently from the UI and changes the Run from `Running` to the non-terminal `WaitingForInput` state. The request records its source, options, expiry, response value, response time, and responding Principal.
+
+The REST surface is:
+
+```http
+GET  /api/flowRuns/{runId}/inputs
+GET  /api/flowRuns/{runId}/inputs/{inputId}
+POST /api/flowRuns/{runId}/inputs/{inputId}/response
+```
+
+Posting a valid response stores it once through optimistic concurrency, requeues the Run, and returns `202 Accepted`. A second response conflicts. An unanswered request that reaches `ExpiresAt` becomes `Expired`, and its Run becomes `TimedOut` with an explicit reason.
+
+The Run's captured definition and immutable runtime bindings are authoritative during continuation. The runtime adapter rebuilds the same participant revisions and restores its opaque SQLite-backed execution state; it never resolves the newest Flow or Agent revision. Startup recovery repairs answered-but-not-requeued Runs and expired execution leases. Execution remains at-least-once, so external tool providers must use stable operation identifiers when they offer idempotent effects.
