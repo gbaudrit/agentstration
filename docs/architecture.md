@@ -359,6 +359,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 24. **Delivered durable interactive execution increment:** Flow Runs persist exact participant revision/deployment bindings and opaque runtime checkpoints, expose durable input requests through REST and Workplace pending actions, recover through at-least-once leases, expire unanswered requests, and protect live revisions with impact-aware normal and forced purge operations. See ADR-0054.
 25. **Delivered governed Tool lifecycle projection:** the provider-neutral Tool execution pipeline emits started/completed/failed-or-cancelled facts. Runtime Runs project one `RuntimeToolCall` per logical call with physical attempt identity and count; Flow Runs append the same lifecycle to their durable journal. Arguments and results remain excluded from durable projections by default. See ADR-0055.
 26. **Delivered local Tool execution hook chain:** locally registered provider-neutral guards execute in stable order before invocation, may allow or deny without mutating payloads, unwind terminal notifications in reverse order, and classify denial/hook/provider/cancellation outcomes. Every physical at-least-once attempt re-executes the chain. See ADR-0056.
+27. **Delivered workspace-configurable Tool guard increment:** canonical `ToolExecutionHook` resources expose namespaced ETag CRUD and select built-in Runtime handlers by Tool, Tool Provider and Agent within the current Tenant/Workspace. The first bounded handler is `deny`; arbitrary code, scripts and remote hooks are not accepted. See ADR-0057.
 
 ## ADR catalog
 
@@ -411,3 +412,4 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0054: durable interactive Flow execution and exact runtime identity
 - ADR-0055: Agentstration-owned Tool execution boundary
 - ADR-0056: ordered Runtime guards for Tool execution
+- ADR-0057: workspace-scoped Tool Hook resources select built-in Runtime handlers

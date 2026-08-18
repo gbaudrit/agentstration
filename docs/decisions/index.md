@@ -86,3 +86,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 54. [ADR-0054 — Durable interactive Flow execution preserves exact runtime identity](0054-durable-interactive-flow-execution.md)
 55. [ADR-0055 — Agentstration owns the Tool execution boundary](0055-agentstration-owns-tool-execution-boundary.md)
 56. [ADR-0056 — Tool execution hooks are ordered Runtime guards](0056-tool-execution-hooks-are-ordered-runtime-guards.md)
+57. [ADR-0057 — Tool execution Hook resources select built-in Runtime handlers](0057-tool-execution-hook-resources-select-built-in-runtime-handlers.md)

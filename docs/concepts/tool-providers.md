@@ -26,7 +26,28 @@ Agent / MAF
 
 The pipeline emits provider-neutral lifecycle facts before invocation and after completion, failure, or cancellation. Runtime Runs project a logical `RuntimeToolCall`; Flow Runs append Tool Call events to their own journal. `ToolCallId` identifies the logical call across replay, while `InvocationId` and the projected attempt number distinguish physical attempts. Arguments and provider results are not durably projected by default. Lifecycle sinks are observability ports only and remain separate from execution hooks.
 
-Locally registered `IToolExecutionHook` guards run in stable order before MCP invocation and unwind in reverse order with a terminal outcome. A hook may allow or deny a call; it cannot currently mutate arguments, inspect or replace the provider result, or request approval. Denials never reach MCP and are projected separately from provider and hook failures. Every physical at-least-once attempt runs the hooks again. Management-plane Hook resources and scoped hook selection are not implemented yet.
+Locally registered `IToolExecutionHook` guards run in stable order before MCP invocation and unwind in reverse order with a terminal outcome. A hook may allow or deny a call; it cannot currently mutate arguments, inspect or replace the provider result, or request approval. Denials never reach MCP and are projected separately from provider and hook failures. Every physical at-least-once attempt runs the hooks again.
+
+Workspace-owned `ToolExecutionHook` resources add dynamic selection by canonical Tool, Tool Provider and Agent name. Empty selector lists mean “all”; populated selector dimensions are combined with AND semantics. Only built-in handlers are accepted. The current `deny` handler requires a stable `code` and a diagnostic `message`; resources cannot reference executable types, scripts, commands or remote endpoints. The Runtime resolves these resources through the current Tenant/Workspace-scoped Management store for every physical attempt.
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: ToolExecutionHook
+metadata:
+  name: block-sensitive-lookup
+definition:
+  displayName: Block sensitive lookup
+  enabled: true
+  order: 100
+  handler: deny
+  selector:
+    tools: [sensitive-lookup]
+    providers: []
+    agents: []
+  configuration:
+    code: sensitive_lookup_denied
+    message: This Tool is disabled by workspace governance.
+```
 
 `requiresApproval` remains a native Tool policy. Agentstration wraps its own function adapter in MAF `ApprovalRequiredAIFunction`, preserving durable `RequestInfoEvent` → `InputRequest` → `WaitingForInput` → checkpoint resume behavior. After approval, the resumed invocation enters the Agentstration pipeline and its hook chain. The boundary carries logical Tool Call and physical invocation identities plus the available Tenant, Workspace, Principal, Run, Agent, revision, correlation and argument context. It does not implement automatic retries, provider idempotency or exactly-once effects.
 

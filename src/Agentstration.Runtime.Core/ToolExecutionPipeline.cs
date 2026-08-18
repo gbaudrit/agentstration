@@ -6,27 +6,37 @@ namespace Agentstration.Runtime.Core;
 public sealed class ToolExecutionPipeline : IToolExecutionPipeline
 {
     private readonly IToolInvoker invoker;
-    private readonly IReadOnlyList<IToolExecutionHook> hooks;
+    private readonly IReadOnlyList<IToolExecutionHook> localHooks;
+    private readonly IToolExecutionHookResolver hookResolver;
     private readonly IReadOnlyList<IToolExecutionEventSink> eventSinks;
     private readonly TimeProvider timeProvider;
 
     public ToolExecutionPipeline(IToolInvoker invoker)
-        : this(invoker, [], [], TimeProvider.System) { }
+        : this(invoker, [], EmptyToolExecutionHookResolver.Instance, [], TimeProvider.System) { }
 
     public ToolExecutionPipeline(
         IToolInvoker invoker,
         IEnumerable<IToolExecutionEventSink> eventSinks,
         TimeProvider timeProvider)
-        : this(invoker, [], eventSinks, timeProvider) { }
+        : this(invoker, [], EmptyToolExecutionHookResolver.Instance, eventSinks, timeProvider) { }
 
     public ToolExecutionPipeline(
         IToolInvoker invoker,
         IEnumerable<IToolExecutionHook> hooks,
         IEnumerable<IToolExecutionEventSink> eventSinks,
         TimeProvider timeProvider)
+        : this(invoker, hooks, EmptyToolExecutionHookResolver.Instance, eventSinks, timeProvider) { }
+
+    public ToolExecutionPipeline(
+        IToolInvoker invoker,
+        IEnumerable<IToolExecutionHook> hooks,
+        IToolExecutionHookResolver hookResolver,
+        IEnumerable<IToolExecutionEventSink> eventSinks,
+        TimeProvider timeProvider)
     {
         this.invoker = invoker;
-        this.hooks = OrderHooks(hooks);
+        localHooks = OrderHooks(hooks);
+        this.hookResolver = hookResolver;
         this.eventSinks = eventSinks.ToArray();
         this.timeProvider = timeProvider;
     }
@@ -44,10 +54,22 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
         await PublishAsync(new ToolExecutionStarted(context, startedAt), cancellationToken);
         JsonElement? result;
         DateTimeOffset? completionTimestamp = null;
-        var enteredHooks = new List<IToolExecutionHook>(hooks.Count);
+        var enteredHooks = new List<IToolExecutionHook>();
         var terminalHooksInvoked = false;
         try
         {
+            IReadOnlyList<IToolExecutionHook> hooks;
+            try
+            {
+                var resolvedHooks = await hookResolver.ResolveAsync(context, cancellationToken)
+                    ?? throw new InvalidOperationException("The Tool execution hook resolver returned no collection.");
+                hooks = OrderHooks(localHooks.Concat(resolvedHooks));
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                throw new ToolExecutionHookException("hook-resolver", "resolve", exception);
+            }
+            enteredHooks.Capacity = hooks.Count;
             foreach (var hook in hooks)
             {
                 enteredHooks.Add(hook);

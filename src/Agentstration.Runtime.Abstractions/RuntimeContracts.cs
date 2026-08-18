@@ -364,6 +364,24 @@ public interface IToolExecutionHook
         CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 }
 
+public interface IToolExecutionHookResolver
+{
+    ValueTask<IReadOnlyList<IToolExecutionHook>> ResolveAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class EmptyToolExecutionHookResolver : IToolExecutionHookResolver
+{
+    public static EmptyToolExecutionHookResolver Instance { get; } = new();
+    private EmptyToolExecutionHookResolver() { }
+
+    public ValueTask<IReadOnlyList<IToolExecutionHook>> ResolveAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        ValueTask.FromResult<IReadOnlyList<IToolExecutionHook>>([]);
+}
+
 public sealed class ToolExecutionDeniedException(string hookId, string code, string message) : Exception(message)
 {
     public string HookId { get; } = hookId;

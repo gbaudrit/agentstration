@@ -38,4 +38,4 @@ MAF `ApprovalRequiredAIFunction` remains outside and before this chain. Hooks ca
 - Local or standalone hosts can register concrete hooks through dependency injection without a Management Plane dependency.
 - Hooks fail closed before provider invocation and denial is observable separately from provider failure.
 - Hook implementations must tolerate at-least-once execution; this contract does not make hook side effects exactly-once.
-- `HookResource`, workspace/agent/tool hook selection, DLP/PII, quotas, result redaction, argument/result mutation, remote hooks and a generic policy language remain future work.
+- Workspace/agent/tool selection through bounded Management resources is specified by ADR-0057. DLP/PII, quotas, result redaction, argument/result mutation, remote hooks and a generic policy language remain future work.
