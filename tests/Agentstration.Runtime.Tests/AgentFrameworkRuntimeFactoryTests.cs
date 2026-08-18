@@ -168,8 +168,9 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             await provider.GetRequiredService<IRuntimeRunStore>().InitializeAsync(default);
             using var chatClient = new RecordingChatClient
             {
-                ResponseFactory = (_, _, options) =>
+                ResponseFactory = (call, _, options) =>
                 {
+                    if (call > 1) return new ChatResponse(new ChatMessage(ChatRole.Assistant, "APPROVED_OK"));
                     var tool = options?.Tools?.Single(value => value.Name == ApprovalTool.ToolName)
                         ?? throw new InvalidOperationException("The governed tool was not exposed to the Agent.");
                     Assert.IsInstanceOfType<ApprovalRequiredAIFunction>(tool);
@@ -186,11 +187,13 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 new RecordingResolver(chatClient),
                 NullLoggerFactory.Instance,
                 new GenAiObservabilityOptions());
+            var pipeline = new RecordingToolExecutionPipeline();
             var engine = new AgentFrameworkFlowOrchestrationEngine(
                 new RecordingAgentResolver([ApprovalTool.ResourceId]),
                 new ApprovalToolCatalog(),
                 factory,
-                states);
+                states,
+                configuredToolExecution: pipeline);
             var events = new List<FlowExecutionEvent>();
 
             await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
@@ -213,12 +216,175 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 requested.RuntimeState.RuntimeType,
                 requested.RuntimeState.StateId,
                 default));
+
+            var bindings = events.OfType<FlowRuntimeBindingsResolved>().Single().Bindings;
+            var answer = new InputRequest
+            {
+                WorkspaceId = TestWorkspaceId,
+                Id = "input-real-approval",
+                RunId = "run-real-approval",
+                RuntimeRequestId = requested.RuntimeRequestId,
+                Prompt = requested.Prompt,
+                Type = InputRequestType.Confirmation,
+                CreatedAt = DateTimeOffset.UtcNow,
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+                Status = InputRequestStatus.Answered,
+                Response = new(DateTimeOffset.UtcNow, JsonSerializer.SerializeToElement(true), "principal-1")
+            };
+            var resumed = new List<FlowExecutionEvent>();
+            var scope = new FlowRunScope(
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                TestWorkspaceId,
+                Guid.Parse("33333333-3333-3333-3333-333333333333"));
+            await foreach (var item in engine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
+                TestWorkspaceId,
+                "run-real-approval",
+                new OrchestrationFlowDefinition(
+                    [new FlowTargetReference(FlowTargetKind.Agent, "approval-agent")],
+                    new SequentialOrchestrationPattern()),
+                JsonSerializer.SerializeToElement(new { payload = "durable approval" }),
+                "correlation-real-approval",
+                bindings,
+                requested.RuntimeState,
+                answer,
+                scope)))
+                resumed.Add(item);
+
+            var invocation = pipeline.Contexts.Single();
+            StringAssert.StartsWith(invocation.ToolCallId, "tool-");
+            Assert.AreEqual(TestWorkspaceId, invocation.WorkspaceId);
+            Assert.AreEqual(scope.TenantId, invocation.TenantId);
+            Assert.AreEqual(scope.PrincipalId, invocation.PrincipalId);
+            Assert.AreEqual("run-real-approval", invocation.RunId);
+            Assert.AreEqual("correlation-real-approval", invocation.CorrelationId);
+            Assert.AreEqual("APPROVED_OK", resumed.OfType<FlowExecutionCompleted>().Single().Result.FinalOutput.GetString());
         }
         finally
         {
             SqliteConnection.ClearAllPools();
             if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [TestMethod]
+    public async Task MafToolAdapterHasNoProviderEscapeHatchAndAlwaysUsesPipeline()
+    {
+        var tool = new TestTool();
+        var pipeline = new RecordingToolExecutionPipeline();
+        var workspaceId = new WorkspaceId(Guid.Parse("44444444-4444-4444-4444-444444444444"));
+        var template = new ToolExecutionContext
+        {
+            ToolCallId = "pending",
+            InvocationId = "pending",
+            ToolId = "pending",
+            ToolName = "pending",
+            TenantId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            WorkspaceId = workspaceId,
+            PrincipalId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            RunId = "run-1",
+            AgentId = "agent-1",
+            AgentVersion = 7,
+            AgentRevisionId = "revision-7",
+            CorrelationId = "correlation-1"
+        };
+        var function = Assert.IsInstanceOfType<AIFunction>(
+            AgentFrameworkRuntimeFactory.MapTool(tool, pipeline, template));
+        var arguments = new AIFunctionArguments(new Dictionary<string, object?> { ["value"] = "hello" });
+
+        _ = await function.InvokeAsync(arguments);
+        _ = await function.InvokeAsync(arguments);
+
+        Assert.IsNull(typeof(IAgentTool).GetMethod("GetService"));
+        Assert.IsNull(typeof(IAgentTool).GetMethod("InvokeAsync"));
+        Assert.AreEqual(2, pipeline.Contexts.Count);
+        var first = pipeline.Contexts[0];
+        var second = pipeline.Contexts[1];
+        Assert.AreEqual(tool.Id, first.ToolId);
+        Assert.AreEqual(workspaceId, first.WorkspaceId);
+        Assert.AreEqual("run-1", first.RunId);
+        Assert.AreEqual("agent-1", first.AgentId);
+        Assert.AreEqual(7, first.AgentVersion);
+        Assert.AreEqual("revision-7", first.AgentRevisionId);
+        Assert.AreEqual(first.ToolCallId, second.ToolCallId);
+        Assert.AreNotEqual(first.InvocationId, second.InvocationId);
+    }
+
+    [TestMethod]
+    public async Task DirectAgentExecutionInvokesToolThroughPipelineWithRuntimeScope()
+    {
+        using var chatClient = new RecordingChatClient
+        {
+            ResponseFactory = (call, _, options) => call == 1
+                ? new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                [
+                    new FunctionCallContent("direct-call-1", options!.Tools!.Single().Name,
+                        new Dictionary<string, object?> { ["value"] = "hello" })
+                ]))
+                : new ChatResponse(new ChatMessage(ChatRole.Assistant, "DIRECT_OK"))
+        };
+        var tool = new TestTool();
+        var pipeline = new RecordingToolExecutionPipeline();
+        var definition = Definition() with { EffectiveToolNames = [tool.Id] };
+        var runtime = await new AgentFrameworkRuntimeFactory(
+                new RecordingResolver(chatClient),
+                NullLoggerFactory.Instance,
+                new GenAiObservabilityOptions())
+            .CreateAsync(definition, "revision-direct", new AgentRuntimeContext(new SingleToolCatalog(tool), pipeline), default);
+        var workspaceId = new WorkspaceId(Guid.Parse("55555555-5555-5555-5555-555555555555"));
+
+        var result = await runtime.ExecuteAsync(new AgentExecutionRequest(
+            "Use the tool",
+            "run-direct",
+            ToolExecution: new ToolExecutionScope
+            {
+                TenantId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                WorkspaceId = workspaceId,
+                PrincipalId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                ExecutionId = "run-direct",
+                CorrelationId = "correlation-direct"
+            }), default);
+
+        Assert.AreEqual("DIRECT_OK", result.Output);
+        var invocation = pipeline.Contexts.Single();
+        Assert.AreEqual(workspaceId, invocation.WorkspaceId);
+        Assert.AreEqual("run-direct", invocation.RunId);
+        Assert.AreEqual("revision-direct", invocation.AgentRevisionId);
+        Assert.AreEqual("correlation-direct", invocation.CorrelationId);
+    }
+
+    [TestMethod]
+    public async Task MafToolAdapterPropagatesCancellationAndProviderDiagnostics()
+    {
+        var tool = new TestTool();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        var cancellingPipeline = new RecordingToolExecutionPipeline((_, token) =>
+        {
+            token.ThrowIfCancellationRequested();
+            return ValueTask.FromResult<JsonElement?>(null);
+        });
+        var function = Assert.IsInstanceOfType<AIFunction>(
+            AgentFrameworkRuntimeFactory.MapTool(tool, cancellingPipeline, Template()));
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await function.InvokeAsync(new AIFunctionArguments(), cancelled.Token));
+
+        var expected = new InvalidOperationException("provider diagnostic: tools/call failed");
+        var failingPipeline = new RecordingToolExecutionPipeline(
+            (_, _) => ValueTask.FromException<JsonElement?>(expected));
+        function = Assert.IsInstanceOfType<AIFunction>(
+            AgentFrameworkRuntimeFactory.MapTool(tool, failingPipeline, Template()));
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await function.InvokeAsync(new AIFunctionArguments()));
+        Assert.AreSame(expected, actual);
+
+        static ToolExecutionContext Template() => new()
+        {
+            ToolCallId = "pending",
+            InvocationId = "pending",
+            ToolId = "pending",
+            ToolName = "pending",
+            RunId = "run-diagnostics"
+        };
     }
 
     [TestMethod]
@@ -622,17 +788,58 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     {
         public const string ResourceId = "utilities.hash.compute";
         public const string ToolName = "hash_compute";
-        private readonly ApprovalRequiredAIFunction function = new(AIFunctionFactory.Create(
-            (string text) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text))).ToLowerInvariant(),
-            ToolName,
-            "Compute SHA-256 after approval."));
 
         public string Id => ResourceId;
         public string Name => ToolName;
         public string? Description => "Compute SHA-256 after approval.";
-        public ValueTask<JsonElement?> InvokeAsync(JsonElement? arguments, CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException("MAF must request approval before invoking this tool.");
-        public object? GetService(Type serviceType) => serviceType.IsInstanceOfType(function) ? function : null;
+        public string? ProviderId => "utilities";
+        public string? ExternalId => ToolName;
+        public JsonElement InputSchema => JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { text = new { type = "string" } },
+            required = new[] { "text" }
+        });
+        public JsonElement? OutputSchema => null;
+        public bool RequiresApproval => true;
+    }
+
+    private sealed class TestTool : IAgentTool
+    {
+        public string Id => "provider.tool";
+        public string Name => "tool";
+        public string? Description => "Test tool";
+        public string? ProviderId => "provider";
+        public string? ExternalId => "external-tool";
+        public JsonElement InputSchema => JsonSerializer.SerializeToElement(new { type = "object" });
+        public JsonElement? OutputSchema => null;
+        public bool RequiresApproval => false;
+    }
+
+    private sealed class SingleToolCatalog(IAgentTool tool) : IToolCatalog
+    {
+        public ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(
+            IEnumerable<string> toolIds,
+            CancellationToken cancellationToken = default)
+        {
+            CollectionAssert.AreEqual(new[] { tool.Id }, toolIds.ToArray());
+            return ValueTask.FromResult<IReadOnlyCollection<IAgentTool>>([tool]);
+        }
+    }
+
+    private sealed class RecordingToolExecutionPipeline(
+        Func<ToolExecutionContext, CancellationToken, ValueTask<JsonElement?>>? execute = null) : IToolExecutionPipeline
+    {
+        public List<ToolExecutionContext> Contexts { get; } = [];
+
+        public ValueTask<JsonElement?> ExecuteAsync(
+            ToolExecutionContext context,
+            CancellationToken cancellationToken = default)
+        {
+            Contexts.Add(context);
+            return execute?.Invoke(context, cancellationToken)
+                ?? ValueTask.FromResult<JsonElement?>(JsonSerializer.SerializeToElement("tool-result"));
+        }
     }
 
     private sealed record TestApprovalResponse(IList<ChatMessage> Messages);

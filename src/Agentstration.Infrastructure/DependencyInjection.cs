@@ -158,6 +158,7 @@ public static class DependencyInjection
         services.AddSqliteRuntimeRuns(runtimeConnectionString);
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
+        services.AddSingleton<IToolExecutionPipeline, ToolExecutionPipeline>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         workPlaneConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "work-plane.db")}";
         services.AddSqliteWorkPlane(workPlaneConnectionString);

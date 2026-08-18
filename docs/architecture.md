@@ -105,7 +105,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
 | Scheduling | standalone polling worker | Quartz persistent scheduler |
-| Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog and MAF invocation | richer permissions, credentials and connection policies |
+| Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog, and an Agentstration-owned runtime execution boundary before MCP `tools/call` | richer permissions, credentials, connection policies, and execution hooks |
 | Notifications | internal notification record/event | email, Teams, webhook channels |
 | MCP | nine tools reusing application services | resources and authorization |
 | Evaluation | deterministic `Microsoft.Extensions.AI.Evaluation` metrics and versioned content-workflow dataset | LLM-as-judge quality/safety evaluators and reports |

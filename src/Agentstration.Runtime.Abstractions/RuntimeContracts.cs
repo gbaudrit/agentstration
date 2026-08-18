@@ -22,7 +22,8 @@ public sealed record AgentExecutionRequest(
     string Input,
     string? SessionId = null,
     ModelExecutionOptions? Options = null,
-    AgentExecutionOptions? Execution = null);
+    AgentExecutionOptions? Execution = null,
+    ToolExecutionScope? ToolExecution = null);
 public sealed record AgentExecutionResult(
     string Output,
     string? SessionId = null,
@@ -107,7 +108,18 @@ public static class EffectiveCapabilityResolver
         return new ReasoningCapability { Support = support, SupportedEfforts = efforts };
     }
 }
-public sealed record AgentRuntimeContext(IToolCatalog Tools);
+public sealed record AgentRuntimeContext
+{
+    public AgentRuntimeContext(IToolCatalog tools) => Tools = tools;
+    public AgentRuntimeContext(IToolCatalog tools, IToolExecutionPipeline toolExecution)
+    {
+        Tools = tools;
+        ToolExecution = toolExecution;
+    }
+
+    public IToolCatalog Tools { get; }
+    public IToolExecutionPipeline ToolExecution { get; } = UnavailableToolExecutionPipeline.Instance;
+}
 public sealed record ExecutableAgentDefinition
 {
     public required Guid AgentId { get; init; }
@@ -217,13 +229,65 @@ public interface IAgentTool
     string Id { get; }
     string Name { get; }
     string? Description { get; }
-    ValueTask<JsonElement?> InvokeAsync(JsonElement? arguments, CancellationToken cancellationToken = default);
-    object? GetService(Type serviceType) => null;
+    string? ProviderId { get; }
+    string? ExternalId { get; }
+    JsonElement InputSchema { get; }
+    JsonElement? OutputSchema { get; }
+    bool RequiresApproval { get; }
 }
 
 public interface IToolCatalog
 {
     ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default);
+}
+
+public sealed record ToolExecutionScope
+{
+    public Guid? TenantId { get; init; }
+    public WorkspaceId? WorkspaceId { get; init; }
+    public Guid? PrincipalId { get; init; }
+    public string? ExecutionId { get; init; }
+    public string? CorrelationId { get; init; }
+    public long? AgentGeneration { get; init; }
+}
+
+public sealed record ToolExecutionContext
+{
+    public required string ToolCallId { get; init; }
+    public required string InvocationId { get; init; }
+    public required string ToolId { get; init; }
+    public required string ToolName { get; init; }
+    public string? ToolProviderId { get; init; }
+    public string? ExternalToolId { get; init; }
+    public Guid? TenantId { get; init; }
+    public WorkspaceId? WorkspaceId { get; init; }
+    public Guid? PrincipalId { get; init; }
+    public string? RunId { get; init; }
+    public string? AgentId { get; init; }
+    public long? AgentVersion { get; init; }
+    public long? AgentGeneration { get; init; }
+    public string? AgentRevisionId { get; init; }
+    public string? CorrelationId { get; init; }
+    public JsonElement? Arguments { get; init; }
+}
+
+public interface IToolExecutionPipeline
+{
+    ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
+}
+
+public sealed class UnavailableToolExecutionPipeline : IToolExecutionPipeline
+{
+    public static UnavailableToolExecutionPipeline Instance { get; } = new();
+    private UnavailableToolExecutionPipeline() { }
+
+    public ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
+        ValueTask.FromException<JsonElement?>(new InvalidOperationException("No Agentstration Tool Execution Pipeline is configured."));
+}
+
+public interface IToolInvoker
+{
+    ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
 }
 
 public interface IRuntimeRegistry

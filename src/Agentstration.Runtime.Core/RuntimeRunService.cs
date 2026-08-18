@@ -206,7 +206,16 @@ public sealed class RuntimeRunService(
                     prompt,
                     runId,
                     executionOptions,
-                    new AgentExecutionOptions { Streaming = stored.Value.Properties.Execution.Streaming }),
+                    new AgentExecutionOptions { Streaming = stored.Value.Properties.Execution.Streaming },
+                    new ToolExecutionScope
+                    {
+                        TenantId = stored.Value.Scope.TenantId,
+                        WorkspaceId = workspaceId,
+                        PrincipalId = stored.Value.Scope.PrincipalId,
+                        ExecutionId = runId,
+                        CorrelationId = Activity.Current?.TraceId.ToString(),
+                        AgentGeneration = stored.Value.Properties.Agent.Version
+                    }),
                 timeout.Token))
             {
                 switch (executionEvent)
