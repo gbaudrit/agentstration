@@ -35,6 +35,7 @@ public sealed class FlowToolExecutionEventSink(
     private static FlowRunEventType EventType(ToolExecutionLifecycleEvent executionEvent) => executionEvent switch
     {
         ToolExecutionStarted => FlowRunEventType.ToolCallStarted,
+        ToolExecutionGovernanceEvaluated => FlowRunEventType.ToolCallGovernanceEvaluated,
         ToolExecutionCompleted => FlowRunEventType.ToolCallCompleted,
         ToolExecutionFailed => FlowRunEventType.ToolCallFailed,
         _ => throw new ArgumentOutOfRangeException(nameof(executionEvent))
@@ -56,9 +57,13 @@ public sealed class FlowToolExecutionEventSink(
             context.AgentGeneration,
             context.AgentRevisionId,
             context.CorrelationId,
+            Governance = executionEvent is ToolExecutionGovernanceEvaluated governance
+                ? governance.Evaluations
+                : null,
             Outcome = executionEvent switch
             {
                 ToolExecutionStarted => "running",
+                ToolExecutionGovernanceEvaluated => "governed",
                 ToolExecutionCompleted => "succeeded",
                 ToolExecutionFailed failed when failed.Cancelled => "cancelled",
                 ToolExecutionFailed failed when failed.FailureKind == ToolExecutionFailureKind.Denied => "denied",

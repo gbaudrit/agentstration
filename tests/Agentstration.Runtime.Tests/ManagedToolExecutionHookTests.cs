@@ -36,6 +36,15 @@ public sealed class ManagedToolExecutionHookTests
         Assert.AreEqual("Managed policy blocked this call.", exception.Message);
         Assert.StartsWith("managed:", exception.HookId, StringComparison.Ordinal);
         Assert.AreEqual(0, providerCalls);
+        var governance = Assert.IsInstanceOfType<ToolExecutionGovernanceEvaluated>(lifecycle.Events[^2]);
+        Assert.HasCount(1, governance.Evaluations);
+        var evaluation = governance.Evaluations[0];
+        Assert.AreEqual(ToolExecutionHookSource.Managed, evaluation.Hook.Source);
+        Assert.AreEqual("default/ToolExecutionHook/managed-deny", evaluation.Hook.ResourceId);
+        Assert.AreEqual(1L, evaluation.Hook.ResourceGeneration);
+        Assert.AreEqual(10, evaluation.Hook.Order);
+        Assert.AreEqual(ToolExecutionHookEvaluationKind.Denied, evaluation.Decision);
+        Assert.AreEqual("managed_hook_denied", evaluation.Code);
         var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(lifecycle.Events[^1]);
         Assert.AreEqual(ToolExecutionFailureKind.Denied, failed.FailureKind);
         Assert.AreEqual("managed_hook_denied", failed.ErrorCode);

@@ -138,6 +138,7 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
                 ExternalToolId = context.ExternalToolId,
                 CorrelationId = context.CorrelationId
             },
+            ToolExecutionGovernanceEvaluated governance => Governance(current, governance),
             ToolExecutionCompleted completed => Terminal(
                 current,
                 completed.Context,
@@ -157,6 +158,23 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
             _ => throw new ArgumentOutOfRangeException(nameof(executionEvent))
         };
     }
+
+    private static RuntimeToolCall Governance(
+        RuntimeToolCall? current,
+        ToolExecutionGovernanceEvaluated evaluated) => new()
+    {
+        Id = evaluated.Context.ToolCallId,
+        InvocationId = evaluated.Context.InvocationId,
+        ToolId = evaluated.Context.ToolId,
+        Name = evaluated.Context.ToolName,
+        State = RuntimeRunState.Running,
+        Attempt = Math.Max(1, current?.Attempt ?? 0),
+        StartedAt = current?.StartedAt ?? evaluated.Timestamp,
+        ProviderId = evaluated.Context.ToolProviderId,
+        ExternalToolId = evaluated.Context.ExternalToolId,
+        CorrelationId = evaluated.Context.CorrelationId,
+        Governance = evaluated.Evaluations.ToArray()
+    };
 
     private static RuntimeToolCall Terminal(
         RuntimeToolCall? current,
@@ -182,12 +200,14 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         Error = error,
         FailureKind = failureKind,
         ErrorCode = errorCode,
-        CorrelationId = context.CorrelationId
+        CorrelationId = context.CorrelationId,
+        Governance = current?.Governance ?? []
     };
 
     private static RuntimeRunEventKind EventKind(ToolExecutionLifecycleEvent executionEvent) => executionEvent switch
     {
         ToolExecutionStarted => RuntimeRunEventKind.ToolCallStarted,
+        ToolExecutionGovernanceEvaluated => RuntimeRunEventKind.ToolCallGovernanceEvaluated,
         ToolExecutionCompleted => RuntimeRunEventKind.ToolCallCompleted,
         ToolExecutionFailed => RuntimeRunEventKind.ToolCallFailed,
         _ => throw new ArgumentOutOfRangeException(nameof(executionEvent))
@@ -196,6 +216,7 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
     private static string EventMessage(ToolExecutionLifecycleEvent executionEvent) => executionEvent switch
     {
         ToolExecutionStarted => "Tool call started",
+        ToolExecutionGovernanceEvaluated => "Tool call governance evaluated",
         ToolExecutionCompleted => "Tool call completed",
         ToolExecutionFailed failed when failed.Cancelled => "Tool call cancelled",
         ToolExecutionFailed failed when failed.FailureKind == ToolExecutionFailureKind.Denied => "Tool call denied",

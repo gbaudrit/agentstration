@@ -55,6 +55,7 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
         JsonElement? result;
         DateTimeOffset? completionTimestamp = null;
         var enteredHooks = new List<IToolExecutionHook>();
+        var evaluations = new List<ToolExecutionHookEvaluation>();
         var terminalHooksInvoked = false;
         try
         {
@@ -81,19 +82,51 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
                 }
                 catch (Exception exception) when (exception is not ToolExecutionDeniedException and not OperationCanceledException)
                 {
+                    evaluations.Add(new ToolExecutionHookEvaluation(
+                        hook.Identity,
+                        ToolExecutionHookEvaluationKind.Failed,
+                        "tool_execution_hook_failed"));
+                    await PublishGovernanceAsync(context, evaluations, CancellationToken.None);
                     throw new ToolExecutionHookException(hook.Id, "before-invoke", exception);
                 }
+                catch (OperationCanceledException)
+                {
+                    evaluations.Add(new ToolExecutionHookEvaluation(
+                        hook.Identity,
+                        ToolExecutionHookEvaluationKind.Failed,
+                        "tool_execution_cancelled"));
+                    await PublishGovernanceAsync(context, evaluations, CancellationToken.None);
+                    throw;
+                }
                 if (decision.Kind == ToolExecutionHookDecisionKind.Deny)
+                {
+                    evaluations.Add(new ToolExecutionHookEvaluation(
+                        hook.Identity,
+                        ToolExecutionHookEvaluationKind.Denied,
+                        decision.Code ?? "tool_execution_denied"));
+                    await PublishGovernanceAsync(context, evaluations, cancellationToken);
                     throw new ToolExecutionDeniedException(
                         hook.Id,
                         decision.Code ?? "tool_execution_denied",
                         decision.Message ?? $"Tool execution was denied by hook '{hook.Id}'.");
+                }
                 if (decision.Kind != ToolExecutionHookDecisionKind.Allow)
+                {
+                    evaluations.Add(new ToolExecutionHookEvaluation(
+                        hook.Identity,
+                        ToolExecutionHookEvaluationKind.Failed,
+                        "tool_execution_hook_failed"));
+                    await PublishGovernanceAsync(context, evaluations, cancellationToken);
                     throw new ToolExecutionHookException(
                         hook.Id,
                         "before-invoke",
                         new InvalidOperationException($"Unsupported Tool execution hook decision '{decision.Kind}'."));
+                }
+                evaluations.Add(new ToolExecutionHookEvaluation(
+                    hook.Identity,
+                    ToolExecutionHookEvaluationKind.Allowed));
             }
+            await PublishGovernanceAsync(context, evaluations, cancellationToken);
             result = await invoker.InvokeAsync(context, cancellationToken);
             terminalHooksInvoked = true;
             var succeededAt = timeProvider.GetUtcNow();
@@ -202,5 +235,22 @@ public sealed class ToolExecutionPipeline : IToolExecutionPipeline
     {
         foreach (var sink in eventSinks)
             await sink.PublishAsync(executionEvent, cancellationToken);
+    }
+
+    private async ValueTask PublishGovernanceAsync(
+        ToolExecutionContext context,
+        IReadOnlyList<ToolExecutionHookEvaluation> evaluations,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await PublishAsync(
+                new ToolExecutionGovernanceEvaluated(context, timeProvider.GetUtcNow(), evaluations.ToArray()),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new ToolExecutionHookException("hook-governance", "project", exception);
+        }
     }
 }

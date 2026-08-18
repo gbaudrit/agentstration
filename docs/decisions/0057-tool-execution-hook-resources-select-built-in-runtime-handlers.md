@@ -36,4 +36,5 @@ The Management API exposes workspace-scoped CRUD at `/api/toolexecutionhooks`, i
 - A matching denial is projected as `Denied` and never reaches MCP, whether the Tool came directly from MCP or through AEP-to-MCP.
 - Management storage or resolution failure fails the governed call before provider invocation and is classified as a hook failure.
 - Every physical retry resolves resources and executes matching hooks again; no exactly-once guarantee is implied.
+- The resolved resource identity and generation, evaluation order and decision are durably traced for each physical attempt as defined by ADR-0058.
 - DLP/PII, quotas, redaction, argument/result mutation, remote hooks, scripts, dynamic plug-ins, Pack installation support and Console UI remain future increments.

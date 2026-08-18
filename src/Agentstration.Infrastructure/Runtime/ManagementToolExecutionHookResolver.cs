@@ -41,6 +41,8 @@ public sealed class ManagementToolExecutionHookResolver(IControlPlaneStore store
         ToolExecutionHookHandlers.Deny => new DenyToolExecutionHook(
             $"managed:{resource.Address}",
             resource.Definition.Order,
+            resource.Address.ToString(),
+            resource.Generation,
             ToolExecutionHookManagementService.RequiredString(resource.Definition.Configuration, "code"),
             ToolExecutionHookManagementService.RequiredString(resource.Definition.Configuration, "message")),
         _ => throw new ToolExecutionHookValidationException(
@@ -50,11 +52,19 @@ public sealed class ManagementToolExecutionHookResolver(IControlPlaneStore store
     private sealed class DenyToolExecutionHook(
         string id,
         int order,
+        string resourceId,
+        long resourceGeneration,
         string code,
         string message) : IToolExecutionHook
     {
         public string Id { get; } = id;
         public int Order { get; } = order;
+        public ToolExecutionHookIdentity Identity { get; } = new(
+            id,
+            order,
+            ToolExecutionHookSource.Managed,
+            resourceId,
+            resourceGeneration);
 
         public ValueTask<ToolExecutionHookDecision> BeforeInvokeAsync(
             ToolExecutionContext context,

@@ -289,6 +289,11 @@ public sealed record ToolExecutionStarted(
     ToolExecutionContext Context,
     DateTimeOffset Timestamp) : ToolExecutionLifecycleEvent(Context, Timestamp);
 
+public sealed record ToolExecutionGovernanceEvaluated(
+    ToolExecutionContext Context,
+    DateTimeOffset Timestamp,
+    IReadOnlyList<ToolExecutionHookEvaluation> Evaluations) : ToolExecutionLifecycleEvent(Context, Timestamp);
+
 public sealed record ToolExecutionCompleted(
     ToolExecutionContext Context,
     DateTimeOffset Timestamp,
@@ -315,8 +320,24 @@ public interface IToolExecutionEventSink
 
 public enum ToolExecutionHookDecisionKind { Allow, Deny }
 public enum ToolExecutionOutcomeKind { Succeeded, Failed, Cancelled, Denied }
+[JsonConverter(typeof(JsonStringEnumConverter<ToolExecutionHookSource>))]
+public enum ToolExecutionHookSource { Local, Managed }
+[JsonConverter(typeof(JsonStringEnumConverter<ToolExecutionHookEvaluationKind>))]
+public enum ToolExecutionHookEvaluationKind { Allowed, Denied, Failed }
 [JsonConverter(typeof(JsonStringEnumConverter<ToolExecutionFailureKind>))]
 public enum ToolExecutionFailureKind { Provider, Hook, Denied, Cancelled }
+
+public sealed record ToolExecutionHookIdentity(
+    string Id,
+    int Order,
+    ToolExecutionHookSource Source = ToolExecutionHookSource.Local,
+    string? ResourceId = null,
+    long? ResourceGeneration = null);
+
+public sealed record ToolExecutionHookEvaluation(
+    ToolExecutionHookIdentity Hook,
+    ToolExecutionHookEvaluationKind Decision,
+    string? Code = null);
 
 public sealed record ToolExecutionHookDecision
 {
@@ -352,6 +373,7 @@ public interface IToolExecutionHook
 {
     string Id { get; }
     int Order => 0;
+    ToolExecutionHookIdentity Identity => new(Id, Order);
 
     ValueTask<ToolExecutionHookDecision> BeforeInvokeAsync(
         ToolExecutionContext context,

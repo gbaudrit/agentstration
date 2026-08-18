@@ -27,10 +27,12 @@ public sealed class ToolExecutionLifecycleTests
         var result = await pipeline.ExecuteAsync(Context(), default);
 
         Assert.IsNotNull(result);
-        Assert.HasCount(2, events.Events);
+        Assert.HasCount(3, events.Events);
         Assert.IsInstanceOfType<ToolExecutionStarted>(events.Events[0]);
-        var completed = Assert.IsInstanceOfType<ToolExecutionCompleted>(events.Events[1]);
-        Assert.AreEqual(TimeSpan.FromMilliseconds(25), completed.Duration);
+        var governance = Assert.IsInstanceOfType<ToolExecutionGovernanceEvaluated>(events.Events[1]);
+        Assert.IsEmpty(governance.Evaluations);
+        var completed = Assert.IsInstanceOfType<ToolExecutionCompleted>(events.Events[2]);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(50), completed.Duration);
     }
 
     [TestMethod]
@@ -47,8 +49,9 @@ public sealed class ToolExecutionLifecycleTests
             () => pipeline.ExecuteAsync(Context(), default).AsTask());
 
         Assert.AreSame(expected, actual);
-        Assert.HasCount(2, events.Events);
-        var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(events.Events[1]);
+        Assert.HasCount(3, events.Events);
+        Assert.IsInstanceOfType<ToolExecutionGovernanceEvaluated>(events.Events[1]);
+        var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(events.Events[2]);
         Assert.IsFalse(failed.Cancelled);
         Assert.AreEqual(typeof(ProviderDiagnosticException).FullName, failed.ErrorType);
         Assert.AreEqual("provider diagnostic", failed.ErrorMessage);
@@ -84,8 +87,9 @@ public sealed class ToolExecutionLifecycleTests
         await Assert.ThrowsExactlyAsync<TaskCanceledException>(
             () => pipeline.ExecuteAsync(Context(), cancellation.Token).AsTask());
 
-        Assert.HasCount(2, events.Events);
-        var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(events.Events[1]);
+        Assert.HasCount(3, events.Events);
+        Assert.IsInstanceOfType<ToolExecutionGovernanceEvaluated>(events.Events[1]);
+        var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(events.Events[2]);
         Assert.IsTrue(failed.Cancelled);
     }
 
@@ -163,6 +167,11 @@ public sealed class ToolExecutionLifecycleTests
         var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(lifecycle.Events[^1]);
         Assert.AreEqual(ToolExecutionFailureKind.Denied, failed.FailureKind);
         Assert.AreEqual("local_policy_denied", failed.ErrorCode);
+        var governance = Assert.IsInstanceOfType<ToolExecutionGovernanceEvaluated>(lifecycle.Events[^2]);
+        Assert.HasCount(2, governance.Evaluations);
+        Assert.AreEqual(ToolExecutionHookEvaluationKind.Allowed, governance.Evaluations[0].Decision);
+        Assert.AreEqual(ToolExecutionHookEvaluationKind.Denied, governance.Evaluations[1].Decision);
+        Assert.AreEqual("local_policy_denied", governance.Evaluations[1].Code);
         var projected = store.Current.Value.Status.ToolCalls[0];
         Assert.AreEqual(ToolExecutionFailureKind.Denied, projected.FailureKind);
         Assert.AreEqual("local_policy_denied", projected.ErrorCode);
@@ -205,7 +214,7 @@ public sealed class ToolExecutionLifecycleTests
         Assert.AreEqual("after-invoke", exception.Phase);
         Assert.AreEqual(1, providerCalls);
         Assert.AreEqual(1, terminalCalls);
-        Assert.HasCount(2, lifecycle.Events);
+        Assert.HasCount(3, lifecycle.Events);
         var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(lifecycle.Events[^1]);
         Assert.AreEqual(ToolExecutionFailureKind.Hook, failed.FailureKind);
         Assert.AreEqual("tool_execution_hook_failed", failed.ErrorCode);
@@ -240,6 +249,52 @@ public sealed class ToolExecutionLifecycleTests
         Assert.AreEqual(0, providerCalls);
         var failed = Assert.IsInstanceOfType<ToolExecutionFailed>(lifecycle.Events[^1]);
         Assert.AreEqual(ToolExecutionFailureKind.Hook, failed.FailureKind);
+    }
+
+    [TestMethod]
+    public async Task GovernanceTraceIsPersistedBeforeProviderInvocationWithStableHookIdentity()
+    {
+        var lifecycle = new RecordingSink();
+        var providerCalls = 0;
+        var pipeline = new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) =>
+            {
+                Assert.IsInstanceOfType<ToolExecutionGovernanceEvaluated>(lifecycle.Events[^1]);
+                providerCalls++;
+                return ValueTask.FromResult<JsonElement?>(null);
+            }),
+            [SequenceHook("audit", 20, []), SequenceHook("guard", 10, [])],
+            [lifecycle],
+            new AdvancingTimeProvider());
+
+        await pipeline.ExecuteAsync(Context(), default);
+
+        Assert.AreEqual(1, providerCalls);
+        var governance = Assert.IsInstanceOfType<ToolExecutionGovernanceEvaluated>(lifecycle.Events[1]);
+        CollectionAssert.AreEqual(new[] { "guard", "audit" }, governance.Evaluations.Select(item => item.Hook.Id).ToArray());
+        Assert.IsTrue(governance.Evaluations.All(item => item.Hook.Source == ToolExecutionHookSource.Local));
+        Assert.IsTrue(governance.Evaluations.All(item => item.Decision == ToolExecutionHookEvaluationKind.Allowed));
+    }
+
+    [TestMethod]
+    public async Task GovernanceProjectionFailurePreventsProviderInvocation()
+    {
+        var providerCalls = 0;
+        var pipeline = new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) =>
+            {
+                providerCalls++;
+                return ValueTask.FromResult<JsonElement?>(null);
+            }),
+            [new FailingGovernanceSink()],
+            new AdvancingTimeProvider());
+
+        var exception = await Assert.ThrowsExactlyAsync<ToolExecutionHookException>(
+            () => pipeline.ExecuteAsync(Context(), default).AsTask());
+
+        Assert.AreEqual("hook-governance", exception.HookId);
+        Assert.AreEqual("project", exception.Phase);
+        Assert.AreEqual(0, providerCalls);
     }
 
     [TestMethod]
@@ -387,15 +442,18 @@ public sealed class ToolExecutionLifecycleTests
         Assert.AreEqual("attempt-2", projected.InvocationId);
         Assert.AreEqual(2, projected.Attempt);
         Assert.AreEqual(RuntimeRunState.Succeeded, projected.State);
-        Assert.AreEqual(25d, projected.DurationMilliseconds);
+        Assert.AreEqual(50d, projected.DurationMilliseconds);
         Assert.IsNull(projected.Arguments);
         Assert.IsNull(projected.Result);
+        Assert.IsEmpty(projected.Governance);
         CollectionAssert.AreEqual(
             new[]
             {
                 RuntimeRunEventKind.ToolCallStarted,
+                RuntimeRunEventKind.ToolCallGovernanceEvaluated,
                 RuntimeRunEventKind.ToolCallCompleted,
                 RuntimeRunEventKind.ToolCallStarted,
+                RuntimeRunEventKind.ToolCallGovernanceEvaluated,
                 RuntimeRunEventKind.ToolCallCompleted
             },
             store.Events.Select(runEvent => runEvent.Kind).ToArray());
@@ -425,10 +483,11 @@ public sealed class ToolExecutionLifecycleTests
             await pipeline.ExecuteAsync(Context() with { OwnerKind = ToolExecutionOwnerKind.FlowRun }, default);
 
             var events = await repository.ListRunEventsAsync(Workspace, "run-1", 0, default);
-            Assert.HasCount(2, events);
+            Assert.HasCount(3, events);
             Assert.AreEqual(FlowRunEventType.ToolCallStarted, events[0].Type);
-            Assert.AreEqual(FlowRunEventType.ToolCallCompleted, events[1].Type);
-            Assert.HasCount(2, published.Events);
+            Assert.AreEqual(FlowRunEventType.ToolCallGovernanceEvaluated, events[1].Type);
+            Assert.AreEqual(FlowRunEventType.ToolCallCompleted, events[2].Type);
+            Assert.HasCount(3, published.Events);
             var payload = events[1].Payload?.GetRawText();
             Assert.IsNotNull(payload);
             Assert.DoesNotContain("argument", payload, StringComparison.Ordinal);
@@ -530,6 +589,14 @@ public sealed class ToolExecutionLifecycleTests
         public ValueTask PublishAsync(ToolExecutionLifecycleEvent executionEvent, CancellationToken cancellationToken = default) =>
             executionEvent is ToolExecutionFailed
                 ? ValueTask.FromException(new InvalidOperationException("projection failed"))
+                : ValueTask.CompletedTask;
+    }
+
+    private sealed class FailingGovernanceSink : IToolExecutionEventSink
+    {
+        public ValueTask PublishAsync(ToolExecutionLifecycleEvent executionEvent, CancellationToken cancellationToken = default) =>
+            executionEvent is ToolExecutionGovernanceEvaluated
+                ? ValueTask.FromException(new InvalidOperationException("governance projection failed"))
                 : ValueTask.CompletedTask;
     }
 

@@ -360,6 +360,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 25. **Delivered governed Tool lifecycle projection:** the provider-neutral Tool execution pipeline emits started/completed/failed-or-cancelled facts. Runtime Runs project one `RuntimeToolCall` per logical call with physical attempt identity and count; Flow Runs append the same lifecycle to their durable journal. Arguments and results remain excluded from durable projections by default. See ADR-0055.
 26. **Delivered local Tool execution hook chain:** locally registered provider-neutral guards execute in stable order before invocation, may allow or deny without mutating payloads, unwind terminal notifications in reverse order, and classify denial/hook/provider/cancellation outcomes. Every physical at-least-once attempt re-executes the chain. See ADR-0056.
 27. **Delivered workspace-configurable Tool guard increment:** canonical `ToolExecutionHook` resources expose namespaced ETag CRUD and select built-in Runtime handlers by Tool, Tool Provider and Agent within the current Tenant/Workspace. The first bounded handler is `deny`; arbitrary code, scripts and remote hooks are not accepted. See ADR-0057.
+28. **Delivered durable Tool governance trace:** every physical Tool attempt records the ordered hook identities, Management resource generations and allow/deny/failure decisions before provider invocation. Runtime and Flow journals retain per-attempt facts without arguments or results; failure to project the decision prevents the provider call. See ADR-0058.
 
 ## ADR catalog
 
@@ -413,3 +414,4 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0055: Agentstration-owned Tool execution boundary
 - ADR-0056: ordered Runtime guards for Tool execution
 - ADR-0057: workspace-scoped Tool Hook resources select built-in Runtime handlers
+- ADR-0058: Tool governance decisions are traced per physical attempt

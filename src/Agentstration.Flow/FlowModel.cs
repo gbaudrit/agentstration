@@ -42,6 +42,7 @@ public enum FlowRunEventType
     InputExpired,
     FlowRunResumed,
     ToolCallStarted,
+    ToolCallGovernanceEvaluated,
     ToolCallCompleted,
     ToolCallFailed
 }
