@@ -32,7 +32,7 @@ An Entry now opens a durable Interaction rather than a terminal Task funnel. The
 
 Continuation execution uses a child WorkItem internally. Workplace projects that execution onto the anchor WorkTask, so the user sees one living Task rather than technical run records. The context contains recent functional messages and result/artifact references only; it excludes persistence entities, runtime internals, providers, models, technical prompts, and traces. An optional Entry continuation target can override the initial target, but the initial target remains the default.
 
-Simple PendingActions are conversation-native. `guided-request` asks for a style with one-click Choice buttons; confirmation is also one click, and Input uses a small inline composer. The chosen value is recorded as a user message. Blocking questions disable the permanent composer with an explanation until resolved.
+Simple PendingActions are conversation-native. Their prompt is rendered as an Agentstration turn rather than an operations panel. `guided-request` asks for a style with one-click Choice buttons; confirmation is also one click, and Input uses a small inline composer. The chosen value is recorded as a user message. Blocking questions disable the permanent composer with an explanation until resolved.
 
 The Work API adds recent Interaction listing and makes message continuation explicit:
 
@@ -45,7 +45,7 @@ The POST returns `202 Accepted` with the accepted message, updated Interaction, 
 
 Prompt Entries provide declarative suggestions that fill the composer without submitting, multiline input, an explicit send action, loading/disabled states, and Ctrl/Command+Enter submission. Unsupported attachment controls stay hidden. Pending actions appear inside the conversation that caused them; their single-use raw resume token stays in the initiating browser response and is never persisted or exposed by later Interaction reads.
 
-When an Interaction becomes a Task, Workplace keeps the user in context with an inline Task card. Task detail uses functional activity labels, conversation context, readable results, downloadable artifact cards, and conditional Task actions. Storage keys, Flow Run identifiers, provider/runtime details, and raw JSON infrastructure views are not part of the default experience.
+When an Interaction becomes a Task, Workplace keeps the user in context with an inline Task card. Compact progress retains the current functional activity but suppresses terminal lifecycle markers already conveyed by the answer, pending action, result, or artifact; detailed progress retains the complete functional history. Task detail uses functional activity labels, conversation context, readable results, downloadable artifact cards, and conditional Task actions. Storage keys, Flow Run identifiers, provider/runtime details, and raw JSON infrastructure views are not part of the default experience.
 
 The shell continues to reuse the Console design system and icon language, with end-user vocabulary and a responsive composition: wide two-column workspace, tablet stacking, and a touch-friendly single column with bottom navigation below 620 px. Loading, empty, disconnected-realtime, API-unavailable, expired-action, failure, cancellation, no-result, and no-artifact states remain explicit. SignalR updates only the affected active conversation, Task, or notification summary; REST remains authoritative after reconnect.
 

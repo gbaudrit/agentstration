@@ -75,7 +75,7 @@
             IReadOnlyList<WorkTaskActivity> progress = Presentation.Progress.Visibility switch
             {
                 EntryProgressVisibility.Detailed => Activities,
-                EntryProgressVisibility.Compact => Activities.OrderByDescending(value => value.CreatedAt).Take(1).ToArray(),
+                EntryProgressVisibility.Compact => CompactProgress(),
                 _ => []
             };
             items.AddRange(progress.Select(value => new TimelineItem(value.CreatedAt, 1, value.Id.ToString(), value)));
@@ -90,6 +90,22 @@
 
     private bool ShowMessage(ConversationMessage message) => Presentation.Participants.Visibility == EntryParticipantVisibility.Visible
         || message.Metadata?.ContainsKey("participantId") != true;
+    private IReadOnlyList<WorkTaskActivity> CompactProgress()
+    {
+        var latest = Activities.OrderByDescending(value => value.CreatedAt).FirstOrDefault();
+        if (latest is null) return [];
+        if (latest.Type == WorkTaskActivityType.ActionRequired
+            && Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction)
+            return [];
+        if (latest.Type == WorkTaskActivityType.TaskCompleted
+            && (Results.Any(result => result.CreatedAt >= latest.CreatedAt)
+                || Artifacts.Any(artifact => artifact.CreatedAt >= latest.CreatedAt)
+                || Messages.Any(message => message.Role == ConversationRole.Agentstration && message.CreatedAt >= latest.CreatedAt)))
+            return [];
+        if (latest.Type == WorkTaskActivityType.ResultProduced && Results.Count > 0) return [];
+        if (latest.Type == WorkTaskActivityType.ArtifactProduced && Artifacts.Count > 0) return [];
+        return [latest];
+    }
     private bool ShowTask(WorkTaskResponse task) => Presentation.Task.Display switch
     {
         EntryTaskDisplay.Visible => true,

@@ -15,6 +15,8 @@ The first execution-presentation settings cover participant visibility, progress
 
 Workplace builds a presentation-only unified timeline from existing `ConversationMessage`, `WorkTaskActivity`, `PendingAction`, `WorkTask`, `WorkTaskResult`, and `WorkTaskArtifact` records. Participant turns are projected durably as attributed ConversationMessages so presentation can hide or expose them without querying Flow topology. Flow input requests continue to project to the existing PendingAction and remain Flow-owned.
 
+In conversation mode, a PendingAction is rendered as an Agentstration turn with inline text, choice, or confirmation controls rather than as an operations panel. Compact progress shows the current functional activity and suppresses lifecycle markers already conveyed by the pending action, final answer, result, or artifact; detailed progress retains the full activity history.
+
 The user-facing synthesis is carried by a ConversationMessage. Workplace renders a WorkTaskResult automatically only when it adds structured information beyond that synthesis, and it projects only artifacts explicitly declared by WorkResult. A textual result is not converted into a synthetic downloadable artifact.
 
 ## Consequences

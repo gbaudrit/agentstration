@@ -57,7 +57,8 @@ public sealed class WorkplaceUxTests
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
 
         Assert.AreEqual(1, rendered.FindAll(".conversation-thread .pending-conversation").Count);
-        Assert.IsTrue(rendered.Markup.Contains("Action required", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("Response needed", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Markup.Contains("Action required", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -143,6 +144,37 @@ public sealed class WorkplaceUxTests
         Assert.IsFalse(rendered.Markup.Contains("Duplicate envelope", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Comparison", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Enriched answer", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void CompactProgressKeepsCurrentWorkButDoesNotRepeatCompletionBesideTheAnswer()
+    {
+        using var context = new BunitContext();
+        var now = new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero);
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        var interactionId = InteractionId.New();
+        var taskId = new WorkTaskId(Guid.NewGuid());
+        var started = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.TaskStarted, "Analyzing your request", null, now, WorkActorKind.Agentstration);
+        var completed = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.TaskCompleted, "Task completed", null, now.AddSeconds(1), WorkActorKind.Agentstration);
+        var answer = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.Agentstration, "Here is the answer.", now.AddSeconds(1));
+
+        var running = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.Activities, [started])
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+        Assert.IsTrue(running.Markup.Contains("Analyzing your request", StringComparison.Ordinal));
+
+        var compact = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.Messages, [answer])
+            .Add(value => value.Activities, [started, completed])
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+        Assert.IsFalse(compact.Markup.Contains("Task completed", StringComparison.Ordinal));
+
+        var detailed = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.Presentation, new EntryPresentation { Progress = new(EntryProgressVisibility.Detailed) })
+            .Add(value => value.Messages, [answer])
+            .Add(value => value.Activities, [started, completed])
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+        Assert.IsTrue(detailed.Markup.Contains("Task completed", StringComparison.Ordinal));
     }
 
     [TestMethod]
