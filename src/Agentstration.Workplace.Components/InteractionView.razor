@@ -100,7 +100,25 @@
     {
         EntryResultDisplay.Visible => true,
         EntryResultDisplay.Hidden => false,
-        _ => result.Kind is not WorkTaskResultKind.Text
+        _ => result.Kind is not WorkTaskResultKind.Text && !ConversationAlreadyCarries(result)
+    };
+    private bool ConversationAlreadyCarries(WorkTaskResult result)
+    {
+        var summary = ConversationSummary(result.Content);
+        if (string.IsNullOrWhiteSpace(summary)
+            || !Messages.Any(message => message.Role == ConversationRole.Agentstration && string.Equals(message.Content.Trim(), summary.Trim(), StringComparison.Ordinal)))
+            return false;
+
+        if (result.Content.ValueKind == System.Text.Json.JsonValueKind.String) return true;
+        return result.Content.ValueKind == System.Text.Json.JsonValueKind.Object
+            && result.Content.EnumerateObject().All(property => string.Equals(property.Name, "finalOutput", StringComparison.Ordinal));
+    }
+    private static string? ConversationSummary(System.Text.Json.JsonElement content) => content.ValueKind switch
+    {
+        System.Text.Json.JsonValueKind.String => content.GetString(),
+        System.Text.Json.JsonValueKind.Object when content.TryGetProperty("finalOutput", out var output)
+            && output.ValueKind == System.Text.Json.JsonValueKind.String => output.GetString(),
+        _ => null
     };
     private string? ComposerDisabledReason => Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction || Status == InteractionStatus.WaitingForUser
         ? "Answer the question above to continue."

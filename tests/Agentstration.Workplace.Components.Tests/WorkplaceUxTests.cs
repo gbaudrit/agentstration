@@ -128,17 +128,21 @@ public sealed class WorkplaceUxTests
         var participant = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.Agentstration, "Participant detail", DateTimeOffset.UtcNow, "agent-a", Metadata: new Dictionary<string, string> { ["participantId"] = "alice" });
         var summary = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.Agentstration, "Final answer", DateTimeOffset.UtcNow.AddSeconds(1));
         var text = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Text, "Text", JsonSerializer.SerializeToElement("Final answer"), DateTimeOffset.UtcNow.AddSeconds(2));
-        var structured = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Table, "Comparison", JsonSerializer.SerializeToElement(new { rows = 2 }), DateTimeOffset.UtcNow.AddSeconds(3));
+        var envelope = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Structured, "Duplicate envelope", JsonSerializer.SerializeToElement(new { finalOutput = "Final answer" }), DateTimeOffset.UtcNow.AddSeconds(3));
+        var structured = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Table, "Comparison", JsonSerializer.SerializeToElement(new { rows = 2 }), DateTimeOffset.UtcNow.AddSeconds(4));
+        var enriched = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Structured, "Enriched answer", JsonSerializer.SerializeToElement(new { finalOutput = "Final answer", confidence = 0.9 }), DateTimeOffset.UtcNow.AddSeconds(5));
 
         var rendered = context.Render<InteractionView>(parameters => parameters
             .Add(value => value.Messages, [participant, summary])
-            .Add(value => value.Results, [text, structured])
+            .Add(value => value.Results, [text, envelope, structured, enriched])
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
 
         Assert.IsFalse(rendered.Markup.Contains("Participant detail", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Final answer", StringComparison.Ordinal));
-        Assert.AreEqual(1, rendered.FindAll(".task-result").Count);
+        Assert.AreEqual(2, rendered.FindAll(".task-result").Count);
+        Assert.IsFalse(rendered.Markup.Contains("Duplicate envelope", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Comparison", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("Enriched answer", StringComparison.Ordinal));
     }
 
     [TestMethod]

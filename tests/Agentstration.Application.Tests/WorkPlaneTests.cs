@@ -357,6 +357,47 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public async Task WorkplaceProjectionPublishesOnlyArtifactsDeclaredByTheWorkResult()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var itemId = WorkItemId.New();
+        var taskId = WorkTaskId.FromWorkItem(itemId);
+        var interactionId = InteractionId.New();
+        var executionId = WorkExecutionId.New();
+        var item = WorkItem.Create(
+            itemId,
+            WorkplaceId,
+            "entry",
+            "Build a comparison",
+            Now,
+            metadata: new Dictionary<string, string>
+            {
+                ["workplace.workspaceId"] = WorkplaceId.Value.ToString("D"),
+                ["workplace.interactionId"] = interactionId.Value.ToString("D"),
+                ["workplace.taskId"] = taskId.Value.ToString("D")
+            });
+        item.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddMilliseconds(500));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(1), "agent"));
+        var result = new WorkResult(
+            [new WorkResultContent("Comparison ready")],
+            [new WorkArtifact("comparison.csv", new WorkContentReference("stored-comparison.csv", "text/csv"), Size: 42)],
+            new Dictionary<string, string> { ["flowRunId"] = "flow-run-1" },
+            Now.AddSeconds(2));
+        item.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(2), result));
+
+        var sink = new WorkplaceProjectionSink(fixture.Workplace, []);
+        await sink.PublishAsync(item.ToSnapshot(), default);
+
+        var projected = await fixture.Workplace.ListArtifactsAsync(WorkplaceId, taskId, default);
+        Assert.HasCount(1, projected);
+        var artifact = projected[0];
+        Assert.AreEqual("comparison.csv", artifact.Name);
+        Assert.AreEqual("text/csv", artifact.ContentType);
+        Assert.AreEqual(42, artifact.Length);
+        Assert.AreEqual("stored-comparison.csv", artifact.StorageKey);
+    }
+
+    [TestMethod]
     public async Task SqliteWorkplaceStorageIsolatesHomonymousEntriesByNamespace()
     {
         await using var fixture = await WorkFixture.CreateAsync();
