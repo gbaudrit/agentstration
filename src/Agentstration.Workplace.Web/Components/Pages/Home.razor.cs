@@ -16,6 +16,8 @@ public partial class Home
     private IReadOnlyList<EntryResponse> featuredEntries = [];
     private IReadOnlyList<EntryResponse> standardEntries = [];
     private InteractionResponse? interaction;
+    private EntryResponse? activeEntry;
+    private PendingActionContract? pendingAction;
     private IReadOnlyList<ConversationMessage> messages = [];
     private WorkplaceAction? currentAction;
     private WorkTaskResponse? activeTask;
@@ -118,7 +120,8 @@ public partial class Home
         try
         {
             var submission = await Api.SubmitAsync(CurrentWorkspaceName, new EntryId(entry.Id, entry.Namespace), values, lifetime.Token);
-            interaction = submission.Interaction; messages = submission.Interaction.Messages; currentAction = submission.Action; activeTask = submission.Task;
+            activeEntry = entry; interaction = submission.Interaction; messages = submission.Interaction.Messages; currentAction = submission.Action; activeTask = submission.Task;
+            pendingAction = await CurrentPendingActionAsync(submission.Interaction);
             if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id);
             await RefreshOverviewAsync();
         }
@@ -134,6 +137,7 @@ public partial class Home
         {
             var resolution = await Api.RespondAsync(CurrentWorkspaceName, interaction.Id, answer.PendingActionId.Value, answer.ResumeToken, answer.Values, lifetime.Token);
             interaction = resolution.Interaction; messages = resolution.Interaction.Messages; currentAction = resolution.NextAction; activeTask = resolution.Task;
+            pendingAction = await CurrentPendingActionAsync(resolution.Interaction);
             if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id);
             await RefreshOverviewAsync();
         }
@@ -172,7 +176,11 @@ public partial class Home
         {
             case MessageAddedEvent value when value.Message.InteractionId.Value == interaction?.Id: messages = await Api.ListMessagesAsync(CurrentWorkspaceName, value.Message.InteractionId.Value, lifetime.Token); break;
             case InteractionUpdatedEvent value when value.InteractionId == interaction?.Id:
-                interaction = await Api.GetInteractionAsync(CurrentWorkspaceName, value.InteractionId, lifetime.Token); break;
+                await LoadInteractionAsync(value.InteractionId); break;
+            case PendingActionCreatedEvent value when value.PendingAction.InteractionId == interaction?.Id:
+                await LoadInteractionAsync(value.PendingAction.InteractionId); break;
+            case PendingActionResolvedEvent when interaction is not null:
+                await LoadInteractionAsync(interaction.Id); break;
             case TaskCreatedEvent: await RefreshOverviewAsync(); break;
             case TaskStatusChangedEvent status when status.TaskId == activeTask?.Id:
                 await RefreshActiveTaskAsync(activeTask!.Id); await RefreshOverviewAsync(); break;
@@ -215,12 +223,20 @@ public partial class Home
     private async Task LoadInteractionAsync(Guid interactionId)
     {
         interaction = await Api.GetInteractionAsync(CurrentWorkspaceName, interactionId, lifetime.Token);
+        activeEntry = await Api.GetEntryAsync(new EntryId(interaction.EntryId, interaction.EntryNamespace), lifetime.Token);
         messages = await Api.ListMessagesAsync(CurrentWorkspaceName, interactionId, lifetime.Token);
+        pendingAction = await CurrentPendingActionAsync(interaction);
         currentAction = interaction.ImmediateResult;
         if (interaction.TaskId is not null) await RefreshActiveTaskAsync(interaction.TaskId.Value);
         else { activeTask = null; activities = []; results = []; artifacts = []; }
     }
-    private void ResetInteractionState() { interaction = null; messages = []; currentAction = null; activeTask = null; activities = []; results = []; artifacts = []; interactionError = null; }
+    private void ResetInteractionState() { interaction = null; activeEntry = null; pendingAction = null; messages = []; currentAction = null; activeTask = null; activities = []; results = []; artifacts = []; interactionError = null; }
+    private async Task<PendingActionContract?> CurrentPendingActionAsync(InteractionResponse value)
+    {
+        if (value.PendingActionId is null) return null;
+        return (await Api.ListPendingActionsAsync(CurrentWorkspaceName, value.Id, lifetime.Token))
+            .SingleOrDefault(action => action.Id == value.PendingActionId && action.Status == PendingActionStatus.Pending);
+    }
     private async Task RefreshNotificationsAsync() { notifications = await Api.ListNotificationsAsync(CurrentWorkspaceName, false, lifetime.Token); unread = await Api.GetUnreadCountAsync(CurrentWorkspaceName, lifetime.Token); }
     private async Task MarkReadAsync(WorkNotificationId id) { await Api.MarkNotificationReadAsync(CurrentWorkspaceName, id.Value, lifetime.Token); await RefreshNotificationsAsync(); }
     private async Task MarkAllReadAsync() { await Api.MarkAllNotificationsReadAsync(CurrentWorkspaceName, lifetime.Token); await RefreshNotificationsAsync(); }

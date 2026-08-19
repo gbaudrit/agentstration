@@ -47,6 +47,10 @@ public readonly record struct WorkTaskArtifactId(Guid Value) { public static Wor
 
 public enum DashboardItemRole { Primary, Featured, Standard }
 public enum EntryPresentationKind { Prompt, Form, Conversation, Action, FileDrop }
+public enum EntryParticipantVisibility { Hidden, Visible }
+public enum EntryProgressVisibility { Hidden, Compact, Detailed }
+public enum EntryTaskDisplay { Auto, Hidden, Visible }
+public enum EntryResultDisplay { Auto, Hidden, Visible }
 public enum EntryFieldType { Prompt, Text, Textarea, Number, Boolean, Choice, MultiChoice, Date, DateTime, File, Files, EntityPicker, ResourcePicker, Secret, Conversation }
 public enum EntryFieldRole { Standard, PrimaryInput }
 public enum EntryBindingKind { Agent, Flow }
@@ -58,7 +62,7 @@ public enum PendingActionKind { InputRequired, ConfirmationRequired, ChoiceRequi
 public enum PendingActionStatus { Pending, Completed, Cancelled, Expired }
 public enum ConversationRole { User, Agentstration, System }
 public enum WorkActorKind { User, Agentstration, System }
-public enum WorkTaskActivityType { TaskCreated, TaskStarted, TaskPaused, TaskResumed, TaskCancelled, ActionRequired, ActionResolved, ResultProduced, ArtifactProduced, TaskCompleted, TaskFailed }
+public enum WorkTaskActivityType { TaskCreated, TaskStarted, ProgressStarted, ProgressCompleted, TaskPaused, TaskResumed, TaskCancelled, ActionRequired, ActionResolved, ResultProduced, ArtifactProduced, TaskCompleted, TaskFailed }
 public enum WorkNotificationKind { ActionRequired, TaskCompleted, TaskFailed, Information }
 public enum WorkTaskResultKind { Text, Structured, Table, Json, Status }
 
@@ -102,6 +106,10 @@ public sealed record WorkplaceDashboardDraft
 public sealed record EntryFieldValidation(int? MinimumLength = null, int? MaximumLength = null, IReadOnlyList<string>? AllowedExtensions = null);
 public sealed record EntryFieldOption(string Value, string Label);
 public sealed record EntrySuggestion(string Label, string Value);
+public sealed record EntryParticipantsPresentation(EntryParticipantVisibility Visibility = EntryParticipantVisibility.Hidden);
+public sealed record EntryProgressPresentation(EntryProgressVisibility Visibility = EntryProgressVisibility.Compact);
+public sealed record EntryTaskPresentation(EntryTaskDisplay Display = EntryTaskDisplay.Auto);
+public sealed record EntryResultsPresentation(EntryResultDisplay Display = EntryResultDisplay.Auto);
 
 public sealed record EntryFieldDefinition
 {
@@ -127,6 +135,10 @@ public sealed record EntryPresentation
     public bool AllowVoiceInput { get; init; }
     public IReadOnlyList<EntrySuggestion> Suggestions { get; init; } = [];
     public IReadOnlyList<EntryFieldDefinition> Fields { get; init; } = [];
+    public EntryParticipantsPresentation Participants { get; init; } = new();
+    public EntryProgressPresentation Progress { get; init; } = new();
+    public EntryTaskPresentation Task { get; init; } = new();
+    public EntryResultsPresentation Results { get; init; } = new();
 }
 
 public sealed record EntryBinding(EntryBindingKind Kind, string ResourceId, ResourceNamespace? Namespace = null);
@@ -326,6 +338,15 @@ public static class WorkplaceValidation
 
     private static void ValidatePresentation(EntryPresentation presentation)
     {
+        ArgumentNullException.ThrowIfNull(presentation.Participants);
+        ArgumentNullException.ThrowIfNull(presentation.Progress);
+        ArgumentNullException.ThrowIfNull(presentation.Task);
+        ArgumentNullException.ThrowIfNull(presentation.Results);
+        if (!Enum.IsDefined(presentation.Participants.Visibility)
+            || !Enum.IsDefined(presentation.Progress.Visibility)
+            || !Enum.IsDefined(presentation.Task.Display)
+            || !Enum.IsDefined(presentation.Results.Display))
+            throw new WorkValidationException("entry_execution_presentation_invalid", "The Entry execution presentation contains an unsupported value.");
         if (presentation.Kind is not EntryPresentationKind.Prompt and not EntryPresentationKind.Form)
             throw new WorkValidationException("entry_kind_not_supported", "The MVP supports Prompt and Form Entries.");
         if (presentation.Kind == EntryPresentationKind.Form && presentation.Fields.Count == 0)

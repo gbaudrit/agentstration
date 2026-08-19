@@ -29,6 +29,9 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual(EntryBindingKind.Flow, client.RequestedKinds.Last());
         await rendered.Find("[data-testid='target-resource']").ChangeAsync(new ChangeEventArgs { Value = FakeEntryAdministrationApiClient.FlowResourceId });
         await rendered.Find("[data-testid='presentation-kind']").ChangeAsync(new ChangeEventArgs { Value = "Form" });
+        await rendered.Find("[data-testid='participants-visibility']").ChangeAsync(new ChangeEventArgs { Value = "Visible" });
+        await rendered.Find("[data-testid='progress-visibility']").ChangeAsync(new ChangeEventArgs { Value = "Detailed" });
+        await rendered.Find("[data-testid='task-display']").ChangeAsync(new ChangeEventArgs { Value = "Visible" });
         await rendered.Find("[data-testid='add-field']").ClickAsync(new());
         var primaryRadios = rendered.FindAll("input[name='primary-input']");
         Assert.IsTrue(rendered.FindAll("input[type='checkbox'], input[type='radio']").All(value => value.ParentElement?.ClassList.Contains("entry-toggle") == true));
@@ -40,6 +43,9 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual(EntryBindingKind.Flow, client.SavedEntry.Binding.Kind);
         Assert.AreEqual(FakeEntryAdministrationApiClient.FlowResourceId, client.SavedEntry.Binding.ResourceId);
         Assert.AreEqual(EntryPresentationKind.Form, client.SavedEntry.Presentation.Kind);
+        Assert.AreEqual(EntryParticipantVisibility.Visible, client.SavedEntry.Presentation.Participants.Visibility);
+        Assert.AreEqual(EntryProgressVisibility.Detailed, client.SavedEntry.Presentation.Progress.Visibility);
+        Assert.AreEqual(EntryTaskDisplay.Visible, client.SavedEntry.Presentation.Task.Display);
         Assert.HasCount(2, client.SavedEntry.Presentation.Fields);
         Assert.AreEqual("field2", client.SavedEntry.Presentation.Fields.Single(value => value.Role == EntryFieldRole.PrimaryInput).Name);
         Assert.IsTrue(rendered.Markup.Contains("Published Entry v1 with pinned Flow 1.0.0", StringComparison.Ordinal));

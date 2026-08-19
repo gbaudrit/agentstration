@@ -119,6 +119,16 @@ else
             </section>
 
             <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">Execution experience</p><h2>Interaction presentation</h2><p>These settings change Workplace only; the published Flow remains unchanged.</p></div></div>
+                <div class="form-grid">
+                    <label><span>Participants</span><select data-testid="participants-visibility" @bind="participantsVisibility">@foreach (var value in Enum.GetValues<EntryParticipantVisibility>()) { <option value="@value">@value</option> }</select></label>
+                    <label><span>Progress</span><select data-testid="progress-visibility" @bind="progressVisibility">@foreach (var value in Enum.GetValues<EntryProgressVisibility>()) { <option value="@value">@value</option> }</select></label>
+                    <label><span>Task</span><select data-testid="task-display" @bind="taskDisplay">@foreach (var value in Enum.GetValues<EntryTaskDisplay>()) { <option value="@value">@value</option> }</select></label>
+                    <label><span>Results</span><select data-testid="results-display" @bind="resultDisplay">@foreach (var value in Enum.GetValues<EntryResultDisplay>()) { <option value="@value">@value</option> }</select></label>
+                </div>
+            </section>
+
+            <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">Fields</p><h2>Input schema</h2></div><button class="button-secondary" data-testid="add-field" type="button" @onclick="AddField">Add field</button></div>
                 <div class="entry-card-list">
                     @for (var index = 0; index < fields.Count; index++)
@@ -229,6 +239,10 @@ else
     private EntryTab activeTab = EntryTab.Overview;
     private EntryBindingKind bindingKind = EntryBindingKind.Agent;
     private EntryPresentationKind presentationKind = EntryPresentationKind.Prompt;
+    private EntryParticipantVisibility participantsVisibility = EntryParticipantVisibility.Hidden;
+    private EntryProgressVisibility progressVisibility = EntryProgressVisibility.Compact;
+    private EntryTaskDisplay taskDisplay = EntryTaskDisplay.Auto;
+    private EntryResultDisplay resultDisplay = EntryResultDisplay.Auto;
     private TaskCreationMode taskMode = TaskCreationMode.Automatic;
     private bool allowConversation = true, streamResponse = true, allowAttachments;
     private readonly List<EditorField> fields = [new() { Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true, Primary = true }];
@@ -256,7 +270,7 @@ else
         if (!IsNew)
         {
             var response = await Client.GetEntryAsync(EntryResourceNamespace, Name, default); var draft = response.Value; published = response.Published; publishedBinding = draft.PublishedBinding; draftRevision = draft.Revision;
-            resourceName = draft.Name; displayName = draft.DisplayName; description = draft.Description ?? ""; placeholder = draft.Presentation.Placeholder ?? ""; presentationKind = draft.Presentation.Kind; bindingKind = draft.Binding.Kind; resourceId = draft.Binding.ResourceId; taskMode = draft.Behavior.TaskCreationMode; allowConversation = draft.Behavior.AllowConversation; streamResponse = draft.Behavior.StreamResponse; allowAttachments = draft.Presentation.AllowAttachments;
+            resourceName = draft.Name; displayName = draft.DisplayName; description = draft.Description ?? ""; placeholder = draft.Presentation.Placeholder ?? ""; presentationKind = draft.Presentation.Kind; participantsVisibility = draft.Presentation.Participants.Visibility; progressVisibility = draft.Presentation.Progress.Visibility; taskDisplay = draft.Presentation.Task.Display; resultDisplay = draft.Presentation.Results.Display; bindingKind = draft.Binding.Kind; resourceId = draft.Binding.ResourceId; taskMode = draft.Behavior.TaskCreationMode; allowConversation = draft.Behavior.AllowConversation; streamResponse = draft.Behavior.StreamResponse; allowAttachments = draft.Presentation.AllowAttachments;
             fields.Clear(); fields.AddRange(draft.Presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")) }));
             suggestions.Clear(); suggestions.AddRange(draft.Presentation.Suggestions.Select(value => new EditorSuggestion { Label = value.Label, Value = value.Value }));
             dependencies = await Client.GetDependenciesAsync(EntryResourceNamespace, Name, default);
@@ -290,7 +304,7 @@ else
     private void MoveField(EditorField field, int offset) { var index = fields.IndexOf(field); var target = index + offset; if (index < 0 || target < 0 || target >= fields.Count) return; fields.RemoveAt(index); fields.Insert(target, field); }
     private void AddSuggestion() => suggestions.Add(new EditorSuggestion { Label = "Suggestion", Value = "" });
     private void RemoveSuggestion(EditorSuggestion suggestion) => suggestions.Remove(suggestion);
-    private EntryPresentation Presentation() => new() { Kind = presentationKind, Placeholder = placeholder, AllowAttachments = allowAttachments, Fields = fields.Select((value, index) => new EntryFieldDefinition { Name = value.Name.Trim(), Label = string.IsNullOrWhiteSpace(value.Label) ? null : value.Label.Trim(), Type = value.Type, Required = value.Required, Role = value.Primary ? EntryFieldRole.PrimaryInput : EntryFieldRole.Standard, Order = index, Options = ParseOptions(value.Options), Validation = value.Type is EntryFieldType.Prompt or EntryFieldType.Text or EntryFieldType.Textarea or EntryFieldType.Conversation ? new EntryFieldValidation(1, 10_000) : null }).ToArray(), Suggestions = suggestions.Where(value => !string.IsNullOrWhiteSpace(value.Label) && !string.IsNullOrWhiteSpace(value.Value)).Select(value => new EntrySuggestion(value.Label.Trim(), value.Value.Trim())).ToArray() };
+    private EntryPresentation Presentation() => new() { Kind = presentationKind, Placeholder = placeholder, AllowAttachments = allowAttachments, Participants = new(participantsVisibility), Progress = new(progressVisibility), Task = new(taskDisplay), Results = new(resultDisplay), Fields = fields.Select((value, index) => new EntryFieldDefinition { Name = value.Name.Trim(), Label = string.IsNullOrWhiteSpace(value.Label) ? null : value.Label.Trim(), Type = value.Type, Required = value.Required, Role = value.Primary ? EntryFieldRole.PrimaryInput : EntryFieldRole.Standard, Order = index, Options = ParseOptions(value.Options), Validation = value.Type is EntryFieldType.Prompt or EntryFieldType.Text or EntryFieldType.Textarea or EntryFieldType.Conversation ? new EntryFieldValidation(1, 10_000) : null }).ToArray(), Suggestions = suggestions.Where(value => !string.IsNullOrWhiteSpace(value.Label) && !string.IsNullOrWhiteSpace(value.Value)).Select(value => new EntrySuggestion(value.Label.Trim(), value.Value.Trim())).ToArray() };
     private static IReadOnlyList<EntryFieldOption> ParseOptions(string options) => options.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(value => { var parts = value.Split(':', 2, StringSplitOptions.TrimEntries); return new EntryFieldOption(parts[0], parts.Length == 2 ? parts[1] : parts[0]); }).ToArray();
     private EntryBehavior Behavior() => new(taskMode, allowConversation, streamResponse, new EntryConversationBehavior(allowConversation));
     private Agentstration.Resources.WorkspaceId CurrentWorkspaceId => new(workspaces.FirstOrDefault()?.Id ?? published?.WorkspaceId.Value ?? Guid.Empty);

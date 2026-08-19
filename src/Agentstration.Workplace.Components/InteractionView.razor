@@ -5,45 +5,50 @@
     </header>
 
     <div class="conversation-thread" aria-live="polite">
-        @foreach (var message in Messages.OrderBy(value => value.CreatedAt))
+        @foreach (var item in Timeline)
         {
-            <ConversationMessageView Message="message" />
-        }
-        @if (Action is RespondAction response && !Messages.Any(value => value.Role == ConversationRole.Agentstration && value.Content == response.Content))
-        {
-            <article class="assistant-response"><span><UiIcon Name="sparkle" /></span><div><strong>Agentstration</strong><p>@response.Content</p></div></article>
-        }
-        @if (Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction)
-        {
-            <div class="inline-pending"><PendingActionPanel Action="Action" Busy="Busy" OnSubmit="OnPendingAction" ConversationMode="true" /></div>
+            @switch (item.Value)
+            {
+                case ConversationMessage message:
+                    <ConversationMessageView Message="message" />
+                    break;
+                case WorkTaskActivity activity:
+                    <TaskActivityView Activity="activity" ParticipantVisibility="Presentation.Participants.Visibility" />
+                    break;
+                case WorkplaceAction action when action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction:
+                    <div class="inline-pending"><PendingActionPanel Action="action" Busy="Busy" OnSubmit="OnPendingAction" ConversationMode="true" /></div>
+                    break;
+                case WorkTaskResponse task:
+                    <InlineTaskCard Task="task" LatestActivity="@Activities.OrderByDescending(value => value.CreatedAt).FirstOrDefault()" ResultsCount="Results.Count" ArtifactsCount="Artifacts.Count" />
+                    break;
+                case WorkTaskResult result:
+                    <TaskResultView Result="result" />
+                    break;
+                case WorkTaskArtifact artifact:
+                    <ArtifactCard Artifact="artifact" ContentUrl="@ArtifactContentUrl(artifact)" />
+                    break;
+                case ProcessingItem:
+                    <div class="processing-feedback" role="status"><span></span>Agentstration is working on your request…</div>
+                    break;
+                case AssistantResponseItem response:
+                    <article class="assistant-response"><span><UiIcon Name="sparkle" /></span><div><strong>Agentstration</strong><p>@response.Content</p></div></article>
+                    break;
+            }
         }
         @if (!string.IsNullOrWhiteSpace(Error))
         {
             <p class="interaction-error" role="alert">@Error</p>
         }
-        @if (Task is not null)
-        {
-            <InlineTaskCard Task="Task" LatestActivity="@Activities.OrderByDescending(value => value.CreatedAt).FirstOrDefault()" ResultsCount="Results.Count" ArtifactsCount="Artifacts.Count" />
-        }
-        @if (Task is not null && Task.Status is WorkTaskStatus.Running or WorkTaskStatus.Pending && Activities.Count == 0)
-        {
-            <div class="processing-feedback" role="status"><span></span>Agentstration is starting the task…</div>
-        }
     </div>
-
-    @if (Results.Count > 0 || Artifacts.Count > 0)
-    {
-        <div class="interaction-output">
-            @foreach (var result in Results.OrderByDescending(value => value.CreatedAt)) { <TaskResultView Result="result" /> }
-            @if (Artifacts.Count > 0) { <section><h2>Deliverables</h2><ArtifactList Artifacts="Artifacts" ContentUrl="ArtifactContentUrl" /></section> }
-        </div>
-    }
     <ConversationComposer Busy="Busy" DisabledReason="@ComposerDisabledReason" OnSubmit="OnMessage" />
 </section>
 
 @code {
     [Parameter] public IReadOnlyList<ConversationMessage> Messages { get; set; } = [];
     [Parameter] public WorkplaceAction? Action { get; set; }
+    [Parameter] public PendingActionContract? PendingAction { get; set; }
+    [Parameter] public DateTimeOffset? ActionTimestamp { get; set; }
+    [Parameter] public EntryPresentation Presentation { get; set; } = new();
     [Parameter] public WorkTaskResponse? Task { get; set; }
     [Parameter] public IReadOnlyList<WorkTaskActivity> Activities { get; set; } = [];
     [Parameter] public IReadOnlyList<WorkTaskResult> Results { get; set; } = [];
@@ -56,9 +61,108 @@
     [Parameter] public EventCallback<string> OnMessage { get; set; }
     [Parameter] public EventCallback OnNewRequest { get; set; }
     [Parameter, EditorRequired] public required Func<WorkTaskArtifact, string> ArtifactContentUrl { get; set; }
+
+    private IReadOnlyList<TimelineItem> Timeline
+    {
+        get
+        {
+            var items = new List<TimelineItem>();
+            items.AddRange(Messages.Where(ShowMessage).Select(value => new TimelineItem(value.CreatedAt, 0, value.Id.ToString("N"), value)));
+            if (Action is RespondAction response && !Messages.Any(value => value.Role == ConversationRole.Agentstration && value.Content == response.Content))
+                items.Add(new(ActionTimestamp ?? DateTimeOffset.MaxValue, 0, "response", new AssistantResponseItem(response.Content)));
+            if (Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction)
+                items.Add(new(PendingAction?.CreatedAt ?? ActionTimestamp ?? DateTimeOffset.MaxValue, 2, "pending", Action));
+            IReadOnlyList<WorkTaskActivity> progress = Presentation.Progress.Visibility switch
+            {
+                EntryProgressVisibility.Detailed => Activities,
+                EntryProgressVisibility.Compact => CompactProgress(),
+                _ => []
+            };
+            items.AddRange(progress.Select(value => new TimelineItem(value.CreatedAt, 1, value.Id.ToString(), value)));
+            if (Task is not null && ShowTask(Task)) items.Add(new(Task.CreatedAt, 3, Task.Id.ToString(), Task));
+            items.AddRange(Results.Where(ShowResult).Select(value => new TimelineItem(value.CreatedAt, 4, value.Id.ToString(), value)));
+            items.AddRange(Artifacts.Select(value => new TimelineItem(value.CreatedAt, 5, value.Id.ToString(), value)));
+            if (Presentation.Progress.Visibility != EntryProgressVisibility.Hidden
+                && Task is not null && Task.Status is WorkTaskStatus.Running or WorkTaskStatus.Pending && progress.Count == 0)
+                items.Add(new(Task.UpdatedAt, 1, "processing", ProcessingItem.Instance));
+            return items.OrderBy(value => value.Timestamp).ThenBy(value => value.Order).ThenBy(value => value.Key, StringComparer.Ordinal).ToArray();
+        }
+    }
+
+    private bool ShowMessage(ConversationMessage message) => Presentation.Participants.Visibility == EntryParticipantVisibility.Visible
+        || message.Metadata?.ContainsKey("participantId") != true;
+    private IReadOnlyList<WorkTaskActivity> CompactProgress()
+    {
+        var latest = Activities.OrderByDescending(value => value.CreatedAt).FirstOrDefault();
+        if (latest is null) return [];
+        if (latest.Type == WorkTaskActivityType.ActionRequired
+            && Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction)
+            return [];
+        if (latest.Type == WorkTaskActivityType.TaskCompleted
+            && (Results.Any(result => result.CreatedAt >= latest.CreatedAt)
+                || Artifacts.Any(artifact => artifact.CreatedAt >= latest.CreatedAt)
+                || Messages.Any(message => message.Role == ConversationRole.Agentstration && message.CreatedAt >= latest.CreatedAt)))
+            return [];
+        if (latest.Type == WorkTaskActivityType.ProgressCompleted
+            && latest.Metadata?.GetValueOrDefault("flowEventSequence") is { } sequence
+            && Messages.Any(message => message.Metadata?.GetValueOrDefault("flowEventSequence") == sequence))
+            return [];
+        if (latest.Type == WorkTaskActivityType.ResultProduced && Results.Count > 0) return [];
+        if (latest.Type == WorkTaskActivityType.ArtifactProduced && Artifacts.Count > 0) return [];
+        return [latest];
+    }
+    private static readonly TimeSpan AutoTaskDuration = TimeSpan.FromMinutes(1);
+
+    private bool ShowTask(WorkTaskResponse task) => Presentation.Task.Display switch
+    {
+        EntryTaskDisplay.Visible => true,
+        EntryTaskDisplay.Hidden => false,
+        _ => IsMaterialTask(task)
+    };
+    private bool IsMaterialTask(WorkTaskResponse task)
+    {
+        if (task.Status is WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused or WorkTaskStatus.Failed or WorkTaskStatus.Cancelled)
+            return true;
+
+        var lastObservedAt = Activities.Select(value => value.CreatedAt)
+            .Concat(Results.Select(value => value.CreatedAt))
+            .Concat(Artifacts.Select(value => value.CreatedAt))
+            .Append(task.UpdatedAt)
+            .Max();
+        var completedMilestones = Activities.Count(value => value.Type == WorkTaskActivityType.ProgressCompleted);
+        var deliverables = Results.Count + Artifacts.Count;
+        return lastObservedAt - task.CreatedAt >= AutoTaskDuration || completedMilestones >= 2 || deliverables >= 2;
+    }
+    private bool ShowResult(WorkTaskResult result) => Presentation.Results.Display switch
+    {
+        EntryResultDisplay.Visible => true,
+        EntryResultDisplay.Hidden => false,
+        _ => result.Kind is not WorkTaskResultKind.Text && !ConversationAlreadyCarries(result)
+    };
+    private bool ConversationAlreadyCarries(WorkTaskResult result)
+    {
+        var summary = ConversationSummary(result.Content);
+        if (string.IsNullOrWhiteSpace(summary)
+            || !Messages.Any(message => message.Role == ConversationRole.Agentstration && string.Equals(message.Content.Trim(), summary.Trim(), StringComparison.Ordinal)))
+            return false;
+
+        if (result.Content.ValueKind == System.Text.Json.JsonValueKind.String) return true;
+        return result.Content.ValueKind == System.Text.Json.JsonValueKind.Object
+            && result.Content.EnumerateObject().All(property => string.Equals(property.Name, "finalOutput", StringComparison.Ordinal));
+    }
+    private static string? ConversationSummary(System.Text.Json.JsonElement content) => content.ValueKind switch
+    {
+        System.Text.Json.JsonValueKind.String => content.GetString(),
+        System.Text.Json.JsonValueKind.Object when content.TryGetProperty("finalOutput", out var output)
+            && output.ValueKind == System.Text.Json.JsonValueKind.String => output.GetString(),
+        _ => null
+    };
     private string? ComposerDisabledReason => Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction || Status == InteractionStatus.WaitingForUser
         ? "Answer the question above to continue."
         : Status == InteractionStatus.Closed ? "This conversation is closed."
         : !string.IsNullOrWhiteSpace(Error) ? "The conversation will be available again after reconnecting."
         : null;
+    private sealed record TimelineItem(DateTimeOffset Timestamp, int Order, string Key, object Value);
+    private sealed record AssistantResponseItem(string Content);
+    private sealed class ProcessingItem { public static readonly ProcessingItem Instance = new(); }
 }

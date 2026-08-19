@@ -364,6 +364,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 29. **Delivered Tool governance audit read API:** `GET /api/tool-governance/{runtime|flow}/{runId}` reads the current Workspace's existing durable journal with an `afterSequence` cursor, bounded `limit`, and exact Tool call, physical invocation, Tool, Hook, HookResource generation and decision filters. The safe default response exposes invocation and policy identities without provider results or denial messages.
 30. **Delivered Tool governance Console view:** Runtime and Flow Run details link to a Run-scoped audit page. Runtime links preserve the logical `ToolCallId` and physical `InvocationId`; operators can filter and paginate the evaluated Hook chain, resource generation, order, decision and stable code.
 31. **Delivered opt-in Tool argument retention:** `Agentstration:ToolExecution:PersistArguments` defaults to `false`. Manual Runtime Runs expose an immutable tri-state override (`inherit`, `retain`, `do not retain`); retries preserve it. When effective, provider-neutral arguments are copied into the durable lifecycle projection, bounded by the host `MaximumArgumentsLength`, and shown on the Tool Governance view. Provider results remain excluded. See ADR-0059.
+32. **Delivered Entry-driven Workplace presentation increment:** Entry configures participant, progress, Task, and Result presentation while Workplace composes existing durable Work primitives into one conversation timeline. Flow and Runtime remain presentation-neutral. See ADR-0060.
 
 ## ADR catalog
 
@@ -419,3 +420,4 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0057: workspace-scoped Tool Hook resources select built-in Runtime handlers
 - ADR-0058: Tool governance decisions are traced per physical attempt
 - ADR-0059: Tool arguments require explicit bounded retention
+- ADR-0060: Entry owns Workplace execution presentation
