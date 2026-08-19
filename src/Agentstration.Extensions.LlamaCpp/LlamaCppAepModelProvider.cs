@@ -140,12 +140,7 @@ public sealed class LlamaCppAepModelProvider(HttpClient httpClient) : IAepModelP
             var root = document.RootElement;
             if (ContainsEnabledCapability(root, "tool")) capabilities.Add("tools");
             if (ContainsEnabledCapability(root, "reason")) capabilities.Add("reasoning");
-            if (root.TryGetProperty("modalities", out var modalities)
-                && modalities.ValueKind == JsonValueKind.Array
-                && modalities.EnumerateArray().Any(value => string.Equals(value.GetString(), "image", StringComparison.OrdinalIgnoreCase)))
-            {
-                capabilities.Add("vision");
-            }
+            if (root.TryGetProperty("modalities", out var modalities) && SupportsVision(modalities)) capabilities.Add("vision");
         }
         catch (HttpRequestException)
         {
@@ -365,6 +360,19 @@ public sealed class LlamaCppAepModelProvider(HttpClient httpClient) : IAepModelP
             foreach (var item in element.EnumerateArray()) if (ContainsEnabledCapability(item, fragment)) return true;
         }
         return false;
+    }
+
+    private static bool SupportsVision(JsonElement modalities)
+    {
+        if (modalities.ValueKind == JsonValueKind.Array)
+        {
+            return modalities.EnumerateArray().Any(value =>
+                value.ValueKind == JsonValueKind.String
+                && string.Equals(value.GetString(), "image", StringComparison.OrdinalIgnoreCase));
+        }
+        return modalities.ValueKind == JsonValueKind.Object
+            && ((modalities.TryGetProperty("vision", out var vision) && vision.ValueKind == JsonValueKind.True)
+                || (modalities.TryGetProperty("image", out var image) && image.ValueKind == JsonValueKind.True));
     }
 
     private static void Validate(AepChatRequest request)

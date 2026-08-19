@@ -95,7 +95,7 @@ public sealed class LlamaCppProviderTests
                 {"data":[{"id":"local-gguf","object":"model","meta":{"n_ctx_train":32768,"n_params":7000000000,"size":4200000000}}]}
                 """),
             "/props" => Json(HttpStatusCode.OK, """
-                {"chat_template_caps":{"supports_tools":true,"supports_reasoning":true},"modalities":["text","image"]}
+                {"chat_template_caps":{"supports_tools":true,"supports_reasoning":true},"modalities":{"vision":true,"video":false,"audio":false}}
                 """),
             _ => Json(HttpStatusCode.NotFound, "{}")
         }));

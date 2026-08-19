@@ -25,9 +25,17 @@ public sealed class LlamaCppIntegrationTests
         var response = await provider.ChatAsync(
             new AepChatRequest(model, [new AepMessage(AepRole.User, [AepContent.FromText("Reply with OK.")])]),
             default);
+        var streamedText = new List<string>();
+        await foreach (var update in provider.ChatStreamingAsync(
+                           new AepChatRequest(model, [new AepMessage(AepRole.User, [AepContent.FromText("Reply with STREAM OK.")])]),
+                           default))
+        {
+            streamedText.AddRange(update.Contents.Where(value => value.Text is not null).Select(value => value.Text!));
+        }
 
         Assert.AreEqual("available", health.Status);
         Assert.IsTrue(models.Any(value => string.Equals(value.Id, model, StringComparison.Ordinal)));
         Assert.IsNotEmpty(response.Messages.SelectMany(value => value.Contents).Where(value => value.Text is not null).Select(value => value.Text).ToArray());
+        Assert.IsNotEmpty(streamedText);
     }
 }
