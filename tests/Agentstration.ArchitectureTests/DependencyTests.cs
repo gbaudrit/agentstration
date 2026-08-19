@@ -5,6 +5,7 @@ using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Application;
 using Agentstration.Domain;
 using Agentstration.Evaluation;
+using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.Ollama;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
@@ -108,6 +109,7 @@ public sealed class DependencyTests
     {
         var references = typeof(IModelProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
+            || name.Contains("LlamaCpp", StringComparison.Ordinal)
             || name.Contains("Aspire", StringComparison.Ordinal)
             || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
@@ -141,10 +143,21 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void AgentFrameworkRuntimeDoesNotReferenceOllama()
+    public void LlamaCppExtensionDoesNotReferenceRuntimeMafOllamaOrAspireHosting()
+    {
+        var references = typeof(LlamaCppAepModelProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || name.Contains("Ollama", StringComparison.Ordinal)
+            || name.Contains("Aspire.Hosting", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void AgentFrameworkRuntimeDoesNotReferenceConcreteModelProviders()
     {
         var references = typeof(AgentFrameworkRuntimeFactory).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
-        Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)));
+        Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
+            || name.Contains("LlamaCpp", StringComparison.Ordinal)));
     }
 
     [TestMethod]

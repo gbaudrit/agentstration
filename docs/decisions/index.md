@@ -90,3 +90,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 58. [ADR-0058 — Tool governance decisions are traced per physical attempt](0058-tool-governance-decisions-are-traced-per-physical-attempt.md)
 59. [ADR-0059 — Tool arguments require explicit bounded retention](0059-tool-arguments-require-explicit-bounded-retention.md)
 60. [ADR-0060 — Entry owns Workplace execution presentation](0060-entry-owns-workplace-execution-presentation.md)
+61. [ADR-0061 — llama.cpp is an AEP provider and capabilities are resolved effectively](0061-llama-cpp-provider-and-effective-capabilities.md)

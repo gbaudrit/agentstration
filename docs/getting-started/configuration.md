@@ -7,6 +7,7 @@ The main verified settings are:
 | Setting | Current default | Purpose |
 | --- | --- | --- |
 | `AI:Provider` | `Managed` | Selects model resolution/execution mode. Use `Deterministic` explicitly for offline or test execution. |
+| `LlamaCpp:Endpoint` | `http://localhost:8080` | Native llama.cpp server used by the autonomous llama.cpp extension and Aspire. |
 | `Data:Path` | `.agentstration/data.json` | Content and memory store used by the Console host. |
 | `Data:ControlPlanePath` | `.agentstration/control-plane.db` | Management Plane SQLite database. |
 | `Data:WorkPlanePath` | `.agentstration/work-plane.db` | Work Plane SQLite database. |

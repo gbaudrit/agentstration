@@ -72,13 +72,25 @@ public sealed record EffectiveModelOptionsResponse(
     ModelReasoningOptions Reasoning,
     ModelOutputOptions Output);
 
+public sealed record ModelCapabilityResponse(
+    string Name,
+    string ProviderSupport,
+    string ModelSupport,
+    string AdapterSupport,
+    string EffectiveSupport,
+    IReadOnlyList<string> SupportedValues);
+
+public sealed record ModelCompatibilityIssueResponse(string Capability, string EffectiveSupport, string Message);
+
 public sealed record ModelProfileResolutionResponse(
     ModelProfileIdentityResponse Profile,
     ModelProviderReferenceResponse? Provider,
     ModelReferenceResponse Model,
     EffectiveModelOptionsResponse EffectiveOptions,
     string Status,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<ModelCapabilityResponse>? Capabilities = null,
+    IReadOnlyList<ModelCompatibilityIssueResponse>? Incompatibilities = null);
 
 public sealed record DeclaredAgentModelResponse(ModelProfileIdentityResponse ModelProfile);
 public sealed record ResolvedAgentModelResponse(

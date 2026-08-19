@@ -68,7 +68,11 @@ public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClie
             var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
             if (!string.IsNullOrWhiteSpace(model.Details?.ParameterSize)) metadata["parameterSize"] = model.Details.ParameterSize;
             if (!string.IsNullOrWhiteSpace(model.Details?.QuantizationLevel)) metadata["quantization"] = model.Details.QuantizationLevel;
-            return new AepModelDescriptor(name, name, ["chat"], metadata);
+            return new AepModelDescriptor(
+                name,
+                name,
+                ["chat", "streaming", "tools", "reasoning", "structuredOutput", "vision"],
+                metadata);
         }).Where(value => !string.IsNullOrWhiteSpace(value.Id)).ToArray();
     }
 

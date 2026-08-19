@@ -8,6 +8,8 @@ using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Extensions.Ollama;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.AI;
@@ -120,7 +122,7 @@ public sealed class AepVerticalTests
         var tool = AIFunctionFactory.Create((string city) => $"sunny in {city}", new AIFunctionFactoryOptions { Name = "weather", Description = "Gets weather" });
         var response = await adapter.GetResponseAsync(
             [new ChatMessage(ChatRole.System, "rules"), new ChatMessage(ChatRole.User, "ping")],
-            new ChatOptions { Temperature = 0.25f, MaxOutputTokens = 42, Tools = [tool] });
+            new ChatOptions { Temperature = 0.25f, MaxOutputTokens = 42, ResponseFormat = ChatResponseFormat.Json, Tools = [tool] });
         var updates = new List<ChatResponseUpdate>();
         await foreach (var update in adapter.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "ping")])) updates.Add(update);
         using var cancellation = new CancellationTokenSource();
@@ -161,11 +163,38 @@ public sealed class AepVerticalTests
         var resolver = new ModelProviderResolver([aep]);
 
         Assert.AreSame(aep, resolver.GetRequiredProvider("ollama"));
+        Assert.AreSame(aep, resolver.GetRequiredProvider("llamacpp"));
+    }
+
+    [TestMethod]
+    public async Task AepResolutionMapsProviderModelAndAdapterCapabilitiesIndependently()
+    {
+        await using var factory = new AepExtensionFactory();
+        using var httpClient = factory.CreateClient();
+        var provider = new AepModelProvider(new FixedHttpClientFactory(httpClient));
+        var configuration = new ModelProviderConfiguration
+        {
+            Uid = Guid.NewGuid(),
+            Namespace = ResourceNamespace.Default,
+            Name = "test-local",
+            ProviderType = "test",
+            Endpoint = httpClient.BaseAddress!
+        };
+
+        var capabilities = await provider.ResolveCapabilitiesAsync(
+            configuration,
+            new ModelDeploymentConfiguration { Name = "profile", ProviderName = "test-local", ModelName = "test-model" });
+
+        Assert.AreEqual(CapabilitySupport.Native, capabilities.Provider.Tools.Support);
+        Assert.AreEqual(CapabilitySupport.Native, capabilities.Model.Streaming.Support);
+        Assert.AreEqual(CapabilitySupport.Native, capabilities.Model.Tools.Support);
+        Assert.AreEqual(CapabilitySupport.Unsupported, capabilities.Model.StructuredOutput.Support);
+        Assert.AreEqual(CapabilitySupport.Partial, capabilities.Adapter.Reasoning.Support);
     }
 
     private static AepChatRequest Request() => new("test-model", [new(AepRole.User, [AepContent.FromText("ping")])]);
 
-    private sealed class AepExtensionFactory : WebApplicationFactory<global::Program>
+    private sealed class AepExtensionFactory : WebApplicationFactory<OllamaAepModelProvider>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.ConfigureServices(services =>
         {
@@ -185,6 +214,7 @@ public sealed class AepVerticalTests
             {
                 Assert.AreEqual("weather", request.Tools?.Single().Name);
                 Assert.AreEqual(JsonValueKind.Object, request.Tools?.Single().Parameters.ValueKind);
+                Assert.AreEqual("json_object", request.Options?.ResponseFormat?.GetProperty("type").GetString());
             }
             return Task.FromResult(new AepChatResponse([new(AepRole.Assistant, [AepContent.FromText("pong")])], request.Model, AepFinishReason.Stop));
         }
@@ -196,7 +226,12 @@ public sealed class AepVerticalTests
             yield return new([AepContent.FromText("ng")], FinishReason: AepFinishReason.Stop);
         }
         public Task<IReadOnlyList<AepModelDescriptor>> ListModelsAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<AepModelDescriptor>>([new("test-model", "Test model")]);
+            Task.FromResult<IReadOnlyList<AepModelDescriptor>>([new("test-model", "Test model", ["chat", "streaming", "tools"])]);
+    }
+
+    private sealed class FixedHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
     }
 
     private sealed class StaticHandler(HttpStatusCode statusCode, string content) : HttpMessageHandler

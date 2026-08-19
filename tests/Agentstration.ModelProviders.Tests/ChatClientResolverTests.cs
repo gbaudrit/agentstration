@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -19,6 +20,7 @@ public sealed class ChatClientResolverTests
     {
         using var chatClient = new StubChatClient();
         var provider = new RecordingProvider(chatClient);
+        var capabilityResolver = new RecordingCapabilitiesResolver();
         var resolver = new ChatClientResolver(
             new StubProfileStore(),
             new StubDeploymentStore(),
@@ -26,7 +28,8 @@ public sealed class ChatClientResolverTests
             new ModelProviderResolver([provider]),
             new GenAiObservabilityOptions { Enabled = false },
             NullLoggerFactory.Instance,
-            NullLogger<ChatClientResolver>.Instance);
+            NullLogger<ChatClientResolver>.Instance,
+            [capabilityResolver]);
 
         var resolved = await resolver.ResolveAsync(ProfileId);
 
@@ -41,6 +44,9 @@ public sealed class ChatClientResolverTests
         Assert.AreEqual("ollama-local", provider.Provider?.Name);
         Assert.AreEqual(ProfileId, provider.Deployment?.Name);
         Assert.AreEqual("qwen3:1.7b", provider.Deployment?.ModelName);
+        Assert.AreEqual(CapabilitySupport.Native, metadata.ProviderCapabilities?.Streaming.Support);
+        Assert.AreEqual(CapabilitySupport.Native, metadata.ModelCapabilities?.Tools.Support);
+        Assert.AreEqual(ProviderId, capabilityResolver.Provider?.Name);
 
         _ = await resolved.GetResponseAsync([new ChatMessage(ChatRole.User, "test")]);
         Assert.AreEqual("qwen3:1.7b", chatClient.Options?.ModelId);
@@ -174,6 +180,26 @@ public sealed class ChatClientResolverTests
             Provider = provider;
             Deployment = deployment;
             return client;
+        }
+    }
+
+    private sealed class RecordingCapabilitiesResolver : IModelProviderCapabilitiesResolver
+    {
+        public string ProviderType => "ollama";
+        public ModelProviderConfiguration? Provider { get; private set; }
+
+        public ValueTask<ResolvedModelProviderCapabilities> ResolveCapabilitiesAsync(
+            ModelProviderConfiguration provider,
+            ModelDeploymentConfiguration deployment,
+            CancellationToken cancellationToken = default)
+        {
+            Provider = provider;
+            var capabilities = new AgentRuntimeCapabilities
+            {
+                Streaming = new(CapabilitySupport.Native),
+                Tools = new(CapabilitySupport.Native)
+            };
+            return ValueTask.FromResult(new ResolvedModelProviderCapabilities(capabilities, capabilities, capabilities));
         }
     }
 

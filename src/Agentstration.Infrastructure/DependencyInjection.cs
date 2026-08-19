@@ -71,8 +71,7 @@ public static class DependencyInjection
         services.AddSingleton<IMemorySearch>(provider => provider.GetRequiredService<MemoryService>());
         aiOptions ??= new AiProviderOptions("Deterministic", new Uri("http://localhost/"), "deterministic", null);
         services.AddSingleton(aiOptions);
-        var useManagedProfileResolver = string.Equals(aiOptions.Provider, "Managed", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(aiOptions.Provider, "Ollama", StringComparison.OrdinalIgnoreCase);
+        var useManagedProfileResolver = string.Equals(aiOptions.Provider, "Managed", StringComparison.OrdinalIgnoreCase);
         if (string.Equals(aiOptions.Provider, "Deterministic", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IChatClient, DeterministicChatClient>();

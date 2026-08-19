@@ -125,7 +125,7 @@ public static class ModelManagementUi
     {
         "available" or "ready" or "succeeded" => Agentstration.Web.Components.Models.UiStatus.Success,
         "starting" or "providerunavailable" or "modelunavailable" or "unavailable" => Agentstration.Web.Components.Models.UiStatus.Warning,
-        "invalidconfiguration" or "failed" => Agentstration.Web.Components.Models.UiStatus.Danger,
+        "invalidconfiguration" or "incompatible" or "failed" => Agentstration.Web.Components.Models.UiStatus.Danger,
         _ => Agentstration.Web.Components.Models.UiStatus.Info
     };
 

@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Core;
@@ -8,7 +9,16 @@ namespace Agentstration.Management.Core;
 public sealed record ModelProviderView(ModelProviderConfiguration Configuration, ModelProviderHealth Health, IReadOnlyList<DiscoveredModel> Models, DateTimeOffset CheckedAt);
 public sealed record ModelProfileUsage(string Kind, string Name, string DisplayName);
 public sealed record ModelProviderUsage(string Kind, string Name, string DisplayName);
-public sealed record ModelProfileResolution(ModelProfileResource Profile, ModelProviderConfiguration? Provider, ModelProviderHealth ProviderHealth, DiscoveredModel? Model, string Status, IReadOnlyList<string> Warnings);
+public sealed record ModelProfileResolution(
+    ModelProfileResource Profile,
+    ModelProviderConfiguration? Provider,
+    ModelProviderHealth ProviderHealth,
+    DiscoveredModel? Model,
+    string Status,
+    IReadOnlyList<string> Warnings,
+    ResolvedModelProviderCapabilities? CapabilityLevels = null,
+    EffectiveCapabilities? EffectiveCapabilities = null,
+    IReadOnlyList<ExecutionCapabilityIssue>? Incompatibilities = null);
 
 public sealed class ModelProfileValidationException(string code, string message, IReadOnlyDictionary<string, string[]>? errors = null) : Exception(message)
 {
@@ -182,7 +192,6 @@ public sealed class ModelProviderManagementService(
         DisplayName = resource.Definition.DisplayName,
         ManagementMode = resource.Definition.ManagementMode,
         EndpointDisplayName = resource.Definition.Endpoint.Authority,
-        Capabilities = ["chat"],
         Credential = resource.Definition.Credential
     };
 
@@ -209,6 +218,7 @@ public sealed class ModelProfileManagementService(
     IControlPlaneStore store,
     ModelProviderManagementService providerConfigurations,
     IEnumerable<IModelProviderDiscovery> discoveries,
+    IEnumerable<IModelProviderCapabilitiesResolver> capabilityResolvers,
     IEnumerable<IModelProviderOptionsValidator> optionsValidators) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
 {
     public static string ProfileId(string name) => name;
@@ -265,7 +275,10 @@ public sealed class ModelProfileManagementService(
             .Select(agent => new ModelProfileUsage(agent.Value.Kind, agent.Value.Metadata.Name, agent.Value.Definition.DisplayName))
             .ToArray();
 
-    public async Task<ModelProfileResolution> ResolveAsync(ModelProfileResource profile, CancellationToken cancellationToken)
+    public async Task<ModelProfileResolution> ResolveAsync(
+        ModelProfileResource profile,
+        CancellationToken cancellationToken,
+        bool includeCapabilityDiagnostics = false)
     {
         ModelProviderConfiguration provider;
         var providerAddress = profile.Definition.Provider.Resolve(profile.Namespace, ResourceKinds.ModelProvider);
@@ -277,7 +290,55 @@ public sealed class ModelProfileManagementService(
         if (!string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase)) return new(profile, provider, health, null, "unavailable", [health.Details ?? "Provider unavailable."]);
         var models = await discovery.ListModelsAsync(provider, cancellationToken);
         var model = models.FirstOrDefault(value => value.Name == profile.Definition.Model.Name);
-        return new(profile, provider, health, model, model is null ? "unavailable" : "available", model is null ? ["The configured model is not installed."] : []);
+        if (model is null) return new(profile, provider, health, null, "unavailable", ["The configured model is not installed."]);
+        if (!includeCapabilityDiagnostics) return new(profile, provider, health, model, "available", []);
+        var capabilityResolver = capabilityResolvers.SingleOrDefault(candidate => candidate.CanHandle(provider.ProviderType));
+        if (capabilityResolver is null)
+        {
+            return new(profile, provider, health, model, "unknown", ["Effective capabilities cannot be determined because no capability resolver is registered."]);
+        }
+        try
+        {
+            var deployment = new ModelDeploymentConfiguration
+            {
+                Name = profile.Metadata.Name,
+                ProviderName = provider.Name,
+                ModelName = profile.Definition.Model.Name,
+                ProviderOptions = profile.Definition.ProviderOptions
+            };
+            var levels = await capabilityResolver.ResolveCapabilitiesAsync(provider, deployment, cancellationToken);
+            var effective = EffectiveCapabilityResolver.Intersect(levels.Provider, levels.Model, levels.Adapter);
+            IReadOnlyList<ExecutionCapabilityIssue> incompatibilities = [];
+            try
+            {
+                ExecutionCompatibilityValidator.Validate(
+                    profile.Definition.Reasoning,
+                    profile.Definition.Output,
+                    new ModelExecutionOptions(Streaming: RuntimeStreamingMode.Disabled),
+                    effective,
+                    provider.ProviderType,
+                    model.Name,
+                    "runtime not evaluated");
+            }
+            catch (ExecutionCompatibilityException exception)
+            {
+                incompatibilities = exception.Issues;
+            }
+            return new(
+                profile,
+                provider,
+                health,
+                model,
+                incompatibilities.Count == 0 ? "available" : "incompatible",
+                incompatibilities.Select(issue => issue.Message).ToArray(),
+                levels,
+                effective,
+                incompatibilities);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            return new(profile, provider, health, model, "unknown", [$"Effective capabilities could not be resolved: {exception.Message}"]);
+        }
     }
 
     public async ValueTask<ModelProfileConfiguration> GetRequiredAsync(string name, CancellationToken cancellationToken = default)
@@ -319,7 +380,6 @@ public sealed class ModelProfileManagementService(
         var providerAddress = definition.Provider.Resolve(ownerNamespace, ResourceKinds.ModelProvider);
         try { provider = await providerConfigurations.GetConfigurationRequiredAsync(providerAddress.Namespace, providerAddress.Name, cancellationToken); }
         catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }
-        if (!provider.Capabilities.Contains("chat", StringComparer.OrdinalIgnoreCase)) throw Invalid("definition.provider.name", "The referenced model provider does not support chat.");
         if (string.IsNullOrWhiteSpace(definition.Model.Name)) throw Invalid("definition.model.name", "A model name is required.");
         if (definition.Generation.Temperature is < 0 or > 2) throw Invalid("definition.generation.temperature", "Temperature must be between 0 and 2.");
         foreach (var option in definition.ProviderOptions.Keys)

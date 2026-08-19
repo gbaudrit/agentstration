@@ -18,6 +18,7 @@ public static class ModelProviderServiceCollectionExtensions
         services.AddSingleton<IModelProvider>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IModelProviderOptionsValidator>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IModelProviderDiscovery>(services => services.GetRequiredService<AepModelProvider>());
+        services.AddSingleton<IModelProviderCapabilitiesResolver>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IModelProviderResolver, ModelProviderResolver>();
         if (useManagedProfileResolver) services.AddSingleton<IChatClientResolver, ChatClientResolver>();
         return services;

@@ -164,7 +164,9 @@ public sealed class AgentFrameworkRuntimeFactory(
             var generation = model?.Generation;
             var effective = new ModelExecutionOptions(
                 request.Options?.Temperature ?? (generation?.Temperature is double temperature ? checked((float)temperature) : null),
-                request.Options?.MaxOutputTokens ?? generation?.MaxOutputTokens);
+                request.Options?.MaxOutputTokens ?? generation?.MaxOutputTokens,
+                Streaming: RuntimeStreamingMode.Disabled);
+            ValidateCompatibility(model, effective);
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
             var runOptions = new ChatClientAgentRunOptions(chatOptions);
             var response = await agent.RunAsync(request.Input, options: runOptions, cancellationToken: cancellationToken);
@@ -191,6 +193,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                 checked((int?)chatOptions.Seed),
                 chatOptions.StopSequences?.ToArray(),
                 request.Execution?.Streaming ?? request.Options?.Streaming ?? RuntimeStreamingMode.Automatic);
+            ValidateCompatibility(model, effective);
             var output = new StringBuilder();
             if (effective.Streaming == RuntimeStreamingMode.Disabled)
             {
@@ -230,6 +233,25 @@ public sealed class AgentFrameworkRuntimeFactory(
                 yield return new ContentDelta(update.Text);
             }
             yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ProviderType, model?.ModelName, effective));
+        }
+
+        private void ValidateCompatibility(ModelChatClientMetadata? model, ModelExecutionOptions execution)
+        {
+            if (model?.ProviderCapabilities is null || model.ModelCapabilities is null || model.AdapterCapabilities is null) return;
+            var capabilities = EffectiveCapabilityResolver.Intersect(
+                model.ProviderCapabilities,
+                model.ModelCapabilities,
+                Capabilities,
+                model.AdapterCapabilities);
+            ExecutionCompatibilityValidator.Validate(
+                model.Reasoning ?? new ModelReasoningOptions(),
+                model.Output ?? new ModelOutputOptions(),
+                execution,
+                capabilities,
+                model.ProviderType,
+                model.ModelName,
+                RuntimeType,
+                tools.Count > 0);
         }
 
     }

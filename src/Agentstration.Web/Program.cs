@@ -54,11 +54,8 @@ if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
         : Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "data-protection-keys");
 }
 var aiProvider = builder.Configuration["AI:Provider"] ?? "Managed";
-var useManagedProfileResolver = string.Equals(aiProvider, "Managed", StringComparison.OrdinalIgnoreCase)
-    || string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase);
-var defaultAiEndpoint = string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase)
-    ? "http://localhost:11434"
-    : "http://localhost:11434/v1/";
+var useManagedProfileResolver = string.Equals(aiProvider, "Managed", StringComparison.OrdinalIgnoreCase);
+const string defaultAiEndpoint = "http://localhost:11434/v1/";
 var aiEndpoint = builder.Configuration["AI:Endpoint"] ?? defaultAiEndpoint;
 if (!Uri.TryCreate(aiEndpoint.EndsWith('/') ? aiEndpoint : aiEndpoint + '/', UriKind.Absolute, out var parsedAiEndpoint)) throw new InvalidOperationException("AI:Endpoint must be an absolute URL.");
 var aiOptions = new AiProviderOptions(aiProvider, parsedAiEndpoint, builder.Configuration["AI:Model"] ?? "phi4-mini", builder.Configuration["AI:ApiKey"]);
