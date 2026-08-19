@@ -30,6 +30,7 @@ public static class ModelManagementEndpoints
         ToolProviderEndpoints.Map(endpoints);
         ToolExecutionHookEndpoints.Map(endpoints.MapGroup("/api/toolexecutionhooks"));
         SecretEndpoints.Map(endpoints);
+        ExtensionEndpoints.Map(endpoints);
 
         var agents = endpoints.MapGroup("/api/agents");
         GetAgentModelEndpoint.Map(agents);

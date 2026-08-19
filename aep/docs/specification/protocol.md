@@ -43,6 +43,12 @@ Unknown names are preserved. Each capability evolves through its own version and
 
 The model-provider capability currently uses `/aep/model-providers`. AEP tool contributions may map to MCP servers; MCP remains authoritative for tool schema and invocation.
 
+### Versioned configuration
+
+An extension that advertises `aep.configuration` exposes an `AepConfigurationCatalog` at the capability endpoint, conventionally `/aep/configuration`. An option set identifies one contribution and one scope, declares a preferred authoring version, and publishes all supported immutable versions with their JSON Schema and SHA-256 digest.
+
+Native request options carry `optionSet`, exact `version`, `schemaDigest`, and an object-valued `values` member. Servers reject an unknown set, removed version, changed digest, or schema-invalid value before invoking the contribution. Changing a schema requires a new option-set version; changing the preferred version does not migrate pinned requests.
+
 ## Security
 
 Endpoints must not embed credentials. Clients and inspectors must redact authorization, cookies, tokens, passwords, API keys, and properties explicitly described as secret. Protocol traces are diagnostic data and must be bounded and treated as sensitive.

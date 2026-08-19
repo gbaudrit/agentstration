@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Management.Contracts;
@@ -35,6 +36,34 @@ public sealed record CreateModelProviderRequest(
 public sealed record PutModelProviderRequest(ModelProviderProperties Properties);
 public sealed record ModelProviderUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
 public sealed record ModelProviderUsagesResponse(IReadOnlyList<ModelProviderUsageResponse> Value, int Count);
+
+public sealed record ExtensionIdentityResponse(string Id, string Name, string Version, string? Description);
+public sealed record ExtensionOptionSetVersionResponse(string Version, string SchemaDigest, JsonElement Schema, bool Deprecated);
+public sealed record ExtensionOptionSetResponse(
+    string Id,
+    string ContributionKind,
+    string ContributionId,
+    string Scope,
+    string PreferredVersion,
+    IReadOnlyList<ExtensionOptionSetVersionResponse> Versions);
+public sealed record ExtensionOptionUsageResponse(
+    string ProfileName,
+    string ProfileNamespace,
+    string OptionSet,
+    string Version,
+    string SchemaDigest,
+    string Status,
+    IReadOnlyList<string> Issues);
+public sealed record ExtensionResponse(
+    string ProviderName,
+    string ProviderNamespace,
+    Uri Endpoint,
+    string Status,
+    ExtensionIdentityResponse? Extension,
+    IReadOnlyList<string> Contributions,
+    IReadOnlyList<ExtensionOptionSetResponse> OptionSets,
+    IReadOnlyList<ExtensionOptionUsageResponse> Usages,
+    string? Details);
 
 public sealed record CreateModelProfileRequest(
     string Name,

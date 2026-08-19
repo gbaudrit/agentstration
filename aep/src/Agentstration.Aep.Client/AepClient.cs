@@ -11,6 +11,7 @@ public interface IAepClient
     Task<AepManifest> GetManifestAsync(CancellationToken cancellationToken = default);
     Task<AepHealth> GetHealthAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<string, AepCapabilityDescriptor>> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+    Task<AepConfigurationCatalog> GetConfigurationAsync(CancellationToken cancellationToken = default);
 }
 
 public interface IAepModelProvidersClient
@@ -40,6 +41,16 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
 
     public async Task<IReadOnlyDictionary<string, AepCapabilityDescriptor>> GetCapabilitiesAsync(CancellationToken cancellationToken = default) =>
         (await DiscoverAsync(cancellationToken)).Capabilities;
+
+    public async Task<AepConfigurationCatalog> GetConfigurationAsync(CancellationToken cancellationToken = default)
+    {
+        var manifest = await DiscoverAsync(cancellationToken);
+        if (!manifest.Capabilities.TryGetValue(AepCapabilityNames.Configuration, out var capability))
+            return new AepConfigurationCatalog([]);
+        var endpoint = string.IsNullOrWhiteSpace(capability.Endpoint) ? AepProtocol.ConfigurationPath : capability.Endpoint;
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, cancellationToken);
+        return await ReadAsync<AepConfigurationCatalog>(response, cancellationToken);
+    }
 
     public async Task<IReadOnlyList<AepModelProviderDescriptor>> ListModelProvidersAsync(CancellationToken cancellationToken = default)
     {

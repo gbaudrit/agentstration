@@ -26,6 +26,17 @@ public interface IModelProvidersClient
     Task<ModelProviderStatusResponse> TestProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => TestProviderAsync(providerName, cancellationToken);
 }
 
+public interface IExtensionsClient
+{
+    Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken);
+}
+
+public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClient
+{
+    public async Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<ExtensionResponse>>(httpClient, "api/extensions", cancellationToken)).Value;
+}
+
 public interface IModelProfilesClient
 {
     Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken);

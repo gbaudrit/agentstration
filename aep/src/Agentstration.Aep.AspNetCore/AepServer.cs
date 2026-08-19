@@ -27,6 +27,7 @@ public sealed class AepExtensionOptions
     public IDictionary<string, AepCapabilityDescriptor> Capabilities { get; } = new Dictionary<string, AepCapabilityDescriptor>(StringComparer.Ordinal);
     public IList<AepMcpServerDescriptor> McpServers { get; } = [];
     public IList<AepToolContribution> Tools { get; } = [];
+    public IList<AepOptionSetDescriptor> OptionSets { get; } = [];
 }
 
 public static class AepServerExtensions
@@ -55,6 +56,8 @@ public static class AepServerExtensions
         endpoints.MapGet(AepProtocol.HealthPath, () => Results.Json(new AepHealth("available"), AepProtocol.JsonOptions));
         endpoints.MapGet(AepProtocol.ModelProvidersPath, (IEnumerable<IAepModelProvider> providers) =>
             Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions));
+        endpoints.MapGet(AepProtocol.ConfigurationPath, (IOptions<AepExtensionOptions> options) =>
+            Results.Json(new AepConfigurationCatalog(options.Value.OptionSets.ToArray()), AepProtocol.JsonOptions));
         endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync);
         endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync);
         endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync);
@@ -68,12 +71,14 @@ public static class AepServerExtensions
     private static AepManifest CreateManifest(AepExtensionOptions options, IEnumerable<IAepModelProvider> providers)
     {
         var modelProviders = providers.Select(value => value.Descriptor).ToArray();
+        ValidateOptionSets(options.OptionSets, modelProviders);
         var capabilities = new Dictionary<string, AepCapabilityDescriptor>(options.Capabilities, StringComparer.Ordinal)
         {
             [AepCapabilityNames.Health] = new("1.0", AepProtocol.HealthPath)
         };
         if (modelProviders.Length > 0) capabilities[AepCapabilityNames.ModelProvider] = new("1.0", AepProtocol.ModelProvidersPath);
         if (options.Tools.Count > 0) capabilities[AepCapabilityNames.Tools] = new("1.0");
+        if (options.OptionSets.Count > 0) capabilities[AepCapabilityNames.Configuration] = new("1.0", AepProtocol.ConfigurationPath);
         var descriptor = new AepManifest(
             AepProtocol.Version,
             options.Extension,
@@ -83,6 +88,32 @@ public static class AepServerExtensions
         var errors = AepDescriptorValidator.Validate(descriptor);
         if (errors.Count > 0) throw new InvalidOperationException($"The AEP extension descriptor is invalid: {string.Join(" ", errors)}");
         return descriptor;
+    }
+
+    private static void ValidateOptionSets(
+        ICollection<AepOptionSetDescriptor> optionSets,
+        IReadOnlyCollection<AepModelProviderDescriptor> modelProviders)
+    {
+        var duplicate = optionSets.GroupBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault(value => value.Count() > 1);
+        if (duplicate is not null) throw new InvalidOperationException($"AEP option set '{duplicate.Key}' is declared more than once.");
+        foreach (var optionSet in optionSets)
+        {
+            if (string.IsNullOrWhiteSpace(optionSet.Id)) throw new InvalidOperationException("An AEP option set id is required.");
+            if (!string.Equals(optionSet.ContributionKind, AepContributionKinds.ModelProvider, StringComparison.Ordinal)
+                || !modelProviders.Any(value => string.Equals(value.Id, optionSet.ContributionId, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException($"AEP option set '{optionSet.Id}' targets an unknown contribution.");
+            if (optionSet.Versions.Count == 0
+                || !optionSet.Versions.Any(value => string.Equals(value.Version, optionSet.PreferredVersion, StringComparison.Ordinal)))
+                throw new InvalidOperationException($"AEP option set '{optionSet.Id}' must contain its preferred version.");
+            if (optionSet.Versions.Select(value => value.Version).Distinct(StringComparer.Ordinal).Count() != optionSet.Versions.Count)
+                throw new InvalidOperationException($"AEP option set '{optionSet.Id}' contains duplicate versions.");
+            foreach (var version in optionSet.Versions)
+            {
+                var actual = AepSchemaDigest.Compute(version.Schema);
+                if (!string.Equals(actual, version.SchemaDigest, StringComparison.Ordinal))
+                    throw new InvalidOperationException($"AEP option set '{optionSet.Id}' version '{version.Version}' has an invalid schema digest.");
+            }
+        }
     }
 
     private static async Task<IResult> ProviderHealthAsync(string providerId, IEnumerable<IAepModelProvider> providers, CancellationToken cancellationToken)
@@ -100,21 +131,43 @@ public static class AepServerExtensions
         catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
     }
 
-    private static async Task<IResult> ChatAsync(string providerId, AepChatRequest request, IEnumerable<IAepModelProvider> providers, CancellationToken cancellationToken)
+    private static async Task<IResult> ChatAsync(
+        string providerId,
+        AepChatRequest request,
+        IEnumerable<IAepModelProvider> providers,
+        IOptions<AepExtensionOptions> options,
+        CancellationToken cancellationToken)
     {
         var provider = Find(providers, providerId);
         if (provider is null) return Error(StatusCodes.Status404NotFound, "provider_unavailable", $"Model provider '{providerId}' is not registered.");
-        try { return Results.Json(await provider.ChatAsync(request, cancellationToken), AepProtocol.JsonOptions); }
+        try
+        {
+            ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets);
+            return Results.Json(await provider.ChatAsync(request, cancellationToken), AepProtocol.JsonOptions);
+        }
         catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
     }
 
-    private static async Task StreamAsync(string providerId, AepChatRequest request, IEnumerable<IAepModelProvider> providers, HttpResponse response, CancellationToken cancellationToken)
+    private static async Task StreamAsync(
+        string providerId,
+        AepChatRequest request,
+        IEnumerable<IAepModelProvider> providers,
+        IOptions<AepExtensionOptions> options,
+        HttpResponse response,
+        CancellationToken cancellationToken)
     {
         var provider = Find(providers, providerId);
         if (provider is null)
         {
             response.StatusCode = StatusCodes.Status404NotFound;
             await response.WriteAsJsonAsync(new AepErrorResponse(new AepError("provider_unavailable", $"Model provider '{providerId}' is not registered.")), AepProtocol.JsonOptions, cancellationToken);
+            return;
+        }
+        try { ValidateNativeOptions(providerId, request.Options?.NativeOptions, options.Value.OptionSets); }
+        catch (AepServerException exception)
+        {
+            response.StatusCode = exception.StatusCode;
+            await response.WriteAsJsonAsync(new AepErrorResponse(new AepError(exception.Code, exception.Message)), AepProtocol.JsonOptions, cancellationToken);
             return;
         }
         response.StatusCode = StatusCodes.Status200OK;
@@ -136,6 +189,34 @@ public static class AepServerExtensions
 
     private static IAepModelProvider? Find(IEnumerable<IAepModelProvider> providers, string id) =>
         providers.FirstOrDefault(value => string.Equals(value.Descriptor.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    private static void ValidateNativeOptions(
+        string providerId,
+        AepVersionedOptions? nativeOptions,
+        IEnumerable<AepOptionSetDescriptor> optionSets)
+    {
+        if (nativeOptions is null) return;
+        var optionSet = optionSets.SingleOrDefault(value =>
+            string.Equals(value.Id, nativeOptions.OptionSet, StringComparison.Ordinal)
+            && string.Equals(value.ContributionKind, AepContributionKinds.ModelProvider, StringComparison.Ordinal)
+            && string.Equals(value.ContributionId, providerId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(value.Scope, AepOptionScopes.ModelProfile, StringComparison.Ordinal));
+        if (optionSet is null)
+            throw new AepServerException("option_set_unsupported", $"Option set '{nativeOptions.OptionSet}' is not supported by model provider '{providerId}'.", StatusCodes.Status422UnprocessableEntity);
+        var version = optionSet.Versions.SingleOrDefault(value => string.Equals(value.Version, nativeOptions.Version, StringComparison.Ordinal));
+        if (version is null)
+            throw new AepServerException("option_version_unsupported", $"Option set '{nativeOptions.OptionSet}' version '{nativeOptions.Version}' is not supported.", StatusCodes.Status422UnprocessableEntity);
+        if (!string.Equals(version.SchemaDigest, nativeOptions.SchemaDigest, StringComparison.Ordinal))
+            throw new AepServerException("option_schema_mismatch", $"Option set '{nativeOptions.OptionSet}' version '{nativeOptions.Version}' has an unexpected schema digest.", StatusCodes.Status422UnprocessableEntity);
+        if (nativeOptions.Values.ValueKind != JsonValueKind.Object)
+            throw new AepServerException("invalid_options", "Native option values must be a JSON object.", StatusCodes.Status422UnprocessableEntity);
+        var issues = AepOptionSchemaValidator.Validate(nativeOptions.Values, version.Schema);
+        if (issues.Count > 0)
+            throw new AepServerException(
+                "invalid_options",
+                string.Join(" ", issues.Select(value => value.Message)),
+                StatusCodes.Status422UnprocessableEntity);
+    }
 
     private static IResult Error(int status, string code, string message) =>
         Results.Json(new AepErrorResponse(new AepError(code, message)), AepProtocol.JsonOptions, statusCode: status);

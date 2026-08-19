@@ -218,8 +218,7 @@ public sealed class ModelProfileManagementService(
     IControlPlaneStore store,
     ModelProviderManagementService providerConfigurations,
     IEnumerable<IModelProviderDiscovery> discoveries,
-    IEnumerable<IModelProviderCapabilitiesResolver> capabilityResolvers,
-    IEnumerable<IModelProviderOptionsValidator> optionsValidators) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
+    IEnumerable<IModelProviderCapabilitiesResolver> capabilityResolvers) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
 {
     public static string ProfileId(string name) => name;
     public async Task<StoredResource<ModelProfileResource>> CreateAsync(ModelProfileResource resource, CancellationToken cancellationToken)
@@ -335,6 +334,10 @@ public sealed class ModelProfileManagementService(
                 effective,
                 incompatibilities);
         }
+        catch (ModelProviderConfigurationException exception)
+        {
+            return new(profile, provider, health, model, "incompatible", [exception.Message]);
+        }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             return new(profile, provider, health, model, "unknown", [$"Effective capabilities could not be resolved: {exception.Message}"]);
@@ -384,8 +387,21 @@ public sealed class ModelProfileManagementService(
         if (definition.Generation.Temperature is < 0 or > 2) throw Invalid("definition.generation.temperature", "Temperature must be between 0 and 2.");
         foreach (var option in definition.ProviderOptions.Keys)
             if (!string.Equals(option, provider.ProviderType, StringComparison.OrdinalIgnoreCase)) throw Invalid($"definition.providerOptions.{option}", $"Provider options for '{option}' cannot be used with provider '{provider.ProviderType}'.");
-        try { optionsValidators.SingleOrDefault(candidate => candidate.CanHandle(provider.ProviderType))?.Validate(definition.ProviderOptions); }
-        catch (ModelProviderConfigurationException exception) { throw Invalid($"definition.providerOptions.{provider.ProviderType}", exception.Message); }
+        if (definition.ProviderOptions.TryGetValue(provider.ProviderType, out var options))
+            ValidateVersionedOptions(provider.ProviderType, options);
+    }
+
+    private static void ValidateVersionedOptions(string providerType, VersionedExtensionOptions options)
+    {
+        var path = $"definition.providerOptions.{providerType}";
+        if (string.IsNullOrWhiteSpace(options.OptionSet)) throw Invalid($"{path}.optionSet", "An option set identifier is required.");
+        if (string.IsNullOrWhiteSpace(options.Version)) throw Invalid($"{path}.version", "An option set version is required.");
+        if (string.IsNullOrWhiteSpace(options.SchemaDigest)
+            || !options.SchemaDigest.StartsWith("sha256:", StringComparison.Ordinal)
+            || options.SchemaDigest.Length != 71)
+            throw Invalid($"{path}.schemaDigest", "A sha256 schema digest is required.");
+        if (options.Values.ValueKind != System.Text.Json.JsonValueKind.Object)
+            throw Invalid($"{path}.values", "Extension option values must be a JSON object.");
     }
 
     private static ModelProfileValidationException Invalid(string field, string message) => new("model_profile_invalid", message, new Dictionary<string, string[]> { [field] = [message] });
@@ -408,6 +424,7 @@ public static class ModelManagementServiceCollectionExtensions
         services.AddSingleton<IModelProfileStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
         services.AddSingleton<IModelDeploymentStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
         services.AddSingleton<IModelProfileReferenceValidator>(provider => provider.GetRequiredService<ModelProfileManagementService>());
+        services.AddSingleton<ExtensionManagementService>();
         return services;
     }
 }

@@ -51,15 +51,19 @@ definition:
     maxOutputTokens: 1024
   providerOptions:
     llamacpp:
-      minP: 0.05
-      repeatPenalty: 1.1
+      optionSet: io.agentstration.llamacpp/model-profile
+      version: 1.0.0
+      schemaDigest: <digest published by the extension>
+      values:
+        minP: 0.05
+        repeatPenalty: 1.1
 ```
 
 Supported functional capabilities are chat completions, true SSE streaming, model discovery, readiness, schema-constrained structured output, and tool calling when `/props` reports a tool-capable chat template. Reasoning controls are mapped when the model/template supports them, but reasoning remains partial because AEP does not yet expose reasoning content as a distinct content kind. Vision may be reported by llama.cpp discovery but is not effective through the current text/tool AEP adapter. The native `/completion` endpoint is intentionally not exposed as chat; the managed Runtime currently consumes chat completions through `IChatClient`.
 
-The Model Provider page can test the AEP connection and shows discovered models with their reported capabilities. The Model Profile page adds a runtime-independent compatibility diagnosis: it intersects provider, selected model, and AEP adapter capabilities, then checks the profile's reasoning and structured-output requirements. Runtime capabilities and an agent's tool requirements are evaluated later when that agent is resolved, so the profile diagnosis deliberately does not claim full execution compatibility.
+The Model Provider page can test the AEP connection and shows discovered models with their reported capabilities. The Extensions page shows the live option-set versions and schema digests to use when authoring a Model Profile, plus every pinned usage and incompatibility. The Model Profile page adds a runtime-independent compatibility diagnosis: it intersects provider, selected model, and AEP adapter capabilities, then checks the profile's reasoning and structured-output requirements. Runtime capabilities and an agent's tool requirements are evaluated later when that agent is resolved, so the profile diagnosis deliberately does not claim full execution compatibility.
 
-Provider-specific keys currently mapped by the extension include `minP`, `typicalP`, `repeatPenalty`, `repeatLastN`, `mirostat`, `mirostatTau`, `mirostatEta`, `reasoningFormat`, `reasoningEffort`, `chatTemplateKwargs`, and `additionalOptions`. Portable temperature, top-p, top-k, seed, stop sequences, maximum output tokens, reasoning intent, and output format remain canonical Model Profile fields.
+Provider-specific keys currently mapped by the extension include `minP`, `typicalP`, `repeatPenalty`, `repeatLastN`, `mirostat`, `mirostatTau`, `mirostatEta`, `reasoningFormat`, `reasoningEffort`, `chatTemplateKwargs`, and `additionalOptions`. They live under the versioned envelope's `values` member. Portable temperature, top-p, top-k, seed, stop sequences, maximum output tokens, reasoning intent, and output format remain canonical Model Profile fields.
 
 The default tests use fake HTTP and require no model. To run the optional real-server smoke test:
 

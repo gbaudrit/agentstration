@@ -44,7 +44,7 @@ The Inspector provides:
 - a bounded HTTP exchange viewer with redacted headers and JSON secrets;
 - conformance validation and formatted raw payloads.
 
-Configuration editing remains unavailable until an extension publishes the versioned `aep.configuration` schema and secret annotations. The Inspector does not invent provider-specific fields.
+Extensions can publish immutable option-set versions through `aep.configuration`. Consumers pin the option-set id, version, and schema digest; a newer preferred version does not silently reinterpret existing values. Secret annotations and schema-driven editing in the standalone Inspector remain future work.
 
 ## CLI
 

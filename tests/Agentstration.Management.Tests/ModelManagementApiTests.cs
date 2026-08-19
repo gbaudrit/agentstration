@@ -94,6 +94,20 @@ public sealed class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task ExtensionsApiReportsConfiguredProvidersWithoutRequiringThemToBeOnline()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
+        var extension = response!.Value.Single(value => value.ProviderName == "ollama-local");
+
+        Assert.AreEqual("unavailable", extension.Status);
+        Assert.AreEqual("http://127.0.0.1:1/", extension.Endpoint.AbsoluteUri);
+        Assert.IsEmpty(extension.OptionSets);
+    }
+
+    [TestMethod]
     public async Task ProfileCrudUsesETagAndAllowsTemporarilyUnavailableModel()
     {
         await using var factory = Factory();
@@ -371,9 +385,15 @@ public sealed class ModelManagementApiTests
                 Generation = new ModelGenerationOptions { Temperature = 0.2, TopP = 0.8, TopK = 20, MaxOutputTokens = 4096 },
                 Reasoning = new ModelReasoningOptions { Mode = ReasoningMode.Enabled, Effort = ReasoningEffort.Medium },
                 Output = new ModelOutputOptions { Format = ModelOutputFormat.JsonObject },
-                ProviderOptions = new Dictionary<string, JsonElement>
+                ProviderOptions = new Dictionary<string, VersionedExtensionOptions>
                 {
-                    ["ollama"] = JsonSerializer.SerializeToElement(new { think = "medium", contextSize = 8192 })
+                    ["ollama"] = new()
+                    {
+                        OptionSet = "io.agentstration.ollama/model-profile",
+                        Version = "1.0.0",
+                        SchemaDigest = $"sha256:{new string('0', 64)}",
+                        Values = JsonSerializer.SerializeToElement(new { think = "medium", contextSize = 8192 })
+                    }
                 }
             }
         };
@@ -584,6 +604,17 @@ public sealed class ModelManagementApiTests
         delete.Headers.IfMatch.Add(updatedResponse.Headers.ETag!);
         using var deleted = await client.SendAsync(delete);
         Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
+    }
+
+    [TestMethod]
+    public void LegacyProviderOptionsRemainReadableForExplicitMigration()
+    {
+        var options = JsonSerializer.Deserialize<VersionedExtensionOptions>("""{"minP":0.05,"repeatPenalty":1.1}""");
+
+        Assert.IsNotNull(options);
+        Assert.AreEqual(string.Empty, options.OptionSet);
+        Assert.IsNotNull(options.LegacyValues);
+        Assert.IsTrue(options.LegacyValues.ContainsKey("minP"));
     }
 
     private static WebApplicationFactory<Program> Factory() =>

@@ -617,6 +617,16 @@ public sealed record ModelOutputOptions
     public bool Strict { get; init; }
 }
 
+public sealed record VersionedExtensionOptions
+{
+    public string OptionSet { get; init; } = string.Empty;
+    public string Version { get; init; } = string.Empty;
+    public string SchemaDigest { get; init; } = string.Empty;
+    public JsonElement Values { get; init; }
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public IDictionary<string, JsonElement>? LegacyValues { get; init; }
+}
+
 public sealed record ModelProfileProperties
 {
     public required string DisplayName { get; init; }
@@ -626,7 +636,7 @@ public sealed record ModelProfileProperties
     public ModelGenerationOptions Generation { get; init; } = new();
     public ModelReasoningOptions Reasoning { get; init; } = new();
     public ModelOutputOptions Output { get; init; } = new();
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
 }
 
 public sealed record ModelProfileResource : Resource

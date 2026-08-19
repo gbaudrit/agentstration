@@ -24,7 +24,7 @@ public sealed record ModelDeploymentConfiguration
     public required string Name { get; init; }
     public required string ProviderName { get; init; }
     public required string ModelName { get; init; }
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
 }
 
 public sealed record ModelProfileConfiguration
@@ -34,7 +34,7 @@ public sealed record ModelProfileConfiguration
     public ModelGenerationOptions Generation { get; init; } = new();
     public ModelReasoningOptions Reasoning { get; init; } = new();
     public ModelOutputOptions Output { get; init; } = new();
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
 }
 
 public sealed record ModelChatClientMetadata(
@@ -46,7 +46,7 @@ public sealed record ModelChatClientMetadata(
     ModelGenerationOptions? Generation = null,
     ModelReasoningOptions? Reasoning = null,
     ModelOutputOptions? Output = null,
-    IReadOnlyDictionary<string, JsonElement>? ProviderOptions = null,
+    IReadOnlyDictionary<string, VersionedExtensionOptions>? ProviderOptions = null,
     AgentRuntimeCapabilities? ProviderCapabilities = null,
     AgentRuntimeCapabilities? ModelCapabilities = null,
     AgentRuntimeCapabilities? AdapterCapabilities = null);

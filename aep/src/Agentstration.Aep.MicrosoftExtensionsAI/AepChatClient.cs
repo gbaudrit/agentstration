@@ -9,7 +9,7 @@ namespace Agentstration.Aep.MicrosoftExtensionsAI;
 public sealed class AepChatClient(
     AepModelProviderClient provider,
     string model,
-    IReadOnlyDictionary<string, JsonElement>? providerOptions = null) : IChatClient
+    AepVersionedOptions? nativeOptions = null) : IChatClient
 {
     public async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -62,8 +62,6 @@ public sealed class AepChatClient(
             MapContents(message),
             message.AuthorName)).ToArray();
         var additional = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-        if (providerOptions is not null)
-            foreach (var value in providerOptions) additional[value.Key] = value.Value;
         if (options?.AdditionalProperties is not null)
             foreach (var value in options.AdditionalProperties)
                 additional[value.Key] = JsonSerializer.SerializeToElement(value.Value, AepProtocol.JsonOptions);
@@ -82,6 +80,7 @@ public sealed class AepChatClient(
                 Seed = options?.Seed,
                 StopSequences = options?.StopSequences?.ToArray(),
                 ResponseFormat = MapResponseFormat(options?.ResponseFormat),
+                NativeOptions = nativeOptions,
                 AdditionalOptions = additional
             },
             tools);

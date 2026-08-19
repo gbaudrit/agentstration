@@ -7,6 +7,7 @@ using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Extensions.Ollama;
+using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -103,6 +104,68 @@ public sealed class AepVerticalTests
     }
 
     [TestMethod]
+    public async Task ConfigurationCatalogPublishesImmutableOptionContracts()
+    {
+        await using var factory = new AepExtensionFactory();
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+
+        var descriptor = await client.DiscoverAsync();
+        var configuration = await client.GetConfigurationAsync();
+        var optionSet = configuration.OptionSets.Single();
+        var version = optionSet.Versions.Single();
+
+        Assert.IsTrue(descriptor.Capabilities.ContainsKey(AepCapabilityNames.Configuration));
+        Assert.AreEqual(OllamaOptionContracts.ModelProfileOptionSet, optionSet.Id);
+        Assert.AreEqual(OllamaOptionContracts.Version, optionSet.PreferredVersion);
+        Assert.AreEqual(AepSchemaDigest.Compute(version.Schema), version.SchemaDigest);
+    }
+
+    [TestMethod]
+    public async Task ServerRejectsInvalidOptionsBeforeInvokingProvider()
+    {
+        await using var factory = new AepExtensionFactory();
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var optionSet = (await client.GetConfigurationAsync()).OptionSets.Single();
+        var version = optionSet.Versions.Single();
+        var invalid = new AepVersionedOptions(
+            optionSet.Id,
+            version.Version,
+            version.SchemaDigest,
+            JsonSerializer.SerializeToElement(new { removedOption = true }));
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() =>
+            client.CreateModelProvider("test").ChatAsync(Request() with { Options = new AepModelOptions { NativeOptions = invalid } }));
+
+        Assert.AreEqual("invalid_options", exception.Code);
+        Assert.AreEqual(0, factory.Provider.InvocationCount);
+    }
+
+    [TestMethod]
+    public async Task OlderPinnedOptionVersionRemainsExecutableWhenNewVersionBecomesPreferred()
+    {
+        await using var factory = new AepExtensionFactory(addSecondOptionVersion: true);
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var optionSet = (await client.GetConfigurationAsync()).OptionSets.Single();
+        var versionOne = optionSet.Versions.Single(value => value.Version == OllamaOptionContracts.Version);
+        var pinned = new AepVersionedOptions(
+            optionSet.Id,
+            versionOne.Version,
+            versionOne.SchemaDigest,
+            JsonSerializer.SerializeToElement(new { }));
+
+        var response = await client.CreateModelProvider("test").ChatAsync(
+            Request() with { Options = new AepModelOptions { NativeOptions = pinned } });
+
+        Assert.AreEqual("2.0.0", optionSet.PreferredVersion);
+        Assert.HasCount(2, optionSet.Versions);
+        Assert.AreEqual("pong", response.Messages.Single().Contents.Single().Text);
+        Assert.AreEqual(1, factory.Provider.InvocationCount);
+    }
+
+    [TestMethod]
     public async Task ClientRejectsIncompatibleProtocol()
     {
         var descriptor = new AepManifest("2.0", new("x", "x", "1"), new Dictionary<string, AepCapabilityDescriptor>(), new([]));
@@ -139,12 +202,14 @@ public sealed class AepVerticalTests
         using var inner = new CapturingChatClient();
         using var api = new OllamaApiClient(new HttpClient { BaseAddress = new Uri("http://localhost:11434") });
         var provider = new OllamaAepModelProvider(inner, api);
-        var options = new Dictionary<string, JsonElement>
-        {
-            ["ollama"] = JsonSerializer.SerializeToElement(new { think = "medium", contextSize = 8192, additionalOptions = new { repeat_penalty = 1.1 } })
-        };
+        var values = JsonSerializer.SerializeToElement(new { think = "medium", contextSize = 8192, additionalOptions = new { repeat_penalty = 1.1 } });
+        var options = new AepVersionedOptions(
+            OllamaOptionContracts.ModelProfileOptionSet,
+            OllamaOptionContracts.Version,
+            OllamaOptionContracts.ModelProfile.Versions.Single().SchemaDigest,
+            values);
 
-        var response = await provider.ChatAsync(Request() with { Options = new AepModelOptions { Temperature = 0.2f, AdditionalOptions = options } }, default);
+        var response = await provider.ChatAsync(Request() with { Options = new AepModelOptions { Temperature = 0.2f, NativeOptions = options } }, default);
 
         Assert.AreEqual("pong", response.Messages.Single().Contents.Single().Text);
         Assert.AreEqual("test-model", inner.Options?.ModelId);
@@ -192,23 +257,85 @@ public sealed class AepVerticalTests
         Assert.AreEqual(CapabilitySupport.Partial, capabilities.Adapter.Reasoning.Support);
     }
 
+    [TestMethod]
+    public async Task AepResolutionFailsClosedWhenPinnedOptionVersionWasRemoved()
+    {
+        await using var factory = new AepExtensionFactory();
+        using var httpClient = factory.CreateClient();
+        var provider = new AepModelProvider(new FixedHttpClientFactory(httpClient));
+        var configuration = new ModelProviderConfiguration
+        {
+            Uid = Guid.NewGuid(),
+            Namespace = ResourceNamespace.Default,
+            Name = "test-local",
+            ProviderType = "test",
+            Endpoint = httpClient.BaseAddress!
+        };
+        var deployment = new ModelDeploymentConfiguration
+        {
+            Name = "profile",
+            ProviderName = "test-local",
+            ModelName = "test-model",
+            ProviderOptions = new Dictionary<string, VersionedExtensionOptions>
+            {
+                ["test"] = new()
+                {
+                    OptionSet = OllamaOptionContracts.ModelProfileOptionSet,
+                    Version = "0.9.0",
+                    SchemaDigest = $"sha256:{new string('0', 64)}",
+                    Values = JsonSerializer.SerializeToElement(new { })
+                }
+            }
+        };
+
+        var exception = await Assert.ThrowsAsync<ModelProviderConfigurationException>(() =>
+            provider.ResolveCapabilitiesAsync(configuration, deployment).AsTask());
+
+        StringAssert.Contains(exception.Message, "version '0.9.0' is not supported");
+    }
+
     private static AepChatRequest Request() => new("test-model", [new(AepRole.User, [AepContent.FromText("ping")])]);
 
-    private sealed class AepExtensionFactory : WebApplicationFactory<OllamaAepModelProvider>
+    private sealed class AepExtensionFactory(bool addSecondOptionVersion = false) : WebApplicationFactory<OllamaAepModelProvider>
     {
+        public FakeProvider Provider { get; } = new();
+
         protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.ConfigureServices(services =>
         {
             services.RemoveAll<IAepModelProvider>();
-            services.AddSingleton<IAepModelProvider, FakeProvider>();
+            services.AddSingleton<IAepModelProvider>(Provider);
+            services.PostConfigure<AepExtensionOptions>(options =>
+            {
+                var original = options.OptionSets.Single() with { ContributionId = "test" };
+                options.OptionSets.Clear();
+                if (!addSecondOptionVersion)
+                {
+                    options.OptionSets.Add(original);
+                    return;
+                }
+                var nextSchema = JsonSerializer.SerializeToElement(new
+                {
+                    type = "object",
+                    properties = new { },
+                    additionalProperties = false
+                });
+                options.OptionSets.Add(original with
+                {
+                    PreferredVersion = "2.0.0",
+                    Versions = [.. original.Versions, AepOptionSetVersionDescriptor.Create("2.0.0", nextSchema)]
+                });
+            });
         });
     }
 
     private sealed class FakeProvider : IAepModelProvider
     {
+        public int InvocationCount { get; private set; }
         public AepModelProviderDescriptor Descriptor { get; } = new("test", "Test", new(Tools: true, ModelDiscovery: true));
         public Task<AepChatResponse> ChatAsync(AepChatRequest request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            InvocationCount++;
             Assert.AreEqual("test-model", request.Model);
             if (request.Options?.Temperature == 0.25f)
             {
