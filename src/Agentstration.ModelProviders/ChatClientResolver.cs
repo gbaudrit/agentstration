@@ -10,7 +10,8 @@ public sealed class ChatClientResolver(
     IModelProviderResolver providers,
     GenAiObservabilityOptions observability,
     ILoggerFactory loggerFactory,
-    ILogger<ChatClientResolver> logger) : IChatClientResolver
+    ILogger<ChatClientResolver> logger,
+    IEnumerable<IModelProviderCapabilitiesResolver>? capabilityResolvers = null) : IChatClientResolver
 {
     public async ValueTask<IChatClient> ResolveAsync(string modelProfileResourceId, CancellationToken cancellationToken = default)
     {
@@ -18,6 +19,10 @@ public sealed class ChatClientResolver(
         var deployment = await deployments.GetRequiredAsync(profile.DeploymentName, cancellationToken);
         var providerConfiguration = await providerConfigurations.GetRequiredAsync(deployment.ProviderName, cancellationToken);
         var provider = providers.GetRequiredProvider(providerConfiguration.ProviderType);
+        var capabilityResolver = capabilityResolvers?.SingleOrDefault(value => value.CanHandle(providerConfiguration.ProviderType));
+        var capabilities = capabilityResolver is null
+            ? null
+            : await capabilityResolver.ResolveCapabilitiesAsync(providerConfiguration, deployment, cancellationToken);
         if (logger.IsEnabled(LogLevel.Information))
         {
             logger.LogInformation(
@@ -49,6 +54,9 @@ public sealed class ChatClientResolver(
                 profile.Generation,
                 profile.Reasoning,
                 profile.Output,
-                profile.ProviderOptions));
+                profile.ProviderOptions,
+                capabilities?.Provider,
+                capabilities?.Model,
+                capabilities?.Adapter));
     }
 }

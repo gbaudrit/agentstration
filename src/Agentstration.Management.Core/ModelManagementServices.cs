@@ -182,7 +182,6 @@ public sealed class ModelProviderManagementService(
         DisplayName = resource.Definition.DisplayName,
         ManagementMode = resource.Definition.ManagementMode,
         EndpointDisplayName = resource.Definition.Endpoint.Authority,
-        Capabilities = ["chat"],
         Credential = resource.Definition.Credential
     };
 
@@ -319,7 +318,6 @@ public sealed class ModelProfileManagementService(
         var providerAddress = definition.Provider.Resolve(ownerNamespace, ResourceKinds.ModelProvider);
         try { provider = await providerConfigurations.GetConfigurationRequiredAsync(providerAddress.Namespace, providerAddress.Name, cancellationToken); }
         catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }
-        if (!provider.Capabilities.Contains("chat", StringComparer.OrdinalIgnoreCase)) throw Invalid("definition.provider.name", "The referenced model provider does not support chat.");
         if (string.IsNullOrWhiteSpace(definition.Model.Name)) throw Invalid("definition.model.name", "A model name is required.");
         if (definition.Generation.Temperature is < 0 or > 2) throw Invalid("definition.generation.temperature", "Temperature must be between 0 and 2.");
         foreach (var option in definition.ProviderOptions.Keys)

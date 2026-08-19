@@ -114,7 +114,8 @@ The standalone vertical uses SQLite for management resources and runs without Az
 ## Prerequisites
 
 - .NET SDK 10.0.300 or later feature band
-- Optional: a local Ollama installation for the managed Ollama profile, including Aspire launches
+- Optional: a local Ollama installation for the managed Ollama profile
+- Optional: a local `llama-server` and GGUF model for the `llamacpp` provider
 
 No Azure subscription or remote API key is required.
 
@@ -150,7 +151,7 @@ For the Aspire dashboard and orchestration experience:
 dotnet run --project src/Agentstration.AppHost
 ```
 
-The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to the existing local Ollama installation configured by `Ollama:Endpoint` (default `http://localhost:11434`); it does not provision an Ollama server or model. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
+The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to `Ollama:Endpoint` (default `http://localhost:11434`) and the llama.cpp extension to `LlamaCpp:Endpoint` (default `http://localhost:8080`). It provisions neither inference server nor model and requires no Docker for either path. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
 
 Or with containers:
 
@@ -160,7 +161,7 @@ docker compose up --build
 
 ## AI modes
 
-The normal `Managed` mode resolves the provider, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; no `AI__Provider=Ollama` environment variable is required. The seeded `ollama-local` Model Provider URL, editable from `/modelproviders/default/ollama-local`, is the AEP extension URL and never the native Ollama URL.
+The normal `Managed` mode resolves the provider, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; concrete provider names are never host execution modes. The seeded `ollama-local` and `llama-cpp-local` URLs are AEP extension URLs, never native inference-server URLs.
 
 Use the deterministic offline mode explicitly for tests or fallback diagnostics:
 
@@ -178,6 +179,16 @@ dotnet run --project src/Agentstration.AppHost
 ```
 
 The seeded `reasoning-default` profile resolves to the persisted `ollama-local` AEP contribution and its `qwen3:1.7b` model. Aspire injects the autonomous Ollama extension endpoint and passes `Ollama:Endpoint` to that extension. To target a non-default local address, set `Ollama__Endpoint` before starting the AppHost. Direct startup of the extension defaults to `http://localhost:11434`, while Agentstration’s persisted AEP endpoint defaults to `http://localhost:5260`. The persisted AEP endpoint can be edited without restarting the host and is authoritative for subsequent runtime resolution.
+
+For llama.cpp, start `llama-server` with a stable alias and point Aspire at it before creating a Model Profile that references `llama-cpp-local`:
+
+```powershell
+llama-server -m C:\models\model.gguf --alias local-gguf --port 8080 --jinja
+$env:LlamaCpp__Endpoint = "http://localhost:8080"
+dotnet run --project src/Agentstration.AppHost
+```
+
+See [Model providers](../concepts/model-providers.md) for declarations, capabilities, native options, and limitations.
 
 The Agent Runner uses this resolver through Microsoft Agent Framework, so no Ollama-specific execution path exists in the Runtime Plane. Create a normal durable Runtime Run to exercise the entire declared-agent path:
 
@@ -199,13 +210,13 @@ $body = @{ prompt = "Reply with one short sentence." } | ConvertTo-Json
 Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5100/api/diagnostics/models/ollama/chat
 ```
 
-`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. The autonomous `Agentstration.Extensions.Ollama` service alone owns OllamaSharp, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no AEP or Ollama dependency.
+`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama and llama.cpp extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no dependency on either concrete provider.
 
-Current limitations are deliberate: Ollama is the only mutable provider type, credentials are not stored on provider resources, separate Flow Runs are not dispatched in parallel, and there is no conversation persistence or provider-native streaming yet. The Concurrent Flow orchestration strategy does execute its participants concurrently inside one bounded Run. Other OpenAI-compatible endpoints still use the legacy host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
+Current limitations are deliberate: credentials are not stored on provider resources, llama.cpp reasoning output is not represented as a distinct AEP content kind, and image input is not yet effective through the AEP-to-`IChatClient` adapter. Separate Flow Runs are not dispatched in parallel and there is no conversation persistence. Other legacy OpenAI-compatible endpoints still use host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 
 ### Model provider and profile APIs
 
-Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Aspire starts the AEP extension and supplies its initial seed URL, but relies on the configured local Ollama installation and remains outside the provider source of truth:
+Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
 
 ```powershell
 Invoke-RestMethod http://localhost:5100/api/modelproviders
@@ -213,9 +224,11 @@ Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/status
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/models
 Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/test
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/usages
+Invoke-RestMethod http://localhost:5100/api/modelproviders/llama-cpp-local/status
+Invoke-RestMethod http://localhost:5100/api/modelproviders/llama-cpp-local/models
 ```
 
-Create or edit a local Ollama declaration from the Blazor console at `/modelproviders`. Provider URLs must be absolute HTTP(S) URLs without embedded credentials, query strings, or fragments. Saving a provider does not require Ollama to be online; health and installed models remain observed state. Deleting a provider is rejected while a model profile references its exact resource ID.
+Create or edit Ollama and llama.cpp declarations from the Blazor console at `/modelproviders`. Provider URLs must be absolute HTTP(S) extension URLs without embedded credentials, query strings, or fragments. Saving a provider does not require its native inference server to be online; health and installed models remain observed state. Deleting a provider is rejected while a model profile references its exact resource ID.
 
 Model profiles are durable Management Plane resources with ETag concurrency and usage protection:
 

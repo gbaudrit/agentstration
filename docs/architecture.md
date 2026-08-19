@@ -31,6 +31,7 @@ src/
   Agentstration.Management.Storage.Sqlite/
   ../aep/                            autonomous future AEP repository subtree
   Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
+  Agentstration.Extensions.LlamaCpp/ autonomous AEP-to-llama.cpp service
   Agentstration.ModelProviders/      provider-neutral model-provider resolution through AEP
   Agentstration.Tools.Mcp/           Tool catalog, AEP-to-MCP resolution, official MCP client
   Agentstration.Runtime.Abstractions/
@@ -67,7 +68,8 @@ Management.Storage.Sqlite -> Management.Abstractions + EF Core SQLite
 Infrastructure -> SQLite control-plane storage + local/MAF runtime adapters
 Web -> ModelProviders -> Aep.MicrosoftExtensionsAI -> Aep.Client
 Extensions.Ollama -> Aep.AspNetCore + OllamaSharp
-AppHost -> Extensions.Ollama (configured local Ollama endpoint)
+Extensions.LlamaCpp -> Aep.AspNetCore + native HTTP
+AppHost -> provider extensions (configured local inference endpoints)
 Runtime.AgentFramework -> runtime abstractions + ModelProviders + Microsoft Agent Framework
 Application -> Work + Work storage abstractions
 Flow.Application -> Flow + Flow.Storage.Abstractions
@@ -266,7 +268,8 @@ An interactive console Run is owned entirely by the Runtime Plane and does not c
 
 ```text
 Local Ollama installation <--native HTTP-- autonomous Agentstration.Extensions.Ollama
-AppHost --configures Ollama endpoint--> Agentstration.Extensions.Ollama
+Local llama-server     <--native HTTP-- autonomous Agentstration.Extensions.LlamaCpp
+AppHost --configures native endpoints--> provider extensions
    |--injects AEP extension endpoint--> Agentstration hosts
 Agent modelProfile.resourceId
    -> persisted Management profile
@@ -277,11 +280,12 @@ Agent modelProfile.resourceId
    -> Runtime.AgentFramework
    -> MAF AIAgent
    -> AEP HTTP/JSON or SSE
-   -> Agentstration.Extensions.Ollama
-   -> OllamaSharp -> Ollama
+   -> selected AEP extension
+      |-> Agentstration.Extensions.Ollama -> OllamaSharp -> Ollama
+      `-> Agentstration.Extensions.LlamaCpp -> OpenAI-compatible/native HTTP -> llama-server
 ```
 
-The normal Web and Aspire composition uses the managed profile resolver: the persisted Model Profile and Model Provider are authoritative for contribution, AEP endpoint, and model selection. `Deterministic` remains the explicit offline/test mode. Startup seeds `ollama-local` only when absent: Aspire starts the AEP extension and configures it to use the existing local Ollama endpoint from `Ollama:Endpoint`, defaulting to `http://localhost:11434`; it does not provision Ollama or pull models. Direct launch of the extension uses the same default. Subsequent AEP URL changes take effect on the next resolution. Only `Agentstration.Extensions.Ollama` knows OllamaSharp or the native Ollama API. The profile resource ID remains in the immutable agent revision; no provider endpoint is embedded in an agent.
+The normal Web and Aspire composition uses the managed profile resolver: the persisted Model Profile and Model Provider are authoritative for contribution, AEP endpoint, and model selection. `Deterministic` remains the explicit offline/test mode. Startup seeds independent `ollama-local` and `llama-cpp-local` declarations when absent. Aspire starts both AEP extensions and configures them to use existing local inference servers; it provisions neither server and downloads no model. Subsequent AEP URL changes take effect on the next resolution. Only the concrete extension knows its native API. The profile resource ID remains in the immutable agent revision; no provider endpoint is embedded in an agent.
 
 ### AEP tool contribution and MCP flow
 
@@ -307,7 +311,7 @@ The Interactive Server console consumes these same HTTP contracts through dedica
 
 Model behavior and runtime behavior are now separate canonical categories. `ModelProfileResource` carries `generation`, `reasoning`, `output`, and provider-keyed `providerOptions`; `RuntimeProfileResource` carries session/tool/streaming defaults and runtime-keyed `runtimeOptions`. `AgentDeployment` records the resolved agent and model-profile references alongside the runtime-profile reference. Runtime option layers are merged by category from provider/model defaults through profile, agent, runtime, Work/Flow, and explicit execution override, then validated as one effective configuration.
 
-Runtime adapters expose normalized `AgentExecutionEvent` values rather than MAF updates. Effective capability resolution intersects provider, selected model, runtime, and concrete adapter support and preserves `Unsupported`, `Native`, `Emulated`, or `Partial`. The MAF adapter maps canonical options to `ChatOptions`; the Ollama adapter alone parses `think`, `keepAlive`, engine sizing, `endpointMode`, and its forward-compatible additional options. See ADR-0017.
+Runtime adapters expose normalized `AgentExecutionEvent` values rather than MAF updates. Resolution carries dynamically observed provider and selected-model capabilities with the client. Before invocation, effective capability resolution intersects provider, selected model, runtime, and concrete adapter support and preserves `Unsupported`, `Native`, `Emulated`, or `Partial`. The MAF adapter maps canonical options to `ChatOptions`; each AEP extension validates and maps only its own native options. See ADR-0017 and ADR-0055.
 
 Agent CRUD and Agent Runner always use canonical Management and Runtime HTTP clients, independently of simulated dashboard projections. This prevents a simulated agent generation from being activated against a different persisted generation. Before enabling Run the console combines `/api/agents/{name}/model` with `/api/runtime/agents/{name}/readiness`. Save-and-apply or **Reconcile runtime** calls `/prepare`, which creates or reuses the current revision and local deployment and reconciles it. At execution time the MAF adapter resolves the current profile again, merges profile defaults with the only supported overrides (`temperature`, `maxOutputTokens`), selects the deployment model through `ChatOptions.ModelId`, and records the actual provider/model/effective options on the durable Run.
 

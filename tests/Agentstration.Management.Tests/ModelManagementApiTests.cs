@@ -41,7 +41,7 @@ public sealed class ModelManagementApiTests
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("AI:Provider", "Ollama");
+            builder.UseSetting("AI:Provider", "Managed");
             builder.UseSetting("AI:Endpoint", "http://localhost:11434");
             builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint", "http://localhost:5265");
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
@@ -53,6 +53,25 @@ public sealed class ModelManagementApiTests
         Assert.IsNotNull(provider);
         Assert.AreEqual(new Uri("http://localhost:5265"), provider.Definition.Endpoint);
         Assert.AreNotEqual(new Uri("http://localhost:11434"), provider.Definition.Endpoint);
+    }
+
+    [TestMethod]
+    public async Task SeededLlamaCppProviderUsesItsAepExtensionEndpoint()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("AI:Provider", "Managed");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.LlamaCpp:Endpoint", "http://localhost:5275");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+        using var client = factory.CreateClient();
+
+        var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/llama-cpp-local");
+
+        Assert.IsNotNull(provider);
+        Assert.AreEqual("llamacpp", provider.Definition.ProviderType);
+        Assert.AreEqual(new Uri("http://localhost:5275"), provider.Definition.Endpoint);
     }
 
     [TestMethod]

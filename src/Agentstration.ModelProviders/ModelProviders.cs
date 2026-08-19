@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Resources;
 using Microsoft.Extensions.AI;
 
@@ -15,7 +16,6 @@ public sealed record ModelProviderConfiguration
     public string? DisplayName { get; init; }
     public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
     public string? EndpointDisplayName { get; init; }
-    public IReadOnlyList<string> Capabilities { get; init; } = ["chat"];
     public ResourceReference? Credential { get; init; }
 }
 
@@ -46,7 +46,15 @@ public sealed record ModelChatClientMetadata(
     ModelGenerationOptions? Generation = null,
     ModelReasoningOptions? Reasoning = null,
     ModelOutputOptions? Output = null,
-    IReadOnlyDictionary<string, JsonElement>? ProviderOptions = null);
+    IReadOnlyDictionary<string, JsonElement>? ProviderOptions = null,
+    AgentRuntimeCapabilities? ProviderCapabilities = null,
+    AgentRuntimeCapabilities? ModelCapabilities = null,
+    AgentRuntimeCapabilities? AdapterCapabilities = null);
+
+public sealed record ResolvedModelProviderCapabilities(
+    AgentRuntimeCapabilities Provider,
+    AgentRuntimeCapabilities Model,
+    AgentRuntimeCapabilities Adapter);
 
 public sealed record DiscoveredModel(
     string Name,
@@ -69,6 +77,16 @@ public interface IModelProviderOptionsValidator
     string ProviderType { get; }
     bool CanHandle(string providerType) => string.Equals(ProviderType, providerType, StringComparison.OrdinalIgnoreCase);
     void Validate(IReadOnlyDictionary<string, JsonElement> providerOptions);
+}
+
+public interface IModelProviderCapabilitiesResolver
+{
+    string ProviderType { get; }
+    bool CanHandle(string providerType) => string.Equals(ProviderType, providerType, StringComparison.OrdinalIgnoreCase);
+    ValueTask<ResolvedModelProviderCapabilities> ResolveCapabilitiesAsync(
+        ModelProviderConfiguration provider,
+        ModelDeploymentConfiguration deployment,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IModelProviderResolver

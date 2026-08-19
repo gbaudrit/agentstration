@@ -35,6 +35,26 @@ public static class ManagementDemoData
             }, cancellationToken);
         }
 
+        if (await providers.GetAsync("llama-cpp-local", cancellationToken) is null)
+        {
+            var connectionString = configuration.GetConnectionString("llama-cpp-extension");
+            var configuredEndpoint = configuration["Agentstration:Extensions:Agentstration.Extensions.LlamaCpp:Endpoint"];
+            var endpoint = ResolveEndpoint(connectionString) ?? (Uri.TryCreate(configuredEndpoint, UriKind.Absolute, out var value) ? value : new Uri("http://localhost:5270"));
+            await providers.CreateAsync(new ModelProviderResource
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.ModelProvider,
+                Metadata = new ResourceMetadata { Name = "llama-cpp-local", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
+                Definition = new ModelProviderProperties
+                {
+                    DisplayName = "llama.cpp via AEP",
+                    ProviderType = "llamacpp",
+                    Endpoint = endpoint,
+                    ManagementMode = string.IsNullOrWhiteSpace(connectionString) ? ModelProviderManagementMode.External : ModelProviderManagementMode.Aspire
+                }
+            }, cancellationToken);
+        }
+
         if (await runtimes.GetAsync("maf-default", cancellationToken) is null)
         {
             await runtimes.CreateAsync(new RuntimeProfileResource

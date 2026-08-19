@@ -81,9 +81,28 @@ public sealed class AepChatClient(
                 TopK = options?.TopK,
                 Seed = options?.Seed,
                 StopSequences = options?.StopSequences?.ToArray(),
+                ResponseFormat = MapResponseFormat(options?.ResponseFormat),
                 AdditionalOptions = additional
             },
             tools);
+    }
+
+    private static JsonElement? MapResponseFormat(ChatResponseFormat? format)
+    {
+        if (format is null) return null;
+        if (format == ChatResponseFormat.Text)
+            return JsonSerializer.SerializeToElement(new { type = "text" }, AepProtocol.JsonOptions);
+        if (format == ChatResponseFormat.Json)
+            return JsonSerializer.SerializeToElement(new { type = "json_object" }, AepProtocol.JsonOptions);
+        if (format is ChatResponseFormatJson { Schema: { } schema } json)
+        {
+            return JsonSerializer.SerializeToElement(new
+            {
+                type = "json_schema",
+                json_schema = new { name = json.SchemaName ?? "agentstration_output", schema }
+            }, AepProtocol.JsonOptions);
+        }
+        return null;
     }
 
     private static List<AepContent> MapContents(ChatMessage message)
