@@ -92,7 +92,8 @@ public sealed class AgentFrameworkRuntimeFactory(
         AgentVersion = definition.AgentVersion,
         AgentGeneration = generation ?? scope?.AgentGeneration,
         AgentRevisionId = revisionId,
-        CorrelationId = scope?.CorrelationId
+        CorrelationId = scope?.CorrelationId,
+        PersistArguments = scope?.PersistArguments
     };
 
     private static AIAgent Observe(AIAgent agent, bool enabled) => enabled

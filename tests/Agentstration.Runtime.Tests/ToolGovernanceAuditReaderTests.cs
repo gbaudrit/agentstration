@@ -127,6 +127,41 @@ public sealed class ToolGovernanceAuditReaderTests
         });
     }
 
+    [TestMethod]
+    public async Task AuditExposesArgumentsOnlyWhenTheDurableFactCapturedThem()
+    {
+        await WithStoresAsync(async (runtimeRuns, flowRuns) =>
+        {
+            await runtimeRuns.CreateAsync(RuntimeRun(), default);
+            var runEvent = RuntimeEvent(
+                1,
+                "attempt-1",
+                "lookup",
+                Evaluation("managed:guard", null, null, ToolExecutionHookEvaluationKind.Allowed)) with
+            {
+                ToolCall = RuntimeEvent(
+                    1,
+                    "attempt-1",
+                    "lookup",
+                    Evaluation("managed:guard", null, null, ToolExecutionHookEvaluationKind.Allowed)).ToolCall! with
+                {
+                    Arguments = "{\"query\":\"dotnet\"}"
+                }
+            };
+            await runtimeRuns.AppendEventAsync(runEvent, default);
+            var reader = new ToolGovernanceAuditReader(runtimeRuns, flowRuns);
+
+            var page = await reader.ListAsync(new ToolGovernanceAuditQuery
+            {
+                OwnerKind = ToolExecutionOwnerKind.RuntimeRun,
+                WorkspaceId = Workspace,
+                RunId = "runtime-run"
+            });
+
+            Assert.AreEqual("{\"query\":\"dotnet\"}", page.Items[0].Arguments);
+        });
+    }
+
     private static async Task WithStoresAsync(Func<IRuntimeRunStore, IFlowRepository, Task> test)
     {
         var directory = Path.Combine(Path.GetTempPath(), $"agentstration-governance-audit-{Guid.NewGuid():N}");

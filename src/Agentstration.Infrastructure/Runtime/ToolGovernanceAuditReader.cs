@@ -78,6 +78,7 @@ public sealed class ToolGovernanceAuditReader(
             ProviderId = call.ProviderId,
             ExternalToolId = call.ExternalToolId,
             CorrelationId = call.CorrelationId,
+            Arguments = call.Arguments,
             Evaluations = call.Governance
         };
     }
@@ -99,6 +100,7 @@ public sealed class ToolGovernanceAuditReader(
             ExternalToolId = OptionalString(payload, "ExternalToolId"),
             AgentId = OptionalString(payload, "AgentId"),
             CorrelationId = OptionalString(payload, "CorrelationId"),
+            Arguments = OptionalString(payload, "Arguments"),
             Evaluations = Property(payload, "Governance") is { ValueKind: JsonValueKind.Array } governance
                 ? governance.Deserialize<ToolExecutionHookEvaluation[]>() ?? []
                 : []

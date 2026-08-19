@@ -45,6 +45,7 @@ public sealed record RuntimeExecutionOptions
     public RuntimeExecutionMode Mode { get; init; } = RuntimeExecutionMode.Interactive;
     public int TimeoutSeconds { get; init; } = 120;
     public RuntimeStreamingMode Streaming { get; init; } = RuntimeStreamingMode.Automatic;
+    public bool? PersistToolArguments { get; init; }
     public IReadOnlyDictionary<string, JsonElement> Parameters { get; init; } = new Dictionary<string, JsonElement>();
 }
 

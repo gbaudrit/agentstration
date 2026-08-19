@@ -3,8 +3,25 @@ using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Runtime.Core;
 
-public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider timeProvider)
+public sealed class RuntimeRunStateManager
 {
+    private readonly IRuntimeRunStore runs;
+    private readonly TimeProvider timeProvider;
+    private readonly ToolExecutionCaptureOptions captureOptions;
+
+    public RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider timeProvider)
+        : this(runs, timeProvider, new ToolExecutionCaptureOptions()) { }
+
+    public RuntimeRunStateManager(
+        IRuntimeRunStore runs,
+        TimeProvider timeProvider,
+        ToolExecutionCaptureOptions captureOptions)
+    {
+        this.runs = runs;
+        this.timeProvider = timeProvider;
+        this.captureOptions = captureOptions;
+    }
+
     public async Task CompleteFailureAsync(WorkspaceId workspaceId, string runId, RuntimeRunState state, string error, CancellationToken cancellationToken)
     {
         for (var attempt = 0; ; attempt++)
@@ -120,7 +137,7 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         }
     }
 
-    private static RuntimeToolCall Project(RuntimeToolCall? current, ToolExecutionLifecycleEvent executionEvent)
+    private RuntimeToolCall Project(RuntimeToolCall? current, ToolExecutionLifecycleEvent executionEvent)
     {
         var context = executionEvent.Context;
         return executionEvent switch
@@ -136,6 +153,7 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
                 StartedAt = started.Timestamp,
                 ProviderId = context.ToolProviderId,
                 ExternalToolId = context.ExternalToolId,
+                Arguments = captureOptions.CaptureArguments(context.Arguments, context.PersistArguments),
                 CorrelationId = context.CorrelationId
             },
             ToolExecutionGovernanceEvaluated governance => Governance(current, governance),
@@ -159,7 +177,7 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         };
     }
 
-    private static RuntimeToolCall Governance(
+    private RuntimeToolCall Governance(
         RuntimeToolCall? current,
         ToolExecutionGovernanceEvaluated evaluated) => new()
     {
@@ -172,11 +190,12 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         StartedAt = current?.StartedAt ?? evaluated.Timestamp,
         ProviderId = evaluated.Context.ToolProviderId,
         ExternalToolId = evaluated.Context.ExternalToolId,
+        Arguments = captureOptions.CaptureArguments(evaluated.Context.Arguments, evaluated.Context.PersistArguments),
         CorrelationId = evaluated.Context.CorrelationId,
         Governance = evaluated.Evaluations.ToArray()
     };
 
-    private static RuntimeToolCall Terminal(
+    private RuntimeToolCall Terminal(
         RuntimeToolCall? current,
         ToolExecutionContext context,
         DateTimeOffset completedAt,
@@ -197,6 +216,7 @@ public sealed class RuntimeRunStateManager(IRuntimeRunStore runs, TimeProvider t
         DurationMilliseconds = duration.TotalMilliseconds,
         ProviderId = context.ToolProviderId,
         ExternalToolId = context.ExternalToolId,
+        Arguments = captureOptions.CaptureArguments(context.Arguments, context.PersistArguments),
         Error = error,
         FailureKind = failureKind,
         ErrorCode = errorCode,

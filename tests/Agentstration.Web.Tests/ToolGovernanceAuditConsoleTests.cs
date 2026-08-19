@@ -52,7 +52,7 @@ public sealed class ToolGovernanceAuditConsoleTests
     }
 
     [TestMethod]
-    public void PageRendersAttemptAndHookGenerationWithoutToolPayloads()
+    public void PageRendersAttemptAndExplainsWhenArgumentsWereNotRetained()
     {
         using var context = new BunitContext();
         context.Services.AddSingleton<IToolGovernanceAuditClient>(new FakeAuditClient());
@@ -67,12 +67,29 @@ public sealed class ToolGovernanceAuditConsoleTests
             Assert.Contains("default/ToolExecutionHook/guard", rendered.Markup, StringComparison.Ordinal);
             Assert.Contains(">7<", rendered.Markup, StringComparison.Ordinal);
             Assert.Contains("Denied", rendered.Markup, StringComparison.Ordinal);
-            Assert.DoesNotContain("arguments", rendered.Markup, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Arguments were not retained", rendered.Markup, StringComparison.Ordinal);
             Assert.DoesNotContain("provider-result", rendered.Markup, StringComparison.OrdinalIgnoreCase);
         });
     }
 
-    private sealed class FakeAuditClient : IToolGovernanceAuditClient
+    [TestMethod]
+    public void PageRendersRetainedInvocationArguments()
+    {
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IToolGovernanceAuditClient>(new FakeAuditClient("{\"query\":\"latest dotnet version\"}"));
+
+        var rendered = context.Render<ToolGovernanceAudit>(parameters => parameters
+            .Add(value => value.Owner, "runtime")
+            .Add(value => value.RunId, "run-1"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.Contains("latest dotnet version", rendered.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain("Arguments were not retained", rendered.Markup, StringComparison.Ordinal);
+        });
+    }
+
+    private sealed class FakeAuditClient(string? arguments = null) : IToolGovernanceAuditClient
     {
         public Task<ToolGovernanceAuditPage> GetAsync(
             ToolExecutionOwnerKind ownerKind,
@@ -92,6 +109,7 @@ public sealed class ToolGovernanceAuditConsoleTests
                     ToolId = "lookup",
                     ToolName = "Lookup",
                     ProviderId = "provider",
+                    Arguments = arguments,
                     Evaluations = [new ToolExecutionHookEvaluation(
                         new ToolExecutionHookIdentity(
                             "managed:guard",

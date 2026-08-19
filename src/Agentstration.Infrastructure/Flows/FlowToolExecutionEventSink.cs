@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Storage.Abstractions;
@@ -6,10 +7,29 @@ using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Infrastructure.Flows;
 
-public sealed class FlowToolExecutionEventSink(
-    IFlowRepository runs,
-    IFlowRunEventSink eventSink) : IToolExecutionEventSink
+public sealed class FlowToolExecutionEventSink : IToolExecutionEventSink
 {
+    private static readonly JsonSerializerOptions PayloadJsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+    private readonly IFlowRepository runs;
+    private readonly IFlowRunEventSink eventSink;
+    private readonly ToolExecutionCaptureOptions captureOptions;
+
+    public FlowToolExecutionEventSink(IFlowRepository runs, IFlowRunEventSink eventSink)
+        : this(runs, eventSink, new ToolExecutionCaptureOptions()) { }
+
+    public FlowToolExecutionEventSink(
+        IFlowRepository runs,
+        IFlowRunEventSink eventSink,
+        ToolExecutionCaptureOptions captureOptions)
+    {
+        this.runs = runs;
+        this.eventSink = eventSink;
+        this.captureOptions = captureOptions;
+    }
+
     public async ValueTask PublishAsync(
         ToolExecutionLifecycleEvent executionEvent,
         CancellationToken cancellationToken = default)
@@ -41,7 +61,7 @@ public sealed class FlowToolExecutionEventSink(
         _ => throw new ArgumentOutOfRangeException(nameof(executionEvent))
     };
 
-    private static JsonElement Payload(ToolExecutionLifecycleEvent executionEvent)
+    private JsonElement Payload(ToolExecutionLifecycleEvent executionEvent)
     {
         var context = executionEvent.Context;
         return JsonSerializer.SerializeToElement(new
@@ -57,6 +77,7 @@ public sealed class FlowToolExecutionEventSink(
             context.AgentGeneration,
             context.AgentRevisionId,
             context.CorrelationId,
+            Arguments = captureOptions.CaptureArguments(context.Arguments, context.PersistArguments),
             Governance = executionEvent is ToolExecutionGovernanceEvaluated governance
                 ? governance.Evaluations
                 : null,
@@ -80,6 +101,6 @@ public sealed class FlowToolExecutionEventSink(
             ErrorCode = (executionEvent as ToolExecutionFailed)?.ErrorCode,
             FailureKind = (executionEvent as ToolExecutionFailed)?.FailureKind.ToString(),
             Error = (executionEvent as ToolExecutionFailed)?.ErrorMessage
-        });
+        }, PayloadJsonOptions);
     }
 }

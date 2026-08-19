@@ -215,7 +215,8 @@ public sealed class RuntimeRunService(
                         PrincipalId = stored.Value.Scope.PrincipalId,
                         ExecutionId = runId,
                         CorrelationId = Activity.Current?.TraceId.ToString(),
-                        AgentGeneration = stored.Value.Properties.Agent.Version
+                        AgentGeneration = stored.Value.Properties.Agent.Version,
+                        PersistArguments = stored.Value.Properties.Execution.PersistToolArguments
                     }),
                 timeout.Token))
             {

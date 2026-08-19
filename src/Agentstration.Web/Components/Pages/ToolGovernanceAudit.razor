@@ -10,7 +10,7 @@
 <section class="panel governance-context">
     <div><span>Owner</span><strong>@OwnerLabel</strong></div>
     <div><span>Run</span><code>@RunId</code></div>
-    <div><span>Safety</span><strong>No Tool payloads</strong></div>
+    <div><span>Arguments</span><strong>Opt-in retention</strong></div>
 </section>
 
 <section class="panel governance-filters">
@@ -53,6 +53,17 @@ else
                     <dt>Agent</dt><dd><code>@(record.AgentId ?? "—")</code></dd>
                     <dt>Correlation</dt><dd><code>@(record.CorrelationId ?? "—")</code></dd>
                 </dl>
+                <section class="governance-invocation" aria-label="Tool invocation arguments">
+                    <h3>Invocation arguments</h3>
+                    @if (record.Arguments is null)
+                    {
+                        <p class="muted">Arguments were not retained for this invocation.</p>
+                    }
+                    else
+                    {
+                        <pre>@record.Arguments</pre>
+                    }
+                </section>
                 @if (record.Evaluations.Count == 0)
                 {
                     <p class="muted">No hook matched this physical attempt. The empty governance decision was persisted before provider invocation.</p>

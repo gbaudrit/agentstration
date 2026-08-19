@@ -341,7 +341,8 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 WorkspaceId = workspaceId,
                 PrincipalId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
                 ExecutionId = "run-direct",
-                CorrelationId = "correlation-direct"
+                CorrelationId = "correlation-direct",
+                PersistArguments = true
             }), default);
 
         Assert.AreEqual("DIRECT_OK", result.Output);
@@ -350,6 +351,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         Assert.AreEqual("run-direct", invocation.RunId);
         Assert.AreEqual("revision-direct", invocation.AgentRevisionId);
         Assert.AreEqual("correlation-direct", invocation.CorrelationId);
+        Assert.AreEqual(true, invocation.PersistArguments);
     }
 
     [TestMethod]

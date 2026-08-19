@@ -87,3 +87,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 55. [ADR-0055 — Agentstration owns the Tool execution boundary](0055-agentstration-owns-tool-execution-boundary.md)
 56. [ADR-0056 — Tool execution hooks are ordered Runtime guards](0056-tool-execution-hooks-are-ordered-runtime-guards.md)
 57. [ADR-0057 — Tool execution Hook resources select built-in Runtime handlers](0057-tool-execution-hook-resources-select-built-in-runtime-handlers.md)
+58. [ADR-0058 — Tool governance decisions are traced per physical attempt](0058-tool-governance-decisions-are-traced-per-physical-attempt.md)
+59. [ADR-0059 — Tool arguments require explicit bounded retention](0059-tool-arguments-require-explicit-bounded-retention.md)

@@ -64,6 +64,7 @@ else
                     <label><span>Runtime parameter overrides · JSON</span><InputTextArea @bind-Value="model.RuntimeParameters" rows="7" placeholder="{ &quot;temperature&quot;: 0.2 }" /><small>Overrides remain subject to Model Profile policy resolution.</small></label>
                     <label><span>Timeout · seconds</span><InputNumber @bind-Value="model.TimeoutSeconds" /><ValidationMessage For="() => model.TimeoutSeconds" /></label>
                     <label><span>Streaming</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@value</option> }</InputSelect><small>Automatic inherits the runtime profile default.</small></label>
+                    <label><span>Tool arguments</span><InputSelect @bind-Value="model.ToolArgumentRetention"><option value="@ToolArgumentRetentionMode.Inherit">Inherit host default</option><option value="@ToolArgumentRetentionMode.Retain">Retain for this Run</option><option value="@ToolArgumentRetentionMode.DoNotRetain">Do not retain for this Run</option></InputSelect><small>The host maximum capture length still applies.</small></label>
                 }
             </div>
             <div class="runner-actions">
@@ -99,6 +100,7 @@ else
                         <dt>Resolved model</dt><dd>@(state.Run.Status.ResolvedModel ?? "Provider did not report it")</dd>
                         <dt>Temperature</dt><dd>@(state.Run.Status.EffectiveTemperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Profile default")</dd>
                         <dt>Maximum output tokens</dt><dd>@(state.Run.Status.EffectiveMaxOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Provider default")</dd>
+                        <dt>Tool arguments</dt><dd>@ToolArgumentRetentionLabel(state.Run.Properties.Execution.PersistToolArguments)</dd>
                         <dt>Tokens</dt><dd>@(state.Run.Status.InputTokens?.ToString() ?? "—") input · @(state.Run.Status.OutputTokens?.ToString() ?? "—") output</dd>
                         <dt>Started</dt><dd>@(state.Run.Status.StartedAt?.LocalDateTime.ToString("G") ?? "Pending")</dd>
                         <dt>Completed</dt><dd>@(state.Run.Status.CompletedAt?.LocalDateTime.ToString("G") ?? "—")</dd>
@@ -115,8 +117,8 @@ else
                 }
                 else if (activeTab == "Tools")
                 {
-                    var tools = state.Events.Where(item => item.ToolCall is not null).Select(item => item.ToolCall!).GroupBy(tool => tool.Id).Select(group => group.Last()).ToArray();
-                    @if (tools.Length == 0) { <EmptyState Title="No tool calls" Message="This run has not reported a tool invocation." /> }
+                    var tools = state.ToolCalls;
+                    @if (tools.Count == 0) { <EmptyState Title="No tool calls" Message="This run has not reported a tool invocation." /> }
                     else { @foreach (var tool in tools) { <details><summary>@tool.Name · @tool.State</summary><p><a class="text-button" href="@GovernanceUrl(state.Run.Id, tool)">Inspect governance decision</a></p><pre>@tool.Arguments</pre><pre>@(tool.Error ?? tool.Result)</pre></details> } }
                 }
                 else if (activeTab == "Trace")
@@ -321,6 +323,7 @@ else
     private static string ShortId(string id) => id.Length > 13 ? id[..13] : id;
     private static string PromptPreview(RuntimeRun run) { var value = run.Properties.Input.Messages.LastOrDefault(message => message.Role == RuntimeMessageRole.User)?.Content ?? "—"; return value.Length > 60 ? $"{value[..60]}…" : value; }
     private static string Duration(RuntimeRun run) { var start = run.Status.StartedAt ?? run.Status.CreatedAt; var end = run.Status.CompletedAt; return end is null ? "Live" : (end.Value - start).ToString("g"); }
+    private static string ToolArgumentRetentionLabel(bool? value) => value switch { true => "Retain for this Run", false => "Do not retain for this Run", null => "Inherit host default" };
     private static string GovernanceUrl(string runId, RuntimeToolCall tool) => $"/tool-governance/runtime/{Uri.EscapeDataString(runId)}?toolCallId={Uri.EscapeDataString(tool.Id)}&invocationId={Uri.EscapeDataString(tool.InvocationId)}";
     private static CreateRuntimeRunRequest ToRequest(RuntimeRun run) => new() { Agent = run.Properties.Agent, Input = run.Properties.Input, Execution = run.Properties.Execution, Origin = run.Properties.Origin };
 

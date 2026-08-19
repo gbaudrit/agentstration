@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Agentstration.Resources;
 
 namespace Agentstration.Runtime.Abstractions;
@@ -31,6 +32,8 @@ public sealed record ToolGovernanceAuditRecord
     public string? ExternalToolId { get; init; }
     public string? AgentId { get; init; }
     public string? CorrelationId { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Arguments { get; init; }
     public IReadOnlyList<ToolExecutionHookEvaluation> Evaluations { get; init; } = [];
 }
 

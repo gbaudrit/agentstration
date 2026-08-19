@@ -159,6 +159,7 @@ public static class DependencyInjection
         services.AddSqliteRuntimeRuns(runtimeConnectionString);
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
+        services.TryAddSingleton(new ToolExecutionCaptureOptions());
         services.AddSingleton<IToolExecutionEventSink, RuntimeToolExecutionEventSink>();
         services.AddSingleton<IToolExecutionEventSink, FlowToolExecutionEventSink>();
         services.AddSingleton<IToolExecutionHookResolver, ManagementToolExecutionHookResolver>();

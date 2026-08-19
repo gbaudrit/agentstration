@@ -253,6 +253,7 @@ public sealed record ToolExecutionScope
     public string? ExecutionId { get; init; }
     public string? CorrelationId { get; init; }
     public long? AgentGeneration { get; init; }
+    public bool? PersistArguments { get; init; }
 }
 
 public sealed record ToolExecutionContext
@@ -273,7 +274,32 @@ public sealed record ToolExecutionContext
     public long? AgentGeneration { get; init; }
     public string? AgentRevisionId { get; init; }
     public string? CorrelationId { get; init; }
+    public bool? PersistArguments { get; init; }
     public JsonElement? Arguments { get; init; }
+}
+
+public sealed record ToolExecutionCaptureOptions
+{
+    public const int DefaultMaximumArgumentsLength = 16_384;
+
+    public bool PersistArguments { get; init; }
+    public int MaximumArgumentsLength { get; init; } = DefaultMaximumArgumentsLength;
+
+    public string? CaptureArguments(JsonElement? arguments, bool? persistArgumentsOverride = null)
+    {
+        if (!(persistArgumentsOverride ?? PersistArguments)) return null;
+        Validate();
+        var value = arguments?.GetRawText() ?? "null";
+        if (value.Length <= MaximumArgumentsLength) return value;
+        const string suffix = "\n… [truncated]";
+        return $"{value[..(MaximumArgumentsLength - suffix.Length)]}{suffix}";
+    }
+
+    public void Validate()
+    {
+        if (MaximumArgumentsLength is < 64 or > 1_048_576)
+            throw new InvalidOperationException("ToolExecution MaximumArgumentsLength must be between 64 and 1048576 characters.");
+    }
 }
 
 public interface IToolExecutionPipeline

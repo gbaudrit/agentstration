@@ -461,6 +461,54 @@ public sealed class ToolExecutionLifecycleTests
     }
 
     [TestMethod]
+    public async Task RuntimeProjectionRetainsArgumentsOnlyWhenExplicitlyEnabled()
+    {
+        var store = new ProjectionRuntimeRunStore(Run());
+        var capture = new ToolExecutionCaptureOptions
+        {
+            PersistArguments = true,
+            MaximumArgumentsLength = 1024
+        };
+        var pipeline = new ToolExecutionPipeline(
+            new DelegateInvoker((_, _) => ValueTask.FromResult<JsonElement?>(null)),
+            [new RuntimeToolExecutionEventSink(new RuntimeRunStateManager(store, TimeProvider.System, capture))],
+            new AdvancingTimeProvider());
+
+        await pipeline.ExecuteAsync(Context(), default);
+
+        Assert.AreEqual("{\"secret\":\"argument\"}", store.Current.Value.Status.ToolCalls[0].Arguments);
+        Assert.IsTrue(store.Events.All(runEvent => runEvent.ToolCall?.Arguments == "{\"secret\":\"argument\"}"));
+    }
+
+    [TestMethod]
+    public void ArgumentCaptureIsBoundedWhenEnabled()
+    {
+        var capture = new ToolExecutionCaptureOptions
+        {
+            PersistArguments = true,
+            MaximumArgumentsLength = 64
+        };
+
+        var value = capture.CaptureArguments(JsonSerializer.SerializeToElement(new { secret = new string('x', 100) }));
+
+        Assert.IsNotNull(value);
+        Assert.AreEqual(64, value.Length);
+        Assert.StartsWith("{\"secret\":\"xxx", value);
+        Assert.EndsWith("… [truncated]", value);
+    }
+
+    [TestMethod]
+    public void RunOverrideWinsTheHostArgumentRetentionDefault()
+    {
+        var arguments = JsonSerializer.SerializeToElement(new { query = "dotnet" });
+        var disabledHost = new ToolExecutionCaptureOptions { PersistArguments = false };
+        var enabledHost = new ToolExecutionCaptureOptions { PersistArguments = true };
+
+        Assert.AreEqual("{\"query\":\"dotnet\"}", disabledHost.CaptureArguments(arguments, persistArgumentsOverride: true));
+        Assert.IsNull(enabledHost.CaptureArguments(arguments, persistArgumentsOverride: false));
+    }
+
+    [TestMethod]
     public async Task FlowProjectionUsesTheSamePipelineAndOmitsArgumentsAndResults()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"agentstration-tool-flow-{Guid.NewGuid():N}");
@@ -490,9 +538,44 @@ public sealed class ToolExecutionLifecycleTests
             Assert.HasCount(3, published.Events);
             var payload = events[1].Payload?.GetRawText();
             Assert.IsNotNull(payload);
-            Assert.DoesNotContain("argument", payload, StringComparison.Ordinal);
-            Assert.DoesNotContain("result", payload, StringComparison.Ordinal);
+            Assert.DoesNotContain("argument", payload, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("result", payload, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("logical-call", payload, StringComparison.Ordinal);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task FlowProjectionRetainsArgumentsWhenExplicitlyEnabled()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-tool-flow-capture-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton(TimeProvider.System);
+            services.AddSqliteFlowStorage($"Data Source={Path.Combine(directory, "flow.db")}");
+            await using var provider = services.BuildServiceProvider();
+            var repository = provider.GetRequiredService<IFlowRepository>();
+            await repository.InitializeAsync(default);
+            await repository.CreateRunAsync(FlowRun(), default);
+            var pipeline = new ToolExecutionPipeline(
+                new DelegateInvoker((_, _) => ValueTask.FromResult<JsonElement?>(null)),
+                [new FlowToolExecutionEventSink(
+                    repository,
+                    new RecordingFlowRunEventSink(),
+                    new ToolExecutionCaptureOptions { PersistArguments = true })],
+                new AdvancingTimeProvider());
+
+            await pipeline.ExecuteAsync(Context() with { OwnerKind = ToolExecutionOwnerKind.FlowRun }, default);
+
+            var events = await repository.ListRunEventsAsync(Workspace, "run-1", 0, default);
+            var arguments = events[1].Payload?.GetProperty("Arguments").GetString();
+            Assert.AreEqual("{\"secret\":\"argument\"}", arguments);
         }
         finally
         {
