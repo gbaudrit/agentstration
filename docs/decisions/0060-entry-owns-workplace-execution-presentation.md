@@ -1,4 +1,4 @@
-# ADR-0055 — Entry owns Workplace execution presentation
+# ADR-0060 — Entry owns Workplace execution presentation
 
 - Status: Accepted
 - Date: 2026-08-18

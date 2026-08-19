@@ -16,10 +16,12 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
     IToolCatalog tools,
     AgentFrameworkRuntimeFactory agentFactory,
     IRuntimeExecutionStateStore? executionStates = null,
-    TimeProvider? timeProvider = null) : IFlowOrchestrationEngine
+    TimeProvider? timeProvider = null,
+    IToolExecutionPipeline? configuredToolExecution = null) : IFlowOrchestrationEngine
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly TimeProvider timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly IToolExecutionPipeline toolExecution = configuredToolExecution ?? UnavailableToolExecutionPipeline.Instance;
 
     public async IAsyncEnumerable<FlowExecutionEvent> ExecuteAsync(
         FlowOrchestrationExecutionRequest request,
@@ -29,7 +31,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         var references = request.Definition.Pattern is MagenticOrchestrationPattern magentic
             ? request.Definition.Participants.Concat([magentic.Manager]).ToArray()
             : request.Definition.Participants;
-        var participants = await ResolveParticipantsAsync(references, request.RuntimeBindings, cancellationToken);
+        var participants = await ResolveParticipantsAsync(references, request.RuntimeBindings, ToolScope(request), cancellationToken);
         var bindings = references.Select(reference => participants[reference.Id].Binding).ToArray();
         yield return new FlowRuntimeBindingsResolved(bindings);
         var built = await BuildWorkflowAsync(request.Definition, participants, cancellationToken);
@@ -231,6 +233,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
     private async Task<IReadOnlyDictionary<string, ResolvedParticipant>> ResolveParticipantsAsync(
         IReadOnlyList<FlowTargetReference> references,
         IReadOnlyList<RuntimeExecutionBinding>? persistedBindings,
+        ToolExecutionScope executionScope,
         CancellationToken cancellationToken)
     {
         var participants = new Dictionary<string, ResolvedParticipant>(StringComparer.Ordinal);
@@ -252,7 +255,13 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                 throw new FlowValidationException("flow_runtime_binding_mismatch", $"The exact runtime binding for participant '{reference.Id}' is no longer available.");
             if (!string.Equals(resolved.Definition.Handler, agentFactory.Handler, StringComparison.Ordinal))
                 throw new FlowValidationException("flow_participant_handler_unsupported", $"Agent '{reference.Id}' does not use the supported runtime handler.");
-            var agent = await agentFactory.CreateAgentAsync(resolved.Definition, new AgentRuntimeContext(tools), cancellationToken);
+            var agent = await agentFactory.CreateAgentAsync(
+                resolved.Definition,
+                resolved.RevisionId,
+                resolved.Generation,
+                new AgentRuntimeContext(tools, toolExecution),
+                executionScope,
+                cancellationToken);
             var effectiveBinding = binding ?? new RuntimeExecutionBinding
             {
                 ParticipantId = reference.Id,
@@ -268,6 +277,24 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         }
         return participants;
     }
+
+    private static ToolExecutionScope ToolScope(FlowOrchestrationExecutionRequest request) => request.Scope is null
+        ? new ToolExecutionScope
+        {
+            OwnerKind = ToolExecutionOwnerKind.FlowRun,
+            WorkspaceId = request.WorkspaceId,
+            ExecutionId = request.RunId,
+            CorrelationId = request.CorrelationId
+        }
+        : new ToolExecutionScope
+        {
+            OwnerKind = ToolExecutionOwnerKind.FlowRun,
+            TenantId = request.Scope.TenantId,
+            WorkspaceId = request.Scope.WorkspaceId,
+            PrincipalId = request.Scope.PrincipalId,
+            ExecutionId = request.RunId,
+            CorrelationId = request.CorrelationId
+        };
 
     private async Task<BuiltWorkflow> BuildWorkflowAsync(
         OrchestrationFlowDefinition definition,

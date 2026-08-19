@@ -27,6 +27,7 @@ public static class ResourceKinds
     public const string Vault = "Vault";
     public const string Tool = "Tool";
     public const string ToolProvider = "ToolProvider";
+    public const string ToolExecutionHook = "ToolExecutionHook";
 }
 
 public static class PackKinds
@@ -311,6 +312,33 @@ public sealed record ToolResourceProperties
 public sealed record ToolResource : Resource
 {
     public ToolResourceProperties Definition { get; init; } = null!;
+}
+
+public static class ToolExecutionHookHandlers
+{
+    public const string Deny = "deny";
+}
+
+public sealed record ToolExecutionHookSelector
+{
+    public IReadOnlyList<string> Tools { get; init; } = [];
+    public IReadOnlyList<string> Providers { get; init; } = [];
+    public IReadOnlyList<string> Agents { get; init; } = [];
+}
+
+public sealed record ToolExecutionHookProperties
+{
+    public required string DisplayName { get; init; }
+    public bool Enabled { get; init; } = true;
+    public int Order { get; init; }
+    public required string Handler { get; init; }
+    public ToolExecutionHookSelector Selector { get; init; } = new();
+    public IReadOnlyDictionary<string, JsonElement> Configuration { get; init; } = new Dictionary<string, JsonElement>();
+}
+
+public sealed record ToolExecutionHookResource : Resource
+{
+    public ToolExecutionHookProperties Definition { get; init; } = null!;
 }
 
 public sealed record DiscoveredToolDescriptor(

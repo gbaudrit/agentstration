@@ -148,6 +148,7 @@ public sealed class RuntimeRunTests
         await using var fixture = await RuntimeFixture.CreateAsync();
         var options = new RuntimeExecutionOptions
         {
+            PersistToolArguments = true,
             Parameters = new Dictionary<string, JsonElement>
             {
                 ["temperature"] = JsonSerializer.SerializeToElement(0.6f),
@@ -163,6 +164,7 @@ public sealed class RuntimeRunTests
         Assert.IsTrue(readiness.Ready);
         Assert.AreEqual(0.6f, fixture.Registry.LastRequest?.Options?.Temperature);
         Assert.AreEqual(750, fixture.Registry.LastRequest?.Options?.MaxOutputTokens);
+        Assert.AreEqual(true, fixture.Registry.LastRequest?.ToolExecution?.PersistArguments);
         Assert.AreEqual(0.6f, completed!.Value.Status.EffectiveTemperature);
         Assert.AreEqual(750, completed.Value.Status.EffectiveMaxOutputTokens);
     }
@@ -283,7 +285,14 @@ public sealed class RuntimeRunTests
     public async Task RetryCreatesNewRunAndTerminalEventStreamCloses()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
-        var original = await fixture.CreateRunAsync();
+        var original = await fixture.Service.CreateAsync(
+            TestScope,
+            new RuntimeAgentReference(fixture.AgentId, 3),
+            Input("test prompt"),
+            new RuntimeExecutionOptions { PersistToolArguments = true },
+            RuntimeRunOrigin.Console,
+            "operator",
+            default);
         await fixture.Service.ExecuteAsync(new(TestScope, original.Value.Id), default);
 
         var retry = await fixture.Service.RetryAsync(TestScope, original.Value.Id, default);
@@ -293,6 +302,7 @@ public sealed class RuntimeRunTests
         Assert.AreNotEqual(original.Value.Id, retry.Value.Id);
         CollectionAssert.AreEqual(original.Value.Properties.Input.Messages.ToArray(), retry.Value.Properties.Input.Messages.ToArray());
         Assert.AreEqual(original.Value.Properties.Input.Context, retry.Value.Properties.Input.Context);
+        Assert.AreEqual(true, retry.Value.Properties.Execution.PersistToolArguments);
         Assert.AreEqual(RuntimeRunEventKind.RunCompleted, observed[^1].Kind);
     }
 

@@ -9,6 +9,7 @@ using Agentstration.Infrastructure.Flows;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
@@ -37,6 +38,9 @@ if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration
 builder.Services.AddSingleton(bootstrapOptions);
 var genAiObservability = builder.Configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new();
 genAiObservability.Validate(builder.Environment.IsDevelopment());
+var toolExecutionCapture = builder.Configuration.GetSection("Agentstration:ToolExecution").Get<ToolExecutionCaptureOptions>() ?? new();
+toolExecutionCapture.Validate();
+builder.Services.AddSingleton(toolExecutionCapture);
 var dataPath = builder.Configuration["Data:Path"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "data.json");
 var identityConnectionString = builder.Configuration.GetConnectionString("Identity")
     ?? (builder.Environment.IsEnvironment("Testing")
@@ -174,6 +178,7 @@ app.MapAgentstrationWorkplaceApi();
 app.MapAgentstrationWorkOperationsApi();
 app.MapAgentstrationFlowApi();
 app.MapAgentstrationRuntimeApi();
+app.MapAgentstrationToolGovernanceAuditApi();
 app.MapHub<FlowRunHub>("/hubs/flow-runs").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
 app.MapHub<WorkplaceHub>("/hubs/workplace");
 if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();

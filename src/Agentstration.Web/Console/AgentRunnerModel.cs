@@ -6,6 +6,8 @@ using Agentstration.Runtime.Contracts;
 
 namespace Agentstration.Web.Console;
 
+public enum ToolArgumentRetentionMode { Inherit, Retain, DoNotRetain }
+
 public sealed class AgentRunnerModel
 {
     [Required, StringLength(100_000, MinimumLength = 1)]
@@ -14,6 +16,7 @@ public sealed class AgentRunnerModel
     public string? Context { get; set; }
     public string? RuntimeParameters { get; set; }
     public RuntimeStreamingMode Streaming { get; set; } = RuntimeStreamingMode.Automatic;
+    public ToolArgumentRetentionMode ToolArgumentRetention { get; set; }
     [Range(1, 600)] public int TimeoutSeconds { get; set; } = 120;
 
     public CreateRuntimeRunRequest ToRequest(AgentResource agent)
@@ -59,6 +62,12 @@ public sealed class AgentRunnerModel
             {
                 Mode = RuntimeExecutionMode.Interactive,
                 Streaming = Streaming,
+                PersistToolArguments = ToolArgumentRetention switch
+                {
+                    ToolArgumentRetentionMode.Retain => true,
+                    ToolArgumentRetentionMode.DoNotRetain => false,
+                    _ => null
+                },
                 TimeoutSeconds = TimeoutSeconds,
                 Parameters = parameters
             },
@@ -74,6 +83,11 @@ public sealed class AgentRunnerState
     public string Response { get; private set; } = string.Empty;
     public RuntimeRunState State { get; private set; } = RuntimeRunState.Pending;
     public IReadOnlyList<RuntimeRunEvent> Events => events;
+    public IReadOnlyList<RuntimeToolCall> ToolCalls => (Run?.Status.ToolCalls ?? [])
+        .Concat(events.Where(runEvent => runEvent.ToolCall is not null).Select(runEvent => runEvent.ToolCall!))
+        .GroupBy(toolCall => toolCall.Id, StringComparer.Ordinal)
+        .Select(group => group.Last())
+        .ToArray();
     public long LastSequence => events.Count == 0 ? 0 : events[^1].Sequence;
 
     public void Reset(RuntimeRun run)
