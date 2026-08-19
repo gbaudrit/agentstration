@@ -216,7 +216,7 @@ Current limitations are deliberate: credentials are not stored on provider resou
 
 ### Model provider and profile APIs
 
-Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
+Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Model Profile resolution exposes provider/model/adapter capability levels, their effective intersection, and profile-option incompatibilities before execution. Runtime and agent-tool compatibility remains an execution-resolution concern. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
 
 ```powershell
 Invoke-RestMethod http://localhost:5100/api/modelproviders

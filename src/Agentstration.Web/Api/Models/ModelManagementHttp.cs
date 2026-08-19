@@ -98,7 +98,42 @@ internal static class ModelManagementHttp
             resolution.Profile.Definition.Reasoning,
             resolution.Profile.Definition.Output),
         resolution.Status,
-        resolution.Warnings);
+        resolution.Warnings,
+        Capabilities(resolution),
+        resolution.Incompatibilities?.Select(issue => new ModelCompatibilityIssueResponse(
+            issue.Capability,
+            Support(issue.EffectiveSupport),
+            issue.Message)).ToArray() ?? []);
+
+    private static IReadOnlyList<ModelCapabilityResponse> Capabilities(ModelProfileResolution resolution)
+    {
+        if (resolution.CapabilityLevels is null || resolution.EffectiveCapabilities is null) return [];
+        var levels = resolution.CapabilityLevels;
+        var effective = resolution.EffectiveCapabilities;
+        return
+        [
+            Capability("Streaming", levels.Provider.Streaming, levels.Model.Streaming, levels.Adapter.Streaming, effective.Streaming),
+            Capability("Tools", levels.Provider.Tools, levels.Model.Tools, levels.Adapter.Tools, effective.Tools),
+            Capability("Structured output", levels.Provider.StructuredOutput, levels.Model.StructuredOutput, levels.Adapter.StructuredOutput, effective.StructuredOutput),
+            new ModelCapabilityResponse(
+                "Reasoning",
+                Support(levels.Provider.Reasoning.Support),
+                Support(levels.Model.Reasoning.Support),
+                Support(levels.Adapter.Reasoning.Support),
+                Support(effective.Reasoning.Support),
+                effective.Reasoning.SupportedEfforts.Order(StringComparer.OrdinalIgnoreCase).ToArray())
+        ];
+    }
+
+    private static ModelCapabilityResponse Capability(
+        string name,
+        Agentstration.Runtime.Abstractions.FeatureCapability provider,
+        Agentstration.Runtime.Abstractions.FeatureCapability model,
+        Agentstration.Runtime.Abstractions.FeatureCapability adapter,
+        Agentstration.Runtime.Abstractions.FeatureCapability effective) =>
+        new(name, Support(provider.Support), Support(model.Support), Support(adapter.Support), Support(effective.Support), []);
+
+    private static string Support(Agentstration.Runtime.Abstractions.CapabilitySupport support) => support.ToString().ToLowerInvariant();
 
     private static IResult Problem(
         string type,

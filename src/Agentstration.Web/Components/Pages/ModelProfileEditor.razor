@@ -76,12 +76,30 @@ else
     @if (!IsNew)
     {
         <section class="details-grid resource-section">
-            <article class="panel"><div class="panel-header"><div><p class="eyebrow">Overview</p><h2>Effective resolution</h2></div></div>
-                @if (resolution is null) { <p>Resolution is not available.</p> } else { <dl class="resource-details"><dt>Declared profile</dt><dd>@resolution.Profile.DisplayName <code>@resolution.Profile.Name</code></dd><dt>Resolved provider</dt><dd>@(resolution.Provider?.DisplayName ?? resolution.Provider?.Name ?? "Not resolved")</dd><dt>Resolved model</dt><dd>@resolution.Model.Name</dd><dt>Status</dt><dd>@ModelManagementUi.Label(resolution.Status)</dd><dt>Streaming capability</dt><dd>@(resolution.Model.Capabilities?.Contains("streaming", StringComparer.OrdinalIgnoreCase) == true ? "Declared by model" : "Not declared by model")</dd><dt>Tool capability</dt><dd>@(resolution.Model.Capabilities?.Contains("tools", StringComparer.OrdinalIgnoreCase) == true ? "Declared by model" : "Not declared by model")</dd></dl>@foreach (var item in resolution.Warnings) { <p class="inline-warning">@item</p> } }
+            <article class="panel"><div class="panel-header"><div><p class="eyebrow">Overview</p><h2>Effective resolution</h2></div><button class="button-secondary" type="button" @onclick="RefreshResolutionAsync" disabled="@diagnosing">@(diagnosing ? "Checking…" : "Refresh diagnosis")</button></div>
+                @if (resolution is null) { <p>Resolution is not available.</p> } else { <dl class="resource-details"><dt>Declared profile</dt><dd>@resolution.Profile.DisplayName <code>@resolution.Profile.Name</code></dd><dt>Resolved provider</dt><dd>@(resolution.Provider?.DisplayName ?? resolution.Provider?.Name ?? "Not resolved")</dd><dt>Provider connection</dt><dd>@ModelManagementUi.Label(resolution.Provider?.Status ?? "unknown")</dd><dt>Resolved model</dt><dd>@resolution.Model.Name</dd><dt>Model status</dt><dd>@ModelManagementUi.Label(resolution.Model.Status ?? "unknown")</dd><dt>Profile status</dt><dd>@ModelManagementUi.Label(resolution.Status)</dd></dl>@foreach (var item in resolution.Warnings) { <p class="inline-warning">@item</p> } }
             </article>
             <article class="panel" id="agents"><div class="panel-header"><div><p class="eyebrow">Usages</p><h2>Agents</h2></div><span>@usages.Count</span></div>
                 @if (usages.Count == 0) { <p>No agent references this profile.</p> } else { <ul class="resource-links">@foreach (var usage in usages) { <li><a href="@AgentUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul> }
             </article>
+        </section>
+        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">Compatibility</p><h2>Effective capabilities</h2></div><span>Provider · model · adapter</span></div>
+            @if (resolution?.Capabilities is not { Count: > 0 })
+            {
+                <EmptyState Title="Capabilities unavailable" Message="Refresh the diagnosis after the provider and model become available." />
+            }
+            else
+            {
+                <DataGrid TItem="ModelCapabilityResponse" Items="resolution.Capabilities"><Header><tr><th>Capability</th><th>Provider</th><th>Model</th><th>Adapter</th><th>Effective</th><th>Values</th></tr></Header><Row Context="capability"><tr><td><strong>@capability.Name</strong></td><td>@SupportLabel(capability.ProviderSupport)</td><td>@SupportLabel(capability.ModelSupport)</td><td>@SupportLabel(capability.AdapterSupport)</td><td><strong>@SupportLabel(capability.EffectiveSupport)</strong></td><td>@(capability.SupportedValues.Count == 0 ? "—" : string.Join(", ", capability.SupportedValues))</td></tr></Row></DataGrid>
+            }
+            @if (resolution?.Incompatibilities is { Count: > 0 })
+            {
+                <div class="form-alert form-alert-danger" role="alert"><strong>Profile configuration is incompatible</strong>@foreach (var issue in resolution.Incompatibilities) { <span><code>@issue.Capability</code> — @issue.Message</span> }</div>
+            }
+            else if (resolution?.Capabilities is { Count: > 0 })
+            {
+                <p class="inline-info">The profile options are compatible with the provider, model and AEP adapter. Runtime capabilities and agent tools are evaluated when an agent is resolved.</p>
+            }
         </section>
         <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Declarative resource</h2></div><span>Read only</span></div><pre class="runner-json">@Definition</pre></section>
     }
@@ -95,7 +113,7 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = [];
     private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
-    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool confirmDelete;
+    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
     private string SelectedProvider => model is null || string.IsNullOrWhiteSpace(model.ProviderName) ? string.Empty : $"{model.ProviderNamespace}:{model.ProviderName}";
@@ -161,6 +179,13 @@ else
         catch (AgentstrationApiException exception) { error = exception; }
         finally { saving = false; }
     }
+    private async Task RefreshResolutionAsync()
+    {
+        if (IsNew || diagnosing) return; diagnosing = true; error = null;
+        try { resolution = await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { diagnosing = false; }
+    }
     private void RequestDelete() { if (usages.Count > 0) { warning = $"This model profile cannot be deleted because it is used by {usages.Count} agent(s): {string.Join(", ", usages.Select(item => item.DisplayName))}."; return; } confirmDelete = true; }
     private async Task DeleteAsync()
     {
@@ -169,6 +194,7 @@ else
         catch (AgentstrationApiException exception) { error = exception; }
     }
     private static bool IsUnavailable(AvailableModelResponse model) => string.Equals(model.Status, "unavailable", StringComparison.OrdinalIgnoreCase);
+    private static string SupportLabel(string support) => support switch { "native" => "Native", "emulated" => "Emulated", "partial" => "Partial", _ => "Unsupported" };
     private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
     private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";
     private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/modelprofiles/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";

@@ -7,9 +7,11 @@ using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
@@ -387,6 +389,48 @@ public sealed class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task ProfileResolutionExposesEffectiveCapabilitiesAndConfigurationIssues()
+    {
+        await using var factory = DiagnosticFactory();
+        using var client = factory.CreateClient();
+        using var providerResponse = await client.PostAsJsonAsync("/api/modelproviders", new CreateModelProviderRequest(
+            "diagnostic-local",
+            new ModelProviderProperties
+            {
+                DisplayName = "Diagnostic provider",
+                ProviderType = "diagnostic",
+                Endpoint = new Uri("http://127.0.0.1:9000")
+            }));
+        Assert.AreEqual(HttpStatusCode.Created, providerResponse.StatusCode);
+        using var profileResponse = await client.PostAsJsonAsync("/api/modelprofiles", new CreateModelProfileRequest(
+            "incompatible-profile",
+            new ModelProfileProperties
+            {
+                DisplayName = "Incompatible profile",
+                Provider = new ResourceReference("diagnostic-local"),
+                Model = new ModelSelection { Name = "local-model" },
+                Reasoning = new ModelReasoningOptions { Mode = ReasoningMode.Enabled },
+                Output = new ModelOutputOptions { Format = ModelOutputFormat.JsonObject }
+            }));
+        Assert.AreEqual(HttpStatusCode.Created, profileResponse.StatusCode);
+
+        var resolution = await client.GetFromJsonAsync<ModelProfileResolutionResponse>("/api/modelprofiles/incompatible-profile/resolution");
+
+        Assert.IsNotNull(resolution);
+        Assert.AreEqual("incompatible", resolution.Status);
+        var capabilities = resolution.Capabilities ?? [];
+        var incompatibilities = resolution.Incompatibilities ?? [];
+        Assert.HasCount(4, capabilities);
+        var tools = capabilities.Single(capability => capability.Name == "Tools");
+        Assert.AreEqual("native", tools.ProviderSupport);
+        Assert.AreEqual("unsupported", tools.ModelSupport);
+        Assert.AreEqual("unsupported", tools.EffectiveSupport);
+        Assert.AreEqual("native", capabilities.Single(capability => capability.Name == "Structured output").EffectiveSupport);
+        Assert.IsTrue(incompatibilities.Any(issue => issue.Capability == "reasoning"));
+        Assert.IsFalse(incompatibilities.Any(issue => issue.Capability == "structuredOutput"));
+    }
+
+    [TestMethod]
     public async Task RuntimeProfileIsPersistedAsAnIndependentManagementResource()
     {
         await using var factory = Factory();
@@ -492,6 +536,45 @@ public sealed class ModelManagementApiTests
             builder.UseSetting("ConnectionStrings:ollama-extension", "Endpoint=http://127.0.0.1:1");
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
         });
+
+    private static WebApplicationFactory<Program> DiagnosticFactory() => Factory().WithWebHostBuilder(builder =>
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IModelProviderDiscovery>();
+            services.RemoveAll<IModelProviderCapabilitiesResolver>();
+            services.AddSingleton<IModelProviderDiscovery, DiagnosticModelProvider>();
+            services.AddSingleton<IModelProviderCapabilitiesResolver, DiagnosticModelProvider>();
+        }));
+
+    private sealed class DiagnosticModelProvider : IModelProviderDiscovery, IModelProviderCapabilitiesResolver
+    {
+        public string ProviderType => "diagnostic";
+        public bool CanHandle(string providerType) => true;
+
+        public ValueTask<ModelProviderHealth> GetHealthAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ModelProviderHealth("available"));
+
+        public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult<IReadOnlyList<DiscoveredModel>>([
+                new("local-model", "Local model", "available", ["chat", "streaming", "structuredOutput"], new Dictionary<string, string>())
+            ]);
+
+        public ValueTask<ResolvedModelProviderCapabilities> ResolveCapabilitiesAsync(
+            ModelProviderConfiguration provider,
+            ModelDeploymentConfiguration deployment,
+            CancellationToken cancellationToken = default) => ValueTask.FromResult(new ResolvedModelProviderCapabilities(
+                Capabilities(streaming: true, tools: true, structuredOutput: true, reasoning: true),
+                Capabilities(streaming: true, tools: false, structuredOutput: true, reasoning: false),
+                Capabilities(streaming: true, tools: true, structuredOutput: true, reasoning: true)));
+
+        private static AgentRuntimeCapabilities Capabilities(bool streaming, bool tools, bool structuredOutput, bool reasoning) => new()
+        {
+            Streaming = new(streaming ? CapabilitySupport.Native : CapabilitySupport.Unsupported),
+            Tools = new(tools ? CapabilitySupport.Native : CapabilitySupport.Unsupported),
+            StructuredOutput = new(structuredOutput ? CapabilitySupport.Native : CapabilitySupport.Unsupported),
+            Reasoning = new ReasoningCapability { Support = reasoning ? CapabilitySupport.Native : CapabilitySupport.Unsupported }
+        };
+    }
 
     private static CreateModelProfileRequest Request(string name, string model) => new(
         name,

@@ -119,6 +119,6 @@ internal sealed class ResolveModelProfileEndpoint : IModelManagementEndpoint
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             var profile = await service.GetAsync(@namespace, profileName, cancellationToken)
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
-            return Results.Ok(ModelManagementHttp.Resolution(await service.ResolveAsync(profile.Value, cancellationToken)));
+            return Results.Ok(ModelManagementHttp.Resolution(await service.ResolveAsync(profile.Value, cancellationToken, includeCapabilityDiagnostics: true)));
         });
 }
