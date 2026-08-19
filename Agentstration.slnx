@@ -24,6 +24,7 @@
     <Project Path="src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <Project Path="src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <Project Path="src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
+    <Project Path="src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
     <Project Path="src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
     <Project Path="src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <Project Path="src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />

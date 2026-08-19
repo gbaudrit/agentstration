@@ -55,6 +55,26 @@ public static class ManagementDemoData
             }, cancellationToken);
         }
 
+        if (await providers.GetAsync("localai-local", cancellationToken) is null)
+        {
+            var connectionString = configuration.GetConnectionString("localai-extension");
+            var configuredEndpoint = configuration["Agentstration:Extensions:Agentstration.Extensions.LocalAI:Endpoint"];
+            var endpoint = ResolveEndpoint(connectionString) ?? (Uri.TryCreate(configuredEndpoint, UriKind.Absolute, out var value) ? value : new Uri("http://localhost:5280"));
+            await providers.CreateAsync(new ModelProviderResource
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.ModelProvider,
+                Metadata = new ResourceMetadata { Name = "localai-local", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
+                Definition = new ModelProviderProperties
+                {
+                    DisplayName = "LocalAI via AEP",
+                    ProviderType = "localai",
+                    Endpoint = endpoint,
+                    ManagementMode = string.IsNullOrWhiteSpace(connectionString) ? ModelProviderManagementMode.External : ModelProviderManagementMode.Aspire
+                }
+            }, cancellationToken);
+        }
+
         if (await runtimes.GetAsync("maf-default", cancellationToken) is null)
         {
             await runtimes.CreateAsync(new RuntimeProfileResource

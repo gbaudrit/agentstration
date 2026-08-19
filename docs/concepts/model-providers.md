@@ -2,7 +2,46 @@
 
 A Model Provider describes how Agentstration reaches an out-of-process AEP extension contribution and what that provider can do. Provider declarations are durable Management resources with connectivity testing, dynamic model discovery, ETag concurrency, usage visibility, and deletion protection.
 
-Ollama and llama.cpp are implemented as independent AEP contributions in `Agentstration.Extensions.Ollama` and `Agentstration.Extensions.LlamaCpp`. The persisted endpoint is always the extension URL rather than the native inference-server URL. Cloud services are optional. Provider endpoints and credentials do not belong in portable Agent definitions.
+Ollama, llama.cpp, and LocalAI are implemented as independent AEP contributions in their corresponding `Agentstration.Extensions.*` hosts. The persisted endpoint is always the extension URL rather than the native inference-server URL. Cloud services are optional. Provider endpoints and credentials do not belong in portable Agent definitions.
+
+## LocalAI
+
+Start an existing LocalAI server on host port 8081. This avoids colliding with the default llama.cpp endpoint on port 8080. A container that listens on 8080 can be published with a host mapping such as `8081:8080`.
+
+Aspire starts only the Agentstration extension. For direct startup:
+
+```powershell
+$env:LocalAI__Endpoint = "http://localhost:8081"
+# Optional: $env:LocalAI__ApiKey = "..."
+dotnet run --project src/Agentstration.Extensions.LocalAI
+```
+
+The extension listens on `http://localhost:5280` with its development launch profile. Declare that AEP endpoint as the Model Provider endpoint:
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: ModelProvider
+metadata:
+  name: localai-local
+definition:
+  displayName: LocalAI local
+  providerType: localai
+  endpoint: http://localhost:5280
+  managementMode: external
+```
+
+Model discovery requires LocalAI's additive `/v1/models/capabilities` endpoint and exposes only entries that report `chat`. Tool and thinking flags are mapped per model. Vision is not effective through the current AEP adapter, and structured output is not advertised because LocalAI support varies by backend. Streaming uses OpenAI-compatible SSE Chat Completions.
+
+Only `frequencyPenalty` and `presencePenalty` are accepted under the `localai` provider-options key. Arbitrary LocalAI metadata is rejected: in particular, `metadata.mcp_servers` cannot activate provider-owned MCP tools and bypass Agentstration governance. Portable generation options remain canonical Model Profile fields.
+
+The default tests use fake HTTP. To run the optional real-server smoke test:
+
+```powershell
+$env:AGENTSTRATION_LOCALAI_ENDPOINT = "http://localhost:8081"
+$env:AGENTSTRATION_LOCALAI_MODEL = "your-chat-model"
+# Optional: $env:AGENTSTRATION_LOCALAI_API_KEY = "..."
+dotnet test tests/Agentstration.ModelProviders.Tests --filter TestCategory=Integration
+```
 
 ## llama.cpp
 
