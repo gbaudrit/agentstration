@@ -53,6 +53,15 @@ public sealed class NullFlowRunEventSink : IFlowRunEventSink
     public Task PublishAsync(FlowRunEvent runEvent, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+public sealed class CompositeFlowRunEventSink(IReadOnlyList<IFlowRunEventSink> sinks) : IFlowRunEventSink
+{
+    public async Task PublishAsync(FlowRunEvent runEvent, CancellationToken cancellationToken)
+    {
+        foreach (var sink in sinks)
+            await sink.PublishAsync(runEvent, cancellationToken);
+    }
+}
+
 public interface IFlowInputRequestSink
 {
     Task PublishRequestedAsync(FlowRun run, InputRequest request, CancellationToken cancellationToken);
@@ -574,7 +583,8 @@ public sealed class FlowRunService(
             stored.Value.CorrelationId!,
             stored.Value.RuntimeBindings,
             stored.Value.RuntimeState,
-            answeredInput);
+            answeredInput,
+            stored.Value.Scope);
 
         await foreach (var executionEvent in orchestrations.ExecuteAsync(request, runToken))
         {

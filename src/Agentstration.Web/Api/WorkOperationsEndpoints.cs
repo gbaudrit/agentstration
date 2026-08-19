@@ -121,7 +121,7 @@ public static class WorkOperationsEndpoints
     private static WorkTaskResultResponse ToResult(WorkTaskResult value) => new(value.Id.Value, value.FlowRunId, value.Kind, value.Title, value.Content, value.CreatedAt, value.Sequence);
     private static WorkTaskArtifactResponse ToArtifact(WorkTaskArtifact value, WorkspaceId workspaceId) => new(value.Id.Value, value.FlowRunId, value.Name, value.ContentType, value.Length, value.CreatedAt, value.Sequence,
         $"/api/workspaces/{Uri.EscapeDataString(WorkspaceName(workspaceId))}/tasks/{value.WorkTaskId}/artifacts/{value.Id}/content");
-    private static InteractionResponse ToInteraction(WorkplaceInteraction value) => new(value.Id.Value, value.WorkspaceId.Value, value.EntryId.Value, value.Status, value.StartedAt, value.LastActivityAt, value.InputValues, value.Attachments, value.Messages, value.PendingActionId?.Value, value.TaskId?.Value, value.ImmediateResult, value.Version, value.LastFlowRunId, value.LastTriggerMessageId);
+    private static InteractionResponse ToInteraction(WorkplaceInteraction value) => new(value.Id.Value, value.WorkspaceId.Value, value.EntryId.Value, value.Status, value.StartedAt, value.LastActivityAt, value.InputValues, value.Attachments, value.Messages, value.PendingActionId?.Value, value.TaskId?.Value, value.ImmediateResult, value.Version, value.LastFlowRunId, value.LastTriggerMessageId) { EntryNamespace = value.EntryId.Namespace };
     private static string WorkspaceName(WorkspaceId id) => id.ToString();
     private static FlowRunScope CurrentScope(ICurrentRequestContext requestContext)
     {

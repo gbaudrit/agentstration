@@ -1,14 +1,25 @@
-<section class="panel pending-action @(ConversationMode ? "pending-conversation" : null)" aria-live="polite" aria-busy="@Busy">
-    <div class="panel-header">
-        <div>
-            <p class="eyebrow">Action required</p>
-            <h2>@Title</h2>
+<section class="@(ConversationMode ? "pending-action pending-conversation" : "panel pending-action")" aria-live="polite" aria-busy="@Busy">
+    @if (ConversationMode)
+    {
+        <span class="pending-author-avatar" aria-hidden="true"><UiIcon Name="sparkle" /></span>
+        <div class="pending-prompt">
+            <div><strong>Agentstration</strong><span>Response needed</span></div>
+            <p>@Title</p>
         </div>
-        <StatusBadge Text="Required" Status="Agentstration.Web.Components.Models.UiStatus.Warning" />
-    </div>
+    }
+    else
+    {
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Action required</p>
+                <h2>@Title</h2>
+            </div>
+            <StatusBadge Text="Required" Status="Agentstration.Web.Components.Models.UiStatus.Warning" />
+        </div>
+    }
     @if (Description is not null)
     {
-        <p>@Description</p>
+        <p class="pending-description">@Description</p>
     }
 
     @if (Action is RequestChoiceAction choice)
@@ -29,8 +40,10 @@
     }
     else if (Action is RequestInputAction input)
     {
-        <textarea @bind="text" placeholder="Your response"></textarea>
-        <button class="button-primary action-button" disabled="@(string.IsNullOrWhiteSpace(text) || Busy)" @onclick="() => SubmitInput(input)">Continue</button>
+        <div class="input-response">
+            <textarea @bind="text" placeholder="Your response" aria-label="Your response" disabled="@(Busy || submitting)"></textarea>
+            <button class="button-primary action-button" disabled="@(string.IsNullOrWhiteSpace(text) || Busy || submitting)" @onclick="() => SubmitInput(input)">@(submitting ? "Continuing…" : "Continue")</button>
+        </div>
     }
 </section>
 
@@ -87,8 +100,17 @@
         finally { submitting = false; }
     }
 
-    private Task SubmitInput(RequestInputAction action) => OnSubmit.InvokeAsync(new(
-        action.PendingActionId,
-        action.ResumeToken,
-        new Dictionary<string, JsonElement> { [action.Fields.First().Name] = JsonSerializer.SerializeToElement(text) }));
+    private async Task SubmitInput(RequestInputAction action)
+    {
+        if (submitting || Busy || string.IsNullOrWhiteSpace(text)) return;
+        submitting = true;
+        try
+        {
+            await OnSubmit.InvokeAsync(new(
+                action.PendingActionId,
+                action.ResumeToken,
+                new Dictionary<string, JsonElement> { [action.Fields.First().Name] = JsonSerializer.SerializeToElement(text) }));
+        }
+        finally { submitting = false; }
+    }
 }

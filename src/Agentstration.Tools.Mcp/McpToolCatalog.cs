@@ -3,7 +3,6 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Management.Abstractions;
 using Agentstration.Runtime.Abstractions;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -81,7 +80,7 @@ public sealed class ToolProviderAdapter(
     {
         if (provider.Definition.ProviderType == ToolProviderType.Mcp)
         {
-            var client = await ConnectMcpAsync(provider, cancellationToken);
+            await using var client = await ConnectMcpAsync(provider, cancellationToken);
             var native = await client.ListToolsAsync(cancellationToken: cancellationToken);
             return tools.Select(tool => Wrap(tool, native.FirstOrDefault(value => value.ProtocolTool.Name == tool.Definition.ExternalId)
                 ?? throw new ToolResolutionException("mcp_tool_not_found", $"Provider '{provider.Metadata.Name}' no longer exposes tool '{tool.Definition.ExternalId}'."))).ToArray();
@@ -92,7 +91,7 @@ public sealed class ToolProviderAdapter(
         foreach (var group in tools.GroupBy(tool => (descriptor.Contributions.Tools ?? []).First(value => value.Id == tool.Definition.ExternalId).Mcp.Server, StringComparer.Ordinal))
         {
             var server = descriptor.Mcp!.Servers.First(value => value.Id == group.Key);
-            var client = await ConnectHttpAsync(AepDescriptorValidator.ResolveMcpEndpoint(extensionEndpoint, server), server.Id, cancellationToken);
+            await using var client = await ConnectHttpAsync(AepDescriptorValidator.ResolveMcpEndpoint(extensionEndpoint, server), server.Id, cancellationToken);
             var native = await client.ListToolsAsync(cancellationToken: cancellationToken);
             foreach (var tool in group)
             {
@@ -144,7 +143,7 @@ public sealed class ToolProviderAdapter(
         new(tools.Select(tool => ToDescriptor(tool.ProtocolTool.Name, tool.Title ?? tool.Name, tool.Description, tool, null)).ToArray(), Capabilities(client), ServerMetadata(client));
 
     private static DiscoveredToolDescriptor ToDescriptor(string id, string displayName, string? description, McpClientTool tool, IReadOnlyDictionary<string, JsonElement>? metadata) =>
-        new(id, displayName, description, tool.JsonSchema, tool.ReturnJsonSchema, metadata ?? new Dictionary<string, JsonElement>());
+        new(id, displayName, description, tool.JsonSchema.Clone(), tool.ReturnJsonSchema?.Clone(), metadata ?? new Dictionary<string, JsonElement>());
 
     private static IReadOnlyDictionary<string, bool> Capabilities(McpClient client) => new Dictionary<string, bool>
     {
@@ -162,10 +161,52 @@ public sealed class ToolProviderAdapter(
     private static IAgentTool Wrap(ToolResource resource, McpClientTool native)
     {
         if (!string.IsNullOrWhiteSpace(resource.Definition.Description)) native = native.WithDescription(resource.Definition.Description);
-        AITool exposed = resource.Definition.RequiresApproval
-            ? new ApprovalRequiredAIFunction(native)
-            : native;
-        return new McpAgentTool(resource.Metadata.Name, resource.Definition.Description ?? native.Description, native, exposed);
+        return new McpAgentTool(
+            resource.Metadata.Name,
+            native.Name,
+            resource.Definition.Description ?? native.Description,
+            resource.Definition.Provider?.Name,
+            resource.Definition.ExternalId,
+            native.JsonSchema.Clone(),
+            native.ReturnJsonSchema?.Clone(),
+            resource.Definition.RequiresApproval);
+    }
+
+    public async ValueTask<JsonElement?> InvokeAsync(
+        ToolProviderResource provider,
+        ToolResource tool,
+        JsonElement? arguments,
+        CancellationToken cancellationToken)
+    {
+        McpClient client;
+        string externalId;
+        if (provider.Definition.ProviderType == ToolProviderType.Mcp)
+        {
+            client = await ConnectMcpAsync(provider, cancellationToken);
+            externalId = tool.Definition.ExternalId
+                ?? throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{tool.Metadata.Name}' has no external Tool identity.");
+        }
+        else
+        {
+            var (descriptor, extensionEndpoint) = await DiscoverAepAsync(provider, cancellationToken);
+            var mapping = (descriptor.Contributions.Tools ?? []).FirstOrDefault(value => value.Id == tool.Definition.ExternalId)
+                ?? throw new ToolResolutionException("aep_tool_not_found", $"AEP contribution '{tool.Definition.ExternalId}' was not found.");
+            var server = descriptor.Mcp?.Servers.FirstOrDefault(value => value.Id == mapping.Mcp.Server)
+                ?? throw new ToolResolutionException("aep_mcp_server_not_found", $"AEP MCP server '{mapping.Mcp.Server}' was not found.");
+            client = await ConnectHttpAsync(AepDescriptorValidator.ResolveMcpEndpoint(extensionEndpoint, server), server.Id, cancellationToken);
+            externalId = mapping.Mcp.Tool;
+        }
+
+        await using (client)
+        {
+            var native = (await client.ListToolsAsync(cancellationToken: cancellationToken))
+                .FirstOrDefault(value => value.ProtocolTool.Name == externalId)
+                ?? throw new ToolResolutionException("mcp_tool_not_found", $"Provider '{provider.Metadata.Name}' no longer exposes tool '{externalId}'.");
+            var values = arguments is { ValueKind: JsonValueKind.Object }
+                ? arguments.Value.EnumerateObject().ToDictionary(value => value.Name, value => (object?)value.Value.Clone(), StringComparer.Ordinal)
+                : new Dictionary<string, object?>();
+            return JsonSerializer.SerializeToElement(await native.InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments(values), cancellationToken));
+        }
     }
 }
 
@@ -194,17 +235,35 @@ public sealed class McpToolCatalog(IControlPlaneStore store, ToolProviderAdapter
     }
 }
 
-internal sealed class McpAgentTool(string id, string? description, McpClientTool native, AITool exposed) : IAgentTool
+internal sealed record McpAgentTool(
+    string Id,
+    string Name,
+    string? Description,
+    string? ProviderId,
+    string? ExternalId,
+    JsonElement InputSchema,
+    JsonElement? OutputSchema,
+    bool RequiresApproval) : IAgentTool;
+
+public sealed class McpToolInvoker(IControlPlaneStore store, ToolProviderAdapter providers) : IToolInvoker
 {
-    public string Id { get; } = id;
-    public string Name => native.Name;
-    public string? Description { get; } = description;
-    public async ValueTask<JsonElement?> InvokeAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
+    public async ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
-        var values = arguments is { ValueKind: JsonValueKind.Object } ? arguments.Value.EnumerateObject().ToDictionary(value => value.Name, value => (object?)value.Value.Clone(), StringComparer.Ordinal) : new Dictionary<string, object?>();
-        return JsonSerializer.SerializeToElement(await native.InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments(values), cancellationToken));
+        var tool = await store.GetAsync<ToolResource>(new ResourceKey(ResourceKinds.Tool, context.ToolId), cancellationToken)
+            ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{context.ToolId}' was not found.");
+        if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{context.ToolId}' is disabled.");
+        if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{context.ToolId}' is no longer available from its provider.");
+        var providerId = tool.Value.Definition.Provider?.Name
+            ?? throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{context.ToolId}' has no ToolProvider mapping.");
+        if (context.ToolProviderId is not null && !string.Equals(context.ToolProviderId, providerId, StringComparison.Ordinal))
+            throw new ToolResolutionException("tool_provider_mismatch", $"Tool resource '{context.ToolId}' no longer maps to provider '{context.ToolProviderId}'.");
+        if (context.ExternalToolId is not null && !string.Equals(context.ExternalToolId, tool.Value.Definition.ExternalId, StringComparison.Ordinal))
+            throw new ToolResolutionException("external_tool_mismatch", $"Tool resource '{context.ToolId}' no longer maps to external Tool '{context.ExternalToolId}'.");
+        var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ResourceKinds.ToolProvider, providerId), cancellationToken)
+            ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{providerId}' was not found.");
+        if (!provider.Value.Definition.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{providerId}' is disabled.");
+        return await providers.InvokeAsync(provider.Value, tool.Value, context.Arguments, cancellationToken);
     }
-    public object? GetService(Type serviceType) => serviceType.IsInstanceOfType(exposed) ? exposed : null;
 }
 
 public sealed class ToolResolutionException(string code, string message, Exception? innerException = null) : Exception(message, innerException) { public string Code { get; } = code; }
@@ -223,6 +282,7 @@ public static class McpToolServiceCollectionExtensions
         services.AddSingleton<ToolProviderAdapter>();
         services.AddSingleton<IToolProviderDiscovery>(provider => provider.GetRequiredService<ToolProviderAdapter>());
         services.AddSingleton<IToolCatalog, McpToolCatalog>();
+        services.AddSingleton<IToolInvoker, McpToolInvoker>();
         return services;
     }
 }

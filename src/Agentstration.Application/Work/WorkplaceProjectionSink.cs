@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
@@ -9,7 +8,6 @@ namespace Agentstration.Application.Work;
 
 public sealed class WorkplaceProjectionSink(
     IWorkplaceRepository repository,
-    IArtifactStore artifacts,
     IEnumerable<IWorkplaceEventSink> eventSinks) : IWorkTaskEventSink
 {
     private long sequence;
@@ -60,27 +58,41 @@ public sealed class WorkplaceProjectionSink(
         var flowRunId = snapshot.Result?.Metadata.GetValueOrDefault("flowRunId");
         if (flowRunId is not null && existingResults.Any(value => value.FlowRunId == flowRunId)) return;
         var resultSequence = existingResults.Count + 1;
-        var resultTitle = resultSequence switch { 1 => "Initial report", 2 => "Executive version", _ => $"Revised version {resultSequence}" };
+        var resultTitle = resultSequence switch { 1 => "Result", 2 => "Updated result", _ => $"Updated result {resultSequence}" };
         var result = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, flowRunId, content?.Text is null ? WorkTaskResultKind.Structured : WorkTaskResultKind.Text, resultTitle, structured, snapshot.UpdatedAt, resultSequence);
         await repository.AddResultAsync(result, token); await EmitAsync(new TaskResultAddedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, result), token);
-        var artifactText = content?.Text ?? structured.GetRawText(); await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(artifactText));
-        var artifactName = resultSequence switch { 1 => "monthly-report.txt", 2 => "executive-summary.txt", _ => $"monthly-report-v{resultSequence}.txt" };
-        var reference = await artifacts.SaveAsync(workspaceId, new ArtifactContent(artifactName, "text/plain; charset=utf-8", stream), token);
-        var artifact = new WorkTaskArtifact(WorkTaskArtifactId.New(), workspaceId, taskId, flowRunId, artifactName, reference.ContentType, reference.Length, reference.StorageKey, snapshot.UpdatedAt, resultSequence);
-        await repository.AddArtifactAsync(artifact, token); await EmitAsync(new TaskArtifactAddedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, new(artifact.Id.Value, artifact.WorkTaskId.Value, artifact.FlowRunId, artifact.Name, artifact.ContentType, artifact.Length, artifact.CreatedAt, artifact.Sequence)), token);
+        foreach (var produced in snapshot.Result?.Artifacts ?? [])
+        {
+            var artifact = new WorkTaskArtifact(
+                WorkTaskArtifactId.New(), workspaceId, taskId, flowRunId,
+                produced.Name, produced.Content.MediaType ?? "application/octet-stream", produced.Size ?? 0,
+                produced.Content.Uri, snapshot.UpdatedAt, resultSequence);
+            await repository.AddArtifactAsync(artifact, token);
+            await EmitAsync(new TaskArtifactAddedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, new(artifact.Id.Value, artifact.WorkTaskId.Value, artifact.FlowRunId, artifact.Name, artifact.ContentType, artifact.Length, artifact.CreatedAt, artifact.Sequence)), token);
+        }
         if (flowRunId is not null) await EmitAsync(new FlowRunCompletedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, interactionId.Value, taskId.Value, flowRunId), token);
-        await CompleteInteractionAsync(workspaceId, interactionId, taskId, flowRunId, resultTitle, snapshot.UpdatedAt, token);
-        await NotifyAsync(workspaceId, WorkNotificationKind.TaskCompleted, resultSequence == 1 ? "Task completed" : "New version ready", $"{resultTitle} and its deliverable are ready.", taskId, snapshot.UpdatedAt, token);
+        await CompleteInteractionAsync(workspaceId, interactionId, taskId, flowRunId, resultTitle, ConversationText(content, structured), snapshot.UpdatedAt, token);
+        var artifactCount = snapshot.Result?.Artifacts.Count ?? 0;
+        var notification = artifactCount switch
+        {
+            0 => $"{resultTitle} is ready.",
+            1 => $"{resultTitle} and its deliverable are ready.",
+            _ => $"{resultTitle} and {artifactCount} deliverables are ready."
+        };
+        await NotifyAsync(workspaceId, WorkNotificationKind.TaskCompleted, resultSequence == 1 ? "Task completed" : "New version ready", notification, taskId, snapshot.UpdatedAt, token);
     }
 
-    private async Task CompleteInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, string? flowRunId, string resultTitle, DateTimeOffset now, CancellationToken token)
+    private async Task CompleteInteractionAsync(WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, string? flowRunId, string resultTitle, string? conversationText, DateTimeOffset now, CancellationToken token)
     {
         var interaction = await repository.GetInteractionAsync(workspaceId, interactionId, token);
         if (interaction is null || interaction.Status == InteractionStatus.Closed) return;
-        var message = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.Agentstration, $"{resultTitle} is ready. You can ask for another version or continue with a follow-up.", now);
+        var messageText = string.IsNullOrWhiteSpace(conversationText)
+            ? $"{resultTitle} is ready. You can ask for another version or continue with a follow-up."
+            : conversationText;
+        var message = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, taskId, ConversationRole.Agentstration, messageText, now);
         await repository.AddMessageAsync(message, token);
         await EmitAsync(new MessageAddedEvent(Id(), workspaceId.Value, Next(), now, message), token);
-        var updated = interaction with { Status = InteractionStatus.Idle, LastFlowRunId = flowRunId ?? interaction.LastFlowRunId, LastActivityAt = now, ImmediateResult = new ShowResultAction(resultTitle, null), Messages = [.. interaction.Messages, message], Version = interaction.Version + 1 };
+        var updated = interaction with { Status = InteractionStatus.Idle, LastFlowRunId = flowRunId ?? interaction.LastFlowRunId, LastActivityAt = now, ImmediateResult = new ShowResultAction(resultTitle, conversationText), Messages = [.. interaction.Messages, message], Version = interaction.Version + 1 };
         try
         {
             await repository.SaveInteractionAsync(updated, interaction.Version, token);
@@ -124,4 +136,14 @@ public sealed class WorkplaceProjectionSink(
     }
     private static WorkActorKind Actor(WorkTaskActivityType type) => type is WorkTaskActivityType.TaskPaused or WorkTaskActivityType.TaskResumed or WorkTaskActivityType.TaskCancelled ? WorkActorKind.User : WorkActorKind.Agentstration;
     private static string Title(WorkTaskActivityType type) => type switch { WorkTaskActivityType.TaskCreated => "Task created", WorkTaskActivityType.TaskStarted => "Work started", WorkTaskActivityType.TaskPaused => "Task paused", WorkTaskActivityType.TaskResumed => "Task resumed", WorkTaskActivityType.TaskCancelled => "Task cancelled", WorkTaskActivityType.ActionRequired => "Action required", WorkTaskActivityType.TaskCompleted => "Task completed", WorkTaskActivityType.TaskFailed => "Task failed", _ => type.ToString() };
+    private static string? ConversationText(WorkResultContent? content, JsonElement structured)
+    {
+        if (!string.IsNullOrWhiteSpace(content?.Text)) return content.Text;
+        if (structured.ValueKind == JsonValueKind.String) return structured.GetString();
+        if (structured.ValueKind == JsonValueKind.Object
+            && structured.TryGetProperty("finalOutput", out var finalOutput)
+            && finalOutput.ValueKind == JsonValueKind.String)
+            return finalOutput.GetString();
+        return null;
+    }
 }

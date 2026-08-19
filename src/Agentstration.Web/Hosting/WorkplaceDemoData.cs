@@ -77,6 +77,8 @@ public static class WorkplaceDemoData
             {
                 Kind = EntryPresentationKind.Prompt,
                 Placeholder = "What should the report cover?",
+                Progress = new(EntryProgressVisibility.Detailed),
+                Task = new(EntryTaskDisplay.Visible),
                 Suggestions =
                 [
                     new("Monthly report", "Prepare a monthly report summarizing progress, risks, and next steps."),

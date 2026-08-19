@@ -40,7 +40,11 @@ public enum FlowRunEventType
     InputRequested,
     InputReceived,
     InputExpired,
-    FlowRunResumed
+    FlowRunResumed,
+    ToolCallStarted,
+    ToolCallGovernanceEvaluated,
+    ToolCallCompleted,
+    ToolCallFailed
 }
 
 public enum InputRequestType { Text, Choice, Confirmation }

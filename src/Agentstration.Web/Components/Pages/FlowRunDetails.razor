@@ -11,7 +11,7 @@
 else
 {
     <PageHeader Title="Flow Run" Description="@run.Id">
-        <Actions>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">Cancel</button> }<a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId)">Flow definition</a></Actions>
+        <Actions>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">Cancel</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)">Tool governance</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId)">Flow definition</a></Actions>
     </PageHeader>
     <section class="run-summary">
         <div><span class="field-label">Status</span><StatusBadge Text="@run.Status.ToString()" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></div>

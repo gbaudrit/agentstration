@@ -1,4 +1,4 @@
-# ADR-0055 — llama.cpp is an AEP provider and capabilities are resolved effectively
+# ADR-0061 — llama.cpp is an AEP provider and capabilities are resolved effectively
 
 ## Status
 

@@ -248,7 +248,7 @@ public static class WorkplaceEndpoints
         await service.DeleteAsync(WorkspaceId(workspaceName), DashboardResourceId(dashboardName), token);
         return Results.NoContent();
     });
-    private static InteractionResponse ToResponse(WorkplaceInteraction value) => new(value.Id.Value, value.WorkspaceId.Value, value.EntryId.Value, value.Status, value.StartedAt, value.LastActivityAt, value.InputValues, value.Attachments, value.Messages, value.PendingActionId?.Value, value.TaskId?.Value, value.ImmediateResult, value.Version, value.LastFlowRunId, value.LastTriggerMessageId);
+    private static InteractionResponse ToResponse(WorkplaceInteraction value) => new(value.Id.Value, value.WorkspaceId.Value, value.EntryId.Value, value.Status, value.StartedAt, value.LastActivityAt, value.InputValues, value.Attachments, value.Messages, value.PendingActionId?.Value, value.TaskId?.Value, value.ImmediateResult, value.Version, value.LastFlowRunId, value.LastTriggerMessageId) { EntryNamespace = value.EntryId.Namespace };
     private static WorkTaskResponse ToResponse(WorkTask value) => new(value.Id.Value, value.WorkspaceId.Value, value.EntryId.Value, value.InteractionId.Value, value.Title, value.Description, value.Status, value.CreatedAt, value.UpdatedAt, value.FlowRunId, value.Conversation, value.Activities, value.Artifacts, value.Result, value.Error, WorkplaceService.CurrentAction(value), value.Version);
     private static WorkspaceId WorkspaceId(string value) => new(Guid.Parse(value));
     private static DashboardId DashboardResourceId(string name) => new(name);

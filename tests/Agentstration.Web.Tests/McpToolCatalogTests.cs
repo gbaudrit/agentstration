@@ -1,7 +1,10 @@
+extern alias UtilitiesExtension;
+
 using System.Net.Http;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Core;
 using Agentstration.Tools.Mcp;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -21,15 +24,17 @@ public sealed class McpToolCatalogTests
         var provider = Provider();
         var tool = Tool(provider.Metadata.Name);
         var adapter = Adapter(host);
-        var catalog = new McpToolCatalog(new FakeStore(provider, tool), adapter);
+        var store = new FakeStore(provider, tool);
+        var catalog = new McpToolCatalog(store, adapter);
 
         var discovery = await adapter.DiscoverAsync(provider, default);
         var runtime = (await catalog.ResolveAsync([tool.Metadata.Name])).Single();
-        var result = await runtime.InvokeAsync(null);
+        var pipeline = new ToolExecutionPipeline(new McpToolInvoker(store, adapter));
+        var result = await pipeline.ExecuteAsync(Context(runtime));
 
         Assert.IsTrue(discovery.Tools.Any(value => value.ExternalId == "list_workspaces"));
         Assert.IsTrue(discovery.Capabilities["tools"]);
-        Assert.IsInstanceOfType<AITool>(runtime.GetService(typeof(AITool)));
+        Assert.IsFalse(runtime is AITool);
         Assert.IsNotNull(result);
     }
 
@@ -47,14 +52,26 @@ public sealed class McpToolCatalogTests
 
         async Task AssertCodeAsync(string code, ToolProviderResource currentProvider, ToolResource currentTool)
         {
-            var catalog = new McpToolCatalog(new FakeStore(currentProvider, currentTool), adapter);
+            var store = new FakeStore(currentProvider, currentTool);
+            var catalog = new McpToolCatalog(store, adapter);
             var error = await Assert.ThrowsAsync<ToolResolutionException>(async () => await catalog.ResolveAsync([currentTool.Metadata.Name]));
             Assert.AreEqual(code, error.Code);
+            var invocationError = await Assert.ThrowsAsync<ToolResolutionException>(async () =>
+                await new ToolExecutionPipeline(new McpToolInvoker(store, adapter)).ExecuteAsync(new ToolExecutionContext
+                {
+                    ToolCallId = "governance-call",
+                    InvocationId = "governance-invocation",
+                    ToolId = currentTool.Metadata.Name,
+                    ToolName = currentTool.Definition.ExternalId ?? currentTool.Metadata.Name,
+                    ToolProviderId = currentProvider.Metadata.Name,
+                    ExternalToolId = currentTool.Definition.ExternalId
+                }));
+            Assert.AreEqual(code, invocationError.Code);
         }
     }
 
     [TestMethod]
-    public async Task ApprovalGovernanceExposesAnApprovalRequiredAiFunction()
+    public async Task ApprovalGovernanceIsRetainedAsProviderNeutralMetadata()
     {
         await using var host = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         var provider = Provider();
@@ -66,8 +83,63 @@ public sealed class McpToolCatalogTests
 
         var runtime = (await catalog.ResolveAsync([tool.Metadata.Name])).Single();
 
-        Assert.IsInstanceOfType<ApprovalRequiredAIFunction>(runtime.GetService(typeof(AITool)));
+        Assert.IsTrue(runtime.RequiresApproval);
+        Assert.IsFalse(runtime is AITool);
     }
+
+    [TestMethod]
+    public async Task AepContributionInvokesMcpThroughTheSameExecutionPipeline()
+    {
+        await using var host = new WebApplicationFactory<UtilitiesExtension::Program>();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agentstration:Extensions:Agentstration.Extensions.Utilities:Endpoint"] = "http://extension/"
+        }).Build();
+        var adapter = new ToolProviderAdapter(
+            new ConfigurationAepExtensionEndpointResolver(configuration),
+            new ConfigurationToolProviderEnvironmentResolver(configuration),
+            new TestHttpClientFactory(host.Server.CreateHandler()),
+            NullLoggerFactory.Instance);
+        var provider = Provider() with
+        {
+            Metadata = new ResourceMetadata { Name = "utilities" },
+            Definition = new ToolProviderProperties
+            {
+                DisplayName = "Utilities AEP",
+                ProviderType = ToolProviderType.Aep,
+                Aep = new AepToolProviderConfiguration { ExtensionId = "Agentstration.Extensions.Utilities" }
+            }
+        };
+        var tool = Tool(provider.Metadata.Name) with
+        {
+            Metadata = new ResourceMetadata { Name = "utilities.hash.compute" },
+            Definition = Tool(provider.Metadata.Name).Definition with { ExternalId = "hash.compute" }
+        };
+        var store = new FakeStore(provider, tool);
+        var descriptor = (await new McpToolCatalog(store, adapter).ResolveAsync([tool.Metadata.Name])).Single();
+        var pipeline = new ToolExecutionPipeline(new McpToolInvoker(store, adapter));
+        var context = Context(descriptor) with
+        {
+            Arguments = JsonSerializer.SerializeToElement(new { text = "agentstration" })
+        };
+
+        var result = await pipeline.ExecuteAsync(context);
+
+        Assert.AreEqual("utilities", descriptor.ProviderId);
+        Assert.AreEqual("hash.compute", descriptor.ExternalId);
+        Assert.IsNotNull(result);
+        StringAssert.Contains(result.Value.GetRawText(), UtilitiesExtension::Agentstration.Extensions.Utilities.UtilityTools.ComputeHash("agentstration"));
+    }
+
+    private static ToolExecutionContext Context(IAgentTool tool) => new()
+    {
+        ToolCallId = "call-1",
+        InvocationId = "invocation-1",
+        ToolId = tool.Id,
+        ToolName = tool.Name,
+        ToolProviderId = tool.ProviderId,
+        ExternalToolId = tool.ExternalId
+    };
 
     private static ToolProviderAdapter Adapter(WebApplicationFactory<global::Program> host)
     {

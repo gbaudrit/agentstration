@@ -723,6 +723,7 @@ public sealed class ApiClientTests
             Context = "{\"engine\":\"sqlserver\"}",
             RuntimeParameters = "{\"temperature\":0.2}",
             Streaming = RuntimeStreamingMode.Enabled,
+            ToolArgumentRetention = ToolArgumentRetentionMode.Retain,
             TimeoutSeconds = 90
         };
 
@@ -733,7 +734,24 @@ public sealed class ApiClientTests
         Assert.AreEqual(RuntimeRunOrigin.Console, request.Origin);
         Assert.AreEqual(90, request.Execution.TimeoutSeconds);
         Assert.AreEqual(RuntimeStreamingMode.Enabled, request.Execution.Streaming);
+        Assert.AreEqual(true, request.Execution.PersistToolArguments);
         Assert.AreEqual(0.2, request.Execution.Parameters["temperature"].GetDouble());
+    }
+
+    [TestMethod]
+    public void AgentRunnerMapsAllToolArgumentRetentionModes()
+    {
+        var agent = CreateAgentResource("web-agent");
+
+        bool? Map(ToolArgumentRetentionMode mode) => new AgentRunnerModel
+        {
+            Prompt = "test",
+            ToolArgumentRetention = mode
+        }.ToRequest(agent).Execution.PersistToolArguments;
+
+        Assert.IsNull(Map(ToolArgumentRetentionMode.Inherit));
+        Assert.AreEqual(true, Map(ToolArgumentRetentionMode.Retain));
+        Assert.AreEqual(false, Map(ToolArgumentRetentionMode.DoNotRetain));
     }
 
     [TestMethod]
@@ -753,6 +771,32 @@ public sealed class ApiClientTests
         Assert.AreEqual("partial response", state.Response);
         Assert.AreEqual(RuntimeRunState.Succeeded, state.State);
         Assert.HasCount(3, state.Events);
+    }
+
+    [TestMethod]
+    public void AgentRunnerRestoresToolCallsFromTheDurableRunProjection()
+    {
+        var persistedToolCall = new RuntimeToolCall
+        {
+            Id = "tool-call-1",
+            InvocationId = "invocation-1",
+            ToolId = "microsoft-learn.microsoft_docs_search",
+            Name = "microsoft_docs_search",
+            State = RuntimeRunState.Succeeded,
+            Attempt = 1,
+            StartedAt = DateTimeOffset.UtcNow
+        };
+        var originalRun = CreateRun("run-with-tool");
+        var run = originalRun with
+        {
+            Status = originalRun.Status with { ToolCalls = [persistedToolCall] }
+        };
+        var state = new AgentRunnerState();
+
+        state.Reset(run);
+
+        Assert.HasCount(1, state.ToolCalls);
+        Assert.AreEqual(persistedToolCall, state.ToolCalls[0]);
     }
 
     [TestMethod]

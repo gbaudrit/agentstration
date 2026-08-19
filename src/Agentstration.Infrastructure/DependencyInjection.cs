@@ -152,11 +152,18 @@ public static class DependencyInjection
         services.AddSingleton<PackAuthoringService>();
         services.AddSingleton<PackCompositionService>();
         services.AddSingleton<ToolManagementService>();
+        services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
         runtimeConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "runtime-plane.db")}";
         services.AddSqliteRuntimeRuns(runtimeConnectionString);
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
+        services.TryAddSingleton(new ToolExecutionCaptureOptions());
+        services.AddSingleton<IToolExecutionEventSink, RuntimeToolExecutionEventSink>();
+        services.AddSingleton<IToolExecutionEventSink, FlowToolExecutionEventSink>();
+        services.AddSingleton<IToolExecutionHookResolver, ManagementToolExecutionHookResolver>();
+        services.AddSingleton<IToolGovernanceAuditReader, ToolGovernanceAuditReader>();
+        services.AddSingleton<IToolExecutionPipeline, ToolExecutionPipeline>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
         workPlaneConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "work-plane.db")}";
         services.AddSqliteWorkPlane(workPlaneConnectionString);

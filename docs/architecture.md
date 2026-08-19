@@ -107,7 +107,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
 | Scheduling | standalone polling worker | Quartz persistent scheduler |
-| Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog and MAF invocation | richer permissions, credentials and connection policies |
+| Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog, and an Agentstration-owned runtime execution boundary before MCP `tools/call` | richer permissions, credentials, connection policies, and execution hooks |
 | Notifications | internal notification record/event | email, Teams, webhook channels |
 | MCP | nine tools reusing application services | resources and authorization |
 | Evaluation | deterministic `Microsoft.Extensions.AI.Evaluation` metrics and versioned content-workflow dataset | LLM-as-judge quality/safety evaluators and reports |
@@ -311,7 +311,7 @@ The Interactive Server console consumes these same HTTP contracts through dedica
 
 Model behavior and runtime behavior are now separate canonical categories. `ModelProfileResource` carries `generation`, `reasoning`, `output`, and provider-keyed `providerOptions`; `RuntimeProfileResource` carries session/tool/streaming defaults and runtime-keyed `runtimeOptions`. `AgentDeployment` records the resolved agent and model-profile references alongside the runtime-profile reference. Runtime option layers are merged by category from provider/model defaults through profile, agent, runtime, Work/Flow, and explicit execution override, then validated as one effective configuration.
 
-Runtime adapters expose normalized `AgentExecutionEvent` values rather than MAF updates. Resolution carries dynamically observed provider and selected-model capabilities with the client. Before invocation, effective capability resolution intersects provider, selected model, runtime, and concrete adapter support and preserves `Unsupported`, `Native`, `Emulated`, or `Partial`. The MAF adapter maps canonical options to `ChatOptions`; each AEP extension validates and maps only its own native options. See ADR-0017 and ADR-0055.
+Runtime adapters expose normalized `AgentExecutionEvent` values rather than MAF updates. Resolution carries dynamically observed provider and selected-model capabilities with the client. Before invocation, effective capability resolution intersects provider, selected model, runtime, and concrete adapter support and preserves `Unsupported`, `Native`, `Emulated`, or `Partial`. The MAF adapter maps canonical options to `ChatOptions`; each AEP extension validates and maps only its own native options. See ADR-0017 and ADR-0061.
 
 Agent CRUD and Agent Runner always use canonical Management and Runtime HTTP clients, independently of simulated dashboard projections. This prevents a simulated agent generation from being activated against a different persisted generation. Before enabling Run the console combines `/api/agents/{name}/model` with `/api/runtime/agents/{name}/readiness`. Save-and-apply or **Reconcile runtime** calls `/prepare`, which creates or reuses the current revision and local deployment and reconciles it. At execution time the MAF adapter resolves the current profile again, merges profile defaults with the only supported overrides (`temperature`, `maxOutputTokens`), selects the deployment model through `ChatOptions.ModelId`, and records the actual provider/model/effective options on the durable Run.
 
@@ -361,6 +361,14 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 22. **Delivered Pack bindings increment:** Pack manifests declare logical Model Profile and Secret requirements, installation resolves them to workspace resources without copying Secret values, and selections persist by Pack identity across uninstall and reinstall.
 23. **Delivered Pack composition increment:** the Console catalogs current workspace resources, previews the complete Entry/Flow/Agent dependency closure, converts environment-specific Model Profile references into logical bindings, and creates a validated immutable Pack Project source snapshot without mutating the selected resources.
 24. **Delivered durable interactive execution increment:** Flow Runs persist exact participant revision/deployment bindings and opaque runtime checkpoints, expose durable input requests through REST and Workplace pending actions, recover through at-least-once leases, expire unanswered requests, and protect live revisions with impact-aware normal and forced purge operations. See ADR-0054.
+25. **Delivered governed Tool lifecycle projection:** the provider-neutral Tool execution pipeline emits started/completed/failed-or-cancelled facts. Runtime Runs project one `RuntimeToolCall` per logical call with physical attempt identity and count; Flow Runs append the same lifecycle to their durable journal. Arguments and results remain excluded from durable projections by default. See ADR-0055.
+26. **Delivered local Tool execution hook chain:** locally registered provider-neutral guards execute in stable order before invocation, may allow or deny without mutating payloads, unwind terminal notifications in reverse order, and classify denial/hook/provider/cancellation outcomes. Every physical at-least-once attempt re-executes the chain. See ADR-0056.
+27. **Delivered workspace-configurable Tool guard increment:** canonical `ToolExecutionHook` resources expose namespaced ETag CRUD and select built-in Runtime handlers by Tool, Tool Provider and Agent within the current Tenant/Workspace. The first bounded handler is `deny`; arbitrary code, scripts and remote hooks are not accepted. See ADR-0057.
+28. **Delivered durable Tool governance trace:** every physical Tool attempt records the ordered hook identities, Management resource generations and allow/deny/failure decisions before provider invocation. Runtime and Flow journals retain per-attempt facts without arguments or results; failure to project the decision prevents the provider call. See ADR-0058.
+29. **Delivered Tool governance audit read API:** `GET /api/tool-governance/{runtime|flow}/{runId}` reads the current Workspace's existing durable journal with an `afterSequence` cursor, bounded `limit`, and exact Tool call, physical invocation, Tool, Hook, HookResource generation and decision filters. The safe default response exposes invocation and policy identities without provider results or denial messages.
+30. **Delivered Tool governance Console view:** Runtime and Flow Run details link to a Run-scoped audit page. Runtime links preserve the logical `ToolCallId` and physical `InvocationId`; operators can filter and paginate the evaluated Hook chain, resource generation, order, decision and stable code.
+31. **Delivered opt-in Tool argument retention:** `Agentstration:ToolExecution:PersistArguments` defaults to `false`. Manual Runtime Runs expose an immutable tri-state override (`inherit`, `retain`, `do not retain`); retries preserve it. When effective, provider-neutral arguments are copied into the durable lifecycle projection, bounded by the host `MaximumArgumentsLength`, and shown on the Tool Governance view. Provider results remain excluded. See ADR-0059.
+32. **Delivered Entry-driven Workplace presentation increment:** Entry configures participant, progress, Task, and Result presentation while Workplace composes existing durable Work primitives into one conversation timeline. Flow and Runtime remain presentation-neutral. See ADR-0060.
 
 ## ADR catalog
 
@@ -411,3 +419,10 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0052: Pack composition distinguishes contained model configuration from bindings
 - ADR-0053: Workspace scope is part of durable identity
 - ADR-0054: durable interactive Flow execution and exact runtime identity
+- ADR-0055: Agentstration-owned Tool execution boundary
+- ADR-0056: ordered Runtime guards for Tool execution
+- ADR-0057: workspace-scoped Tool Hook resources select built-in Runtime handlers
+- ADR-0058: Tool governance decisions are traced per physical attempt
+- ADR-0059: Tool arguments require explicit bounded retention
+- ADR-0060: Entry owns Workplace execution presentation
+- ADR-0061: llama.cpp AEP provider and effective capability resolution
