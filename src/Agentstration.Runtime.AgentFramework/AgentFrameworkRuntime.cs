@@ -78,23 +78,23 @@ public sealed class AgentFrameworkRuntimeFactory(
         string? revisionId,
         long? generation,
         ToolExecutionScope? scope) => new()
-    {
-        OwnerKind = scope?.OwnerKind ?? ToolExecutionOwnerKind.Unspecified,
-        ToolCallId = "pending",
-        InvocationId = "pending",
-        ToolId = "pending",
-        ToolName = "pending",
-        TenantId = scope?.TenantId,
-        WorkspaceId = scope?.WorkspaceId,
-        PrincipalId = scope?.PrincipalId,
-        RunId = scope?.ExecutionId,
-        AgentId = definition.AgentKey,
-        AgentVersion = definition.AgentVersion,
-        AgentGeneration = generation ?? scope?.AgentGeneration,
-        AgentRevisionId = revisionId,
-        CorrelationId = scope?.CorrelationId,
-        PersistArguments = scope?.PersistArguments
-    };
+        {
+            OwnerKind = scope?.OwnerKind ?? ToolExecutionOwnerKind.Unspecified,
+            ToolCallId = "pending",
+            InvocationId = "pending",
+            ToolId = "pending",
+            ToolName = "pending",
+            TenantId = scope?.TenantId,
+            WorkspaceId = scope?.WorkspaceId,
+            PrincipalId = scope?.PrincipalId,
+            RunId = scope?.ExecutionId,
+            AgentId = definition.AgentKey,
+            AgentVersion = definition.AgentVersion,
+            AgentGeneration = generation ?? scope?.AgentGeneration,
+            AgentRevisionId = revisionId,
+            CorrelationId = scope?.CorrelationId,
+            PersistArguments = scope?.PersistArguments
+        };
 
     private static AIAgent Observe(AIAgent agent, bool enabled) => enabled
         ? agent.AsBuilder()

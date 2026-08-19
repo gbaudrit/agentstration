@@ -191,26 +191,26 @@ public sealed class ToolGovernanceAuditReaderTests
         string invocationId,
         string toolId,
         ToolExecutionHookEvaluation evaluation) => new()
-    {
-        WorkspaceId = Workspace,
-        EventId = Guid.NewGuid(),
-        RunId = "runtime-run",
-        Kind = RuntimeRunEventKind.ToolCallGovernanceEvaluated,
-        Sequence = sequence,
-        Timestamp = DateTimeOffset.UnixEpoch.AddSeconds(sequence),
-        ToolCall = new RuntimeToolCall
         {
-            Id = "logical-call",
-            InvocationId = invocationId,
-            ToolId = toolId,
-            Name = toolId,
-            State = RuntimeRunState.Running,
-            Attempt = (int)sequence,
-            StartedAt = DateTimeOffset.UnixEpoch,
-            ProviderId = "provider",
-            Governance = [evaluation]
-        }
-    };
+            WorkspaceId = Workspace,
+            EventId = Guid.NewGuid(),
+            RunId = "runtime-run",
+            Kind = RuntimeRunEventKind.ToolCallGovernanceEvaluated,
+            Sequence = sequence,
+            Timestamp = DateTimeOffset.UnixEpoch.AddSeconds(sequence),
+            ToolCall = new RuntimeToolCall
+            {
+                Id = "logical-call",
+                InvocationId = invocationId,
+                ToolId = toolId,
+                Name = toolId,
+                State = RuntimeRunState.Running,
+                Attempt = (int)sequence,
+                StartedAt = DateTimeOffset.UnixEpoch,
+                ProviderId = "provider",
+                Governance = [evaluation]
+            }
+        };
 
     private static ToolExecutionHookEvaluation Evaluation(
         string id,

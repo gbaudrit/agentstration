@@ -23,7 +23,8 @@ public sealed class ToolGovernanceAuditConsoleTests
             requested = request.RequestUri;
             var json = JsonSerializer.Serialize(new ToolGovernanceAuditPage([], null), JsonOptions);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ToolGovernanceAuditApiClient(http);
 
         await client.GetAsync(

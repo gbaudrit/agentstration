@@ -180,20 +180,20 @@ public sealed class RuntimeRunStateManager
     private RuntimeToolCall Governance(
         RuntimeToolCall? current,
         ToolExecutionGovernanceEvaluated evaluated) => new()
-    {
-        Id = evaluated.Context.ToolCallId,
-        InvocationId = evaluated.Context.InvocationId,
-        ToolId = evaluated.Context.ToolId,
-        Name = evaluated.Context.ToolName,
-        State = RuntimeRunState.Running,
-        Attempt = Math.Max(1, current?.Attempt ?? 0),
-        StartedAt = current?.StartedAt ?? evaluated.Timestamp,
-        ProviderId = evaluated.Context.ToolProviderId,
-        ExternalToolId = evaluated.Context.ExternalToolId,
-        Arguments = captureOptions.CaptureArguments(evaluated.Context.Arguments, evaluated.Context.PersistArguments),
-        CorrelationId = evaluated.Context.CorrelationId,
-        Governance = evaluated.Evaluations.ToArray()
-    };
+        {
+            Id = evaluated.Context.ToolCallId,
+            InvocationId = evaluated.Context.InvocationId,
+            ToolId = evaluated.Context.ToolId,
+            Name = evaluated.Context.ToolName,
+            State = RuntimeRunState.Running,
+            Attempt = Math.Max(1, current?.Attempt ?? 0),
+            StartedAt = current?.StartedAt ?? evaluated.Timestamp,
+            ProviderId = evaluated.Context.ToolProviderId,
+            ExternalToolId = evaluated.Context.ExternalToolId,
+            Arguments = captureOptions.CaptureArguments(evaluated.Context.Arguments, evaluated.Context.PersistArguments),
+            CorrelationId = evaluated.Context.CorrelationId,
+            Governance = evaluated.Evaluations.ToArray()
+        };
 
     private RuntimeToolCall Terminal(
         RuntimeToolCall? current,
@@ -204,25 +204,25 @@ public sealed class RuntimeRunStateManager
         string? error,
         ToolExecutionFailureKind? failureKind = null,
         string? errorCode = null) => new()
-    {
-        Id = context.ToolCallId,
-        InvocationId = context.InvocationId,
-        ToolId = context.ToolId,
-        Name = context.ToolName,
-        State = state,
-        Attempt = Math.Max(1, current?.Attempt ?? 0),
-        StartedAt = current?.StartedAt ?? completedAt - duration,
-        CompletedAt = completedAt,
-        DurationMilliseconds = duration.TotalMilliseconds,
-        ProviderId = context.ToolProviderId,
-        ExternalToolId = context.ExternalToolId,
-        Arguments = captureOptions.CaptureArguments(context.Arguments, context.PersistArguments),
-        Error = error,
-        FailureKind = failureKind,
-        ErrorCode = errorCode,
-        CorrelationId = context.CorrelationId,
-        Governance = current?.Governance ?? []
-    };
+        {
+            Id = context.ToolCallId,
+            InvocationId = context.InvocationId,
+            ToolId = context.ToolId,
+            Name = context.ToolName,
+            State = state,
+            Attempt = Math.Max(1, current?.Attempt ?? 0),
+            StartedAt = current?.StartedAt ?? completedAt - duration,
+            CompletedAt = completedAt,
+            DurationMilliseconds = duration.TotalMilliseconds,
+            ProviderId = context.ToolProviderId,
+            ExternalToolId = context.ExternalToolId,
+            Arguments = captureOptions.CaptureArguments(context.Arguments, context.PersistArguments),
+            Error = error,
+            FailureKind = failureKind,
+            ErrorCode = errorCode,
+            CorrelationId = context.CorrelationId,
+            Governance = current?.Governance ?? []
+        };
 
     private static RuntimeRunEventKind EventKind(ToolExecutionLifecycleEvent executionEvent) => executionEvent switch
     {
