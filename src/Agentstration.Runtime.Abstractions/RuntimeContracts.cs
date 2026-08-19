@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Resources;
 
 namespace Agentstration.Runtime.Abstractions;
@@ -22,7 +23,8 @@ public sealed record AgentExecutionRequest(
     string Input,
     string? SessionId = null,
     ModelExecutionOptions? Options = null,
-    AgentExecutionOptions? Execution = null);
+    AgentExecutionOptions? Execution = null,
+    ToolExecutionScope? ToolExecution = null);
 public sealed record AgentExecutionResult(
     string Output,
     string? SessionId = null,
@@ -107,7 +109,18 @@ public static class EffectiveCapabilityResolver
         return new ReasoningCapability { Support = support, SupportedEfforts = efforts };
     }
 }
-public sealed record AgentRuntimeContext(IToolCatalog Tools);
+public sealed record AgentRuntimeContext
+{
+    public AgentRuntimeContext(IToolCatalog tools) => Tools = tools;
+    public AgentRuntimeContext(IToolCatalog tools, IToolExecutionPipeline toolExecution)
+    {
+        Tools = tools;
+        ToolExecution = toolExecution;
+    }
+
+    public IToolCatalog Tools { get; }
+    public IToolExecutionPipeline ToolExecution { get; } = UnavailableToolExecutionPipeline.Instance;
+}
 public sealed record ExecutableAgentDefinition
 {
     public required Guid AgentId { get; init; }
@@ -217,13 +230,233 @@ public interface IAgentTool
     string Id { get; }
     string Name { get; }
     string? Description { get; }
-    ValueTask<JsonElement?> InvokeAsync(JsonElement? arguments, CancellationToken cancellationToken = default);
-    object? GetService(Type serviceType) => null;
+    string? ProviderId { get; }
+    string? ExternalId { get; }
+    JsonElement InputSchema { get; }
+    JsonElement? OutputSchema { get; }
+    bool RequiresApproval { get; }
 }
 
 public interface IToolCatalog
 {
     ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default);
+}
+
+public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun }
+
+public sealed record ToolExecutionScope
+{
+    public ToolExecutionOwnerKind OwnerKind { get; init; }
+    public Guid? TenantId { get; init; }
+    public WorkspaceId? WorkspaceId { get; init; }
+    public Guid? PrincipalId { get; init; }
+    public string? ExecutionId { get; init; }
+    public string? CorrelationId { get; init; }
+    public long? AgentGeneration { get; init; }
+    public bool? PersistArguments { get; init; }
+}
+
+public sealed record ToolExecutionContext
+{
+    public ToolExecutionOwnerKind OwnerKind { get; init; }
+    public required string ToolCallId { get; init; }
+    public required string InvocationId { get; init; }
+    public required string ToolId { get; init; }
+    public required string ToolName { get; init; }
+    public string? ToolProviderId { get; init; }
+    public string? ExternalToolId { get; init; }
+    public Guid? TenantId { get; init; }
+    public WorkspaceId? WorkspaceId { get; init; }
+    public Guid? PrincipalId { get; init; }
+    public string? RunId { get; init; }
+    public string? AgentId { get; init; }
+    public long? AgentVersion { get; init; }
+    public long? AgentGeneration { get; init; }
+    public string? AgentRevisionId { get; init; }
+    public string? CorrelationId { get; init; }
+    public bool? PersistArguments { get; init; }
+    public JsonElement? Arguments { get; init; }
+}
+
+public sealed record ToolExecutionCaptureOptions
+{
+    public const int DefaultMaximumArgumentsLength = 16_384;
+
+    public bool PersistArguments { get; init; }
+    public int MaximumArgumentsLength { get; init; } = DefaultMaximumArgumentsLength;
+
+    public string? CaptureArguments(JsonElement? arguments, bool? persistArgumentsOverride = null)
+    {
+        if (!(persistArgumentsOverride ?? PersistArguments)) return null;
+        Validate();
+        var value = arguments?.GetRawText() ?? "null";
+        if (value.Length <= MaximumArgumentsLength) return value;
+        const string suffix = "\n… [truncated]";
+        return $"{value[..(MaximumArgumentsLength - suffix.Length)]}{suffix}";
+    }
+
+    public void Validate()
+    {
+        if (MaximumArgumentsLength is < 64 or > 1_048_576)
+            throw new InvalidOperationException("ToolExecution MaximumArgumentsLength must be between 64 and 1048576 characters.");
+    }
+}
+
+public interface IToolExecutionPipeline
+{
+    ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
+}
+
+public abstract record ToolExecutionLifecycleEvent(
+    ToolExecutionContext Context,
+    DateTimeOffset Timestamp);
+
+public sealed record ToolExecutionStarted(
+    ToolExecutionContext Context,
+    DateTimeOffset Timestamp) : ToolExecutionLifecycleEvent(Context, Timestamp);
+
+public sealed record ToolExecutionGovernanceEvaluated(
+    ToolExecutionContext Context,
+    DateTimeOffset Timestamp,
+    IReadOnlyList<ToolExecutionHookEvaluation> Evaluations) : ToolExecutionLifecycleEvent(Context, Timestamp);
+
+public sealed record ToolExecutionCompleted(
+    ToolExecutionContext Context,
+    DateTimeOffset Timestamp,
+    TimeSpan Duration) : ToolExecutionLifecycleEvent(Context, Timestamp);
+
+public sealed record ToolExecutionFailed(
+    ToolExecutionContext Context,
+    DateTimeOffset Timestamp,
+    TimeSpan Duration,
+    string ErrorType,
+    string ErrorMessage,
+    bool Cancelled) : ToolExecutionLifecycleEvent(Context, Timestamp)
+{
+    public ToolExecutionFailureKind FailureKind { get; init; } = Cancelled
+        ? ToolExecutionFailureKind.Cancelled
+        : ToolExecutionFailureKind.Provider;
+    public string? ErrorCode { get; init; }
+}
+
+public interface IToolExecutionEventSink
+{
+    ValueTask PublishAsync(ToolExecutionLifecycleEvent executionEvent, CancellationToken cancellationToken = default);
+}
+
+public enum ToolExecutionHookDecisionKind { Allow, Deny }
+public enum ToolExecutionOutcomeKind { Succeeded, Failed, Cancelled, Denied }
+[JsonConverter(typeof(JsonStringEnumConverter<ToolExecutionHookSource>))]
+public enum ToolExecutionHookSource { Local, Managed }
+[JsonConverter(typeof(JsonStringEnumConverter<ToolExecutionHookEvaluationKind>))]
+public enum ToolExecutionHookEvaluationKind { Allowed, Denied, Failed }
+[JsonConverter(typeof(JsonStringEnumConverter<ToolExecutionFailureKind>))]
+public enum ToolExecutionFailureKind { Provider, Hook, Denied, Cancelled }
+
+public sealed record ToolExecutionHookIdentity(
+    string Id,
+    int Order,
+    ToolExecutionHookSource Source = ToolExecutionHookSource.Local,
+    string? ResourceId = null,
+    long? ResourceGeneration = null);
+
+public sealed record ToolExecutionHookEvaluation(
+    ToolExecutionHookIdentity Hook,
+    ToolExecutionHookEvaluationKind Decision,
+    string? Code = null);
+
+public sealed record ToolExecutionHookDecision
+{
+    private ToolExecutionHookDecision(ToolExecutionHookDecisionKind kind, string? code, string? message)
+    {
+        Kind = kind;
+        Code = code;
+        Message = message;
+    }
+
+    public ToolExecutionHookDecisionKind Kind { get; }
+    public string? Code { get; }
+    public string? Message { get; }
+    public static ToolExecutionHookDecision Allowed { get; } = new(ToolExecutionHookDecisionKind.Allow, null, null);
+
+    public static ToolExecutionHookDecision Deny(string code, string message)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        return new(ToolExecutionHookDecisionKind.Deny, code, message);
+    }
+}
+
+public sealed record ToolExecutionOutcome(
+    ToolExecutionOutcomeKind Kind,
+    DateTimeOffset Timestamp,
+    TimeSpan Duration,
+    string? ErrorType = null,
+    string? ErrorCode = null,
+    string? ErrorMessage = null);
+
+public interface IToolExecutionHook
+{
+    string Id { get; }
+    int Order => 0;
+    ToolExecutionHookIdentity Identity => new(Id, Order);
+
+    ValueTask<ToolExecutionHookDecision> BeforeInvokeAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        ValueTask.FromResult(ToolExecutionHookDecision.Allowed);
+
+    ValueTask AfterInvokeAsync(
+        ToolExecutionContext context,
+        ToolExecutionOutcome outcome,
+        CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+}
+
+public interface IToolExecutionHookResolver
+{
+    ValueTask<IReadOnlyList<IToolExecutionHook>> ResolveAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class EmptyToolExecutionHookResolver : IToolExecutionHookResolver
+{
+    public static EmptyToolExecutionHookResolver Instance { get; } = new();
+    private EmptyToolExecutionHookResolver() { }
+
+    public ValueTask<IReadOnlyList<IToolExecutionHook>> ResolveAsync(
+        ToolExecutionContext context,
+        CancellationToken cancellationToken = default) =>
+        ValueTask.FromResult<IReadOnlyList<IToolExecutionHook>>([]);
+}
+
+public sealed class ToolExecutionDeniedException(string hookId, string code, string message) : Exception(message)
+{
+    public string HookId { get; } = hookId;
+    public string Code { get; } = code;
+}
+
+public sealed class ToolExecutionHookException(
+    string hookId,
+    string phase,
+    Exception innerException) : Exception($"Tool execution hook '{hookId}' failed during '{phase}'.", innerException)
+{
+    public string HookId { get; } = hookId;
+    public string Phase { get; } = phase;
+}
+
+public sealed class UnavailableToolExecutionPipeline : IToolExecutionPipeline
+{
+    public static UnavailableToolExecutionPipeline Instance { get; } = new();
+    private UnavailableToolExecutionPipeline() { }
+
+    public ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
+        ValueTask.FromException<JsonElement?>(new InvalidOperationException("No Agentstration Tool Execution Pipeline is configured."));
+}
+
+public interface IToolInvoker
+{
+    ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
 }
 
 public interface IRuntimeRegistry

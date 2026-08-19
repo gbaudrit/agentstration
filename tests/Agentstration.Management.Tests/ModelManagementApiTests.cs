@@ -466,6 +466,63 @@ public sealed class ModelManagementApiTests
         Assert.IsTrue(runtimes!.Value.Any(value => value.Name == profileName && value.Namespace == resourceNamespace));
     }
 
+    [TestMethod]
+    public async Task ToolExecutionHookCrudIsNamespacedValidatedAndUsesETags()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        const string hookName = "block-api-lookup";
+        const string resourceNamespace = "team.governance";
+        var properties = new ToolExecutionHookProperties
+        {
+            DisplayName = "Block API lookup",
+            Handler = ToolExecutionHookHandlers.Deny,
+            Order = 25,
+            Selector = new ToolExecutionHookSelector { Tools = ["lookup"] },
+            Configuration = new Dictionary<string, JsonElement>
+            {
+                ["code"] = JsonSerializer.SerializeToElement("api_lookup_denied"),
+                ["message"] = JsonSerializer.SerializeToElement("API lookup is blocked.")
+            }
+        };
+
+        using var createdResponse = await client.PostAsJsonAsync(
+            "/api/toolexecutionhooks",
+            new CreateToolExecutionHookRequest(hookName, properties, resourceNamespace));
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        Assert.IsNotNull(createdResponse.Headers.ETag);
+        var created = await createdResponse.Content.ReadFromJsonAsync<ToolExecutionHookResource>();
+        Assert.IsNotNull(created);
+        Assert.AreEqual(resourceNamespace, created.Namespace.Value);
+
+        using var update = new HttpRequestMessage(
+            HttpMethod.Put,
+            $"/api/toolexecutionhooks/{hookName}?resourceNamespace={resourceNamespace}")
+        {
+            Content = JsonContent.Create(new PutToolExecutionHookRequest(properties with { Enabled = false }))
+        };
+        update.Headers.IfMatch.Add(createdResponse.Headers.ETag);
+        using var updatedResponse = await client.SendAsync(update);
+        Assert.AreEqual(HttpStatusCode.OK, updatedResponse.StatusCode);
+
+        var listed = await client.GetFromJsonAsync<ValueResponse<ToolExecutionHookResource>>("/api/toolexecutionhooks");
+        Assert.IsTrue(listed!.Value.Any(value => value.Name == hookName && value.Namespace.Value == resourceNamespace));
+
+        using var invalid = await client.PostAsJsonAsync(
+            "/api/toolexecutionhooks",
+            new CreateToolExecutionHookRequest(
+                "invalid-handler",
+                properties with { Handler = "arbitrary-code" }));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+
+        using var delete = new HttpRequestMessage(
+            HttpMethod.Delete,
+            $"/api/toolexecutionhooks/{hookName}?resourceNamespace={resourceNamespace}");
+        delete.Headers.IfMatch.Add(updatedResponse.Headers.ETag!);
+        using var deleted = await client.SendAsync(delete);
+        Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
+    }
+
     private static WebApplicationFactory<Program> Factory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {

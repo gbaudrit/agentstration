@@ -574,7 +574,8 @@ public sealed class FlowRunService(
             stored.Value.CorrelationId!,
             stored.Value.RuntimeBindings,
             stored.Value.RuntimeState,
-            answeredInput);
+            answeredInput,
+            stored.Value.Scope);
 
         await foreach (var executionEvent in orchestrations.ExecuteAsync(request, runToken))
         {

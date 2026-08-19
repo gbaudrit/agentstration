@@ -21,6 +21,6 @@ else
 @code {
     private IReadOnlyList<ToolResource> tools = []; private bool loading = true; private string? error;
     protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { tools = await Client.GetToolsAsync("default"); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
+    private async Task LoadAsync() { loading = true; error = null; try { tools = await Client.GetToolsAsync(); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
     private static string ResourceName(string? id) => id ?? "—";
 }

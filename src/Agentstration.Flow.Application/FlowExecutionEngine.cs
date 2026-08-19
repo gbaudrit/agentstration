@@ -12,7 +12,8 @@ public sealed record FlowOrchestrationExecutionRequest(
     string CorrelationId,
     IReadOnlyList<RuntimeExecutionBinding>? RuntimeBindings = null,
     DurableRuntimeStateReference? RuntimeState = null,
-    InputRequest? AnsweredInput = null);
+    InputRequest? AnsweredInput = null,
+    FlowRunScope? Scope = null);
 
 public abstract record FlowExecutionEvent;
 

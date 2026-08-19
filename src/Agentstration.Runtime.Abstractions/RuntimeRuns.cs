@@ -23,7 +23,7 @@ public enum RuntimeRunOrigin { Console, Api, WorkItem, Flow }
 [JsonConverter(typeof(JsonStringEnumConverter<RuntimeMessageRole>))]
 public enum RuntimeMessageRole { System, Developer, User, Assistant, Tool }
 [JsonConverter(typeof(JsonStringEnumConverter<RuntimeRunEventKind>))]
-public enum RuntimeRunEventKind { RunCreated, StatusChanged, StepStarted, StepCompleted, ResponseDelta, ToolCallStarted, ToolCallCompleted, Metrics, Error, RunCompleted }
+public enum RuntimeRunEventKind { RunCreated, StatusChanged, StepStarted, StepCompleted, ResponseDelta, ToolCallStarted, ToolCallGovernanceEvaluated, ToolCallCompleted, ToolCallFailed, Metrics, Error, RunCompleted }
 
 public sealed record RuntimeAgentReference(string ResourceId, long Version)
 {
@@ -45,6 +45,7 @@ public sealed record RuntimeExecutionOptions
     public RuntimeExecutionMode Mode { get; init; } = RuntimeExecutionMode.Interactive;
     public int TimeoutSeconds { get; init; } = 120;
     public RuntimeStreamingMode Streaming { get; init; } = RuntimeStreamingMode.Automatic;
+    public bool? PersistToolArguments { get; init; }
     public IReadOnlyDictionary<string, JsonElement> Parameters { get; init; } = new Dictionary<string, JsonElement>();
 }
 
@@ -61,14 +62,23 @@ public sealed record RuntimeRunProperties
 public sealed record RuntimeToolCall
 {
     public required string Id { get; init; }
+    public required string InvocationId { get; init; }
+    public required string ToolId { get; init; }
     public required string Name { get; init; }
     public required RuntimeRunState State { get; init; }
+    public int Attempt { get; init; }
     public DateTimeOffset StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
+    public double? DurationMilliseconds { get; init; }
+    public string? ProviderId { get; init; }
+    public string? ExternalToolId { get; init; }
     public string? Arguments { get; init; }
     public string? Result { get; init; }
     public string? Error { get; init; }
+    public ToolExecutionFailureKind? FailureKind { get; init; }
+    public string? ErrorCode { get; init; }
     public string? CorrelationId { get; init; }
+    public IReadOnlyList<ToolExecutionHookEvaluation> Governance { get; init; } = [];
 }
 
 public sealed record RuntimeRunStatus

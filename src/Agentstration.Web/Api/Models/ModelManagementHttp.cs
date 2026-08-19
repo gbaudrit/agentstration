@@ -30,6 +30,7 @@ internal static class ModelManagementHttp
         }
         catch (RuntimeProfileValidationException exception) { return Problem("runtime-profile-invalid", "Invalid runtime profile", 422, exception.Message); }
         catch (ToolResourceValidationException exception) { return Problem("tool-resource-invalid", "Invalid tool resource", 422, exception.Message); }
+        catch (ToolExecutionHookValidationException exception) { return Problem("tool-execution-hook-invalid", "Invalid Tool execution hook", 422, exception.Message); }
         catch (ToolProviderDiscoveryFailedException exception) { return Problem("tool-provider-unavailable", "Tool provider unavailable", 503, exception.Message); }
         catch (ModelProfileInUseException exception)
         {
@@ -73,6 +74,12 @@ internal static class ModelManagementHttp
     }
 
     public static IResult ResourceResult(StoredResource<ToolResource> stored, HttpResponse response, int statusCode)
+    {
+        response.Headers.ETag = stored.ETag;
+        return Results.Json(stored.Value, statusCode: statusCode);
+    }
+
+    public static IResult ResourceResult(StoredResource<ToolExecutionHookResource> stored, HttpResponse response, int statusCode)
     {
         response.Headers.ETag = stored.ETag;
         return Results.Json(stored.Value, statusCode: statusCode);
