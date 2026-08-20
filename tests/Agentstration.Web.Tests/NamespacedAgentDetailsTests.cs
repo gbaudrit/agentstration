@@ -1,6 +1,8 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Contracts;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
@@ -12,12 +14,14 @@ namespace Agentstration.Web.Tests;
 public sealed class NamespacedAgentDetailsTests
 {
     [TestMethod]
-    public void PageShowsTheEffectiveModelProfileAndItsPackBinding()
+    public async Task PageShowsPackBindingsAndDeploysTheExactNamespacedAgent()
     {
         using var context = new BunitContext();
         var agents = new FakeManagementClient();
+        var runtime = new FakeRuntimeClient();
         context.Services.AddSingleton<IManagementApiClient>(agents);
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
+        context.Services.AddSingleton<IAgentRunnerRuntimeClient>(runtime);
 
         var rendered = context.Render<NamespacedAgentDetails>(parameters => parameters
             .Add(component => component.AgentNamespace, FakeManagementClient.PackNamespace.Value)
@@ -39,6 +43,46 @@ public sealed class NamespacedAgentDetailsTests
         Assert.AreEqual(
             "/packs?publisher=agentstration&name=daily-life-assistant",
             rendered.FindAll("a").First(link => link.TextContent.Contains("Open Pack installation", StringComparison.Ordinal)).GetAttribute("href"));
+        Assert.IsFalse(rendered.FindAll(".form-actions").Any());
+        Assert.IsTrue(rendered.FindAll(".namespaced-agent-actions").Any());
+
+        await rendered.FindAll("button").First(button => button.TextContent.Contains("Deploy generation 1", StringComparison.Ordinal)).ClickAsync(new());
+
+        Assert.AreEqual(FakeManagementClient.PackNamespace, runtime.PreparedNamespace);
+        Assert.AreEqual("concierge", runtime.PreparedAgentName);
+        Assert.AreEqual(1, runtime.PreparedGeneration);
+        Assert.IsTrue(rendered.Markup.Contains("Deployment ready", StringComparison.Ordinal));
+    }
+
+    private sealed class FakeRuntimeClient : IAgentRunnerRuntimeClient
+    {
+        private bool ready;
+        public ResourceNamespace? PreparedNamespace { get; private set; }
+        public string? PreparedAgentName { get; private set; }
+        public long? PreparedGeneration { get; private set; }
+
+        public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken) =>
+            Task.FromResult(new AgentRuntimeReadinessResponse(agentName, generation, ready, ready ? "Ready" : "agent_deployment_not_found", ready ? "deployment-concierge" : null, ready ? "revision-concierge" : null, null));
+
+        public Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken)
+        {
+            ready = true;
+            PreparedNamespace = @namespace;
+            PreparedAgentName = agentName;
+            PreparedGeneration = generation;
+            return Task.FromResult(new PrepareAgentRuntimeResponse(agentName, generation, "deployment-concierge", "revision-concierge", "Ready"));
+        }
+
+        public Task<IReadOnlyList<RuntimeInstanceSummary>> GetInstancesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> GetRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<RuntimeRun>> GetRunsAsync(string? agentResourceId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> CancelRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RuntimeRun> RetryRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string agentName, long generation, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string agentName, long generation, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class FakeManagementClient : IManagementApiClient

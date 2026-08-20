@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject IManagementApiClient Client
 @inject IPacksClient PacksClient
+@inject IAgentRunnerRuntimeClient RuntimeClient
 
 <PageTitle>@(agent?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 
@@ -18,7 +19,7 @@ else if (agent is not null)
 {
     <ResourceHeader ResourceType="Agent" Domain="agent" Icon="◎" Name="@agent.Definition.DisplayName" Description="@agent.Definition.Description" StatusText="@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())" Status="@StatusPresentation.Tone(agent.Status.ProvisioningState.ToString())">
         <Metadata><span><code>@AgentResourceNamespace.Value/@agent.Metadata.Name</code></span><span>Generation @agent.Generation</span></Metadata>
-        <Actions><a class="button-secondary" href="/agents">Back to agents</a></Actions>
+        <Actions><button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="/agents">Back to agents</a></Actions>
     </ResourceHeader>
     <p class="muted">This Agent is managed by its namespaced source. Fork or repack its Pack to change the definition.</p>
     <article class="panel definition-grid">
@@ -54,11 +55,11 @@ else if (agent is not null)
                 <dt>Managed by</dt><dd><code>@PackIdentity</code></dd>
             </dl>
             <p class="resource-hint">The binding belongs to the Pack installation. The Agent definition remains read-only so changing it cannot detach the resource from its source.</p>
-            <div class="form-actions"><a class="button-primary" href="@ModelProfileUrl">Open effective model profile</a><a class="button-secondary" href="@PackUrl">Open Pack installation</a></div>
+            <div class="namespaced-agent-actions"><a class="button-primary" href="@ModelProfileUrl">Open effective model profile</a><a class="button-secondary" href="@PackUrl">Open Pack installation</a></div>
         }
     </section>
     <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">Local deployment</p><h2>Runtime binding</h2></div>@if (runtimeBindings.Count > 0) { <StatusBadge Text="Bound by Pack" Status="UiStatus.Info" /> }</div>
+        <div class="panel-header"><div><p class="eyebrow">Local deployment</p><h2>Runtime binding</h2></div><div class="namespaced-agent-status">@if (runtimeBindings.Count > 0) { <StatusBadge Text="Bound by Pack" Status="UiStatus.Info" /> }<StatusBadge Text="@DeploymentStatus" Status="@DeploymentTone" /></div></div>
         @if (ownerPack is null)
         {
             <p class="muted">Local execution uses <a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a>. No installed Pack provenance could be loaded.</p>
@@ -79,8 +80,15 @@ else if (agent is not null)
                 }
                 <dt>Managed by</dt><dd><code>@PackIdentity</code></dd>
             </dl>
-            <div class="form-actions"><a class="button-primary" href="@RuntimeProfileUrl">Open effective runtime profile</a><a class="button-secondary" href="@PackUrl">Open Pack installation</a></div>
         }
+        <dl class="resource-details namespaced-deployment-details">
+            <dt>Desired generation</dt><dd>@agent.Generation</dd>
+            <dt>Deployment</dt><dd>@(readiness?.DeploymentId ?? "Not prepared")</dd>
+            @if (!string.IsNullOrWhiteSpace(readiness?.RevisionId)) { <dt>Revision</dt><dd><code>@readiness.RevisionId</code></dd> }
+        </dl>
+        @if (!string.IsNullOrWhiteSpace(deploymentError)) { <div class="form-alert form-alert-danger" role="alert"><strong>Deployment failed</strong><span>@deploymentError</span></div> }
+        @if (!string.IsNullOrWhiteSpace(deploymentMessage)) { <div class="form-alert form-alert-success" role="status"><strong>Deployment ready</strong><span>@deploymentMessage</span></div> }
+        <div class="namespaced-agent-actions"><button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="@RuntimeProfileUrl">Open effective runtime profile</a>@if (ownerPack is not null) { <a class="button-secondary" href="@PackUrl">Open Pack installation</a> }</div>
     </section>
     <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Instructions</h2></div></div><pre>@agent.Definition.Instructions</pre></section>
 }
@@ -93,8 +101,12 @@ else if (agent is not null)
     private InstalledPackResource? ownerPack;
     private IReadOnlyList<PackBindingResolution> modelBindings = [];
     private IReadOnlyList<PackBindingResolution> runtimeBindings = [];
+    private AgentRuntimeReadinessResponse? readiness;
     private AgentstrationApiException? error;
+    private string? deploymentError;
+    private string? deploymentMessage;
     private bool loading = true;
+    private bool deploying;
     private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Parse(AgentNamespace);
     private ResourceAddress ModelProfileAddress => agent?.Definition.ModelProfile.Resolve(AgentResourceNamespace, ResourceKinds.ModelProfile)
         ?? ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.ModelProfile, "unavailable");
@@ -105,6 +117,9 @@ else if (agent is not null)
     private string PackIdentity => ownerPack is null ? "Unknown Pack" : $"{ownerPack.Definition.Publisher}/{ownerPack.Definition.PackName}";
     private string PackUrl => ownerPack is null ? "/packs" : $"/packs?publisher={Uri.EscapeDataString(ownerPack.Definition.Publisher)}&name={Uri.EscapeDataString(ownerPack.Definition.PackName)}";
     private string Capabilities => agent is null || agent.Definition.Behaviors.Count == 0 ? "—" : string.Join(", ", agent.Definition.Behaviors);
+    private string DeploymentStatus => readiness?.Ready == true ? "Ready" : readiness?.State ?? "Not deployed";
+    private UiStatus DeploymentTone => readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning;
+    private string DeploymentActionLabel => deploying ? "Deploying…" : readiness?.Ready == true ? "Reconcile deployment" : $"Deploy generation {agent?.Generation}";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -113,10 +128,37 @@ else if (agent is not null)
         try
         {
             agent = (await Client.GetAgentAsync(AgentResourceNamespace, Name, cancellation.Token)).Value;
-            await LoadPackContextAsync();
+            await Task.WhenAll(LoadPackContextAsync(), LoadReadinessAsync());
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
+    }
+
+    private async Task LoadReadinessAsync()
+    {
+        readiness = null;
+        if (agent is null) return;
+        try { readiness = await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, agent.Metadata.Name, agent.Generation, cancellation.Token); }
+        catch (AgentstrationApiException exception) { deploymentError = exception.Message; }
+    }
+
+    private async Task PrepareRuntimeAsync()
+    {
+        if (agent is null || deploying) return;
+        deploying = true;
+        deploymentError = null;
+        deploymentMessage = null;
+        try
+        {
+            var prepared = await RuntimeClient.PrepareAgentAsync(AgentResourceNamespace, agent.Metadata.Name, agent.Generation, cancellation.Token);
+            await LoadReadinessAsync();
+            if (string.Equals(prepared.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
+                deploymentMessage = $"Generation {prepared.Generation} is active through deployment '{prepared.DeploymentId}'.";
+            else
+                deploymentError = $"Runtime preparation completed with state '{prepared.State}'.";
+        }
+        catch (AgentstrationApiException exception) { deploymentError = exception.Message; }
+        finally { deploying = false; }
     }
 
     private async Task LoadPackContextAsync()

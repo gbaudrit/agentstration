@@ -846,11 +846,18 @@ public sealed class ApiClientTests
 
         var actual = await client.GetAgentReadinessAsync("sql-expert", 4, default);
         var prepared = await client.PrepareAgentAsync("sql-expert", 4, default);
+        var agentNamespace = new ResourceNamespace("agentstration.daily-life-assistant");
+        var namespaced = await client.GetAgentReadinessAsync(agentNamespace, "concierge", 5, default);
+        var namespacedPreparation = await client.PrepareAgentAsync(agentNamespace, "concierge", 5, default);
 
         Assert.IsTrue(actual.Ready);
         Assert.AreEqual("Ready", prepared.State);
+        Assert.IsTrue(namespaced.Ready);
+        Assert.AreEqual("Ready", namespacedPreparation.State);
         StringAssert.Contains(requested[0].PathAndQuery, "/api/runtime/agents/sql-expert/readiness?generation=4");
         StringAssert.Contains(requested[1].PathAndQuery, "/api/runtime/agents/sql-expert/prepare?generation=4");
+        StringAssert.Contains(requested[2].PathAndQuery, "/api/runtime/namespaces/agentstration.daily-life-assistant/agents/concierge/readiness?generation=5");
+        StringAssert.Contains(requested[3].PathAndQuery, "/api/runtime/namespaces/agentstration.daily-life-assistant/agents/concierge/prepare?generation=5");
     }
 
     [TestMethod]

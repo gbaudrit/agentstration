@@ -12,6 +12,7 @@ using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Resources;
+using Agentstration.Runtime.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -381,6 +382,18 @@ public sealed class PackTests
         var deployment = await agents.PrepareLocalRuntimeAsync(packNamespace, "assistant", agent.Value.Generation, default);
         Assert.AreEqual("pack-runtime", deployment.Value.RuntimeProfileName);
         Assert.AreEqual(runtimeNamespace, deployment.Value.RuntimeProfileNamespace);
+
+        using var readinessResponse = await client.GetAsync($"/api/runtime/namespaces/{packNamespace.Value}/agents/assistant/readiness?generation={agent.Value.Generation}");
+        Assert.AreEqual(HttpStatusCode.OK, readinessResponse.StatusCode, await readinessResponse.Content.ReadAsStringAsync());
+        var readiness = await readinessResponse.Content.ReadFromJsonAsync<AgentRuntimeReadinessResponse>();
+        Assert.IsNotNull(readiness);
+        Assert.IsTrue(readiness.Ready);
+
+        using var preparationResponse = await client.PostAsync($"/api/runtime/namespaces/{packNamespace.Value}/agents/assistant/prepare?generation={agent.Value.Generation}", null);
+        Assert.AreEqual(HttpStatusCode.OK, preparationResponse.StatusCode, await preparationResponse.Content.ReadAsStringAsync());
+        var prepared = await preparationResponse.Content.ReadFromJsonAsync<PrepareAgentRuntimeResponse>();
+        Assert.IsNotNull(prepared);
+        Assert.AreEqual("Ready", prepared.State);
     }
 
     [TestMethod]
