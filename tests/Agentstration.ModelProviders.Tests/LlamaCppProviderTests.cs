@@ -40,7 +40,11 @@ public sealed class LlamaCppProviderTests
                 Temperature = 0.2f,
                 MaxOutputTokens = 128,
                 ResponseFormat = responseFormat,
-                AdditionalOptions = new Dictionary<string, JsonElement> { ["llamacpp"] = native }
+                NativeOptions = new AepVersionedOptions(
+                    LlamaCppOptionContracts.ModelProfileOptionSet,
+                    LlamaCppOptionContracts.Version,
+                    LlamaCppOptionContracts.ModelProfile.Versions.Single().SchemaDigest,
+                    native)
             },
             Tools = [new AepToolDefinition("weather", "Weather", JsonSerializer.SerializeToElement(new { type = "object" }))]
         };

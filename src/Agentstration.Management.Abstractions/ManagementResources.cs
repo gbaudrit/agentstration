@@ -21,6 +21,7 @@ public static class ResourceKinds
     public const string InstalledPack = "InstalledPack";
     public const string PackConfiguration = "PackConfiguration";
     public const string ModelProvider = "ModelProvider";
+    public const string ExtensionRegistration = "ExtensionRegistration";
     public const string ModelProfile = "ModelProfile";
     public const string RuntimeProfile = "RuntimeProfile";
     public const string Secret = "Secret";
@@ -84,6 +85,7 @@ public enum PackBindingTargetKind
 {
     [JsonStringEnumMemberName("modelProfile")] ModelProfile,
     [JsonStringEnumMemberName("modelProvider")] ModelProvider,
+    [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
     [JsonStringEnumMemberName("secret")] Secret
 }
 
@@ -543,21 +545,39 @@ public sealed record ModelSelection
     public required string Name { get; init; }
 }
 
-public enum ModelProviderManagementMode { External, Aspire }
+[JsonConverter(typeof(JsonStringEnumConverter<ExtensionRegistrationSource>))]
+public enum ExtensionRegistrationSource
+{
+    [JsonStringEnumMemberName("manual")] Manual,
+    [JsonStringEnumMemberName("configuration")] Configuration,
+    [JsonStringEnumMemberName("aspire")] Aspire
+}
 
 public sealed record ModelProviderProperties
 {
     public required string DisplayName { get; init; }
-    public required string ProviderType { get; init; }
-    public required Uri Endpoint { get; init; }
-    public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
-    public ResourceReference? Credential { get; init; }
+    public required ResourceReference Extension { get; init; }
+    public required string ContributionId { get; init; }
 }
 
 public sealed record ModelProviderResource : Resource
 {
     public ModelProviderProperties Definition { get; init; } = null!;
+}
+
+public sealed record ExtensionRegistrationProperties
+{
+    public required string DisplayName { get; init; }
+    public required Uri Endpoint { get; init; }
+    public bool Enabled { get; init; } = true;
+    public string? ExpectedExtensionId { get; init; }
+    public ExtensionRegistrationSource Source { get; init; } = ExtensionRegistrationSource.Manual;
+    public ResourceReference? Credential { get; init; }
+}
+
+public sealed record ExtensionRegistrationResource : Resource
+{
+    public ExtensionRegistrationProperties Definition { get; init; } = null!;
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<SecretType>))]
@@ -617,6 +637,16 @@ public sealed record ModelOutputOptions
     public bool Strict { get; init; }
 }
 
+public sealed record VersionedExtensionOptions
+{
+    public string OptionSet { get; init; } = string.Empty;
+    public string Version { get; init; } = string.Empty;
+    public string SchemaDigest { get; init; } = string.Empty;
+    public JsonElement Values { get; init; }
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public IDictionary<string, JsonElement>? LegacyValues { get; init; }
+}
+
 public sealed record ModelProfileProperties
 {
     public required string DisplayName { get; init; }
@@ -626,7 +656,7 @@ public sealed record ModelProfileProperties
     public ModelGenerationOptions Generation { get; init; } = new();
     public ModelReasoningOptions Reasoning { get; init; } = new();
     public ModelOutputOptions Output { get; init; } = new();
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
 }
 
 public sealed record ModelProfileResource : Resource

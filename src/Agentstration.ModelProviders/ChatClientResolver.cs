@@ -18,8 +18,8 @@ public sealed class ChatClientResolver(
         var profile = await profiles.GetRequiredAsync(modelProfileResourceId, cancellationToken);
         var deployment = await deployments.GetRequiredAsync(profile.DeploymentName, cancellationToken);
         var providerConfiguration = await providerConfigurations.GetRequiredAsync(deployment.ProviderName, cancellationToken);
-        var provider = providers.GetRequiredProvider(providerConfiguration.ProviderType);
-        var capabilityResolver = capabilityResolvers?.SingleOrDefault(value => value.CanHandle(providerConfiguration.ProviderType));
+        var provider = providers.GetRequiredProvider(providerConfiguration.AdapterType);
+        var capabilityResolver = capabilityResolvers?.SingleOrDefault(value => value.CanHandle(providerConfiguration.AdapterType));
         var capabilities = capabilityResolver is null
             ? null
             : await capabilityResolver.ResolveCapabilitiesAsync(providerConfiguration, deployment, cancellationToken);
@@ -29,7 +29,7 @@ public sealed class ChatClientResolver(
                 "Resolved model profile {ModelProfile} to deployment {Deployment}, provider {ProviderType}/{ProviderName}, and model {ModelName}",
                 profile.Name,
                 deployment.Name,
-                providerConfiguration.ProviderType,
+                providerConfiguration.AdapterType,
                 providerConfiguration.Name,
                 deployment.ModelName);
         }
@@ -48,7 +48,7 @@ public sealed class ChatClientResolver(
             new ModelChatClientMetadata(
                 profile.Name,
                 deployment.Name,
-                providerConfiguration.ProviderType,
+                providerConfiguration.ContributionId,
                 providerConfiguration.Name,
                 deployment.ModelName,
                 profile.Generation,

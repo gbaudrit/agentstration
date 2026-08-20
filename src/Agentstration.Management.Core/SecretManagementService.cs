@@ -76,14 +76,14 @@ public sealed class SecretManagementService(IControlPlaneStore store, IEnumerabl
     }
     public async Task DeleteSecretAsync(string name, string? etag, CancellationToken cancellationToken)
     {
-        if ((await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken)).Any(value => value.Value.Definition.Credential?.Name == name))
-            throw new SecretManagementException($"Secret '{name}' is referenced by a model provider.");
+        if ((await store.ListAllAsync<ExtensionRegistrationResource>(ResourceKinds.ExtensionRegistration, cancellationToken)).Any(value => value.Value.Definition.Credential?.Name == name))
+            throw new SecretManagementException($"Secret '{name}' is referenced by an extension registration.");
         await DeleteValueAsync(name, cancellationToken);
         await store.DeleteAsync(new(ResourceKinds.Secret, name), etag, cancellationToken);
     }
 
     public async Task<IReadOnlyList<ModelProviderUsage>> GetSecretUsagesAsync(string name, CancellationToken cancellationToken) =>
-        (await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken))
+        (await store.ListAllAsync<ExtensionRegistrationResource>(ResourceKinds.ExtensionRegistration, cancellationToken))
             .Where(value => value.Value.Definition.Credential?.Name == name)
             .Select(value => new ModelProviderUsage(value.Value.Kind, value.Value.Name, value.Value.Definition.DisplayName))
             .ToArray();

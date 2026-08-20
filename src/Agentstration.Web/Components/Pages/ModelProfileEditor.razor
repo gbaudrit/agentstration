@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject IModelProfilesClient Client
 @inject IModelProvidersClient ProvidersClient
+@inject IExtensionsClient ExtensionsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 
@@ -64,10 +65,42 @@ else
             </div>
         </section>
 
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Adapter</p><h2>Provider options</h2></div><span>Advanced</span></div>
-            <div class="form-grid">
-                <label class="form-span-2"><span>Provider-specific JSON</span><InputTextArea @bind-Value="model.ProviderOptionsJson" rows="8" class="runner-json form-code-editor" /><small>Top-level keys must match the selected provider type, for example <code>ollama</code> or <code>llamacpp</code>.</small></label>
-            </div>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Adapter</p><h2>Provider options</h2></div><span>@(optionEditor is null ? "Advanced" : $"{optionEditor.Contract.Id}@{optionEditor.Version.Version}")</span></div>
+            @if (optionEditor is { CanGuide: true } && !rawOptions)
+            {
+                <div class="form-grid">
+                    <label class="checkbox-field form-span-2"><input type="checkbox" checked="@optionEditor.Enabled" @onchange="SetProviderOptionsEnabled" /><span>Configure provider-native options</span></label>
+                    @if (optionEditor.Enabled)
+                    {
+                        @foreach (var field in optionEditor.Fields)
+                        {
+                            @if (field.Kind == ExtensionOptionFieldKind.Toggle)
+                            {
+                                <label class="checkbox-field"><input type="checkbox" checked="@BooleanValue(field)" @onchange="args => SetBooleanOption(field, args)" /><span>@FieldLabel(field)</span></label>
+                            }
+                            else if (field.AllowedValues.Count > 0)
+                            {
+                                <label><span>@FieldLabel(field)</span><select value="@field.Value" @onchange="args => SetOption(field, args.Value?.ToString())"><option value="">Provider default</option>@foreach (var value in field.AllowedValues) { <option value="@value">@value</option> }</select>@FieldHelp(field)</label>
+                            }
+                            else if (field.Kind is ExtensionOptionFieldKind.JsonObject or ExtensionOptionFieldKind.JsonValue)
+                            {
+                                <label class="form-span-2"><span>@FieldLabel(field)</span><textarea rows="5" class="runner-json form-code-editor" value="@field.Value" @onchange="args => SetOption(field, args.Value?.ToString())"></textarea>@FieldHelp(field)</label>
+                            }
+                            else
+                            {
+                                <label><span>@FieldLabel(field)</span><input type="@(field.Kind is ExtensionOptionFieldKind.WholeNumber or ExtensionOptionFieldKind.DecimalNumber ? "number" : "text")" value="@field.Value" min="@field.Minimum" max="@field.Maximum" step="@(field.Kind == ExtensionOptionFieldKind.WholeNumber ? "1" : "any")" @onchange="args => SetOption(field, args.Value?.ToString())" />@FieldHelp(field)</label>
+                            }
+                        }
+                    }
+                </div>
+                <div class="panel-actions"><button class="button-secondary" type="button" @onclick="() => rawOptions = true">Edit raw JSON</button><a class="text-button" href="/extensions">Inspect contract</a></div>
+            }
+            else
+            {
+                @if (optionEditor?.UnavailableReason is { } reason) { <p class="inline-warning">@reason</p> }
+                <div class="form-grid"><label class="form-span-2"><span>Provider-specific JSON</span><InputTextArea @bind-Value="model.ProviderOptionsJson" rows="8" class="runner-json form-code-editor" /><small>Each provider value pins <code>optionSet</code>, <code>version</code>, <code>schemaDigest</code>, and <code>values</code>.</small></label></div>
+                @if (optionEditor?.CanGuide == true) { <div class="panel-actions"><button class="button-secondary" type="button" @onclick="UseGuidedOptions">Return to guided editor</button></div> }
+            }
         </section>
 
         <div class="form-actions"><a class="button-secondary" href="/modelprofiles">Cancel</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create profile" : "Save changes")</button></div>
@@ -111,8 +144,9 @@ else
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     private readonly CancellationTokenSource cancellation = new();
-    private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = [];
+    private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
+    private ExtensionOptionsEditorModel? optionEditor; private bool rawOptions;
     private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
@@ -133,6 +167,7 @@ else
         try
         {
             providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
+            extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
             if (IsNew) model = new ModelProfileEditorModel { Namespace = SelectedNamespace.Value };
             else
             {
@@ -142,6 +177,7 @@ else
                 resolution = await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
             }
             if (!string.IsNullOrWhiteSpace(model.ProviderName)) await LoadModelsAsync(clearSelection: false);
+            ConfigureOptionEditor();
         }
         catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProfileEditorModel(); }
         finally { loading = false; }
@@ -154,6 +190,7 @@ else
         model.ProviderNamespace = separator > 0 ? value[..separator] : ResourceNamespace.DefaultValue;
         model.ProviderName = separator > 0 ? value[(separator + 1)..] : value;
         await LoadModelsAsync(clearSelection: true);
+        ConfigureOptionEditor();
     }
     private async Task LoadModelsAsync(bool clearSelection)
     {
@@ -169,6 +206,7 @@ else
         if (model is null || saving) return; saving = true; error = null;
         try
         {
+            if (!rawOptions && optionEditor?.CanGuide == true) model.ProviderOptionsJson = optionEditor.ToProviderOptionsJson();
             ResourceSnapshot<ModelProfileResource> snapshot = IsNew
                 ? await Client.CreateModelProfileAsync(model.ToCreateRequest(), cancellation.Token)
                 : await Client.UpdateModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, model.ToPutRequest(), etag!, cancellation.Token);
@@ -194,6 +232,43 @@ else
         catch (AgentstrationApiException exception) { error = exception; }
     }
     private static bool IsUnavailable(AvailableModelResponse model) => string.Equals(model.Status, "unavailable", StringComparison.OrdinalIgnoreCase);
+    private void ConfigureOptionEditor()
+    {
+        optionEditor = null;
+        rawOptions = false;
+        if (model is null) return;
+        var provider = providers.SingleOrDefault(value => string.Equals(value.Name, model.ProviderName, StringComparison.Ordinal)
+            && string.Equals(value.Namespace, model.ProviderNamespace, StringComparison.Ordinal));
+        if (provider is null) return;
+        var extension = extensions.SingleOrDefault(value => value.Providers.Any(binding =>
+            string.Equals(binding.Name, provider.Name, StringComparison.Ordinal)
+            && string.Equals(binding.Namespace, provider.Namespace, StringComparison.Ordinal)));
+        var contract = extension?.OptionSets.SingleOrDefault(value =>
+            string.Equals(value.ContributionKind, "model-provider", StringComparison.Ordinal)
+            && string.Equals(value.ContributionId, provider.Properties.ContributionId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(value.Scope, "model-profile", StringComparison.Ordinal));
+        if (contract is not null) optionEditor = ExtensionOptionsEditorModel.Create(provider.Properties.ContributionId, contract, model.ProviderOptionsJson);
+    }
+    private void UseGuidedOptions()
+    {
+        ConfigureOptionEditor();
+        rawOptions = false;
+    }
+    private void SetProviderOptionsEnabled(ChangeEventArgs args)
+    {
+        if (optionEditor is not null) optionEditor.Enabled = args.Value is true;
+    }
+    private static void SetOption(ExtensionOptionFieldEditor field, string? value) => field.Value = value;
+    private static void SetBooleanOption(ExtensionOptionFieldEditor field, ChangeEventArgs args) => field.Value = args.Value is true ? "true" : "false";
+    private static bool BooleanValue(ExtensionOptionFieldEditor field) => bool.TryParse(field.Value, out var value) && value;
+    private static string FieldLabel(ExtensionOptionFieldEditor field) => field.Required ? $"{field.Name} *" : field.Name;
+    private static Microsoft.AspNetCore.Components.RenderFragment FieldHelp(ExtensionOptionFieldEditor field) => builder =>
+    {
+        var text = field.Description;
+        if (string.IsNullOrWhiteSpace(text) && (field.Minimum is not null || field.Maximum is not null)) text = $"Range: {field.Minimum ?? "−∞"} to {field.Maximum ?? "+∞"}.";
+        if (string.IsNullOrWhiteSpace(text)) return;
+        builder.OpenElement(0, "small"); builder.AddContent(1, text); builder.CloseElement();
+    };
     private static string SupportLabel(string support) => support switch { "native" => "Native", "emulated" => "Emulated", "partial" => "Partial", _ => "Unsupported" };
     private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
     private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";

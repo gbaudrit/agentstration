@@ -26,6 +26,67 @@ public interface IModelProvidersClient
     Task<ModelProviderStatusResponse> TestProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => TestProviderAsync(providerName, cancellationToken);
 }
 
+public interface IExtensionsClient
+{
+    Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken);
+    Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken);
+    Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken);
+}
+
+public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClient
+{
+    public async Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<ExtensionResponse>>(httpClient, "api/extensions", cancellationToken)).Value;
+
+    public async Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync("api/extensions/discover", null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ExtensionDiscoveryResponse>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty extension discovery result.", Guid.NewGuid().ToString("N"));
+    }
+
+    public async Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<ExtensionRegistrationResource>>(httpClient, "api/extensionregistrations", cancellationToken)).Value;
+
+    public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        ReadRegistrationAsync(HttpMethod.Get, RegistrationPath(@namespace, name), null, null, cancellationToken);
+
+    public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) =>
+        ReadRegistrationAsync(HttpMethod.Post, "api/extensionregistrations", JsonContent.Create(request), null, cancellationToken);
+
+    public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) =>
+        ReadRegistrationAsync(HttpMethod.Put, RegistrationPath(@namespace, name), JsonContent.Create(request), etag, cancellationToken);
+
+    public async Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Delete, RegistrationPath(@namespace, name));
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    private async Task<ResourceSnapshot<ExtensionRegistrationResource>> ReadRegistrationAsync(HttpMethod method, string path, HttpContent? content, string? etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(method, path) { Content = content };
+        if (!string.IsNullOrWhiteSpace(etag)) message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        var value = await response.Content.ReadFromJsonAsync<ExtensionRegistrationResource>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty extension registration.", Guid.NewGuid().ToString("N"));
+        var responseEtag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(responseEtag)) throw new AgentstrationApiException("Agentstration API did not return the extension registration ETag.", Guid.NewGuid().ToString("N"));
+        return new(value, responseEtag);
+    }
+
+    private static string RegistrationPath(ResourceNamespace @namespace, string name) =>
+        $"api/extensionregistrations/{Uri.EscapeDataString(name)}?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}";
+}
+
 public interface IModelProfilesClient
 {
     Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken);
@@ -40,6 +101,8 @@ public interface IModelProfilesClient
     Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileUsagesAsync(profileName, cancellationToken);
     Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(string profileName, CancellationToken cancellationToken);
     Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileResolutionAsync(profileName, cancellationToken);
+    Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken);
 }
 
 public interface IAgentsModelClient
@@ -201,6 +264,35 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
     public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<ModelProfileResolutionResponse>(httpClient, ProfilePath(@namespace, profileName, "resolution"), cancellationToken);
 
+    public async Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(
+        ResourceNamespace @namespace,
+        string profileName,
+        string targetVersion,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            ProfilePath(@namespace, profileName, "option-migrations/preview"),
+            new PreviewModelProfileOptionMigrationRequest(targetVersion),
+            cancellationToken);
+        return await ReadSnapshotAsync<ModelProfileOptionMigrationPreviewResponse>(response, "option migration preview", cancellationToken);
+    }
+
+    public async Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(
+        ResourceNamespace @namespace,
+        string profileName,
+        string targetVersion,
+        string etag,
+        CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, ProfilePath(@namespace, profileName, "option-migrations/apply"))
+        {
+            Content = JsonContent.Create(new PreviewModelProfileOptionMigrationRequest(targetVersion))
+        };
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        return await ReadResourceAsync(response, cancellationToken);
+    }
+
     private static string ProfilePath(ResourceNamespace @namespace, string profileName, string? child = null)
     {
         var path = $"api/modelprofiles/{Uri.EscapeDataString(profileName)}";
@@ -222,6 +314,17 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
         if (string.IsNullOrWhiteSpace(etag))
             throw new AgentstrationApiException("Agentstration API did not return the model profile ETag.", Guid.NewGuid().ToString("N"));
         return new ResourceSnapshot<ModelProfileResource>(value, etag);
+    }
+
+    private static async Task<ResourceSnapshot<T>> ReadSnapshotAsync<T>(HttpResponseMessage response, string resourceName, CancellationToken cancellationToken)
+    {
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken)
+            ?? throw new AgentstrationApiException($"Agentstration API returned an empty {resourceName}.", Guid.NewGuid().ToString("N"));
+        var etag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(etag))
+            throw new AgentstrationApiException($"Agentstration API did not return the {resourceName} ETag.", Guid.NewGuid().ToString("N"));
+        return new(value, etag);
     }
 }
 

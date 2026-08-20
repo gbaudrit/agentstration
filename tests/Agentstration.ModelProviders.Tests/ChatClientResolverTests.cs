@@ -37,7 +37,7 @@ public sealed class ChatClientResolverTests
         var metadata = resolved.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
         Assert.IsNotNull(metadata);
         Assert.AreEqual("reasoning-default", metadata.ModelProfile);
-        Assert.AreEqual("ollama", metadata.ProviderType);
+        Assert.AreEqual("ollama", metadata.ContributionId);
         Assert.AreEqual("qwen3:1.7b", metadata.ModelName);
         Assert.AreEqual(0.2, metadata.Generation?.Temperature);
         Assert.AreEqual(1000, metadata.Generation?.MaxOutputTokens);
@@ -156,7 +156,9 @@ public sealed class ChatClientResolverTests
         {
             Uid = Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Name = "ollama-local",
-            ProviderType = "ollama",
+            AdapterType = "ollama",
+            ContributionId = "ollama",
+            Extension = new ResourceReference("ollama-extension"),
             Endpoint = new Uri("http://localhost:11434/")
         };
 

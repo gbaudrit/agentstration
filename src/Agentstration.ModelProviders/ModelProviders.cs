@@ -11,10 +11,14 @@ public sealed record ModelProviderConfiguration
     public required Guid Uid { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public required string Name { get; init; }
-    public required string ProviderType { get; init; }
+    public required string AdapterType { get; init; }
+    public required string ContributionId { get; init; }
+    public required ResourceReference Extension { get; init; }
     public required Uri Endpoint { get; init; }
+    public bool ExtensionEnabled { get; init; } = true;
+    public string? ExpectedExtensionId { get; init; }
     public string? DisplayName { get; init; }
-    public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
+    public ExtensionRegistrationSource RegistrationSource { get; init; } = ExtensionRegistrationSource.Manual;
     public string? EndpointDisplayName { get; init; }
     public ResourceReference? Credential { get; init; }
 }
@@ -24,7 +28,7 @@ public sealed record ModelDeploymentConfiguration
     public required string Name { get; init; }
     public required string ProviderName { get; init; }
     public required string ModelName { get; init; }
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
 }
 
 public sealed record ModelProfileConfiguration
@@ -34,19 +38,19 @@ public sealed record ModelProfileConfiguration
     public ModelGenerationOptions Generation { get; init; } = new();
     public ModelReasoningOptions Reasoning { get; init; } = new();
     public ModelOutputOptions Output { get; init; } = new();
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
 }
 
 public sealed record ModelChatClientMetadata(
     string ModelProfile,
     string Deployment,
-    string ProviderType,
+    string ContributionId,
     string ProviderName,
     string ModelName,
     ModelGenerationOptions? Generation = null,
     ModelReasoningOptions? Reasoning = null,
     ModelOutputOptions? Output = null,
-    IReadOnlyDictionary<string, JsonElement>? ProviderOptions = null,
+    IReadOnlyDictionary<string, VersionedExtensionOptions>? ProviderOptions = null,
     AgentRuntimeCapabilities? ProviderCapabilities = null,
     AgentRuntimeCapabilities? ModelCapabilities = null,
     AgentRuntimeCapabilities? AdapterCapabilities = null);
