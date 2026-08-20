@@ -13,6 +13,7 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     internal DbSet<TenantRow> Tenants => Set<TenantRow>();
     internal DbSet<WorkspaceRow> Workspaces => Set<WorkspaceRow>();
     internal DbSet<PrincipalRow> Principals => Set<PrincipalRow>();
+    internal DbSet<PrincipalPreferencesRow> PrincipalPreferences => Set<PrincipalPreferencesRow>();
     internal DbSet<ExternalIdentityRow> ExternalIdentities => Set<ExternalIdentityRow>();
     internal DbSet<LocalIdentityRow> LocalIdentities => Set<LocalIdentityRow>();
     internal DbSet<PlatformAdministratorRow> PlatformAdministrators => Set<PlatformAdministratorRow>();
@@ -66,6 +67,16 @@ public sealed class SqliteControlPlaneStore(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS PrincipalPreferences (
+                PrincipalId TEXT NOT NULL CONSTRAINT PK_PrincipalPreferences PRIMARY KEY,
+                PreferencesJson TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL,
+                CONSTRAINT FK_PrincipalPreferences_Users_PrincipalId FOREIGN KEY (PrincipalId) REFERENCES Users (Id) ON DELETE CASCADE
+            )
+            """,
+            cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_AgentRevisionLookup ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.agentUid'), json_extract(Payload, '$.agentVersion'))",
             cancellationToken);

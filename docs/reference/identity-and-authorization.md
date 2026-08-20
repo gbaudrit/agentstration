@@ -14,6 +14,7 @@ Agentstration now provides:
 - local accounts backed by ASP.NET Core Identity;
 - interactive OIDC authentication and JWT Bearer validation through standard ASP.NET Core handlers;
 - a provider-neutral Agentstration `Principal` resolved from every authenticated caller;
+- Principal-scoped profile preferences shared by Console and Workplace;
 - exact external identity mapping by `(Issuer, Subject)`;
 - canonical Tenant and Workspace memberships;
 - built-in Workspace roles and contextual permissions;
@@ -55,7 +56,7 @@ Authentication proves control of an account. Identity mapping converts that auth
 
 | Concern | Owner |
 | --- | --- |
-| `Principal`, `ExternalIdentity`, `LocalIdentity`, Tenant, Workspace, memberships, role assignments, Platform administrator grant | `Agentstration.Management.Abstractions` |
+| `Principal`, `PrincipalPreferences`, `ExternalIdentity`, `LocalIdentity`, Tenant, Workspace, memberships, role assignments, Platform administrator grant | `Agentstration.Management.Abstractions` |
 | Identity and authorization use cases and invariant enforcement | `Agentstration.Management.Core` |
 | Management records, external/local links, memberships, roles, grants, and security audit persistence | `Agentstration.Management.Storage.Sqlite` |
 | Local credentials, password hashing, lockout, security stamps, and Identity lifecycle tokens | `Agentstration.Security.AspNetCoreIdentity` |
@@ -75,6 +76,11 @@ Principal
 ├── Status             Active | Disabled
 └── CreatedAt
 
+PrincipalPreferences
+├── PrincipalId
+├── Theme              System | Light | Dark
+└── UpdatedAt
+
 LocalIdentity
 ├── AccountId          ASP.NET Core Identity user identifier
 ├── PrincipalId
@@ -89,6 +95,8 @@ ExternalIdentity
 ```
 
 The pair `(Issuer, Subject)` is unique for the entire instance. Email and display name never participate in identity resolution. The same subject from two different issuers represents two different external identities. A Principal may have one local link and multiple external links.
+
+`PrincipalPreferences` contains presentation choices only and has no credential or authorization semantics. It is global to the Principal rather than scoped to a Workspace, so the same theme follows the authenticated user between Console and Workplace. The API always derives `PrincipalId` from `PrincipalResolutionMiddleware`; it never accepts a target Principal identifier from the client.
 
 `PrincipalKind.Workload` is reserved for non-human callers. The delivered external interactive-link workflow accepts only `Human` Principals; workload authentication remains future work.
 
@@ -280,6 +288,13 @@ There is no auto-linking by email, IdP tenant-to-Workspace mapping, provider use
 | `DELETE /api/identity/workspaces/{workspaceId}/memberships/{principalId}` | AuthorizationAdmin | remove contextual membership |
 | `GET /api/identity/members` | AuthorizationReader | list organization members |
 
+### Current-user profile preferences
+
+| Method and route | Policy | Purpose |
+| --- | --- | --- |
+| `GET /api/identity/preferences` | Authenticated resolved Principal | read the caller's preferences, defaulting to `System` |
+| `PUT /api/identity/preferences` | Authenticated resolved Principal | replace the caller's typed preferences |
+
 API cookie handlers return 401/403 instead of redirecting. Independently deployed API clients should use audience-bound Bearer tokens.
 
 ## Console and Razor UI
@@ -295,10 +310,12 @@ The delivered UI includes:
 - `/settings/organization/members/{principalId}`: Principal details, current Workspace role, membership removal, Platform administrator grant/revoke, and external identity link/unlink;
 - `/settings/organization/access`: effective assignments;
 - `/settings/organization/security-audit`: PlatformAdmin-only audit history.
+- the Console and Workplace shell theme controls, backed by the same Principal preference;
+- `/settings/profile`, which displays the current Principal, offers explicit `System`, `Light`, and `Dark` choices with immediate persistence, and links to the separate account-security surface.
 
 Razor components invoke the same application services as HTTP endpoints. They do not reproduce authorization rules. The latest external-link workflow is deliberately manual: administrators enter the provider's exact issuer and subject.
 
-Not yet delivered in the UI: external-only invitation/provisioning, a friendly unresolved-OIDC enrollment page, self-service linking, profile editing, account deletion/anonymization, password recovery, email confirmation, MFA/passkeys, device/session inventory, and graphical OIDC provider configuration.
+Not yet delivered in the UI: preferences beyond the theme, external-only invitation/provisioning, a friendly unresolved-OIDC enrollment page, self-service linking, profile editing, account deletion/anonymization, password recovery, email confirmation, MFA/passkeys, device/session inventory, and graphical OIDC provider configuration.
 
 ## Trusted Console session propagation
 
@@ -320,12 +337,12 @@ Remote or independently deployed APIs must leave this setting disabled and use B
 | Data | Default store |
 | --- | --- |
 | ASP.NET Core Identity accounts, credentials, lockout, tokens | `.agentstration/identity.db` |
-| Principals, links, Tenants, Workspaces, memberships, roles, grants, audit | `.agentstration/control-plane.db` |
+| Principals, preferences, links, Tenants, Workspaces, memberships, roles, grants, audit | `.agentstration/control-plane.db` |
 | Data Protection key ring | `.agentstration/data-protection-keys/` |
 
 `ConnectionStrings:Identity` overrides the Identity database. `Agentstration:Authentication:DataProtectionKeysPath` overrides the key directory.
 
-The Identity schema is managed by EF Core migration `20260816100707_InitialIdentity`. The startup initializer verifies every expected table before baselining a legacy database created by the earlier `EnsureCreated` implementation; partial legacy schemas fail startup. Management identity tables are created and evolved inside the existing Control Plane SQLite boundary. The Platform administrator and external-link iterations reuse existing tables and require no new migration.
+The Identity schema is managed by EF Core migration `20260816100707_InitialIdentity`. The startup initializer verifies every expected table before baselining a legacy database created by the earlier `EnsureCreated` implementation; partial legacy schemas fail startup. Management identity tables are created and evolved inside the existing Control Plane SQLite boundary. `PrincipalPreferences` is added idempotently at Control Plane initialization so existing local databases gain the table without a reseed; its JSON payload permits additional typed preferences without a schema change.
 
 Back up `identity.db`, `control-plane.db`, and the Data Protection key ring together. Restoring the Identity database without the matching key ring invalidates cookies and lifecycle tokens. The key ring is sensitive instance state and must be protected from unauthorized reads or writes.
 
@@ -371,6 +388,7 @@ The offline MSTest suite covers:
 - external-link validation, uniqueness, idempotence, resolution, audit, and concurrent final-method protection;
 - Identity migration, legacy baseline verification, partial-schema refusal, and durable restart behavior;
 - Data Protection persistence and trusted Console-cookie forwarding boundaries;
+- per-Principal preference isolation, authenticated preference API validation, and UI theme persistence;
 - durable security audit restart behavior and sensitive-value exclusion;
 - architecture rules preventing provider IAM SDKs, credential fields, or ASP.NET Identity dependencies in neutral layers.
 
@@ -381,7 +399,7 @@ dotnet build Agentstration.slnx --configuration Release --no-restore
 dotnet test Agentstration.slnx --configuration Release --no-build
 
 Build: 0 warnings, 0 errors
-Tests: 281 passed, 0 failed, 0 skipped
+Tests: 414 passed, 0 failed, 1 optional integration test skipped
 ```
 
 Tests require no Internet connection, external IdP, live model, or cloud service.

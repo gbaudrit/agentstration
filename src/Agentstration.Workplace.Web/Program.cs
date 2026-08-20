@@ -1,3 +1,5 @@
+using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Web;
 using Agentstration.Workplace.Web.Components;
@@ -12,6 +14,7 @@ var hubValue = builder.Configuration["Agentstration:WorkplaceHubUrl"];
 hubValue = string.IsNullOrWhiteSpace(hubValue) ? new Uri(apiUrl, "hubs/workplace").ToString() : hubValue;
 if (!Uri.TryCreate(hubValue, UriKind.Absolute, out var hubUrl) || hubUrl.Scheme is not ("http" or "https")) throw new InvalidOperationException("Agentstration:WorkplaceHubUrl must be an absolute HTTP(S) URL.");
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddAgentstrationWebComponents();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient(provider => new WorkplaceApiSessionHandler(
     provider.GetRequiredService<IHttpContextAccessor>(),
@@ -19,6 +22,9 @@ builder.Services.AddTransient(provider => new WorkplaceApiSessionHandler(
     ".Agentstration.Identity.Application",
     "agentstration.workspace"));
 builder.Services.AddAgentstrationWorkplaceClient(apiUrl, hubUrl)
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
+    .AddHttpMessageHandler<WorkplaceApiSessionHandler>();
+builder.Services.AddHttpClient<IUserPreferencesClient, HttpUserPreferencesClient>(client => client.BaseAddress = apiUrl)
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
     .AddHttpMessageHandler<WorkplaceApiSessionHandler>();
 builder.Services.AddProblemDetails(); builder.Services.AddHealthChecks();
