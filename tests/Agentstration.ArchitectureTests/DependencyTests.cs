@@ -121,6 +121,7 @@ public sealed class DependencyTests
         Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || name.Contains("Agentstration.Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Aep", StringComparison.Ordinal)
             || name.Contains("Agentstration.Web", StringComparison.Ordinal)
             || name.Contains("AspNetCore", StringComparison.Ordinal)));
     }
@@ -143,6 +144,7 @@ public sealed class DependencyTests
         Assert.IsFalse(assemblies.SelectMany(value => value.GetReferencedAssemblies()).Any(reference =>
             reference.Name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || reference.Name.Contains("Microsoft.Extensions.AI", StringComparison.Ordinal)
+            || reference.Name.Contains("Agentstration.Memory", StringComparison.Ordinal)
             || reference.Name.Contains("Ollama", StringComparison.Ordinal)));
     }
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Agentstration.Memory;
 using Agentstration.Memory.Application;
 using Agentstration.Memory.Storage.Abstractions;
@@ -63,12 +64,18 @@ public sealed class MemoryContextTests
             clock.Advance(TimeSpan.FromMinutes(2));
             listed = await service.ListAsync(workspace, scope, 0, 10, default);
             CollectionAssert.AreEqual(new[] { first.Id }, listed.Select(value => value.Id).ToArray());
-            Assert.AreEqual(1, await service.PurgeExpiredAsync(100, default));
+            Assert.AreEqual(1, await service.PurgeExpiredAsync(workspace, 100, default));
             Assert.IsTrue(await service.DeleteAsync(workspace, first.Id, default));
             await service.WriteAsync(new(workspace, scope, "clear-1", [], MemorySourceKind.Manual, null, "test", principal), default);
             await service.WriteAsync(new(workspace, scope, "clear-2", [], MemorySourceKind.Manual, null, "test", principal), default);
             Assert.AreEqual(2, await service.ClearScopeAsync(workspace, scope, default));
             Assert.AreEqual(0, (await service.ListAsync(workspace, scope, 0, 10, default)).Count);
+            var audit = await service.ListAuditAsync(workspace, MemoryProviderReference.Local, 0, 100, default);
+            Assert.IsTrue(audit.Any(value => value.Operation == MemoryMutationOperation.Write && value.Outcome == MemoryMutationOutcome.Succeeded));
+            Assert.IsTrue(audit.Any(value => value.Operation == MemoryMutationOperation.ClearScope && value.Affected == 2));
+            var auditJson = JsonSerializer.Serialize(audit);
+            Assert.IsFalse(auditJson.Contains("clear-1", StringComparison.Ordinal));
+            Assert.IsFalse(auditJson.Contains("clear-2", StringComparison.Ordinal));
         }
         finally
         {
@@ -82,7 +89,7 @@ public sealed class MemoryContextTests
     {
         var clock = new MutableTimeProvider(FixedNow());
         var store = new InMemoryMemoryRecordStore();
-        var memories = new MemoryService(store, clock);
+        var memories = new MemoryService(new SingleMemoryRecordStoreResolver(store), clock);
         var workspace = new WorkspaceId(Guid.NewGuid());
         var principal = Guid.NewGuid();
         var agentId = Guid.NewGuid();
@@ -117,7 +124,7 @@ public sealed class MemoryContextTests
         var clock = new MutableTimeProvider(FixedNow());
         var store = new InMemoryMemoryRecordStore();
         var authorization = new AllowMemoryReadAuthorization();
-        var assembler = new AgentExecutionContextAssembler(new MemoryService(store, clock), authorization);
+        var assembler = new AgentExecutionContextAssembler(new MemoryService(new SingleMemoryRecordStoreResolver(store), clock), authorization);
         var workspace = new WorkspaceId(Guid.NewGuid());
 
         var agent = Agent(Guid.NewGuid(), null);
@@ -201,7 +208,7 @@ public sealed class MemoryContextTests
         public Task<int> ClearScopeAsync(WorkspaceId workspaceId, MemoryScope scope, CancellationToken cancellationToken) =>
             Task.FromResult(_records.RemoveAll(value => value.WorkspaceId == workspaceId && value.Scope == scope));
 
-        public Task<int> PurgeExpiredAsync(DateTimeOffset now, int take, CancellationToken cancellationToken)
+        public Task<int> PurgeExpiredAsync(WorkspaceId workspaceId, DateTimeOffset now, int take, CancellationToken cancellationToken)
         {
             var expired = _records.Where(value => value.ExpiresAt is not null && value.ExpiresAt <= now).OrderBy(value => value.ExpiresAt).Take(take).ToArray();
             foreach (var record in expired) _records.Remove(record);

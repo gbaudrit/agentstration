@@ -85,6 +85,23 @@ public sealed class ModelProfilePackResourceHandler(ModelProfileManagementServic
     private static ManagedPackResource Managed(PackResourceDocument resource, ResourceNamespace @namespace, string token) => new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = token };
 }
 
+public sealed class MemoryProfilePackResourceHandler(MemoryProfileManagementService service) : IPackResourceHandler
+{
+    public string Kind => ResourceKinds.MemoryProfile;
+    public int InstallOrder => 35;
+    public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) { _ = Parse(resource); return Task.CompletedTask; }
+    public async Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => await service.GetAsync(@namespace, name, cancellationToken) is not null;
+    public async Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, ResourceNamespace @namespace, string packVersion, CancellationToken cancellationToken)
+    {
+        var value = Parse(resource);
+        var stored = await service.CreateAsync(value with { Metadata = PackProvenance.Add(value.Metadata, pack, @namespace, packVersion) }, cancellationToken);
+        return new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = stored.ETag };
+    }
+    public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAsync(@namespace, name, cancellationToken))?.ETag;
+    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
+    private static MemoryProfileResource Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<MemoryProfileResource>(resource.Manifest.GetRawText());
+}
+
 public sealed class AgentPackResourceHandler(AgentManagementService service) : IPackResourceHandler
 {
     public string Kind => ResourceKinds.Agent;

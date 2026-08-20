@@ -17,17 +17,21 @@ public static class MemoryEndpoints
 {
     public static IEndpointRouteBuilder MapAgentstrationMemoryApi(this IEndpointRouteBuilder endpoints)
     {
-        var records = endpoints.MapGroup("/api/memory/records").RequireAuthorization(AgentstrationPolicies.Authenticated);
+        var records = endpoints.MapGroup("/api/memoryproviders/{providerName}/records").RequireAuthorization(AgentstrationPolicies.Authenticated);
         records.MapPost("/", WriteAsync).RequireAuthorization(AgentstrationPolicies.CanWriteMemory);
         records.MapGet("/", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadMemory);
         records.MapDelete("/{recordId:guid}", DeleteAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteMemory);
         records.MapDelete("/", ClearAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteMemory);
+        records.MapPost("/purge-expired", PurgeAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteMemory);
+        records.MapGet("/audit", AuditAsync).RequireAuthorization(AgentstrationPolicies.CanReadMemory);
         endpoints.MapPost("/api/runtime/runs/{runId}/memory-records", WriteFromRunAsync)
             .RequireAuthorization(AgentstrationPolicies.CanWriteMemory);
         return endpoints;
     }
 
     private static Task<IResult> WriteAsync(
+        string providerName,
+        string? resourceNamespace,
         WriteMemoryRequest body,
         Agentstration.Memory.Application.MemoryService memories,
         IControlPlaneStore controlPlane,
@@ -38,8 +42,8 @@ public static class MemoryEndpoints
         var scope = await ResolveScopeAsync(body.Scope, controlPlane, cancellationToken);
         var value = await memories.WriteAsync(new WriteMemoryCommand(
             new WorkspaceId(current.WorkspaceId), scope, body.Content, body.Tags ?? [], MemorySourceKind.Manual,
-            null, body.Reason, current.PrincipalId, body.ExpiresAt), cancellationToken);
-        return Results.Created($"/api/memory/records/{value.Id}", value);
+            null, body.Reason, current.PrincipalId, body.ExpiresAt, Provider(providerName, resourceNamespace)), cancellationToken);
+        return Results.Created($"/api/memoryproviders/{Uri.EscapeDataString(providerName)}/records/{value.Id}", value);
     });
 
     private static Task<IResult> WriteFromRunAsync(
@@ -49,19 +53,23 @@ public static class MemoryEndpoints
         RuntimeRunService runs,
         IRuntimeAgentResolver agents,
         ICurrentRequestContext requestContext,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
     {
         var current = requestContext.Current;
         var workspaceId = new WorkspaceId(current.WorkspaceId);
         var run = await runs.GetAsync(workspaceId, runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);
         var agent = await agents.ResolveAsync(run.Value.Properties.Agent, cancellationToken);
+        var configured = agent.Definition.Memory ?? throw new MemoryValidationException("memory_not_configured", "The Run Agent has no Memory profile.");
+        var expiresAt = body.ExpiresAt ?? (configured.DefaultTimeToLive is { } ttl ? timeProvider.GetUtcNow().Add(ttl) : null);
         var value = await memories.WriteAsync(new WriteMemoryCommand(
             workspaceId, MemoryScope.ForAgent(agent.Definition.AgentId), body.Content, body.Tags ?? [], MemorySourceKind.RuntimeRun,
-            runId, body.Reason, current.PrincipalId, body.ExpiresAt), cancellationToken);
-        return Results.Created($"/api/memory/records/{value.Id}", value);
+            runId, body.Reason, current.PrincipalId, expiresAt, new(configured.ProviderName, configured.Namespace)), cancellationToken);
+        return Results.Created($"/api/memoryproviders/{Uri.EscapeDataString(configured.ProviderName)}/records/{value.Id}", value);
     });
 
     private static Task<IResult> ListAsync(
+        string providerName, string? resourceNamespace,
         string? scopeKind, string? scopeName, string? scopeNamespace, int? skip, int? top,
         Agentstration.Memory.Application.MemoryService memories,
         IControlPlaneStore controlPlane,
@@ -71,24 +79,30 @@ public static class MemoryEndpoints
         var actualSkip = Math.Max(0, skip ?? 0);
         var actualTop = Math.Clamp(top ?? 50, 1, MemoryLimits.MaximumAdministrationPageSize);
         var scope = scopeKind is null ? null : await ResolveScopeAsync(new(scopeKind, scopeName ?? string.Empty, scopeNamespace), controlPlane, cancellationToken);
-        var values = await memories.ListAsync(new WorkspaceId(requestContext.Current.WorkspaceId), scope, actualSkip, actualTop, cancellationToken);
-        var next = values.Count == actualTop ? BuildNextLink(scopeKind, scopeName, scopeNamespace, actualSkip + actualTop, actualTop) : null;
+        var values = await memories.ListAsync(new WorkspaceId(requestContext.Current.WorkspaceId), scope, actualSkip, actualTop, cancellationToken, Provider(providerName, resourceNamespace));
+        var next = values.Count == actualTop ? BuildNextLink(providerName, resourceNamespace, scopeKind, scopeName, scopeNamespace, actualSkip + actualTop, actualTop) : null;
         return Results.Ok(new MemoryRecordPage(values, next));
     });
 
     private static Task<IResult> DeleteAsync(
-        Guid recordId, Agentstration.Memory.Application.MemoryService memories, ICurrentRequestContext requestContext, CancellationToken cancellationToken) =>
-        ExecuteAsync(async () => await memories.DeleteAsync(new WorkspaceId(requestContext.Current.WorkspaceId), new MemoryRecordId(recordId), cancellationToken)
+        string providerName, string? resourceNamespace, Guid recordId, Agentstration.Memory.Application.MemoryService memories, ICurrentRequestContext requestContext, CancellationToken cancellationToken) =>
+        ExecuteAsync(async () => await memories.DeleteAsync(new WorkspaceId(requestContext.Current.WorkspaceId), new MemoryRecordId(recordId), cancellationToken, Provider(providerName, resourceNamespace), requestContext.Current.PrincipalId)
             ? Results.NoContent() : Results.NotFound());
 
     private static Task<IResult> ClearAsync(
-        string scopeKind, string scopeName, string? scopeNamespace,
+        string providerName, string? resourceNamespace, string scopeKind, string scopeName, string? scopeNamespace,
         Agentstration.Memory.Application.MemoryService memories, IControlPlaneStore controlPlane, ICurrentRequestContext requestContext,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
     {
         var scope = await ResolveScopeAsync(new(scopeKind, scopeName, scopeNamespace), controlPlane, cancellationToken);
-        return Results.Ok(new { deleted = await memories.ClearScopeAsync(new WorkspaceId(requestContext.Current.WorkspaceId), scope, cancellationToken) });
+        return Results.Ok(new { deleted = await memories.ClearScopeAsync(new WorkspaceId(requestContext.Current.WorkspaceId), scope, cancellationToken, Provider(providerName, resourceNamespace), requestContext.Current.PrincipalId) });
     });
+
+    private static Task<IResult> PurgeAsync(string providerName, string? resourceNamespace, int? top, MemoryService memories, ICurrentRequestContext requestContext, CancellationToken cancellationToken) =>
+        ExecuteAsync(async () => Results.Ok(new { deleted = await memories.PurgeExpiredAsync(new(requestContext.Current.WorkspaceId), top ?? 100, cancellationToken, Provider(providerName, resourceNamespace), requestContext.Current.PrincipalId) }));
+
+    private static Task<IResult> AuditAsync(string providerName, string? resourceNamespace, int? skip, int? top, MemoryService memories, ICurrentRequestContext requestContext, CancellationToken cancellationToken) =>
+        ExecuteAsync(async () => Results.Ok(new { value = await memories.ListAuditAsync(new(requestContext.Current.WorkspaceId), Provider(providerName, resourceNamespace), skip ?? 0, top ?? 50, cancellationToken) }));
 
     private static async Task<MemoryScope> ResolveScopeAsync(MemoryScopeRequest request, IControlPlaneStore controlPlane, CancellationToken cancellationToken)
     {
@@ -116,9 +130,12 @@ public static class MemoryEndpoints
         catch (ArgumentException exception) { return Results.Problem(statusCode: 400, title: "validation_failed", detail: exception.Message); }
     }
 
-    private static string BuildNextLink(string? scopeKind, string? scopeName, string? scopeNamespace, int skip, int top)
+    private static MemoryProviderReference Provider(string name, string? @namespace) => new(name, ResourceNamespace.Parse(@namespace).Value);
+
+    private static string BuildNextLink(string providerName, string? resourceNamespace, string? scopeKind, string? scopeName, string? scopeNamespace, int skip, int top)
     {
-        var link = $"/api/memory/records?skip={skip}&top={top}";
+        var link = $"/api/memoryproviders/{Uri.EscapeDataString(providerName)}/records?skip={skip}&top={top}";
+        if (resourceNamespace is not null) link += $"&resourceNamespace={Uri.EscapeDataString(resourceNamespace)}";
         if (scopeKind is null) return link;
         link += $"&scopeKind={Uri.EscapeDataString(scopeKind)}&scopeName={Uri.EscapeDataString(scopeName ?? string.Empty)}";
         return scopeNamespace is null ? link : $"{link}&scopeNamespace={Uri.EscapeDataString(scopeNamespace)}";

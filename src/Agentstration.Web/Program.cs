@@ -90,6 +90,7 @@ builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
 builder.Services.AddAgentstrationModelManagement();
+builder.Services.AddAgentstrationMemoryManagement();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddRazorPages();
@@ -182,6 +183,7 @@ app.MapAgentstrationWorkOperationsApi();
 app.MapAgentstrationFlowApi();
 app.MapAgentstrationRuntimeApi();
 app.MapAgentstrationMemoryApi();
+app.MapAgentstrationMemoryManagementApi();
 app.MapAgentstrationToolGovernanceAuditApi();
 app.MapHub<FlowRunHub>("/hubs/flow-runs").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
 app.MapHub<WorkplaceHub>("/hubs/workplace");
@@ -202,7 +204,6 @@ await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetim
 await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<MemoryService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-await app.Services.GetRequiredService<MemoryService>().PurgeExpiredAsync(1_000, app.Lifetime.ApplicationStopping);
 if (app.Services.GetRequiredService<ICurrentRequestContext>().IsInitialized)
 {
     await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);

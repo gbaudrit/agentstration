@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
 
@@ -12,8 +13,41 @@ public static class ManagementDemoData
         var providers = services.GetRequiredService<ModelProviderManagementService>();
         var profiles = services.GetRequiredService<ModelProfileManagementService>();
         var runtimes = services.GetRequiredService<RuntimeProfileManagementService>();
+        var memoryProviders = services.GetRequiredService<MemoryProviderManagementService>();
+        var memoryProfiles = services.GetRequiredService<MemoryProfileManagementService>();
         var store = services.GetRequiredService<IControlPlaneStore>();
         var configuration = services.GetRequiredService<IConfiguration>();
+
+        if (await memoryProviders.GetAsync(ResourceNamespace.Default, "local-memory", cancellationToken) is null)
+        {
+            await memoryProviders.CreateAsync(new MemoryProviderResource
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.MemoryProvider,
+                Metadata = new ResourceMetadata { Name = "local-memory", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
+                Definition = new MemoryProviderProperties
+                {
+                    DisplayName = "Local SQLite Memory",
+                    IntegrationKind = MemoryProviderIntegrationKind.Builtin,
+                    Builtin = new()
+                }
+            }, cancellationToken);
+        }
+
+        if (await memoryProfiles.GetAsync(ResourceNamespace.Default, "default-memory", cancellationToken) is null)
+        {
+            await memoryProfiles.CreateAsync(new MemoryProfileResource
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.MemoryProfile,
+                Metadata = new ResourceMetadata { Name = "default-memory", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
+                Definition = new MemoryProfileProperties
+                {
+                    DisplayName = "Default local Memory",
+                    Provider = new ResourceReference("local-memory")
+                }
+            }, cancellationToken);
+        }
 
         if (await providers.GetAsync("ollama-local", cancellationToken) is null)
         {

@@ -79,8 +79,8 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
     private static AgentMemoryConfiguration? ValidateMemory(AgentMemoryConfiguration? memory)
     {
         if (memory is null) return null;
-        if (memory.MaximumRecords is < 1 or > 20)
-            throw new AgentDefinitionValidationException("memory_limit_invalid", "Agent Memory maximumRecords must be between 1 and 20.");
+        if (string.IsNullOrWhiteSpace(memory.Profile.Name))
+            throw new AgentDefinitionValidationException("memory_profile_required", "Agent Memory requires a profile reference.");
         if (memory.SharedScopes.Count > 16)
             throw new AgentDefinitionValidationException("memory_shared_scopes_too_many", "An Agent cannot read more than 16 shared Memory scopes.");
         var scopes = memory.SharedScopes.Select(value => value.Trim()).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();

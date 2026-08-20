@@ -22,6 +22,8 @@ public static class ResourceKinds
     public const string PackConfiguration = "PackConfiguration";
     public const string ModelProvider = "ModelProvider";
     public const string ModelProfile = "ModelProfile";
+    public const string MemoryProvider = "MemoryProvider";
+    public const string MemoryProfile = "MemoryProfile";
     public const string RuntimeProfile = "RuntimeProfile";
     public const string Secret = "Secret";
     public const string Vault = "Vault";
@@ -84,6 +86,8 @@ public enum PackBindingTargetKind
 {
     [JsonStringEnumMemberName("modelProfile")] ModelProfile,
     [JsonStringEnumMemberName("modelProvider")] ModelProvider,
+    [JsonStringEnumMemberName("memoryProfile")] MemoryProfile,
+    [JsonStringEnumMemberName("memoryProvider")] MemoryProvider,
     [JsonStringEnumMemberName("secret")] Secret
 }
 
@@ -451,9 +455,62 @@ public record AgentProperties
 
 public sealed record AgentMemoryConfiguration
 {
+    public ResourceReference Profile { get; init; } = new("default-memory");
     public bool ReadOwnMemory { get; init; } = true;
     public IReadOnlyList<string> SharedScopes { get; init; } = [];
+}
+
+public enum MemoryProviderIntegrationKind { Builtin, Aep }
+
+public sealed record BuiltinMemoryProviderConfiguration
+{
+    public string Adapter { get; init; } = "sqlite";
+}
+
+public sealed record AepMemoryProviderConfiguration
+{
+    public required string ExtensionId { get; init; }
+    public required string ProviderId { get; init; }
+}
+
+public sealed record MemoryProviderProperties
+{
+    public required string DisplayName { get; init; }
+    public MemoryProviderIntegrationKind IntegrationKind { get; init; }
+    public BuiltinMemoryProviderConfiguration? Builtin { get; init; }
+    public AepMemoryProviderConfiguration? Aep { get; init; }
+}
+
+public sealed record MemoryProviderResource : Resource
+{
+    public MemoryProviderProperties Definition { get; init; } = null!;
+}
+
+public enum MemoryRetrievalStrategy { Recent }
+
+public sealed record MemoryRetrievalConfiguration
+{
+    public MemoryRetrievalStrategy Strategy { get; init; } = MemoryRetrievalStrategy.Recent;
     public int MaximumRecords { get; init; } = 10;
+}
+
+public sealed record MemoryRetentionConfiguration
+{
+    public TimeSpan? DefaultTimeToLive { get; init; }
+}
+
+public sealed record MemoryProfileProperties
+{
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required ResourceReference Provider { get; init; }
+    public MemoryRetrievalConfiguration Retrieval { get; init; } = new();
+    public MemoryRetentionConfiguration Retention { get; init; } = new();
+}
+
+public sealed record MemoryProfileResource : Resource
+{
+    public MemoryProfileProperties Definition { get; init; } = null!;
 }
 
 public sealed record AgentResource : Resource

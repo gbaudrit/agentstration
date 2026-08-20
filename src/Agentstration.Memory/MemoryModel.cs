@@ -2,6 +2,30 @@ using Agentstration.Resources;
 
 namespace Agentstration.Memory;
 
+public sealed record MemoryProviderReference(string Name, string Namespace = "default")
+{
+    public static MemoryProviderReference Local { get; } = new("local-memory");
+}
+
+public enum MemoryMutationOperation { Write, Delete, ClearScope, PurgeExpired }
+public enum MemoryMutationOutcome { Requested, Succeeded, Failed }
+
+public sealed record MemoryMutationAuditRecord(
+    Guid Id,
+    Guid OperationId,
+    WorkspaceId WorkspaceId,
+    MemoryProviderReference Provider,
+    MemoryMutationOperation Operation,
+    MemoryMutationOutcome Outcome,
+    DateTimeOffset Timestamp,
+    Guid? PrincipalId = null,
+    MemoryScope? Scope = null,
+    MemoryRecordId? RecordId = null,
+    int? Affected = null,
+    MemorySourceKind? SourceKind = null,
+    string? SourceId = null,
+    string? ErrorCode = null);
+
 public readonly record struct MemoryRecordId(Guid Value)
 {
     public static MemoryRecordId New() => new(Guid.NewGuid());

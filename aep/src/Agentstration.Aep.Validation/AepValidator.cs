@@ -38,6 +38,13 @@ public sealed class AepValidator : IAepValidator
             if (!capability.Key.StartsWith("aep.", StringComparison.Ordinal)) issues.Add(new("AEP020", $"Capability '{capability.Key}' is outside the AEP namespace.", AepValidationSeverity.Warning, $"capabilities.{capability.Key}"));
             if (string.IsNullOrWhiteSpace(capability.Value.Version)) issues.Add(new("AEP021", $"Capability '{capability.Key}' has no version.", AepValidationSeverity.Error, $"capabilities.{capability.Key}.version"));
         }
+        var memoryProviderIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var provider in manifest.Contributions.MemoryProviders ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(provider.Id)) issues.Add(new("AEP030", "Memory provider id is required.", AepValidationSeverity.Error, "contributions.memoryProviders"));
+            else if (!memoryProviderIds.Add(provider.Id)) issues.Add(new("AEP031", $"Memory provider '{provider.Id}' is duplicated.", AepValidationSeverity.Error, "contributions.memoryProviders"));
+            if (string.IsNullOrWhiteSpace(provider.DisplayName)) issues.Add(new("AEP032", $"Memory provider '{provider.Id}' displayName is required.", AepValidationSeverity.Error, "contributions.memoryProviders"));
+        }
         foreach (var descriptorIssue in AepDescriptorValidator.Validate(manifest)) issues.Add(new("AEP100", descriptorIssue, AepValidationSeverity.Error, "contributions.tools"));
         try
         {

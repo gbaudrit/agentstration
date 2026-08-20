@@ -34,10 +34,23 @@ public sealed class PackTests
         var modelProfile = catalog.Single(item => item.Resource.Kind == ResourceKinds.ModelProfile && item.Resource.Name == "reasoning-default");
         var modelProvider = catalog.Single(item => item.Resource.Kind == ResourceKinds.ModelProvider && item.Resource.Name == "ollama-local");
         var runtimeProfile = catalog.Single(item => item.Resource.Kind == ResourceKinds.RuntimeProfile && item.Resource.Name == "maf-default");
+        var memoryProfile = catalog.Single(item => item.Resource.Kind == ResourceKinds.MemoryProfile && item.Resource.Name == "default-memory");
+        var memoryProvider = catalog.Single(item => item.Resource.Kind == ResourceKinds.MemoryProvider && item.Resource.Name == "local-memory");
         Assert.AreEqual(PackCompositionAvailability.Selectable, agent.Availability);
         Assert.AreEqual(PackCompositionAvailability.Selectable, modelProfile.Availability);
         Assert.AreEqual(PackCompositionAvailability.Selectable, modelProvider.Availability);
         Assert.AreEqual(PackCompositionAvailability.Selectable, runtimeProfile.Availability);
+        Assert.AreEqual(PackCompositionAvailability.Selectable, memoryProfile.Availability);
+        Assert.AreEqual(PackCompositionAvailability.BindingOnly, memoryProvider.Availability);
+
+        var memoryPreviewResponse = await client.PostAsJsonAsync(
+            "/api/pack-projects/composer/preview",
+            new PreviewPackCompositionCommand([memoryProfile.Resource]));
+        memoryPreviewResponse.EnsureSuccessStatusCode();
+        var memoryPreview = await memoryPreviewResponse.Content.ReadFromJsonAsync<PackCompositionPreview>();
+        Assert.IsNotNull(memoryPreview);
+        Assert.AreEqual(ResourceKinds.MemoryProfile, memoryPreview.Resources.Single().Resource.Kind);
+        Assert.AreEqual(PackBindingTargetKind.MemoryProvider, memoryPreview.Bindings.Single().TargetKind);
 
         var previewResponse = await client.PostAsJsonAsync(
             "/api/pack-projects/composer/preview",

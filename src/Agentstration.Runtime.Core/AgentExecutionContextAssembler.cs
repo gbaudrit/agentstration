@@ -45,7 +45,11 @@ public sealed class AgentExecutionContextAssembler(
             if (configured.ReadOwnMemory) scopes.Add(MemoryScope.ForAgent(request.Agent.AgentId));
             scopes.AddRange(configured.SharedScopes.Select(MemoryScope.Shared));
             if (scopes.Count > 0)
-                retrieved = await memories.RetrieveAsync(new(request.Scope.WorkspaceId, scopes, configured.MaximumRecords), cancellationToken);
+                retrieved = await memories.RetrieveAsync(new(
+                    request.Scope.WorkspaceId,
+                    scopes,
+                    configured.MaximumRecords,
+                    new MemoryProviderReference(configured.ProviderName, configured.Namespace)), cancellationToken);
             var rendered = Render(retrieved);
             if (rendered.Length > 0) messages.Add(new RuntimeRunMessage(RuntimeMessageRole.Developer, rendered));
         }

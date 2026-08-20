@@ -103,6 +103,31 @@ public sealed class AepVerticalTests
     }
 
     [TestMethod]
+    public async Task ServerAndClientSupportWorkspaceScopedMemoryStoreOperations()
+    {
+        await using var factory = new AepExtensionFactory();
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var descriptor = await client.DiscoverAsync();
+        var providers = await client.ListMemoryProvidersAsync();
+        var memory = client.CreateMemoryProvider("memory-test");
+        var workspace = Guid.NewGuid();
+        var otherWorkspace = Guid.NewGuid();
+        var record = new AepMemoryRecord(Guid.NewGuid(), workspace, new("Agent", "agent-1"), "cobalt", [], new("Manual", null, "test", Guid.NewGuid()), DateTimeOffset.UtcNow);
+
+        await memory.WriteAsync(record);
+        var values = await memory.ListAsync(new(workspace, record.Scope, DateTimeOffset.UtcNow, 0, 10));
+        var isolated = await memory.ListAsync(new(otherWorkspace, record.Scope, DateTimeOffset.UtcNow, 0, 10));
+        var deleted = await memory.DeleteAsync(new(workspace, record.Id));
+
+        Assert.IsTrue(descriptor.Capabilities.ContainsKey(AepCapabilityNames.MemoryProvider));
+        Assert.AreEqual("memory-test", providers.Single().Id);
+        Assert.AreEqual("cobalt", values.Single().Content);
+        Assert.IsEmpty(isolated);
+        Assert.IsTrue(deleted);
+    }
+
+    [TestMethod]
     public async Task ClientRejectsIncompatibleProtocol()
     {
         var descriptor = new AepManifest("2.0", new("x", "x", "1"), new Dictionary<string, AepCapabilityDescriptor>(), new([]));
@@ -200,7 +225,27 @@ public sealed class AepVerticalTests
         {
             services.RemoveAll<IAepModelProvider>();
             services.AddSingleton<IAepModelProvider, FakeProvider>();
+            services.AddSingleton<IAepMemoryProvider, FakeMemoryProvider>();
         });
+    }
+
+    private sealed class FakeMemoryProvider : IAepMemoryProvider
+    {
+        private readonly List<AepMemoryRecord> records = [];
+        public AepMemoryProviderDescriptor Descriptor { get; } = new("memory-test", "Memory test", new());
+        public Task WriteAsync(AepMemoryRecord record, CancellationToken cancellationToken) { records.Add(record); return Task.CompletedTask; }
+        public Task<AepMemoryRecord?> GetAsync(AepMemoryRecordRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(records.SingleOrDefault(value => value.WorkspaceId == request.WorkspaceId && value.Id == request.RecordId));
+        public Task<IReadOnlyList<AepMemoryRecord>> ListAsync(AepMemoryListRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<AepMemoryRecord>>(records.Where(value => value.WorkspaceId == request.WorkspaceId
+                && (request.Scope is null || value.Scope == request.Scope) && (value.ExpiresAt is null || value.ExpiresAt > request.Now))
+                .OrderByDescending(value => value.CreatedAt).Skip(request.Skip).Take(request.Take).ToArray());
+        public Task<bool> DeleteAsync(AepMemoryRecordRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(records.RemoveAll(value => value.WorkspaceId == request.WorkspaceId && value.Id == request.RecordId) == 1);
+        public Task<int> ClearScopeAsync(AepMemoryScopeRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(records.RemoveAll(value => value.WorkspaceId == request.WorkspaceId && value.Scope == request.Scope));
+        public Task<int> PurgeExpiredAsync(AepMemoryPurgeRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(records.RemoveAll(value => value.WorkspaceId == request.WorkspaceId && value.ExpiresAt <= request.Now));
     }
 
     private sealed class FakeProvider : IAepModelProvider

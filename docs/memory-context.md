@@ -101,8 +101,26 @@ Memory content remains untrusted input at execution time. Callers are responsibl
 
 Accumulated records are runtime/user data and are never Pack payloads. The optional Agent read configuration is portable desired state and may later participate in Pack validation/binding without exporting personal history.
 
-`MemoryRecord`, `IMemoryRecordStore`, `IMemoryRetriever`, and context assembly are separate contracts. A semantic, tagged, explicit-reference, or hybrid retriever can replace the deterministic V1 retriever without changing record ownership or leaking a provider type into the domain. External Memory providers and AEP changes remain out of scope until such a need is concrete.
+`MemoryRecord`, `IMemoryRecordStore`, `IMemoryRetriever`, and context assembly are separate contracts. A semantic, tagged, explicit-reference, or hybrid retriever can replace the deterministic V1 retriever without changing record ownership or leaking a provider type into the domain. ADR-0063 adds external store providers through AEP while deliberately keeping retrieval inside Agentstration.
+
+## Providers and profiles
+
+The next increment makes that external boundary concrete without changing record semantics:
+
+```text
+Agent revision
+    → MemoryProfile (recent retrieval, bound, retention default)
+        → MemoryProvider (configured store instance)
+            ├── builtin SQLite
+            └── AEP extension / providerId
+```
+
+`MemoryProvider` belongs to the Management Plane. `MemoryProfile` is portable desired-state configuration. Records remain Workspace-owned runtime/user data and are addressed through an explicit provider. AEP implements only the store contract; `IMemoryRetriever` and `AgentExecutionContextAssembler` remain Agentstration responsibilities.
+
+The AEP V1 capability supports exact-scope CRUD and expiry. It has no semantic retrieval, embeddings or provider-owned context assembly. The repository contains an offline fake provider test, not an Azure implementation.
+
+Mutation audit is local even for external stores. It records provider, scope, operation, outcome, principal and Run/source correlation but never Memory content, tags, prompts, secrets or Tool arguments/results.
 
 ## V1 limitations
 
-There is no vector database, embeddings, RAG/document ingestion, automatic extraction, compaction, archival, policy engine, Memory UI, Workplace transcript projection, dedicated Flow steps, Workspace-wide scope, or distributed/cloud store. Multi-agent MAF orchestration-specific context injection is deferred; Runtime Run and the current simple Work/Flow execution path use the common assembler.
+There is no vector database, embeddings, RAG/document ingestion, automatic extraction, compaction, archival, policy engine, Workplace transcript projection, dedicated Flow steps, Workspace-wide scope, or built-in distributed/cloud store. The Console surface is limited to administrative inspection, provider testing and explicit deletion; it is not a user-facing “what the Agent remembers” experience. Multi-agent MAF orchestration-specific context injection is deferred; Runtime Run and the current simple Work/Flow execution path use the common assembler.

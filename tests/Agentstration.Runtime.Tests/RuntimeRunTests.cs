@@ -557,6 +557,12 @@ public sealed class RuntimeRunTests
             await management.InitializeAsync(default);
             await store.InitializeAsync(default);
 
+            if (memoryEnabled)
+            {
+                await management.PutAsync(MemoryProvider(), null, true, default);
+                await management.PutAsync(MemoryProfile(), null, true, default);
+            }
+
             const string agentId = "sql-expert";
             const string revisionId = "sql-expert--000001";
             var agent = await management.PutAsync(Agent(agentId, memoryEnabled), null, true, default);
@@ -597,6 +603,33 @@ public sealed class RuntimeRunTests
                 Instructions = "Test",
                 ModelProfile = new ResourceReference("reasoning-default"),
                 Memory = memoryEnabled ? new AgentMemoryConfiguration() : null
+            }
+        };
+
+        private static MemoryProviderResource MemoryProvider() => new()
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.MemoryProvider,
+            Metadata = new ResourceMetadata { Name = "local-memory" },
+            Definition = new MemoryProviderProperties
+            {
+                DisplayName = "Local Memory",
+                IntegrationKind = MemoryProviderIntegrationKind.Builtin,
+                Builtin = new()
+            }
+        };
+
+        private static MemoryProfileResource MemoryProfile() => new()
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.MemoryProfile,
+            Metadata = new ResourceMetadata { Name = "default-memory" },
+            Definition = new MemoryProfileProperties
+            {
+                DisplayName = "Default Memory",
+                Provider = new("local-memory"),
+                Retrieval = new() { MaximumRecords = 5 },
+                Retention = new()
             }
         };
 

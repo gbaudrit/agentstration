@@ -1,0 +1,88 @@
+@page "/memory"
+@using Agentstration.Memory
+@implements IDisposable
+@inject IMemoryManagementClient Client
+
+<PageTitle>Memory · Agentstration</PageTitle>
+<PageHeader Title="Memory" Description="Inspect governed Memory providers, profiles, provenance and retention. Conversation history and checkpoints are not shown here.">
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh</button></Actions>
+</PageHeader>
+
+@if (loading && providers is null)
+{
+    <LoadingState Message="Loading Memory configuration…" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else
+{
+    <section class="panel">
+        <div class="panel-header"><div><p class="eyebrow">Store providers</p><h2>Persistence bindings</h2></div></div>
+        @if (providers?.Count == 0) { <EmptyState Title="No Memory provider" Message="Create a MemoryProvider resource through the Management API." /> }
+        else
+        {
+            <DataGrid TItem="MemoryProviderResource" Items="providers ?? []">
+                <Header><tr><th>Provider</th><th>Namespace</th><th>Integration</th><th>Status</th><th></th></tr></Header>
+                <Row Context="provider"><tr>
+                    <td><strong>@provider.Definition.DisplayName</strong><br /><code>@provider.Name</code></td>
+                    <td><code>@provider.Namespace</code></td><td>@provider.Definition.IntegrationKind</td>
+                    <td>@if (statuses.TryGetValue(provider.Address, out var status)) { <StatusBadge Text="@status" Status="@(status == "available" ? UiStatus.Success : UiStatus.Danger)" /> } else { <span>Not tested</span> }</td>
+                    <td><button class="text-button" @onclick="() => TestAsync(provider)">Test</button><button class="text-button" @onclick="() => SelectAsync(provider)">Records →</button></td>
+                </tr></Row>
+            </DataGrid>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-header"><div><p class="eyebrow">Memory profiles</p><h2>Retrieval and retention policy</h2></div></div>
+        @if (profiles?.Count == 0) { <EmptyState Title="No Memory profile" Message="Agents remain fully operational without Memory." /> }
+        else
+        {
+            <DataGrid TItem="MemoryProfileResource" Items="profiles ?? []">
+                <Header><tr><th>Profile</th><th>Provider binding</th><th>Retrieval</th><th>Default retention</th></tr></Header>
+                <Row Context="profile"><tr><td><strong>@profile.Definition.DisplayName</strong><br /><code>@profile.Name</code></td><td><code>@profile.Definition.Provider</code></td><td>@profile.Definition.Retrieval.Strategy · max @profile.Definition.Retrieval.MaximumRecords</td><td>@(profile.Definition.Retention.DefaultTimeToLive?.ToString() ?? "Persistent until deleted")</td></tr></Row>
+            </DataGrid>
+        }
+    </section>
+
+    @if (selected is not null)
+    {
+        <section class="panel">
+            <div class="panel-header"><div><p class="eyebrow">Bounded inspection</p><h2>@selected.Definition.DisplayName records</h2></div><button class="button-secondary" @onclick="() => SelectAsync(selected)">Refresh records</button></div>
+            @if (records.Count == 0) { <EmptyState Title="No active records" Message="Expired or deleted records are not returned." /> }
+            else
+            {
+                <DataGrid TItem="MemoryRecord" Items="records">
+                    <Header><tr><th>Scope</th><th>Content</th><th>Provenance</th><th>Created / expiry</th><th></th></tr></Header>
+                    <Row Context="record"><tr><td>@record.Scope.Kind<br /><code>@record.Scope.Key</code></td><td>@record.Content</td><td>@record.Provenance.SourceKind<br /><small>@record.Provenance.Reason</small></td><td>@record.CreatedAt.ToLocalTime().ToString("g")<br /><small>@(record.ExpiresAt?.ToLocalTime().ToString("g") ?? "No expiry")</small></td><td><button class="text-button" @onclick="() => DeleteAsync(record)">Delete</button></td></tr></Row>
+                </DataGrid>
+            }
+        </section>
+    }
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<MemoryProviderResource>? providers;
+    private IReadOnlyList<MemoryProfileResource>? profiles;
+    private IReadOnlyList<MemoryRecord> records = [];
+    private readonly Dictionary<ResourceAddress, string> statuses = [];
+    private MemoryProviderResource? selected;
+    private AgentstrationApiException? error;
+    private bool loading;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { var providerTask = Client.GetProvidersAsync(cancellation.Token); var profileTask = Client.GetProfilesAsync(cancellation.Token); await Task.WhenAll(providerTask, profileTask); providers = await providerTask; profiles = await profileTask; }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private async Task TestAsync(MemoryProviderResource provider) { var result = await Client.TestProviderAsync(provider.Namespace, provider.Name, cancellation.Token); statuses[provider.Address] = result.Status; }
+    private async Task SelectAsync(MemoryProviderResource provider) { selected = provider; records = await Client.GetRecordsAsync(provider.Namespace, provider.Name, 50, cancellation.Token); }
+    private async Task DeleteAsync(MemoryRecord record) { if (selected is null) return; await Client.DeleteRecordAsync(selected.Namespace, selected.Name, record.Id, cancellation.Token); await SelectAsync(selected); }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

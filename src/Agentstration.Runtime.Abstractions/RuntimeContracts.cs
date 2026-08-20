@@ -142,9 +142,13 @@ public sealed record ExecutableAgentDefinition
 
 public sealed record ExecutableAgentMemoryConfiguration
 {
+    public string ProfileName { get; init; } = "default-memory";
+    public string ProviderName { get; init; } = "local-memory";
+    public string Namespace { get; init; } = "default";
     public bool ReadOwnMemory { get; init; } = true;
     public IReadOnlyList<string> SharedScopes { get; init; } = [];
     public int MaximumRecords { get; init; } = 10;
+    public TimeSpan? DefaultTimeToLive { get; init; }
 }
 
 public sealed record ResolvedRuntimeAgent(

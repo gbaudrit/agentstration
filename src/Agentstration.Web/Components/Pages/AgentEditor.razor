@@ -5,6 +5,7 @@
 @inject IAgentsModelClient AgentsModelClient
 @inject IAgentRunnerRuntimeClient RuntimeClient
 @inject IToolsClient ToolsClient
+@inject IMemoryManagementClient MemoryClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 
@@ -56,6 +57,16 @@ else
                 <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
             </div>
             @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">UID: <code>@resourceId</code></p> }
+        </section>
+
+        <section class="panel form-section">
+            <div class="panel-header"><div><p class="eyebrow">Memory</p><h2>Optional governed context</h2></div><StatusBadge Text="@(model.MemoryEnabled ? "Enabled" : "Disabled")" Status="@(model.MemoryEnabled ? UiStatus.Info : UiStatus.Neutral)" /></div>
+            <div class="form-grid">
+                <label><span>Enable Memory</span><InputCheckbox @bind-Value="model.MemoryEnabled" /><small>An Agent works normally when this is disabled.</small></label>
+                <label><span>Memory profile</span><select @bind="model.MemoryProfileName" disabled="@(!model.MemoryEnabled)">@foreach (var profile in memoryProfiles) { <option value="@profile.Name">@profile.Definition.DisplayName — @profile.Name</option> }</select></label>
+                <label><span>Read own Agent scope</span><InputCheckbox @bind-Value="model.ReadOwnMemory" disabled="@(!model.MemoryEnabled)" /></label>
+                <label><span>Shared scopes</span><InputTextArea @bind-Value="model.SharedMemoryScopes" rows="3" disabled="@(!model.MemoryEnabled)" /><small>One explicit shared scope per line. Workspace-wide implicit retrieval is not enabled.</small></label>
+            </div>
         </section>
 
         <section class="panel form-section">
@@ -112,6 +123,7 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private AgentEditorModel? model;
     private IReadOnlyList<ToolResource> catalogTools = [];
+    private IReadOnlyList<MemoryProfileResource> memoryProfiles = [];
     private string? etag;
     private string? resourceId;
     private string? errorMessage;
@@ -143,7 +155,11 @@ else
         errorMessage = null;
         try
         {
-            catalogTools = await ToolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
+            var toolsTask = ToolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
+            var memoryProfilesTask = MemoryClient.GetProfilesAsync(cancellation.Token);
+            await Task.WhenAll(toolsTask, memoryProfilesTask);
+            catalogTools = await toolsTask;
+            memoryProfiles = await memoryProfilesTask;
             if (IsNew)
             {
                 model = new AgentEditorModel();
