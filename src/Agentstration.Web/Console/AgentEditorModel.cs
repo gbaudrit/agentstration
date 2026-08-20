@@ -21,6 +21,17 @@ public sealed class AgentEditorModel
     public string Tags { get; set; } = string.Empty;
     public string Annotations { get; set; } = string.Empty;
 
+    public bool SelectModelProfile(ModelProfileSummaryResponse profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        if (string.Equals(ModelProfileName, profile.Name, StringComparison.Ordinal)
+            && string.Equals(ModelProfileNamespace, profile.Namespace, StringComparison.Ordinal))
+            return false;
+        ModelProfileName = profile.Name;
+        ModelProfileNamespace = profile.Namespace;
+        return true;
+    }
+
     public AgentResourceRequest ToRequest()
     {
         var tools = Lines(ToolNames).Select(value => new ResourceReference(value)).ToArray();

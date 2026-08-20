@@ -189,12 +189,7 @@ else
 
     private Task ModelProfileSelectionChanged(ModelProfileSummaryResponse? profile)
     {
-        if (model is not null && profile is not null)
-        {
-            model.ModelProfileName = profile.Name;
-            model.ModelProfileNamespace = profile.Namespace;
-            isDirty = true;
-        }
+        if (model is not null && profile is not null && model.SelectModelProfile(profile)) isDirty = true;
         return Task.CompletedTask;
     }
 

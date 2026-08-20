@@ -747,6 +747,22 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public void AgentEditorMarksOnlyAnEffectiveModelProfileChange()
+    {
+        var model = new AgentEditorModel
+        {
+            ModelProfileName = "default-reasoning",
+            ModelProfileNamespace = "default"
+        };
+        var current = Summary("default-reasoning", "ollama-local", "qwen3:1.7b", "available");
+        var namespaced = current with { Namespace = "shared.models" };
+
+        Assert.IsFalse(model.SelectModelProfile(current));
+        Assert.IsTrue(model.SelectModelProfile(namespaced));
+        Assert.AreEqual("shared.models", model.ModelProfileNamespace);
+    }
+
+    [TestMethod]
     public void AgentRunnerBuildsVersionedRuntimePayloadAndValidatesJson()
     {
         var agent = CreateAgentResource("web-agent") with { Generation = 7 };
