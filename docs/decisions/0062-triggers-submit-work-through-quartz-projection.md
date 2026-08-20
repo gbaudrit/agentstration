@@ -44,7 +44,7 @@ Misfires are explicit and bounded:
 
 There is no unbounded catch-up backlog. Concurrency is also explicit: `skip` does not submit when prior Work from the Trigger is active; `allow` permits overlap. Queueing is not implemented in V1.
 
-Enabling or changing an enabled Trigger snapshots a server-owned execution scope containing Tenant, Workspace and owner Principal IDs. Every future firing reloads the Principal and Workspace and re-evaluates current `runs/execute` authorization before submission. A disabled Principal, Workspace, removed membership or revoked permission fails closed. No null Principal or RBAC bypass is permitted.
+Enabling or changing an enabled Trigger snapshots a server-owned execution scope containing Tenant, Workspace and owner Principal IDs. Every future firing reloads the Principal and Workspace and re-evaluates current `runs/execute` authorization before submission. After authorization, the firing pipeline enters that scope synchronously around Work submission so the Work Plane receives the authenticated `FlowRunScope`; authorization and ambient scope propagation are deliberately separate operations. A disabled Principal, Workspace, removed membership or revoked permission fails closed. No null Principal or RBAC bypass is permitted.
 
 Autonomous Work is projected as a Task without an Entry or Interaction. If its Flow requests input, the existing durable PendingAction mechanism is reused with a Task link and Workplace notification; no synthetic user message or Interaction is created.
 

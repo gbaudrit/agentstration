@@ -196,7 +196,8 @@ public sealed class TriggerFiringService(
         var firedAt = timeProvider.GetUtcNow();
         try
         {
-            await using var authorization = await authorizer.AuthorizeAsync(scope, cancellationToken);
+            await authorizer.AuthorizeAsync(scope, cancellationToken);
+            using var executionScope = authorizer.Enter(scope);
             if (trigger.Definition.ConcurrencyPolicy == TriggerConcurrencyPolicy.Skip
                 && await workSubmitter.HasActiveWorkAsync(trigger.WorkspaceId, trigger.Uid, cancellationToken))
             {

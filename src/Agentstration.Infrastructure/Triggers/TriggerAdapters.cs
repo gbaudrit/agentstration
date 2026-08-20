@@ -90,7 +90,7 @@ public sealed class WorkspaceTriggerExecutionAuthorizer(
     IAuthorizationService authorization,
     IRequestContextScopeFactory scopes) : ITriggerExecutionAuthorizer
 {
-    public async Task<IAsyncDisposable> AuthorizeAsync(TriggerExecutionScope executionScope, CancellationToken cancellationToken)
+    public async Task AuthorizeAsync(TriggerExecutionScope executionScope, CancellationToken cancellationToken)
     {
         var principal = await identities.GetPrincipalAsync(executionScope.PrincipalId, cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(executionScope.TenantId, executionScope.WorkspaceId, cancellationToken);
@@ -99,17 +99,10 @@ public sealed class WorkspaceTriggerExecutionAuthorizer(
         var context = new RequestContext(executionScope.PrincipalId, executionScope.TenantId, executionScope.WorkspaceId);
         try { await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.RunsExecute, cancellationToken); }
         catch (AuthorizationDeniedException) { throw new TriggerExecutionException("trigger_authorization_denied", "The Trigger owner no longer has runs/execute permission."); }
-        return new AsyncScope(scopes.Push(context));
     }
 
-    private sealed class AsyncScope(IDisposable scope) : IAsyncDisposable
-    {
-        public ValueTask DisposeAsync()
-        {
-            scope.Dispose();
-            return ValueTask.CompletedTask;
-        }
-    }
+    public IDisposable Enter(TriggerExecutionScope executionScope) =>
+        scopes.Push(new RequestContext(executionScope.PrincipalId, executionScope.TenantId, executionScope.WorkspaceId));
 }
 
 public sealed class TriggerWorkSubmitter(FlowService flows, WorkItemService work, IWorkItemRepository repository) : ITriggerWorkSubmitter

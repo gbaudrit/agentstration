@@ -143,6 +143,27 @@ public sealed class TriggerTests
     }
 
     [TestMethod]
+    public async Task ScheduledFiringEntersTheAuthorizedExecutionScopeBeforeWorkSubmissionAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using (fixture.Context.Push(fixture.Request))
+        {
+            await fixture.Services.GetRequiredService<TriggerManagementService>().CreateAsync(Resource("scoped", true), CancellationToken.None);
+        }
+
+        using (fixture.Context.PushSystem())
+        {
+            await fixture.Services.GetRequiredService<TriggerFiringService>().FireScheduledAsync(
+                ResourceNamespace.Default,
+                "scoped",
+                DateTimeOffset.Parse("2026-08-21T06:00:00Z", System.Globalization.CultureInfo.InvariantCulture),
+                CancellationToken.None);
+        }
+
+        Assert.AreEqual(fixture.Request, fixture.Work.SubmissionContext);
+    }
+
+    [TestMethod]
     public async Task DisabledTriggerNeverRunsAndAuthorizationFailureIsRecordedBeforeWorkAsync()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -252,8 +273,8 @@ public sealed class TriggerTests
             var database = Path.Combine(Path.GetTempPath(), $"agentstration-trigger-management-{Guid.NewGuid():N}.db");
             var context = new CurrentRequestContext();
             var scheduler = new RecordingScheduler();
-            var work = new RecordingWorkSubmitter();
-            var authorizer = new RecordingAuthorizer();
+            var work = new RecordingWorkSubmitter(context);
+            var authorizer = new RecordingAuthorizer(context);
             var services = new ServiceCollection().AddSingleton(TimeProvider.System).AddSingleton(context).AddSingleton<ICurrentRequestContext>(context)
                 .AddSqliteControlPlane($"Data Source={database}")
                 .AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>()
@@ -311,20 +332,22 @@ public sealed class TriggerTests
         public Task<IReadOnlyList<TriggerOccurrence>> ListAsync(Guid workspaceId, Guid triggerUid, int take, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TriggerOccurrence>>(values.Values.Where(value => value.WorkspaceId == workspaceId && value.TriggerUid == triggerUid).Take(take).ToArray());
     }
 
-    private sealed class RecordingWorkSubmitter : ITriggerWorkSubmitter
+    private sealed class RecordingWorkSubmitter(CurrentRequestContext context) : ITriggerWorkSubmitter
     {
         public int Submissions { get; private set; }
+        public RequestContext? SubmissionContext { get; private set; }
         public Task<bool> HasActiveWorkAsync(Guid workspaceId, Guid triggerUid, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<TriggerSubmission?> GetExistingAsync(Guid workspaceId, Guid occurrenceId, CancellationToken cancellationToken) => Task.FromResult<TriggerSubmission?>(null);
-        public Task<TriggerSubmission> SubmitAsync(TriggerResource trigger, TriggerOccurrence occurrence, CancellationToken cancellationToken) { Submissions++; return Task.FromResult(new TriggerSubmission(occurrence.Id.ToString())); }
+        public Task<TriggerSubmission> SubmitAsync(TriggerResource trigger, TriggerOccurrence occurrence, CancellationToken cancellationToken) { Submissions++; SubmissionContext = context.IsInitialized ? context.Current : null; return Task.FromResult(new TriggerSubmission(occurrence.Id.ToString())); }
     }
 
-    private sealed class RecordingAuthorizer : ITriggerExecutionAuthorizer
+    private sealed class RecordingAuthorizer(CurrentRequestContext context) : ITriggerExecutionAuthorizer
     {
         public bool Deny { get; set; }
-        public Task<IAsyncDisposable> AuthorizeAsync(TriggerExecutionScope executionScope, CancellationToken cancellationToken) => Deny
+        public Task AuthorizeAsync(TriggerExecutionScope executionScope, CancellationToken cancellationToken) => Deny
             ? throw new TriggerExecutionException("trigger_authorization_denied", "Permission was revoked.")
-            : Task.FromResult<IAsyncDisposable>(new EmptyAsyncDisposable());
-        private sealed class EmptyAsyncDisposable : IAsyncDisposable { public ValueTask DisposeAsync() => ValueTask.CompletedTask; }
+            : Task.CompletedTask;
+        public IDisposable Enter(TriggerExecutionScope executionScope) =>
+            context.Push(new RequestContext(executionScope.PrincipalId, executionScope.TenantId, executionScope.WorkspaceId));
     }
 }

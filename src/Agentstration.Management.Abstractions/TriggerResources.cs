@@ -163,5 +163,6 @@ public interface ITriggerWorkSubmitter
 
 public interface ITriggerExecutionAuthorizer
 {
-    Task<IAsyncDisposable> AuthorizeAsync(TriggerExecutionScope executionScope, CancellationToken cancellationToken);
+    Task AuthorizeAsync(TriggerExecutionScope executionScope, CancellationToken cancellationToken);
+    IDisposable Enter(TriggerExecutionScope executionScope);
 }
