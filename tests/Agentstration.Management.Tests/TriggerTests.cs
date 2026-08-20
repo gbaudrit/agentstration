@@ -1,4 +1,8 @@
 using System.Text.Json;
+using Agentstration.Flow;
+using Agentstration.Flow.Application;
+using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Flow.Storage.Sqlite;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Management.Abstractions;
@@ -70,6 +74,20 @@ public sealed class TriggerTests
         };
         var created = await service.CreateAsync(reference, CancellationToken.None);
         Assert.AreEqual("provider-owned-reference", created.Value.Definition.Input.GetProperty("credentialRef").GetString());
+    }
+
+    [TestMethod]
+    public async Task TargetValidatorAllowsPackNamespaceWithinWorkspaceAndRejectsAnotherWorkspaceAsync()
+    {
+        await using var fixture = await FlowTargetFixture.CreateAsync();
+        var packNamespace = new ResourceNamespace("agentstration.installed-pack");
+        await fixture.CreatePublishedAsync(fixture.WorkspaceId, packNamespace, "pack-flow");
+        await fixture.CreatePublishedAsync(new WorkspaceId(Guid.NewGuid()), packNamespace, "foreign-flow");
+
+        await fixture.Validator.ValidateAsync(ResourceNamespace.Default, Target("pack-flow", packNamespace), CancellationToken.None);
+
+        await Assert.ThrowsExactlyAsync<FlowNotFoundException>(() =>
+            fixture.Validator.ValidateAsync(ResourceNamespace.Default, Target("foreign-flow", packNamespace), CancellationToken.None));
     }
 
     [TestMethod]
@@ -168,6 +186,56 @@ public sealed class TriggerTests
         Kind = TriggerOccurrenceKind.Scheduled,
         ScheduledAt = DateTimeOffset.UtcNow
     };
+
+    private static TriggerTarget Target(string name, ResourceNamespace @namespace) => new()
+    {
+        Flow = new() { Name = name, Namespace = @namespace }
+    };
+
+    private sealed class FlowTargetFixture : IAsyncDisposable
+    {
+        private readonly string directory;
+        private readonly ServiceProvider services;
+        public WorkspaceId WorkspaceId { get; } = new(Guid.NewGuid());
+        public FlowTriggerTargetValidator Validator { get; }
+
+        private FlowTargetFixture(string directory, ServiceProvider services, CurrentRequestContext context)
+        {
+            this.directory = directory;
+            this.services = services;
+            Validator = new(services.GetRequiredService<FlowService>(), context);
+        }
+
+        public static async Task<FlowTargetFixture> CreateAsync()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), $"agentstration-trigger-flow-target-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            var context = new CurrentRequestContext();
+            var services = new ServiceCollection()
+                .AddSingleton(TimeProvider.System)
+                .AddSqliteFlowStorage($"Data Source={Path.Combine(directory, "flow.db")};Pooling=False")
+                .AddSingleton<FlowService>()
+                .BuildServiceProvider();
+            var fixture = new FlowTargetFixture(directory, services, context);
+            await services.GetRequiredService<FlowService>().InitializeAsync(CancellationToken.None);
+            context.Initialize(new(Guid.NewGuid(), Guid.NewGuid(), fixture.WorkspaceId.Value));
+            return fixture;
+        }
+
+        public async Task CreatePublishedAsync(WorkspaceId workspaceId, ResourceNamespace @namespace, string name)
+        {
+            var flows = services.GetRequiredService<FlowService>();
+            await flows.CreateAsync(workspaceId, new(name, null, "1.0.0", true,
+                new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "deterministic-agent"))), @namespace, CancellationToken.None);
+            await flows.PublishVersionAsync(workspaceId, new(name, @namespace), "1.0.0", true, CancellationToken.None);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await services.DisposeAsync();
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+    }
 
     private sealed class Fixture : IAsyncDisposable
     {

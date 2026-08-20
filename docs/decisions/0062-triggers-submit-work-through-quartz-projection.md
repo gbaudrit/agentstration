@@ -33,6 +33,8 @@ Management resources are the source of truth. Quartz.NET 3.19 uses a local Micro
 
 Every scheduled firing has a deterministic occurrence ID derived from Workspace, Trigger UID and UTC scheduled instant. The occurrence is inserted durably before Work submission. The WorkItem uses the same deterministic GUID; a retry can recover the Work correlation after a crash between Work creation and occurrence completion. This provides **at most one local Work submission per Trigger occurrence**. It does not provide exactly-once Flow or tool effects.
 
+A Trigger target may name a Flow in another namespace, including an installed Pack namespace. Namespace is a resource identity and ownership boundary inside a Workspace, not an authorization boundary. Target validation and firing resolve the explicit Flow namespace through the current Trigger Workspace, so a cross-Workspace Flow remains inaccessible.
+
 Manual `Run now` creates a distinct manual occurrence, uses the same authorization, target-resolution and Work-submission pipeline, rejects disabled Triggers, and does not change the schedule.
 
 Misfires are explicit and bounded:

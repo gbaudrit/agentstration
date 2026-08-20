@@ -80,8 +80,6 @@ public sealed class FlowTriggerTargetValidator(FlowService flows, ICurrentReques
     {
         if (!context.IsInitialized) throw new TriggerValidationException("trigger_context_missing", "Flow target validation requires a workspace context.");
         var flow = target.Flow ?? throw new TriggerValidationException("target_invalid", "A Flow target is required.");
-        if (flow.Namespace is { } explicitNamespace && explicitNamespace != ownerNamespace)
-            throw new TriggerValidationException("target_cross_namespace", "A Trigger cannot target a Flow in another namespace.");
         var reference = new FlowReference(new FlowId(flow.Name, flow.Namespace ?? ownerNamespace), flow.Version, flow.Version is null, flow.Namespace);
         _ = await flows.ResolveAsync(new WorkspaceId(context.Current.WorkspaceId), reference, ownerNamespace, cancellationToken);
     }
