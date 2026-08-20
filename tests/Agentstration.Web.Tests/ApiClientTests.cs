@@ -799,6 +799,31 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public void AgentRunnerRestoresPersistedTraceWithoutDuplicatingProjectedResponse()
+    {
+        var originalRun = CreateRun("completed-run");
+        var run = originalRun with
+        {
+            Status = originalRun.Status with
+            {
+                State = RuntimeRunState.Succeeded,
+                Response = "final response"
+            }
+        };
+        var state = new AgentRunnerState();
+        state.Reset(run);
+
+        state.Restore(RunEvent(1, RuntimeRunEventKind.StatusChanged, state: RuntimeRunState.Running));
+        state.Restore(RunEvent(2, RuntimeRunEventKind.ResponseDelta, content: "final response"));
+        state.Restore(RunEvent(3, RuntimeRunEventKind.RunCompleted, state: RuntimeRunState.Succeeded));
+
+        Assert.AreEqual("final response", state.Response);
+        Assert.AreEqual(RuntimeRunState.Succeeded, state.State);
+        Assert.HasCount(3, state.Events);
+        Assert.AreEqual(3L, state.LastSequence);
+    }
+
+    [TestMethod]
     public async Task AgentRunnerRuntimeClientReadsCanonicalReadinessEndpoint()
     {
         var requested = new List<Uri>();

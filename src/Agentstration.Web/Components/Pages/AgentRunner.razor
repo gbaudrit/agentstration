@@ -190,7 +190,8 @@ else
                 await LoadExecutionContextAsync(run.Properties.Agent.Version);
                 rawRequest = JsonSerializer.Serialize(ToRequest(run), new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
                 await LoadHistoryAsync();
-                if (!run.Status.State.IsTerminal()) StartObservation(run.Id);
+                if (run.Status.State.IsTerminal()) await RestoreEventHistoryAsync(run.Id);
+                else StartObservation(run.Id);
             }
             else
             {
@@ -249,6 +250,12 @@ else
         observation?.Dispose();
         observation = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         _ = ObserveAsync(runId, observation.Token);
+    }
+
+    private async Task RestoreEventHistoryAsync(string runId)
+    {
+        await foreach (var runEvent in RuntimeClient.ObserveRunAsync(runId, 0, cancellation.Token))
+            state.Restore(runEvent);
     }
 
     private async Task ObserveAsync(string runId, CancellationToken token)
