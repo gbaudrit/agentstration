@@ -20,6 +20,8 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
     IToolExecutionPipeline? configuredToolExecution = null) : IFlowOrchestrationEngine
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan CheckpointAvailabilityPollInterval = TimeSpan.FromMilliseconds(10);
+    private const int CheckpointAvailabilityPollAttempts = 1000;
     private readonly TimeProvider timeProvider = timeProvider ?? TimeProvider.System;
     private readonly IToolExecutionPipeline toolExecution = configuredToolExecution ?? UnavailableToolExecutionPipeline.Instance;
 
@@ -94,8 +96,8 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                     var prompt = sourceState is not null
                         ? sourceState.Active?.Content.ToString()
                         : null;
-                    for (var attempt = 0; checkpointManager is not null && run.LastCheckpoint is null && attempt < 100; attempt++)
-                        await Task.Delay(TimeSpan.FromMilliseconds(10), timeProvider, cancellationToken);
+                    for (var attempt = 0; checkpointManager is not null && run.LastCheckpoint is null && attempt < CheckpointAvailabilityPollAttempts; attempt++)
+                        await Task.Delay(CheckpointAvailabilityPollInterval, timeProvider, cancellationToken);
                     if (checkpointManager is null || run.LastCheckpoint is null)
                         throw new FlowValidationException(
                             "flow_orchestration_interaction_not_durable",

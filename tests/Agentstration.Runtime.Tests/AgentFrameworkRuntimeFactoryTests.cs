@@ -97,9 +97,10 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 };
                 var factory = new AgentFrameworkRuntimeFactory(
                     new RecordingResolver(requestingClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions());
+                var executionStateStore = firstProvider.GetRequiredService<IRuntimeExecutionStateStore>();
                 var firstEngine = new AgentFrameworkFlowOrchestrationEngine(
                     agentResolver, new EmptyToolCatalog(), factory,
-                    firstProvider.GetRequiredService<IRuntimeExecutionStateStore>());
+                    new DelayedRuntimeExecutionStateStore(executionStateStore, TimeSpan.FromMilliseconds(1250)));
 
                 await foreach (var item in firstEngine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
                     TestWorkspaceId, "run-maf-resume", definition, JsonSerializer.SerializeToElement(new { prompt = "Delete it" }), "correlation-1")))
@@ -107,7 +108,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 suspended = initialEvents.OfType<FlowExternalInputRequested>().Single();
                 bindings = initialEvents.OfType<FlowRuntimeBindingsResolved>().Single().Bindings;
                 Assert.AreEqual(InputRequestType.Confirmation, suspended.Type);
-                Assert.IsNotNull(await firstProvider.GetRequiredService<IRuntimeExecutionStateStore>().GetAsync(
+                Assert.IsNotNull(await executionStateStore.GetAsync(
                     TestWorkspaceId, "run-maf-resume", suspended.RuntimeState.RuntimeType, suspended.RuntimeState.StateId, default));
             }
 
@@ -842,6 +843,40 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             return execute?.Invoke(context, cancellationToken)
                 ?? ValueTask.FromResult<JsonElement?>(JsonSerializer.SerializeToElement("tool-result"));
         }
+    }
+
+    private sealed class DelayedRuntimeExecutionStateStore(
+        IRuntimeExecutionStateStore inner,
+        TimeSpan storeDelay) : IRuntimeExecutionStateStore
+    {
+        public async Task StoreAsync(RuntimeExecutionState state, CancellationToken cancellationToken)
+        {
+            await Task.Delay(storeDelay, cancellationToken);
+            await inner.StoreAsync(state, cancellationToken);
+        }
+
+        public Task<RuntimeExecutionState?> GetAsync(
+            WorkspaceId workspaceId,
+            string runId,
+            string runtimeType,
+            string stateId,
+            CancellationToken cancellationToken) =>
+            inner.GetAsync(workspaceId, runId, runtimeType, stateId, cancellationToken);
+
+        public Task<IReadOnlyList<RuntimeExecutionState>> ListAsync(
+            WorkspaceId workspaceId,
+            string runId,
+            string runtimeType,
+            string? parentStateId,
+            CancellationToken cancellationToken) =>
+            inner.ListAsync(workspaceId, runId, runtimeType, parentStateId, cancellationToken);
+
+        public Task DeleteAsync(
+            WorkspaceId workspaceId,
+            string runId,
+            string? runtimeType,
+            CancellationToken cancellationToken) =>
+            inner.DeleteAsync(workspaceId, runId, runtimeType, cancellationToken);
     }
 
     private sealed record TestApprovalResponse(IList<ChatMessage> Messages);
