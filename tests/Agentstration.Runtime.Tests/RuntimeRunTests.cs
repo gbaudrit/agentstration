@@ -2,26 +2,32 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Sockets;
 using System.Text.Json;
 using Agentstration.Infrastructure.Agents;
+using Agentstration.Infrastructure.Memory;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Memory;
 using Agentstration.Memory.Application;
+using Agentstration.Memory.Storage.Abstractions;
 using Agentstration.Memory.Storage.Sqlite;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Tools.Mcp;
 using Agentstration.Work.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Runtime.Tests;
@@ -142,6 +148,71 @@ public sealed class RuntimeRunTests
         StringAssert.Contains(secondCompleted.Value.Status.Response!, "cobalt");
         Assert.IsTrue(events.Any(value => value.Kind == RuntimeRunEventKind.ContextAssembled
             && value.Message?.Contains("1 Memory record", StringComparison.Ordinal) == true));
+    }
+
+    [TestMethod]
+    public async Task AepMemoryProfileInfluencesANewRunWithoutMutatingAgentDesiredState()
+    {
+        var directory = CreateTemporaryDirectory("agentstration-runtime-memory-aep");
+        try
+        {
+            await using var extension = await MemoryExtensionProcess.StartAsync(Path.Combine(directory, "extension-memory.db"), default);
+            await using var fixture = await RuntimeFixture.CreateAsync(memoryEnabled: true, deterministicRuntime: true, aepMemoryEndpoint: extension.Endpoint);
+            var agentBefore = await fixture.Management.GetAsync<AgentResource>(new(ResourceKinds.Agent, fixture.AgentId), default);
+            var revisionsBefore = await fixture.Management.ListAllAsync<AgentRevision>(ResourceKinds.AgentRevision, default);
+            Assert.IsNotNull(agentBefore);
+
+            var first = await fixture.CreateRunAsync("What is the launch code?");
+            await fixture.Service.ExecuteAsync(new(TestScope, first.Value.Id), default);
+            var firstCompleted = await fixture.Service.GetAsync(TestScope.WorkspaceId, first.Value.Id, default);
+            Assert.IsNotNull(firstCompleted);
+            Assert.IsFalse(firstCompleted.Value.Status.Response?.Contains("cobalt", StringComparison.OrdinalIgnoreCase) == true);
+
+            await fixture.Memories!.WriteAsync(new(
+                TestScope.WorkspaceId,
+                MemoryScope.ForAgent(fixture.AgentUid),
+                "The launch code is cobalt.",
+                ["fact"],
+                MemorySourceKind.RuntimeRun,
+                first.Value.Id,
+                "Explicitly retain the launch code through the AEP provider.",
+                TestScope.PrincipalId,
+                Provider: fixture.MemoryProviderReference), default);
+            await fixture.Memories.WriteAsync(new(
+                new WorkspaceId(Guid.NewGuid()),
+                MemoryScope.ForAgent(fixture.AgentUid),
+                "The launch code is scarlet.",
+                ["fact"],
+                MemorySourceKind.Manual,
+                null,
+                "Cross-Workspace isolation sentinel.",
+                TestScope.PrincipalId,
+                Provider: fixture.MemoryProviderReference), default);
+
+            var second = await fixture.CreateRunAsync("What is the launch code?");
+            await fixture.Service.ExecuteAsync(new(TestScope, second.Value.Id), default);
+            var secondCompleted = await fixture.Service.GetAsync(TestScope.WorkspaceId, second.Value.Id, default);
+            var events = await fixture.Store.ListEventsAsync(TestScope.WorkspaceId, second.Value.Id, 0, default);
+            var agentAfter = await fixture.Management.GetAsync<AgentResource>(new(ResourceKinds.Agent, fixture.AgentId), default);
+            var revisionsAfter = await fixture.Management.ListAllAsync<AgentRevision>(ResourceKinds.AgentRevision, default);
+
+            Assert.IsNotNull(secondCompleted);
+            Assert.AreEqual(RuntimeRunState.Succeeded, secondCompleted.Value.Status.State);
+            StringAssert.Contains(secondCompleted.Value.Status.Response!, "cobalt");
+            Assert.DoesNotContain("scarlet", secondCompleted.Value.Status.Response!, StringComparison.OrdinalIgnoreCase);
+            Assert.IsTrue(events.Any(value => value.Kind == RuntimeRunEventKind.ContextAssembled
+                && value.Message?.Contains("1 Memory record", StringComparison.Ordinal) == true));
+            Assert.IsNotNull(agentAfter);
+            Assert.AreEqual(agentBefore.ETag, agentAfter.ETag);
+            Assert.AreEqual(agentBefore.Value.Generation, agentAfter.Value.Generation);
+            CollectionAssert.AreEqual(
+                revisionsBefore.Select(value => value.Value.DefinitionHash).Order().ToArray(),
+                revisionsAfter.Select(value => value.Value.DefinitionHash).Order().ToArray());
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
     }
 
     [TestMethod]
@@ -475,6 +546,13 @@ public sealed class RuntimeRunTests
         Context = context
     };
 
+    private static string CreateTemporaryDirectory(string prefix)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
     private enum RuntimeBehavior { Succeed, Fail, Block }
 
     private sealed class FakeRuntimeRegistry : IRuntimeRegistry
@@ -497,6 +575,131 @@ public sealed class RuntimeRunTests
         }
     }
 
+    private sealed class FixedAepExtensionEndpointResolver(Uri endpoint) : IAepExtensionEndpointResolver
+    {
+        public Uri Resolve(string extensionId)
+        {
+            Assert.AreEqual("Agentstration.Extensions.Memory.Sqlite", extensionId);
+            return endpoint;
+        }
+    }
+
+    private sealed class MemoryExtensionProcess : IAsyncDisposable
+    {
+        private readonly Process process;
+        private readonly HttpClient http;
+        private readonly ConcurrentQueue<string> output;
+
+        private MemoryExtensionProcess(Process process, HttpClient http, ConcurrentQueue<string> output, Uri endpoint)
+        {
+            this.process = process;
+            this.http = http;
+            this.output = output;
+            Endpoint = endpoint;
+        }
+
+        public Uri Endpoint { get; }
+
+        public static async Task<MemoryExtensionProcess> StartAsync(string databasePath, CancellationToken cancellationToken)
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var projectPath = Path.Combine(repositoryRoot, "src", "Agentstration.Extensions.Memory.Sqlite", "Agentstration.Extensions.Memory.Sqlite.csproj");
+            var port = ReservePort();
+            var endpoint = new Uri($"http://127.0.0.1:{port}");
+            var startInfo = new ProcessStartInfo("dotnet")
+            {
+                WorkingDirectory = repositoryRoot,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            startInfo.ArgumentList.Add("run");
+            startInfo.ArgumentList.Add("--project");
+            startInfo.ArgumentList.Add(projectPath);
+            startInfo.ArgumentList.Add("--configuration");
+            startInfo.ArgumentList.Add("Release");
+            startInfo.ArgumentList.Add("--no-build");
+            startInfo.ArgumentList.Add("--no-launch-profile");
+            startInfo.Environment["ASPNETCORE_URLS"] = endpoint.AbsoluteUri;
+            startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Testing";
+            startInfo.Environment["MemorySqlite__Path"] = databasePath;
+            var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+            var output = new ConcurrentQueue<string>();
+            process.OutputDataReceived += (_, args) => Capture(output, args.Data);
+            process.ErrorDataReceived += (_, args) => Capture(output, args.Data);
+            if (!process.Start()) throw new InvalidOperationException("The Memory extension process could not be started.");
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            var http = new HttpClient { BaseAddress = endpoint, Timeout = TimeSpan.FromSeconds(2) };
+            var host = new MemoryExtensionProcess(process, http, output, endpoint);
+            try
+            {
+                await host.WaitUntilReadyAsync(cancellationToken);
+                return host;
+            }
+            catch
+            {
+                await host.DisposeAsync();
+                throw;
+            }
+        }
+
+        private async Task WaitUntilReadyAsync(CancellationToken cancellationToken)
+        {
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (process.HasExited)
+                    throw new InvalidOperationException($"The Memory extension exited with code {process.ExitCode}. {string.Join(' ', output.TakeLast(10))}");
+                try
+                {
+                    using var response = await http.GetAsync("/.well-known/aep", cancellationToken);
+                    if (response.IsSuccessStatusCode) return;
+                }
+                catch (HttpRequestException) { }
+                catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+                await Task.Delay(100, cancellationToken);
+            }
+            throw new TimeoutException($"The Memory extension did not become ready. {string.Join(' ', output.TakeLast(10))}");
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            http.Dispose();
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
+            }
+            process.Dispose();
+        }
+
+        private static int ReservePort()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return port;
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            for (var current = new DirectoryInfo(AppContext.BaseDirectory); current is not null; current = current.Parent)
+                if (File.Exists(Path.Combine(current.FullName, "Agentstration.slnx"))) return current.FullName;
+            throw new InvalidOperationException("The Agentstration repository root could not be located.");
+        }
+
+        private static void Capture(ConcurrentQueue<string> output, string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            output.Enqueue(value);
+            while (output.Count > 100) output.TryDequeue(out _);
+        }
+    }
+
     private sealed class RuntimeFixture : IAsyncDisposable
     {
         private readonly string directory;
@@ -508,8 +711,21 @@ public sealed class RuntimeRunTests
         public string AgentId { get; }
         public Guid AgentUid { get; }
         public MemoryService? Memories { get; }
+        public IControlPlaneStore Management { get; }
+        public MemoryProviderReference MemoryProviderReference { get; }
 
-        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store, FakeRuntimeRegistry registry, TestRuntimeRunQueue queue, string agentId, Guid agentUid, MemoryService? memories)
+        private RuntimeFixture(
+            string directory,
+            ServiceProvider provider,
+            RuntimeRunService service,
+            IRuntimeRunStore store,
+            FakeRuntimeRegistry registry,
+            TestRuntimeRunQueue queue,
+            string agentId,
+            Guid agentUid,
+            MemoryService? memories,
+            IControlPlaneStore management,
+            MemoryProviderReference memoryProvider)
         {
             this.directory = directory;
             this.provider = provider;
@@ -520,9 +736,11 @@ public sealed class RuntimeRunTests
             AgentId = agentId;
             AgentUid = agentUid;
             Memories = memories;
+            Management = management;
+            MemoryProviderReference = memoryProvider;
         }
 
-        public static async Task<RuntimeFixture> CreateAsync(bool memoryEnabled = false, bool deterministicRuntime = false)
+        public static async Task<RuntimeFixture> CreateAsync(bool memoryEnabled = false, bool deterministicRuntime = false, Uri? aepMemoryEndpoint = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -545,6 +763,13 @@ public sealed class RuntimeRunTests
             if (memoryEnabled)
             {
                 services.AddSqliteMemoryStorage($"Data Source={Path.Combine(directory, "memory.db")}");
+                if (aepMemoryEndpoint is not null)
+                {
+                    services.AddHttpClient("agentstration-aep-memory", client => client.Timeout = TimeSpan.FromSeconds(30));
+                    services.AddSingleton<IAepExtensionEndpointResolver>(new FixedAepExtensionEndpointResolver(aepMemoryEndpoint));
+                    services.RemoveAll<IMemoryRecordStoreResolver>();
+                    services.AddSingleton<IMemoryRecordStoreResolver, ManagedMemoryRecordStoreResolver>();
+                }
                 services.AddSingleton<MemoryService>();
                 services.AddSingleton<IMemoryRetriever>(provider => provider.GetRequiredService<MemoryService>());
                 services.AddSingleton<IMemoryReadAuthorization, AllowMemoryReadAuthorization>();
@@ -559,14 +784,14 @@ public sealed class RuntimeRunTests
 
             if (memoryEnabled)
             {
-                await management.PutAsync(MemoryProvider(), null, true, default);
-                await management.PutAsync(MemoryProfile(), null, true, default);
+                await management.PutAsync(MemoryProvider(aepMemoryEndpoint is not null), null, true, default);
+                await management.PutAsync(MemoryProfile(aepMemoryEndpoint is not null), null, true, default);
             }
 
             const string agentId = "sql-expert";
             const string revisionId = "sql-expert--000001";
-            var agent = await management.PutAsync(Agent(agentId, memoryEnabled), null, true, default);
-            var revision = await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid, memoryEnabled), default);
+            var agent = await management.PutAsync(Agent(agentId, memoryEnabled, aepMemoryEndpoint is not null), null, true, default);
+            var revision = await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid, memoryEnabled, aepMemoryEndpoint is not null), default);
             await management.PutAsync(Deployment(revisionId), null, true, default);
             var memories = memoryEnabled ? provider.GetRequiredService<MemoryService>() : null;
             if (memories is not null) await memories.InitializeAsync(default);
@@ -578,7 +803,8 @@ public sealed class RuntimeRunTests
                         new GenAiObservabilityOptions())
                     .CreateAsync(RuntimeAgentDefinitionMapper.ToExecutable(revision.Value.Definition), revisionId, new AgentRuntimeContext(new EmptyToolCatalog()), default);
             }
-            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, registry, queue, agentId, agent.Value.Uid, memories);
+            var memoryProvider = aepMemoryEndpoint is null ? MemoryProviderReference.Local : new MemoryProviderReference("memory-sqlite-aep");
+            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, registry, queue, agentId, agent.Value.Uid, memories, management, memoryProvider);
         }
 
         public Task<StoredRuntimeRun> CreateRunAsync() => Service.CreateAsync(TestScope, new RuntimeAgentReference(AgentId, 3), Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", default);
@@ -591,7 +817,7 @@ public sealed class RuntimeRunTests
             if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
         }
 
-        private static AgentResource Agent(string id, bool memoryEnabled) => new()
+        private static AgentResource Agent(string id, bool memoryEnabled, bool aepMemory) => new()
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.Agent,
@@ -602,38 +828,39 @@ public sealed class RuntimeRunTests
                 DisplayName = "SQL Expert",
                 Instructions = "Test",
                 ModelProfile = new ResourceReference("reasoning-default"),
-                Memory = memoryEnabled ? new AgentMemoryConfiguration() : null
+                Memory = memoryEnabled ? new AgentMemoryConfiguration { Profile = new(aepMemory ? "aep-memory-default" : "default-memory") } : null
             }
         };
 
-        private static MemoryProviderResource MemoryProvider() => new()
+        private static MemoryProviderResource MemoryProvider(bool aepMemory) => new()
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.MemoryProvider,
-            Metadata = new ResourceMetadata { Name = "local-memory" },
+            Metadata = new ResourceMetadata { Name = aepMemory ? "memory-sqlite-aep" : "local-memory" },
             Definition = new MemoryProviderProperties
             {
-                DisplayName = "Local Memory",
-                IntegrationKind = MemoryProviderIntegrationKind.Builtin,
-                Builtin = new()
+                DisplayName = aepMemory ? "SQLite Memory via AEP" : "Local Memory",
+                IntegrationKind = aepMemory ? MemoryProviderIntegrationKind.Aep : MemoryProviderIntegrationKind.Builtin,
+                Builtin = aepMemory ? null : new(),
+                Aep = aepMemory ? new() { ExtensionId = "Agentstration.Extensions.Memory.Sqlite", ProviderId = "sqlite" } : null
             }
         };
 
-        private static MemoryProfileResource MemoryProfile() => new()
+        private static MemoryProfileResource MemoryProfile(bool aepMemory) => new()
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.MemoryProfile,
-            Metadata = new ResourceMetadata { Name = "default-memory" },
+            Metadata = new ResourceMetadata { Name = aepMemory ? "aep-memory-default" : "default-memory" },
             Definition = new MemoryProfileProperties
             {
                 DisplayName = "Default Memory",
-                Provider = new("local-memory"),
+                Provider = new(aepMemory ? "memory-sqlite-aep" : "local-memory"),
                 Retrieval = new() { MaximumRecords = 5 },
                 Retention = new()
             }
         };
 
-        private static AgentRevision Revision(string id, string agentId, Guid agentUid, bool memoryEnabled) => new()
+        private static AgentRevision Revision(string id, string agentId, Guid agentUid, bool memoryEnabled, bool aepMemory) => new()
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.AgentRevision,
@@ -656,7 +883,7 @@ public sealed class RuntimeRunTests
                 RuntimeProfileName = "maf-default",
                 EffectiveToolNames = [],
                 MiddlewareIds = [],
-                Memory = memoryEnabled ? new AgentMemoryConfiguration() : null,
+                Memory = memoryEnabled ? new AgentMemoryConfiguration { Profile = new(aepMemory ? "aep-memory-default" : "default-memory") } : null,
                 Capabilities = [],
                 Handler = "prompt-agent",
                 DefinitionHash = "hash"

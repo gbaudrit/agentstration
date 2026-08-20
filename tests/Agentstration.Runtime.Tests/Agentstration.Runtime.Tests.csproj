@@ -1,5 +1,6 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Extensions.Memory.Sqlite/Agentstration.Extensions.Memory.Sqlite.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../src/Agentstration.Memory/Agentstration.Memory.csproj" />
     <ProjectReference Include="../../src/Agentstration.Memory.Application/Agentstration.Memory.Application.csproj" />
     <ProjectReference Include="../../src/Agentstration.Memory.Storage.Sqlite/Agentstration.Memory.Storage.Sqlite.csproj" />

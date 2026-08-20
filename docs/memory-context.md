@@ -148,7 +148,7 @@ The factory returns a fresh `MemoryRecordStoreLease` per scenario. This prevents
 - duplicate-write failure, exact-scope clear, and delete semantics;
 - cancellation propagation.
 
-Reports expose stable scenario/failure codes and exception type names only. Provider exception messages are deliberately discarded because they may contain Memory content or backend diagnostics. Builtin SQLite, the in-process AEP adapter, and the real out-of-process SQLite extension execute this same offline suite in `Agentstration.Memory.Conformance.Tests`. A separate restart scenario writes through HTTP, terminates the extension, starts a new process against the same database, and verifies both durability and cross-Workspace isolation.
+Reports expose stable scenario/failure codes and exception type names only. Provider exception messages are deliberately discarded because they may contain Memory content or backend diagnostics. Builtin SQLite, the in-process AEP adapter, and the real out-of-process SQLite extension execute this same offline suite in `Agentstration.Memory.Conformance.Tests`. A separate restart scenario writes through HTTP, terminates the extension, starts a new process against the same database, and verifies both durability and cross-Workspace isolation. `Agentstration.Runtime.Tests` additionally proves the complete deterministic path: explicit AEP write after one Run, profile/provider resolution in a new Run, bounded context assembly, MAF execution influenced by the remembered fact, cross-Workspace exclusion, and unchanged Agent desired state/revisions.
 
 ## V1 limitations
 
