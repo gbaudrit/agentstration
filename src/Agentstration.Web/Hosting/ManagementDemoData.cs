@@ -49,6 +49,41 @@ public static class ManagementDemoData
             }, cancellationToken);
         }
 
+        var memoryExtensionEndpoint = configuration["Agentstration:Extensions:Agentstration.Extensions.Memory.Sqlite:Endpoint"];
+        if (Uri.TryCreate(memoryExtensionEndpoint, UriKind.Absolute, out _))
+        {
+            if (await memoryProviders.GetAsync(ResourceNamespace.Default, "memory-sqlite-aep", cancellationToken) is null)
+            {
+                await memoryProviders.CreateAsync(new MemoryProviderResource
+                {
+                    ApiVersion = ManagementApiVersions.CoreV1,
+                    Kind = ResourceKinds.MemoryProvider,
+                    Metadata = new ResourceMetadata { Name = "memory-sqlite-aep", Tags = new Dictionary<string, string> { ["sample"] = "aspire" } },
+                    Definition = new MemoryProviderProperties
+                    {
+                        DisplayName = "SQLite Memory via AEP",
+                        IntegrationKind = MemoryProviderIntegrationKind.Aep,
+                        Aep = new() { ExtensionId = "Agentstration.Extensions.Memory.Sqlite", ProviderId = "sqlite" }
+                    }
+                }, cancellationToken);
+            }
+
+            if (await memoryProfiles.GetAsync(ResourceNamespace.Default, "aep-memory-default", cancellationToken) is null)
+            {
+                await memoryProfiles.CreateAsync(new MemoryProfileResource
+                {
+                    ApiVersion = ManagementApiVersions.CoreV1,
+                    Kind = ResourceKinds.MemoryProfile,
+                    Metadata = new ResourceMetadata { Name = "aep-memory-default", Tags = new Dictionary<string, string> { ["sample"] = "aspire" } },
+                    Definition = new MemoryProfileProperties
+                    {
+                        DisplayName = "Default AEP SQLite Memory",
+                        Provider = new ResourceReference("memory-sqlite-aep")
+                    }
+                }, cancellationToken);
+            }
+        }
+
         if (await providers.GetAsync("ollama-local", cancellationToken) is null)
         {
             var connectionString = configuration.GetConnectionString("ollama-extension");

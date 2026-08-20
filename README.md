@@ -16,6 +16,8 @@ The product is a modular monolith organized around a Management Plane, Runtime P
 
 The autonomous Agentstration Extension Protocol SDK, conformance validator, CLI, samples, and standalone Inspector are staged in [`aep/`](aep/README.md). That directory has its own solution and build configuration so it can be moved into a dedicated repository without carrying Agentstration application projects.
 
+Governed Memory is explicit and Workspace-isolated. Direct startup uses the builtin SQLite store; the Aspire AppHost additionally starts the autonomous `Agentstration.Extensions.Memory.Sqlite` AEP reference provider. Storage-provider selection does not move retrieval policy or context assembly outside Agentstration. See [Memory and execution context](docs/memory-context.md).
+
 ## Quick start
 
 Requirements: the .NET SDK version selected by [`global.json`](global.json) (currently .NET 10.0.300 or a compatible feature band).

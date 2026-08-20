@@ -3,6 +3,7 @@
     <ProjectReference Include="../../src/Agentstration.Memory.Testing/Agentstration.Memory.Testing.csproj" />
     <ProjectReference Include="../../src/Agentstration.Memory.Storage.Sqlite/Agentstration.Memory.Storage.Sqlite.csproj" />
     <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.Memory.Sqlite/Agentstration.Extensions.Memory.Sqlite.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />

@@ -151,7 +151,7 @@ For the Aspire dashboard and orchestration experience:
 dotnet run --project src/Agentstration.AppHost
 ```
 
-The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to `Ollama:Endpoint` (default `http://localhost:11434`) and the llama.cpp extension to `LlamaCpp:Endpoint` (default `http://localhost:8080`). It provisions neither inference server nor model and requires no Docker for either path. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
+The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to `Ollama:Endpoint` (default `http://localhost:11434`) and the llama.cpp extension to `LlamaCpp:Endpoint` (default `http://localhost:8080`). It also starts the autonomous SQLite AEP Memory extension, assigns its local database path, and seeds an optional provider/profile binding without replacing the builtin direct-launch default. It provisions neither inference server nor model and requires no Docker for these paths. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
 
 Or with containers:
 

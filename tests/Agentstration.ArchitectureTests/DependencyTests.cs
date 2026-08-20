@@ -6,6 +6,7 @@ using Agentstration.Application;
 using Agentstration.Domain;
 using Agentstration.Evaluation;
 using Agentstration.Extensions.LlamaCpp;
+using Agentstration.Extensions.Memory.Sqlite;
 using Agentstration.Extensions.Ollama;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
@@ -187,6 +188,19 @@ public sealed class DependencyTests
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || name.Contains("Ollama", StringComparison.Ordinal)
             || name.Contains("Aspire.Hosting", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void MemorySqliteExtensionDependsOnlyOnAepAndItsStorageImplementation()
+    {
+        var references = typeof(SqliteAepMemoryProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name ?? string.Empty).ToArray();
+        Assert.IsFalse(references.Any(name => name.Equals("Agentstration.Memory", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.Memory.", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Management", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Web", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
     }
 
     [TestMethod]

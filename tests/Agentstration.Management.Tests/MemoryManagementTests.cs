@@ -2,6 +2,8 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Resources;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,6 +12,32 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class MemoryManagementTests
 {
+    [TestMethod]
+    public async Task ConfiguredSqliteExtensionSeedsOptionalAepProviderAndProfile()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.Memory.Sqlite:Endpoint", "http://localhost:5285");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/health");
+        Assert.IsTrue(response.IsSuccessStatusCode);
+
+        var providers = factory.Services.GetRequiredService<MemoryProviderManagementService>();
+        var profiles = factory.Services.GetRequiredService<MemoryProfileManagementService>();
+        var provider = await providers.GetAsync(ResourceNamespace.Default, "memory-sqlite-aep", default);
+        var profile = await profiles.GetAsync(ResourceNamespace.Default, "aep-memory-default", default);
+
+        Assert.IsNotNull(provider);
+        Assert.AreEqual(MemoryProviderIntegrationKind.Aep, provider.Value.Definition.IntegrationKind);
+        Assert.AreEqual("Agentstration.Extensions.Memory.Sqlite", provider.Value.Definition.Aep?.ExtensionId);
+        Assert.AreEqual("sqlite", provider.Value.Definition.Aep?.ProviderId);
+        Assert.IsNotNull(profile);
+        Assert.AreEqual("memory-sqlite-aep", profile.Value.Definition.Provider.Name);
+    }
+
     [TestMethod]
     public async Task ProviderAndProfileValidateBindingsLimitsAndImmutableIntegration()
     {

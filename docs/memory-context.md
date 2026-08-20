@@ -105,7 +105,7 @@ Accumulated records are runtime/user data and are never Pack payloads. The optio
 
 ## Providers and profiles
 
-The next increment makes that external boundary concrete without changing record semantics:
+The external boundary is concrete without changing record semantics:
 
 ```text
 Agent revision
@@ -117,7 +117,16 @@ Agent revision
 
 `MemoryProvider` belongs to the Management Plane. `MemoryProfile` is portable desired-state configuration. Records remain Workspace-owned runtime/user data and are addressed through an explicit provider. AEP implements only the store contract; `IMemoryRetriever` and `AgentExecutionContextAssembler` remain Agentstration responsibilities.
 
-The AEP V1 capability supports exact-scope CRUD and expiry. It has no semantic retrieval, embeddings or provider-owned context assembly. The repository contains an offline fake provider test, not an Azure implementation.
+The AEP V1 capability supports exact-scope CRUD and expiry. It has no semantic retrieval, embeddings or provider-owned context assembly. `Agentstration.Extensions.Memory.Sqlite` is the executable reference implementation: it is an autonomous ASP.NET Core AEP extension with its own SQLite schema and no dependency on Agentstration's Memory domain, Runtime, Management, Web, or MAF assemblies. Aspire starts it, supplies its endpoint to the authoritative server, and seeds the optional `memory-sqlite-aep` provider plus `aep-memory-default` profile. Direct Web startup keeps the builtin `local-memory` provider as the offline default.
+
+The extension can also be run independently:
+
+```powershell
+$env:MemorySqlite__Path = "C:\data\agentstration-memory.db"
+dotnet run --project src/Agentstration.Extensions.Memory.Sqlite --no-launch-profile
+```
+
+Register its HTTP endpoint under `Agentstration:Extensions:Agentstration.Extensions.Memory.Sqlite:Endpoint`, then declare an AEP `MemoryProvider` whose `extensionId` is `Agentstration.Extensions.Memory.Sqlite` and `providerId` is `sqlite`. The path is installation configuration, never Pack-portable profile data. Azure remains a future provider implementation, not a dependency of this increment.
 
 Mutation audit is local even for external stores. It records provider, scope, operation, outcome, principal and Run/source correlation but never Memory content, tags, prompts, secrets or Tool arguments/results.
 
@@ -139,7 +148,7 @@ The factory returns a fresh `MemoryRecordStoreLease` per scenario. This prevents
 - duplicate-write failure, exact-scope clear, and delete semantics;
 - cancellation propagation.
 
-Reports expose stable scenario/failure codes and exception type names only. Provider exception messages are deliberately discarded because they may contain Memory content or backend diagnostics. SQLite and the AEP adapter both execute this same offline suite in `Agentstration.Memory.Conformance.Tests`.
+Reports expose stable scenario/failure codes and exception type names only. Provider exception messages are deliberately discarded because they may contain Memory content or backend diagnostics. Builtin SQLite, the in-process AEP adapter, and the real out-of-process SQLite extension execute this same offline suite in `Agentstration.Memory.Conformance.Tests`. A separate restart scenario writes through HTTP, terminates the extension, starts a new process against the same database, and verifies both durability and cross-Workspace isolation.
 
 ## V1 limitations
 

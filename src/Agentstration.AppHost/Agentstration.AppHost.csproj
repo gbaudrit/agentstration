@@ -9,5 +9,6 @@
     <ProjectReference Include="../Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.Memory.Sqlite/Agentstration.Extensions.Memory.Sqlite.csproj" />
   </ItemGroup>
 </Project>
