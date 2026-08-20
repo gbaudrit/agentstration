@@ -17,6 +17,7 @@ using Agentstration.Infrastructure.Missions;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.Persistence;
 using Agentstration.Infrastructure.Runtime;
+using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
 using Agentstration.Infrastructure.Workflows;
 using Agentstration.Management.Abstractions;
@@ -37,6 +38,8 @@ using Agentstration.Work.Storage.Sqlite;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Quartz;
 
 namespace Agentstration.Infrastructure;
 
@@ -154,6 +157,28 @@ public static class DependencyInjection
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
+        services.AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>();
+        services.AddSingleton<ITriggerTargetValidator, FlowTriggerTargetValidator>();
+        services.AddSingleton<ITriggerExecutionAuthorizer, WorkspaceTriggerExecutionAuthorizer>();
+        services.AddSingleton<ITriggerWorkSubmitter, TriggerWorkSubmitter>();
+        services.AddSingleton<ITriggerSchedulerProjection, QuartzTriggerScheduler>();
+        services.AddSingleton<TriggerManagementService>();
+        services.AddSingleton<TriggerFiringService>();
+        var schedulerConnectionString = $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "scheduler.db")}";
+        services.AddSingleton<IHostedService>(_ => new QuartzSqliteSchemaInitializer(schedulerConnectionString));
+        services.AddQuartz(configuration =>
+        {
+            configuration.SchedulerId = "AUTO";
+            configuration.SchedulerName = "Agentstration.TriggerScheduler";
+            configuration.UsePersistentStore(options =>
+            {
+                options.UseProperties = true;
+                options.UseMicrosoftSQLite(sqlite => sqlite.ConnectionString = schedulerConnectionString);
+                options.UseSystemTextJsonSerializer();
+            });
+        });
+        services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
+        services.AddHostedService<TriggerSchedulerReconciler>();
         runtimeConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "runtime-plane.db")}";
         services.AddSqliteRuntimeRuns(runtimeConnectionString);
         services.AddSingleton<RuntimeRunStateManager>();

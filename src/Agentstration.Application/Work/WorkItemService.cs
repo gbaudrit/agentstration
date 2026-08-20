@@ -20,7 +20,8 @@ public sealed record SubmitWorkItemCommand(
     IReadOnlyDictionary<string, string>? Metadata = null,
     IReadOnlyList<WorkInput>? Inputs = null,
     IReadOnlyList<WorkAttachment>? Attachments = null,
-    FlowReference? Flow = null);
+    FlowReference? Flow = null,
+    WorkItemId? Id = null);
 
 public sealed class WorkItemService(
     IWorkItemRepository repository,
@@ -58,7 +59,7 @@ public sealed class WorkItemService(
         using var activity = ActivitySource.StartActivity("work.submit");
         var now = timeProvider.GetUtcNow();
         var item = WorkItem.Create(
-            WorkItemId.New(), command.WorkspaceId, command.Type, command.Instruction, now, command.Title, command.Description,
+            command.Id ?? WorkItemId.New(), command.WorkspaceId, command.Type, command.Instruction, now, command.Title, command.Description,
             command.RequesterIdentity, command.CorrelationId, command.Metadata, command.RequestedAgentId, command.Inputs, command.Attachments, command.Flow);
         activity?.SetTag("work.item.id", item.Id.ToString());
         activity?.SetTag("work.correlation.id", item.CorrelationId.ToString());

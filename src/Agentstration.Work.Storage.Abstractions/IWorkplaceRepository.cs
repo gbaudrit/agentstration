@@ -33,6 +33,7 @@ public interface IWorkplaceRepository
     Task CreatePendingActionAsync(PendingAction action, CancellationToken cancellationToken);
     Task<PendingAction?> GetPendingActionAsync(WorkspaceId workspaceId, PendingActionId actionId, CancellationToken cancellationToken);
     Task<IReadOnlyList<PendingAction>> ListPendingActionsAsync(WorkspaceId workspaceId, InteractionId interactionId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PendingAction>> ListPendingActionsForTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken);
     Task SavePendingActionAsync(PendingAction action, long expectedVersion, CancellationToken cancellationToken);
     Task AddActivityAsync(WorkTaskActivity activity, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken);

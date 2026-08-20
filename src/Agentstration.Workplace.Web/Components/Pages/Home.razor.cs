@@ -177,8 +177,8 @@ public partial class Home
             case MessageAddedEvent value when value.Message.InteractionId.Value == interaction?.Id: messages = await Api.ListMessagesAsync(CurrentWorkspaceName, value.Message.InteractionId.Value, lifetime.Token); break;
             case InteractionUpdatedEvent value when value.InteractionId == interaction?.Id:
                 await LoadInteractionAsync(value.InteractionId); break;
-            case PendingActionCreatedEvent value when value.PendingAction.InteractionId == interaction?.Id:
-                await LoadInteractionAsync(value.PendingAction.InteractionId); break;
+            case PendingActionCreatedEvent value when value.PendingAction.InteractionId is Guid interactionId && interactionId == interaction?.Id:
+                await LoadInteractionAsync(interactionId); break;
             case PendingActionResolvedEvent when interaction is not null:
                 await LoadInteractionAsync(interaction.Id); break;
             case TaskCreatedEvent: await RefreshOverviewAsync(); break;

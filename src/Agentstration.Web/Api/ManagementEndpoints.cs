@@ -27,6 +27,7 @@ public static class ManagementEndpoints
         ReconcileDeploymentEndpoint.Map(group);
         RouteAndExecuteEndpoint.Map(group);
         PackEndpoints.Map(group);
+        TriggerEndpoints.Map(group);
     }
 }
 

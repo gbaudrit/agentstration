@@ -106,7 +106,7 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Routing | deterministic stateless decision | rule catalog and LLM router |
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
-| Scheduling | standalone polling worker | Quartz persistent scheduler |
+| Scheduling | Workspace-scoped Trigger resources, durable occurrences, Quartz.NET persistent SQLite projection, startup reconciliation, explicit misfire/concurrency policy and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
 | Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog, and an Agentstration-owned runtime execution boundary before MCP `tools/call` | richer permissions, credentials, connection policies, and execution hooks |
 | Notifications | internal notification record/event | email, Teams, webhook channels |
 | MCP | nine tools reusing application services | resources and authorization |
@@ -130,7 +130,7 @@ public interface IMemoryStore { Task AddAsync(MemoryEntry entry, CancellationTok
 public interface IMemorySearch { Task<IReadOnlyList<MemoryEntry>> SearchAsync(WorkspaceId workspaceId, string query, int limit, CancellationToken cancellationToken); }
 public interface IBlobStore { Task<string> PutAsync(WorkspaceId workspaceId, string name, Stream content, CancellationToken cancellationToken); }
 public interface IEmbeddingStore { Task UpsertAsync(WorkspaceId workspaceId, Guid id, ReadOnlyMemory<float> embedding, CancellationToken cancellationToken); }
-public interface IScheduler { Task TriggerDueMissionsAsync(CancellationToken cancellationToken); }
+public interface ITriggerSchedulerProjection { Task ReconcileAsync(TriggerResource trigger, CancellationToken cancellationToken); }
 ```
 
 Other important contracts are `IPlatformStore`, `IEventBus`, `IEventHandler<T>`, `IItemProcessingQueue`, `IContentSourceReader`, and `IObservationTool`. Expected business failures use `Result<T>`; unexpected infrastructure failures remain exceptions and are translated at the HTTP boundary.
@@ -163,13 +163,29 @@ REST / UI / MCP
 ### Monitoring vertical
 
 ```text
-REST / UI / MCP / scheduler tick
+REST / UI / MCP (manual legacy vertical)
   -> MissionService
   -> IObservationTool (demo sequence in MVP)
   -> MissionRun + observation MemoryEntry
   -> compare previous observation
   -> threshold satisfied and changed
   -> Notification + NotificationRequested
+```
+
+The historical Mission polling worker is no longer started. It belongs to the legacy monitoring vertical and is not reused for proactive Work.
+
+### Trigger vertical
+
+```text
+TriggerResource (Management desired state)
+  -> Quartz SQLite projection (reconstructible)
+  -> durable TriggerOccurrence (idempotency and pre-Work outcome)
+  -> current Principal authorization
+  -> exact immutable FlowReference
+  -> WorkItem origin/correlation
+  -> FlowRun
+  -> Runtime
+  -> autonomous Task/result or existing task-scoped PendingAction
 ```
 
 ### Work vertical

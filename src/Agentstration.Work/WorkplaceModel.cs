@@ -196,7 +196,7 @@ public sealed record PendingAction
 {
     public required PendingActionId Id { get; init; }
     public required WorkspaceId WorkspaceId { get; init; }
-    public required InteractionId InteractionId { get; init; }
+    public InteractionId? InteractionId { get; init; }
     public WorkTaskId? WorkTaskId { get; init; }
     public string? FlowRunId { get; init; }
     public string? ExternalInputRequestId { get; init; }
@@ -284,8 +284,8 @@ public sealed record ShowErrorAction(string Title, string? Description) : Workpl
 public sealed record WorkTask(
     WorkTaskId Id,
     WorkspaceId WorkspaceId,
-    EntryId EntryId,
-    InteractionId InteractionId,
+    EntryId? EntryId,
+    InteractionId? InteractionId,
     string Title,
     string? Description,
     WorkTaskStatus Status,
