@@ -90,34 +90,44 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
             });
     }
 
-    public async ValueTask<ExtensionInspection> InspectAsync(
+    public bool CanInspectEndpoint(Uri endpoint) => endpoint.Scheme is "http" or "https";
+
+    public ValueTask<ExtensionInspection> InspectAsync(
         ModelProviderConfiguration provider,
+        CancellationToken cancellationToken = default) =>
+        InspectAsync(provider.Name, provider.Endpoint, cancellationToken);
+
+    public async ValueTask<ExtensionInspection> InspectAsync(
+        string registrationName,
+        Uri endpoint,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var client = CreateClient(provider);
+            var client = CreateClient(endpoint);
             var manifest = await client.DiscoverAsync(cancellationToken);
             var catalog = await client.GetConfigurationAsync(cancellationToken);
             return new ExtensionInspection(
-                provider.Name,
-                provider.Endpoint,
+                registrationName,
+                endpoint,
                 "available",
                 new ExtensionIdentity(
                     manifest.Extension.Id,
                     manifest.Extension.Name,
                     manifest.Extension.Version,
                     manifest.Extension.Description),
-                manifest.Contributions.ModelProviders.Select(value => value.Id)
-                    .Concat(manifest.Contributions.Tools?.Select(value => value.Id) ?? [])
+                manifest.Contributions.ModelProviders
+                    .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.ModelProvider, value.Id))
+                    .Concat((manifest.Contributions.Tools ?? [])
+                        .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.Tool, value.Id)))
                     .ToArray(),
                 catalog.OptionSets.Select(Map).ToArray());
         }
         catch (AepProtocolException exception)
         {
             return new ExtensionInspection(
-                provider.Name,
-                provider.Endpoint,
+                registrationName,
+                endpoint,
                 exception.Code == "protocol_incompatible" ? "incompatible" : "unavailable",
                 null,
                 [],
@@ -126,18 +136,21 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         }
         catch (HttpRequestException exception)
         {
-            return new ExtensionInspection(provider.Name, provider.Endpoint, "unavailable", null, [], [], exception.Message);
+            return new ExtensionInspection(registrationName, endpoint, "unavailable", null, [], [], exception.Message);
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            return new ExtensionInspection(provider.Name, provider.Endpoint, "unavailable", null, [], [], exception.Message);
+            return new ExtensionInspection(registrationName, endpoint, "unavailable", null, [], [], exception.Message);
         }
     }
 
     private AepClient CreateClient(ModelProviderConfiguration provider)
+        => CreateClient(provider.Endpoint);
+
+    private AepClient CreateClient(Uri endpoint)
     {
         var client = httpClients.CreateClient("agentstration-aep");
-        client.BaseAddress = provider.Endpoint;
+        client.BaseAddress = endpoint;
         return new AepClient(client);
     }
 

@@ -41,6 +41,7 @@ public sealed record AepCapabilityDescriptor(
 public static class AepContributionKinds
 {
     public const string ModelProvider = "model-provider";
+    public const string Tool = "tool";
 }
 
 public static class AepOptionScopes

@@ -17,7 +17,7 @@ else if (error is not null)
 }
 else if (extensions?.Count == 0)
 {
-    <EmptyState Title="No extensions" Message="Create an AEP-backed Model Provider to observe its extension here." />
+    <EmptyState Title="No extensions discovered" Message="Declare an endpoint under Agentstration:Extensions or start the Aspire AppHost to make an AEP extension discoverable." />
 }
 else
 {
@@ -26,7 +26,7 @@ else
         <section class="panel resource-section">
             <div class="panel-header">
                 <div>
-                    <p class="eyebrow">AEP extension · <code>@extension.ProviderNamespace/@extension.ProviderName</code></p>
+                    <p class="eyebrow">AEP extension · @if (extension.Configured) { <code>@extension.ProviderNamespace/@extension.ProviderName</code> } else { <span>discovered from @extension.DiscoverySource</span> }</p>
                     <h2>@(extension.Extension?.Name ?? extension.ProviderName)</h2>
                     <p>@(extension.Extension?.Description ?? extension.Details ?? "Extension identity is not currently available.")</p>
                 </div>
@@ -36,8 +36,19 @@ else
                 <dt>Extension ID</dt><dd><code>@(extension.Extension?.Id ?? "—")</code></dd>
                 <dt>Observed version</dt><dd>@(extension.Extension?.Version ?? "—")</dd>
                 <dt>AEP endpoint</dt><dd><code>@extension.Endpoint</code></dd>
-                <dt>Contributions</dt><dd>@(extension.Contributions.Count == 0 ? "—" : string.Join(", ", extension.Contributions))</dd>
+                <dt>Registration</dt><dd>@(extension.Configured ? "Configured Model Provider" : "Discovered endpoint")</dd>
+                <dt>Contributions</dt><dd>@(extension.Contributions.Count == 0 ? "—" : string.Join(", ", extension.Contributions.Select(value => $"{value.Kind}:{value.Id}")))</dd>
             </dl>
+
+            @if (!extension.Configured && extension.Contributions.Any(value => value.Kind == "model-provider"))
+            {
+                <div class="form-actions">
+                    @foreach (var contribution in extension.Contributions.Where(value => value.Kind == "model-provider"))
+                    {
+                        <a class="button-primary" href="@ConfigureProviderUrl(extension, contribution)">Configure @contribution.Id provider</a>
+                    }
+                </div>
+            }
 
             <div class="panel-header"><div><h3>Option contracts</h3><p>Every version and schema digest is immutable.</p></div><span>@extension.OptionSets.Count set(s)</span></div>
             @if (extension.OptionSets.Count == 0)
@@ -100,6 +111,8 @@ else
         System.Text.Json.JsonSerializer.Serialize(schema, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
     private static string ProfileUrl(ExtensionOptionUsageResponse usage) =>
         $"/modelprofiles/{Uri.EscapeDataString(usage.ProfileName)}?namespace={Uri.EscapeDataString(usage.ProfileNamespace)}";
+    private static string ConfigureProviderUrl(ExtensionResponse extension, ExtensionContributionResponse contribution) =>
+        $"/modelproviders/new?providerType={Uri.EscapeDataString(contribution.Id)}&endpoint={Uri.EscapeDataString(extension.Endpoint.AbsoluteUri)}&displayName={Uri.EscapeDataString(extension.Extension?.Name ?? contribution.Id)}";
 
     public void Dispose()
     {

@@ -38,6 +38,7 @@ public sealed record ModelProviderUsageResponse(string ResourceType, string Reso
 public sealed record ModelProviderUsagesResponse(IReadOnlyList<ModelProviderUsageResponse> Value, int Count);
 
 public sealed record ExtensionIdentityResponse(string Id, string Name, string Version, string? Description);
+public sealed record ExtensionContributionResponse(string Kind, string Id);
 public sealed record ExtensionOptionSetVersionResponse(string Version, string SchemaDigest, JsonElement Schema, bool Deprecated);
 public sealed record ExtensionOptionSetResponse(
     string Id,
@@ -60,10 +61,12 @@ public sealed record ExtensionResponse(
     Uri Endpoint,
     string Status,
     ExtensionIdentityResponse? Extension,
-    IReadOnlyList<string> Contributions,
+    IReadOnlyList<ExtensionContributionResponse> Contributions,
     IReadOnlyList<ExtensionOptionSetResponse> OptionSets,
     IReadOnlyList<ExtensionOptionUsageResponse> Usages,
-    string? Details);
+    string? Details,
+    bool Configured,
+    string DiscoverySource);
 
 public sealed record CreateModelProfileRequest(
     string Name,

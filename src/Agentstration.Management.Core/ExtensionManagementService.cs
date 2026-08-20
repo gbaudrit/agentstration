@@ -18,15 +18,18 @@ public sealed record ExtensionView(
     Uri Endpoint,
     string Status,
     ExtensionIdentity? Extension,
-    IReadOnlyList<string> Contributions,
+    IReadOnlyList<ExtensionContribution> Contributions,
     IReadOnlyList<ExtensionOptionSet> OptionSets,
     IReadOnlyList<ExtensionOptionUsage> Usages,
-    string? Details);
+    string? Details,
+    bool Configured,
+    string DiscoverySource);
 
 public sealed class ExtensionManagementService(
     IModelProviderConfigurationStore providers,
     ModelProfileManagementService profiles,
-    IEnumerable<IExtensionInspector> inspectors)
+    IEnumerable<IExtensionInspector> inspectors,
+    IEnumerable<IExtensionEndpointSource> endpointSources)
 {
     public async Task<IReadOnlyList<ExtensionView>> ListAsync(CancellationToken cancellationToken)
     {
@@ -56,10 +59,42 @@ public sealed class ExtensionManagementService(
                 inspection.Contributions,
                 inspection.OptionSets,
                 usages,
-                inspection.Details));
+                inspection.Details,
+                true,
+                "model-provider"));
+        }
+
+        var configuredEndpoints = configurations
+            .Select(value => Normalize(value.Endpoint))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var registrations = endpointSources
+            .SelectMany(value => value.List())
+            .Where(value => !configuredEndpoints.Contains(Normalize(value.Endpoint)))
+            .DistinctBy(value => Normalize(value.Endpoint), StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value.Id, StringComparer.Ordinal);
+        foreach (var registration in registrations)
+        {
+            var inspector = inspectors.SingleOrDefault(value => value.CanInspectEndpoint(registration.Endpoint));
+            var inspection = inspector is null
+                ? new ExtensionInspection(registration.Id, registration.Endpoint, "unknown", null, [], [], "No extension inspector is registered.")
+                : await inspector.InspectAsync(registration.Id, registration.Endpoint, cancellationToken);
+            views.Add(new ExtensionView(
+                registration.Id,
+                string.Empty,
+                registration.Endpoint,
+                inspection.Status,
+                inspection.Extension,
+                inspection.Contributions,
+                inspection.OptionSets,
+                [],
+                inspection.Details,
+                false,
+                registration.Source));
         }
         return views;
     }
+
+    private static string Normalize(Uri endpoint) => endpoint.AbsoluteUri.TrimEnd('/');
 
     private static bool References(ModelProfileResource profile, ModelProviderConfiguration provider)
     {

@@ -108,6 +108,32 @@ public sealed class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task ExtensionsApiDiscoversConfiguredEndpointBeforeProviderCreation()
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Agentstration:Extensions:extension.discovered:Endpoint", "http://127.0.0.1:5678");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IExtensionInspector>();
+                services.AddSingleton<IExtensionInspector, ConfiguredEndpointInspector>();
+            });
+        });
+        using var client = factory.CreateClient();
+
+        var response = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
+        var extension = response!.Value.Single(value => value.ProviderName == "extension.discovered");
+
+        Assert.IsFalse(extension.Configured);
+        Assert.AreEqual("configuration", extension.DiscoverySource);
+        Assert.AreEqual("extension.discovered", extension.Extension!.Id);
+        Assert.AreEqual("http://127.0.0.1:5678/", extension.Endpoint.AbsoluteUri);
+        var contribution = extension.Contributions.Single();
+        Assert.AreEqual("model-provider", contribution.Kind);
+        Assert.AreEqual("discovered", contribution.Id);
+    }
+
+    [TestMethod]
     public async Task ProfileCrudUsesETagAndAllowsTemporarilyUnavailableModel()
     {
         await using var factory = Factory();
@@ -662,6 +688,27 @@ public sealed class ModelManagementApiTests
             StructuredOutput = new(structuredOutput ? CapabilitySupport.Native : CapabilitySupport.Unsupported),
             Reasoning = new ReasoningCapability { Support = reasoning ? CapabilitySupport.Native : CapabilitySupport.Unsupported }
         };
+    }
+
+    private sealed class ConfiguredEndpointInspector : IExtensionInspector
+    {
+        public bool CanHandle(string providerType) => true;
+        public bool CanInspectEndpoint(Uri endpoint) => true;
+        public ValueTask<ExtensionInspection> InspectAsync(
+            ModelProviderConfiguration provider,
+            CancellationToken cancellationToken = default) =>
+            InspectAsync(provider.Name, provider.Endpoint, cancellationToken);
+        public ValueTask<ExtensionInspection> InspectAsync(
+            string registrationName,
+            Uri endpoint,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ExtensionInspection(
+                registrationName,
+                endpoint,
+                "available",
+                new ExtensionIdentity(registrationName, "Discovered extension", "1.0.0", null),
+                [new ExtensionContribution("model-provider", "discovered")],
+                []));
     }
 
     private static CreateModelProfileRequest Request(string name, string model) => new(

@@ -27,7 +27,7 @@ public static class ExtensionEndpoints
             view.Extension.Name,
             view.Extension.Version,
             view.Extension.Description),
-        view.Contributions,
+        view.Contributions.Select(value => new ExtensionContributionResponse(value.Kind, value.Id)).ToArray(),
         view.OptionSets.Select(optionSet => new ExtensionOptionSetResponse(
             optionSet.Id,
             optionSet.ContributionKind,
@@ -47,5 +47,7 @@ public static class ExtensionEndpoints
             usage.SchemaDigest,
             usage.Status,
             usage.Issues)).ToArray(),
-        view.Details);
+        view.Details,
+        view.Configured,
+        view.DiscoverySource);
 }
