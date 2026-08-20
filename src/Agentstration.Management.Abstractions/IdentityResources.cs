@@ -87,13 +87,16 @@ public static class AuthorizationPermissions
     public const string ResourcesDelete = "resources/delete";
     public const string RunsRead = "runs/read";
     public const string RunsExecute = "runs/execute";
+    public const string MemoryRead = "memory/read";
+    public const string MemoryWrite = "memory/write";
+    public const string MemoryDelete = "memory/delete";
     public const string AuthorizationRead = "authorization/read";
     public const string AuthorizationWrite = "authorization/write";
 
     public static readonly IReadOnlyCollection<string> All =
     [
         TenantsRead, TenantsManage, WorkspacesRead, WorkspacesWrite, WorkspacesDelete,
-        ResourcesRead, ResourcesWrite, ResourcesDelete, RunsRead, RunsExecute,
+        ResourcesRead, ResourcesWrite, ResourcesDelete, RunsRead, RunsExecute, MemoryRead, MemoryWrite, MemoryDelete,
         AuthorizationRead, AuthorizationWrite
     ];
 }

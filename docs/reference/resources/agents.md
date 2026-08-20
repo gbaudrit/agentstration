@@ -22,7 +22,10 @@ definition:
     - name: sql-readonly
   behaviors: []
   middleware: []
-  contextProviders: []
+  memory:
+    readOwnMemory: true
+    sharedScopes: []
+    maximumRecords: 10
   settings: {}
 ```
 

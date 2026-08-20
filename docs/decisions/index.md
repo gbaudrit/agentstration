@@ -91,3 +91,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 59. [ADR-0059 — Tool arguments require explicit bounded retention](0059-tool-arguments-require-explicit-bounded-retention.md)
 60. [ADR-0060 — Entry owns Workplace execution presentation](0060-entry-owns-workplace-execution-presentation.md)
 61. [ADR-0061 — llama.cpp is an AEP provider and capabilities are resolved effectively](0061-llama-cpp-provider-and-effective-capabilities.md)
+62. [ADR-0062 — Memory is governed state and Runtime assembles execution context](0062-memory-is-governed-state-and-runtime-assembles-context.md)

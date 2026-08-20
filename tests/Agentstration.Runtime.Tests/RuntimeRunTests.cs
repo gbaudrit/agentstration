@@ -558,7 +558,6 @@ public sealed class RuntimeRunTests
                 RuntimeProfileName = "maf-default",
                 EffectiveToolNames = [],
                 MiddlewareIds = [],
-                ContextProviderIds = [],
                 Capabilities = [],
                 Handler = "prompt-agent",
                 DefinitionHash = "hash"

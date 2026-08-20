@@ -1,7 +1,6 @@
 using Agentstration.Application;
 using Agentstration.Application.Common;
 using Agentstration.Application.Ingestion;
-using Agentstration.Application.Memory;
 using Agentstration.Application.Missions;
 using Agentstration.Application.Workspaces;
 using Agentstration.Contracts;
@@ -20,7 +19,6 @@ public static class ApiEndpoints
         api.MapGet("/workspaces/{workspaceId:guid}/inboxes", (Guid workspaceId, WorkspaceService service, CancellationToken token) => service.ListInboxesAsync(new WorkspaceId(workspaceId), token));
         api.MapPost("/workspaces/{workspaceId:guid}/inboxes/{inboxId:guid}/items", IngestAsync).DisableAntiforgery();
         api.MapGet("/workspaces/{workspaceId:guid}/items/{itemId:guid}", GetItemAsync);
-        api.MapPost("/workspaces/{workspaceId:guid}/memory/search", SearchMemoryAsync);
         api.MapPost("/workspaces/{workspaceId:guid}/missions", CreateMissionAsync);
         api.MapGet("/workspaces/{workspaceId:guid}/missions", (Guid workspaceId, MissionService service, CancellationToken token) => service.ListAsync(new WorkspaceId(workspaceId), token));
         api.MapGet("/workspaces/{workspaceId:guid}/missions/{missionId:guid}", GetMissionAsync);
@@ -73,7 +71,6 @@ public static class ApiEndpoints
     }
 
     private static async Task<IResult> GetItemAsync(Guid workspaceId, Guid itemId, IngestionService service, CancellationToken token) => ToHttp(await service.GetAsync(new WorkspaceId(workspaceId), new ItemId(itemId), token), Results.Ok);
-    private static async Task<IResult> SearchMemoryAsync(Guid workspaceId, SearchMemoryRequest request, IMemorySearch memory, CancellationToken token) => Results.Ok(await memory.SearchAsync(new WorkspaceId(workspaceId), request.Query, request.Limit, token));
     private static async Task<IResult> CreateMissionAsync(Guid workspaceId, CreateMissionRequest request, MissionService service, CancellationToken token) => ToHttp(await service.CreateAsync(new WorkspaceId(workspaceId), request, token), value => Results.Created($"/api/workspaces/{workspaceId}/missions/{value.Id}", value));
     private static async Task<IResult> GetMissionAsync(Guid workspaceId, Guid missionId, MissionService service, CancellationToken token) => ToHttp(await service.GetAsync(new WorkspaceId(workspaceId), new MissionId(missionId), token), Results.Ok);
     private static async Task<IResult> RunMissionAsync(Guid workspaceId, Guid missionId, MissionService service, CancellationToken token) => ToHttp(await service.RunAsync(new WorkspaceId(workspaceId), new MissionId(missionId), token), Results.Ok);

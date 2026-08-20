@@ -21,6 +21,10 @@
     <Project Path="src/Agentstration.Management.Abstractions/Agentstration.Management.Abstractions.csproj" />
     <Project Path="src/Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
     <Project Path="src/Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
+    <Project Path="src/Agentstration.Memory/Agentstration.Memory.csproj" />
+    <Project Path="src/Agentstration.Memory.Application/Agentstration.Memory.Application.csproj" />
+    <Project Path="src/Agentstration.Memory.Storage.Abstractions/Agentstration.Memory.Storage.Abstractions.csproj" />
+    <Project Path="src/Agentstration.Memory.Storage.Sqlite/Agentstration.Memory.Storage.Sqlite.csproj" />
     <Project Path="src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <Project Path="src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <Project Path="src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />

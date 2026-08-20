@@ -169,7 +169,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             ValidateCompatibility(model, effective);
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
             var runOptions = new ChatClientAgentRunOptions(chatOptions);
-            var response = await agent.RunAsync(request.Input, options: runOptions, cancellationToken: cancellationToken);
+            var response = await agent.RunAsync(Messages(request), options: runOptions, cancellationToken: cancellationToken);
             return new AgentExecutionResult(response.Text, request.SessionId, model?.ProviderType, model?.ModelName, effective);
         }
 
@@ -198,7 +198,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             if (effective.Streaming == RuntimeStreamingMode.Disabled)
             {
                 var response = await agent.RunAsync(
-                    request.Input,
+                    Messages(request),
                     options: new ChatClientAgentRunOptions(chatOptions),
                     cancellationToken: cancellationToken);
                 if (!string.IsNullOrEmpty(response.Text)) yield return new ContentDelta(response.Text);
@@ -206,7 +206,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                 yield break;
             }
             await using var updates = agent.RunStreamingAsync(
-                request.Input,
+                Messages(request),
                 options: new ChatClientAgentRunOptions(chatOptions),
                 cancellationToken: cancellationToken).GetAsyncEnumerator(cancellationToken);
             while (true)
@@ -234,6 +234,17 @@ public sealed class AgentFrameworkRuntimeFactory(
             }
             yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ProviderType, model?.ModelName, effective));
         }
+
+        private static IEnumerable<ChatMessage> Messages(AgentExecutionRequest request) =>
+            (request.Messages ?? [new RuntimeRunMessage(RuntimeMessageRole.User, request.Input)]).Select(message => new ChatMessage(message.Role switch
+            {
+                RuntimeMessageRole.System => ChatRole.System,
+                RuntimeMessageRole.Developer => ChatRole.System,
+                RuntimeMessageRole.User => ChatRole.User,
+                RuntimeMessageRole.Assistant => ChatRole.Assistant,
+                RuntimeMessageRole.Tool => ChatRole.Tool,
+                _ => throw new ArgumentOutOfRangeException(nameof(request), message.Role, "Unsupported runtime message role.")
+            }, message.Content));
 
         private void ValidateCompatibility(ModelChatClientMetadata? model, ModelExecutionOptions execution)
         {

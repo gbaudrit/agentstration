@@ -7,7 +7,6 @@ public sealed record CreateInboxRequest(string Name, string? Slug, string? Descr
 public sealed record InboxCreatedResponse(Inbox Inbox, string ApiKey);
 public sealed record IngestItemRequest(string? Text, string? Url, string? ExternalId);
 public sealed record IngestItemResponse(ItemId ItemId, string Status, bool Duplicate);
-public sealed record ItemDetails(Item Item, RawContent Raw, NormalizedContent? Normalized, IReadOnlyList<MemoryEntry> Memory);
-public sealed record SearchMemoryRequest(string Query, int Limit = 20);
+public sealed record ItemDetails(Item Item, RawContent Raw, NormalizedContent? Normalized, IReadOnlyList<ItemAnalysis> Analyses);
 public sealed record CreateMissionRequest(string Name, string Objective, string SourceUrl, int FrequencyMinutes, decimal? Threshold);
 public sealed record MissionDetails(Mission Mission, IReadOnlyList<MissionRun> Runs, IReadOnlyList<Notification> Notifications);

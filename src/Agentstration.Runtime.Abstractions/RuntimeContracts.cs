@@ -24,7 +24,8 @@ public sealed record AgentExecutionRequest(
     string? SessionId = null,
     ModelExecutionOptions? Options = null,
     AgentExecutionOptions? Execution = null,
-    ToolExecutionScope? ToolExecution = null);
+    ToolExecutionScope? ToolExecution = null,
+    IReadOnlyList<RuntimeRunMessage>? Messages = null);
 public sealed record AgentExecutionResult(
     string Output,
     string? SessionId = null,
@@ -133,10 +134,17 @@ public sealed record ExecutableAgentDefinition
     public required string RuntimeProfileName { get; init; }
     public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
     public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
-    public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
+    public ExecutableAgentMemoryConfiguration? Memory { get; init; }
     public required IReadOnlyCollection<string> Capabilities { get; init; }
     public required string Handler { get; init; }
     public required string DefinitionHash { get; init; }
+}
+
+public sealed record ExecutableAgentMemoryConfiguration
+{
+    public bool ReadOwnMemory { get; init; } = true;
+    public IReadOnlyList<string> SharedScopes { get; init; } = [];
+    public int MaximumRecords { get; init; } = 10;
 }
 
 public sealed record ResolvedRuntimeAgent(

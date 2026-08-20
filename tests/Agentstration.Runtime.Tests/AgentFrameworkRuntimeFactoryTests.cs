@@ -730,7 +730,6 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         RuntimeProfileName = "maf-default",
         EffectiveToolNames = [],
         MiddlewareIds = [],
-        ContextProviderIds = [],
         Capabilities = [],
         Handler = "prompt-agent",
         DefinitionHash = "hash"

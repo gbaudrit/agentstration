@@ -177,7 +177,10 @@ public static class WebConsoleServiceCollectionExtensions
             .AddPolicy(AgentstrationPolicies.CanManageAgents, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesWrite))
             .AddPolicy(AgentstrationPolicies.CanRunAgents, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute))
             .AddPolicy(AgentstrationPolicies.CanReadRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsRead))
-            .AddPolicy(AgentstrationPolicies.CanRunFlows, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute));
+            .AddPolicy(AgentstrationPolicies.CanRunFlows, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute))
+            .AddPolicy(AgentstrationPolicies.CanReadMemory, policy => WorkspacePolicy(policy, AuthorizationPermissions.MemoryRead))
+            .AddPolicy(AgentstrationPolicies.CanWriteMemory, policy => WorkspacePolicy(policy, AuthorizationPermissions.MemoryWrite))
+            .AddPolicy(AgentstrationPolicies.CanDeleteMemory, policy => WorkspacePolicy(policy, AuthorizationPermissions.MemoryDelete));
     }
 
     private static void WorkspacePolicy(AuthorizationPolicyBuilder policy, string permission)

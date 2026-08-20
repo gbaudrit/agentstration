@@ -32,7 +32,7 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
         var instructions = NormalizeInstructions(agent.Instructions);
         var tools = agent.Tools.Select(reference => reference.Name).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         var middleware = agent.Middleware.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
-        var contextProviders = agent.ContextProviders.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        var memory = ValidateMemory(agent.Memory);
         var capabilities = agent.Behaviors.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         var canonical = new
         {
@@ -48,7 +48,7 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             deployment.HostingMode,
             Tools = tools,
             Middleware = middleware,
-            ContextProviders = contextProviders,
+            Memory = memory,
             Capabilities = capabilities,
             Settings = agent.Settings.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray()
         };
@@ -66,7 +66,7 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             RuntimeProfileName = deployment.RuntimeProfileName,
             EffectiveToolNames = tools,
             MiddlewareIds = middleware,
-            ContextProviderIds = contextProviders,
+            Memory = memory,
             Capabilities = capabilities,
             Handler = agent.Handler,
             DefinitionHash = hash
@@ -75,4 +75,17 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
 
     private static string NormalizeInstructions(string instructions) =>
         instructions.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Trim();
+
+    private static AgentMemoryConfiguration? ValidateMemory(AgentMemoryConfiguration? memory)
+    {
+        if (memory is null) return null;
+        if (memory.MaximumRecords is < 1 or > 20)
+            throw new AgentDefinitionValidationException("memory_limit_invalid", "Agent Memory maximumRecords must be between 1 and 20.");
+        if (memory.SharedScopes.Count > 16)
+            throw new AgentDefinitionValidationException("memory_shared_scopes_too_many", "An Agent cannot read more than 16 shared Memory scopes.");
+        var scopes = memory.SharedScopes.Select(value => value.Trim()).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        if (scopes.Any(value => value.Length is 0 or > 256 || !value.All(character => char.IsLetterOrDigit(character) || character is '-' or '_' or '.')))
+            throw new AgentDefinitionValidationException("memory_shared_scope_invalid", "Shared Memory scope names may contain letters, digits, '-', '_' and '.'.");
+        return memory with { SharedScopes = scopes };
+    }
 }

@@ -128,9 +128,11 @@ public static class BuiltInIdentityRoles
             [AuthorizationPermissions.TenantsRead, AuthorizationPermissions.WorkspacesRead, AuthorizationPermissions.WorkspacesWrite,
              AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesWrite, AuthorizationPermissions.ResourcesDelete,
              AuthorizationPermissions.RunsRead, AuthorizationPermissions.RunsExecute, AuthorizationPermissions.AuthorizationRead,
-             AuthorizationPermissions.AuthorizationWrite], true),
+             AuthorizationPermissions.AuthorizationWrite, AuthorizationPermissions.MemoryRead, AuthorizationPermissions.MemoryWrite,
+             AuthorizationPermissions.MemoryDelete], true),
         new(new Guid("2c0b9724-f78f-43db-b0b6-673c04dc68a4"), Member, Member,
-            [AuthorizationPermissions.WorkspacesRead, AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.RunsRead, AuthorizationPermissions.RunsExecute], true),
+            [AuthorizationPermissions.WorkspacesRead, AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.RunsRead, AuthorizationPermissions.RunsExecute,
+             AuthorizationPermissions.MemoryRead, AuthorizationPermissions.MemoryWrite], true),
         new(new Guid("8bb015ea-acda-4770-8d7a-0399e1d28ab4"), Viewer, Viewer,
             [AuthorizationPermissions.WorkspacesRead, AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.RunsRead], true)
     ];

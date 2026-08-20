@@ -445,8 +445,15 @@ public record AgentProperties
     public IReadOnlyList<ResourceReference> Tools { get; init; } = [];
     public IReadOnlyList<string> Behaviors { get; init; } = [];
     public IReadOnlyList<string> Middleware { get; init; } = [];
-    public IReadOnlyList<string> ContextProviders { get; init; } = [];
+    public AgentMemoryConfiguration? Memory { get; init; }
     public IReadOnlyDictionary<string, JsonElement> Settings { get; init; } = new Dictionary<string, JsonElement>();
+}
+
+public sealed record AgentMemoryConfiguration
+{
+    public bool ReadOwnMemory { get; init; } = true;
+    public IReadOnlyList<string> SharedScopes { get; init; } = [];
+    public int MaximumRecords { get; init; } = 10;
 }
 
 public sealed record AgentResource : Resource
@@ -504,7 +511,7 @@ public sealed record ResolvedAgentDefinition
     public required string RuntimeProfileName { get; init; }
     public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
     public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
-    public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
+    public AgentMemoryConfiguration? Memory { get; init; }
     public required IReadOnlyCollection<string> Capabilities { get; init; }
     public required string Handler { get; init; }
     public required string DefinitionHash { get; init; }

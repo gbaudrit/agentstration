@@ -40,13 +40,11 @@ public sealed record NormalizedContent(
     string Value,
     DateTimeOffset CreatedAt);
 
-public sealed record MemoryEntry(
+public sealed record ItemAnalysis(
     Guid Id,
     WorkspaceId WorkspaceId,
-    ItemId? ItemId,
-    MissionId? MissionId,
-    string Kind,
-    string Content,
+    ItemId ItemId,
+    string Summary,
     IReadOnlyList<string> Categories,
     DateTimeOffset CreatedAt);
 

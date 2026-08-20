@@ -14,6 +14,9 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Memory;
+using Agentstration.Memory.Application;
+using Agentstration.Memory.Storage.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
@@ -102,6 +105,24 @@ public sealed class DependencyTests
     {
         var references = typeof(IRuntimeRegistry).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void MemoryContractsAreProviderNeutralAndUiIndependent()
+    {
+        var assemblies = new[]
+        {
+            typeof(MemoryRecord).Assembly,
+            typeof(IMemoryRetriever).Assembly,
+            typeof(IMemoryRecordStore).Assembly
+        };
+        var references = assemblies.SelectMany(value => value.GetReferencedAssemblies()).Select(value => value.Name).ToArray();
+
+        Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Web", StringComparison.Ordinal)
+            || name.Contains("AspNetCore", StringComparison.Ordinal)));
     }
 
     [TestMethod]

@@ -23,7 +23,7 @@ public enum RuntimeRunOrigin { Console, Api, WorkItem, Flow }
 [JsonConverter(typeof(JsonStringEnumConverter<RuntimeMessageRole>))]
 public enum RuntimeMessageRole { System, Developer, User, Assistant, Tool }
 [JsonConverter(typeof(JsonStringEnumConverter<RuntimeRunEventKind>))]
-public enum RuntimeRunEventKind { RunCreated, StatusChanged, StepStarted, StepCompleted, ResponseDelta, ToolCallStarted, ToolCallGovernanceEvaluated, ToolCallCompleted, ToolCallFailed, Metrics, Error, RunCompleted }
+public enum RuntimeRunEventKind { RunCreated, StatusChanged, ContextAssembled, StepStarted, StepCompleted, ResponseDelta, ToolCallStarted, ToolCallGovernanceEvaluated, ToolCallCompleted, ToolCallFailed, Metrics, Error, RunCompleted }
 
 public sealed record RuntimeAgentReference(string ResourceId, long Version)
 {

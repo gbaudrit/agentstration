@@ -36,17 +36,15 @@ public partial class InitialCreate : Migration
             NormalizedContent = table.Column<string>(type: "text", nullable: true),
             CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
         }, constraints: table => table.PrimaryKey("PK_items", x => x.Id));
-        migrationBuilder.CreateTable(name: "memory_entries", schema: "agent_platform", columns: table => new
+        migrationBuilder.CreateTable(name: "item_analyses", schema: "agent_platform", columns: table => new
         {
             Id = table.Column<Guid>(type: "uuid", nullable: false),
             WorkspaceId = table.Column<Guid>(type: "uuid", nullable: false),
-            ItemId = table.Column<Guid>(type: "uuid", nullable: true),
-            MissionId = table.Column<Guid>(type: "uuid", nullable: true),
-            Kind = table.Column<string>(type: "text", nullable: false),
-            Content = table.Column<string>(type: "text", nullable: false),
+            ItemId = table.Column<Guid>(type: "uuid", nullable: false),
+            Summary = table.Column<string>(type: "text", nullable: false),
             CategoriesJson = table.Column<string>(type: "jsonb", nullable: false),
             CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-        }, constraints: table => table.PrimaryKey("PK_memory_entries", x => x.Id));
+        }, constraints: table => table.PrimaryKey("PK_item_analyses", x => x.Id));
         migrationBuilder.CreateTable(name: "missions", schema: "agent_platform", columns: table => new
         {
             Id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -75,7 +73,7 @@ public partial class InitialCreate : Migration
         migrationBuilder.CreateIndex(name: "IX_inboxes_WorkspaceId_Slug", schema: "agent_platform", table: "inboxes", columns: new[] { "WorkspaceId", "Slug" }, unique: true);
         migrationBuilder.CreateIndex(name: "IX_items_WorkspaceId_InboxId_ContentHash", schema: "agent_platform", table: "items", columns: new[] { "WorkspaceId", "InboxId", "ContentHash" }, unique: true);
         migrationBuilder.CreateIndex(name: "IX_items_WorkspaceId_Status_CreatedAt", schema: "agent_platform", table: "items", columns: new[] { "WorkspaceId", "Status", "CreatedAt" });
-        migrationBuilder.CreateIndex(name: "IX_memory_entries_WorkspaceId_ItemId_CreatedAt", schema: "agent_platform", table: "memory_entries", columns: new[] { "WorkspaceId", "ItemId", "CreatedAt" });
+        migrationBuilder.CreateIndex(name: "IX_item_analyses_WorkspaceId_ItemId_CreatedAt", schema: "agent_platform", table: "item_analyses", columns: new[] { "WorkspaceId", "ItemId", "CreatedAt" });
         migrationBuilder.CreateIndex(name: "IX_missions_WorkspaceId_Status_NextRunAt", schema: "agent_platform", table: "missions", columns: new[] { "WorkspaceId", "Status", "NextRunAt" });
         migrationBuilder.CreateIndex(name: "IX_mission_runs_WorkspaceId_MissionId_StartedAt", schema: "agent_platform", table: "mission_runs", columns: new[] { "WorkspaceId", "MissionId", "StartedAt" });
     }
@@ -84,7 +82,7 @@ public partial class InitialCreate : Migration
     {
         migrationBuilder.DropTable(name: "inboxes", schema: "agent_platform");
         migrationBuilder.DropTable(name: "items", schema: "agent_platform");
-        migrationBuilder.DropTable(name: "memory_entries", schema: "agent_platform");
+        migrationBuilder.DropTable(name: "item_analyses", schema: "agent_platform");
         migrationBuilder.DropTable(name: "mission_runs", schema: "agent_platform");
         migrationBuilder.DropTable(name: "missions", schema: "agent_platform");
         migrationBuilder.DropTable(name: "workspaces", schema: "agent_platform");

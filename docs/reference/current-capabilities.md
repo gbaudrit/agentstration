@@ -302,11 +302,12 @@ Start-Sleep -Seconds 1
 Invoke-RestMethod "http://localhost:5100/api/workspaces/$($workspace.id.value)/items/$($accepted.itemId.value)"
 ```
 
-Search memory:
+Write and list an explicit shared Memory record (the server resolves the current Workspace):
 
 ```powershell
-$search = @{ query = "agent"; limit = 20 } | ConvertTo-Json
-Invoke-RestMethod -Method Post -ContentType application/json -Body $search "http://localhost:5100/api/workspaces/$($workspace.id.value)/memory/search"
+$memory = @{ scope = @{ kind = "shared"; name = "demo" }; content = "Prefer concise summaries."; reason = "Explicit user preference"; tags = @("preference") } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Method Post -ContentType application/json -Body $memory "http://localhost:5100/api/memory/records"
+Invoke-RestMethod "http://localhost:5100/api/memory/records?scopeKind=shared&scopeName=demo&top=20"
 ```
 
 Create and run a deterministic monitoring mission:
@@ -366,7 +367,7 @@ The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5100/mcp`. 
 }
 ```
 
-Tools: `list_workspaces`, `list_inboxes`, `ingest_text`, `ingest_url`, `search_memory`, `create_mission`, `get_mission`, `list_mission_runs`, and `run_mission_now`.
+Tools: `list_workspaces`, `list_inboxes`, `ingest_text`, `ingest_url`, `create_mission`, `get_mission`, `list_mission_runs`, and `run_mission_now`.
 
 ## Runtime and MAF observability
 

@@ -15,7 +15,8 @@ public sealed class RuntimeRunService(
     IRuntimeRegistry runtimes,
     RuntimeRunStateManager stateManager,
     TimeProvider timeProvider,
-    ILogger<RuntimeRunService> logger)
+    ILogger<RuntimeRunService> logger,
+    IAgentExecutionContextAssembler? contextAssembler = null)
 {
     public static readonly ActivitySource ActivitySource = new("Agentstration.Runtime");
 
@@ -197,27 +198,38 @@ public sealed class RuntimeRunService(
             activity?.SetTag("agentstration.model.profile", stored.Value.Status.ModelProfile);
             await stateManager.TraceStepAsync(workspaceId, runId, "Prompt composed", timeout.Token);
             await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.StepStarted, "Model invocation started", "Model invoked", cancellationToken: timeout.Token);
-            var prompt = ComposePrompt(stored.Value.Properties.Input);
             var executionOptions = ParseExecutionOptions(stored.Value.Properties.Execution);
+            var toolScope = new ToolExecutionScope
+            {
+                OwnerKind = ToolExecutionOwnerKind.RuntimeRun,
+                TenantId = stored.Value.Scope.TenantId,
+                WorkspaceId = workspaceId,
+                PrincipalId = stored.Value.Scope.PrincipalId,
+                ExecutionId = runId,
+                CorrelationId = Activity.Current?.TraceId.ToString(),
+                AgentGeneration = stored.Value.Properties.Agent.Version,
+                PersistArguments = stored.Value.Properties.Execution.PersistToolArguments
+            };
+            AgentExecutionRequest executionRequest;
+            if (contextAssembler is null)
+            {
+                executionRequest = new AgentExecutionRequest(ComposePrompt(stored.Value.Properties.Input), runId, executionOptions,
+                    new AgentExecutionOptions { Streaming = stored.Value.Properties.Execution.Streaming }, toolScope);
+            }
+            else
+            {
+                var assembled = await contextAssembler.AssembleAsync(new AgentExecutionContextRequest(
+                    stored.Value.Scope, resolved.Definition, stored.Value.Properties.Input.Messages, stored.Value.Properties.Input.Context,
+                    runId, executionOptions, new AgentExecutionOptions { Streaming = stored.Value.Properties.Execution.Streaming }, toolScope), timeout.Token);
+                executionRequest = assembled.Request;
+                await stateManager.AppendEventAsync(workspaceId, runId, RuntimeRunEventKind.ContextAssembled,
+                    $"Execution context assembled with {assembled.MemoryRecordIds.Count} Memory record(s).",
+                    content: string.Join(',', assembled.MemoryRecordIds.Select(value => value.ToString())), cancellationToken: timeout.Token);
+            }
             AgentExecutionResult? execution = null;
             await foreach (var executionEvent in runtimes.ExecuteEventsAsync(
                 resolved.DeploymentId,
-                new AgentExecutionRequest(
-                    prompt,
-                    runId,
-                    executionOptions,
-                    new AgentExecutionOptions { Streaming = stored.Value.Properties.Execution.Streaming },
-                    new ToolExecutionScope
-                    {
-                        OwnerKind = ToolExecutionOwnerKind.RuntimeRun,
-                        TenantId = stored.Value.Scope.TenantId,
-                        WorkspaceId = workspaceId,
-                        PrincipalId = stored.Value.Scope.PrincipalId,
-                        ExecutionId = runId,
-                        CorrelationId = Activity.Current?.TraceId.ToString(),
-                        AgentGeneration = stored.Value.Properties.Agent.Version,
-                        PersistArguments = stored.Value.Properties.Execution.PersistToolArguments
-                    }),
+                executionRequest,
                 timeout.Token))
             {
                 switch (executionEvent)

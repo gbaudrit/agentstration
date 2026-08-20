@@ -57,7 +57,12 @@ public static class RuntimeAgentDefinitionMapper
         RuntimeProfileName = definition.RuntimeProfileName,
         EffectiveToolNames = definition.EffectiveToolNames,
         MiddlewareIds = definition.MiddlewareIds,
-        ContextProviderIds = definition.ContextProviderIds,
+        Memory = definition.Memory is null ? null : new ExecutableAgentMemoryConfiguration
+        {
+            ReadOwnMemory = definition.Memory.ReadOwnMemory,
+            SharedScopes = definition.Memory.SharedScopes,
+            MaximumRecords = definition.Memory.MaximumRecords
+        },
         Capabilities = definition.Capabilities,
         Handler = definition.Handler,
         DefinitionHash = definition.DefinitionHash

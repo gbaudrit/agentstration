@@ -82,8 +82,8 @@ public sealed class IngestionService(IPlatformStore store, IEventBus eventBus, I
         }
 
         var normalized = await store.GetNormalizedContentAsync(workspaceId, itemId, cancellationToken);
-        var memory = await store.GetItemMemoryAsync(workspaceId, itemId, cancellationToken);
-        return Result<ItemDetails>.Success(new ItemDetails(item, raw, normalized, memory));
+        var analyses = await store.GetItemAnalysesAsync(workspaceId, itemId, cancellationToken);
+        return Result<ItemDetails>.Success(new ItemDetails(item, raw, normalized, analyses));
     }
 }
 

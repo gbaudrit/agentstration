@@ -1,15 +1,19 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Core;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.Core;
 
 namespace Agentstration.Infrastructure;
 
-public sealed record SelectedAgentRoute(AgentRouteResult Route, string DeploymentId);
+public sealed record SelectedAgentRoute(AgentRouteResult Route, string DeploymentId, ExecutableAgentDefinition Definition);
 
 public sealed class AgentExecutionCoordinator(
     IControlPlaneStore store,
     IAgentResourceQueries agentQueries,
     IAgentRouter router,
-    IRuntimeRegistry runtimes)
+    IRuntimeRegistry runtimes,
+    IAgentExecutionContextAssembler? contextAssembler = null,
+    ICurrentRequestContext? requestContext = null)
 {
     public async Task<(AgentRouteResult Route, AgentExecutionResult Execution)> RouteAndExecuteAsync(
         string input,
@@ -57,13 +61,25 @@ public sealed class AgentExecutionCoordinator(
             : candidates.Any(candidate => candidate.AgentId == requestedAgentName)
                 ? new AgentRouteResult(requestedAgentName, 1, "The caller explicitly requested this agent.")
                 : throw new InvalidOperationException($"Requested agent '{requestedAgentName}' is not ready or does not exist.");
-        var deployment = newest.Single(item => item.Revision.Definition.AgentKey == route.AgentId).Deployment;
-        return new SelectedAgentRoute(route, deployment.Uid.ToString("N"));
+        var selected = newest.Single(item => item.Revision.Definition.AgentKey == route.AgentId);
+        return new SelectedAgentRoute(route, selected.Deployment.Uid.ToString("N"), RuntimeAgentDefinitionMapper.ToExecutable(selected.Revision.Definition));
     }
 
-    public Task<AgentExecutionResult> ExecuteSelectedAsync(
+    public async Task<AgentExecutionResult> ExecuteSelectedAsync(
         SelectedAgentRoute selected,
         string input,
-        CancellationToken cancellationToken) =>
-        runtimes.ExecuteAsync(selected.DeploymentId, new AgentExecutionRequest(input), cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var request = new AgentExecutionRequest(input);
+        if (selected.Definition.Memory is not null)
+        {
+            if (contextAssembler is null || requestContext?.IsInitialized != true)
+                throw new InvalidOperationException("Memory-enabled Agent execution requires an initialized execution scope and context assembler.");
+            var current = requestContext.Current;
+            request = (await contextAssembler.AssembleAsync(new AgentExecutionContextRequest(
+                new RuntimeRunScope(current.TenantId, new Agentstration.Resources.WorkspaceId(current.WorkspaceId), current.PrincipalId),
+                selected.Definition, [new RuntimeRunMessage(RuntimeMessageRole.User, input)], null, Guid.NewGuid().ToString("N")), cancellationToken)).Request;
+        }
+        return await runtimes.ExecuteAsync(selected.DeploymentId, request, cancellationToken);
+    }
 }

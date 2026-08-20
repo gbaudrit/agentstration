@@ -1,6 +1,6 @@
 using Agentstration.Application;
 using Agentstration.Application.Ingestion;
-using Agentstration.Application.Memory;
+using Agentstration.Application.Analysis;
 using Agentstration.Application.Missions;
 using Agentstration.Application.Routing;
 using Agentstration.Application.Workflows;
@@ -69,9 +69,8 @@ public sealed class VerticalTests
         var details = (await fixture.Ingestion.GetAsync(fixture.Workspace.Id, result.Value.ItemId, default)).Value!;
         Assert.AreEqual("AI agent roadmap milestone one", details.Normalized!.Value);
         Assert.AreEqual(ItemStatus.Processed, details.Item.Status);
-        Assert.HasCount(1, details.Memory);
-        CollectionAssert.Contains(details.Memory[0].Categories.ToArray(), "artificial intelligence");
-        Assert.HasCount(1, await fixture.Memory.SearchAsync(fixture.Workspace.Id, "roadmap", 20, default));
+        Assert.HasCount(1, details.Analyses);
+        CollectionAssert.Contains(details.Analyses[0].Categories.ToArray(), "artificial intelligence");
     }
 
     [TestMethod]
@@ -107,7 +106,7 @@ public sealed class VerticalTests
         var names = typeof(PlatformMcpTools).GetMethods()
             .Select(method => method.GetCustomAttributes(typeof(McpServerToolAttribute), false).Cast<McpServerToolAttribute>().FirstOrDefault()?.Name)
             .Where(name => name is not null).ToArray();
-        var required = new[] { "list_workspaces", "list_inboxes", "ingest_text", "ingest_url", "search_memory", "create_mission", "get_mission", "list_mission_runs", "run_mission_now" };
+        var required = new[] { "list_workspaces", "list_inboxes", "ingest_text", "ingest_url", "create_mission", "get_mission", "list_mission_runs", "run_mission_now" };
         foreach (var tool in required) CollectionAssert.Contains(names, tool);
     }
 
@@ -127,7 +126,7 @@ public sealed class VerticalTests
         public RecordingBus Bus { get; } = new();
         public WorkspaceService Workspaces { get; }
         public IngestionService Ingestion { get; }
-        public MemoryService Memory { get; }
+        public ItemAnalysisService Analyses { get; }
         public ContentProcessingWorkflow Workflow { get; }
         public MissionService Missions { get; }
         public Workspace? Workspace { get; private set; }
@@ -137,9 +136,9 @@ public sealed class VerticalTests
         {
             Workspaces = new WorkspaceService(Store, TimeProvider.System);
             Ingestion = new IngestionService(Store, Bus, new StubContentReader(), TimeProvider.System);
-            Memory = new MemoryService(Store);
+            Analyses = new ItemAnalysisService(Store);
             runtime ??= new MicrosoftExtensionsAiAgentRuntime(new SingleChatClientResolver(new DeterministicChatClient()));
-            Workflow = new ContentProcessingWorkflow(Store, new DeterministicIntentRouter(), runtime, Memory, Bus, TimeProvider.System);
+            Workflow = new ContentProcessingWorkflow(Store, new DeterministicIntentRouter(), runtime, Analyses, Bus, TimeProvider.System);
             Missions = new MissionService(Store, new DemoObservationTool(), Bus, TimeProvider.System);
         }
 

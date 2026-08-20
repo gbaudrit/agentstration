@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Agentstration.Application;
 using Agentstration.Application.Ingestion;
-using Agentstration.Application.Memory;
+using Agentstration.Application.Analysis;
 using Agentstration.Application.Routing;
 using Agentstration.Application.Workflows;
 using Agentstration.Application.Workspaces;
@@ -89,9 +89,9 @@ public sealed class ContentWorkflowEvaluationTests
         var eventBus = new NoOpEventBus();
         var workspaces = new WorkspaceService(store, TimeProvider.System);
         var ingestion = new IngestionService(store, eventBus, new NoOpContentSourceReader(), TimeProvider.System);
-        var memory = new MemoryService(store);
+        var analyses = new ItemAnalysisService(store);
         var runtime = new MicrosoftExtensionsAiAgentRuntime(new SingleChatClientResolver(new DeterministicChatClient()));
-        var workflow = new ContentProcessingWorkflow(store, new DeterministicIntentRouter(), runtime, memory, eventBus, TimeProvider.System);
+        var workflow = new ContentProcessingWorkflow(store, new DeterministicIntentRouter(), runtime, analyses, eventBus, TimeProvider.System);
         var workspace = (await workspaces.CreateAsync("Evaluation workspace", cancellationToken)).Value!;
         var inbox = (await workspaces.CreateInboxAsync(workspace.Id, new CreateInboxRequest("Evaluation inbox", null, null), cancellationToken)).Value!.Inbox;
         var accepted = (await ingestion.IngestAsync(workspace.Id, inbox.Id, source, null, null, "text/plain", cancellationToken)).Value!;
@@ -100,8 +100,8 @@ public sealed class ContentWorkflowEvaluationTests
 
         var item = (await ingestion.GetAsync(workspace.Id, accepted.ItemId, cancellationToken)).Value!;
         Assert.AreEqual(source, item.Raw.Value, "Evaluation must run without changing the preserved source.");
-        Assert.HasCount(1, item.Memory);
-        return new AgentExecutionResult(item.Memory[0].Content, item.Memory[0].Categories);
+        Assert.HasCount(1, item.Analyses);
+        return new AgentExecutionResult(item.Analyses[0].Summary, item.Analyses[0].Categories);
     }
 
     private static async Task<ContentWorkflowEvaluationDataSet> LoadDataSetAsync(CancellationToken cancellationToken)
