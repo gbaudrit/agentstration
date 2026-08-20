@@ -121,8 +121,11 @@ internal static class ModelProviderMappings
         provider.Configuration.Name,
         new ModelProviderPropertiesResponse(
             provider.Configuration.DisplayName ?? provider.Configuration.Name,
-            provider.Configuration.ProviderType,
-            provider.Configuration.ManagementMode.ToString().ToLowerInvariant(),
+            provider.Configuration.AdapterType,
+            provider.Configuration.ContributionId,
+            provider.Configuration.Extension.Name,
+            (provider.Configuration.Extension.Namespace ?? provider.Configuration.Namespace).Value,
+            provider.Configuration.RegistrationSource.ToString().ToLowerInvariant(),
             provider.Health.Status,
             provider.Configuration.EndpointDisplayName,
             provider.Models.Count,

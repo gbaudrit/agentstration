@@ -156,7 +156,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                         "Run {RunId} uses deployment {Deployment}, provider {ProviderType}/{ProviderName}, and model {ModelName}",
                         request.SessionId,
                         model.Deployment,
-                        model.ProviderType,
+                        model.ContributionId,
                         model.ProviderName,
                         model.ModelName);
                 }
@@ -170,7 +170,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
             var runOptions = new ChatClientAgentRunOptions(chatOptions);
             var response = await agent.RunAsync(request.Input, options: runOptions, cancellationToken: cancellationToken);
-            return new AgentExecutionResult(response.Text, request.SessionId, model?.ProviderType, model?.ModelName, effective);
+            return new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective);
         }
 
         public async IAsyncEnumerable<AgentExecutionEvent> ExecuteEventsAsync(
@@ -202,7 +202,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                     options: new ChatClientAgentRunOptions(chatOptions),
                     cancellationToken: cancellationToken);
                 if (!string.IsNullOrEmpty(response.Text)) yield return new ContentDelta(response.Text);
-                yield return new ExecutionCompleted(new AgentExecutionResult(response.Text, request.SessionId, model?.ProviderType, model?.ModelName, effective));
+                yield return new ExecutionCompleted(new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective));
                 yield break;
             }
             await using var updates = agent.RunStreamingAsync(
@@ -232,7 +232,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                 output.Append(update.Text);
                 yield return new ContentDelta(update.Text);
             }
-            yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ProviderType, model?.ModelName, effective));
+            yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ContributionId, model?.ModelName, effective));
         }
 
         private void ValidateCompatibility(ModelChatClientMetadata? model, ModelExecutionOptions execution)
@@ -248,7 +248,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                 model.Output ?? new ModelOutputOptions(),
                 execution,
                 capabilities,
-                model.ProviderType,
+                model.ContributionId,
                 model.ModelName,
                 RuntimeType,
                 tools.Count > 0);

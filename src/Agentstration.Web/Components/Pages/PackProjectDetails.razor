@@ -125,6 +125,13 @@ else
                                             <option value="@BindingValue(runtimeProfile.Name, ResourceNamespace.Parse(runtimeProfile.Namespace))">@runtimeProfile.Properties.DisplayName — @runtimeProfile.Namespace/@runtimeProfile.Name</option>
                                         }
                                     }
+                                    else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration)
+                                    {
+                                        @foreach (var extension in extensionRegistrations)
+                                        {
+                                            <option value="@BindingValue(extension.Name, extension.Namespace)">@extension.Definition.DisplayName — @extension.Namespace/@extension.Name</option>
+                                        }
+                                    }
                                     else
                                     {
                                         @foreach (var secret in secrets)
@@ -184,6 +191,7 @@ else
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
     private IReadOnlyList<ModelProviderResponse> modelProviders = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
+    private IReadOnlyList<ExtensionRegistrationResource> extensionRegistrations = [];
     private IReadOnlyList<SecretResponse> secrets = [];
     private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
     private AgentstrationApiException? error;
@@ -328,6 +336,8 @@ else
             modelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(cancellation.Token);
         if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile))
             runtimeProfiles = await Services.GetRequiredService<IRuntimeProfilesClient>().GetRuntimeProfilesAsync(cancellation.Token);
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ExtensionRegistration))
+            extensionRegistrations = await Services.GetRequiredService<IExtensionsClient>().GetRegistrationsAsync(cancellation.Token);
         if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
             secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
     }
@@ -345,6 +355,7 @@ else
         PackBindingTargetKind.Secret => "Secret",
         PackBindingTargetKind.ModelProvider => "Model provider",
         PackBindingTargetKind.RuntimeProfile => "Runtime profile",
+        PackBindingTargetKind.ExtensionRegistration => "Extension registration",
         _ => "Model profile"
     };
     private string PreviewMessage(string buildVersion) => preview?.CanInstall == true

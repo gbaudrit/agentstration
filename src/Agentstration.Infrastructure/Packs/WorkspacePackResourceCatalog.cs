@@ -37,6 +37,8 @@ public sealed class WorkspacePackResourceCatalog(
             .Select(value => RuntimeProfileItem(value.Value)));
         resources.AddRange((await store.ListAsync<SecretResource>(ResourceNamespace.Default, ResourceKinds.Secret, 0, 1000, cancellationToken))
             .Select(value => BindingItem(value.Value, value.Value.Definition.DisplayName, "Secrets are converted to installation bindings; their values are never exported.")));
+        resources.AddRange((await store.ListAsync<ExtensionRegistrationResource>(ResourceNamespace.Default, ResourceKinds.ExtensionRegistration, 0, 1000, cancellationToken))
+            .Select(value => BindingItem(value.Value, value.Value.Definition.DisplayName, "Extension registrations are installation bindings; endpoints and credentials are never exported.")));
         await AddUnsupportedAsync<VaultResource>(resources, ResourceKinds.Vault, "Vaults and their configuration are never copied into a Pack.", cancellationToken);
         await AddUnsupportedAsync<ToolProviderResource>(resources, ResourceKinds.ToolProvider, "Tool Providers are not yet exportable by the Composer.", cancellationToken);
         await AddUnsupportedAsync<ToolResource>(resources, ResourceKinds.Tool, "Tools are not yet exportable by the Composer.", cancellationToken);
@@ -60,6 +62,7 @@ public sealed class WorkspacePackResourceCatalog(
             ResourceKinds.ModelProvider => await GetModelProviderAsync(resource, cancellationToken),
             ResourceKinds.RuntimeProfile => await GetRuntimeProfileAsync(resource, cancellationToken),
             ResourceKinds.Secret => await GetBindingAsync<SecretResource>(resource, PackBindingTargetKind.Secret, cancellationToken),
+            ResourceKinds.ExtensionRegistration => await GetBindingAsync<ExtensionRegistrationResource>(resource, PackBindingTargetKind.ExtensionRegistration, cancellationToken),
             _ => (await ListAsync(cancellationToken)).Where(value => value.Resource.Address == resource.Address).Select(value => new PackCompositionResourceSnapshot(value, [])).SingleOrDefault()
         };
     }
@@ -130,9 +133,10 @@ public sealed class WorkspacePackResourceCatalog(
         var stored = await store.GetAsync<ModelProviderResource>(ResourceKey.Create(ResourceKinds.ModelProvider, key.Name, key.NamespaceValue), token);
         if (stored is null) return null;
         var provider = stored.Value;
-        var dependencies = provider.Definition.Credential is { } credential
-            ? new[] { BindingDependency(credential, provider.Namespace, ResourceKinds.Secret, PackBindingTargetKind.Secret, "credential") }
-            : [];
+        var dependencies = new[]
+        {
+            BindingDependency(provider.Definition.Extension, provider.Namespace, ResourceKinds.ExtensionRegistration, PackBindingTargetKind.ExtensionRegistration, "extension")
+        };
         return new(ModelProviderItem(provider) with { DependencyCount = dependencies.Length }, dependencies);
     }
 
@@ -264,11 +268,8 @@ public sealed class WorkspacePackResourceCatalog(
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Accepted }
         };
         var node = JsonSerializer.SerializeToNode(clean, JsonOptions)!.AsObject();
-        if (provider.Definition.Credential is { } credential)
-        {
-            var target = credential.Resolve(provider.Namespace, ResourceKinds.Secret);
-            node["definition"]!.AsObject()["credential"] = BindingNode(bindings, target);
-        }
+        var target = provider.Definition.Extension.Resolve(provider.Namespace, ResourceKinds.ExtensionRegistration);
+        node["definition"]!.AsObject()["extension"] = BindingNode(bindings, target);
         return ToElement(node);
     }
 
@@ -354,7 +355,7 @@ public sealed class WorkspacePackResourceCatalog(
     private static PackCompositionCatalogItem FlowItem(FlowResource value) => new() { Resource = new(ResourceKinds.Flow, value.Name, value.Id.Namespace), DisplayName = value.DisplayName ?? value.Name, Description = value.Description, Version = value.ActiveVersion ?? value.Version, Status = value.ActiveVersion is null ? "Draft" : "Published" };
     private static PackCompositionCatalogItem EntryItem(EntryDraft value) => new() { Resource = new(ResourceKinds.Entry, value.Name, value.Id.Namespace), DisplayName = value.DisplayName, Description = value.Description, Version = value.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture), Status = value.PublishedBinding is null ? "Draft" : "Published" };
     private static PackCompositionCatalogItem ModelProfileItem(ModelProfileResource value) => new() { Resource = new(ResourceKinds.ModelProfile, value.Name, value.Namespace), DisplayName = value.Definition.DisplayName, Description = value.Definition.Description, Version = value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), Status = value.Status.ProvisioningState.ToString() };
-    private static PackCompositionCatalogItem ModelProviderItem(ModelProviderResource value) => new() { Resource = new(ResourceKinds.ModelProvider, value.Name, value.Namespace), DisplayName = value.Definition.DisplayName, Description = $"{value.Definition.ProviderType} · {value.Definition.Endpoint}", Version = value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), Status = value.Status.ProvisioningState.ToString() };
+    private static PackCompositionCatalogItem ModelProviderItem(ModelProviderResource value) => new() { Resource = new(ResourceKinds.ModelProvider, value.Name, value.Namespace), DisplayName = value.Definition.DisplayName, Description = $"AEP contribution: {value.Definition.ContributionId}", Version = value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), Status = value.Status.ProvisioningState.ToString() };
     private static PackCompositionCatalogItem RuntimeProfileItem(RuntimeProfileResource value) => new() { Resource = new(ResourceKinds.RuntimeProfile, value.Name, value.Namespace), DisplayName = value.Definition.DisplayName, Description = $"Runtime type: {value.Definition.RuntimeType}", Version = value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), Status = value.Status.ProvisioningState.ToString() };
     private static PackCompositionCatalogItem BindingItem(Resource value, string displayName, string reason) => new() { Resource = new(value.Kind, value.Name, value.Namespace), DisplayName = displayName, Status = value.Status.ProvisioningState.ToString(), Availability = PackCompositionAvailability.BindingOnly, AvailabilityReason = reason };
     private static PackCompositionDependency IncludeDependency(string name, ResourceNamespace @namespace, string kind, string relationship) => new() { Target = new(kind, name, @namespace), Relationship = relationship };
@@ -376,6 +377,7 @@ public sealed class WorkspacePackResourceCatalog(
         PackBindingTargetKind.Secret => "Secret",
         PackBindingTargetKind.ModelProvider => "Model Provider",
         PackBindingTargetKind.RuntimeProfile => "Runtime Profile",
+        PackBindingTargetKind.ExtensionRegistration => "Extension registration",
         _ => "Model Profile"
     };
     private static int KindOrder(string kind) => kind switch { ResourceKinds.Entry => 10, ResourceKinds.Flow => 20, ResourceKinds.Agent => 30, ResourceKinds.ModelProfile => 40, ResourceKinds.ModelProvider => 50, ResourceKinds.RuntimeProfile => 60, ResourceKinds.Secret => 70, _ => 100 };

@@ -501,7 +501,7 @@ public sealed class ApiClientTests
     [TestMethod]
     public async Task ModelProvidersClientMapsProviderAndDynamicModels()
     {
-        var provider = new ModelProviderResponse("provider-id", "ollama-local", new ModelProviderPropertiesResponse("Ollama local", "ollama", "aspire", "available", "ollama", 1));
+        var provider = new ModelProviderResponse("provider-id", "ollama-local", new ModelProviderPropertiesResponse("Ollama local", "aep", "ollama", "ollama-extension", "default", "aspire", "available", "Ollama extension", 1));
         var model = new AvailableModelResponse("qwen3:4b", "Qwen 3 4B", "available", ["chat"], new Dictionary<string, string> { ["parameterSize"] = "4B" });
         using var httpClient = new HttpClient(new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/models", StringComparison.Ordinal)
             ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ValueResponse<AvailableModelResponse>([model])) }
@@ -512,7 +512,7 @@ public sealed class ApiClientTests
         var providers = await client.GetModelProvidersAsync(default);
         var models = await client.GetProviderModelsAsync("ollama-local", default);
 
-        Assert.AreEqual("aspire", providers[0].Properties.ManagementMode);
+        Assert.AreEqual("aspire", providers[0].Properties.RegistrationSource);
         Assert.AreEqual("qwen3:4b", models[0].Name);
         Assert.AreEqual("4B", models[0].Metadata["parameterSize"]);
     }
@@ -637,22 +637,21 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
-    public void ModelProviderEditorPersistsOnlySecretReference()
+    public void ModelProviderEditorPersistsExtensionAndContributionReferences()
     {
         var editor = new ModelProviderEditorModel
         {
             Name = "openai",
             DisplayName = "OpenAI",
-            ProviderType = "openai",
-            Endpoint = "https://extension.example.test",
-            CredentialId = "default:openai-api-key"
+            ExtensionId = "default:openai-extension",
+            ContributionId = "openai"
         };
 
         var properties = editor.ToProperties();
 
-        Assert.IsNotNull(properties.Credential);
-        Assert.AreEqual("openai-api-key", properties.Credential.Name);
-        Assert.IsNull(properties.Credential.Namespace);
+        Assert.AreEqual("openai-extension", properties.Extension.Name);
+        Assert.IsNull(properties.Extension.Namespace);
+        Assert.AreEqual("openai", properties.ContributionId);
     }
 
     [TestMethod]

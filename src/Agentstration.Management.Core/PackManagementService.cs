@@ -285,6 +285,7 @@ public sealed partial class PackManagementService
             PackBindingTargetKind.ModelProfile => await store.GetAsync<ModelProfileResource>(new(ResourceKinds.ModelProfile, target.Name, @namespace), cancellationToken) is not null,
             PackBindingTargetKind.ModelProvider => await store.GetAsync<ModelProviderResource>(new(ResourceKinds.ModelProvider, target.Name, @namespace), cancellationToken) is not null,
             PackBindingTargetKind.RuntimeProfile => await store.GetAsync<RuntimeProfileResource>(new(ResourceKinds.RuntimeProfile, target.Name, @namespace), cancellationToken) is not null,
+            PackBindingTargetKind.ExtensionRegistration => await store.GetAsync<ExtensionRegistrationResource>(new(ResourceKinds.ExtensionRegistration, target.Name, @namespace), cancellationToken) is not null,
             PackBindingTargetKind.Secret => await store.GetAsync<SecretResource>(new(ResourceKinds.Secret, target.Name, @namespace), cancellationToken) is not null,
             _ => false
         };

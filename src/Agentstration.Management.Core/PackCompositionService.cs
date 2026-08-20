@@ -232,6 +232,7 @@ public sealed partial class PackCompositionService(
                 PackBindingTargetKind.Secret => "secret",
                 PackBindingTargetKind.ModelProvider => "provider",
                 PackBindingTargetKind.RuntimeProfile => "runtime",
+                PackBindingTargetKind.ExtensionRegistration => "extension",
                 _ => "model"
             };
             var baseName = Slug($"{prefix}-{pair.Value.Resource.Name}");
@@ -283,6 +284,7 @@ public sealed partial class PackCompositionService(
         PackBindingTargetKind.Secret => "Secret",
         PackBindingTargetKind.ModelProvider => "Model Provider",
         PackBindingTargetKind.RuntimeProfile => "Runtime Profile",
+        PackBindingTargetKind.ExtensionRegistration => "Extension registration",
         _ => "Model Profile"
     };
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -169,7 +169,14 @@ else
                                             {
                                                 @foreach (var provider in modelProviders)
                                                 {
-                                                    <option value="@BindingValue(provider.Name, ResourceNamespace.Default)">@provider.Properties.DisplayName — default/@provider.Name · @provider.Properties.ProviderType</option>
+                                                    <option value="@BindingValue(provider.Name, ResourceNamespace.Default)">@provider.Properties.DisplayName — default/@provider.Name · @provider.Properties.ContributionId</option>
+                                                }
+                                            }
+                                            else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration)
+                                            {
+                                                @foreach (var extension in extensionRegistrations)
+                                                {
+                                                    <option value="@BindingValue(extension.Name, extension.Namespace)">@extension.Definition.DisplayName — @extension.Namespace/@extension.Name</option>
                                                 }
                                             }
                                             else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile)
@@ -263,6 +270,7 @@ else
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
     private IReadOnlyList<ModelProviderResponse> modelProviders = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
+    private IReadOnlyList<ExtensionRegistrationResource> extensionRegistrations = [];
     private IReadOnlyList<SecretResponse> secrets = [];
     private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
     private byte[]? archive;
@@ -373,6 +381,8 @@ else
                     modelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(cancellation.Token);
                 if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile))
                     runtimeProfiles = await Services.GetRequiredService<IRuntimeProfilesClient>().GetRuntimeProfilesAsync(cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ExtensionRegistration))
+                    extensionRegistrations = await Services.GetRequiredService<IExtensionsClient>().GetRegistrationsAsync(cancellation.Token);
                 if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
                     secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
             }
@@ -491,6 +501,7 @@ else
         PackBindingTargetKind.Secret => "Secret",
         PackBindingTargetKind.ModelProvider => "Model provider",
         PackBindingTargetKind.RuntimeProfile => "Runtime profile",
+        PackBindingTargetKind.ExtensionRegistration => "Extension registration",
         _ => "Model profile"
     };
     private static string PurposeLabel(PackPurpose purpose) => purpose switch { PackPurpose.Sample => "SAMPLE", PackPurpose.Template => "TEMPLATE", _ => "STANDARD" };

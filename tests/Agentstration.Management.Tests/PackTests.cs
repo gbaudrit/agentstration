@@ -72,7 +72,9 @@ public sealed class PackTests
         preview = await previewResponse.Content.ReadFromJsonAsync<PackCompositionPreview>();
         Assert.IsNotNull(preview);
         Assert.HasCount(4, preview.Resources);
-        Assert.IsEmpty(preview.Bindings);
+        var extensionBinding = preview.Bindings.Single();
+        Assert.AreEqual(PackBindingTargetKind.ExtensionRegistration, extensionBinding.TargetKind);
+        Assert.AreEqual("ollama-extension", extensionBinding.WorkspaceResource.Name);
 
         var createResponse = await client.PostAsJsonAsync("/api/pack-projects", new CreatePackProjectFromWorkspaceCommand
         {
