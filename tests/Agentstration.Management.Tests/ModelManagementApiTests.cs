@@ -160,6 +160,48 @@ public sealed class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task NamespacedAgentModelResolutionUsesItsExplicitProfileNamespace()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var profileNamespace = new ResourceNamespace("shared.models");
+        var agentNamespace = new ResourceNamespace("agentstration.daily-life-assistant");
+        var profileRequest = Request("shared-reasoning", "qwen3:4b") with
+        {
+            Namespace = profileNamespace.Value,
+            Properties = Request("shared-reasoning", "qwen3:4b").Properties with
+            {
+                Provider = new ResourceReference("ollama-local", @namespace: ResourceNamespace.Default)
+            }
+        };
+        using var createdProfile = await client.PostAsJsonAsync("/api/modelprofiles", profileRequest);
+        Assert.AreEqual(HttpStatusCode.Created, createdProfile.StatusCode);
+        var agentRequest = new AgentResourceRequest
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = "concierge", Namespace = agentNamespace },
+            Definition = new AgentProperties
+            {
+                DisplayName = "Concierge",
+                Instructions = "Help the user.",
+                ModelProfile = new ResourceReference("shared-reasoning", @namespace: profileNamespace)
+            }
+        };
+        using var createdAgent = await client.PutAsJsonAsync(
+            $"/api/namespaces/{agentNamespace.Value}/agents/concierge",
+            agentRequest);
+        Assert.AreEqual(HttpStatusCode.OK, createdAgent.StatusCode);
+
+        var resolution = await client.GetFromJsonAsync<AgentModelResponse>(
+            $"/api/namespaces/{agentNamespace.Value}/agents/concierge/model");
+
+        Assert.IsNotNull(resolution);
+        Assert.AreEqual("shared-reasoning", resolution.Declared.ModelProfile.Name);
+        Assert.AreEqual(profileNamespace.Value, resolution.Declared.ModelProfile.Namespace);
+    }
+
+    [TestMethod]
     public async Task AgentUpdateRejectsUnknownModelProfileWithUnprocessableEntity()
     {
         await using var factory = Factory();

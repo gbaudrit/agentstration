@@ -172,6 +172,13 @@ else
                                                     <option value="@BindingValue(provider.Name, ResourceNamespace.Default)">@provider.Properties.DisplayName — default/@provider.Name · @provider.Properties.ProviderType</option>
                                                 }
                                             }
+                                            else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile)
+                                            {
+                                                @foreach (var runtimeProfile in runtimeProfiles)
+                                                {
+                                                    <option value="@BindingValue(runtimeProfile.Name, ResourceNamespace.Parse(runtimeProfile.Namespace))">@runtimeProfile.Properties.DisplayName — @runtimeProfile.Namespace/@runtimeProfile.Name · @runtimeProfile.Properties.RuntimeType</option>
+                                                }
+                                            }
                                             else
                                             {
                                                 @foreach (var secret in secrets)
@@ -237,6 +244,9 @@ else
 <ConfirmationDialog IsOpen="@confirmUninstall" Title="Uninstall Pack?" Message="Managed resources are removed only if they have not changed since installation. Modified resources are preserved and the Pack is marked degraded." ConfirmLabel="Uninstall" OnCancel="() => confirmUninstall = false" OnConfirm="UninstallAsync" />
 
 @code {
+    [SupplyParameterFromQuery(Name = "publisher")] public string? RequestedPublisher { get; set; }
+    [SupplyParameterFromQuery(Name = "name")] public string? RequestedName { get; set; }
+
     private const long MaximumArchiveBytes = 8 * 1024 * 1024;
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<InstalledPackResource>? packs;
@@ -246,6 +256,7 @@ else
     private PackInstallationPreview? preview;
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
     private IReadOnlyList<ModelProviderResponse> modelProviders = [];
+    private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private IReadOnlyList<SecretResponse> secrets = [];
     private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
     private byte[]? archive;
@@ -287,7 +298,14 @@ else
         {
             packs = await Client.GetPacksAsync(cancellation.Token);
             projects = await Client.GetProjectsAsync(cancellation.Token);
-            if (selected is not null)
+            if (!string.IsNullOrWhiteSpace(RequestedPublisher) && !string.IsNullOrWhiteSpace(RequestedName))
+            {
+                var requested = packs.FirstOrDefault(pack =>
+                    string.Equals(pack.Definition.Publisher, RequestedPublisher, StringComparison.Ordinal)
+                    && string.Equals(pack.Definition.PackName, RequestedName, StringComparison.Ordinal));
+                selected = requested is null ? null : await Client.GetPackAsync(requested.Definition.Publisher, requested.Definition.PackName, cancellation.Token);
+            }
+            else if (selected is not null)
             {
                 var match = packs.FirstOrDefault(pack => SameIdentity(pack, selected.Value));
                 selected = match is null ? null : await Client.GetPackAsync(match.Definition.Publisher, match.Definition.PackName, cancellation.Token);
@@ -339,6 +357,8 @@ else
                     modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
                 if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProvider))
                     modelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile))
+                    runtimeProfiles = await Services.GetRequiredService<IRuntimeProfilesClient>().GetRuntimeProfilesAsync(cancellation.Token);
                 if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
                     secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
             }
@@ -452,7 +472,13 @@ else
         if (parts.Length != 2) throw new InvalidOperationException("The selected Pack binding is invalid.");
         return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
     }
-    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model provider", _ => "Model profile" };
+    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch
+    {
+        PackBindingTargetKind.Secret => "Secret",
+        PackBindingTargetKind.ModelProvider => "Model provider",
+        PackBindingTargetKind.RuntimeProfile => "Runtime profile",
+        _ => "Model profile"
+    };
     private static string PurposeLabel(PackPurpose purpose) => purpose switch { PackPurpose.Sample => "SAMPLE", PackPurpose.Template => "TEMPLATE", _ => "STANDARD" };
     private static string AudienceLabel(PackAudience audience) => audience switch { PackAudience.Personal => "Personal", PackAudience.Professional => "Professional", _ => "Universal" };
     private static string StateLabel(InstalledPackState state) => state switch { InstalledPackState.Installing => "Installing", InstalledPackState.Installed => "Installed", InstalledPackState.Uninstalling => "Uninstalling", InstalledPackState.Failed => "Failed", _ => "Degraded" };

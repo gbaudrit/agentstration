@@ -89,13 +89,14 @@ internal static class ModelManagementHttp
     public static ResourceNamespace Namespace(string? value) => ResourceNamespace.Parse(value);
 
     public static ModelProfileResolutionResponse Resolution(ModelProfileResolution resolution) => new(
-        new ModelProfileIdentityResponse(resolution.Profile.Metadata.Name, resolution.Profile.Metadata.Name, resolution.Profile.Definition.DisplayName),
+        new ModelProfileIdentityResponse(resolution.Profile.Metadata.Name, resolution.Profile.Metadata.Name, resolution.Profile.Definition.DisplayName, resolution.Profile.Namespace.Value),
         resolution.Provider is null ? null : new ModelProviderReferenceResponse(
             resolution.Profile.Definition.Provider.Name,
             resolution.Provider.Name,
             resolution.Provider.DisplayName,
             resolution.Provider.ProviderType,
-            resolution.ProviderHealth.Status),
+            resolution.ProviderHealth.Status,
+            resolution.Profile.Definition.Provider.Resolve(resolution.Profile.Namespace, ResourceKinds.ModelProvider).Namespace.Value),
         new ModelReferenceResponse(
             resolution.Profile.Definition.Model.Name,
             resolution.Model?.Status ?? (resolution.Status == "modelUnavailable" ? "unavailable" : "unknown"),

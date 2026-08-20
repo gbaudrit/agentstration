@@ -47,7 +47,9 @@ public sealed class PackTests
         Assert.IsNotNull(preview);
         Assert.IsTrue(preview.CanCreate);
         Assert.AreEqual("dotnet-expert", preview.Resources.Single().Resource.Name);
-        Assert.AreEqual(PackBindingTargetKind.ModelProfile, preview.Bindings.Single().TargetKind);
+        CollectionAssert.AreEquivalent(
+            new[] { PackBindingTargetKind.ModelProfile, PackBindingTargetKind.RuntimeProfile },
+            preview.Bindings.Select(binding => binding.TargetKind).ToArray());
 
         previewResponse = await client.PostAsJsonAsync(
             "/api/pack-projects/composer/preview",
@@ -58,7 +60,9 @@ public sealed class PackTests
         CollectionAssert.AreEquivalent(
             new[] { ResourceKinds.Agent, ResourceKinds.ModelProfile },
             preview.Resources.Select(resource => resource.Resource.Kind).ToArray());
-        Assert.AreEqual(PackBindingTargetKind.ModelProvider, preview.Bindings.Single().TargetKind);
+        CollectionAssert.AreEquivalent(
+            new[] { PackBindingTargetKind.ModelProvider, PackBindingTargetKind.RuntimeProfile },
+            preview.Bindings.Select(binding => binding.TargetKind).ToArray());
 
         previewResponse = await client.PostAsJsonAsync(
             "/api/pack-projects/composer/preview",
@@ -218,6 +222,17 @@ public sealed class PackTests
                 Key = "shared-key"
             }
         }, null, true, default);
+        _ = await fixture.Store.PutAsync(new RuntimeProfileResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.RuntimeProfile,
+            Metadata = new ResourceMetadata { Name = "shared-runtime", Namespace = new ResourceNamespace("shared.platform") },
+            Definition = new RuntimeProfileProperties
+            {
+                DisplayName = "Shared Runtime",
+                RuntimeType = "microsoft-agent-framework"
+            }
+        }, null, true, default);
         var handler = new FakeHandler("Consumer", 10, []);
         var service = new PackManagementService(fixture.Store, [handler], TimeProvider.System);
         var document = new PackResourceDocument(
@@ -233,6 +248,7 @@ public sealed class PackTests
                 definition = new
                 {
                     modelProfile = new { binding = "chat" },
+                    runtimeProfile = new { binding = "runtime" },
                     credential = new { binding = "credential" }
                 }
             }));
@@ -248,6 +264,7 @@ public sealed class PackTests
                     Bindings =
                     [
                         new PackBindingRequirement { Name = "chat", TargetKind = PackBindingTargetKind.ModelProfile },
+                        new PackBindingRequirement { Name = "runtime", TargetKind = PackBindingTargetKind.RuntimeProfile },
                         new PackBindingRequirement { Name = "credential", TargetKind = PackBindingTargetKind.Secret }
                     ]
                 }
@@ -263,6 +280,7 @@ public sealed class PackTests
             archive,
             [
                 new PackBindingSelection("chat", new("shared-key", @namespace: ResourceNamespace.Default)),
+                new PackBindingSelection("runtime", new("shared-key", @namespace: ResourceNamespace.Default)),
                 new PackBindingSelection("credential", new("shared-key", @namespace: ResourceNamespace.Default))
             ],
             default));
@@ -272,15 +290,18 @@ public sealed class PackTests
             archive,
             [
                 new PackBindingSelection("chat", new("shared-chat", @namespace: ResourceNamespace.Default)),
+                new PackBindingSelection("runtime", new("shared-runtime", @namespace: new ResourceNamespace("shared.platform"))),
                 new PackBindingSelection("credential", new("shared-key", @namespace: ResourceNamespace.Default))
             ],
             default);
 
-        Assert.HasCount(2, installed.Value.Definition.Bindings);
+        Assert.HasCount(3, installed.Value.Definition.Bindings);
         Assert.IsNotNull(handler.LastInstalledManifest);
         var definition = handler.LastInstalledManifest.Value.GetProperty("definition");
         Assert.AreEqual("shared-chat", definition.GetProperty("modelProfile").GetProperty("name").GetString());
         Assert.AreEqual("default", definition.GetProperty("modelProfile").GetProperty("namespace").GetString());
+        Assert.AreEqual("shared-runtime", definition.GetProperty("runtimeProfile").GetProperty("name").GetString());
+        Assert.AreEqual("shared.platform", definition.GetProperty("runtimeProfile").GetProperty("namespace").GetString());
         Assert.AreEqual("shared-key", definition.GetProperty("credential").GetProperty("name").GetString());
 
         await service.UninstallAsync(new("agentstration", "test-pack"), default);
@@ -289,8 +310,77 @@ public sealed class PackTests
         Assert.IsTrue(restoredPreview.Bindings.All(binding => binding.TargetAvailable));
 
         var reinstalled = await service.InstallAsync(archive, default);
-        Assert.HasCount(2, reinstalled.Value.Definition.Bindings);
+        Assert.HasCount(3, reinstalled.Value.Definition.Bindings);
         Assert.AreEqual("shared-key", reinstalled.Value.Definition.Bindings.Single(binding => binding.Name == "credential").Target.Name);
+    }
+
+    [TestMethod]
+    public async Task RuntimeProfileBindingControlsThePackAgentsLocalDeployment()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var runtimeNamespace = new ResourceNamespace("shared.platform");
+        var runtimeProfiles = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
+        _ = await runtimeProfiles.CreateAsync(new RuntimeProfileResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.RuntimeProfile,
+            Metadata = new ResourceMetadata { Name = "pack-runtime", Namespace = runtimeNamespace },
+            Definition = new RuntimeProfileProperties
+            {
+                DisplayName = "Pack runtime",
+                RuntimeType = "microsoft-agent-framework"
+            }
+        }, default);
+        await using var archive = CreateZip(new Dictionary<string, string>
+        {
+            ["pack.yaml"] = """
+                apiVersion: agentstration.io/v1
+                kind: Pack
+                metadata:
+                  name: runtime-binding-pack
+                  publisher: agentstration
+                  version: 1.0.0
+                definition:
+                  bindings:
+                    - name: local-runtime
+                      targetKind: runtimeProfile
+                      required: true
+                  resources:
+                    - agents/assistant.yaml
+                """,
+            ["agents/assistant.yaml"] = """
+                apiVersion: agentstration.io/v1
+                kind: Agent
+                metadata:
+                  name: assistant
+                definition:
+                  displayName: Assistant
+                  instructions: Help the user.
+                  modelProfile:
+                    name: reasoning-default
+                    namespace: default
+                  runtimeProfile:
+                    binding: local-runtime
+                """
+        });
+        using var content = InstallationContent(
+            archive.ToArray(),
+            "runtime-binding.pack.zip",
+            [new PackBindingSelection("local-runtime", new("pack-runtime", @namespace: runtimeNamespace))]);
+
+        using var response = await client.PostAsync("/api/packs", content);
+
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        var packNamespace = new ResourceNamespace("agentstration.runtime-binding-pack");
+        var agent = await agents.GetAgentAsync(packNamespace, "assistant", default);
+        Assert.IsNotNull(agent);
+        Assert.AreEqual("pack-runtime", agent.Value.Definition.RuntimeProfile.Name);
+        Assert.AreEqual(runtimeNamespace, agent.Value.Definition.RuntimeProfile.Namespace);
+        var deployment = await agents.PrepareLocalRuntimeAsync(packNamespace, "assistant", agent.Value.Generation, default);
+        Assert.AreEqual("pack-runtime", deployment.Value.RuntimeProfileName);
+        Assert.AreEqual(runtimeNamespace, deployment.Value.RuntimeProfileNamespace);
     }
 
     [TestMethod]
@@ -394,8 +484,9 @@ public sealed class PackTests
         Assert.AreEqual(new ResourceNamespace("agentstration.who-am-i"), preview.Namespace);
         Assert.HasCount(5, preview.Resources);
         Assert.IsTrue(preview.RequiresConfiguration);
-        Assert.AreEqual("conversational-model", preview.Bindings.Single().Name);
-        Assert.HasCount(3, preview.Bindings.Single().UsedBy);
+        Assert.HasCount(2, preview.Bindings);
+        Assert.HasCount(3, preview.Bindings.Single(binding => binding.Name == "conversational-model").UsedBy);
+        Assert.HasCount(3, preview.Bindings.Single(binding => binding.Name == "local-runtime").UsedBy);
         CollectionAssert.AreEquivalent(
             new[] { ResourceKinds.Agent, ResourceKinds.Agent, ResourceKinds.Agent, ResourceKinds.Flow, ResourceKinds.Entry },
             preview.Resources.Select(resource => resource.Kind).ToArray());
@@ -403,7 +494,10 @@ public sealed class PackTests
         using var installContent = InstallationContent(
             bytes,
             "who-am-i.pack.zip",
-            [new PackBindingSelection("conversational-model", new("reasoning-default", @namespace: ResourceNamespace.Default))]);
+            [
+                new PackBindingSelection("conversational-model", new("reasoning-default", @namespace: ResourceNamespace.Default)),
+                new PackBindingSelection("local-runtime", new("maf-default", @namespace: ResourceNamespace.Default))
+            ]);
         using var installResponse = await client.PostAsync("/api/packs", installContent);
         Assert.AreEqual(HttpStatusCode.Created, installResponse.StatusCode, await installResponse.Content.ReadAsStringAsync());
         var installed = await installResponse.Content.ReadFromJsonAsync<InstalledPackResource>();
@@ -411,7 +505,8 @@ public sealed class PackTests
         Assert.AreEqual(InstalledPackState.Installed, installed.Definition.State);
         Assert.AreEqual(new ResourceNamespace("agentstration.who-am-i"), installed.Definition.Namespace);
         Assert.HasCount(5, installed.Definition.ManagedResources);
-        Assert.AreEqual("reasoning-default", installed.Definition.Bindings.Single().Target.Name);
+        Assert.AreEqual("reasoning-default", installed.Definition.Bindings.Single(binding => binding.Name == "conversational-model").Target.Name);
+        Assert.AreEqual("maf-default", installed.Definition.Bindings.Single(binding => binding.Name == "local-runtime").Target.Name);
         Assert.IsTrue(installed.Definition.ManagedResources.All(resource => resource.Namespace == installed.Definition.Namespace));
         Assert.IsNotNull(installed.Definition.SourceArtifact);
 
@@ -494,7 +589,11 @@ public sealed class PackTests
         using var localInstallResponse = await client.PostAsJsonAsync(
             $"/api/pack-projects/{project.Uid:D}/builds/{build.Uid:D}/install",
             new PackBuildInstallRequest(
-                Bindings: [new PackBindingSelection("conversational-model", new("reasoning-default", @namespace: ResourceNamespace.Default))]));
+                Bindings:
+                [
+                    new PackBindingSelection("conversational-model", new("reasoning-default", @namespace: ResourceNamespace.Default)),
+                    new PackBindingSelection("local-runtime", new("maf-default", @namespace: ResourceNamespace.Default))
+                ]));
         Assert.AreEqual(HttpStatusCode.Created, localInstallResponse.StatusCode, await localInstallResponse.Content.ReadAsStringAsync());
         var localInstallation = await localInstallResponse.Content.ReadFromJsonAsync<InstalledPackResource>();
         Assert.IsNotNull(localInstallation);

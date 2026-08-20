@@ -51,7 +51,7 @@ public sealed class RuntimeProfileManagementService(IControlPlaneStore store)
 
     public async Task<IReadOnlyList<RuntimeProfileUsage>> GetUsagesAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         (await store.ListAllAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken))
-            .Where(value => value.Value.RuntimeProfileName == name && value.Value.Namespace == @namespace)
+            .Where(value => value.Value.RuntimeProfileName == name && value.Value.RuntimeProfileNamespace == @namespace)
             .Select(value => new RuntimeProfileUsage(value.Value.Uid, value.Value.Metadata.Name, value.Value.Environment, value.Value.AgentName ?? string.Empty))
             .ToArray();
 

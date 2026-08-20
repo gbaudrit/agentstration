@@ -16,6 +16,8 @@ definition:
     Never claim access to the secret identity or private context.
   modelProfile:
     binding: conversational-model
+  runtimeProfile:
+    binding: local-runtime
   tools: []
   behaviors:
     - game-player

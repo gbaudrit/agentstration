@@ -158,7 +158,15 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
     {
         var path = "api/agents?allNamespaces=true&top=1000";
         var page = await ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, path, cancellationToken);
-        return page.Value.Select(agent => new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Definition.ModelProfile.Name) { Namespace = agent.Namespace }).ToArray();
+        return page.Value.Select(agent =>
+        {
+            var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ResourceKinds.ModelProfile);
+            return new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, modelProfile.Name)
+            {
+                Namespace = agent.Namespace,
+                ModelProfileNamespace = modelProfile.Namespace
+            };
+        }).ToArray();
     }
 
     public async Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken)

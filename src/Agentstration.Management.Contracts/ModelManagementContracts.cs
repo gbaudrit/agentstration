@@ -43,7 +43,7 @@ public sealed record CreateModelProfileRequest(
 
 public sealed record PutModelProfileRequest(ModelProfileProperties Properties);
 
-public sealed record ModelProviderReferenceResponse(string ResourceId, string Name, string? DisplayName = null, string? ProviderType = null, string? Status = null);
+public sealed record ModelProviderReferenceResponse(string ResourceId, string Name, string? DisplayName = null, string? ProviderType = null, string? Status = null, string Namespace = "default");
 public sealed record ModelReferenceResponse(string Name, string? Status = null, IReadOnlyList<string>? Capabilities = null);
 
 public sealed record ModelProfileSummaryPropertiesResponse(
@@ -66,7 +66,7 @@ public sealed record ModelProfileSummaryResponse(
 public sealed record ModelProfileUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
 public sealed record ModelProfileUsagesResponse(IReadOnlyList<ModelProfileUsageResponse> Value, int Count);
 
-public sealed record ModelProfileIdentityResponse(string ResourceId, string Name, string? DisplayName = null);
+public sealed record ModelProfileIdentityResponse(string ResourceId, string Name, string? DisplayName = null, string Namespace = "default");
 public sealed record EffectiveModelOptionsResponse(
     ModelGenerationOptions Generation,
     ModelReasoningOptions Reasoning,

@@ -2,6 +2,7 @@
 @using Agentstration.Resources
 @implements IDisposable
 @inject IManagementApiClient Client
+@inject IPacksClient PacksClient
 
 <PageTitle>@(agent?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 
@@ -24,10 +25,63 @@ else if (agent is not null)
         <div><span class="field-label">Namespace</span><code>@AgentResourceNamespace.Value</code></div>
         <div><span class="field-label">Resource name</span><code>@agent.Metadata.Name</code></div>
         <div><span class="field-label">Handler</span><strong>@agent.Definition.Handler</strong></div>
-        <div><span class="field-label">Model profile</span><strong>@agent.Definition.ModelProfile.Name</strong></div>
+        <div><span class="field-label">Model profile</span><a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a></div>
+        <div><span class="field-label">Runtime profile</span><a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a></div>
         <div><span class="field-label">Capabilities</span><strong>@Capabilities</strong></div>
         <div><span class="field-label">Status</span><strong>@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())</strong></div>
     </article>
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">Installation configuration</p><h2>Model binding</h2></div>@if (modelBindings.Count > 0) { <StatusBadge Text="Bound by Pack" Status="UiStatus.Info" /> }</div>
+        @if (ownerPack is null)
+        {
+            <p class="muted">The Agent references <a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a>. No installed Pack provenance could be loaded.</p>
+        }
+        else if (modelBindings.Count == 0)
+        {
+            <p>This Model Profile is a contained or explicitly qualified Pack resource reference, not an external installation binding.</p>
+            <dl class="resource-details"><dt>Effective profile</dt><dd><a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a></dd><dt>Managed by</dt><dd><code>@PackIdentity</code></dd></dl>
+            <a class="button-secondary" href="@PackUrl">Open Pack installation</a>
+        }
+        else
+        {
+            <p>The archive declared a logical Model Profile requirement. Installation resolved it to the effective resource below.</p>
+            <dl class="resource-details">
+                @foreach (var binding in modelBindings)
+                {
+                    <dt>Binding</dt><dd><code>@binding.Name</code></dd>
+                    <dt>Effective profile</dt><dd><a class="text-button" href="@ModelProfileUrl"><code>@BindingTarget(binding.Target)</code></a></dd>
+                }
+                <dt>Managed by</dt><dd><code>@PackIdentity</code></dd>
+            </dl>
+            <p class="resource-hint">The binding belongs to the Pack installation. The Agent definition remains read-only so changing it cannot detach the resource from its source.</p>
+            <div class="form-actions"><a class="button-primary" href="@ModelProfileUrl">Open effective model profile</a><a class="button-secondary" href="@PackUrl">Open Pack installation</a></div>
+        }
+    </section>
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">Local deployment</p><h2>Runtime binding</h2></div>@if (runtimeBindings.Count > 0) { <StatusBadge Text="Bound by Pack" Status="UiStatus.Info" /> }</div>
+        @if (ownerPack is null)
+        {
+            <p class="muted">Local execution uses <a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a>. No installed Pack provenance could be loaded.</p>
+        }
+        else if (runtimeBindings.Count == 0)
+        {
+            <p>The Agent uses a contained or explicitly qualified Runtime Profile rather than an external installation binding.</p>
+            <dl class="resource-details"><dt>Effective runtime</dt><dd><a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a></dd><dt>Managed by</dt><dd><code>@PackIdentity</code></dd></dl>
+        }
+        else
+        {
+            <p>Installation selected the Runtime Profile used when this Pack Agent is prepared for local execution.</p>
+            <dl class="resource-details">
+                @foreach (var binding in runtimeBindings)
+                {
+                    <dt>Binding</dt><dd><code>@binding.Name</code></dd>
+                    <dt>Effective runtime</dt><dd><a class="text-button" href="@RuntimeProfileUrl"><code>@BindingTarget(binding.Target)</code></a></dd>
+                }
+                <dt>Managed by</dt><dd><code>@PackIdentity</code></dd>
+            </dl>
+            <div class="form-actions"><a class="button-primary" href="@RuntimeProfileUrl">Open effective runtime profile</a><a class="button-secondary" href="@PackUrl">Open Pack installation</a></div>
+        }
+    </section>
     <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Instructions</h2></div></div><pre>@agent.Definition.Instructions</pre></section>
 }
 
@@ -36,19 +90,60 @@ else if (agent is not null)
     [Parameter] public string Name { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
     private AgentResource? agent;
+    private InstalledPackResource? ownerPack;
+    private IReadOnlyList<PackBindingResolution> modelBindings = [];
+    private IReadOnlyList<PackBindingResolution> runtimeBindings = [];
     private AgentstrationApiException? error;
     private bool loading = true;
     private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Parse(AgentNamespace);
+    private ResourceAddress ModelProfileAddress => agent?.Definition.ModelProfile.Resolve(AgentResourceNamespace, ResourceKinds.ModelProfile)
+        ?? ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.ModelProfile, "unavailable");
+    private string ModelProfileUrl => ConsoleResourceUrls.ModelProfile(ModelProfileAddress);
+    private ResourceAddress RuntimeProfileAddress => agent?.Definition.RuntimeProfile.Resolve(AgentResourceNamespace, ResourceKinds.RuntimeProfile)
+        ?? ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.RuntimeProfile, "unavailable");
+    private string RuntimeProfileUrl => ConsoleResourceUrls.RuntimeProfile(RuntimeProfileAddress);
+    private string PackIdentity => ownerPack is null ? "Unknown Pack" : $"{ownerPack.Definition.Publisher}/{ownerPack.Definition.PackName}";
+    private string PackUrl => ownerPack is null ? "/packs" : $"/packs?publisher={Uri.EscapeDataString(ownerPack.Definition.Publisher)}&name={Uri.EscapeDataString(ownerPack.Definition.PackName)}";
     private string Capabilities => agent is null || agent.Definition.Behaviors.Count == 0 ? "—" : string.Join(", ", agent.Definition.Behaviors);
 
     protected override async Task OnParametersSetAsync()
     {
         loading = true;
         error = null;
-        try { agent = (await Client.GetAgentAsync(AgentResourceNamespace, Name, cancellation.Token)).Value; }
+        try
+        {
+            agent = (await Client.GetAgentAsync(AgentResourceNamespace, Name, cancellation.Token)).Value;
+            await LoadPackContextAsync();
+        }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
     }
+
+    private async Task LoadPackContextAsync()
+    {
+        ownerPack = null;
+        modelBindings = [];
+        runtimeBindings = [];
+        if (agent is null
+            || !agent.Metadata.Annotations.TryGetValue(PackProvenanceAnnotations.Publisher, out var publisher)
+            || !agent.Metadata.Annotations.TryGetValue(PackProvenanceAnnotations.Name, out var packName)) return;
+
+        try
+        {
+            ownerPack = (await PacksClient.GetPackAsync(publisher, packName, cancellation.Token)).Value;
+            modelBindings = ownerPack.Definition.Bindings
+                .Where(binding => binding.TargetKind == PackBindingTargetKind.ModelProfile
+                    && binding.Target.Resolve(ResourceNamespace.Default, ResourceKinds.ModelProfile) == ModelProfileAddress)
+                .ToArray();
+            runtimeBindings = ownerPack.Definition.Bindings
+                .Where(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile
+                    && binding.Target.Resolve(ResourceNamespace.Default, ResourceKinds.RuntimeProfile) == RuntimeProfileAddress)
+                .ToArray();
+        }
+        catch (AgentstrationApiException) { }
+    }
+
+    private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";
 
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

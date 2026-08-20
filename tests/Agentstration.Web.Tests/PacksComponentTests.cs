@@ -27,6 +27,23 @@ public sealed class PacksComponentTests
     }
 
     [TestMethod]
+    public void PageSelectsThePackRequestedByResourceNavigation()
+    {
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo("/packs?publisher=agentstration&name=starter");
+
+        var rendered = context.Render<Packs>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(1, rendered.FindAll("tr.selected-pack"));
+            Assert.IsTrue(rendered.Markup.Contains("default/openai-production", StringComparison.Ordinal));
+        });
+    }
+
+    [TestMethod]
     public async Task InstallActionOpensSideEffectFreeArchivePreviewStep()
     {
         using var context = new BunitContext();

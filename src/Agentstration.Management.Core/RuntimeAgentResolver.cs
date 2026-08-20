@@ -39,7 +39,10 @@ public sealed class ControlPlaneRuntimeAgentResolver(
             RuntimeAgentDefinitionMapper.ToExecutable(revision.Value.Definition),
             ready,
             ready ? "Ready" : deployment.Value.OperationalState.ToString(),
-            ready ? null : deployment.Value.LastError ?? $"Deployment is {deployment.Value.OperationalState}.");
+            ready ? null : deployment.Value.LastError ?? $"Deployment is {deployment.Value.OperationalState}.")
+        {
+            RuntimeProfileNamespace = deployment.Value.RuntimeProfileNamespace
+        };
     }
 }
 
@@ -55,6 +58,7 @@ public static class RuntimeAgentDefinitionMapper
         EffectiveInstructions = definition.EffectiveInstructions,
         ModelProfileName = definition.ModelProfileName,
         RuntimeProfileName = definition.RuntimeProfileName,
+        RuntimeProfileNamespace = definition.RuntimeProfileNamespace,
         EffectiveToolNames = definition.EffectiveToolNames,
         MiddlewareIds = definition.MiddlewareIds,
         ContextProviderIds = definition.ContextProviderIds,

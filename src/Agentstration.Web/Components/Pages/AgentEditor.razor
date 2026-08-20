@@ -4,6 +4,7 @@
 @inject IManagementApiClient Client
 @inject IAgentsModelClient AgentsModelClient
 @inject IAgentRunnerRuntimeClient RuntimeClient
+@inject IRuntimeProfilesClient RuntimeProfilesClient
 @inject IToolsClient ToolsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
@@ -63,6 +64,7 @@ else
             <div class="form-grid">
                 <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
                 <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" ValueChanged="ModelProfileChanged" /><ValidationMessage For="() => model.ModelProfileName" /></div>
+                <label class="form-span-2"><span>Runtime profile</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option> }</select><small>Used when this Agent is prepared for local execution.</small></label>
                 <label class="form-span-2"><span>Instructions</span><InputTextArea @bind-Value="model.Instructions" rows="6" /><ValidationMessage For="() => model.Instructions" /></label>
             </div>
         </section>
@@ -112,6 +114,7 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private AgentEditorModel? model;
     private IReadOnlyList<ToolResource> catalogTools = [];
+    private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private string? etag;
     private string? resourceId;
     private string? errorMessage;
@@ -135,6 +138,7 @@ else
     private string? ActiveRuntime => readiness?.RuntimeProfileId is null ? readiness?.DeploymentId : ResourceName(readiness.RuntimeProfileId);
     private string StateSummary => IsStateSynchronized ? $"Generation {generation} is ready." : isDirty ? "Save or apply the modified desired definition." : "The current generation is not active.";
     private string HeaderStatus => readiness?.Ready == true ? "Ready" : StatusPresentation.Label(provisioningStatus);
+    private string RuntimeProfileValue => model is null ? string.Empty : $"{model.RuntimeProfileNamespace}:{model.RuntimeProfileName}";
     private UiStatus HeaderStatusTone => readiness?.Ready == true ? UiStatus.Success : StatusPresentation.Tone(provisioningStatus);
 
     protected override async Task OnParametersSetAsync()
@@ -144,6 +148,7 @@ else
         try
         {
             catalogTools = await ToolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
+            runtimeProfiles = await RuntimeProfilesClient.GetRuntimeProfilesAsync(cancellation.Token);
             if (IsNew)
             {
                 model = new AgentEditorModel();
@@ -190,11 +195,24 @@ else
     private static string ResourceName(string name) => name;
     private static string ProfileUrl(AgentModelResponse value)
     {
-        return $"/modelprofiles/{Uri.EscapeDataString(value.Declared.ModelProfile.ResourceId)}";
+        return ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId));
     }
+
+    private void RuntimeProfileChanged(ChangeEventArgs args)
+    {
+        if (model is null) return;
+        var parts = args.Value?.ToString()?.Split(':', 2);
+        if (parts is not { Length: 2 }) return;
+        model.RuntimeProfileNamespace = parts[0];
+        model.RuntimeProfileName = parts[1];
+        isDirty = true;
+    }
+
+    private static string RuntimeProfileValueFor(RuntimeProfileSummaryResponse profile) => $"{profile.Namespace}:{profile.Name}";
     private static string ProviderUrl(AgentModelResponse value)
     {
-        return $"/modelproviders/{Uri.EscapeDataString(value.Resolved.Provider!.ResourceId)}";
+        var provider = value.Resolved.Provider!;
+        return $"/modelproviders/{Uri.EscapeDataString(provider.ResourceId)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
     }
 
     private async Task LoadAgentModelAsync(string name)
