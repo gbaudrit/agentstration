@@ -63,7 +63,7 @@ else
             <div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Behavior and model</h2></div></div>
             <div class="form-grid">
                 <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
-                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" ValueChanged="ModelProfileChanged" /><ValidationMessage For="() => model.ModelProfileName" /></div>
+                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" SelectFirstWhenMissing="@IsNew" /><ValidationMessage For="() => model.ModelProfileName" /></div>
                 <label class="form-span-2"><span>Runtime profile</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option> }</select><small>Used when this Agent is prepared for local execution.</small></label>
                 <label class="form-span-2"><span>Instructions</span><InputTextArea @bind-Value="model.Instructions" rows="6" /><ValidationMessage For="() => model.Instructions" /></label>
             </div>
@@ -152,6 +152,12 @@ else
             if (IsNew)
             {
                 model = new AgentEditorModel();
+                var runtimeProfile = runtimeProfiles.FirstOrDefault();
+                if (runtimeProfile is not null)
+                {
+                    model.RuntimeProfileName = runtimeProfile.Name;
+                    model.RuntimeProfileNamespace = runtimeProfile.Namespace;
+                }
             }
             else
             {
@@ -178,6 +184,17 @@ else
     private Task ModelProfileChanged(string value)
     {
         if (model is not null) { model.ModelProfileName = value; isDirty = true; }
+        return Task.CompletedTask;
+    }
+
+    private Task ModelProfileSelectionChanged(ModelProfileSummaryResponse? profile)
+    {
+        if (model is not null && profile is not null)
+        {
+            model.ModelProfileName = profile.Name;
+            model.ModelProfileNamespace = profile.Namespace;
+            isDirty = true;
+        }
         return Task.CompletedTask;
     }
 

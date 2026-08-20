@@ -729,6 +729,7 @@ public sealed class ApiClientTests
             DisplayName = "Web Agent",
             Instructions = "Help with web development.",
             ModelProfileName = "reasoning-default",
+            ModelProfileNamespace = "shared.models",
             RuntimeProfileName = "maf-shared",
             RuntimeProfileNamespace = "shared.platform",
             ToolNames = "search",
@@ -738,6 +739,7 @@ public sealed class ApiClientTests
         var request = model.ToRequest();
 
         Assert.AreEqual("reasoning-default", request.Definition.ModelProfile.Name);
+        Assert.AreEqual(new ResourceNamespace("shared.models"), request.Definition.ModelProfile.Namespace);
         Assert.AreEqual("maf-shared", request.Definition.RuntimeProfile.Name);
         Assert.AreEqual(new ResourceNamespace("shared.platform"), request.Definition.RuntimeProfile.Namespace);
         Assert.HasCount(1, request.Definition.Tools);
