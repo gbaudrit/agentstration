@@ -424,6 +424,18 @@ public sealed class PackTests
         Assert.AreEqual("test-pack", body.RootElement.GetProperty("definition").GetProperty("packName").GetString());
         Assert.AreEqual("installed", body.RootElement.GetProperty("definition").GetProperty("state").GetString());
 
+        using var rejectedContent = new ByteArrayContent(archiveBytes);
+        rejectedContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        rejectedContent.Headers.Add("X-Pack-File-Name", "empty-pack.zip");
+        using var rejected = await client.PostAsync("/api/packs", rejectedContent);
+        Assert.AreEqual(HttpStatusCode.Conflict, rejected.StatusCode);
+
+        using var replacementContent = new ByteArrayContent(archiveBytes);
+        replacementContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        replacementContent.Headers.Add("X-Pack-File-Name", "empty-pack.zip");
+        using var replaced = await client.PostAsync("/api/packs?replaceExisting=true", replacementContent);
+        Assert.AreEqual(HttpStatusCode.Created, replaced.StatusCode, await replaced.Content.ReadAsStringAsync());
+
         var listed = await client.GetFromJsonAsync<JsonElement[]>("/api/packs");
         Assert.IsNotNull(listed);
         Assert.IsTrue(listed.Any(value => value.GetProperty("definition").GetProperty("packName").GetString() == "test-pack"));

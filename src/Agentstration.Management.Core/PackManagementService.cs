@@ -47,22 +47,35 @@ public sealed partial class PackManagementService
     }
 
     public async Task<StoredResource<InstalledPackResource>> InstallAsync(PackArchive archive, CancellationToken cancellationToken)
-        => await InstallAsync(archive, [], cancellationToken);
+        => await InstallAsync(archive, false, [], cancellationToken);
 
     public async Task<StoredResource<InstalledPackResource>> InstallAsync(
         PackArchive archive,
         IReadOnlyList<PackBindingSelection> bindings,
         CancellationToken cancellationToken)
+        => await InstallAsync(archive, false, bindings, cancellationToken);
+
+    public async Task<StoredResource<InstalledPackResource>> InstallAsync(
+        PackArchive archive,
+        bool replaceExisting,
+        IReadOnlyList<PackBindingSelection> bindings,
+        CancellationToken cancellationToken)
     {
-        var prepared = await PrepareAsync(archive, bindings, cancellationToken);
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
-        var @namespace = identity.Namespace;
-        if (prepared.Preview.AlreadyInstalled) throw new PackAlreadyInstalledException(identity);
-        var conflict = prepared.Preview.Resources.FirstOrDefault(resource => resource.AlreadyExists);
-        if (conflict is not null) throw new PackResourceConflictException(conflict.Kind, conflict.Name);
+        var prepared = await PrepareAsync(archive, bindings, cancellationToken);
         var unresolved = prepared.Preview.Bindings.FirstOrDefault(binding => !binding.IsResolved);
         if (unresolved is not null)
             throw new PackValidationException("pack_binding_unresolved", $"Pack binding '{unresolved.Name}' requires an available {unresolved.TargetKind} resource.");
+        if (prepared.Preview.AlreadyInstalled)
+        {
+            if (!replaceExisting) throw new PackAlreadyInstalledException(identity);
+            await UninstallAsync(identity, cancellationToken);
+            prepared = await PrepareAsync(archive, bindings, cancellationToken);
+        }
+
+        var @namespace = identity.Namespace;
+        var conflict = prepared.Preview.Resources.FirstOrDefault(resource => resource.AlreadyExists);
+        if (conflict is not null) throw new PackResourceConflictException(conflict.Kind, conflict.Name);
         var resolutions = prepared.Preview.Bindings
             .Where(binding => binding.Target is not null && binding.TargetAvailable)
             .Select(binding => new PackBindingResolution(binding.Name, binding.TargetKind, binding.Target!))

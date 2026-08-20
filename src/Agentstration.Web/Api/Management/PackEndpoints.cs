@@ -43,6 +43,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
         });
 
     private static Task<IResult> InstallAsync(
+        bool? replaceExisting,
         HttpRequest request,
         HttpResponse response,
         IPackArchiveReader archiveReader,
@@ -52,7 +53,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
         {
             ManagementHttp.RequireApiVersion(request);
             var (archive, bindings) = await ReadInstallationAsync(request, archiveReader, cancellationToken);
-            var installed = await service.InstallAsync(archive, bindings, cancellationToken);
+            var installed = await service.InstallAsync(archive, replaceExisting ?? false, bindings, cancellationToken);
             response.Headers.ETag = installed.ETag;
             response.Headers.Location = $"/api/packs/{Uri.EscapeDataString(installed.Value.Definition.Publisher)}/{Uri.EscapeDataString(installed.Value.Definition.PackName)}";
             return Results.Created(response.Headers.Location, installed.Value);

@@ -184,16 +184,7 @@ public sealed partial class PackAuthoringService(
         CancellationToken cancellationToken)
     {
         var archive = await ReadBuildArchiveAsync(projectId, buildId, cancellationToken);
-        var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
-        var existing = await installations.GetAsync(identity, cancellationToken);
-        if (existing is not null)
-        {
-            if (!replaceExisting)
-                throw new PackValidationException("pack_already_installed", $"Pack '{identity}' is already installed. Enable replacement to reinstall this development build.");
-            await installations.UninstallAsync(identity, cancellationToken);
-        }
-
-        return await installations.InstallAsync(archive, bindings, cancellationToken);
+        return await installations.InstallAsync(archive, replaceExisting, bindings, cancellationToken);
     }
 
     public Task<StoredResource<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken) =>
