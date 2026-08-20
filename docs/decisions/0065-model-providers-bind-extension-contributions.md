@@ -14,7 +14,7 @@ The first AEP vertical stored an endpoint and a free-form provider type directly
 - `ModelProvider` owns only its display name, a typed `ResourceReference` to an `ExtensionRegistration`, and an AEP model-provider `contributionId`.
 - Runtime resolution is explicit: the technical adapter is `aep`, while `contributionId` selects the contribution inside the extension. Model Profile native options remain keyed by that contribution ID and pinned to an immutable option-contract version and digest.
 - The Extensions inventory starts from registrations, inspects each enabled endpoint once, and joins every Model Provider by its explicit reference. Disabling a registration makes its providers unavailable. Deletion is rejected while providers reference it.
-- Configuration and Aspire endpoints are materialized as stable read-only registrations at startup. Manual registrations retain ETag CRUD. No source performs network scanning.
+- Configuration and Aspire endpoints are materialized as stable read-only registrations at startup. `POST /api/extensions/discover` repeats that synchronization on demand, returning created, updated, and unchanged counts before the Console reloads the live inventory. Manual registrations retain ETag CRUD. Refresh never starts a process or performs network scanning.
 - Packs include Model Providers but turn their extension dependency into an installation binding. Extension endpoints and credentials are never exported.
 - This is a deliberate breaking `0.x` resource-schema change. The old `providerType`, `endpoint`, `managementMode`, provider-level options, and credential fields are not read or migrated.
 
