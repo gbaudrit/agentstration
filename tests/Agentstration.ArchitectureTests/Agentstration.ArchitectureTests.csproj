@@ -6,6 +6,7 @@
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.Memory.Sqlite/Agentstration.Extensions.Memory.Sqlite.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
     <ProjectReference Include="../../src/Agentstration.Domain/Agentstration.Domain.csproj" />
     <ProjectReference Include="../../src/Agentstration.Application/Agentstration.Application.csproj" />
@@ -17,6 +18,10 @@
     <ProjectReference Include="../../src/Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
     <ProjectReference Include="../../src/Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Memory/Agentstration.Memory.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Memory.Application/Agentstration.Memory.Application.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Memory.Storage.Abstractions/Agentstration.Memory.Storage.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Memory.Testing/Agentstration.Memory.Testing.csproj" />
     <ProjectReference Include="../../src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />

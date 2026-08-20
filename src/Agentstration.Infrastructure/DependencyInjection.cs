@@ -1,6 +1,6 @@
 using Agentstration.Application;
 using Agentstration.Application.Ingestion;
-using Agentstration.Application.Memory;
+using Agentstration.Application.Analysis;
 using Agentstration.Application.Missions;
 using Agentstration.Application.Routing;
 using Agentstration.Application.Work;
@@ -12,6 +12,7 @@ using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Infrastructure.Memory;
 using Agentstration.Infrastructure.Ingestion;
 using Agentstration.Infrastructure.Missions;
 using Agentstration.Infrastructure.Packs;
@@ -22,6 +23,8 @@ using Agentstration.Infrastructure.Workflows;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Memory.Storage.Abstractions;
+using Agentstration.Memory.Storage.Sqlite;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
@@ -50,7 +53,8 @@ public static class DependencyInjection
         string? controlPlaneConnectionString = null,
         string? workPlaneConnectionString = null,
         string? flowConnectionString = null,
-        string? runtimeConnectionString = null)
+        string? runtimeConnectionString = null,
+        string? memoryConnectionString = null)
     {
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton<LocalBootstrapOptions>();
@@ -66,9 +70,8 @@ public static class DependencyInjection
         services.AddSingleton<IManagementEventPublisher, InProcessManagementEventPublisher>();
         services.AddSingleton<IItemProcessingQueue, ItemProcessingQueue>();
         services.AddSingleton<IIntentRouter, DeterministicIntentRouter>();
-        services.AddSingleton<MemoryService>();
-        services.AddSingleton<IMemoryStore>(provider => provider.GetRequiredService<MemoryService>());
-        services.AddSingleton<IMemorySearch>(provider => provider.GetRequiredService<MemoryService>());
+        services.AddSingleton<ItemAnalysisService>();
+        services.AddSingleton<IItemAnalysisStore>(provider => provider.GetRequiredService<ItemAnalysisService>());
         aiOptions ??= new AiProviderOptions("Deterministic", new Uri("http://localhost/"), "deterministic", null);
         services.AddSingleton(aiOptions);
         var useManagedProfileResolver = string.Equals(aiOptions.Provider, "Managed", StringComparison.OrdinalIgnoreCase);
@@ -144,6 +147,7 @@ public static class DependencyInjection
         services.AddSingleton<IPackResourceHandler, ModelProviderPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, RuntimeProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, ModelProfilePackResourceHandler>();
+        services.AddSingleton<IPackResourceHandler, MemoryProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, AgentPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, FlowPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, EntryPackResourceHandler>();
@@ -157,6 +161,14 @@ public static class DependencyInjection
         runtimeConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "runtime-plane.db")}";
         services.AddSqliteRuntimeRuns(runtimeConnectionString);
         services.AddSingleton<RuntimeRunStateManager>();
+        memoryConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "memory-plane.db")}";
+        services.AddSqliteMemoryStorage(memoryConnectionString);
+        services.AddHttpClient("agentstration-aep-memory", client => client.Timeout = TimeSpan.FromSeconds(30));
+        services.AddSingleton<IMemoryRecordStoreResolver, ManagedMemoryRecordStoreResolver>();
+        services.AddSingleton<Agentstration.Memory.Application.MemoryService>();
+        services.AddSingleton<Agentstration.Memory.Application.IMemoryRetriever>(provider => provider.GetRequiredService<Agentstration.Memory.Application.MemoryService>());
+        services.AddSingleton<IMemoryReadAuthorization, MemoryReadAuthorization>();
+        services.AddSingleton<IAgentExecutionContextAssembler, AgentExecutionContextAssembler>();
         services.AddSingleton<RuntimeRunService>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());
         services.AddSingleton<IToolExecutionEventSink, RuntimeToolExecutionEventSink>();

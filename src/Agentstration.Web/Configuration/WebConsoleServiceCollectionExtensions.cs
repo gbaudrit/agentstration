@@ -66,6 +66,7 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<ModelProfilesApiClient, IModelProfilesClient>(services, configured.ManagementApi);
         AddClient<AgentsModelApiClient, IAgentsModelClient>(services, configured.ManagementApi);
         AddClient<RuntimeProfilesApiClient, IRuntimeProfilesClient>(services, configured.ManagementApi);
+        AddClient<MemoryManagementApiClient, IMemoryManagementClient>(services, configured.ManagementApi);
         AddClient<PacksApiClient, IPacksClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
         AddSensitiveClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi);
@@ -177,7 +178,10 @@ public static class WebConsoleServiceCollectionExtensions
             .AddPolicy(AgentstrationPolicies.CanManageAgents, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesWrite))
             .AddPolicy(AgentstrationPolicies.CanRunAgents, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute))
             .AddPolicy(AgentstrationPolicies.CanReadRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsRead))
-            .AddPolicy(AgentstrationPolicies.CanRunFlows, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute));
+            .AddPolicy(AgentstrationPolicies.CanRunFlows, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute))
+            .AddPolicy(AgentstrationPolicies.CanReadMemory, policy => WorkspacePolicy(policy, AuthorizationPermissions.MemoryRead))
+            .AddPolicy(AgentstrationPolicies.CanWriteMemory, policy => WorkspacePolicy(policy, AuthorizationPermissions.MemoryWrite))
+            .AddPolicy(AgentstrationPolicies.CanDeleteMemory, policy => WorkspacePolicy(policy, AuthorizationPermissions.MemoryDelete));
     }
 
     private static void WorkspacePolicy(AuthorizationPolicyBuilder policy, string permission)

@@ -17,9 +17,8 @@ public interface IPlatformStore
     Task SetItemStatusAsync(WorkspaceId workspaceId, ItemId itemId, ItemStatus status, string? error, CancellationToken cancellationToken);
     Task AddNormalizedContentAsync(NormalizedContent content, CancellationToken cancellationToken);
     Task<NormalizedContent?> GetNormalizedContentAsync(WorkspaceId workspaceId, ItemId itemId, CancellationToken cancellationToken);
-    Task AddMemoryEntryAsync(MemoryEntry entry, CancellationToken cancellationToken);
-    Task<IReadOnlyList<MemoryEntry>> SearchMemoryAsync(WorkspaceId workspaceId, string query, int limit, CancellationToken cancellationToken);
-    Task<IReadOnlyList<MemoryEntry>> GetItemMemoryAsync(WorkspaceId workspaceId, ItemId itemId, CancellationToken cancellationToken);
+    Task AddItemAnalysisAsync(ItemAnalysis analysis, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ItemAnalysis>> GetItemAnalysesAsync(WorkspaceId workspaceId, ItemId itemId, CancellationToken cancellationToken);
     Task AddMissionAsync(Mission mission, CancellationToken cancellationToken);
     Task<IReadOnlyList<Mission>> ListMissionsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken);
     Task<Mission?> GetMissionAsync(WorkspaceId workspaceId, MissionId missionId, CancellationToken cancellationToken);
@@ -32,10 +31,8 @@ public interface IPlatformStore
     Task AddAuditEntryAsync(AuditEntry entry, CancellationToken cancellationToken);
 }
 
-public interface IMemoryStore { Task AddAsync(MemoryEntry entry, CancellationToken cancellationToken); }
-public interface IMemorySearch { Task<IReadOnlyList<MemoryEntry>> SearchAsync(WorkspaceId workspaceId, string query, int limit, CancellationToken cancellationToken); }
+public interface IItemAnalysisStore { Task AddAsync(ItemAnalysis analysis, CancellationToken cancellationToken); }
 public interface IBlobStore { Task<string> PutAsync(WorkspaceId workspaceId, string name, Stream content, CancellationToken cancellationToken); }
-public interface IEmbeddingStore { Task UpsertAsync(WorkspaceId workspaceId, Guid id, ReadOnlyMemory<float> embedding, CancellationToken cancellationToken); }
 
 public interface IEventBus
 {

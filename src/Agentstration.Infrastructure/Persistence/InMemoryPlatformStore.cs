@@ -18,21 +18,16 @@ public class InMemoryPlatformStore : IPlatformStore
     public Task<Item?> GetItemAsync(WorkspaceId workspaceId, ItemId id, CancellationToken cancellationToken) => ReadAsync(state => state.Items.FirstOrDefault(x => x.WorkspaceId == workspaceId && x.Id == id));
     public Task<RawContent?> GetRawContentAsync(WorkspaceId workspaceId, ItemId id, CancellationToken cancellationToken) => ReadAsync(state => state.RawContents.FirstOrDefault(x => x.WorkspaceId == workspaceId && x.ItemId == id));
     public Task<NormalizedContent?> GetNormalizedContentAsync(WorkspaceId workspaceId, ItemId id, CancellationToken cancellationToken) => ReadAsync(state => state.NormalizedContents.FirstOrDefault(x => x.WorkspaceId == workspaceId && x.ItemId == id));
-    public Task<IReadOnlyList<MemoryEntry>> GetItemMemoryAsync(WorkspaceId workspaceId, ItemId id, CancellationToken cancellationToken) => ReadAsync<IReadOnlyList<MemoryEntry>>(state => state.MemoryEntries.Where(x => x.WorkspaceId == workspaceId && x.ItemId == id).OrderByDescending(x => x.CreatedAt).ToArray());
+    public Task<IReadOnlyList<ItemAnalysis>> GetItemAnalysesAsync(WorkspaceId workspaceId, ItemId id, CancellationToken cancellationToken) => ReadAsync<IReadOnlyList<ItemAnalysis>>(state => state.ItemAnalyses.Where(x => x.WorkspaceId == workspaceId && x.ItemId == id).OrderByDescending(x => x.CreatedAt).ToArray());
     public Task<IReadOnlyList<Mission>> ListMissionsAsync(WorkspaceId id, CancellationToken cancellationToken) => ReadAsync<IReadOnlyList<Mission>>(state => state.Missions.Where(x => x.WorkspaceId == id).OrderBy(x => x.Name).ToArray());
     public Task<Mission?> GetMissionAsync(WorkspaceId workspaceId, MissionId id, CancellationToken cancellationToken) => ReadAsync(state => state.Missions.FirstOrDefault(x => x.WorkspaceId == workspaceId && x.Id == id));
     public Task<IReadOnlyList<MissionRun>> ListMissionRunsAsync(WorkspaceId workspaceId, MissionId missionId, CancellationToken cancellationToken) => ReadAsync<IReadOnlyList<MissionRun>>(state => state.MissionRuns.Where(x => x.WorkspaceId == workspaceId && x.MissionId == missionId).OrderByDescending(x => x.StartedAt).ToArray());
     public Task<IReadOnlyList<Notification>> ListNotificationsAsync(WorkspaceId workspaceId, MissionId missionId, CancellationToken cancellationToken) => ReadAsync<IReadOnlyList<Notification>>(state => state.Notifications.Where(x => x.WorkspaceId == workspaceId && x.MissionId == missionId).OrderByDescending(x => x.CreatedAt).ToArray());
 
-    public Task<IReadOnlyList<MemoryEntry>> SearchMemoryAsync(WorkspaceId workspaceId, string query, int limit, CancellationToken cancellationToken) =>
-        ReadAsync<IReadOnlyList<MemoryEntry>>(state => state.MemoryEntries
-            .Where(x => x.WorkspaceId == workspaceId && (string.IsNullOrEmpty(query) || x.Content.Contains(query, StringComparison.OrdinalIgnoreCase) || x.Categories.Any(c => c.Contains(query, StringComparison.OrdinalIgnoreCase))))
-            .OrderByDescending(x => x.CreatedAt).Take(limit).ToArray());
-
     public Task AddWorkspaceAsync(Workspace value, CancellationToken token) => MutateAsync(state => state.Workspaces.Add(value), token);
     public Task AddInboxAsync(Inbox value, CancellationToken token) => MutateAsync(state => state.Inboxes.Add(value), token);
     public Task AddNormalizedContentAsync(NormalizedContent value, CancellationToken token) => MutateAsync(state => { state.NormalizedContents.RemoveAll(x => x.WorkspaceId == value.WorkspaceId && x.ItemId == value.ItemId); state.NormalizedContents.Add(value); }, token);
-    public Task AddMemoryEntryAsync(MemoryEntry value, CancellationToken token) => MutateAsync(state => state.MemoryEntries.Add(value), token);
+    public Task AddItemAnalysisAsync(ItemAnalysis value, CancellationToken token) => MutateAsync(state => state.ItemAnalyses.Add(value), token);
     public Task AddMissionAsync(Mission value, CancellationToken token) => MutateAsync(state => state.Missions.Add(value), token);
     public Task AddMissionRunAsync(MissionRun value, CancellationToken token) => MutateAsync(state => state.MissionRuns.Add(value), token);
     public Task AddNotificationAsync(Notification value, CancellationToken token) => MutateAsync(state => state.Notifications.Add(value), token);
@@ -75,7 +70,7 @@ public sealed class PlatformState
     public List<Item> Items { get; init; } = [];
     public List<RawContent> RawContents { get; init; } = [];
     public List<NormalizedContent> NormalizedContents { get; init; } = [];
-    public List<MemoryEntry> MemoryEntries { get; init; } = [];
+    public List<ItemAnalysis> ItemAnalyses { get; init; } = [];
     public List<Mission> Missions { get; init; } = [];
     public List<MissionRun> MissionRuns { get; init; } = [];
     public List<Notification> Notifications { get; init; } = [];

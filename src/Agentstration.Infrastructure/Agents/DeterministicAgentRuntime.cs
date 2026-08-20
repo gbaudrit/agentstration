@@ -18,15 +18,23 @@ public sealed partial class DeterministicChatClient : IChatClient
         {
             return Task.FromResult(Route(content));
         }
-        var words = Words().Matches(content).Select(match => match.Value).ToArray();
+        var rememberedFacts = materialized
+            .Where(message => message.Text.StartsWith("Remembered facts follow.", StringComparison.Ordinal))
+            .SelectMany(message => message.Text.Split('\n').Skip(1))
+            .Where(line => line.StartsWith("- ", StringComparison.Ordinal))
+            .Select(line => line[2..].Trim())
+            .Where(line => line.Length > 0)
+            .ToArray();
+        var effectiveContent = rememberedFacts.Length == 0 ? content : $"{content} {string.Join(' ', rememberedFacts)}";
+        var words = Words().Matches(effectiveContent).Select(match => match.Value).ToArray();
         var summary = string.Join(' ', words.Take(40));
         if (words.Length > 40) summary += "…";
         if (string.IsNullOrWhiteSpace(summary)) summary = "No textual content.";
 
         var categories = new List<string>();
-        AddIfContains(content, categories, "artificial intelligence", "ai", "agent", "llm");
-        AddIfContains(content, categories, "finance", "price", "invoice", "budget");
-        AddIfContains(content, categories, "project", "project", "roadmap", "milestone");
+        AddIfContains(effectiveContent, categories, "artificial intelligence", "ai", "agent", "llm");
+        AddIfContains(effectiveContent, categories, "finance", "price", "invoice", "budget");
+        AddIfContains(effectiveContent, categories, "project", "project", "roadmap", "milestone");
         if (categories.Count == 0) categories.Add("general");
         var json = JsonSerializer.Serialize(new AgentExecutionResult(summary, categories));
         return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, json)));

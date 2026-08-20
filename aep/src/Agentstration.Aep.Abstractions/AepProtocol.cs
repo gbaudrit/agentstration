@@ -10,6 +10,7 @@ public static class AepProtocol
     public const string LegacyDiscoveryPath = "/.well-known/agentstration";
     public const string HealthPath = "/aep/health";
     public const string ModelProvidersPath = "/aep/model-providers";
+    public const string MemoryProvidersPath = "/aep/memory-providers";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
 
@@ -25,6 +26,7 @@ public static class AepCapabilityNames
 {
     public const string Health = "aep.health";
     public const string ModelProvider = "aep.model-provider";
+    public const string MemoryProvider = "aep.memory-provider";
     public const string Tools = "aep.tools";
     public const string Configuration = "aep.configuration";
 }
@@ -47,7 +49,8 @@ public sealed record AepHealth(string Status, string? Details = null);
 
 public sealed record AepContributions(
     IReadOnlyList<AepModelProviderDescriptor> ModelProviders,
-    IReadOnlyList<AepToolContribution>? Tools = null);
+    IReadOnlyList<AepToolContribution>? Tools = null,
+    IReadOnlyList<AepMemoryProviderDescriptor>? MemoryProviders = null);
 
 public sealed record AepMcpDescriptor(IReadOnlyList<AepMcpServerDescriptor> Servers);
 
@@ -84,6 +87,13 @@ public static class AepDescriptorValidator
             if (string.IsNullOrWhiteSpace(tool.Mcp.Tool)) errors.Add($"Tool contribution '{tool.Id}' MCP tool name is required.");
             if (string.IsNullOrWhiteSpace(tool.Mcp.Server) || !servers.Contains(tool.Mcp.Server))
                 errors.Add($"Tool contribution '{tool.Id}' references unknown MCP server '{tool.Mcp.Server}'.");
+        }
+        var memoryProviders = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var provider in descriptor.Contributions.MemoryProviders ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(provider.Id)) errors.Add("Memory provider id is required.");
+            else if (!memoryProviders.Add(provider.Id)) errors.Add($"Memory provider '{provider.Id}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(provider.DisplayName)) errors.Add($"Memory provider '{provider.Id}' displayName is required.");
         }
         return errors;
     }
@@ -133,6 +143,38 @@ public sealed record AepModelDescriptor(
     IReadOnlyDictionary<string, string>? Metadata = null);
 
 public sealed record AepProviderHealth(string Status, string? Details = null);
+
+public sealed record AepMemoryProviderDescriptor(
+    string Id,
+    string DisplayName,
+    AepMemoryProviderCapabilities Capabilities,
+    IReadOnlyDictionary<string, JsonElement>? Metadata = null);
+
+public sealed record AepMemoryProviderCapabilities(
+    bool ExactScope = true,
+    bool Expiry = true,
+    bool Delete = true,
+    bool ClearScope = true,
+    bool PurgeExpired = true);
+
+public sealed record AepMemoryScope(string Kind, string Key);
+public sealed record AepMemoryProvenance(string SourceKind, string? SourceId, string Reason, Guid CreatedByPrincipalId);
+public sealed record AepMemoryRecord(
+    Guid Id,
+    Guid WorkspaceId,
+    AepMemoryScope Scope,
+    string Content,
+    IReadOnlyList<string> Tags,
+    AepMemoryProvenance Provenance,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ExpiresAt = null);
+public sealed record AepMemoryRecordRequest(Guid WorkspaceId, Guid RecordId);
+public sealed record AepMemoryGetResponse(AepMemoryRecord? Value);
+public sealed record AepMemoryListRequest(Guid WorkspaceId, AepMemoryScope? Scope, DateTimeOffset Now, int Skip, int Take);
+public sealed record AepMemoryListResponse(IReadOnlyList<AepMemoryRecord> Value);
+public sealed record AepMemoryScopeRequest(Guid WorkspaceId, AepMemoryScope Scope);
+public sealed record AepMemoryPurgeRequest(Guid WorkspaceId, DateTimeOffset Now, int Take);
+public sealed record AepMemoryMutationResponse(int Affected);
 
 public enum AepRole { System, User, Assistant, Tool }
 public enum AepContentKind { Text, Image, File, Structured, ToolCall, ToolResult }

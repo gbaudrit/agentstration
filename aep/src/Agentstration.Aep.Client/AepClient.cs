@@ -19,7 +19,13 @@ public interface IAepModelProvidersClient
     AepModelProviderClient CreateModelProvider(string providerId);
 }
 
-public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProvidersClient
+public interface IAepMemoryProvidersClient
+{
+    Task<IReadOnlyList<AepMemoryProviderDescriptor>> ListMemoryProvidersAsync(CancellationToken cancellationToken = default);
+    AepMemoryProviderClient CreateMemoryProvider(string providerId);
+}
+
+public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProvidersClient, IAepMemoryProvidersClient
 {
     public Task<AepManifest> GetManifestAsync(CancellationToken cancellationToken = default) => DiscoverAsync(cancellationToken);
 
@@ -49,6 +55,50 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
     }
 
     public AepModelProviderClient CreateModelProvider(string providerId) => new(this, providerId);
+
+    public async Task<IReadOnlyList<AepMemoryProviderDescriptor>> ListMemoryProvidersAsync(CancellationToken cancellationToken = default)
+    {
+        _ = await DiscoverAsync(cancellationToken);
+        using var response = await SendAsync(HttpMethod.Get, AepProtocol.MemoryProvidersPath, null, cancellationToken);
+        return await ReadAsync<AepMemoryProviderDescriptor[]>(response, cancellationToken);
+    }
+
+    public AepMemoryProviderClient CreateMemoryProvider(string providerId) => new(this, providerId);
+
+    internal async Task<AepProviderHealth> GetMemoryHealthAsync(string providerId, CancellationToken cancellationToken) =>
+        await SendMemoryAsync<AepProviderHealth>(providerId, HttpMethod.Get, "health", null, cancellationToken);
+
+    internal async Task WriteMemoryAsync(string providerId, AepMemoryRecord record, CancellationToken cancellationToken)
+    {
+        using var response = await SendMemoryResponseAsync(providerId, HttpMethod.Post, "records", record, cancellationToken);
+    }
+
+    internal async Task<AepMemoryRecord?> GetMemoryAsync(string providerId, AepMemoryRecordRequest request, CancellationToken cancellationToken) =>
+        (await SendMemoryAsync<AepMemoryGetResponse>(providerId, HttpMethod.Post, "records/get", request, cancellationToken)).Value;
+
+    internal async Task<IReadOnlyList<AepMemoryRecord>> ListMemoryAsync(string providerId, AepMemoryListRequest request, CancellationToken cancellationToken) =>
+        (await SendMemoryAsync<AepMemoryListResponse>(providerId, HttpMethod.Post, "records/query", request, cancellationToken)).Value;
+
+    internal async Task<int> DeleteMemoryAsync(string providerId, AepMemoryRecordRequest request, CancellationToken cancellationToken) =>
+        (await SendMemoryAsync<AepMemoryMutationResponse>(providerId, HttpMethod.Post, "records/delete", request, cancellationToken)).Affected;
+
+    internal async Task<int> ClearMemoryScopeAsync(string providerId, AepMemoryScopeRequest request, CancellationToken cancellationToken) =>
+        (await SendMemoryAsync<AepMemoryMutationResponse>(providerId, HttpMethod.Post, "records/clear", request, cancellationToken)).Affected;
+
+    internal async Task<int> PurgeMemoryAsync(string providerId, AepMemoryPurgeRequest request, CancellationToken cancellationToken) =>
+        (await SendMemoryAsync<AepMemoryMutationResponse>(providerId, HttpMethod.Post, "records/purge", request, cancellationToken)).Affected;
+
+    private async Task<T> SendMemoryAsync<T>(string providerId, HttpMethod method, string operation, object? body, CancellationToken cancellationToken)
+    {
+        using var response = await SendMemoryResponseAsync(providerId, method, operation, body, cancellationToken);
+        return await ReadAsync<T>(response, cancellationToken);
+    }
+
+    private async Task<HttpResponseMessage> SendMemoryResponseAsync(string providerId, HttpMethod method, string operation, object? body, CancellationToken cancellationToken)
+    {
+        _ = await DiscoverAsync(cancellationToken);
+        return await SendAsync(method, $"{AepProtocol.MemoryProvidersPath}/{Uri.EscapeDataString(providerId)}/{operation}", body, cancellationToken);
+    }
 
     internal async Task<AepChatResponse> ChatAsync(string providerId, AepChatRequest request, CancellationToken cancellationToken)
     {
@@ -144,6 +194,17 @@ public sealed class AepModelProviderClient(AepClient client, string providerId)
 
     public IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(AepChatRequest request, CancellationToken cancellationToken = default) =>
         client.StreamAsync(providerId, request, cancellationToken);
+}
+
+public sealed class AepMemoryProviderClient(AepClient client, string providerId)
+{
+    public Task<AepProviderHealth> GetHealthAsync(CancellationToken cancellationToken = default) => client.GetMemoryHealthAsync(providerId, cancellationToken);
+    public Task WriteAsync(AepMemoryRecord record, CancellationToken cancellationToken = default) => client.WriteMemoryAsync(providerId, record, cancellationToken);
+    public Task<AepMemoryRecord?> GetAsync(AepMemoryRecordRequest request, CancellationToken cancellationToken = default) => client.GetMemoryAsync(providerId, request, cancellationToken);
+    public Task<IReadOnlyList<AepMemoryRecord>> ListAsync(AepMemoryListRequest request, CancellationToken cancellationToken = default) => client.ListMemoryAsync(providerId, request, cancellationToken);
+    public async Task<bool> DeleteAsync(AepMemoryRecordRequest request, CancellationToken cancellationToken = default) => await client.DeleteMemoryAsync(providerId, request, cancellationToken) == 1;
+    public Task<int> ClearScopeAsync(AepMemoryScopeRequest request, CancellationToken cancellationToken = default) => client.ClearMemoryScopeAsync(providerId, request, cancellationToken);
+    public Task<int> PurgeExpiredAsync(AepMemoryPurgeRequest request, CancellationToken cancellationToken = default) => client.PurgeMemoryAsync(providerId, request, cancellationToken);
 }
 
 public sealed class AepProtocolException(string code, string message, HttpStatusCode? statusCode = null, Exception? innerException = null)

@@ -16,6 +16,9 @@ public static class AgentstrationPolicies
     public const string CanRunAgents = "agentstration:agents:run";
     public const string CanReadRuns = "agentstration:runs:read";
     public const string CanRunFlows = "agentstration:flows:run";
+    public const string CanReadMemory = "agentstration:memory:read";
+    public const string CanWriteMemory = "agentstration:memory:write";
+    public const string CanDeleteMemory = "agentstration:memory:delete";
 }
 
 public sealed record WorkspacePermissionRequirement(string Permission) : IAuthorizationRequirement;

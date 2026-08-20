@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Memory/Agentstration.Memory.csproj" />
+    <ProjectReference Include="../Agentstration.Memory.Application/Agentstration.Memory.Application.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>

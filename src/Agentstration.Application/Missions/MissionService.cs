@@ -65,7 +65,6 @@ public sealed class MissionService(IPlatformStore store, IObservationTool observ
             var changed = previous?.Observation != observation;
             run = run with { Status = MissionRunStatus.Completed, Observation = observation, Changed = changed, CompletedAt = timeProvider.GetUtcNow() };
             await store.UpdateMissionRunAsync(run, cancellationToken);
-            await memoryStoreObservationAsync(run, cancellationToken);
             mission = mission with { NextRunAt = timeProvider.GetUtcNow().Add(mission.Frequency) };
             await store.UpdateMissionAsync(mission, cancellationToken);
 
@@ -87,7 +86,4 @@ public sealed class MissionService(IPlatformStore store, IObservationTool observ
             return Result<MissionRun>.Failure("mission.run_failed", exception.Message);
         }
     }
-
-    private Task memoryStoreObservationAsync(MissionRun run, CancellationToken cancellationToken) =>
-        store.AddMemoryEntryAsync(new MemoryEntry(Guid.NewGuid(), run.WorkspaceId, null, run.MissionId, "observation", $"Observed value: {run.Observation}", Array.Empty<string>(), timeProvider.GetUtcNow()), cancellationToken);
 }

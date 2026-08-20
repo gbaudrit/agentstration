@@ -231,6 +231,8 @@ public sealed partial class PackCompositionService(
             {
                 PackBindingTargetKind.Secret => "secret",
                 PackBindingTargetKind.ModelProvider => "provider",
+                PackBindingTargetKind.MemoryProvider => "memory-provider",
+                PackBindingTargetKind.MemoryProfile => "memory-profile",
                 _ => "model"
             };
             var baseName = Slug($"{prefix}-{pair.Value.Resource.Name}");
@@ -271,13 +273,14 @@ public sealed partial class PackCompositionService(
             ResourceKinds.Entry => "entries",
             ResourceKinds.ModelProfile => "model-profiles",
             ResourceKinds.ModelProvider => "model-providers",
+            ResourceKinds.MemoryProfile => "memory-profiles",
             ResourceKinds.RuntimeProfile => "runtime-profiles",
             _ => $"{resource.Kind.ToLowerInvariant()}s"
         };
         return $"{directory}/{resource.Name}.json";
     }
-    private static int KindOrder(string kind) => kind switch { ResourceKinds.ModelProvider => 10, ResourceKinds.RuntimeProfile => 20, ResourceKinds.ModelProfile => 30, ResourceKinds.Agent => 40, ResourceKinds.Flow => 50, ResourceKinds.Entry => 60, _ => 100 };
-    private static string BindingLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model Provider", _ => "Model Profile" };
+    private static int KindOrder(string kind) => kind switch { ResourceKinds.ModelProvider => 10, ResourceKinds.MemoryProfile => 15, ResourceKinds.RuntimeProfile => 20, ResourceKinds.ModelProfile => 30, ResourceKinds.Agent => 40, ResourceKinds.Flow => 50, ResourceKinds.Entry => 60, _ => 100 };
+    private static string BindingLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model Provider", PackBindingTargetKind.MemoryProvider => "Memory Provider", PackBindingTargetKind.MemoryProfile => "Memory Profile", _ => "Model Profile" };
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static IReadOnlyList<string> Clean(IEnumerable<string> values) => values.Select(value => value.Trim()).Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     private static string Slug(string value)

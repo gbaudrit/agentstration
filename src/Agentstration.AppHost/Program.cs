@@ -19,6 +19,10 @@ var llamaCppExtension = builder.AddProject<Projects.Agentstration_Extensions_Lla
     .WithEnvironment("LlamaCpp__Endpoint", parsedLlamaCppEndpoint.AbsoluteUri)
     .WithHttpHealthCheck("/health");
 var utilitiesExtension = builder.AddProject<Projects.Agentstration_Extensions_Utilities>("utilities-extension").WithHttpHealthCheck("/health");
+var memorySqlitePath = Path.GetFullPath(builder.Configuration["MemorySqlite:Path"] ?? Path.Combine(".agentstration", "memory-sqlite-extension.db"));
+var memoryExtension = builder.AddProject<Projects.Agentstration_Extensions_Memory_Sqlite>("memory-sqlite-extension")
+    .WithEnvironment("MemorySqlite__Path", memorySqlitePath)
+    .WithHttpHealthCheck("/health");
 
 var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-console")
     .WithEnvironment("ConnectionStrings__ollama-extension", ollamaExtension.GetEndpoint("http"))
@@ -26,10 +30,12 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Ollama__Endpoint", ollamaExtension.GetEndpoint("http"))
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.LlamaCpp__Endpoint", llamaCppExtension.GetEndpoint("http"))
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint", utilitiesExtension.GetEndpoint("http"))
+    .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Memory.Sqlite__Endpoint", memoryExtension.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WaitFor(ollamaExtension);
 console.WaitFor(llamaCppExtension);
 console.WaitFor(utilitiesExtension);
+console.WaitFor(memoryExtension);
 console
     .WithEnvironment("Agentstration__ManagementApi__BaseAddress", console.GetEndpoint("http"))
     .WithEnvironment("Agentstration__ManagementApi__ForwardSessionCookie", "true")

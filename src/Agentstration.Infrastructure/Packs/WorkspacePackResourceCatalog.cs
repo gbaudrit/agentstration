@@ -33,6 +33,10 @@ public sealed class WorkspacePackResourceCatalog(
             .Select(value => ModelProfileItem(value.Value)));
         resources.AddRange((await store.ListAsync<ModelProviderResource>(ResourceNamespace.Default, ResourceKinds.ModelProvider, 0, 1000, cancellationToken))
             .Select(value => ModelProviderItem(value.Value)));
+        resources.AddRange((await store.ListAsync<MemoryProfileResource>(ResourceNamespace.Default, ResourceKinds.MemoryProfile, 0, 1000, cancellationToken))
+            .Select(value => MemoryProfileItem(value.Value)));
+        resources.AddRange((await store.ListAsync<MemoryProviderResource>(ResourceNamespace.Default, ResourceKinds.MemoryProvider, 0, 1000, cancellationToken))
+            .Select(value => BindingItem(value.Value, value.Value.Definition.DisplayName, "Memory Providers are environment bindings; Memory records are never exported.")));
         resources.AddRange((await store.ListAsync<RuntimeProfileResource>(ResourceNamespace.Default, ResourceKinds.RuntimeProfile, 0, 1000, cancellationToken))
             .Select(value => RuntimeProfileItem(value.Value)));
         resources.AddRange((await store.ListAsync<SecretResource>(ResourceNamespace.Default, ResourceKinds.Secret, 0, 1000, cancellationToken))
@@ -58,6 +62,8 @@ public sealed class WorkspacePackResourceCatalog(
             ResourceKinds.Entry => await GetEntryAsync(resource, cancellationToken),
             ResourceKinds.ModelProfile => await GetModelProfileAsync(resource, cancellationToken),
             ResourceKinds.ModelProvider => await GetModelProviderAsync(resource, cancellationToken),
+            ResourceKinds.MemoryProfile => await GetMemoryProfileAsync(resource, cancellationToken),
+            ResourceKinds.MemoryProvider => await GetBindingAsync<MemoryProviderResource>(resource, PackBindingTargetKind.MemoryProvider, cancellationToken),
             ResourceKinds.RuntimeProfile => await GetRuntimeProfileAsync(resource, cancellationToken),
             ResourceKinds.Secret => await GetBindingAsync<SecretResource>(resource, PackBindingTargetKind.Secret, cancellationToken),
             _ => (await ListAsync(cancellationToken)).Where(value => value.Resource.Address == resource.Address).Select(value => new PackCompositionResourceSnapshot(value, [])).SingleOrDefault()
@@ -74,6 +80,7 @@ public sealed class WorkspacePackResourceCatalog(
             ResourceKinds.Entry => await ExportEntryAsync(resource, cancellationToken),
             ResourceKinds.ModelProfile => await ExportModelProfileAsync(resource, bindings, cancellationToken),
             ResourceKinds.ModelProvider => await ExportModelProviderAsync(resource, bindings, cancellationToken),
+            ResourceKinds.MemoryProfile => await ExportMemoryProfileAsync(resource, bindings, cancellationToken),
             ResourceKinds.RuntimeProfile => await ExportRuntimeProfileAsync(resource, cancellationToken),
             _ => throw new InvalidOperationException($"Resource kind '{resource.Kind}' is not exportable by the Pack Composer.")
         };
@@ -87,6 +94,8 @@ public sealed class WorkspacePackResourceCatalog(
         {
             BindingDependency(agent.Definition.ModelProfile, agent.Namespace, ResourceKinds.ModelProfile, PackBindingTargetKind.ModelProfile, "modelProfile")
         };
+        if (agent.Definition.Memory is { } memory)
+            dependencies.Add(IncludeDependency(memory.Profile.Name, memory.Profile.Namespace ?? agent.Namespace, ResourceKinds.MemoryProfile, "memoryProfile"));
         dependencies.AddRange(agent.Definition.Tools.Select(tool => UnsupportedDependency(tool, agent.Namespace, ResourceKinds.Tool, "tool")));
         return new(AgentItem(agent) with { DependencyCount = dependencies.Count }, dependencies);
     }
@@ -135,6 +144,18 @@ public sealed class WorkspacePackResourceCatalog(
         return new(ModelProviderItem(provider) with { DependencyCount = dependencies.Length }, dependencies);
     }
 
+    private async Task<PackCompositionResourceSnapshot?> GetMemoryProfileAsync(PackCompositionResourceKey key, CancellationToken token)
+    {
+        var stored = await store.GetAsync<MemoryProfileResource>(ResourceKey.Create(ResourceKinds.MemoryProfile, key.Name, key.NamespaceValue), token);
+        if (stored is null) return null;
+        var profile = stored.Value;
+        var dependencies = new[]
+        {
+            BindingDependency(profile.Definition.Provider, profile.Namespace, ResourceKinds.MemoryProvider, PackBindingTargetKind.MemoryProvider, "provider")
+        };
+        return new(MemoryProfileItem(profile) with { DependencyCount = 1 }, dependencies);
+    }
+
     private async Task<PackCompositionResourceSnapshot?> GetRuntimeProfileAsync(PackCompositionResourceKey key, CancellationToken token)
     {
         var stored = await store.GetAsync<RuntimeProfileResource>(ResourceKey.Create(ResourceKinds.RuntimeProfile, key.Name, key.NamespaceValue), token);
@@ -151,6 +172,7 @@ public sealed class WorkspacePackResourceCatalog(
         var displayName = stored.Value switch
         {
             ModelProfileResource profile => profile.Definition.DisplayName,
+            MemoryProviderResource provider => provider.Definition.DisplayName,
             SecretResource secret => secret.Definition.DisplayName,
             _ => stored.Value.Name
         };
@@ -268,6 +290,21 @@ public sealed class WorkspacePackResourceCatalog(
         return ToElement(node);
     }
 
+    private async Task<JsonElement> ExportMemoryProfileAsync(PackCompositionResourceKey key, IReadOnlyDictionary<ResourceAddress, string> bindings, CancellationToken token)
+    {
+        var profile = (await store.GetAsync<MemoryProfileResource>(ResourceKey.Create(ResourceKinds.MemoryProfile, key.Name, key.NamespaceValue), token))?.Value
+            ?? throw new KeyNotFoundException($"Memory Profile '{key.Name}' was not found.");
+        var clean = profile with
+        {
+            Uid = Guid.Empty, TenantId = Guid.Empty, WorkspaceId = Guid.Empty, Generation = 1, ETag = null,
+            Metadata = CleanMetadata(profile.Metadata), Status = new ResourceStatus { ProvisioningState = ProvisioningState.Accepted }
+        };
+        var node = JsonSerializer.SerializeToNode(clean, JsonOptions)!.AsObject();
+        var target = profile.Definition.Provider.Resolve(profile.Namespace, ResourceKinds.MemoryProvider);
+        node["definition"]!.AsObject()["provider"] = BindingNode(bindings, target);
+        return ToElement(node);
+    }
+
     private async Task<JsonElement> ExportRuntimeProfileAsync(PackCompositionResourceKey key, CancellationToken token)
     {
         var runtime = (await store.GetAsync<RuntimeProfileResource>(ResourceKey.Create(ResourceKinds.RuntimeProfile, key.Name, key.NamespaceValue), token))?.Value
@@ -351,6 +388,7 @@ public sealed class WorkspacePackResourceCatalog(
     private static PackCompositionCatalogItem EntryItem(EntryDraft value) => new() { Resource = new(ResourceKinds.Entry, value.Name, value.Id.Namespace), DisplayName = value.DisplayName, Description = value.Description, Version = value.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture), Status = value.PublishedBinding is null ? "Draft" : "Published" };
     private static PackCompositionCatalogItem ModelProfileItem(ModelProfileResource value) => new() { Resource = new(ResourceKinds.ModelProfile, value.Name, value.Namespace), DisplayName = value.Definition.DisplayName, Description = value.Definition.Description, Version = value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), Status = value.Status.ProvisioningState.ToString() };
     private static PackCompositionCatalogItem ModelProviderItem(ModelProviderResource value) => new() { Resource = new(ResourceKinds.ModelProvider, value.Name, value.Namespace), DisplayName = value.Definition.DisplayName, Description = $"{value.Definition.ProviderType} · {value.Definition.Endpoint}", Version = value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), Status = value.Status.ProvisioningState.ToString() };
+    private static PackCompositionCatalogItem MemoryProfileItem(MemoryProfileResource value) => new() { Resource = new(ResourceKinds.MemoryProfile, value.Name, value.Namespace), DisplayName = value.Definition.DisplayName, Description = value.Definition.Description, Version = value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), Status = value.Status.ProvisioningState.ToString() };
     private static PackCompositionCatalogItem RuntimeProfileItem(RuntimeProfileResource value) => new() { Resource = new(ResourceKinds.RuntimeProfile, value.Name, value.Namespace), DisplayName = value.Definition.DisplayName, Description = $"Runtime type: {value.Definition.RuntimeType}", Version = value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), Status = value.Status.ProvisioningState.ToString() };
     private static PackCompositionCatalogItem BindingItem(Resource value, string displayName, string reason) => new() { Resource = new(value.Kind, value.Name, value.Namespace), DisplayName = displayName, Status = value.Status.ProvisioningState.ToString(), Availability = PackCompositionAvailability.BindingOnly, AvailabilityReason = reason };
     private static PackCompositionDependency IncludeDependency(string name, ResourceNamespace @namespace, string kind, string relationship) => new() { Target = new(kind, name, @namespace), Relationship = relationship };
@@ -367,7 +405,7 @@ public sealed class WorkspacePackResourceCatalog(
     private static IReadOnlyDictionary<string, string> WithoutProvenance(IReadOnlyDictionary<string, string> values) => values.Where(pair => !pair.Key.StartsWith("agentstration.io/pack.", StringComparison.Ordinal)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     private static string DisplayName(Resource value) => value switch { ModelProviderResource provider => provider.Definition.DisplayName, RuntimeProfileResource runtime => runtime.Definition.DisplayName, VaultResource vault => vault.Definition.DisplayName, ToolProviderResource provider => provider.Definition.DisplayName, ToolResource tool => tool.Definition.DisplayName, _ => value.Name };
     private static bool Dynamic(string value) => value.StartsWith("${", StringComparison.Ordinal);
-    private static string BindingLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model Provider", _ => "Model Profile" };
-    private static int KindOrder(string kind) => kind switch { ResourceKinds.Entry => 10, ResourceKinds.Flow => 20, ResourceKinds.Agent => 30, ResourceKinds.ModelProfile => 40, ResourceKinds.ModelProvider => 50, ResourceKinds.RuntimeProfile => 60, ResourceKinds.Secret => 70, _ => 100 };
+    private static string BindingLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model Provider", PackBindingTargetKind.MemoryProvider => "Memory Provider", PackBindingTargetKind.MemoryProfile => "Memory Profile", _ => "Model Profile" };
+    private static int KindOrder(string kind) => kind switch { ResourceKinds.Entry => 10, ResourceKinds.Flow => 20, ResourceKinds.Agent => 30, ResourceKinds.ModelProfile => 40, ResourceKinds.MemoryProfile => 45, ResourceKinds.ModelProvider => 50, ResourceKinds.MemoryProvider => 55, ResourceKinds.RuntimeProfile => 60, ResourceKinds.Secret => 70, _ => 100 };
     private static JsonSerializerOptions CreateJsonOptions() { var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }; options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)); return options; }
 }

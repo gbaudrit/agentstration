@@ -102,14 +102,14 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Identity | local accounts, Principal mapping, Workspace memberships/RBAC, bootstrap, account security, append-only security audit | external-account provisioning/linking, recovery, workload authentication |
 | Workspaces | workspace and inbox lifecycle | teams, organizations, policies |
 | Ingestion | text, JSON, multipart file, URL, hash deduplication | webhooks, email, connectors |
-| Memory | normalized content, summaries, categories, search contract | facts, relations, embeddings, conversations |
+| Memory/context | governed Agent/shared records in isolated SQLite storage, deterministic bounded retrieval, Runtime context assembly, explicit writes/deletes/expiry | semantic retrieval, policies, compaction, user-facing inspection |
 | Routing | deterministic stateless decision | rule catalog and LLM router |
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
-| Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
+| Workflows | normalize → analyze → derived result | parallel, routing, handoff, supervisor, HITL |
 | Scheduling | standalone polling worker | Quartz persistent scheduler |
 | Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog, and an Agentstration-owned runtime execution boundary before MCP `tools/call` | richer permissions, credentials, connection policies, and execution hooks |
 | Notifications | internal notification record/event | email, Teams, webhook channels |
-| MCP | nine tools reusing application services | resources and authorization |
+| MCP | eight tools reusing application services | resources and authorization |
 | Evaluation | deterministic `Microsoft.Extensions.AI.Evaluation` metrics and versioned content-workflow dataset | LLM-as-judge quality/safety evaluators and reports |
 | Observability | OTel traces/metrics/log correlation tags | dashboards, SLOs, evaluation telemetry |
 
@@ -126,10 +126,7 @@ public interface IAgentRuntime
     Task<AgentExecutionResult> RunAsync(AgentExecutionRequest request, CancellationToken cancellationToken);
 }
 
-public interface IMemoryStore { Task AddAsync(MemoryEntry entry, CancellationToken cancellationToken); }
-public interface IMemorySearch { Task<IReadOnlyList<MemoryEntry>> SearchAsync(WorkspaceId workspaceId, string query, int limit, CancellationToken cancellationToken); }
 public interface IBlobStore { Task<string> PutAsync(WorkspaceId workspaceId, string name, Stream content, CancellationToken cancellationToken); }
-public interface IEmbeddingStore { Task UpsertAsync(WorkspaceId workspaceId, Guid id, ReadOnlyMemory<float> embedding, CancellationToken cancellationToken); }
 public interface IScheduler { Task TriggerDueMissionsAsync(CancellationToken cancellationToken); }
 ```
 
@@ -137,11 +134,15 @@ Other important contracts are `IPlatformStore`, `IEventBus`, `IEventHandler<T>`,
 
 ## Initial data model
 
-The executable model includes `Workspace`, `Inbox`, `Item`, `RawContent`, `NormalizedContent`, `MemoryEntry`, `Mission`, `MissionRun`, `Notification`, and `AuditEntry`. The wider model reserves `User`, `WorkspaceMember`, `AgentDefinition`, `AgentRun`, `WorkflowDefinition`, `WorkflowRun`, `Schedule`, and `ToolDefinition` for later increments.
+The executable model includes `Workspace`, `Inbox`, `Item`, `RawContent`, `NormalizedContent`, `ItemAnalysis`, `Mission`, `MissionRun`, `Notification`, `AuditEntry`, and the independently owned `MemoryRecord`. An item analysis is not agent memory merely because it was produced by AI.
+
+Memory storage is selected through canonical `MemoryProviderResource` declarations and reusable `MemoryProfileResource` policies. Runtime resolves the Agent's optional profile and provider before bounded retrieval. SQLite is builtin; external stores implement the versioned AEP `aep.memory-provider` capability. `Agentstration.Extensions.Memory.Sqlite` is the autonomous reference extension and Aspire wires it as an optional AEP provider while preserving the builtin direct-launch default. AEP never owns retrieval policy or context assembly, and record APIs are provider- and Workspace-scoped.
 
 Every workspace-owned record carries `WorkspaceId`. Queries require it alongside the entity identifier. Runtime runs, Flow definitions and runs, Work items, events, queues, cancellation state, and artifacts preserve that scope end to end; storage identities are composite where identifiers may repeat across workspaces. HTTP scope comes from the authenticated request context rather than caller-controlled payload or query values, and background workers re-authorize the durable scope before execution. Key indexes in the PostgreSQL model cover `(WorkspaceId, Slug)`, `(WorkspaceId, InboxId, ContentHash)`, `(WorkspaceId, Status, CreatedAt)`, `(WorkspaceId, ItemId, CreatedAt)`, and `(WorkspaceId, MissionId, StartedAt)`. See ADR-0050.
 
 Raw content is append-only from the workflow's perspective. Normalization and AI results are separate records. Content hash plus inbox scope provides ingestion idempotency.
+
+The governed Memory/context model, provider conformance contract, lifecycle, and V1 limitations are documented in [Memory and execution context](memory-context.md), ADR-0062, and ADR-0063.
 
 ## Main flows
 
@@ -156,7 +157,7 @@ REST / UI / MCP
   -> deterministic router
   -> normalize
   -> IAgentRuntime -> IChatClient
-  -> MemoryEntry
+  -> ItemAnalysis
   -> ItemProcessed
 ```
 
@@ -166,7 +167,7 @@ REST / UI / MCP
 REST / UI / MCP / scheduler tick
   -> MissionService
   -> IObservationTool (demo sequence in MVP)
-  -> MissionRun + observation MemoryEntry
+  -> MissionRun
   -> compare previous observation
   -> threshold satisfied and changed
   -> Notification + NotificationRequested
@@ -340,7 +341,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 1. **Delivered foundation:** solution conventions, domain/application boundaries, local content store, API/UI/MCP, OTel, Aspire, and tests.
 2. **Delivered management vertical:** direct agent definitions, deterministic compilation, immutable revisions, SQLite control-plane storage, deployments, ETags, concise REST API, and pagination.
 3. **Delivered runtime vertical:** isolated Microsoft Agent Framework adapter, in-process/shared-host provisioners, runtime registry, periodic reconciliation, single-agent routing, execution, and standalone sample data.
-4. **Delivered content and monitoring verticals:** ingestion, memory/search, deterministic/OpenAI-compatible AI, missions, change detection, and internal notifications.
+4. **Delivered content and monitoring verticals:** ingestion, derived analysis data, deterministic/OpenAI-compatible AI, missions, change detection, and internal notifications.
 5. **Delivered Work vertical:** domain-controlled lifecycle, typed identifiers, interactions, idempotent Runtime events, independent SQLite persistence, local execution gateway, canonical REST API, metrics, traces, and tests.
 6. **Delivered Flow authoring vertical:** independent projects, typed seven-step graphs, draft revisions and ETags, structural/resource/expression validation, YAML/JSON source, immutable publication, visual authoring, Work references, OpenAPI, and SQLite.
 7. **Delivered Flow Runtime vertical:** durable FlowRun contracts and event history, immutable draft/published snapshots, bounded sequential typed-graph execution, input validation, cancellation, SignalR replay, telemetry, and the Flow-centered console.
@@ -426,3 +427,5 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0059: Tool arguments require explicit bounded retention
 - ADR-0060: Entry owns Workplace execution presentation
 - ADR-0061: llama.cpp AEP provider and effective capability resolution
+- ADR-0062: Memory is governed state and Runtime assembles execution context
+- ADR-0063: Memory providers are Management bindings and AEP extends stores

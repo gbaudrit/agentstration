@@ -6,6 +6,7 @@ using Agentstration.Application;
 using Agentstration.Domain;
 using Agentstration.Evaluation;
 using Agentstration.Extensions.LlamaCpp;
+using Agentstration.Extensions.Memory.Sqlite;
 using Agentstration.Extensions.Ollama;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
@@ -14,6 +15,10 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Memory;
+using Agentstration.Memory.Application;
+using Agentstration.Memory.Storage.Abstractions;
+using Agentstration.Memory.Testing;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
@@ -105,6 +110,38 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void MemoryContractsAreProviderNeutralAndUiIndependent()
+    {
+        var assemblies = new[]
+        {
+            typeof(MemoryRecord).Assembly,
+            typeof(IMemoryRetriever).Assembly,
+            typeof(IMemoryRecordStore).Assembly
+        };
+        var references = assemblies.SelectMany(value => value.GetReferencedAssemblies()).Select(value => value.Name).ToArray();
+
+        Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Runtime.AgentFramework", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Aep", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Web", StringComparison.Ordinal)
+            || name.Contains("AspNetCore", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void MemoryConformanceKitDependsOnlyOnMemoryContracts()
+    {
+        var references = typeof(MemoryRecordStoreConformanceSuite).Assembly.GetReferencedAssemblies().Select(reference => reference.Name ?? string.Empty).ToArray();
+        Assert.IsFalse(references.Any(name => name.Contains("Sqlite", StringComparison.Ordinal)
+            || name.Contains("EntityFramework", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Aep", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Web", StringComparison.Ordinal)
+            || name.Contains("MSTest", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public void ModelProviderAbstractionsDoNotReferenceOllamaAspireOrRuntimeAdapters()
     {
         var references = typeof(IModelProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
@@ -122,6 +159,7 @@ public sealed class DependencyTests
         Assert.IsFalse(assemblies.SelectMany(value => value.GetReferencedAssemblies()).Any(reference =>
             reference.Name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || reference.Name.Contains("Microsoft.Extensions.AI", StringComparison.Ordinal)
+            || reference.Name.Contains("Agentstration.Memory", StringComparison.Ordinal)
             || reference.Name.Contains("Ollama", StringComparison.Ordinal)));
     }
 
@@ -150,6 +188,19 @@ public sealed class DependencyTests
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || name.Contains("Ollama", StringComparison.Ordinal)
             || name.Contains("Aspire.Hosting", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void MemorySqliteExtensionDependsOnlyOnAepAndItsStorageImplementation()
+    {
+        var references = typeof(SqliteAepMemoryProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name ?? string.Empty).ToArray();
+        Assert.IsFalse(references.Any(name => name.Equals("Agentstration.Memory", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.Memory.", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Management", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Web", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
     }
 
     [TestMethod]

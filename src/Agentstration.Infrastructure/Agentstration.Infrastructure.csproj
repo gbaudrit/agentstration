@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../Agentstration.Domain/Agentstration.Domain.csproj" />
     <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
@@ -7,6 +8,8 @@
     <ProjectReference Include="../Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
     <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
     <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Memory.Application/Agentstration.Memory.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Memory.Storage.Sqlite/Agentstration.Memory.Storage.Sqlite.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />

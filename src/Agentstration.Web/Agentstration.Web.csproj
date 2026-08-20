@@ -8,6 +8,8 @@
     <ProjectReference Include="../Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
+    <ProjectReference Include="../Agentstration.Memory/Agentstration.Memory.csproj" />
+    <ProjectReference Include="../Agentstration.Memory.Application/Agentstration.Memory.Application.csproj" />
     <ProjectReference Include="../Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Contracts/Agentstration.Runtime.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />

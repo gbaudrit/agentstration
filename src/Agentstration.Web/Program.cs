@@ -8,6 +8,7 @@ using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Memory.Application;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
@@ -79,11 +80,17 @@ var runtimePath = builder.Environment.IsEnvironment("Testing")
     : builder.Configuration["Data:RuntimePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "runtime-plane.db");
 var runtimeDirectory = Path.GetDirectoryName(runtimePath);
 if (!string.IsNullOrWhiteSpace(runtimeDirectory)) Directory.CreateDirectory(runtimeDirectory);
-builder.Services.AddAgentstration(dataPath, builder.Environment.IsEnvironment("Testing"), aiOptions, $"Data Source={controlPlanePath}", $"Data Source={workPlanePath}", $"Data Source={flowPath}", $"Data Source={runtimePath}");
+var memoryPath = builder.Environment.IsEnvironment("Testing")
+    ? Path.Combine(Path.GetTempPath(), $"agentstration-memory-tests-{Guid.NewGuid():N}.db")
+    : builder.Configuration["Data:MemoryPath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "memory-plane.db");
+var memoryDirectory = Path.GetDirectoryName(memoryPath);
+if (!string.IsNullOrWhiteSpace(memoryDirectory)) Directory.CreateDirectory(memoryDirectory);
+builder.Services.AddAgentstration(dataPath, builder.Environment.IsEnvironment("Testing"), aiOptions, $"Data Source={controlPlanePath}", $"Data Source={workPlanePath}", $"Data Source={flowPath}", $"Data Source={runtimePath}", $"Data Source={memoryPath}");
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
 builder.Services.AddAgentstrationModelManagement();
+builder.Services.AddAgentstrationMemoryManagement();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddRazorPages();
@@ -175,6 +182,8 @@ app.MapAgentstrationWorkplaceApi();
 app.MapAgentstrationWorkOperationsApi();
 app.MapAgentstrationFlowApi();
 app.MapAgentstrationRuntimeApi();
+app.MapAgentstrationMemoryApi();
+app.MapAgentstrationMemoryManagementApi();
 app.MapAgentstrationToolGovernanceAuditApi();
 app.MapHub<FlowRunHub>("/hubs/flow-runs").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
 app.MapHub<WorkplaceHub>("/hubs/workplace");
@@ -194,6 +203,7 @@ await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Li
 await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+await app.Services.GetRequiredService<MemoryService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 if (app.Services.GetRequiredService<ICurrentRequestContext>().IsInitialized)
 {
     await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);

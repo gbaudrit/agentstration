@@ -13,6 +13,10 @@ public sealed class AgentEditorModel
     [Required] public string Handler { get; set; } = "prompt-agent";
     [Required] public string Instructions { get; set; } = string.Empty;
     [Required] public string ModelProfileName { get; set; } = "reasoning-default";
+    public bool MemoryEnabled { get; set; }
+    public string MemoryProfileName { get; set; } = "default-memory";
+    public bool ReadOwnMemory { get; set; } = true;
+    public string SharedMemoryScopes { get; set; } = string.Empty;
     public string ToolNames { get; set; } = string.Empty;
     public string Tags { get; set; } = string.Empty;
     public string Annotations { get; set; } = string.Empty;
@@ -34,6 +38,12 @@ public sealed class AgentEditorModel
                 Handler = Handler.Trim(),
                 Instructions = Instructions.Trim(),
                 ModelProfile = new ResourceReference(ModelProfileName.Trim()),
+                Memory = MemoryEnabled ? new AgentMemoryConfiguration
+                {
+                    Profile = new ResourceReference(MemoryProfileName.Trim()),
+                    ReadOwnMemory = ReadOwnMemory,
+                    SharedScopes = Lines(SharedMemoryScopes)
+                } : null,
                 Tools = tools
             }
         };
@@ -47,6 +57,10 @@ public sealed class AgentEditorModel
         Handler = resource.Definition.Handler,
         Instructions = resource.Definition.Instructions,
         ModelProfileName = resource.Definition.ModelProfile.Name,
+        MemoryEnabled = resource.Definition.Memory is not null,
+        MemoryProfileName = resource.Definition.Memory?.Profile.Name ?? "default-memory",
+        ReadOwnMemory = resource.Definition.Memory?.ReadOwnMemory ?? true,
+        SharedMemoryScopes = string.Join(Environment.NewLine, resource.Definition.Memory?.SharedScopes ?? []),
         ToolNames = string.Join(Environment.NewLine, resource.Definition.Tools.Select(tool => tool.Name)),
         Tags = Format(resource.Metadata.Tags),
         Annotations = Format(resource.Metadata.Annotations)

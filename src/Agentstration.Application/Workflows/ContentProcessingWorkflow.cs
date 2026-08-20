@@ -9,7 +9,7 @@ public sealed partial class ContentProcessingWorkflow(
     IPlatformStore store,
     IIntentRouter router,
     IAgentRuntime agentRuntime,
-    IMemoryStore memoryStore,
+    IItemAnalysisStore analyses,
     IEventBus eventBus,
     TimeProvider timeProvider)
 {
@@ -36,7 +36,7 @@ public sealed partial class ContentProcessingWorkflow(
             if (!decision.StoreOnly)
             {
                 var result = await agentRuntime.RunAsync(new AgentExecutionRequest(workspaceId, itemId, normalizedText), cancellationToken);
-                await memoryStore.AddAsync(new MemoryEntry(Guid.NewGuid(), workspaceId, itemId, null, "summary", result.Summary, result.Categories, timeProvider.GetUtcNow()), cancellationToken);
+                await analyses.AddAsync(new ItemAnalysis(Guid.NewGuid(), workspaceId, itemId, result.Summary, result.Categories, timeProvider.GetUtcNow()), cancellationToken);
             }
 
             await store.SetItemStatusAsync(workspaceId, itemId, ItemStatus.Processed, null, cancellationToken);
