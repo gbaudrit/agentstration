@@ -3,10 +3,16 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Infrastructure.Agents;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Memory;
+using Agentstration.Memory.Application;
+using Agentstration.Memory.Storage.Sqlite;
+using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
@@ -16,6 +22,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Runtime.Tests;
 
@@ -103,6 +110,38 @@ public sealed class RuntimeRunTests
         Assert.IsTrue(events.Any(item => item.Kind == RuntimeRunEventKind.ResponseDelta));
         Assert.IsTrue(events.Any(item => item.Kind == RuntimeRunEventKind.StepCompleted && item.Step == "Model profile resolved"));
         Assert.AreEqual(RuntimeRunEventKind.RunCompleted, events[^1].Kind);
+    }
+
+    [TestMethod]
+    public async Task ExplicitMemoryWriteInfluencesTheNextDeterministicRuntimeRun()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync(memoryEnabled: true, deterministicRuntime: true);
+        var first = await fixture.CreateRunAsync("What is the launch code?");
+        await fixture.Service.ExecuteAsync(new(TestScope, first.Value.Id), default);
+        var firstCompleted = await fixture.Service.GetAsync(TestScope.WorkspaceId, first.Value.Id, default);
+        Assert.IsNotNull(firstCompleted);
+        Assert.IsFalse(firstCompleted.Value.Status.Response?.Contains("cobalt", StringComparison.OrdinalIgnoreCase) == true);
+
+        await fixture.Memories!.WriteAsync(new(
+            TestScope.WorkspaceId,
+            MemoryScope.ForAgent(fixture.AgentUid),
+            "The launch code is cobalt.",
+            ["fact"],
+            MemorySourceKind.RuntimeRun,
+            first.Value.Id,
+            "Explicitly retain the launch code for the next Run.",
+            TestScope.PrincipalId), default);
+
+        var second = await fixture.CreateRunAsync("What is the launch code?");
+        await fixture.Service.ExecuteAsync(new(TestScope, second.Value.Id), default);
+        var secondCompleted = await fixture.Service.GetAsync(TestScope.WorkspaceId, second.Value.Id, default);
+        var events = await fixture.Store.ListEventsAsync(TestScope.WorkspaceId, second.Value.Id, 0, default);
+
+        Assert.IsNotNull(secondCompleted);
+        Assert.AreEqual(RuntimeRunState.Succeeded, secondCompleted.Value.Status.State);
+        StringAssert.Contains(secondCompleted.Value.Status.Response!, "cobalt");
+        Assert.IsTrue(events.Any(value => value.Kind == RuntimeRunEventKind.ContextAssembled
+            && value.Message?.Contains("1 Memory record", StringComparison.Ordinal) == true));
     }
 
     [TestMethod]
@@ -441,6 +480,7 @@ public sealed class RuntimeRunTests
     private sealed class FakeRuntimeRegistry : IRuntimeRegistry
     {
         public RuntimeBehavior Behavior { get; set; }
+        public IAgentRuntime? Runtime { get; set; }
         public AgentExecutionRequest? LastRequest { get; private set; }
         public TaskCompletionSource ExecutionStarted { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public void Set(string deploymentId, IAgentRuntime runtime) { }
@@ -450,6 +490,7 @@ public sealed class RuntimeRunTests
         {
             LastRequest = request;
             ExecutionStarted.TrySetResult();
+            if (Runtime is not null) return await Runtime.ExecuteAsync(request, cancellationToken);
             if (Behavior == RuntimeBehavior.Fail) throw new InvalidOperationException("runtime failed");
             if (Behavior == RuntimeBehavior.Block) await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return new AgentExecutionResult("runtime response", request.SessionId, "ollama", "qwen3:1.7b", request.Options);
@@ -465,8 +506,10 @@ public sealed class RuntimeRunTests
         public FakeRuntimeRegistry Registry { get; }
         public TestRuntimeRunQueue Queue { get; }
         public string AgentId { get; }
+        public Guid AgentUid { get; }
+        public MemoryService? Memories { get; }
 
-        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store, FakeRuntimeRegistry registry, TestRuntimeRunQueue queue, string agentId)
+        private RuntimeFixture(string directory, ServiceProvider provider, RuntimeRunService service, IRuntimeRunStore store, FakeRuntimeRegistry registry, TestRuntimeRunQueue queue, string agentId, Guid agentUid, MemoryService? memories)
         {
             this.directory = directory;
             this.provider = provider;
@@ -475,9 +518,11 @@ public sealed class RuntimeRunTests
             Registry = registry;
             Queue = queue;
             AgentId = agentId;
+            AgentUid = agentUid;
+            Memories = memories;
         }
 
-        public static async Task<RuntimeFixture> CreateAsync()
+        public static async Task<RuntimeFixture> CreateAsync(bool memoryEnabled = false, bool deterministicRuntime = false)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -497,6 +542,14 @@ public sealed class RuntimeRunTests
             services.AddSingleton(registry);
             services.AddSingleton<IRuntimeRegistry>(registry);
             services.AddSingleton<RuntimeRunStateManager>();
+            if (memoryEnabled)
+            {
+                services.AddSqliteMemoryStorage($"Data Source={Path.Combine(directory, "memory.db")}");
+                services.AddSingleton<MemoryService>();
+                services.AddSingleton<IMemoryRetriever>(provider => provider.GetRequiredService<MemoryService>());
+                services.AddSingleton<IMemoryReadAuthorization, AllowMemoryReadAuthorization>();
+                services.AddSingleton<IAgentExecutionContextAssembler, AgentExecutionContextAssembler>();
+            }
             services.AddSingleton<RuntimeRunService>();
             var provider = services.BuildServiceProvider();
             var management = provider.GetRequiredService<IControlPlaneStore>();
@@ -506,13 +559,24 @@ public sealed class RuntimeRunTests
 
             const string agentId = "sql-expert";
             const string revisionId = "sql-expert--000001";
-            var agent = await management.PutAsync(Agent(agentId), null, true, default);
-            await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid), default);
+            var agent = await management.PutAsync(Agent(agentId, memoryEnabled), null, true, default);
+            var revision = await management.CreateImmutableAsync(Revision(revisionId, agentId, agent.Value.Uid, memoryEnabled), default);
             await management.PutAsync(Deployment(revisionId), null, true, default);
-            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, registry, queue, agentId);
+            var memories = memoryEnabled ? provider.GetRequiredService<MemoryService>() : null;
+            if (memories is not null) await memories.InitializeAsync(default);
+            if (deterministicRuntime)
+            {
+                registry.Runtime = await new AgentFrameworkRuntimeFactory(
+                        new SingleChatClientResolver(new DeterministicChatClient()),
+                        NullLoggerFactory.Instance,
+                        new GenAiObservabilityOptions())
+                    .CreateAsync(RuntimeAgentDefinitionMapper.ToExecutable(revision.Value.Definition), revisionId, new AgentRuntimeContext(new EmptyToolCatalog()), default);
+            }
+            return new RuntimeFixture(directory, provider, provider.GetRequiredService<RuntimeRunService>(), store, registry, queue, agentId, agent.Value.Uid, memories);
         }
 
         public Task<StoredRuntimeRun> CreateRunAsync() => Service.CreateAsync(TestScope, new RuntimeAgentReference(AgentId, 3), Input("test prompt"), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", default);
+        public Task<StoredRuntimeRun> CreateRunAsync(string prompt) => Service.CreateAsync(TestScope, new RuntimeAgentReference(AgentId, 3), Input(prompt), new RuntimeExecutionOptions(), RuntimeRunOrigin.Api, "test", default);
 
         public async ValueTask DisposeAsync()
         {
@@ -521,7 +585,7 @@ public sealed class RuntimeRunTests
             if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
         }
 
-        private static AgentResource Agent(string id) => new()
+        private static AgentResource Agent(string id, bool memoryEnabled) => new()
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.Agent,
@@ -531,11 +595,12 @@ public sealed class RuntimeRunTests
             {
                 DisplayName = "SQL Expert",
                 Instructions = "Test",
-                ModelProfile = new ResourceReference("reasoning-default")
+                ModelProfile = new ResourceReference("reasoning-default"),
+                Memory = memoryEnabled ? new AgentMemoryConfiguration() : null
             }
         };
 
-        private static AgentRevision Revision(string id, string agentId, Guid agentUid) => new()
+        private static AgentRevision Revision(string id, string agentId, Guid agentUid, bool memoryEnabled) => new()
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.AgentRevision,
@@ -558,6 +623,7 @@ public sealed class RuntimeRunTests
                 RuntimeProfileName = "maf-default",
                 EffectiveToolNames = [],
                 MiddlewareIds = [],
+                Memory = memoryEnabled ? new AgentMemoryConfiguration() : null,
                 Capabilities = [],
                 Handler = "prompt-agent",
                 DefinitionHash = "hash"
@@ -590,6 +656,11 @@ public sealed class RuntimeRunTests
         {
             public void Dispose() { }
         }
+    }
+
+    private sealed class AllowMemoryReadAuthorization : IMemoryReadAuthorization
+    {
+        public Task EnsureReadAsync(RuntimeRunScope scope, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class TestRuntimeRunQueue : IRuntimeRunQueue
