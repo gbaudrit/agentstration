@@ -20,6 +20,7 @@
     <ProjectReference Include="../../src/Agentstration.Memory/Agentstration.Memory.csproj" />
     <ProjectReference Include="../../src/Agentstration.Memory.Application/Agentstration.Memory.Application.csproj" />
     <ProjectReference Include="../../src/Agentstration.Memory.Storage.Abstractions/Agentstration.Memory.Storage.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Memory.Testing/Agentstration.Memory.Testing.csproj" />
     <ProjectReference Include="../../src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />

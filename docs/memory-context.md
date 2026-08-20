@@ -121,6 +121,26 @@ The AEP V1 capability supports exact-scope CRUD and expiry. It has no semantic r
 
 Mutation audit is local even for external stores. It records provider, scope, operation, outcome, principal and Run/source correlation but never Memory content, tags, prompts, secrets or Tool arguments/results.
 
+## Provider conformance
+
+Every `IMemoryRecordStore` implementation must pass `MemoryRecordStoreConformanceSuite` from `Agentstration.Memory.Testing`. The runner has no dependency on MSTest, SQLite, AEP, Runtime, Infrastructure, or UI, so an external provider can invoke it from its preferred test framework:
+
+```csharp
+var suite = new MemoryRecordStoreConformanceSuite(CreateIsolatedStoreAsync);
+var report = await suite.RunAsync(cancellationToken);
+report.EnsureConformant();
+```
+
+The factory returns a fresh `MemoryRecordStoreLease` per scenario. This prevents scenario coupling and gives the provider a deterministic cleanup hook. The common scenarios verify:
+
+- exact record round-trip and Workspace isolation;
+- newest-first ordering, scope filtering, pagination, and bounded counts;
+- expiry filtering and Workspace-scoped bounded purge;
+- duplicate-write failure, exact-scope clear, and delete semantics;
+- cancellation propagation.
+
+Reports expose stable scenario/failure codes and exception type names only. Provider exception messages are deliberately discarded because they may contain Memory content or backend diagnostics. SQLite and the AEP adapter both execute this same offline suite in `Agentstration.Memory.Conformance.Tests`.
+
 ## V1 limitations
 
 There is no vector database, embeddings, RAG/document ingestion, automatic extraction, compaction, archival, policy engine, Workplace transcript projection, dedicated Flow steps, Workspace-wide scope, or built-in distributed/cloud store. The Console surface is limited to administrative inspection, provider testing and explicit deletion; it is not a user-facing “what the Agent remembers” experience. Multi-agent MAF orchestration-specific context injection is deferred; Runtime Run and the current simple Work/Flow execution path use the common assembler.

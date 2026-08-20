@@ -25,6 +25,7 @@
     <Project Path="src/Agentstration.Memory.Application/Agentstration.Memory.Application.csproj" />
     <Project Path="src/Agentstration.Memory.Storage.Abstractions/Agentstration.Memory.Storage.Abstractions.csproj" />
     <Project Path="src/Agentstration.Memory.Storage.Sqlite/Agentstration.Memory.Storage.Sqlite.csproj" />
+    <Project Path="src/Agentstration.Memory.Testing/Agentstration.Memory.Testing.csproj" />
     <Project Path="src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <Project Path="src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <Project Path="src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
@@ -56,6 +57,7 @@
     <Project Path="tests/Agentstration.ArchitectureTests/Agentstration.ArchitectureTests.csproj" />
     <Project Path="tests/Agentstration.Evaluation.Tests/Agentstration.Evaluation.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Tests/Agentstration.Management.Tests.csproj" />
+    <Project Path="tests/Agentstration.Memory.Conformance.Tests/Agentstration.Memory.Conformance.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
     <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />

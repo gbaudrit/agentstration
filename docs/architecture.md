@@ -142,7 +142,7 @@ Every workspace-owned record carries `WorkspaceId`. Queries require it alongside
 
 Raw content is append-only from the workflow's perspective. Normalization and AI results are separate records. Content hash plus inbox scope provides ingestion idempotency.
 
-The governed Memory/context model, existing-state audit, lifecycle, and V1 limitations are documented in [Memory and execution context](memory-context.md) and ADR-0062.
+The governed Memory/context model, provider conformance contract, lifecycle, and V1 limitations are documented in [Memory and execution context](memory-context.md), ADR-0062, and ADR-0063.
 
 ## Main flows
 
@@ -427,3 +427,5 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0059: Tool arguments require explicit bounded retention
 - ADR-0060: Entry owns Workplace execution presentation
 - ADR-0061: llama.cpp AEP provider and effective capability resolution
+- ADR-0062: Memory is governed state and Runtime assembles execution context
+- ADR-0063: Memory providers are Management bindings and AEP extends stores

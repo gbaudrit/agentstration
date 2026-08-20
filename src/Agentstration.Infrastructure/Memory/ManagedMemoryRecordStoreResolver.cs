@@ -41,7 +41,7 @@ public sealed class ManagedMemoryRecordStoreResolver(
     }
 }
 
-internal sealed class AepMemoryRecordStore(AepMemoryProviderClient client) : IMemoryRecordStore
+public sealed class AepMemoryRecordStore(AepMemoryProviderClient client) : IMemoryRecordStore
 {
     public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     public Task AddAsync(MemoryRecord record, CancellationToken cancellationToken) => client.WriteAsync(ToAep(record), cancellationToken);

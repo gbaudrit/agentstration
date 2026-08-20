@@ -92,3 +92,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 60. [ADR-0060 — Entry owns Workplace execution presentation](0060-entry-owns-workplace-execution-presentation.md)
 61. [ADR-0061 — llama.cpp is an AEP provider and capabilities are resolved effectively](0061-llama-cpp-provider-and-effective-capabilities.md)
 62. [ADR-0062 — Memory is governed state and Runtime assembles execution context](0062-memory-is-governed-state-and-runtime-assembles-context.md)
+63. [ADR-0063 — Memory providers are Management bindings and AEP extends stores](0063-memory-providers-are-management-bindings-and-aep-extends-stores.md)

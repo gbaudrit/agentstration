@@ -17,6 +17,7 @@ using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Memory;
 using Agentstration.Memory.Application;
 using Agentstration.Memory.Storage.Abstractions;
+using Agentstration.Memory.Testing;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
@@ -124,6 +125,19 @@ public sealed class DependencyTests
             || name.Contains("Agentstration.Aep", StringComparison.Ordinal)
             || name.Contains("Agentstration.Web", StringComparison.Ordinal)
             || name.Contains("AspNetCore", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void MemoryConformanceKitDependsOnlyOnMemoryContracts()
+    {
+        var references = typeof(MemoryRecordStoreConformanceSuite).Assembly.GetReferencedAssemblies().Select(reference => reference.Name ?? string.Empty).ToArray();
+        Assert.IsFalse(references.Any(name => name.Contains("Sqlite", StringComparison.Ordinal)
+            || name.Contains("EntityFramework", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Aep", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Web", StringComparison.Ordinal)
+            || name.Contains("MSTest", StringComparison.Ordinal)));
     }
 
     [TestMethod]
