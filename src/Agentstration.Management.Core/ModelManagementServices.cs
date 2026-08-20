@@ -424,6 +424,8 @@ public static class ModelManagementServiceCollectionExtensions
         services.AddSingleton<IModelProfileStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
         services.AddSingleton<IModelDeploymentStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
         services.AddSingleton<IModelProfileReferenceValidator>(provider => provider.GetRequiredService<ModelProfileManagementService>());
+        services.AddSingleton<ExtensionRegistrationManagementService>();
+        services.AddSingleton<IExtensionEndpointSource>(provider => provider.GetRequiredService<ExtensionRegistrationManagementService>());
         services.AddSingleton<ExtensionManagementService>();
         return services;
     }

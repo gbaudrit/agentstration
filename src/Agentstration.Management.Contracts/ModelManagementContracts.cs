@@ -34,6 +34,11 @@ public sealed record CreateModelProviderRequest(
     ModelProviderProperties Properties,
     string Namespace = "default");
 public sealed record PutModelProviderRequest(ModelProviderProperties Properties);
+public sealed record CreateExtensionRegistrationRequest(
+    string Name,
+    ExtensionRegistrationProperties Properties,
+    string Namespace = "default");
+public sealed record PutExtensionRegistrationRequest(ExtensionRegistrationProperties Properties);
 public sealed record ModelProviderUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
 public sealed record ModelProviderUsagesResponse(IReadOnlyList<ModelProviderUsageResponse> Value, int Count);
 

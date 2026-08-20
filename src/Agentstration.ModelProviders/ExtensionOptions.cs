@@ -32,13 +32,17 @@ public sealed record ExtensionEndpointRegistration(string Id, Uri Endpoint, stri
 
 public interface IExtensionEndpointSource
 {
-    IReadOnlyList<ExtensionEndpointRegistration> List();
+    ValueTask<IReadOnlyList<ExtensionEndpointRegistration>> ListEndpointsAsync(
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class ConfigurationExtensionEndpointSource(IConfiguration configuration) : IExtensionEndpointSource
 {
-    public IReadOnlyList<ExtensionEndpointRegistration> List() =>
-        configuration.GetSection("Agentstration:Extensions")
+    public ValueTask<IReadOnlyList<ExtensionEndpointRegistration>> ListEndpointsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        IReadOnlyList<ExtensionEndpointRegistration> registrations = configuration.GetSection("Agentstration:Extensions")
             .GetChildren()
             .Select(section => new { section.Key, Endpoint = section["Endpoint"] })
             .Where(value => Uri.TryCreate(value.Endpoint, UriKind.Absolute, out var endpoint)
@@ -49,6 +53,8 @@ public sealed class ConfigurationExtensionEndpointSource(IConfiguration configur
                 "configuration"))
             .DistinctBy(value => value.Endpoint.AbsoluteUri, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        return ValueTask.FromResult(registrations);
+    }
 
     private static Uri Normalize(Uri endpoint) =>
         new(endpoint.AbsoluteUri.TrimEnd('/') + '/', UriKind.Absolute);

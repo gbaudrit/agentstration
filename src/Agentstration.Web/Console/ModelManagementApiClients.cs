@@ -29,12 +29,53 @@ public interface IModelProvidersClient
 public interface IExtensionsClient
 {
     Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken);
+    Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken);
 }
 
 public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClient
 {
     public async Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ExtensionResponse>>(httpClient, "api/extensions", cancellationToken)).Value;
+
+    public async Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<ExtensionRegistrationResource>>(httpClient, "api/extensionregistrations", cancellationToken)).Value;
+
+    public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        ReadRegistrationAsync(HttpMethod.Get, RegistrationPath(@namespace, name), null, null, cancellationToken);
+
+    public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) =>
+        ReadRegistrationAsync(HttpMethod.Post, "api/extensionregistrations", JsonContent.Create(request), null, cancellationToken);
+
+    public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) =>
+        ReadRegistrationAsync(HttpMethod.Put, RegistrationPath(@namespace, name), JsonContent.Create(request), etag, cancellationToken);
+
+    public async Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Delete, RegistrationPath(@namespace, name));
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    private async Task<ResourceSnapshot<ExtensionRegistrationResource>> ReadRegistrationAsync(HttpMethod method, string path, HttpContent? content, string? etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(method, path) { Content = content };
+        if (!string.IsNullOrWhiteSpace(etag)) message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        var value = await response.Content.ReadFromJsonAsync<ExtensionRegistrationResource>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty extension registration.", Guid.NewGuid().ToString("N"));
+        var responseEtag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(responseEtag)) throw new AgentstrationApiException("Agentstration API did not return the extension registration ETag.", Guid.NewGuid().ToString("N"));
+        return new(value, responseEtag);
+    }
+
+    private static string RegistrationPath(ResourceNamespace @namespace, string name) =>
+        $"api/extensionregistrations/{Uri.EscapeDataString(name)}?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}";
 }
 
 public interface IModelProfilesClient

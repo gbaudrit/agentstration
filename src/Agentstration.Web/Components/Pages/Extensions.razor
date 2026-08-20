@@ -3,9 +3,60 @@
 @inject IExtensionsClient Client
 
 <PageTitle>Extensions · Agentstration</PageTitle>
-<PageHeader Title="Extensions" Description="Inspect AEP extensions, their immutable option contracts, and compatibility with persisted Model Profiles.">
-    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh discovery</button></Actions>
+<PageHeader Title="Extensions" Description="Register AEP endpoints and inspect their immutable option contracts and compatibility with persisted Model Profiles.">
+    <Actions>
+        <button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh discovery</button>
+        <button class="button-primary" @onclick="StartCreate" disabled="@loading">Register endpoint</button>
+    </Actions>
 </PageHeader>
+
+<section class="panel resource-section">
+    <div class="panel-header">
+        <div><p class="eyebrow">Discovery sources</p><h2>Registered endpoints</h2><p>Workspace-scoped endpoints are persisted and discovered while enabled. Configuration and Aspire sources remain read-only.</p></div>
+        <span>@(registrations?.Count ?? 0) registration(s)</span>
+    </div>
+
+    @if (editing)
+    {
+        <EditForm Model="form" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="form-grid">
+                <label>Name<InputText @bind-Value="form.Name" disabled="@(!creating)" /></label>
+                <label>Namespace<InputText @bind-Value="form.Namespace" disabled="@(!creating)" /></label>
+                <label>Display name<InputText @bind-Value="form.DisplayName" /></label>
+                <label>AEP endpoint<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
+                <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> Enabled for discovery</label>
+            </div>
+            <div class="form-actions">
+                <button class="button-primary" type="submit" disabled="@saving">@(creating ? "Create registration" : "Save changes")</button>
+                <button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">Cancel</button>
+            </div>
+        </EditForm>
+    }
+    else if (registrations?.Count > 0)
+    {
+        <DataGrid TItem="ExtensionRegistrationResource" Items="registrations">
+            <Header><tr><th>Registration</th><th>Endpoint</th><th>Discovery</th><th>Actions</th></tr></Header>
+            <Row Context="registration"><tr>
+                <td><strong>@registration.Definition.DisplayName</strong><br /><code>@registration.Namespace/@registration.Name</code></td>
+                <td><code>@registration.Definition.Endpoint</code></td>
+                <td><StatusBadge Text="@(registration.Definition.Enabled ? "Enabled" : "Disabled")" Status="@ModelManagementUi.Status(registration.Definition.Enabled ? "available" : "disabled")" /></td>
+                <td>
+                    <button class="button-secondary" @onclick="() => EditAsync(registration)">Edit</button>
+                    <button class="button-secondary" @onclick="() => ToggleAsync(registration)">@(registration.Definition.Enabled ? "Disable" : "Enable")</button>
+                    <button class="button-danger" @onclick="() => RequestDelete(registration)">Delete</button>
+                </td>
+            </tr></Row>
+        </DataGrid>
+    }
+    else if (!loading)
+    {
+        <p>No manually registered endpoint. Use <strong>Register endpoint</strong>, application configuration, or Aspire discovery.</p>
+    }
+</section>
+
+<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="Delete extension registration" Message="@DeleteMessage" ConfirmLabel="Delete registration" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
 
 @if (loading && extensions is null)
 {
@@ -92,8 +143,15 @@ else
 @code {
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<ExtensionResponse>? extensions;
+    private IReadOnlyList<ExtensionRegistrationResource>? registrations;
     private AgentstrationApiException? error;
     private bool loading;
+    private bool saving;
+    private bool editing;
+    private bool creating;
+    private string? etag;
+    private RegistrationForm form = new();
+    private ExtensionRegistrationResource? pendingDelete;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -101,10 +159,90 @@ else
     {
         loading = true;
         error = null;
-        try { extensions = await Client.GetExtensionsAsync(cancellation.Token); }
+        try
+        {
+            var extensionsTask = Client.GetExtensionsAsync(cancellation.Token);
+            var registrationsTask = Client.GetRegistrationsAsync(cancellation.Token);
+            await Task.WhenAll(extensionsTask, registrationsTask);
+            extensions = await extensionsTask;
+            registrations = await registrationsTask;
+        }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
     }
+
+    private void StartCreate()
+    {
+        form = new();
+        etag = null;
+        creating = true;
+        editing = true;
+    }
+
+    private async Task EditAsync(ExtensionRegistrationResource registration)
+    {
+        try
+        {
+            var snapshot = await Client.GetRegistrationAsync(registration.Namespace, registration.Name, cancellation.Token);
+            form = RegistrationForm.From(snapshot.Value);
+            etag = snapshot.ETag;
+            creating = false;
+            editing = true;
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        error = null;
+        try
+        {
+            if (!Uri.TryCreate(form.Endpoint, UriKind.Absolute, out var endpoint))
+                throw new AgentstrationApiException("The endpoint must be an absolute HTTP(S) URL.", Guid.NewGuid().ToString("N"));
+            var properties = new ExtensionRegistrationProperties { DisplayName = form.DisplayName, Endpoint = endpoint, Enabled = form.Enabled };
+            if (creating)
+                _ = await Client.CreateRegistrationAsync(new(form.Name, properties, form.Namespace), cancellation.Token);
+            else
+                _ = await Client.UpdateRegistrationAsync(ResourceNamespace.Parse(form.Namespace), form.Name, new(properties), etag!, cancellation.Token);
+            editing = false;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { saving = false; }
+    }
+
+    private async Task ToggleAsync(ExtensionRegistrationResource registration)
+    {
+        try
+        {
+            var snapshot = await Client.GetRegistrationAsync(registration.Namespace, registration.Name, cancellation.Token);
+            _ = await Client.UpdateRegistrationAsync(registration.Namespace, registration.Name,
+                new(snapshot.Value.Definition with { Enabled = !snapshot.Value.Definition.Enabled }), snapshot.ETag, cancellation.Token);
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private void RequestDelete(ExtensionRegistrationResource registration) => pendingDelete = registration;
+    private void CancelDelete() => pendingDelete = null;
+    private string DeleteMessage => $"Delete extension registration '{pendingDelete?.Namespace}/{pendingDelete?.Name}'?";
+
+    private async Task DeleteAsync()
+    {
+        var registration = pendingDelete;
+        if (registration is null) return;
+        try
+        {
+            var snapshot = await Client.GetRegistrationAsync(registration.Namespace, registration.Name, cancellation.Token);
+            await Client.DeleteRegistrationAsync(registration.Namespace, registration.Name, snapshot.ETag, cancellation.Token);
+            pendingDelete = null;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private void CancelEdit() => editing = false;
 
     private static string ShortDigest(string value) => value.Length <= 24 ? value : $"{value[..18]}…{value[^6..]}";
     private static string FormatSchema(System.Text.Json.JsonElement schema) =>
@@ -118,5 +256,28 @@ else
     {
         cancellation.Cancel();
         cancellation.Dispose();
+    }
+
+    private sealed class RegistrationForm
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Name { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Namespace { get; set; } = "default";
+        [System.ComponentModel.DataAnnotations.Required]
+        public string DisplayName { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.Url]
+        public string Endpoint { get; set; } = string.Empty;
+        public bool Enabled { get; set; } = true;
+
+        public static RegistrationForm From(ExtensionRegistrationResource resource) => new()
+        {
+            Name = resource.Name,
+            Namespace = resource.Namespace.Value,
+            DisplayName = resource.Definition.DisplayName,
+            Endpoint = resource.Definition.Endpoint.AbsoluteUri,
+            Enabled = resource.Definition.Enabled
+        };
     }
 }

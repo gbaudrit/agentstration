@@ -134,6 +134,90 @@ public sealed class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task ExtensionRegistrationCrudUsesETagAndControlsDiscovery()
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IExtensionInspector>();
+                services.AddSingleton<IExtensionInspector, ConfiguredEndpointInspector>();
+            }));
+        using var client = factory.CreateClient();
+        var properties = new ExtensionRegistrationProperties
+        {
+            DisplayName = "Registered extension",
+            Endpoint = new("http://127.0.0.1:6789"),
+            Enabled = true
+        };
+
+        using var createdResponse = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("registered-extension", properties));
+
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        Assert.IsNotNull(createdResponse.Headers.ETag);
+        var created = await createdResponse.Content.ReadFromJsonAsync<ExtensionRegistrationResource>();
+        Assert.IsNotNull(created);
+        Assert.AreEqual("http://127.0.0.1:6789/", created.Definition.Endpoint.AbsoluteUri);
+        var registrations = await client.GetFromJsonAsync<ValueResponse<ExtensionRegistrationResource>>("/api/extensionregistrations");
+        Assert.IsTrue(registrations!.Value.Any(value => value.Name == created.Name));
+        var discovered = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
+        Assert.AreEqual("registration", discovered!.Value.Single(value => value.ProviderName == created.Name).DiscoverySource);
+
+        using var disable = new HttpRequestMessage(HttpMethod.Put, $"/api/extensionregistrations/{created.Name}")
+        {
+            Content = JsonContent.Create(new PutExtensionRegistrationRequest(created.Definition with { Enabled = false }))
+        };
+        disable.Headers.IfMatch.Add(createdResponse.Headers.ETag);
+        using var disabledResponse = await client.SendAsync(disable);
+        Assert.AreEqual(HttpStatusCode.OK, disabledResponse.StatusCode);
+        Assert.IsNotNull(disabledResponse.Headers.ETag);
+        discovered = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
+        Assert.IsFalse(discovered!.Value.Any(value => value.ProviderName == created.Name));
+
+        using var stale = new HttpRequestMessage(HttpMethod.Put, $"/api/extensionregistrations/{created.Name}")
+        {
+            Content = JsonContent.Create(new PutExtensionRegistrationRequest(created.Definition))
+        };
+        stale.Headers.IfMatch.Add(createdResponse.Headers.ETag);
+        using var staleResponse = await client.SendAsync(stale);
+        Assert.AreEqual(HttpStatusCode.Conflict, staleResponse.StatusCode);
+
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, $"/api/extensionregistrations/{created.Name}");
+        delete.Headers.IfMatch.Add(disabledResponse.Headers.ETag);
+        using var deletedResponse = await client.SendAsync(delete);
+        Assert.AreEqual(HttpStatusCode.NoContent, deletedResponse.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ExtensionRegistrationRejectsUnsafeAndDuplicateEndpoints()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var unsafeProperties = new ExtensionRegistrationProperties
+        {
+            DisplayName = "Unsafe",
+            Endpoint = new("https://user:password@example.test/aep")
+        };
+
+        using var unsafeResponse = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("unsafe-extension", unsafeProperties));
+
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, unsafeResponse.StatusCode);
+
+        var endpoint = new ExtensionRegistrationProperties { DisplayName = "First", Endpoint = new("http://127.0.0.1:6790") };
+        using var first = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("first-extension", endpoint, "extensions"));
+        Assert.AreEqual(HttpStatusCode.Created, first.StatusCode);
+        using var duplicate = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("duplicate-extension", endpoint with { DisplayName = "Duplicate" }, "extensions"));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, duplicate.StatusCode);
+    }
+
+    [TestMethod]
     public async Task ProfileCrudUsesETagAndAllowsTemporarilyUnavailableModel()
     {
         await using var factory = Factory();

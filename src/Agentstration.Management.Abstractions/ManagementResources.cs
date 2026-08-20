@@ -21,6 +21,7 @@ public static class ResourceKinds
     public const string InstalledPack = "InstalledPack";
     public const string PackConfiguration = "PackConfiguration";
     public const string ModelProvider = "ModelProvider";
+    public const string ExtensionRegistration = "ExtensionRegistration";
     public const string ModelProfile = "ModelProfile";
     public const string RuntimeProfile = "RuntimeProfile";
     public const string Secret = "Secret";
@@ -558,6 +559,18 @@ public sealed record ModelProviderProperties
 public sealed record ModelProviderResource : Resource
 {
     public ModelProviderProperties Definition { get; init; } = null!;
+}
+
+public sealed record ExtensionRegistrationProperties
+{
+    public required string DisplayName { get; init; }
+    public required Uri Endpoint { get; init; }
+    public bool Enabled { get; init; } = true;
+}
+
+public sealed record ExtensionRegistrationResource : Resource
+{
+    public ExtensionRegistrationProperties Definition { get; init; } = null!;
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<SecretType>))]

@@ -67,8 +67,10 @@ public sealed class ExtensionManagementService(
         var configuredEndpoints = configurations
             .Select(value => Normalize(value.Endpoint))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var registrations = endpointSources
-            .SelectMany(value => value.List())
+        var endpointRegistrations = new List<ExtensionEndpointRegistration>();
+        foreach (var source in endpointSources)
+            endpointRegistrations.AddRange(await source.ListEndpointsAsync(cancellationToken));
+        var registrations = endpointRegistrations
             .Where(value => !configuredEndpoints.Contains(Normalize(value.Endpoint)))
             .DistinctBy(value => Normalize(value.Endpoint), StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value.Id, StringComparer.Ordinal);
