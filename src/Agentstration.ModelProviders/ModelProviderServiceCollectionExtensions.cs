@@ -21,7 +21,6 @@ public static class ModelProviderServiceCollectionExtensions
         services.AddSingleton<IModelProviderCapabilitiesResolver>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IExtensionInspector>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IExtensionOptionsMigrator>(services => services.GetRequiredService<AepModelProvider>());
-        services.AddSingleton<IExtensionEndpointSource, ConfigurationExtensionEndpointSource>();
         services.AddSingleton<IModelProviderResolver, ModelProviderResolver>();
         if (useManagedProfileResolver) services.AddSingleton<IChatClientResolver, ChatClientResolver>();
         return services;

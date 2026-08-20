@@ -19,9 +19,9 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
             throw new ModelProviderConfigurationException($"AEP deployment '{deployment.Name}' must specify a model name.");
         var client = httpClients.CreateClient("agentstration-aep");
         client.BaseAddress = provider.Endpoint;
-        deployment.ProviderOptions.TryGetValue(provider.ProviderType, out var nativeOptions);
+        deployment.ProviderOptions.TryGetValue(provider.ContributionId, out var nativeOptions);
         return new AepChatClient(
-            new AepClient(client).CreateModelProvider(provider.ProviderType),
+            new AepClient(client).CreateModelProvider(provider.ContributionId),
             deployment.ModelName,
             nativeOptions is null ? null : Map(nativeOptions));
     }
@@ -33,13 +33,18 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
 
     public async ValueTask<ModelProviderHealth> GetHealthAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default)
     {
+        if (!provider.ExtensionEnabled)
+            return new ModelProviderHealth("unavailable", $"Extension registration '{provider.Extension.Name}' is disabled.");
         try
         {
             var client = CreateClient(provider);
             var descriptor = await client.DiscoverAsync(cancellationToken);
-            var contribution = descriptor.Contributions.ModelProviders.FirstOrDefault(value => string.Equals(value.Id, provider.ProviderType, StringComparison.OrdinalIgnoreCase));
-            if (contribution is null) return new ModelProviderHealth("unavailable", $"The extension does not contribute model provider '{provider.ProviderType}'.");
-            var health = await client.CreateModelProvider(provider.ProviderType).GetHealthAsync(cancellationToken);
+            if (provider.ExpectedExtensionId is { Length: > 0 } expectedId
+                && !string.Equals(descriptor.Extension.Id, expectedId, StringComparison.Ordinal))
+                return new ModelProviderHealth("incompatible", $"Expected extension '{expectedId}', but endpoint reports '{descriptor.Extension.Id}'.");
+            var contribution = descriptor.Contributions.ModelProviders.FirstOrDefault(value => string.Equals(value.Id, provider.ContributionId, StringComparison.OrdinalIgnoreCase));
+            if (contribution is null) return new ModelProviderHealth("unavailable", $"The extension does not contribute model provider '{provider.ContributionId}'.");
+            var health = await client.CreateModelProvider(provider.ContributionId).GetHealthAsync(cancellationToken);
             return new ModelProviderHealth(health.Status, health.Details);
         }
         catch (AepProtocolException exception)
@@ -51,7 +56,7 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
 
     public async ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default)
     {
-        var models = await CreateClient(provider).CreateModelProvider(provider.ProviderType).ListModelsAsync(cancellationToken);
+        var models = await CreateClient(provider).CreateModelProvider(provider.ContributionId).ListModelsAsync(cancellationToken);
         return models.Select(value => new DiscoveredModel(
             value.Id,
             value.DisplayName,
@@ -67,15 +72,18 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
     {
         var client = CreateClient(provider);
         var manifest = await client.DiscoverAsync(cancellationToken);
+        if (provider.ExpectedExtensionId is { Length: > 0 } expectedId
+            && !string.Equals(manifest.Extension.Id, expectedId, StringComparison.Ordinal))
+            throw new ModelProviderConfigurationException($"Expected extension '{expectedId}', but endpoint reports '{manifest.Extension.Id}'.");
         var contribution = manifest.Contributions.ModelProviders.SingleOrDefault(
-            value => string.Equals(value.Id, provider.ProviderType, StringComparison.OrdinalIgnoreCase))
-            ?? throw new ModelProviderConfigurationException($"The AEP extension does not contribute model provider '{provider.ProviderType}'.");
-        if (deployment.ProviderOptions.TryGetValue(provider.ProviderType, out var nativeOptions))
+            value => string.Equals(value.Id, provider.ContributionId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new ModelProviderConfigurationException($"The AEP extension does not contribute model provider '{provider.ContributionId}'.");
+        if (deployment.ProviderOptions.TryGetValue(provider.ContributionId, out var nativeOptions))
         {
             var catalog = await client.GetConfigurationAsync(cancellationToken);
-            ValidateNativeOptions(provider.ProviderType, nativeOptions, catalog);
+            ValidateNativeOptions(provider.ContributionId, nativeOptions, catalog);
         }
-        var models = await client.CreateModelProvider(provider.ProviderType).ListModelsAsync(cancellationToken);
+        var models = await client.CreateModelProvider(provider.ContributionId).ListModelsAsync(cancellationToken);
         var model = models.SingleOrDefault(value => string.Equals(value.Id, deployment.ModelName, StringComparison.Ordinal));
         if (model is null) throw new ModelProviderConfigurationException($"Model '{deployment.ModelName}' is not available from provider '{provider.Name}'.");
         return new ResolvedModelProviderCapabilities(

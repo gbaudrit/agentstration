@@ -29,6 +29,7 @@ public interface IModelProvidersClient
 public interface IExtensionsClient
 {
     Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken);
+    Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken);
@@ -40,6 +41,14 @@ public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClie
 {
     public async Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ExtensionResponse>>(httpClient, "api/extensions", cancellationToken)).Value;
+
+    public async Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync("api/extensions/discover", null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ExtensionDiscoveryResponse>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty extension discovery result.", Guid.NewGuid().ToString("N"));
+    }
 
     public async Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ExtensionRegistrationResource>>(httpClient, "api/extensionregistrations", cancellationToken)).Value;

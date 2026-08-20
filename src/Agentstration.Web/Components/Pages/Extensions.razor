@@ -7,10 +7,15 @@
 <PageTitle>Extensions · Agentstration</PageTitle>
 <PageHeader Title="Extensions" Description="Register AEP endpoints and inspect their immutable option contracts and compatibility with persisted Model Profiles.">
     <Actions>
-        <button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh discovery</button>
+        <button class="button-secondary" @onclick="DiscoverAsync" disabled="@(loading || discovering)">@(discovering ? "Discovering…" : "Discover extensions")</button>
         <button class="button-primary" @onclick="StartCreate" disabled="@loading">Register endpoint</button>
     </Actions>
 </PageHeader>
+
+@if (!string.IsNullOrWhiteSpace(discoveryMessage))
+{
+    <p class="inline-info">@discoveryMessage</p>
+}
 
 <section class="panel resource-section">
     <div class="panel-header">
@@ -28,9 +33,10 @@
                 <label>Namespace<InputText @bind-Value="form.Namespace" disabled="@(!creating)" /></label>
                 <label>Display name<InputText @bind-Value="form.DisplayName" /></label>
                 <label>AEP endpoint<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
+                <label>Expected extension ID<InputText @bind-Value="form.ExpectedExtensionId" /><small>Optional identity pin checked during discovery.</small></label>
                 <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> Enabled for discovery</label>
             </div>
-            <div class="form-actions">
+            <div class="panel-actions">
                 <button class="button-primary" type="submit" disabled="@saving">@(creating ? "Create registration" : "Save changes")</button>
                 <button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">Cancel</button>
             </div>
@@ -45,9 +51,16 @@
                 <td><code>@registration.Definition.Endpoint</code></td>
                 <td><StatusBadge Text="@(registration.Definition.Enabled ? "Enabled" : "Disabled")" Status="@ModelManagementUi.Status(registration.Definition.Enabled ? "available" : "disabled")" /></td>
                 <td>
-                    <button class="button-secondary" @onclick="() => EditAsync(registration)">Edit</button>
-                    <button class="button-secondary" @onclick="() => ToggleAsync(registration)">@(registration.Definition.Enabled ? "Disable" : "Enable")</button>
-                    <button class="button-danger" @onclick="() => RequestDelete(registration)">Delete</button>
+                    @if (registration.Definition.Source == ExtensionRegistrationSource.Manual)
+                    {
+                        <button class="button-secondary" @onclick="() => EditAsync(registration)">Edit</button>
+                        <button class="button-secondary" @onclick="() => ToggleAsync(registration)">@(registration.Definition.Enabled ? "Disable" : "Enable")</button>
+                        <button class="button-danger" @onclick="() => RequestDelete(registration)">Delete</button>
+                    }
+                    else
+                    {
+                        <span>Managed by @registration.Definition.Source</span>
+                    }
                 </td>
             </tr></Row>
         </DataGrid>
@@ -71,7 +84,7 @@
             <article><h3>Current options</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Source)</pre></article>
             <article><h3>Proposed options</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Target)</pre></article>
         </div>
-        <div class="form-actions">
+        <div class="panel-actions">
             <button class="button-primary" @onclick="ApplyMigrationAsync" disabled="@migrating">@(migrating ? "Applying…" : "Apply migration")</button>
             <button class="button-secondary" @onclick="CancelMigration" disabled="@migrating">Cancel</button>
         </div>
@@ -97,8 +110,8 @@ else
         <section class="panel resource-section">
             <div class="panel-header">
                 <div>
-                    <p class="eyebrow">AEP extension · @if (extension.Configured) { <code>@extension.ProviderNamespace/@extension.ProviderName</code> } else { <span>discovered from @extension.DiscoverySource</span> }</p>
-                    <h2>@(extension.Extension?.Name ?? extension.ProviderName)</h2>
+                    <p class="eyebrow">AEP extension · <code>@extension.RegistrationNamespace/@extension.RegistrationName</code> · @extension.DiscoverySource</p>
+                    <h2>@(extension.Extension?.Name ?? extension.RegistrationName)</h2>
                     <p>@(extension.Extension?.Description ?? extension.Details ?? "Extension identity is not currently available.")</p>
                 </div>
                 <StatusBadge Text="@ModelManagementUi.Label(extension.Status)" Status="@ModelManagementUi.Status(extension.Status)" />
@@ -107,14 +120,19 @@ else
                 <dt>Extension ID</dt><dd><code>@(extension.Extension?.Id ?? "—")</code></dd>
                 <dt>Observed version</dt><dd>@(extension.Extension?.Version ?? "—")</dd>
                 <dt>AEP endpoint</dt><dd><code>@extension.Endpoint</code></dd>
-                <dt>Registration</dt><dd>@(extension.Configured ? "Configured Model Provider" : "Discovered endpoint")</dd>
+                <dt>Registration</dt><dd><code>@extension.RegistrationNamespace/@extension.RegistrationName</code></dd>
+                <dt>Model providers</dt><dd>@(extension.Providers.Count == 0 ? "—" : string.Join(", ", extension.Providers.Select(value => $"{value.Namespace}/{value.Name} → {value.ContributionId}")))</dd>
                 <dt>Contributions</dt><dd>@(extension.Contributions.Count == 0 ? "—" : string.Join(", ", extension.Contributions.Select(value => $"{value.Kind}:{value.Id}")))</dd>
             </dl>
 
-            @if (!extension.Configured && extension.Contributions.Any(value => value.Kind == "model-provider"))
+            @if (extension.Contributions.Any(value => value.Kind == "model-provider"))
             {
-                <div class="form-actions">
-                    @foreach (var contribution in extension.Contributions.Where(value => value.Kind == "model-provider"))
+                <div class="panel-actions">
+                    @foreach (var provider in extension.Providers)
+                    {
+                        <a class="button-secondary" href="@ProviderUrl(provider)">Open @provider.Name provider</a>
+                    }
+                    @foreach (var contribution in extension.Contributions.Where(value => value.Kind == "model-provider" && !extension.Providers.Any(provider => provider.ContributionId == value.Id)))
                     {
                         <a class="button-primary" href="@ConfigureProviderUrl(extension, contribution)">Configure @contribution.Id provider</a>
                     }
@@ -171,6 +189,8 @@ else
     private IReadOnlyList<ExtensionRegistrationResource>? registrations;
     private AgentstrationApiException? error;
     private bool loading;
+    private bool discovering;
+    private string? discoveryMessage;
     private bool saving;
     private bool editing;
     private bool creating;
@@ -196,6 +216,24 @@ else
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
+    }
+
+    private async Task DiscoverAsync()
+    {
+        discovering = true;
+        error = null;
+        discoveryMessage = null;
+        try
+        {
+            var result = await Client.DiscoverAsync(cancellation.Token);
+            await LoadAsync();
+            var available = extensions?.Count(value => value.Status == "available") ?? 0;
+            discoveryMessage = result.Sources == 0
+                ? "Discovery completed: no configured or Aspire extension endpoint source was found."
+                : $"Discovery completed: {result.Sources} source(s), {result.Created} created, {result.Updated} updated, {result.Unchanged} unchanged; {available} extension(s) available.";
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { discovering = false; }
     }
 
     private void StartCreate()
@@ -227,7 +265,7 @@ else
         {
             if (!Uri.TryCreate(form.Endpoint, UriKind.Absolute, out var endpoint))
                 throw new AgentstrationApiException("The endpoint must be an absolute HTTP(S) URL.", Guid.NewGuid().ToString("N"));
-            var properties = new ExtensionRegistrationProperties { DisplayName = form.DisplayName, Endpoint = endpoint, Enabled = form.Enabled };
+            var properties = new ExtensionRegistrationProperties { DisplayName = form.DisplayName, Endpoint = endpoint, Enabled = form.Enabled, ExpectedExtensionId = form.ExpectedExtensionId };
             if (creating)
                 _ = await Client.CreateRegistrationAsync(new(form.Name, properties, form.Namespace), cancellation.Token);
             else
@@ -344,8 +382,10 @@ else
     }
     private static string ProfileUrl(ExtensionOptionUsageResponse usage) =>
         $"/modelprofiles/{Uri.EscapeDataString(usage.ProfileName)}?namespace={Uri.EscapeDataString(usage.ProfileNamespace)}";
+    private static string ProviderUrl(ExtensionProviderBindingResponse provider) =>
+        $"/modelproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
     private static string ConfigureProviderUrl(ExtensionResponse extension, ExtensionContributionResponse contribution) =>
-        $"/modelproviders/new?providerType={Uri.EscapeDataString(contribution.Id)}&endpoint={Uri.EscapeDataString(extension.Endpoint.AbsoluteUri)}&displayName={Uri.EscapeDataString(extension.Extension?.Name ?? contribution.Id)}";
+        $"/modelproviders/new?extension={Uri.EscapeDataString(extension.RegistrationName)}&extensionNamespace={Uri.EscapeDataString(extension.RegistrationNamespace)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(extension.Extension?.Name ?? contribution.Id)}";
 
     public void Dispose()
     {
@@ -365,6 +405,7 @@ else
         [System.ComponentModel.DataAnnotations.Url]
         public string Endpoint { get; set; } = string.Empty;
         public bool Enabled { get; set; } = true;
+        public string? ExpectedExtensionId { get; set; }
 
         public static RegistrationForm From(ExtensionRegistrationResource resource) => new()
         {
@@ -372,7 +413,8 @@ else
             Namespace = resource.Namespace.Value,
             DisplayName = resource.Definition.DisplayName,
             Endpoint = resource.Definition.Endpoint.AbsoluteUri,
-            Enabled = resource.Definition.Enabled
+            Enabled = resource.Definition.Enabled,
+            ExpectedExtensionId = resource.Definition.ExpectedExtensionId
         };
     }
 }

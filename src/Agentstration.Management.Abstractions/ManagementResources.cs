@@ -85,6 +85,7 @@ public enum PackBindingTargetKind
 {
     [JsonStringEnumMemberName("modelProfile")] ModelProfile,
     [JsonStringEnumMemberName("modelProvider")] ModelProvider,
+    [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
     [JsonStringEnumMemberName("secret")] Secret
 }
 
@@ -544,16 +545,19 @@ public sealed record ModelSelection
     public required string Name { get; init; }
 }
 
-public enum ModelProviderManagementMode { External, Aspire }
+[JsonConverter(typeof(JsonStringEnumConverter<ExtensionRegistrationSource>))]
+public enum ExtensionRegistrationSource
+{
+    [JsonStringEnumMemberName("manual")] Manual,
+    [JsonStringEnumMemberName("configuration")] Configuration,
+    [JsonStringEnumMemberName("aspire")] Aspire
+}
 
 public sealed record ModelProviderProperties
 {
     public required string DisplayName { get; init; }
-    public required string ProviderType { get; init; }
-    public required Uri Endpoint { get; init; }
-    public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
-    public ResourceReference? Credential { get; init; }
+    public required ResourceReference Extension { get; init; }
+    public required string ContributionId { get; init; }
 }
 
 public sealed record ModelProviderResource : Resource
@@ -566,6 +570,9 @@ public sealed record ExtensionRegistrationProperties
     public required string DisplayName { get; init; }
     public required Uri Endpoint { get; init; }
     public bool Enabled { get; init; } = true;
+    public string? ExpectedExtensionId { get; init; }
+    public ExtensionRegistrationSource Source { get; init; } = ExtensionRegistrationSource.Manual;
+    public ResourceReference? Credential { get; init; }
 }
 
 public sealed record ExtensionRegistrationResource : Resource

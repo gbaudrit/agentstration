@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Management.Abstractions;
-using Microsoft.Extensions.Configuration;
 
 namespace Agentstration.ModelProviders;
 
@@ -46,38 +45,6 @@ public interface IExtensionOptionsMigrator
 public sealed record ExtensionIdentity(string Id, string Name, string Version, string? Description);
 
 public sealed record ExtensionContribution(string Kind, string Id);
-
-public sealed record ExtensionEndpointRegistration(string Id, Uri Endpoint, string Source);
-
-public interface IExtensionEndpointSource
-{
-    ValueTask<IReadOnlyList<ExtensionEndpointRegistration>> ListEndpointsAsync(
-        CancellationToken cancellationToken = default);
-}
-
-public sealed class ConfigurationExtensionEndpointSource(IConfiguration configuration) : IExtensionEndpointSource
-{
-    public ValueTask<IReadOnlyList<ExtensionEndpointRegistration>> ListEndpointsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        IReadOnlyList<ExtensionEndpointRegistration> registrations = configuration.GetSection("Agentstration:Extensions")
-            .GetChildren()
-            .Select(section => new { section.Key, Endpoint = section["Endpoint"] })
-            .Where(value => Uri.TryCreate(value.Endpoint, UriKind.Absolute, out var endpoint)
-                && endpoint.Scheme is "http" or "https")
-            .Select(value => new ExtensionEndpointRegistration(
-                value.Key,
-                Normalize(new Uri(value.Endpoint!, UriKind.Absolute)),
-                "configuration"))
-            .DistinctBy(value => value.Endpoint.AbsoluteUri, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        return ValueTask.FromResult(registrations);
-    }
-
-    private static Uri Normalize(Uri endpoint) =>
-        new(endpoint.AbsoluteUri.TrimEnd('/') + '/', UriKind.Absolute);
-}
 
 public sealed record ExtensionInspection(
     string ProviderName,

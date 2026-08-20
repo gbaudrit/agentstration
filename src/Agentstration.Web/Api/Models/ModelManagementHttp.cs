@@ -22,6 +22,7 @@ internal static class ModelManagementHttp
         }
         catch (ModelProviderValidationException exception) { return Problem("model-provider-invalid", "Invalid model provider", 422, exception.Message); }
         catch (ExtensionRegistrationNotFoundException exception) { return Problem("extension-registration-not-found", "Extension registration not found", 404, exception.Message); }
+        catch (ExtensionRegistrationInUseException exception) { return Problem("extension-registration-in-use", "Extension registration in use", 409, exception.Message); }
         catch (ExtensionRegistrationValidationException exception) { return Problem("extension-registration-invalid", "Invalid extension registration", 422, exception.Message); }
         catch (ModelProfileOptionMigrationException exception)
         {
@@ -107,7 +108,7 @@ internal static class ModelManagementHttp
             resolution.Profile.Definition.Provider.Name,
             resolution.Provider.Name,
             resolution.Provider.DisplayName,
-            resolution.Provider.ProviderType,
+            resolution.Provider.ContributionId,
             resolution.ProviderHealth.Status),
         new ModelReferenceResponse(
             resolution.Profile.Definition.Model.Name,

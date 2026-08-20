@@ -286,7 +286,9 @@ public sealed class AepVerticalTests
             Uid = Guid.NewGuid(),
             Namespace = ResourceNamespace.Default,
             Name = "test-local",
-            ProviderType = "test",
+            AdapterType = AepModelProvider.AdapterType,
+            ContributionId = "test",
+            Extension = new ResourceReference("test-extension"),
             Endpoint = httpClient.BaseAddress!
         };
 
@@ -312,7 +314,9 @@ public sealed class AepVerticalTests
             Uid = Guid.NewGuid(),
             Namespace = ResourceNamespace.Default,
             Name = "test-local",
-            ProviderType = "test",
+            AdapterType = AepModelProvider.AdapterType,
+            ContributionId = "test",
+            Extension = new ResourceReference("test-extension"),
             Endpoint = httpClient.BaseAddress!
         };
         var deployment = new ModelDeploymentConfiguration

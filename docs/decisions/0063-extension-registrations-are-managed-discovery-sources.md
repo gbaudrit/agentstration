@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-0065](0065-model-providers-bind-extension-contributions.md)
 
 ## Context
 

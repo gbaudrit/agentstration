@@ -92,3 +92,6 @@ Use **Proposed** when implementation or repository evidence does not establish a
 60. [ADR-0060 — Entry owns Workplace execution presentation](0060-entry-owns-workplace-execution-presentation.md)
 61. [ADR-0061 — llama.cpp is an AEP provider and capabilities are resolved effectively](0061-llama-cpp-provider-and-effective-capabilities.md)
 62. [ADR-0062 — Extension options use immutable versioned contracts](0062-versioned-extension-option-contracts.md)
+63. [ADR-0063 — Extension registrations are managed discovery sources](0063-extension-registrations-are-managed-discovery-sources.md)
+64. [ADR-0064 — Extension option migrations are explicit](0064-extension-option-migrations-are-explicit.md)
+65. [ADR-0065 — Model Providers bind registered extension contributions](0065-model-providers-bind-extension-contributions.md)

@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Web.Hosting;
 
 namespace Agentstration.Web.Api.Models;
 
@@ -9,6 +10,7 @@ public static class ExtensionEndpoints
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/extensions", ListAsync);
+        endpoints.MapPost("/api/extensions/discover", DiscoverAsync);
         var registrations = endpoints.MapGroup("/api/extensionregistrations");
         registrations.MapGet("/", ListRegistrationsAsync);
         registrations.MapGet("/{registrationName}", GetRegistrationAsync);
@@ -16,6 +18,11 @@ public static class ExtensionEndpoints
         registrations.MapPut("/{registrationName}", PutRegistrationAsync);
         registrations.MapDelete("/{registrationName}", DeleteRegistrationAsync);
     }
+
+    private static Task<IResult> DiscoverAsync(
+        ExtensionSourceDiscoveryService discovery,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () => Results.Ok(await discovery.DiscoverAsync(cancellationToken)));
 
     private static async Task<IResult> ListAsync(
         ExtensionManagementService service,
@@ -89,8 +96,8 @@ public static class ExtensionEndpoints
         });
 
     private static ExtensionResponse Map(ExtensionView view) => new(
-        view.ProviderName,
-        view.ProviderNamespace,
+        view.RegistrationName,
+        view.RegistrationNamespace,
         view.Endpoint,
         view.Status,
         view.Extension is null ? null : new ExtensionIdentityResponse(
@@ -121,7 +128,10 @@ public static class ExtensionEndpoints
             usage.SchemaDigest,
             usage.Status,
             usage.Issues)).ToArray(),
+        view.Providers.Select(provider => new ExtensionProviderBindingResponse(
+            provider.Name,
+            provider.Namespace,
+            provider.ContributionId)).ToArray(),
         view.Details,
-        view.Configured,
         view.DiscoverySource);
 }

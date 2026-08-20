@@ -11,10 +11,14 @@ public sealed record ModelProviderConfiguration
     public required Guid Uid { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public required string Name { get; init; }
-    public required string ProviderType { get; init; }
+    public required string AdapterType { get; init; }
+    public required string ContributionId { get; init; }
+    public required ResourceReference Extension { get; init; }
     public required Uri Endpoint { get; init; }
+    public bool ExtensionEnabled { get; init; } = true;
+    public string? ExpectedExtensionId { get; init; }
     public string? DisplayName { get; init; }
-    public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
+    public ExtensionRegistrationSource RegistrationSource { get; init; } = ExtensionRegistrationSource.Manual;
     public string? EndpointDisplayName { get; init; }
     public ResourceReference? Credential { get; init; }
 }
@@ -40,7 +44,7 @@ public sealed record ModelProfileConfiguration
 public sealed record ModelChatClientMetadata(
     string ModelProfile,
     string Deployment,
-    string ProviderType,
+    string ContributionId,
     string ProviderName,
     string ModelName,
     ModelGenerationOptions? Generation = null,

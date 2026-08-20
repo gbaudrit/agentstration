@@ -35,31 +35,31 @@ public sealed class ModelProfileOptionMigrationService(
             ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
         var providerAddress = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ResourceKinds.ModelProvider);
         var provider = await providers.GetConfigurationRequiredAsync(providerAddress.Namespace, providerAddress.Name, cancellationToken);
-        if (!profile.Value.Definition.ProviderOptions.TryGetValue(provider.ProviderType, out var source))
-            throw Invalid("option_source_missing", $"Model profile '{profile.Value.Address}' has no native options for provider '{provider.ProviderType}'.");
+        if (!profile.Value.Definition.ProviderOptions.TryGetValue(provider.ContributionId, out var source))
+            throw Invalid("option_source_missing", $"Model profile '{profile.Value.Address}' has no native options for contribution '{provider.ContributionId}'.");
         if (string.IsNullOrWhiteSpace(source.OptionSet)
             || string.IsNullOrWhiteSpace(source.Version)
             || string.IsNullOrWhiteSpace(source.SchemaDigest))
             throw Invalid("legacy_options_unsupported", "Legacy unversioned options cannot be migrated without an explicit source contract.");
         if (string.Equals(source.Version, targetVersion, StringComparison.Ordinal))
             throw Invalid("option_migration_not_required", $"The profile already uses option version '{targetVersion}'.");
-        var inspector = inspectors.SingleOrDefault(value => value.CanHandle(provider.ProviderType))
-            ?? throw Invalid("extension_unavailable", $"No extension inspector supports provider '{provider.ProviderType}'.");
+        var inspector = inspectors.SingleOrDefault(value => value.CanHandle(provider.AdapterType))
+            ?? throw Invalid("extension_unavailable", $"No extension inspector supports adapter '{provider.AdapterType}'.");
         var inspection = await inspector.InspectAsync(provider, cancellationToken);
         if (!string.Equals(inspection.Status, "available", StringComparison.Ordinal))
             throw Invalid("extension_unavailable", inspection.Details ?? "The extension is unavailable.");
         var optionSet = inspection.OptionSets.SingleOrDefault(value =>
             string.Equals(value.Id, source.OptionSet, StringComparison.Ordinal)
-            && string.Equals(value.ContributionId, provider.ProviderType, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(value.ContributionId, provider.ContributionId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(value.Scope, ExtensionOptionScopes.ModelProfile, StringComparison.Ordinal))
-            ?? throw Invalid("option_set_unsupported", $"Option set '{source.OptionSet}' is not supported by provider '{provider.ProviderType}'.");
+            ?? throw Invalid("option_set_unsupported", $"Option set '{source.OptionSet}' is not supported by contribution '{provider.ContributionId}'.");
         Validate(source, optionSet, source.Version, "source");
         _ = optionSet.Versions.SingleOrDefault(value => string.Equals(value.Version, targetVersion, StringComparison.Ordinal))
             ?? throw Invalid("option_version_unsupported", $"Target version '{targetVersion}' is not supported.");
         if (!HasMigrationPath(optionSet, source.Version, targetVersion))
             throw Invalid("option_migration_unsupported", $"No migration path exists from '{source.Version}' to '{targetVersion}'.");
-        var migrator = migrators.SingleOrDefault(value => value.CanHandle(provider.ProviderType))
-            ?? throw Invalid("option_migration_unsupported", $"No option migrator supports provider '{provider.ProviderType}'.");
+        var migrator = migrators.SingleOrDefault(value => value.CanHandle(provider.AdapterType))
+            ?? throw Invalid("option_migration_unsupported", $"No option migrator supports adapter '{provider.AdapterType}'.");
         VersionedExtensionOptions target;
         try { target = await migrator.MigrateAsync(provider, source, targetVersion, cancellationToken); }
         catch (ExtensionOptionMigrationException exception)
@@ -69,7 +69,7 @@ public sealed class ModelProfileOptionMigrationService(
         if (!string.Equals(target.OptionSet, source.OptionSet, StringComparison.Ordinal))
             throw Invalid("option_migration_invalid", "The extension changed the option-set identity during migration.");
         Validate(target, optionSet, targetVersion, "target");
-        return new(profileName, @namespace.Value, provider.ProviderType, source, target, profile.ETag);
+        return new(profileName, @namespace.Value, provider.ContributionId, source, target, profile.ETag);
     }
 
     public async Task<StoredResource<ModelProfileResource>> ApplyAsync(
