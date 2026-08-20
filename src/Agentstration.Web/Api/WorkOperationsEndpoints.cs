@@ -21,7 +21,8 @@ public static class WorkOperationsEndpoints
         tasks.MapGet("/{taskId:guid}/flow-runs", FlowRunsAsync);
         tasks.MapGet("/{taskId:guid}/flow-runs/{runId}", FlowRunAsync);
         tasks.MapGet("/{taskId:guid}/pending-actions", PendingActionsAsync);
-        tasks.MapPost("/{taskId:guid}/pending-actions/{actionId:guid}/respond", RespondPendingActionAsync);
+        tasks.MapPost("/{taskId:guid}/pending-actions/{actionId:guid}/respond", RespondPendingActionAsync)
+            .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanRunFlows);
         tasks.MapGet("/{taskId:guid}/results", ResultsAsync);
         tasks.MapGet("/{taskId:guid}/artifacts", ArtifactsAsync);
         tasks.MapPost("/{taskId:guid}/pause", PauseAsync);

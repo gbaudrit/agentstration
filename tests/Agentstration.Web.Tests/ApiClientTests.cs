@@ -122,6 +122,34 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public async Task WorkClientRespondsToTaskScopedPendingActionWithoutInteractionToken()
+    {
+        var taskId = Guid.NewGuid();
+        var actionId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        HttpMethod? method = null;
+        string? path = null;
+        string? body = null;
+        var contract = new PendingActionContract(actionId, workspaceId, null, taskId, "run-1", PendingActionKind.ConfirmationRequired, PendingActionStatus.Completed, "Approve", null, [], DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow, 2);
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            method = request.Method;
+            path = request.RequestUri!.AbsolutePath;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(contract) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        var actual = await new WorkApiClient(httpClient).RespondTaskPendingActionAsync(taskId, actionId, new Dictionary<string, JsonElement> { ["confirmed"] = JsonSerializer.SerializeToElement(true) }, default);
+
+        Assert.AreEqual(HttpMethod.Post, method);
+        Assert.AreEqual($"/api/tasks/{taskId}/pending-actions/{actionId}/respond", path);
+        StringAssert.Contains(body, "confirmed");
+        Assert.AreEqual(actionId, actual.Id);
+        Assert.IsNull(actual.InteractionId);
+    }
+
+    [TestMethod]
     public async Task WorkClientExposesSafeErrorIdentifier()
     {
         using var httpClient = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)))

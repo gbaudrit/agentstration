@@ -67,7 +67,7 @@ definition:
 
 V1 supports once, interval and Quartz cron schedules, strict IANA time zones, ETag CRUD, enable/disable, `Run now`, next/last observed status and durable occurrence history. Quartz registrations live in a separate local SQLite JobStore and are reconciled from Trigger resources after restart. A deterministic occurrence/Work identity prevents duplicate local submission for the same scheduled instant. Current owner authorization is re-evaluated at every firing and fails closed after revocation.
 
-The Console exposes `/triggers`; the Management API exposes `/api/triggers` and namespaced equivalents. A scheduled Work becomes an autonomous Task without a fabricated Entry or Interaction. Human input uses the existing task-scoped PendingAction and notification path.
+The Console exposes a searchable `/triggers` list, a guided schedule editor with Flow selection, IANA time zones and occurrence preview, plus a detail view for desired state, observed status, occurrence history, enable/disable and `Run now`. The Management API exposes `/api/triggers` and namespaced equivalents. A scheduled Work becomes an autonomous Task without a fabricated Entry or Interaction. Human input uses the existing task-scoped PendingAction panel and notification path directly from Task details.
 
 See [ADR-0062](../decisions/0062-triggers-submit-work-through-quartz-projection.md) for policies, guarantees and V1 limits.
 

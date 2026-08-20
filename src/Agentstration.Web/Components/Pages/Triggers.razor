@@ -1,117 +1,80 @@
 @page "/triggers"
 @rendermode InteractiveServer
-@using System.Text.Json
 @using Agentstration.Management.Abstractions
 @using Agentstration.Management.Core
 @using Agentstration.Resources
 @inject TriggerManagementService Management
-@inject TriggerFiringService Firing
-@inject ITriggerScheduleCalculator Schedules
+@inject ConsoleContextState ContextState
 
 <PageTitle>Triggers · Agentstration</PageTitle>
 <PageHeader Title="Triggers" Description="Schedule autonomous Work through the existing Flow runtime.">
-    <Actions><button class="button-primary" @onclick="New">New Trigger</button></Actions>
+    <Metadata><span>@Filtered.Count Trigger(s)</span><span>@EnabledCount enabled</span><span>@AttentionCount requiring attention</span></Metadata>
+    <Actions>@if (CanManage) { <a class="button-primary" href="/triggers/new">New Trigger</a> }</Actions>
 </PageHeader>
 
-@if (!string.IsNullOrWhiteSpace(error)) { <section class="panel task-error"><strong>Could not save Trigger</strong><p>@error</p></section> }
+@if (loading)
+{
+    <LoadingState Message="Loading Triggers…" />
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <ErrorState Title="Triggers unavailable" Message="@error" OnRetry="LoadAsync" />
+}
+else
+{
+    <div class="filter-bar">
+        <SearchBox @bind-Value="search" Placeholder="Search Trigger or Flow" />
+        <select @bind="state" aria-label="Filter Trigger state">
+            <option value="">State: All</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option><option value="attention">Requires attention</option>
+        </select>
+        <select @bind="scheduleType" aria-label="Filter schedule type">
+            <option value="">Schedule: All</option><option value="once">Once</option><option value="interval">Interval</option><option value="cron">Cron</option>
+        </select>
+    </div>
 
-<section class="panel">
-    <div class="panel-header"><h2>Schedule Triggers</h2><span>@items.Count</span></div>
-    @if (items.Count == 0) { <EmptyState Title="No Triggers" Message="Create a disabled schedule, review it, then enable it explicitly." /> }
+    @if (items.Count == 0)
+    {
+        <EmptyState Title="No Triggers" Message="Create a disabled schedule, review it, then enable it explicitly.">@if (CanManage) { <a class="button-primary" href="/triggers/new">Create Trigger</a> }</EmptyState>
+    }
+    else if (Filtered.Count == 0)
+    {
+        <EmptyState Title="No matching Triggers" Message="Adjust the search or filters." />
+    }
     else
     {
-        <DataGrid TItem="StoredResource<TriggerResource>" Items="items">
-            <Header><tr><th>Trigger</th><th>State</th><th>Schedule</th><th>Target</th><th>Next</th><th>Last outcome</th><th></th></tr></Header>
+        <DataGrid TItem="StoredResource<TriggerResource>" Items="Filtered">
+            <Header><tr><th>Trigger</th><th>State</th><th>Schedule</th><th>Target</th><th>Next occurrence</th><th>Last outcome</th><th></th></tr></Header>
             <Row Context="stored"><tr>
-                <td><strong>@stored.Value.Definition.DisplayName</strong><small class="table-secondary">@stored.Value.Name</small></td>
+                <td><strong><a href="@DetailsUrl(stored.Value)">@stored.Value.Definition.DisplayName</a></strong><small class="table-secondary">@stored.Value.Namespace.Value/@stored.Value.Name</small></td>
                 <td><StatusBadge Text="@(stored.Value.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(stored.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /></td>
-                <td>@ScheduleLabel(stored.Value.Definition.Source.Schedule)</td>
-                <td><code>@stored.Value.Definition.Target.Flow?.Name</code></td>
-                <td>@Format(stored.Value.Observed.NextOccurrenceAt)</td>
-                <td>@stored.Value.Observed.LastOutcome
-                    @if (stored.Value.Observed.LastErrorCode is { } errorCode) { <small class="table-secondary">@errorCode</small> }
-                </td>
-                <td><button class="text-button" @onclick="() => Edit(stored)">Edit</button><button class="text-button" disabled="@(!stored.Value.Definition.Enabled)" @onclick="() => RunAsync(stored)">Run now</button><button class="text-button" @onclick="() => ToggleAsync(stored)">@(stored.Value.Definition.Enabled ? "Disable" : "Enable")</button><button class="text-button" @onclick="() => DeleteAsync(stored)">Delete</button></td>
+                <td>@TriggerUi.ScheduleLabel(stored.Value.Definition.Source.Schedule)</td>
+                <td><a class="text-button" href="@FlowUrl(stored.Value)">@stored.Value.Definition.Target.Flow?.Name</a></td>
+                <td>@TriggerUi.FormatDate(stored.Value.Observed.NextOccurrenceAt)</td>
+                <td><StatusBadge Text="@stored.Value.Observed.LastOutcome.ToString()" Status="@OutcomeStatus(stored.Value.Observed.LastOutcome)" />@if (stored.Value.Observed.LastErrorCode is { } errorCode) { <small class="table-secondary">@errorCode</small> }</td>
+                <td><a class="text-button" href="@DetailsUrl(stored.Value)">Open</a>@if (CanManage) { <a class="text-button" href="@EditUrl(stored.Value)">Edit</a> }</td>
             </tr></Row>
         </DataGrid>
     }
-</section>
-
-@if (editing)
-{
-    <section class="panel">
-        <div class="panel-header"><h2>@(etag is null ? "Create Trigger" : "Edit Trigger")</h2><button class="icon-button" @onclick="Cancel" aria-label="Close">×</button></div>
-        <div class="form-grid">
-            <label>Name<input @bind="name" disabled="@(etag is not null)" placeholder="morning-summary" /></label>
-            <label>Display name<input @bind="displayName" /></label>
-            <label>Flow name<input @bind="flowName" placeholder="daily-report" /></label>
-            <label>Schedule type<select @bind="scheduleType"><option value="once">Once</option><option value="cron">Cron</option><option value="interval">Interval</option></select></label>
-            @if (scheduleType == "cron")
-            {
-                <label>Cron (Quartz)<input @bind="cron" placeholder="0 0 8 ? * MON-FRI" /></label>
-                <label>IANA time zone<input @bind="timeZone" placeholder="Europe/Paris" /></label>
-            }
-            else if (scheduleType == "interval")
-            {
-                <label>Every (ISO-8601)<input @bind="every" placeholder="PT6H" /></label>
-                <label>Start at (with offset)<input @bind="startAt" placeholder="2026-08-21T08:00:00+02:00" /></label>
-            }
-            else
-            {
-                <label>At (with offset)<input @bind="onceAt" placeholder="2026-08-21T08:00:00+02:00" /></label>
-            }
-            <label>Misfire<select @bind="misfire"><option value="fireOnce">Fire once</option><option value="skip">Skip</option></select></label>
-            <label>Concurrency<select @bind="concurrency"><option value="skip">Skip while active</option><option value="allow">Allow overlap</option></select></label>
-            <label class="form-span">Static input (JSON object)<textarea @bind="input" rows="5"></textarea></label>
-            <label><input type="checkbox" @bind="enabled" /> Enabled</label>
-        </div>
-        @if (preview.Count > 0) { <p><strong>Next occurrences:</strong> @string.Join(" · ", preview.Select(value => value.ToLocalTime().ToString("g")))</p> }
-        <div class="button-row"><button class="button-secondary" @onclick="Preview">Preview</button><button class="button-primary" @onclick="SaveAsync">Save</button><button class="button-secondary" @onclick="Cancel">Cancel</button></div>
-    </section>
 }
 
 @code {
     private IReadOnlyList<StoredResource<TriggerResource>> items = [];
-    private IReadOnlyList<DateTimeOffset> preview = [];
-    private bool editing, enabled;
-    private string? etag, error;
-    private string name = "", displayName = "", flowName = "", scheduleType = "once", cron = "0 0 8 ? * MON-FRI", timeZone = "Europe/Paris", every = "PT6H", startAt = DateTimeOffset.Now.AddMinutes(5).ToString("O"), onceAt = DateTimeOffset.Now.AddHours(1).ToString("O"), input = "{}", misfire = "fireOnce", concurrency = "skip";
+    private bool loading = true;
+    private string? error;
+    private string search = "", state = "", scheduleType = "";
+    private bool CanManage => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private int EnabledCount => items.Count(value => value.Value.Definition.Enabled);
+    private int AttentionCount => items.Count(value => value.Value.Observed.LastOutcome == TriggerLastOutcome.Failed);
+    private IReadOnlyList<StoredResource<TriggerResource>> Filtered => items
+        .Where(value => string.IsNullOrWhiteSpace(search) || value.Value.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || value.Value.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) || (value.Value.Definition.Target.Flow?.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(value => state switch { "enabled" => value.Value.Definition.Enabled, "disabled" => !value.Value.Definition.Enabled, "attention" => value.Value.Observed.LastOutcome == TriggerLastOutcome.Failed, _ => true })
+        .Where(value => string.IsNullOrWhiteSpace(scheduleType) || string.Equals(value.Value.Definition.Source.Schedule?.Type.ToString(), scheduleType, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(value => value.Value.Observed.NextOccurrenceAt ?? DateTimeOffset.MaxValue).ThenBy(value => value.Value.Definition.DisplayName, StringComparer.OrdinalIgnoreCase).ToArray();
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
-    private async Task LoadAsync() => items = await Management.ListAsync(CancellationToken.None);
-    private void New() { editing = true; etag = null; error = null; name = ""; displayName = ""; flowName = ""; enabled = false; preview = []; }
-    private void Cancel() { editing = false; error = null; preview = []; }
-    private void Edit(StoredResource<TriggerResource> stored)
-    {
-        var value = stored.Value; editing = true; etag = stored.ETag; error = null; name = value.Name; displayName = value.Definition.DisplayName; flowName = value.Definition.Target.Flow?.Name ?? ""; enabled = value.Definition.Enabled;
-        misfire = value.Definition.MisfirePolicy == TriggerMisfirePolicy.Skip ? "skip" : "fireOnce"; concurrency = value.Definition.ConcurrencyPolicy == TriggerConcurrencyPolicy.Allow ? "allow" : "skip";
-        var schedule = value.Definition.Source.Schedule!; scheduleType = schedule.Type.ToString().ToLowerInvariant(); cron = schedule.Expression ?? cron; timeZone = schedule.TimeZone ?? timeZone; every = schedule.Every ?? every; startAt = schedule.StartAt?.ToString("O") ?? startAt; onceAt = schedule.At?.ToString("O") ?? onceAt; input = value.Definition.Input.GetRawText(); Preview();
-    }
-    private TriggerSchedule BuildSchedule() => scheduleType switch
-    {
-        "cron" => new() { Type = TriggerScheduleType.Cron, Expression = cron, TimeZone = timeZone },
-        "interval" => new() { Type = TriggerScheduleType.Interval, Every = every, StartAt = DateTimeOffset.Parse(startAt, System.Globalization.CultureInfo.InvariantCulture) },
-        _ => new() { Type = TriggerScheduleType.Once, At = DateTimeOffset.Parse(onceAt, System.Globalization.CultureInfo.InvariantCulture) }
-    };
-    private void Preview()
-    {
-        try { var schedule = BuildSchedule(); Schedules.Validate(schedule); var values = new List<DateTimeOffset>(); var cursor = DateTimeOffset.UtcNow; for (var i = 0; i < 5; i++) { var next = Schedules.GetNextOccurrence(schedule, cursor); if (next is null) break; values.Add(next.Value); cursor = next.Value; } preview = values; error = null; }
-        catch (Exception exception) { preview = []; error = exception.Message; }
-    }
-    private async Task SaveAsync()
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(input); var definition = new TriggerProperties { DisplayName = displayName, Enabled = enabled, Source = new() { Schedule = BuildSchedule() }, Target = new() { Flow = new() { Name = flowName } }, Input = document.RootElement.Clone(), MisfirePolicy = misfire == "skip" ? TriggerMisfirePolicy.Skip : TriggerMisfirePolicy.FireOnce, ConcurrencyPolicy = concurrency == "allow" ? TriggerConcurrencyPolicy.Allow : TriggerConcurrencyPolicy.Skip };
-            if (etag is null) await Management.CreateAsync(new TriggerResource { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Trigger, Metadata = new() { Name = name }, Definition = definition }, CancellationToken.None);
-            else await Management.UpdateAsync(ResourceNamespace.Default, name, definition, etag, CancellationToken.None);
-            editing = false; await LoadAsync();
-        }
-        catch (Exception exception) { error = exception.Message; }
-    }
-    private async Task ToggleAsync(StoredResource<TriggerResource> stored) { try { await Management.UpdateAsync(stored.Value.Namespace, stored.Value.Name, stored.Value.Definition with { Enabled = !stored.Value.Definition.Enabled }, stored.ETag, CancellationToken.None); await LoadAsync(); } catch (Exception exception) { error = exception.Message; } }
-    private async Task RunAsync(StoredResource<TriggerResource> stored) { try { await Firing.RunNowAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); await LoadAsync(); } catch (Exception exception) { error = exception.Message; } }
-    private async Task DeleteAsync(StoredResource<TriggerResource> stored) { try { await Management.DeleteAsync(stored.Value.Namespace, stored.Value.Name, stored.ETag, CancellationToken.None); await LoadAsync(); } catch (Exception exception) { error = exception.Message; } }
-    private static string ScheduleLabel(TriggerSchedule? value) => value is null ? "—" : value.Type switch { TriggerScheduleType.Cron => $"{value.Expression} · {value.TimeZone}", TriggerScheduleType.Interval => $"Every {value.Every}", _ => $"Once · {value.At:g}" };
-    private static string Format(DateTimeOffset? value) => value is null ? "—" : value.Value.ToLocalTime().ToString("g");
+    private async Task LoadAsync() { loading = true; error = null; try { items = await Management.ListAsync(CancellationToken.None); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
+    private static string DetailsUrl(TriggerResource value) => $"/triggers/{Uri.EscapeDataString(value.Name)}";
+    private static string EditUrl(TriggerResource value) => $"{DetailsUrl(value)}/edit";
+    private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace)); }
+    private static UiStatus OutcomeStatus(TriggerLastOutcome outcome) => outcome switch { TriggerLastOutcome.Submitted => UiStatus.Success, TriggerLastOutcome.Skipped => UiStatus.Warning, TriggerLastOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
 }
