@@ -166,6 +166,50 @@ public sealed class AepVerticalTests
     }
 
     [TestMethod]
+    public async Task OptionMigrationIsExplicitAndValidatedAgainstTheTargetContract()
+    {
+        await using var factory = new AepExtensionFactory(addSecondOptionVersion: true);
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var optionSet = (await client.GetConfigurationAsync()).OptionSets.Single();
+        var source = optionSet.Versions.Single(value => value.Version == OllamaOptionContracts.Version);
+
+        var response = await client.MigrateOptionsAsync(new(
+            optionSet.Id,
+            source.Version,
+            source.SchemaDigest,
+            "2.0.0",
+            JsonSerializer.SerializeToElement(new { })));
+
+        Assert.HasCount(1, optionSet.Migrations!);
+        Assert.AreEqual(OllamaOptionContracts.Version, optionSet.Migrations![0].FromVersion);
+        Assert.AreEqual("2.0.0", response.Options.Version);
+        Assert.AreEqual(optionSet.Versions.Single(value => value.Version == "2.0.0").SchemaDigest, response.Options.SchemaDigest);
+        Assert.AreEqual(JsonValueKind.Object, response.Options.Values.ValueKind);
+    }
+
+    [TestMethod]
+    public async Task OptionMigrationCanTraverseValidatedIntermediateVersions()
+    {
+        await using var factory = new AepExtensionFactory(addSecondOptionVersion: true, addThirdOptionVersion: true);
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var optionSet = (await client.GetConfigurationAsync()).OptionSets.Single();
+        var source = optionSet.Versions.Single(value => value.Version == OllamaOptionContracts.Version);
+
+        var response = await client.MigrateOptionsAsync(new(
+            optionSet.Id,
+            source.Version,
+            source.SchemaDigest,
+            "3.0.0",
+            JsonSerializer.SerializeToElement(new { })));
+
+        Assert.HasCount(2, optionSet.Migrations!);
+        Assert.AreEqual("3.0.0", response.Options.Version);
+        Assert.AreEqual(optionSet.Versions.Single(value => value.Version == "3.0.0").SchemaDigest, response.Options.SchemaDigest);
+    }
+
+    [TestMethod]
     public async Task ClientRejectsIncompatibleProtocol()
     {
         var descriptor = new AepManifest("2.0", new("x", "x", "1"), new Dictionary<string, AepCapabilityDescriptor>(), new([]));
@@ -296,7 +340,7 @@ public sealed class AepVerticalTests
 
     private static AepChatRequest Request() => new("test-model", [new(AepRole.User, [AepContent.FromText("ping")])]);
 
-    private sealed class AepExtensionFactory(bool addSecondOptionVersion = false) : WebApplicationFactory<OllamaAepModelProvider>
+    private sealed class AepExtensionFactory(bool addSecondOptionVersion = false, bool addThirdOptionVersion = false) : WebApplicationFactory<OllamaAepModelProvider>
     {
         public FakeProvider Provider { get; } = new();
 
@@ -304,6 +348,8 @@ public sealed class AepVerticalTests
         {
             services.RemoveAll<IAepModelProvider>();
             services.AddSingleton<IAepModelProvider>(Provider);
+            if (addSecondOptionVersion) services.AddSingleton<IAepOptionMigrator, TestOptionMigrator>();
+            if (addThirdOptionVersion) services.AddSingleton<IAepOptionMigrator, ThirdOptionMigrator>();
             services.PostConfigure<AepExtensionOptions>(options =>
             {
                 var original = options.OptionSets.Single() with { ContributionId = "test" };
@@ -319,13 +365,39 @@ public sealed class AepVerticalTests
                     properties = new { },
                     additionalProperties = false
                 });
+                var versions = original.Versions.Append(AepOptionSetVersionDescriptor.Create("2.0.0", nextSchema));
+                if (addThirdOptionVersion) versions = versions.Append(AepOptionSetVersionDescriptor.Create("3.0.0", nextSchema));
                 options.OptionSets.Add(original with
                 {
-                    PreferredVersion = "2.0.0",
-                    Versions = [.. original.Versions, AepOptionSetVersionDescriptor.Create("2.0.0", nextSchema)]
+                    PreferredVersion = addThirdOptionVersion ? "3.0.0" : "2.0.0",
+                    Versions = versions.ToArray()
                 });
             });
         });
+    }
+
+    private sealed class TestOptionMigrator : IAepOptionMigrator
+    {
+        public string OptionSet => OllamaOptionContracts.ModelProfileOptionSet;
+        public string FromVersion => OllamaOptionContracts.Version;
+        public string ToVersion => "2.0.0";
+        public ValueTask<JsonElement> MigrateAsync(JsonElement values, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(JsonSerializer.SerializeToElement(new { }));
+        }
+    }
+
+    private sealed class ThirdOptionMigrator : IAepOptionMigrator
+    {
+        public string OptionSet => OllamaOptionContracts.ModelProfileOptionSet;
+        public string FromVersion => "2.0.0";
+        public string ToVersion => "3.0.0";
+        public ValueTask<JsonElement> MigrateAsync(JsonElement values, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(values.Clone());
+        }
     }
 
     private sealed class FakeProvider : IAepModelProvider

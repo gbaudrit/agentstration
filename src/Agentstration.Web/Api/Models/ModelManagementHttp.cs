@@ -23,6 +23,11 @@ internal static class ModelManagementHttp
         catch (ModelProviderValidationException exception) { return Problem("model-provider-invalid", "Invalid model provider", 422, exception.Message); }
         catch (ExtensionRegistrationNotFoundException exception) { return Problem("extension-registration-not-found", "Extension registration not found", 404, exception.Message); }
         catch (ExtensionRegistrationValidationException exception) { return Problem("extension-registration-invalid", "Invalid extension registration", 422, exception.Message); }
+        catch (ModelProfileOptionMigrationException exception)
+        {
+            var status = string.Equals(exception.Code, "extension_unavailable", StringComparison.Ordinal) ? 503 : 422;
+            return Problem(exception.Code, "Model profile option migration failed", status, exception.Message);
+        }
         catch (ControlPlaneResourceNotFoundException exception) { return Problem("model-profile-not-found", "Resource not found", 404, exception.Message); }
         catch (ControlPlaneConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
         catch (RuntimeProfileInUseException exception)

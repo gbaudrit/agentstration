@@ -21,6 +21,8 @@ public static class ModelManagementEndpoints
         ListModelProfilesEndpoint.Map(profiles);
         GetModelProfileUsagesEndpoint.Map(profiles);
         ResolveModelProfileEndpoint.Map(profiles);
+        PreviewModelProfileOptionMigrationEndpoint.Map(profiles);
+        ApplyModelProfileOptionMigrationEndpoint.Map(profiles);
         GetModelProfileEndpoint.Map(profiles);
         CreateModelProfileEndpoint.Map(profiles);
         PutModelProfileEndpoint.Map(profiles);

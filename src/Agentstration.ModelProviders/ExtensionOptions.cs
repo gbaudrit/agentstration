@@ -22,7 +22,26 @@ public sealed record ExtensionOptionSet(
     string ContributionId,
     string Scope,
     string PreferredVersion,
-    IReadOnlyList<ExtensionOptionSetVersion> Versions);
+    IReadOnlyList<ExtensionOptionSetVersion> Versions,
+    IReadOnlyList<ExtensionOptionMigration>? Migrations = null);
+
+public sealed record ExtensionOptionMigration(string FromVersion, string ToVersion);
+
+public sealed class ExtensionOptionMigrationException(string code, string message, Exception? innerException = null)
+    : Exception(message, innerException)
+{
+    public string Code { get; } = code;
+}
+
+public interface IExtensionOptionsMigrator
+{
+    bool CanHandle(string providerType);
+    ValueTask<VersionedExtensionOptions> MigrateAsync(
+        ModelProviderConfiguration provider,
+        VersionedExtensionOptions source,
+        string targetVersion,
+        CancellationToken cancellationToken = default);
+}
 
 public sealed record ExtensionIdentity(string Id, string Name, string Version, string? Description);
 
@@ -93,4 +112,9 @@ public static class ExtensionOptionSchemaValidator
         AepOptionSchemaValidator.Validate(value, schema, path)
             .Select(issue => new ExtensionOptionValidationIssue(issue.Path, issue.Code, issue.Message))
             .ToArray();
+}
+
+public static class ExtensionOptionSchemaDigest
+{
+    public static string Compute(JsonElement schema) => AepSchemaDigest.Compute(schema);
 }

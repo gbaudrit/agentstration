@@ -1,6 +1,8 @@
 @page "/extensions"
 @implements IDisposable
 @inject IExtensionsClient Client
+@inject IModelProfilesClient ProfilesClient
+@inject NotificationState Notifications
 
 <PageTitle>Extensions · Agentstration</PageTitle>
 <PageHeader Title="Extensions" Description="Register AEP endpoints and inspect their immutable option contracts and compatibility with persisted Model Profiles.">
@@ -57,6 +59,24 @@
 </section>
 
 <ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="Delete extension registration" Message="@DeleteMessage" ConfirmLabel="Delete registration" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
+
+@if (migrationPreview is not null)
+{
+    <section class="panel resource-section">
+        <div class="panel-header">
+            <div><p class="eyebrow">Explicit migration preview</p><h2>@migrationPreview.Value.ProfileNamespace/@migrationPreview.Value.ProfileName</h2><p>No profile value has been changed yet.</p></div>
+            <span>@migrationPreview.Value.Source.Version → @migrationPreview.Value.Target.Version</span>
+        </div>
+        <div class="details-grid">
+            <article><h3>Current options</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Source)</pre></article>
+            <article><h3>Proposed options</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Target)</pre></article>
+        </div>
+        <div class="form-actions">
+            <button class="button-primary" @onclick="ApplyMigrationAsync" disabled="@migrating">@(migrating ? "Applying…" : "Apply migration")</button>
+            <button class="button-secondary" @onclick="CancelMigration" disabled="@migrating">Cancel</button>
+        </div>
+    </section>
+}
 
 @if (loading && extensions is null)
 {
@@ -127,7 +147,12 @@ else
                     <Row Context="usage"><tr>
                         <td><a href="@ProfileUrl(usage)">@usage.ProfileName</a><br /><small>@usage.ProfileNamespace</small></td>
                         <td>@if (string.IsNullOrWhiteSpace(usage.OptionSet)) { <span>Legacy unversioned options</span> } else { <code>@usage.OptionSet@@@usage.Version</code><br /><small>@ShortDigest(usage.SchemaDigest)</small> }</td>
-                        <td><StatusBadge Text="@ModelManagementUi.Label(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" /></td>
+                        <td><StatusBadge Text="@ModelManagementUi.Label(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" />
+                            @if (MigrationTarget(extension, usage) is { } targetVersion)
+                            {
+                                <br /><button class="button-secondary" @onclick="() => PreviewMigrationAsync(usage, targetVersion)" disabled="@migrating">Migrate to @targetVersion</button>
+                            }
+                        </td>
                         <td>@(usage.Issues.Count == 0 ? "Compatible" : string.Join(" ", usage.Issues))</td>
                     </tr></Row>
                 </DataGrid>
@@ -152,6 +177,8 @@ else
     private string? etag;
     private RegistrationForm form = new();
     private ExtensionRegistrationResource? pendingDelete;
+    private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
+    private bool migrating;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -244,9 +271,77 @@ else
 
     private void CancelEdit() => editing = false;
 
+    private async Task PreviewMigrationAsync(ExtensionOptionUsageResponse usage, string targetVersion)
+    {
+        migrating = true;
+        error = null;
+        try
+        {
+            migrationPreview = await ProfilesClient.PreviewOptionMigrationAsync(
+                ResourceNamespace.Parse(usage.ProfileNamespace),
+                usage.ProfileName,
+                targetVersion,
+                cancellation.Token);
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { migrating = false; }
+    }
+
+    private async Task ApplyMigrationAsync()
+    {
+        var preview = migrationPreview;
+        if (preview is null || migrating) return;
+        migrating = true;
+        error = null;
+        try
+        {
+            _ = await ProfilesClient.ApplyOptionMigrationAsync(
+                ResourceNamespace.Parse(preview.Value.ProfileNamespace),
+                preview.Value.ProfileName,
+                preview.Value.Target.Version,
+                preview.ETag,
+                cancellation.Token);
+            Notifications.Add(new NotificationItem(
+                Guid.NewGuid(),
+                "Extension options migrated",
+                $"{preview.Value.ProfileName}: {preview.Value.Source.Version} → {preview.Value.Target.Version}",
+                DateTimeOffset.Now,
+                UiStatus.Success));
+            migrationPreview = null;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { migrating = false; }
+    }
+
+    private void CancelMigration() => migrationPreview = null;
+
     private static string ShortDigest(string value) => value.Length <= 24 ? value : $"{value[..18]}…{value[^6..]}";
     private static string FormatSchema(System.Text.Json.JsonElement schema) =>
         System.Text.Json.JsonSerializer.Serialize(schema, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+    private static string FormatOptions(VersionedExtensionOptions options) =>
+        System.Text.Json.JsonSerializer.Serialize(options, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true });
+    private static string? MigrationTarget(ExtensionResponse extension, ExtensionOptionUsageResponse usage)
+    {
+        var optionSet = extension.OptionSets.SingleOrDefault(value => string.Equals(value.Id, usage.OptionSet, StringComparison.Ordinal));
+        if (optionSet is null || string.Equals(optionSet.PreferredVersion, usage.Version, StringComparison.Ordinal)) return null;
+        return HasMigrationPath(optionSet, usage.Version, optionSet.PreferredVersion) ? optionSet.PreferredVersion : null;
+    }
+    private static bool HasMigrationPath(ExtensionOptionSetResponse optionSet, string source, string target)
+    {
+        var pending = new Queue<string>();
+        var visited = new HashSet<string>(StringComparer.Ordinal) { source };
+        pending.Enqueue(source);
+        while (pending.TryDequeue(out var current))
+        {
+            foreach (var migration in optionSet.Migrations.Where(value => string.Equals(value.FromVersion, current, StringComparison.Ordinal)))
+            {
+                if (string.Equals(migration.ToVersion, target, StringComparison.Ordinal)) return true;
+                if (visited.Add(migration.ToVersion)) pending.Enqueue(migration.ToVersion);
+            }
+        }
+        return false;
+    }
     private static string ProfileUrl(ExtensionOptionUsageResponse usage) =>
         $"/modelprofiles/{Uri.EscapeDataString(usage.ProfileName)}?namespace={Uri.EscapeDataString(usage.ProfileNamespace)}";
     private static string ConfigureProviderUrl(ExtensionResponse extension, ExtensionContributionResponse contribution) =>

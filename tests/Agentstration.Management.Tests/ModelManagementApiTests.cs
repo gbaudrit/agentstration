@@ -218,6 +218,85 @@ public sealed class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task ModelProfileOptionMigrationPreviewsWithoutWritingAndAppliesWithETag()
+    {
+        await using var factory = Factory().WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IExtensionInspector>();
+                services.RemoveAll<IExtensionOptionsMigrator>();
+                services.AddSingleton<IExtensionInspector, MigrationExtensionAdapter>();
+                services.AddSingleton<IExtensionOptionsMigrator, MigrationExtensionAdapter>();
+            }));
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        var sourceVersion = MigrationExtensionAdapter.OptionSet.Versions.Single(value => value.Version == "1.0.0");
+        var stored = await profiles.CreateAsync(new ModelProfileResource
+        {
+            Metadata = new ResourceMetadata { Name = "migration-profile" },
+            Kind = ResourceKinds.ModelProfile,
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Definition = new ModelProfileProperties
+            {
+                DisplayName = "Migration profile",
+                Provider = new ResourceReference(ModelProviderManagementService.ModelProviderId("ollama-local")),
+                Model = new ModelSelection { Name = "test-model" },
+                ProviderOptions = new Dictionary<string, VersionedExtensionOptions>
+                {
+                    ["ollama"] = new()
+                    {
+                        OptionSet = MigrationExtensionAdapter.OptionSet.Id,
+                        Version = sourceVersion.Version,
+                        SchemaDigest = sourceVersion.SchemaDigest,
+                        Values = JsonSerializer.SerializeToElement(new { legacyName = "kept" })
+                    }
+                }
+            }
+        }, default);
+        using var client = factory.CreateClient();
+
+        using var previewResponse = await client.PostAsJsonAsync(
+            "/api/modelprofiles/migration-profile/option-migrations/preview",
+            new PreviewModelProfileOptionMigrationRequest("2.0.0"));
+
+        Assert.AreEqual(HttpStatusCode.OK, previewResponse.StatusCode);
+        Assert.AreEqual(stored.ETag, previewResponse.Headers.ETag?.ToString());
+        var preview = await previewResponse.Content.ReadFromJsonAsync<ModelProfileOptionMigrationPreviewResponse>();
+        Assert.IsNotNull(preview);
+        Assert.AreEqual("1.0.0", preview.Source.Version);
+        Assert.AreEqual("2.0.0", preview.Target.Version);
+        Assert.AreEqual("kept", preview.Target.Values.GetProperty("name").GetString());
+        var unchanged = await profiles.GetAsync("migration-profile", default);
+        Assert.AreEqual("1.0.0", unchanged!.Value.Definition.ProviderOptions["ollama"].Version);
+
+        using var invalidPreview = await client.PostAsJsonAsync(
+            "/api/modelprofiles/migration-profile/option-migrations/preview",
+            new PreviewModelProfileOptionMigrationRequest("9.0.0"));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalidPreview.StatusCode);
+        unchanged = await profiles.GetAsync("migration-profile", default);
+        Assert.AreEqual(stored.ETag, unchanged!.ETag);
+
+        using var missingPrecondition = await client.PostAsJsonAsync(
+            "/api/modelprofiles/migration-profile/option-migrations/apply",
+            new PreviewModelProfileOptionMigrationRequest("2.0.0"));
+        Assert.AreEqual(HttpStatusCode.Conflict, missingPrecondition.StatusCode);
+        unchanged = await profiles.GetAsync("migration-profile", default);
+        Assert.AreEqual(stored.ETag, unchanged!.ETag);
+
+        using var apply = new HttpRequestMessage(HttpMethod.Post, "/api/modelprofiles/migration-profile/option-migrations/apply")
+        {
+            Content = JsonContent.Create(new PreviewModelProfileOptionMigrationRequest("2.0.0"))
+        };
+        apply.Headers.IfMatch.Add(previewResponse.Headers.ETag!);
+        using var appliedResponse = await client.SendAsync(apply);
+        Assert.AreEqual(HttpStatusCode.OK, appliedResponse.StatusCode);
+        Assert.AreNotEqual(stored.ETag, appliedResponse.Headers.ETag?.ToString());
+        var applied = await appliedResponse.Content.ReadFromJsonAsync<ModelProfileResource>();
+        Assert.IsNotNull(applied);
+        Assert.AreEqual("2.0.0", applied.Definition.ProviderOptions["ollama"].Version);
+        Assert.AreEqual("kept", applied.Definition.ProviderOptions["ollama"].Values.GetProperty("name").GetString());
+    }
+
+    [TestMethod]
     public async Task ProfileCrudUsesETagAndAllowsTemporarilyUnavailableModel()
     {
         await using var factory = Factory();
@@ -793,6 +872,64 @@ public sealed class ModelManagementApiTests
                 new ExtensionIdentity(registrationName, "Discovered extension", "1.0.0", null),
                 [new ExtensionContribution("model-provider", "discovered")],
                 []));
+    }
+
+    private sealed class MigrationExtensionAdapter : IExtensionInspector, IExtensionOptionsMigrator
+    {
+        private static readonly JsonElement SourceSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { legacyName = new { type = "string" } },
+            required = new[] { "legacyName" },
+            additionalProperties = false
+        });
+        private static readonly JsonElement TargetSchema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { name = new { type = "string" } },
+            required = new[] { "name" },
+            additionalProperties = false
+        });
+        public static ExtensionOptionSet OptionSet { get; } = new(
+            "io.agentstration.test/model-profile",
+            "model-provider",
+            "ollama",
+            ExtensionOptionScopes.ModelProfile,
+            "2.0.0",
+            [
+                new("1.0.0", ExtensionOptionSchemaDigest.Compute(SourceSchema), SourceSchema, false),
+                new("2.0.0", ExtensionOptionSchemaDigest.Compute(TargetSchema), TargetSchema, false)
+            ],
+            [new("1.0.0", "2.0.0")]);
+
+        public bool CanHandle(string providerType) => string.Equals(providerType, "ollama", StringComparison.OrdinalIgnoreCase);
+        public bool CanInspectEndpoint(Uri endpoint) => true;
+        public ValueTask<ExtensionInspection> InspectAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
+            InspectAsync(provider.Name, provider.Endpoint, cancellationToken);
+        public ValueTask<ExtensionInspection> InspectAsync(string registrationName, Uri endpoint, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ExtensionInspection(
+                registrationName,
+                endpoint,
+                "available",
+                new ExtensionIdentity("migration.test", "Migration test", "2.0.0", null),
+                [new ExtensionContribution("model-provider", "ollama")],
+                [OptionSet]));
+        public ValueTask<VersionedExtensionOptions> MigrateAsync(
+            ModelProviderConfiguration provider,
+            VersionedExtensionOptions source,
+            string targetVersion,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var target = OptionSet.Versions.Single(value => value.Version == targetVersion);
+            return ValueTask.FromResult(new VersionedExtensionOptions
+            {
+                OptionSet = source.OptionSet,
+                Version = target.Version,
+                SchemaDigest = target.SchemaDigest,
+                Values = JsonSerializer.SerializeToElement(new { name = source.Values.GetProperty("legacyName").GetString() })
+            });
+        }
     }
 
     private static CreateModelProfileRequest Request(string name, string model) => new(

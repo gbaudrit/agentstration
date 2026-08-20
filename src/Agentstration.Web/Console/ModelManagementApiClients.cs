@@ -92,6 +92,8 @@ public interface IModelProfilesClient
     Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileUsagesAsync(profileName, cancellationToken);
     Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(string profileName, CancellationToken cancellationToken);
     Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileResolutionAsync(profileName, cancellationToken);
+    Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken);
 }
 
 public interface IAgentsModelClient
@@ -253,6 +255,35 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
     public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<ModelProfileResolutionResponse>(httpClient, ProfilePath(@namespace, profileName, "resolution"), cancellationToken);
 
+    public async Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(
+        ResourceNamespace @namespace,
+        string profileName,
+        string targetVersion,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            ProfilePath(@namespace, profileName, "option-migrations/preview"),
+            new PreviewModelProfileOptionMigrationRequest(targetVersion),
+            cancellationToken);
+        return await ReadSnapshotAsync<ModelProfileOptionMigrationPreviewResponse>(response, "option migration preview", cancellationToken);
+    }
+
+    public async Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(
+        ResourceNamespace @namespace,
+        string profileName,
+        string targetVersion,
+        string etag,
+        CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, ProfilePath(@namespace, profileName, "option-migrations/apply"))
+        {
+            Content = JsonContent.Create(new PreviewModelProfileOptionMigrationRequest(targetVersion))
+        };
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        return await ReadResourceAsync(response, cancellationToken);
+    }
+
     private static string ProfilePath(ResourceNamespace @namespace, string profileName, string? child = null)
     {
         var path = $"api/modelprofiles/{Uri.EscapeDataString(profileName)}";
@@ -274,6 +305,17 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
         if (string.IsNullOrWhiteSpace(etag))
             throw new AgentstrationApiException("Agentstration API did not return the model profile ETag.", Guid.NewGuid().ToString("N"));
         return new ResourceSnapshot<ModelProfileResource>(value, etag);
+    }
+
+    private static async Task<ResourceSnapshot<T>> ReadSnapshotAsync<T>(HttpResponseMessage response, string resourceName, CancellationToken cancellationToken)
+    {
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken)
+            ?? throw new AgentstrationApiException($"Agentstration API returned an empty {resourceName}.", Guid.NewGuid().ToString("N"));
+        var etag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(etag))
+            throw new AgentstrationApiException($"Agentstration API did not return the {resourceName} ETag.", Guid.NewGuid().ToString("N"));
+        return new(value, etag);
     }
 }
 

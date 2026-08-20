@@ -109,7 +109,10 @@ public static class ExtensionEndpoints
                 version.Version,
                 version.SchemaDigest,
                 version.Schema,
-                version.Deprecated)).ToArray())).ToArray(),
+                version.Deprecated)).ToArray(),
+            (optionSet.Migrations ?? []).Select(migration => new ExtensionOptionMigrationDescriptorResponse(
+                migration.FromVersion,
+                migration.ToVersion)).ToArray())).ToArray(),
         view.Usages.Select(usage => new ExtensionOptionUsageResponse(
             usage.ProfileName,
             usage.ProfileNamespace,

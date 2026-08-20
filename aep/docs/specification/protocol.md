@@ -49,6 +49,8 @@ An extension that advertises `aep.configuration` exposes an `AepConfigurationCat
 
 Native request options carry `optionSet`, exact `version`, `schemaDigest`, and an object-valued `values` member. Servers reject an unknown set, removed version, changed digest, or schema-invalid value before invoking the contribution. Changing a schema requires a new option-set version; changing the preferred version does not migrate pinned requests.
 
+An extension may register directed migration edges between versions of the same option set. The catalog publishes those edges in `migrations`. A client requests an explicit migration at `/aep/configuration/migrate` with the source set, version, digest, values, and target version. The server selects a path, validates the source and every intermediate result, and returns a complete target `AepVersionedOptions` envelope. There is no implicit migration during discovery or contribution invocation.
+
 ## Security
 
 Endpoints must not embed credentials. Clients and inspectors must redact authorization, cookies, tokens, passwords, API keys, and properties explicitly described as secret. Protocol traces are diagnostic data and must be bounded and treated as sensitive.

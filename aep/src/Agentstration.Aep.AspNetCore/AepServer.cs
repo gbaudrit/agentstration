@@ -47,17 +47,21 @@ public static class AepServerExtensions
     public static IServiceCollection AddModelProvider<TProvider>(this IServiceCollection services)
         where TProvider : class, IAepModelProvider => services.AddSingleton<IAepModelProvider, TProvider>();
 
+    public static IServiceCollection AddOptionMigrator<TMigrator>(this IServiceCollection services)
+        where TMigrator : class, IAepOptionMigrator => services.AddSingleton<IAepOptionMigrator, TMigrator>();
+
     public static IEndpointRouteBuilder MapAgentstrationAep(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet(AepProtocol.DiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers) =>
-            Results.Json(CreateManifest(options.Value, providers), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.LegacyDiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers) =>
-            Results.Json(CreateManifest(options.Value, providers), AepProtocol.JsonOptions));
+        endpoints.MapGet(AepProtocol.DiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers, IEnumerable<IAepOptionMigrator> migrators) =>
+            Results.Json(CreateManifest(options.Value, providers, migrators), AepProtocol.JsonOptions));
+        endpoints.MapGet(AepProtocol.LegacyDiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers, IEnumerable<IAepOptionMigrator> migrators) =>
+            Results.Json(CreateManifest(options.Value, providers, migrators), AepProtocol.JsonOptions));
         endpoints.MapGet(AepProtocol.HealthPath, () => Results.Json(new AepHealth("available"), AepProtocol.JsonOptions));
         endpoints.MapGet(AepProtocol.ModelProvidersPath, (IEnumerable<IAepModelProvider> providers) =>
             Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.ConfigurationPath, (IOptions<AepExtensionOptions> options) =>
-            Results.Json(new AepConfigurationCatalog(options.Value.OptionSets.ToArray()), AepProtocol.JsonOptions));
+        endpoints.MapGet(AepProtocol.ConfigurationPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepOptionMigrator> migrators) =>
+            Results.Json(CreateConfigurationCatalog(options.Value.OptionSets, migrators), AepProtocol.JsonOptions));
+        endpoints.MapPost(AepProtocol.ConfigurationMigrationPath, MigrateOptionsAsync);
         endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync);
         endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync);
         endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync);
@@ -68,10 +72,13 @@ public static class AepServerExtensions
 
     public static IEndpointRouteBuilder MapAep(this IEndpointRouteBuilder endpoints) => endpoints.MapAgentstrationAep();
 
-    private static AepManifest CreateManifest(AepExtensionOptions options, IEnumerable<IAepModelProvider> providers)
+    private static AepManifest CreateManifest(
+        AepExtensionOptions options,
+        IEnumerable<IAepModelProvider> providers,
+        IEnumerable<IAepOptionMigrator> migrators)
     {
         var modelProviders = providers.Select(value => value.Descriptor).ToArray();
-        ValidateOptionSets(options.OptionSets, modelProviders);
+        ValidateOptionSets(options.OptionSets, modelProviders, migrators);
         var capabilities = new Dictionary<string, AepCapabilityDescriptor>(options.Capabilities, StringComparer.Ordinal)
         {
             [AepCapabilityNames.Health] = new("1.0", AepProtocol.HealthPath)
@@ -92,7 +99,8 @@ public static class AepServerExtensions
 
     private static void ValidateOptionSets(
         ICollection<AepOptionSetDescriptor> optionSets,
-        IReadOnlyCollection<AepModelProviderDescriptor> modelProviders)
+        IReadOnlyCollection<AepModelProviderDescriptor> modelProviders,
+        IEnumerable<IAepOptionMigrator> migrators)
     {
         var duplicate = optionSets.GroupBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault(value => value.Count() > 1);
         if (duplicate is not null) throw new InvalidOperationException($"AEP option set '{duplicate.Key}' is declared more than once.");
@@ -114,6 +122,104 @@ public static class AepServerExtensions
                     throw new InvalidOperationException($"AEP option set '{optionSet.Id}' version '{version.Version}' has an invalid schema digest.");
             }
         }
+        var migrationKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var migration in migrators)
+        {
+            var optionSet = optionSets.SingleOrDefault(value => string.Equals(value.Id, migration.OptionSet, StringComparison.Ordinal))
+                ?? throw new InvalidOperationException($"AEP option migration targets unknown option set '{migration.OptionSet}'.");
+            if (!optionSet.Versions.Any(value => string.Equals(value.Version, migration.FromVersion, StringComparison.Ordinal))
+                || !optionSet.Versions.Any(value => string.Equals(value.Version, migration.ToVersion, StringComparison.Ordinal)))
+                throw new InvalidOperationException($"AEP option migration '{migration.OptionSet}' {migration.FromVersion} -> {migration.ToVersion} targets an unknown version.");
+            if (string.Equals(migration.FromVersion, migration.ToVersion, StringComparison.Ordinal)
+                || !migrationKeys.Add($"{migration.OptionSet}\n{migration.FromVersion}\n{migration.ToVersion}"))
+                throw new InvalidOperationException($"AEP option migration '{migration.OptionSet}' {migration.FromVersion} -> {migration.ToVersion} is invalid or duplicated.");
+        }
+    }
+
+    private static AepConfigurationCatalog CreateConfigurationCatalog(
+        IEnumerable<AepOptionSetDescriptor> optionSets,
+        IEnumerable<IAepOptionMigrator> migrators)
+    {
+        var migrations = migrators.ToArray();
+        return new(optionSets.Select(optionSet => optionSet with
+        {
+            Migrations = migrations
+                .Where(value => string.Equals(value.OptionSet, optionSet.Id, StringComparison.Ordinal))
+                .Select(value => new AepOptionMigrationDescriptor(value.FromVersion, value.ToVersion))
+                .OrderBy(value => value.FromVersion, StringComparer.Ordinal)
+                .ThenBy(value => value.ToVersion, StringComparer.Ordinal)
+                .ToArray()
+        }).ToArray());
+    }
+
+    private static async Task<IResult> MigrateOptionsAsync(
+        AepOptionMigrationRequest request,
+        IOptions<AepExtensionOptions> options,
+        IEnumerable<IAepOptionMigrator> migrators,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var optionSet = options.Value.OptionSets.SingleOrDefault(value => string.Equals(value.Id, request.OptionSet, StringComparison.Ordinal))
+                ?? throw new AepServerException("option_set_unsupported", $"Option set '{request.OptionSet}' is not supported.", StatusCodes.Status422UnprocessableEntity);
+            var source = optionSet.Versions.SingleOrDefault(value => string.Equals(value.Version, request.FromVersion, StringComparison.Ordinal))
+                ?? throw new AepServerException("option_version_unsupported", $"Source version '{request.FromVersion}' is not supported.", StatusCodes.Status422UnprocessableEntity);
+            var target = optionSet.Versions.SingleOrDefault(value => string.Equals(value.Version, request.ToVersion, StringComparison.Ordinal))
+                ?? throw new AepServerException("option_version_unsupported", $"Target version '{request.ToVersion}' is not supported.", StatusCodes.Status422UnprocessableEntity);
+            if (!string.Equals(source.SchemaDigest, request.FromSchemaDigest, StringComparison.Ordinal))
+                throw new AepServerException("option_schema_mismatch", "The source schema digest does not match the extension contract.", StatusCodes.Status422UnprocessableEntity);
+            ValidateMigrationValues(request.Values, source, "source");
+            var path = FindMigrationPath(request.OptionSet, request.FromVersion, request.ToVersion, migrators);
+            if (path.Length == 0 && !string.Equals(request.FromVersion, request.ToVersion, StringComparison.Ordinal))
+                throw new AepServerException("option_migration_unsupported", $"No migration path exists from '{request.FromVersion}' to '{request.ToVersion}'.", StatusCodes.Status422UnprocessableEntity);
+            var values = request.Values.Clone();
+            foreach (var migration in path)
+            {
+                try { values = (await migration.MigrateAsync(values, cancellationToken)).Clone(); }
+                catch (AepServerException) { throw; }
+                catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+                {
+                    throw new AepServerException("option_migration_failed", $"Migration from '{migration.FromVersion}' to '{migration.ToVersion}' failed.", StatusCodes.Status422UnprocessableEntity, exception);
+                }
+                var version = optionSet.Versions.Single(value => string.Equals(value.Version, migration.ToVersion, StringComparison.Ordinal));
+                ValidateMigrationValues(values, version, "result");
+            }
+            return Results.Json(new AepOptionMigrationResponse(
+                new AepVersionedOptions(optionSet.Id, target.Version, target.SchemaDigest, values)), AepProtocol.JsonOptions);
+        }
+        catch (AepServerException exception) { return Error(exception.StatusCode, exception.Code, exception.Message); }
+    }
+
+    private static void ValidateMigrationValues(JsonElement values, AepOptionSetVersionDescriptor version, string role)
+    {
+        if (values.ValueKind != JsonValueKind.Object)
+            throw new AepServerException("invalid_options", $"The migration {role} values must be a JSON object.", StatusCodes.Status422UnprocessableEntity);
+        var issues = AepOptionSchemaValidator.Validate(values, version.Schema);
+        if (issues.Count > 0)
+            throw new AepServerException("invalid_options", string.Join(" ", issues.Select(value => value.Message)), StatusCodes.Status422UnprocessableEntity);
+    }
+
+    private static IAepOptionMigrator[] FindMigrationPath(
+        string optionSet,
+        string fromVersion,
+        string toVersion,
+        IEnumerable<IAepOptionMigrator> migrators)
+    {
+        if (string.Equals(fromVersion, toVersion, StringComparison.Ordinal)) return [];
+        var edges = migrators.Where(value => string.Equals(value.OptionSet, optionSet, StringComparison.Ordinal)).ToArray();
+        var queue = new Queue<(string Version, IAepOptionMigrator[] Path)>();
+        var visited = new HashSet<string>(StringComparer.Ordinal) { fromVersion };
+        queue.Enqueue((fromVersion, []));
+        while (queue.TryDequeue(out var current))
+        {
+            foreach (var edge in edges.Where(value => string.Equals(value.FromVersion, current.Version, StringComparison.Ordinal)))
+            {
+                var path = current.Path.Append(edge).ToArray();
+                if (string.Equals(edge.ToVersion, toVersion, StringComparison.Ordinal)) return path;
+                if (visited.Add(edge.ToVersion)) queue.Enqueue((edge.ToVersion, path));
+            }
+        }
+        return [];
     }
 
     private static async Task<IResult> ProviderHealthAsync(string providerId, IEnumerable<IAepModelProvider> providers, CancellationToken cancellationToken)

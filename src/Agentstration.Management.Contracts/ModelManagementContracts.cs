@@ -45,13 +45,22 @@ public sealed record ModelProviderUsagesResponse(IReadOnlyList<ModelProviderUsag
 public sealed record ExtensionIdentityResponse(string Id, string Name, string Version, string? Description);
 public sealed record ExtensionContributionResponse(string Kind, string Id);
 public sealed record ExtensionOptionSetVersionResponse(string Version, string SchemaDigest, JsonElement Schema, bool Deprecated);
+public sealed record ExtensionOptionMigrationDescriptorResponse(string FromVersion, string ToVersion);
 public sealed record ExtensionOptionSetResponse(
     string Id,
     string ContributionKind,
     string ContributionId,
     string Scope,
     string PreferredVersion,
-    IReadOnlyList<ExtensionOptionSetVersionResponse> Versions);
+    IReadOnlyList<ExtensionOptionSetVersionResponse> Versions,
+    IReadOnlyList<ExtensionOptionMigrationDescriptorResponse> Migrations);
+public sealed record PreviewModelProfileOptionMigrationRequest(string TargetVersion);
+public sealed record ModelProfileOptionMigrationPreviewResponse(
+    string ProfileName,
+    string ProfileNamespace,
+    string ProviderType,
+    VersionedExtensionOptions Source,
+    VersionedExtensionOptions Target);
 public sealed record ExtensionOptionUsageResponse(
     string ProfileName,
     string ProfileNamespace,

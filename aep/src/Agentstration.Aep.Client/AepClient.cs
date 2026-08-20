@@ -12,6 +12,7 @@ public interface IAepClient
     Task<AepHealth> GetHealthAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<string, AepCapabilityDescriptor>> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
     Task<AepConfigurationCatalog> GetConfigurationAsync(CancellationToken cancellationToken = default);
+    Task<AepOptionMigrationResponse> MigrateOptionsAsync(AepOptionMigrationRequest request, CancellationToken cancellationToken = default);
 }
 
 public interface IAepModelProvidersClient
@@ -50,6 +51,17 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
         var endpoint = string.IsNullOrWhiteSpace(capability.Endpoint) ? AepProtocol.ConfigurationPath : capability.Endpoint;
         using var response = await SendAsync(HttpMethod.Get, endpoint, null, cancellationToken);
         return await ReadAsync<AepConfigurationCatalog>(response, cancellationToken);
+    }
+
+    public async Task<AepOptionMigrationResponse> MigrateOptionsAsync(
+        AepOptionMigrationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var manifest = await DiscoverAsync(cancellationToken);
+        if (!manifest.Capabilities.ContainsKey(AepCapabilityNames.Configuration))
+            throw new AepProtocolException("configuration_unsupported", "The extension does not publish configuration contracts.");
+        using var response = await SendAsync(HttpMethod.Post, AepProtocol.ConfigurationMigrationPath, request, cancellationToken);
+        return await ReadAsync<AepOptionMigrationResponse>(response, cancellationToken);
     }
 
     public async Task<IReadOnlyList<AepModelProviderDescriptor>> ListModelProvidersAsync(CancellationToken cancellationToken = default)

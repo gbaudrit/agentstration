@@ -12,6 +12,7 @@ public static class AepProtocol
     public const string HealthPath = "/aep/health";
     public const string ModelProvidersPath = "/aep/model-providers";
     public const string ConfigurationPath = "/aep/configuration";
+    public const string ConfigurationMigrationPath = "/aep/configuration/migrate";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
 
@@ -65,7 +66,10 @@ public sealed record AepOptionSetDescriptor(
     string ContributionId,
     string Scope,
     string PreferredVersion,
-    IReadOnlyList<AepOptionSetVersionDescriptor> Versions);
+    IReadOnlyList<AepOptionSetVersionDescriptor> Versions,
+    IReadOnlyList<AepOptionMigrationDescriptor>? Migrations = null);
+
+public sealed record AepOptionMigrationDescriptor(string FromVersion, string ToVersion);
 
 public sealed record AepConfigurationCatalog(IReadOnlyList<AepOptionSetDescriptor> OptionSets);
 
@@ -74,6 +78,23 @@ public sealed record AepVersionedOptions(
     string Version,
     string SchemaDigest,
     JsonElement Values);
+
+public sealed record AepOptionMigrationRequest(
+    string OptionSet,
+    string FromVersion,
+    string FromSchemaDigest,
+    string ToVersion,
+    JsonElement Values);
+
+public sealed record AepOptionMigrationResponse(AepVersionedOptions Options);
+
+public interface IAepOptionMigrator
+{
+    string OptionSet { get; }
+    string FromVersion { get; }
+    string ToVersion { get; }
+    ValueTask<JsonElement> MigrateAsync(JsonElement values, CancellationToken cancellationToken = default);
+}
 
 public static class AepSchemaDigest
 {

@@ -5,7 +5,7 @@ using Microsoft.Extensions.AI;
 
 namespace Agentstration.ModelProviders;
 
-public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector
+public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
 {
     public const string AdapterType = "aep";
     public string ProviderType => AdapterType;
@@ -144,6 +144,34 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         }
     }
 
+    public async ValueTask<Agentstration.Management.Abstractions.VersionedExtensionOptions> MigrateAsync(
+        ModelProviderConfiguration provider,
+        Agentstration.Management.Abstractions.VersionedExtensionOptions source,
+        string targetVersion,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await CreateClient(provider).MigrateOptionsAsync(new(
+                source.OptionSet,
+                source.Version,
+                source.SchemaDigest,
+                targetVersion,
+                source.Values.Clone()), cancellationToken);
+            return new Agentstration.Management.Abstractions.VersionedExtensionOptions
+            {
+                OptionSet = response.Options.OptionSet,
+                Version = response.Options.Version,
+                SchemaDigest = response.Options.SchemaDigest,
+                Values = response.Options.Values.Clone()
+            };
+        }
+        catch (AepProtocolException exception)
+        {
+            throw new ExtensionOptionMigrationException(exception.Code, exception.Message, exception);
+        }
+    }
+
     private AepClient CreateClient(ModelProviderConfiguration provider)
         => CreateClient(provider.Endpoint);
 
@@ -197,7 +225,10 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
             version.Version,
             version.SchemaDigest,
             version.Schema.Clone(),
-            version.Deprecated)).ToArray());
+            version.Deprecated)).ToArray(),
+        (value.Migrations ?? []).Select(migration => new ExtensionOptionMigration(
+            migration.FromVersion,
+            migration.ToVersion)).ToArray());
 
     private static AgentRuntimeCapabilities Map(Agentstration.Aep.Abstractions.AepModelProviderCapabilities value) => new()
     {
