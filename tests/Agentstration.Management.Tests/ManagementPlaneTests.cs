@@ -94,6 +94,11 @@ public sealed class ManagementPlaneTests
         {
             Uid = Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Generation = 3,
+            Metadata = new ResourceMetadata
+            {
+                Name = "assistant",
+                Namespace = new ResourceNamespace("agentstration.sample-pack")
+            },
             Definition = Agent("assistant").Definition with
             {
                 Instructions = "  Answer carefully.\r\nUse sources.  ",
@@ -109,6 +114,7 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual("Answer carefully.\nUse sources.", first.EffectiveInstructions);
         CollectionAssert.AreEqual(new[] { "alpha", "zeta" }, first.EffectiveToolNames.ToArray());
         Assert.AreEqual("reasoning-default", first.ModelProfileName);
+        Assert.AreEqual(new ResourceNamespace("agentstration.sample-pack"), first.ModelProfileNamespace);
         Assert.AreEqual("maf-default", first.RuntimeProfileName);
         Assert.AreEqual(ResourceNamespace.Default, first.RuntimeProfileNamespace);
     }

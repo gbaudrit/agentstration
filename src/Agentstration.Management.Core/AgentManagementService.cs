@@ -224,6 +224,7 @@ public sealed class AgentManagementService(
             RevisionName = revisionName,
             AgentName = revision.Value.AgentName,
             ModelProfileName = revision.Value.Definition.ModelProfileName,
+            ModelProfileNamespace = revision.Value.Definition.ModelProfileNamespace,
             Environment = spec.Environment,
             RuntimeProfileName = spec.RuntimeProfileName,
             RuntimeProfileNamespace = spec.RuntimeProfileNamespace,

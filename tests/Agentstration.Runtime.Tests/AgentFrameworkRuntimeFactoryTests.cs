@@ -607,12 +607,13 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         };
         var resolver = new RecordingResolver(chatClient);
         var factory = new AgentFrameworkRuntimeFactory(resolver, NullLoggerFactory.Instance, new GenAiObservabilityOptions { Enabled = false });
-        var definition = Definition();
+        var definition = Definition() with { ModelProfileNamespace = new ResourceNamespace("agentstration.sample-pack") };
 
         var runtime = await factory.CreateAsync(definition, "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
         var result = await runtime.ExecuteAsync(new AgentExecutionRequest("What is HAVING?", "run-1", new ModelExecutionOptions(0.7f, 1500)), default);
 
         Assert.AreEqual(definition.ModelProfileName, resolver.RequestedProfile);
+        Assert.AreEqual(definition.ModelProfileNamespace, resolver.RequestedNamespace);
         Assert.AreEqual("sql-expert", runtime.AgentId);
         Assert.AreEqual("OK", result.Output);
         Assert.IsTrue(chatClient.Options?.Instructions?.Contains(definition.EffectiveInstructions, StringComparison.Ordinal) == true);
@@ -855,6 +856,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     private sealed class RecordingResolver(IChatClient client) : IChatClientResolver
     {
         public string? RequestedProfile { get; private set; }
+        public ResourceNamespace? RequestedNamespace { get; private set; }
         public IChatClient Client { get; set; } = client;
         public int ResolutionCount { get; private set; }
 
@@ -863,6 +865,15 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             RequestedProfile = modelProfileResourceId;
             ResolutionCount++;
             return ValueTask.FromResult(Client);
+        }
+
+        public ValueTask<IChatClient> ResolveAsync(
+            ResourceNamespace @namespace,
+            string modelProfileResourceId,
+            CancellationToken cancellationToken = default)
+        {
+            RequestedNamespace = @namespace;
+            return ResolveAsync(modelProfileResourceId, cancellationToken);
         }
     }
 

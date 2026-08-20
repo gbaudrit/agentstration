@@ -511,6 +511,7 @@ public sealed record ResolvedAgentDefinition
     public required long AgentVersion { get; init; }
     public required string EffectiveInstructions { get; init; }
     public required string ModelProfileName { get; init; }
+    public ResourceNamespace? ModelProfileNamespace { get; init; }
     public required string RuntimeProfileName { get; init; }
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
@@ -527,6 +528,7 @@ public sealed record AgentDeployment : Resource
     public required string RevisionName { get; init; }
     public string? AgentName { get; init; }
     public string? ModelProfileName { get; init; }
+    public ResourceNamespace? ModelProfileNamespace { get; init; }
     public required string Environment { get; init; }
     public required string RuntimeProfileName { get; init; }
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
