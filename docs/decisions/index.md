@@ -97,3 +97,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 65. [ADR-0065 — Model Providers bind registered extension contributions](0065-model-providers-bind-extension-contributions.md)
 66. [ADR-0066 — Pack Runtime Profile bindings drive local deployment](0066-pack-runtime-profile-bindings-drive-local-deployment.md)
 67. [ADR-0067 — LocalAI is an independent AEP provider](0067-localai-is-an-independent-aep-provider.md)
+68. [ADR-0068 — Triggers submit Work through a reconstructible Quartz projection](0068-triggers-submit-work-through-quartz-projection.md)

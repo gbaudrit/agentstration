@@ -14,7 +14,7 @@ public sealed class WorkplaceProjectionSink(
 
     public async Task PublishAsync(WorkItemSnapshot snapshot, CancellationToken cancellationToken)
     {
-        if (!TryContext(snapshot, out var workspaceId, out var interactionId, out var taskId)) return;
+        if (!TryContext(snapshot, out var workspaceId, out var interactionId, out var taskId, out var autonomous)) return;
         var activityType = snapshot.History.LastOrDefault()?.Type switch
         {
             "WorkItemQueued" => WorkTaskActivityType.TaskCreated,
@@ -41,17 +41,20 @@ public sealed class WorkplaceProjectionSink(
         }
 
         await EmitAsync(new TaskStatusChangedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, taskId.Value, WorkplaceService.ToTaskStatus(snapshot.Status), snapshot.Version), cancellationToken);
-        if (snapshot.Status == WorkItemStatus.Running)
+        if (snapshot.Status == WorkItemStatus.Running && !autonomous)
             await EmitAsync(new FlowRunStartedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, interactionId.Value, taskId.Value, snapshot.Metadata.GetValueOrDefault("workplace.parentFlowRunId")), cancellationToken);
-        if (snapshot.Status == WorkItemStatus.Completed) await CompleteAsync(snapshot, workspaceId, interactionId, taskId, cancellationToken);
+        if (snapshot.Status == WorkItemStatus.Completed) await CompleteAsync(snapshot, workspaceId, interactionId, taskId, autonomous, cancellationToken);
         if (snapshot.Status == WorkItemStatus.Failed)
         {
-            await FailInteractionAsync(workspaceId, interactionId, taskId, snapshot.Error?.Message ?? "Agentstration could not complete the Task.", snapshot.UpdatedAt, cancellationToken);
-            await NotifyAsync(workspaceId, WorkNotificationKind.TaskFailed, "Task failed", snapshot.Error?.Message ?? "Agentstration could not complete the Task.", taskId, snapshot.UpdatedAt, cancellationToken);
+            if (!autonomous)
+            {
+                await FailInteractionAsync(workspaceId, interactionId, taskId, snapshot.Error?.Message ?? "Agentstration could not complete the Task.", snapshot.UpdatedAt, cancellationToken);
+                await NotifyAsync(workspaceId, WorkNotificationKind.TaskFailed, "Task failed", snapshot.Error?.Message ?? "Agentstration could not complete the Task.", taskId, snapshot.UpdatedAt, cancellationToken);
+            }
         }
     }
 
-    private async Task CompleteAsync(WorkItemSnapshot snapshot, WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, CancellationToken token)
+    private async Task CompleteAsync(WorkItemSnapshot snapshot, WorkspaceId workspaceId, InteractionId interactionId, WorkTaskId taskId, bool autonomous, CancellationToken token)
     {
         var existingResults = await repository.ListResultsAsync(workspaceId, taskId, token);
         var content = snapshot.Result?.Contents.FirstOrDefault(); var structured = content?.Structured ?? JsonSerializer.SerializeToElement(content?.Text ?? string.Empty);
@@ -70,7 +73,8 @@ public sealed class WorkplaceProjectionSink(
             await repository.AddArtifactAsync(artifact, token);
             await EmitAsync(new TaskArtifactAddedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, new(artifact.Id.Value, artifact.WorkTaskId.Value, artifact.FlowRunId, artifact.Name, artifact.ContentType, artifact.Length, artifact.CreatedAt, artifact.Sequence)), token);
         }
-        if (flowRunId is not null) await EmitAsync(new FlowRunCompletedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, interactionId.Value, taskId.Value, flowRunId), token);
+        if (flowRunId is not null && !autonomous) await EmitAsync(new FlowRunCompletedEvent(Id(), workspaceId.Value, Next(), snapshot.UpdatedAt, interactionId.Value, taskId.Value, flowRunId), token);
+        if (autonomous) return;
         await CompleteInteractionAsync(workspaceId, interactionId, taskId, flowRunId, resultTitle, ConversationText(content, structured), snapshot.UpdatedAt, token);
         var artifactCount = snapshot.Result?.Artifacts.Count ?? 0;
         var notification = artifactCount switch
@@ -127,10 +131,12 @@ public sealed class WorkplaceProjectionSink(
     private async Task EmitAsync(WorkplaceEventContract value, CancellationToken token) { foreach (var sink in eventSinks) await sink.PublishAsync(value, token); }
     private long Next() => Interlocked.Increment(ref sequence);
     private static string Id() => Guid.NewGuid().ToString("N");
-    private static bool TryContext(WorkItemSnapshot snapshot, out WorkspaceId workspaceId, out InteractionId interactionId, out WorkTaskId taskId)
+    private static bool TryContext(WorkItemSnapshot snapshot, out WorkspaceId workspaceId, out InteractionId interactionId, out WorkTaskId taskId, out bool autonomous)
     {
         taskId = snapshot.Metadata.TryGetValue("workplace.taskId", out var taskValue) && Guid.TryParse(taskValue, out var taskGuid) ? new(taskGuid) : WorkTaskId.FromWorkItem(snapshot.Id);
         interactionId = snapshot.Metadata.TryGetValue("workplace.interactionId", out var interactionValue) && Guid.TryParse(interactionValue, out var interactionGuid) ? new(interactionGuid) : default;
+        autonomous = snapshot.Metadata.GetValueOrDefault("origin") == "trigger";
+        if (autonomous) { workspaceId = snapshot.WorkspaceId; return true; }
         if (snapshot.Metadata.TryGetValue("workplace.workspaceId", out var value) && Guid.TryParse(value, out var workspaceGuid) && interactionId != default) { workspaceId = new(workspaceGuid); return true; }
         workspaceId = default; return false;
     }

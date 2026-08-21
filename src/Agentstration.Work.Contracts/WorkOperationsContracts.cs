@@ -6,8 +6,8 @@ namespace Agentstration.Work.Contracts;
 public sealed record WorkTaskOperationsSummary(
     Guid Id,
     string WorkspaceId,
-    string EntryId,
-    Guid InteractionId,
+    string? EntryId,
+    Guid? InteractionId,
     string Title,
     string? Description,
     WorkTaskStatus Status,
@@ -79,7 +79,7 @@ public sealed record WorkTaskArtifactResponse(
 
 public sealed record WorkTaskOperationsDetailResponse(
     WorkTaskOperationsSummary Task,
-    InteractionResponse Interaction,
+    InteractionResponse? Interaction,
     IReadOnlyList<PendingActionContract> PendingActions,
     IReadOnlyList<WorkTaskFlowRunResponse> FlowRuns,
     IReadOnlyList<WorkTaskResultResponse> Results,

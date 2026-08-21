@@ -4,6 +4,8 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.19.1" />
+    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.19.1" />
     <PackageVersion Include="Agentstration.Aep.Abstractions" Version="0.1.0" />
     <PackageVersion Include="Agentstration.Aep.AspNetCore" Version="0.1.0" />
     <PackageVersion Include="Agentstration.Aep.Client" Version="0.1.0" />

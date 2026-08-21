@@ -21,6 +21,8 @@ public static class WorkOperationsEndpoints
         tasks.MapGet("/{taskId:guid}/flow-runs", FlowRunsAsync);
         tasks.MapGet("/{taskId:guid}/flow-runs/{runId}", FlowRunAsync);
         tasks.MapGet("/{taskId:guid}/pending-actions", PendingActionsAsync);
+        tasks.MapPost("/{taskId:guid}/pending-actions/{actionId:guid}/respond", RespondPendingActionAsync)
+            .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanRunFlows);
         tasks.MapGet("/{taskId:guid}/results", ResultsAsync);
         tasks.MapGet("/{taskId:guid}/artifacts", ArtifactsAsync);
         tasks.MapPost("/{taskId:guid}/pause", PauseAsync);
@@ -58,20 +60,25 @@ public static class WorkOperationsEndpoints
     {
         var scope = CurrentScope(requestContext);
         var operational = await service.GetOperationalTaskAsync(scope.WorkspaceId, new(taskId), token); var task = operational.Task;
-        var interaction = await service.GetInteractionAsync(operational.WorkspaceId, task.InteractionId, token);
-        var pending = (await service.ListPendingActionsAsync(operational.WorkspaceId, task.InteractionId, token)).Where(value => value.WorkTaskId == task.Id).Select(WorkplaceService.ToContract).ToArray();
+        var interaction = task.InteractionId is { } interactionId ? await service.GetInteractionAsync(operational.WorkspaceId, interactionId, token) : null;
+        var pending = (await service.ListPendingActionsForTaskAsync(operational.WorkspaceId, task.Id, token)).Select(WorkplaceService.ToContract).ToArray();
         var results = await service.ListResultsAsync(operational.WorkspaceId, task.Id, token);
         var artifacts = await service.ListArtifactsAsync(operational.WorkspaceId, task.Id, token);
         var activities = await service.ListActivitiesAsync(operational.WorkspaceId, task.Id, token);
-        var messages = await service.ListMessagesAsync(operational.WorkspaceId, task.InteractionId, token);
+        var messages = task.InteractionId is { } messageInteractionId ? await service.ListMessagesAsync(operational.WorkspaceId, messageInteractionId, token) : [];
         var runs = await RunsForAsync(task.Id, flowRuns, scope, results, artifacts, token);
         return Results.Ok(new WorkTaskOperationsDetailResponse(
-            await SummaryOfAsync(task, service, flowRuns, scope, token), ToInteraction(interaction), pending, runs,
+            await SummaryOfAsync(task, service, flowRuns, scope, token), interaction is null ? null : ToInteraction(interaction), pending, runs,
             results.Select(ToResult).ToArray(), artifacts.Select(value => ToArtifact(value, operational.WorkspaceId)).ToArray(), activities, messages));
     });
 
     private static Task<IResult> ActivitiesAsync(Guid taskId, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value => Results.Ok(await service.ListActivitiesAsync(value.WorkspaceId, value.Task.Id, token)), token);
-    private static Task<IResult> PendingActionsAsync(Guid taskId, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value => Results.Ok((await service.ListPendingActionsAsync(value.WorkspaceId, value.Task.InteractionId, token)).Where(action => action.WorkTaskId == value.Task.Id).Select(WorkplaceService.ToContract)), token);
+    private static Task<IResult> PendingActionsAsync(Guid taskId, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value => Results.Ok((await service.ListPendingActionsForTaskAsync(value.WorkspaceId, value.Task.Id, token)).Select(WorkplaceService.ToContract)), token);
+    private static Task<IResult> RespondPendingActionAsync(Guid taskId, Guid actionId, TaskPendingActionResponse body, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value =>
+    {
+        var resolved = await service.RespondTaskPendingActionAsync(value.WorkspaceId, value.Task.Id, new(actionId), body.Values, requestContext.Current.PrincipalId.ToString("D"), token);
+        return Results.Ok(WorkplaceService.ToContract(resolved.PendingAction));
+    }, token);
     private static Task<IResult> ResultsAsync(Guid taskId, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value => Results.Ok((await service.ListResultsAsync(value.WorkspaceId, value.Task.Id, token)).Select(ToResult)), token);
     private static Task<IResult> ArtifactsAsync(Guid taskId, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value => Results.Ok((await service.ListArtifactsAsync(value.WorkspaceId, value.Task.Id, token)).Select(artifact => ToArtifact(artifact, value.WorkspaceId))), token);
     private static Task<IResult> FlowRunsAsync(Guid taskId, WorkplaceService service, FlowRunService flowRuns, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value =>
@@ -98,12 +105,12 @@ public static class WorkOperationsEndpoints
         var activities = await service.ListActivitiesAsync(task.WorkspaceId, task.Id, token);
         var results = await service.ListResultsAsync(task.WorkspaceId, task.Id, token);
         var artifacts = await service.ListArtifactsAsync(task.WorkspaceId, task.Id, token);
-        var pending = (await service.ListPendingActionsAsync(task.WorkspaceId, task.InteractionId, token)).Count(value => value.WorkTaskId == task.Id && value.Status == PendingActionStatus.Pending);
+        var pending = (await service.ListPendingActionsForTaskAsync(task.WorkspaceId, task.Id, token)).Count(value => value.Status == PendingActionStatus.Pending);
         var runs = await RunsForAsync(task.Id, flowRuns, scope, results, artifacts, token);
         var started = activities.FirstOrDefault(value => value.Type == WorkTaskActivityType.TaskStarted)?.CreatedAt;
         var completed = activities.LastOrDefault(value => value.Type is WorkTaskActivityType.TaskCompleted or WorkTaskActivityType.TaskFailed or WorkTaskActivityType.TaskCancelled)?.CreatedAt;
         var error = task.Error is null ? null : new WorkTaskErrorResponse(task.Error.Code, "Task failed", task.Error.Message, task.Error.OccurredAt, task.FlowRunId, task.Error.IsRecoverable);
-        return new(task.Id.Value, task.WorkspaceId.ToString(), task.EntryId.Value, task.InteractionId.Value, task.Title, task.Description, task.Status,
+        return new(task.Id.Value, task.WorkspaceId.ToString(), task.EntryId?.Value, task.InteractionId?.Value, task.Title, task.Description, task.Status,
             task.CreatedAt, started, task.UpdatedAt, completed, task.FlowRunId, results.LastOrDefault()?.Id.Value, pending, results.Count, artifacts.Count, runs.Count,
             activities.LastOrDefault()?.Title, error);
     }
@@ -137,3 +144,5 @@ public static class WorkOperationsEndpoints
         catch (WorkTransitionException exception) { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
     }
 }
+
+public sealed record TaskPendingActionResponse(IReadOnlyDictionary<string, System.Text.Json.JsonElement> Values);

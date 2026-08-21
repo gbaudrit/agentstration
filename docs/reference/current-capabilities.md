@@ -38,6 +38,39 @@ flowchart LR
 
 The management plane is the source of truth for agent definitions and desired state; runtime `AIAgent` instances are reconstructible. The Work Plane owns the functional lifecycle, interactions, history, and result of each `WorkItem`. Its architectural principle is **Microsoft-first, provider-neutral, cloud-optional**.
 
+## Schedule Triggers
+
+Agentstration can submit autonomous Work from a declarative Workspace-scoped `Trigger`. Trigger owns **when**, Work owns **what**, Flow owns **how**, and Runtime owns execution. Automation is not a second runtime.
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: Trigger
+metadata:
+  name: morning-summary
+definition:
+  displayName: Morning summary
+  enabled: false
+  source:
+    kind: schedule
+    schedule:
+      type: cron
+      expression: "0 0 8 ? * MON-FRI"
+      timeZone: Europe/Paris
+  target:
+    kind: flow
+    flow:
+      name: daily-report
+  input: {}
+  misfirePolicy: fireOnce
+  concurrencyPolicy: skip
+```
+
+V1 supports once, interval and Quartz cron schedules, strict IANA time zones, ETag CRUD, enable/disable, `Run now`, next/last observed status and durable occurrence history. A Trigger can explicitly target a Flow in any namespace of its Workspace, including an installed Pack namespace; cross-Workspace resolution remains forbidden. Quartz registrations live in a separate local SQLite JobStore and are reconciled from Trigger resources after restart. A deterministic occurrence/Work identity prevents duplicate local submission for the same scheduled instant. Current owner authorization is re-evaluated at every firing and fails closed after revocation.
+
+The Console exposes a searchable `/triggers` list, a guided schedule editor with Flow selection, IANA time zones and occurrence preview, plus a detail view for desired state, observed status, occurrence history, enable/disable and `Run now`. The Management API exposes `/api/triggers` and namespaced equivalents. A scheduled Work becomes an autonomous Task without a fabricated Entry or Interaction. Human input uses the existing task-scoped PendingAction panel and notification path directly from Task details.
+
+See [ADR-0068](../decisions/0068-triggers-submit-work-through-quartz-projection.md) for policies, guarantees and V1 limits.
+
 Packs are a Management/distribution concept above these planes: they install ordinary resources into deterministic `publisher.name` namespaces and retain provenance, but they are never run. Local ZIP installation, source/fork coexistence, installed-Pack inventory, compensating failure handling, modification-safe uninstall, and six resource handlers are implemented through the Management API. See [Pack format and lifecycle](packs.md).
 
 ## Declarative agent resources

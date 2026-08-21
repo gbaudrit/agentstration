@@ -1,0 +1,221 @@
+@page "/triggers/new"
+@page "/triggers/{Name}/edit"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using System.Xml
+@using Agentstration.Management.Core
+@inject TriggerManagementService Management
+@inject ITriggerScheduleCalculator Schedules
+@inject IFlowApiClient Flows
+@inject NavigationManager Navigation
+@inject NotificationState Notifications
+@inject ConsoleContextState ContextState
+@inject TimeProvider TimeProvider
+
+<PageTitle>@(IsNew ? "New Trigger" : "Edit Trigger") · Agentstration</PageTitle>
+@if (loading || model is null)
+{
+    <LoadingState Message="@(IsNew ? "Preparing Trigger editor…" : "Loading Trigger…")" />
+}
+else if (notFound)
+{
+    <EmptyState Title="Trigger not found" Message="The requested Trigger no longer exists."><a class="button-secondary" href="/triggers">Back to Triggers</a></EmptyState>
+}
+else
+{
+    <PageHeader Title="@(IsNew ? "New Trigger" : model.DisplayName)" Description="@(IsNew ? "Create a disabled schedule and review it before activation." : $"Edit desired configuration · {model.Name}")">
+        <Actions><a class="button-secondary" href="@(IsNew ? "/triggers" : $"/triggers/{Uri.EscapeDataString(model.Name)}")">Cancel</a></Actions>
+    </PageHeader>
+
+    @if (!CanManage) { <div class="form-alert form-alert-danger" role="alert">You do not have permission to manage Trigger resources.</div> }
+    @if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="trigger-editor" class="resource-form" @onchange="MarkDirty">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <section class="panel form-section">
+            <div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Trigger resource</h2></div>@if (!IsNew) { <StatusBadge Text="@(existing!.Value.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(existing.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /> }</div>
+            <div class="form-grid">
+                <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /><small>Immutable resource name.</small></label>
+                <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
+            </div>
+        </section>
+
+        <section class="panel form-section">
+            <div class="panel-header"><div><p class="eyebrow">Target</p><h2>Published Flow</h2></div></div>
+            <div class="form-grid">
+                <label class="form-span-2"><span>Flow</span><InputSelect @bind-Value="model.FlowKey"><option value="">Select a Flow</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</InputSelect><ValidationMessage For="() => model.FlowKey" /><small>The Flow version is resolved immutably when the Trigger fires.</small></label>
+            </div>
+        </section>
+
+        <section class="panel form-section">
+            <div class="panel-header"><div><p class="eyebrow">When</p><h2>Schedule</h2></div><button class="button-secondary" type="button" @onclick="PreviewAsync">Preview</button></div>
+            <div class="form-grid">
+                <label><span>Schedule type</span><InputSelect @bind-Value="model.ScheduleType"><option value="@TriggerScheduleType.Once">Once</option><option value="@TriggerScheduleType.Interval">Interval</option><option value="@TriggerScheduleType.Cron">Cron</option></InputSelect></label>
+                <label><span>Time zone</span><InputSelect @bind-Value="model.TimeZone">@foreach (var zone in timeZones) { <option value="@zone">@zone</option> }</InputSelect><small>IANA identifier; local times are rejected when ambiguous.</small></label>
+                @if (model.ScheduleType == TriggerScheduleType.Once)
+                {
+                    <label class="form-span-2"><span>Run at</span><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" /><ValidationMessage For="() => model.LocalAt" /></label>
+                }
+                else if (model.ScheduleType == TriggerScheduleType.Interval)
+                {
+                    <label><span>Repeat every</span><InputNumber @bind-Value="model.IntervalValue" min="1" /><ValidationMessage For="() => model.IntervalValue" /></label>
+                    <label><span>Unit</span><InputSelect @bind-Value="model.IntervalUnit"><option value="minutes">Minutes</option><option value="hours">Hours</option><option value="days">Days</option></InputSelect></label>
+                    <label class="form-span-2"><span>Start at</span><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" /><ValidationMessage For="() => model.LocalAt" /></label>
+                }
+                else
+                {
+                    <label><span>Preset</span><select value="@cronPreset" @onchange="ApplyCronPreset"><option value="advanced">Advanced</option><option value="weekdayMorning">Weekdays at 08:00</option><option value="dailyMorning">Every day at 08:00</option><option value="weeklyMonday">Mondays at 09:00</option></select></label>
+                    <label><span>Quartz cron expression</span><InputText @bind-Value="model.CronExpression" /><ValidationMessage For="() => model.CronExpression" /><small>Quartz syntax; use Advanced for a custom expression.</small></label>
+                }
+                <label><span>Missed occurrence</span><InputSelect @bind-Value="model.MisfirePolicy"><option value="@TriggerMisfirePolicy.FireOnce">Fire once after restart</option><option value="@TriggerMisfirePolicy.Skip">Skip missed occurrence</option></InputSelect><small>No unbounded backlog is created.</small></label>
+                <label><span>While previous Work is active</span><InputSelect @bind-Value="model.ConcurrencyPolicy"><option value="@TriggerConcurrencyPolicy.Skip">Skip new occurrence</option><option value="@TriggerConcurrencyPolicy.Allow">Allow overlap</option></InputSelect><small>This does not change Flow-internal parallelism.</small></label>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(scheduleError)) { <p class="form-alert form-alert-danger" role="alert">@scheduleError</p> }
+            @if (preview.Count > 0)
+            {
+                <div class="trigger-preview" aria-live="polite"><strong>Next occurrences</strong><ol>@foreach (var value in preview) { <li>@TriggerUi.OccurrenceLabel(value, model.TimeZone, TimeProvider.GetUtcNow())</li> }</ol></div>
+            }
+        </section>
+
+        <section class="panel form-section">
+            <div class="panel-header"><div><p class="eyebrow">What</p><h2>Static input</h2></div><button class="text-button" type="button" @onclick="FormatInput">Format JSON</button></div>
+            <div class="form-grid">
+                <label class="form-span-2"><span>JSON object</span><InputTextArea @bind-Value="model.InputJson" rows="10" class="trigger-json form-code-editor" /><ValidationMessage For="() => model.InputJson" /><small>Event payload and expression bindings remain outside V1. Raw credential fields are rejected.</small></label>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(inputError)) { <p class="form-alert form-alert-danger" role="alert">@inputError</p> }
+        </section>
+
+        @if (IsNew)
+        {
+            <div class="form-actions"><a class="button-secondary" href="/triggers">Cancel</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)">@(saving ? "Creating…" : "Create disabled Trigger")</button></div>
+        }
+        else
+        {
+            <UnsavedChangesBar IsVisible="@dirty" Message="Save the desired schedule. Existing Work and occurrences are not changed.">
+                <Actions><a class="button-secondary" href="@($"/triggers/{Uri.EscapeDataString(model.Name)}")">Discard</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)">@(saving ? "Saving…" : "Save changes")</button></Actions>
+            </UnsavedChangesBar>
+        }
+    </EditForm>
+}
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    private TriggerEditorModel? model;
+    private StoredResource<TriggerResource>? existing;
+    private IReadOnlyList<FlowSummary> availableFlows = [];
+    private IReadOnlyList<string> timeZones = [];
+    private IReadOnlyList<DateTimeOffset> preview = [];
+    private bool loading = true, notFound, saving, dirty;
+    private string? error, scheduleError, inputError;
+    private string cronPreset = "weekdayMorning";
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private bool CanManage => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true; error = null; notFound = false;
+        try
+        {
+            timeZones = TriggerUi.IanaTimeZones();
+            availableFlows = (await Flows.GetFlowsAsync(CancellationToken.None)).OrderBy(value => value.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+            if (IsNew)
+            {
+                var zone = timeZones.Contains("Europe/Paris", StringComparer.Ordinal) ? "Europe/Paris" : timeZones[0];
+                model = new() { TimeZone = zone, LocalAt = TriggerUi.LocalInput(TimeProvider.GetUtcNow().AddHours(1), zone) };
+            }
+            else
+            {
+                existing = await Management.GetAsync(ResourceNamespace.Default, Name!, CancellationToken.None);
+                if (existing is null) { notFound = true; return; }
+                model = From(existing.Value);
+            }
+            await PreviewAsync(); dirty = false;
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+
+    private TriggerEditorModel From(TriggerResource resource)
+    {
+        var schedule = resource.Definition.Source.Schedule!;
+        var zone = schedule.TimeZone ?? TimeZoneInfo.Local.Id;
+        if (!timeZones.Contains(zone, StringComparer.Ordinal)) zone = "Europe/Paris";
+        var at = schedule.At ?? schedule.StartAt ?? TimeProvider.GetUtcNow().AddHours(1);
+        var duration = schedule.Every is null ? TimeSpan.FromHours(1) : XmlConvert.ToTimeSpan(schedule.Every);
+        var (intervalValue, intervalUnit) = duration.TotalDays >= 1 && duration.TotalDays == Math.Truncate(duration.TotalDays) ? ((int)duration.TotalDays, "days") : duration.TotalHours >= 1 && duration.TotalHours == Math.Truncate(duration.TotalHours) ? ((int)duration.TotalHours, "hours") : (Math.Max(1, (int)duration.TotalMinutes), "minutes");
+        cronPreset = PresetFor(schedule.Expression);
+        var flow = resource.Definition.Target.Flow!;
+        return new() { Name = resource.Name, DisplayName = resource.Definition.DisplayName, Description = resource.Definition.Description, FlowKey = $"{(flow.Namespace ?? resource.Namespace).Value}/{flow.Name}", ScheduleType = schedule.Type, TimeZone = zone, LocalAt = TriggerUi.LocalInput(at, zone), IntervalValue = intervalValue, IntervalUnit = intervalUnit, CronExpression = schedule.Expression ?? "0 0 8 ? * MON-FRI", MisfirePolicy = resource.Definition.MisfirePolicy, ConcurrencyPolicy = resource.Definition.ConcurrencyPolicy, InputJson = resource.Definition.Input.GetRawText() };
+    }
+
+    private void MarkDirty() => dirty = true;
+    private async Task PreviewAsync()
+    {
+        if (model is null) return;
+        scheduleError = null; preview = [];
+        try { var schedule = BuildSchedule(); Schedules.Validate(schedule); var values = new List<DateTimeOffset>(); var cursor = TimeProvider.GetUtcNow(); for (var index = 0; index < 5; index++) { var next = Schedules.GetNextOccurrence(schedule, cursor); if (next is null) break; values.Add(next.Value); cursor = next.Value; } preview = values; }
+        catch (Exception exception) { scheduleError = exception.Message; }
+        await Task.CompletedTask;
+    }
+
+    private TriggerSchedule BuildSchedule() => model!.ScheduleType switch
+    {
+        TriggerScheduleType.Cron => new() { Type = TriggerScheduleType.Cron, Expression = model.CronExpression.Trim(), TimeZone = model.TimeZone },
+        TriggerScheduleType.Interval => new() { Type = TriggerScheduleType.Interval, StartAt = TriggerUi.ParseLocalInstant(model.LocalAt, model.TimeZone), Every = model.IntervalUnit switch { "days" => $"P{model.IntervalValue}D", "hours" => $"PT{model.IntervalValue}H", _ => $"PT{model.IntervalValue}M" }, TimeZone = model.TimeZone },
+        _ => new() { Type = TriggerScheduleType.Once, At = TriggerUi.ParseLocalInstant(model.LocalAt, model.TimeZone), TimeZone = model.TimeZone }
+    };
+
+    private JsonElement ParseInput()
+    {
+        inputError = null;
+        try { using var document = JsonDocument.Parse(model!.InputJson); if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException("Static input must be a JSON object."); return document.RootElement.Clone(); }
+        catch (Exception exception) when (exception is JsonException or FormatException) { inputError = exception.Message; throw; }
+    }
+
+    private void FormatInput() { try { var value = ParseInput(); model!.InputJson = JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true }); dirty = true; } catch (JsonException) { } }
+    private void ApplyCronPreset(ChangeEventArgs args) { cronPreset = args.Value?.ToString() ?? "advanced"; if (cronPreset != "advanced") model!.CronExpression = CronFor(cronPreset); dirty = true; _ = PreviewAsync(); }
+    private static string CronFor(string preset) => preset switch { "dailyMorning" => "0 0 8 ? * *", "weeklyMonday" => "0 0 9 ? * MON", _ => "0 0 8 ? * MON-FRI" };
+    private static string PresetFor(string? expression) => expression switch { "0 0 8 ? * *" => "dailyMorning", "0 0 9 ? * MON" => "weeklyMonday", "0 0 8 ? * MON-FRI" => "weekdayMorning", _ => "advanced" };
+    private static string FlowKey(FlowSummary flow) => $"{flow.Namespace.Value}/{flow.Id}";
+
+    private async Task SaveAsync()
+    {
+        if (model is null || !CanManage || saving) return;
+        saving = true; error = null;
+        try
+        {
+            await PreviewAsync(); if (scheduleError is not null) return;
+            var input = ParseInput();
+            var separator = model.FlowKey.IndexOf('/'); if (separator <= 0) throw new InvalidOperationException("Select a Flow target.");
+            var flowNamespace = ResourceNamespace.Parse(model.FlowKey[..separator]); var flowName = model.FlowKey[(separator + 1)..];
+            var definition = new TriggerProperties { DisplayName = model.DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), Enabled = existing?.Value.Definition.Enabled ?? false, Source = new() { Schedule = BuildSchedule() }, Target = new() { Flow = new() { Name = flowName, Namespace = flowNamespace } }, Input = input, MisfirePolicy = model.MisfirePolicy, ConcurrencyPolicy = model.ConcurrencyPolicy, ExecutionScope = existing?.Value.Definition.ExecutionScope };
+            StoredResource<TriggerResource> saved;
+            if (IsNew) saved = await Management.CreateAsync(new() { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Trigger, Metadata = new() { Name = model.Name.Trim() }, Definition = definition }, CancellationToken.None);
+            else saved = await Management.UpdateAsync(ResourceNamespace.Default, model.Name, definition, existing!.ETag, CancellationToken.None);
+            Notifications.Add(new(Guid.NewGuid(), IsNew ? "Trigger created" : "Trigger updated", saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));
+            Navigation.NavigateTo($"/triggers/{Uri.EscapeDataString(saved.Value.Name)}");
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { saving = false; }
+    }
+
+    private sealed class TriggerEditorModel
+    {
+        [Required, RegularExpression("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", ErrorMessage = "Use lowercase letters, digits, and hyphens.")] public string Name { get; set; } = "";
+        [Required, StringLength(120)] public string DisplayName { get; set; } = "";
+        [StringLength(500)] public string? Description { get; set; }
+        [Required(ErrorMessage = "Select a published Flow.")] public string FlowKey { get; set; } = "";
+        public TriggerScheduleType ScheduleType { get; set; } = TriggerScheduleType.Once;
+        [Required] public string TimeZone { get; set; } = "Europe/Paris";
+        public DateTime LocalAt { get; set; }
+        [Range(1, 100000)] public int IntervalValue { get; set; } = 6;
+        public string IntervalUnit { get; set; } = "hours";
+        [Required] public string CronExpression { get; set; } = "0 0 8 ? * MON-FRI";
+        public TriggerMisfirePolicy MisfirePolicy { get; set; } = TriggerMisfirePolicy.FireOnce;
+        public TriggerConcurrencyPolicy ConcurrencyPolicy { get; set; } = TriggerConcurrencyPolicy.Skip;
+        [Required] public string InputJson { get; set; } = "{}";
+    }
+}
