@@ -4,7 +4,7 @@
 
 Agentstration lets you define governed agents, model profiles and tools, compose them into versioned Flows, distribute reusable Packs, and execute and track delegated work from an operations Console or the end-user Workplace.
 
-It is built on the Microsoft .NET AI stack and currently executes agents through Microsoft Agent Framework (MAF), while keeping application contracts provider-neutral and cloud-optional. Local deterministic execution requires no Azure subscription, remote model or API key.
+It is built on the Microsoft .NET AI stack and currently executes agents through Microsoft Agent Framework (MAF), while keeping application contracts provider-neutral and cloud-optional. Real agents can run fully locally through Ollama, llama.cpp or LocalAI; no Azure subscription is required.
 
 - **Website:** [www.agentstration.io/en](https://www.agentstration.io/en/)
 - **Documentation:** [docs.agentstration.io](https://docs.agentstration.io/)
@@ -64,20 +64,30 @@ Read the [architecture overview](https://docs.agentstration.io/architecture/over
 ### Requirements
 
 - the .NET SDK selected by [`global.json`](global.json), currently .NET SDK 10.0.300 with compatible feature-band roll-forward;
-- optionally Docker for the Compose path;
-- optionally Ollama, llama.cpp or LocalAI when using a managed local model provider.
+- Ollama, llama.cpp or LocalAI to execute real agents locally;
+- optionally Docker for container-based local model or Compose workflows.
 
-### Run offline with deterministic execution
+### Run locally
 
 ```powershell
 git clone https://github.com/gbaudrit/agentstration.git
 cd agentstration
 
-$env:AI__Provider = "Deterministic"
 dotnet run --project src/Agentstration.Web
 ```
 
 Open the operations Console at [http://localhost:5100](http://localhost:5100). On a fresh installation, `/bootstrap` creates the first local administrator, organization and workspace; no default credentials exist.
+
+`Managed` is the normal execution mode. Configure an Ollama, llama.cpp or LocalAI provider and bind a Model Profile to run real agents entirely on your machine. The provider endpoint and selected model are resolved from Agentstration's persisted resources.
+
+For a first UI exploration, automated test or diagnostic session without any model, use the deterministic fallback:
+
+```powershell
+$env:AI__Provider = "Deterministic"
+dotnet run --project src/Agentstration.Web
+```
+
+Deterministic mode produces reproducible simulated responses. It is not a substitute for a local model and is not the normal production path.
 
 To run the end-user Workplace, keep the authoritative server running and start a second terminal:
 
