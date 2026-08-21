@@ -11,7 +11,7 @@ The Console exposes Entry authoring at `/entries`. An administrator can select a
 - Initial HTML is server rendered. No global WebAssembly or Auto render mode is enabled.
 - The console uses native Razor and CSS; it has no JavaScript UI framework or heavy component library.
 
-`Agentstration.Web.Components` is a Razor Class Library containing the shell, responsive navigation, light/dark themes, focused state services, and reusable operational components. It has no dependency on the Agentstration domain or persistence projects, which keeps it suitable for a possible future MAUI Blazor Hybrid host.
+`Agentstration.Web.Components` is a Razor Class Library containing the shell, responsive navigation, light/dark themes, focused state services, and reusable operational components. It has no dependency on the Agentstration domain or persistence projects, which keeps it suitable for a possible future MAUI Blazor Hybrid host. Theme state uses a small host-provided preferences client, so the same persisted selection is applied by the Console and standalone Workplace.
 
 The current design system includes `StatusBadge`, `HealthIndicator`, `MetricCard`, `PageHeader`, `EmptyState`, `LoadingState`, `ErrorState`, `ConfirmationDialog`, `SearchBox`, `FilterBar`, `DataGrid`, `EventList`, and `ExecutionTimeline`.
 
@@ -88,6 +88,10 @@ Pages depend on `IAgentstrationEventStream`, not a transport implementation. The
 Local launch uses ASP.NET Core Identity with a dedicated SQLite credential store. A fresh instance redirects to the one-time, server-rendered `/bootstrap` page; no default account or password is created. `/login`, `/logout`, and `/access-denied` stay outside the protected Interactive Server circuit so the application cookie is established at the normal ASP.NET Core HTTP boundary. Forms use antiforgery validation, and return URLs are restricted to local paths. The JSON bootstrap and login endpoints under `/api/auth` remain available for programmatic clients. `Local`, `Oidc`, and `Hybrid` modes converge toward the same Agentstration `Principal` and Workspace policies. The isolated `Development` handler remains available only through explicit Development/Testing configuration.
 
 `identity.db` is upgraded with versioned EF Core migrations. The persistent Data Protection key ring defaults beside the local data file and can be changed with `Agentstration:Authentication:DataProtectionKeysPath`. Back up and protect both stores; the key directory contains sensitive material required to keep cookies and Identity lifecycle tokens valid across restarts.
+
+Authenticated users can read and update their own profile preferences through `GET/PUT /api/identity/preferences`. The first delivered preference is the theme (`System`, `Light`, or `Dark`). The server derives the target Principal from the authenticated session or access token; clients cannot submit a Principal identifier. Preferences live in the Management Control Plane rather than the ASP.NET Core Identity credential database.
+
+The Console exposes `/settings/profile` for reviewing the current Principal and explicitly selecting the system, light, or dark appearance. The selection is saved immediately through the same preference state used by the Console and Workplace shell theme controls. Credential management remains isolated at `/account/security`.
 
 Platform administrators can list, create, enable, and disable local accounts from **Organization > Members** or `/api/identity/accounts`. Member details manage the current Workspace role through `/api/identity/workspaces/{workspaceId}/memberships`; the service prevents removal or demotion of the final Owner.
 

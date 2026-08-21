@@ -1,7 +1,9 @@
+using Agentstration.Web.Components;
 using Agentstration.Work;
 using Agentstration.Workplace.Components;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Workplace.Components.Tests;
 
@@ -80,6 +82,8 @@ public sealed class PendingActionPanelTests
     public void WorkplaceLayoutUsesTheConsoleDesignSystemShell()
     {
         using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddAgentstrationWebComponents();
         var rendered = context.Render<WorkplaceLayout>(parameters => parameters
             .Add(value => value.Body, builder => builder.AddContent(0, "Workplace content")));
 

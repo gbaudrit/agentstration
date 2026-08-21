@@ -1,6 +1,9 @@
 @inherits LayoutComponentBase
+@implements IAsyncDisposable
 @inject NavigationManager Navigation
-<div class="app-shell theme-light workplace-shell">
+@inject UserPreferencesState Preferences
+@inject IJSRuntime JS
+<div class="app-shell @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light") workplace-shell">
     <aside class="sidebar" aria-label="Workplace navigation">
         <a class="brand-lockup" href="@HomeUrl" aria-label="Agentstration Workplace home"><span class="brand-mark"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></span><span><strong>Agentstration</strong><small>Workplace</small></span></a>
         <nav class="side-nav"><NavLink href="@HomeUrl"><UiIcon Name="home" /><span class="nav-label">Home</span></NavLink><NavLink href="@TasksUrl"><UiIcon Name="tasks" /><span class="nav-label">Tasks</span></NavLink><NavLink href="@NotificationsUrl"><UiIcon Name="notifications" /><span class="nav-label">Notifications</span></NavLink></nav>
@@ -11,11 +14,30 @@
             <a class="mobile-brand" href="@HomeUrl" aria-label="Agentstration Workplace home"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /><span><small>Agentstration</small><strong>Workplace</strong></span></a>
             <a class="mobile-notifications" href="@NotificationsUrl" aria-label="Open notifications"><UiIcon Name="notifications" /></a>
         </header>
-        <header class="topbar"><div class="topbar-start"><nav class="breadcrumb"><a href="@HomeUrl">@((CurrentWorkspace ?? "My") + " Workplace")</a></nav></div><div class="topbar-actions"><span class="environment-chip">LOCAL</span><a class="icon-button" href="@NotificationsUrl" aria-label="Open notifications"><UiIcon Name="notifications" /></a></div></header><main class="content">@Body</main>
+        <header class="topbar"><div class="topbar-start"><nav class="breadcrumb"><a href="@HomeUrl">@((CurrentWorkspace ?? "My") + " Workplace")</a></nav></div><div class="topbar-actions"><span class="environment-chip">LOCAL</span><button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="Toggle color theme" title="@(Preferences.Error ?? $"Theme: {Preferences.Theme}")"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button><a class="icon-button" href="@NotificationsUrl" aria-label="Open notifications"><UiIcon Name="notifications" /></a></div></header><main class="content">@Body</main>
     </div>
 </div>
 
 @code {
+    private readonly CancellationTokenSource lifetimeCancellation = new();
+    private IJSObjectReference? themeModule;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Preferences.Changed += OnPreferencesChanged;
+        await Preferences.LoadAsync(lifetimeCancellation.Token);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/theme-preferences.js");
+        Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
+    }
+
+    private Task ToggleThemeAsync() => Preferences.ToggleThemeAsync(lifetimeCancellation.Token);
+    private void OnPreferencesChanged() => _ = InvokeAsync(StateHasChanged);
+
     private string? CurrentWorkspace
     {
         get
@@ -29,4 +51,16 @@
     private string HomeUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}";
     private string TasksUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}/tasks";
     private string NotificationsUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}/notifications";
+
+    public async ValueTask DisposeAsync()
+    {
+        Preferences.Changed -= OnPreferencesChanged;
+        lifetimeCancellation.Cancel();
+        lifetimeCancellation.Dispose();
+        if (themeModule is not null)
+        {
+            try { await themeModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+    }
 }

@@ -324,7 +324,7 @@ public sealed class PackTests
         using var client = factory.CreateClient();
         var runtimeNamespace = new ResourceNamespace("shared.platform");
         var runtimeProfiles = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
-        _ = await runtimeProfiles.CreateAsync(new RuntimeProfileResource
+        var runtime = await runtimeProfiles.CreateAsync(new RuntimeProfileResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.RuntimeProfile,
@@ -384,6 +384,8 @@ public sealed class PackTests
         var deployment = await agents.PrepareLocalRuntimeAsync(packNamespace, "assistant", agent.Value.Generation, default);
         Assert.AreEqual("pack-runtime", deployment.Value.RuntimeProfileName);
         Assert.AreEqual(runtimeNamespace, deployment.Value.RuntimeProfileNamespace);
+        var runtimes = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
+        Assert.HasCount(1, await runtimes.GetUsagesAsync(runtimeNamespace, "pack-runtime", default));
 
         using var readinessResponse = await client.GetAsync($"/api/runtime/namespaces/{packNamespace.Value}/agents/assistant/readiness?generation={agent.Value.Generation}");
         Assert.AreEqual(HttpStatusCode.OK, readinessResponse.StatusCode, await readinessResponse.Content.ReadAsStringAsync());
@@ -396,6 +398,12 @@ public sealed class PackTests
         var prepared = await preparationResponse.Content.ReadFromJsonAsync<PrepareAgentRuntimeResponse>();
         Assert.IsNotNull(prepared);
         Assert.AreEqual("Ready", prepared.State);
+
+        var store = factory.Services.GetRequiredService<IControlPlaneStore>();
+        await store.DeleteAsync(new(ResourceKinds.Agent, "assistant", packNamespace), agent.ETag, default);
+        await runtimeProfiles.DeleteAsync(runtimeNamespace, "pack-runtime", runtime.ETag, default);
+        Assert.IsNull(await store.GetAsync<AgentDeployment>(
+            new(ResourceKinds.AgentDeployment, deployment.Value.Metadata.Name, packNamespace), default));
     }
 
     [TestMethod]

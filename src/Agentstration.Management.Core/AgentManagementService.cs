@@ -75,20 +75,30 @@ public sealed class AgentManagementService(
     public Task<StoredResource<AgentDeployment>?> GetDeploymentAsync(string name, CancellationToken cancellationToken) =>
         store.GetAsync<AgentDeployment>(new ResourceKey(ResourceKinds.AgentDeployment, name), cancellationToken);
 
-    public async Task DeleteAgentAsync(string name, string? ifMatch, CancellationToken cancellationToken)
-    {
-        var key = new ResourceKey(ResourceKinds.Agent, name);
-        var existing = await store.GetAsync<AgentResource>(key, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(key);
-        foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(key, cancellationToken);
-        await store.DeleteAsync(key, ifMatch, cancellationToken);
-        await eventBus.PublishAsync(new AgentDeleted(existing.Value.Uid, name, timeProvider.GetUtcNow()), cancellationToken);
-    }
+    public Task DeleteAgentAsync(string name, string? ifMatch, CancellationToken cancellationToken) =>
+        DeleteAgentAsync(ResourceNamespace.Default, name, ifMatch, cancellationToken);
 
     public async Task DeleteAgentAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
     {
         var key = new ResourceKey(ResourceKinds.Agent, name, @namespace);
         var existing = await store.GetAsync<AgentResource>(key, cancellationToken) ?? throw new ControlPlaneResourceNotFoundException(key);
         foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(key, cancellationToken);
+        if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
+            throw new ControlPlaneConcurrencyException("The supplied ETag does not match the current resource version.");
+
+        var deployments = await agentQueries.ListDeploymentsForAgentAsync(@namespace, name, cancellationToken);
+        foreach (var deployment in deployments)
+        {
+            var stopped = deployment.Value.DesiredState == DesiredAgentState.Stopped
+                ? deployment
+                : await StopAsync(deployment, cancellationToken);
+            var reconciled = await ReconcileAsync(stopped, cancellationToken);
+            await store.DeleteAsync(
+                new ResourceKey(ResourceKinds.AgentDeployment, reconciled.Value.Metadata.Name, @namespace),
+                reconciled.ETag,
+                cancellationToken);
+        }
+
         await store.DeleteAsync(key, ifMatch, cancellationToken);
         await eventBus.PublishAsync(new AgentDeleted(existing.Value.Uid, name, timeProvider.GetUtcNow()), cancellationToken);
     }

@@ -42,10 +42,30 @@ public sealed class StateTests
     }
 
     [TestMethod]
-    public void UserPreferencesStateTogglesTheme()
+    public async Task UserPreferencesStateLoadsAndPersistsSelectedTheme()
     {
-        var state = new UserPreferencesState();
-        state.ToggleTheme();
+        var client = new StubUserPreferencesClient(UserTheme.Light);
+        var state = new UserPreferencesState(client);
+
+        await state.LoadAsync(default);
+        await state.SetThemeAsync(UserTheme.Dark, default);
+
         Assert.IsTrue(state.IsDarkTheme);
+        Assert.IsTrue(state.IsLoaded);
+        Assert.AreEqual(UserTheme.Dark, client.SavedTheme);
+    }
+
+    private sealed class StubUserPreferencesClient(UserTheme initialTheme) : IUserPreferencesClient
+    {
+        public UserTheme? SavedTheme { get; private set; }
+
+        public Task<UserPreferences> GetAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new UserPreferences(initialTheme, DateTimeOffset.UtcNow));
+
+        public Task<UserPreferences> UpdateAsync(UserTheme theme, CancellationToken cancellationToken)
+        {
+            SavedTheme = theme;
+            return Task.FromResult(new UserPreferences(theme, DateTimeOffset.UtcNow));
+        }
     }
 }

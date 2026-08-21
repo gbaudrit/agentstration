@@ -31,6 +31,32 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
+    public async Task PrincipalPreferencesArePersistedPerPrincipal()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var firstPrincipalId = fixture.Context.Current.PrincipalId;
+        var secondPrincipal = new Principal(
+            Guid.NewGuid(),
+            PrincipalKind.Human,
+            "Second user",
+            null,
+            PrincipalStatus.Active,
+            DateTimeOffset.UtcNow);
+        await store.AddPrincipalAsync(secondPrincipal, default);
+
+        await store.UpsertPrincipalPreferencesAsync(
+            new PrincipalPreferences(firstPrincipalId, ThemePreference.Dark, DateTimeOffset.UtcNow),
+            default);
+        await store.UpsertPrincipalPreferencesAsync(
+            new PrincipalPreferences(secondPrincipal.Id, ThemePreference.Light, DateTimeOffset.UtcNow),
+            default);
+
+        Assert.AreEqual(ThemePreference.Dark, (await store.GetPrincipalPreferencesAsync(firstPrincipalId, default))?.Theme);
+        Assert.AreEqual(ThemePreference.Light, (await store.GetPrincipalPreferencesAsync(secondPrincipal.Id, default))?.Theme);
+    }
+
+    [TestMethod]
     public async Task BootstrapRepairsMissingWorkspaceMembershipAndOwnerAssignment()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
