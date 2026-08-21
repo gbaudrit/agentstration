@@ -13,6 +13,8 @@ public static class IdentityEndpoints
         var group = endpoints.MapGroup("/api/identity").RequireAuthorization(AgentstrationPolicies.Authenticated);
         group.MapGet("/context", async (IdentityExperienceService service, CancellationToken token) => Results.Ok(await service.GetContextAsync(token)))
             .RequireAuthorization(AgentstrationPolicies.WorkspaceReader);
+        group.MapGet("/preferences", GetPreferencesAsync);
+        group.MapPut("/preferences", UpdatePreferencesAsync);
         group.MapPost("/context/workspace", SelectWorkspaceAsync);
         group.MapGet("/organization", async (IdentityAdministrationService service, CancellationToken token) =>
             Results.Ok(await service.GetCurrentAsync(token))).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
@@ -50,6 +52,37 @@ public static class IdentityEndpoints
             .RequireAuthorization(AgentstrationPolicies.Authenticated);
         return endpoints;
     }
+
+    private static async Task<IResult> GetPreferencesAsync(
+        HttpContext context,
+        PrincipalPreferencesService service,
+        CancellationToken cancellationToken)
+    {
+        var principal = context.Features.Get<ResolvedPrincipalFeature>()?.Principal;
+        if (principal is null) return Results.Forbid();
+        return Results.Ok(ToResponse(await service.GetAsync(principal.Id, cancellationToken)));
+    }
+
+    private static async Task<IResult> UpdatePreferencesAsync(
+        UpdatePrincipalPreferencesRequest request,
+        HttpContext context,
+        PrincipalPreferencesService service,
+        CancellationToken cancellationToken)
+    {
+        var principal = context.Features.Get<ResolvedPrincipalFeature>()?.Principal;
+        if (principal is null) return Results.Forbid();
+        try
+        {
+            return Results.Ok(ToResponse(await service.UpdateAsync(principal.Id, request.Theme, cancellationToken)));
+        }
+        catch (ArgumentException exception)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["theme"] = [exception.Message] });
+        }
+    }
+
+    private static PrincipalPreferencesResponse ToResponse(PrincipalPreferences preferences) =>
+        new(preferences.Theme.ToString(), preferences.UpdatedAt);
 
     private static async Task<IResult> GetWorkspaceAsync(
         Guid workspaceId,
@@ -228,3 +261,5 @@ public static class IdentityEndpoints
 public sealed record SelectWorkspaceRequest(Guid WorkspaceId);
 public sealed record CreateWorkspaceRequest(string Name, string DisplayName);
 public sealed record SetWorkspaceMembershipRequest(string Role);
+public sealed record UpdatePrincipalPreferencesRequest(string Theme);
+public sealed record PrincipalPreferencesResponse(string Theme, DateTimeOffset UpdatedAt);

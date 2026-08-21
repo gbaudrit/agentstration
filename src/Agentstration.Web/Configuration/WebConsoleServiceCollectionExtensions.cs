@@ -62,6 +62,7 @@ public static class WebConsoleServiceCollectionExtensions
         // edits and Runtime activation observe the same persisted generations and
         // profiles, even when unrelated dashboard widgets use simulated data.
         AddClient<ManagementApiClient, IManagementApiClient>(services, configured.ManagementApi);
+        AddClient<HttpUserPreferencesClient, IUserPreferencesClient>(services, configured.ManagementApi);
         AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
         AddClient<ExtensionsApiClient, IExtensionsClient>(services, configured.ManagementApi);
         AddClient<ModelProfilesApiClient, IModelProfilesClient>(services, configured.ManagementApi);

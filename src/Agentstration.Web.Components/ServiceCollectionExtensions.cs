@@ -8,6 +8,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddAgentstrationWebComponents(this IServiceCollection services)
     {
+        services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<NavigationState>();
         services.AddScoped<UserPreferencesState>();
         services.AddScoped<NotificationState>();
@@ -15,6 +16,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ConsoleContextState>();
         services.TryAddScoped<IConsoleContextProvider, EmptyConsoleContextProvider>();
         services.TryAddScoped<IResourceSearchProvider, EmptyResourceSearchProvider>();
+        services.TryAddScoped<IUserPreferencesClient, EmptyUserPreferencesClient>();
         return services;
     }
 }
