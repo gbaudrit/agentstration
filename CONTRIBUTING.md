@@ -70,3 +70,9 @@ When behavior changes, add or update tests in the same pull request. Update publ
 Inspect the complete affected path—transport, application, domain, infrastructure, and tests—and preserve the dependency rules in [`docs/architecture.md`](docs/architecture.md). Significant architectural choices require a new ADR under [`docs/decisions/`](docs/decisions/); do not rewrite an accepted ADR to hide a later decision.
 
 Every change to a public concept, resource, API, configuration setting, or architecture decision must update the corresponding documentation. Keep the root README concise and put durable product documentation under `docs/`. See [Working on the documentation](docs/contributing/documentation.md) and [GitHub governance](docs/contributing/github-governance.md).
+
+## Licensing contributions
+
+Agentstration is licensed under the [Apache License 2.0](LICENSE). Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in Agentstration is provided under Apache-2.0 without additional terms or conditions, as described in section 5 of the license.
+
+By submitting a contribution, you represent that you have the right to license it under those terms. Do not submit code, assets, documentation, model output, or other material whose license is incompatible with Apache-2.0. Existing third-party notices and attribution requirements must be preserved.
