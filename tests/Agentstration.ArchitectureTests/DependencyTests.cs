@@ -6,6 +6,7 @@ using Agentstration.Application;
 using Agentstration.Domain;
 using Agentstration.Evaluation;
 using Agentstration.Extensions.LlamaCpp;
+using Agentstration.Extensions.LocalAI;
 using Agentstration.Extensions.Ollama;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
@@ -110,6 +111,7 @@ public sealed class DependencyTests
         var references = typeof(IModelProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
             || name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || name.Contains("LocalAI", StringComparison.Ordinal)
             || name.Contains("Aspire", StringComparison.Ordinal)
             || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
@@ -122,7 +124,9 @@ public sealed class DependencyTests
         Assert.IsFalse(assemblies.SelectMany(value => value.GetReferencedAssemblies()).Any(reference =>
             reference.Name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || reference.Name.Contains("Microsoft.Extensions.AI", StringComparison.Ordinal)
-            || reference.Name.Contains("Ollama", StringComparison.Ordinal)));
+            || reference.Name.Contains("Ollama", StringComparison.Ordinal)
+            || reference.Name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || reference.Name.Contains("LocalAI", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -130,7 +134,9 @@ public sealed class DependencyTests
     {
         var references = typeof(AepChatClient).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
-            || name.Contains("Ollama", StringComparison.Ordinal)));
+            || name.Contains("Ollama", StringComparison.Ordinal)
+            || name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || name.Contains("LocalAI", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -153,11 +159,23 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void LocalAiExtensionDoesNotReferenceRuntimeMafOtherProvidersOrAspireHosting()
+    {
+        var references = typeof(LocalAiAepModelProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || name.Contains("Ollama", StringComparison.Ordinal)
+            || name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || name.Contains("Aspire.Hosting", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public void AgentFrameworkRuntimeDoesNotReferenceConcreteModelProviders()
     {
         var references = typeof(AgentFrameworkRuntimeFactory).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
-            || name.Contains("LlamaCpp", StringComparison.Ordinal)));
+            || name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || name.Contains("LocalAI", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -297,6 +315,8 @@ public sealed class DependencyTests
         Assert.IsFalse(assemblies.SelectMany(assembly => assembly.GetReferencedAssemblies()).Any(reference =>
             reference.Name!.Contains("Azure", StringComparison.Ordinal)
             || reference.Name.Contains("Ollama", StringComparison.Ordinal)
+            || reference.Name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || reference.Name.Contains("LocalAI", StringComparison.Ordinal)
             || reference.Name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || reference.Name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
             || reference.Name.Contains("Storage.Sqlite", StringComparison.Ordinal)

@@ -16,5 +16,6 @@ dotnet --version
 - Node.js 20 or later and npm, only to build or serve this documentation site.
 - A locally installed and running Ollama server, to execute the seeded managed Ollama profile. Aspire connects to it but does not install or provision it.
 - A `llama-server` executable and local GGUF model, only when using the `llamacpp` provider. Agentstration can connect to an existing server and does not require Docker.
+- A running LocalAI server with a chat model and `/v1/models/capabilities`, only when using the `localai` provider. Agentstration does not install the server or mutate its model catalog.
 
 No cloud subscription or remote model credential is required for deterministic local operation.

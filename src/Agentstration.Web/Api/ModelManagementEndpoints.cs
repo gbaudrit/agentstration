@@ -21,6 +21,8 @@ public static class ModelManagementEndpoints
         ListModelProfilesEndpoint.Map(profiles);
         GetModelProfileUsagesEndpoint.Map(profiles);
         ResolveModelProfileEndpoint.Map(profiles);
+        PreviewModelProfileOptionMigrationEndpoint.Map(profiles);
+        ApplyModelProfileOptionMigrationEndpoint.Map(profiles);
         GetModelProfileEndpoint.Map(profiles);
         CreateModelProfileEndpoint.Map(profiles);
         PutModelProfileEndpoint.Map(profiles);
@@ -30,9 +32,11 @@ public static class ModelManagementEndpoints
         ToolProviderEndpoints.Map(endpoints);
         ToolExecutionHookEndpoints.Map(endpoints.MapGroup("/api/toolexecutionhooks"));
         SecretEndpoints.Map(endpoints);
+        ExtensionEndpoints.Map(endpoints);
 
         var agents = endpoints.MapGroup("/api/agents");
         GetAgentModelEndpoint.Map(agents);
+        GetAgentModelEndpoint.MapNamespaced(endpoints);
         return endpoints;
     }
 }

@@ -18,6 +18,10 @@ public static class RuntimeEndpoints
             .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
         GetAgentRuntimeReadinessEndpoint.Map(agents);
         PrepareAgentRuntimeEndpoint.Map(agents);
+        var namespacedAgents = endpoints.MapGroup("/api/runtime/namespaces/{namespace}/agents")
+            .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
+        GetAgentRuntimeReadinessEndpoint.MapNamespaced(namespacedAgents);
+        PrepareAgentRuntimeEndpoint.MapNamespaced(namespacedAgents);
         return endpoints;
     }
 }

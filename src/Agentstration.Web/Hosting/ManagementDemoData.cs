@@ -1,6 +1,6 @@
-using System.Data.Common;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
 
@@ -10,16 +10,17 @@ public static class ManagementDemoData
     {
         var agents = services.GetRequiredService<AgentManagementService>();
         var providers = services.GetRequiredService<ModelProviderManagementService>();
+        var extensions = services.GetRequiredService<ExtensionRegistrationManagementService>();
+        var extensionDiscovery = services.GetRequiredService<ExtensionSourceDiscoveryService>();
         var profiles = services.GetRequiredService<ModelProfileManagementService>();
         var runtimes = services.GetRequiredService<RuntimeProfileManagementService>();
         var store = services.GetRequiredService<IControlPlaneStore>();
         var configuration = services.GetRequiredService<IConfiguration>();
+        _ = await extensionDiscovery.DiscoverAsync(cancellationToken);
 
-        if (await providers.GetAsync("ollama-local", cancellationToken) is null)
+        if (await extensions.GetAsync(ResourceNamespace.Default, "ollama-extension", cancellationToken) is not null
+            && await providers.GetAsync("ollama-local", cancellationToken) is null)
         {
-            var connectionString = configuration.GetConnectionString("ollama-extension");
-            var configuredEndpoint = configuration["Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint"];
-            var endpoint = ResolveEndpoint(connectionString) ?? (Uri.TryCreate(configuredEndpoint, UriKind.Absolute, out var value) ? value : new Uri("http://localhost:5260"));
             await providers.CreateAsync(new ModelProviderResource
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
@@ -28,18 +29,15 @@ public static class ManagementDemoData
                 Definition = new ModelProviderProperties
                 {
                     DisplayName = "Ollama via AEP",
-                    ProviderType = "ollama",
-                    Endpoint = endpoint,
-                    ManagementMode = string.IsNullOrWhiteSpace(connectionString) ? ModelProviderManagementMode.External : ModelProviderManagementMode.Aspire
+                    Extension = new ResourceReference("ollama-extension"),
+                    ContributionId = "ollama"
                 }
             }, cancellationToken);
         }
 
-        if (await providers.GetAsync("llama-cpp-local", cancellationToken) is null)
+        if (await extensions.GetAsync(ResourceNamespace.Default, "llama-cpp-extension", cancellationToken) is not null
+            && await providers.GetAsync("llama-cpp-local", cancellationToken) is null)
         {
-            var connectionString = configuration.GetConnectionString("llama-cpp-extension");
-            var configuredEndpoint = configuration["Agentstration:Extensions:Agentstration.Extensions.LlamaCpp:Endpoint"];
-            var endpoint = ResolveEndpoint(connectionString) ?? (Uri.TryCreate(configuredEndpoint, UriKind.Absolute, out var value) ? value : new Uri("http://localhost:5270"));
             await providers.CreateAsync(new ModelProviderResource
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
@@ -48,9 +46,25 @@ public static class ManagementDemoData
                 Definition = new ModelProviderProperties
                 {
                     DisplayName = "llama.cpp via AEP",
-                    ProviderType = "llamacpp",
-                    Endpoint = endpoint,
-                    ManagementMode = string.IsNullOrWhiteSpace(connectionString) ? ModelProviderManagementMode.External : ModelProviderManagementMode.Aspire
+                    Extension = new ResourceReference("llama-cpp-extension"),
+                    ContributionId = "llamacpp"
+                }
+            }, cancellationToken);
+        }
+
+        if (await extensions.GetAsync(ResourceNamespace.Default, "localai-extension", cancellationToken) is not null
+            && await providers.GetAsync("localai-local", cancellationToken) is null)
+        {
+            await providers.CreateAsync(new ModelProviderResource
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.ModelProvider,
+                Metadata = new ResourceMetadata { Name = "localai-local", Tags = new Dictionary<string, string> { ["sample"] = "standalone" } },
+                Definition = new ModelProviderProperties
+                {
+                    DisplayName = "LocalAI via AEP",
+                    Extension = new ResourceReference("localai-extension"),
+                    ContributionId = "localai"
                 }
             }, cancellationToken);
         }
@@ -142,15 +156,4 @@ public static class ManagementDemoData
         if (deployment.Value.OperationalState != OperationalState.Ready) await management.ReconcileAsync(deployment, cancellationToken);
     }
 
-    private static Uri? ResolveEndpoint(string? connectionString)
-    {
-        if (string.IsNullOrWhiteSpace(connectionString)) return null;
-        if (Uri.TryCreate(connectionString, UriKind.Absolute, out var endpoint)) return endpoint;
-        try
-        {
-            var values = new DbConnectionStringBuilder { ConnectionString = connectionString };
-            return values.TryGetValue("Endpoint", out var value) && Uri.TryCreate(value?.ToString(), UriKind.Absolute, out endpoint) ? endpoint : null;
-        }
-        catch (ArgumentException) { return null; }
-    }
 }

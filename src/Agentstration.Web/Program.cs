@@ -84,6 +84,7 @@ builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
 builder.Services.AddAgentstrationModelManagement();
+builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddRazorPages();

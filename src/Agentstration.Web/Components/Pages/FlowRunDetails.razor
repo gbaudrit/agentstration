@@ -2,9 +2,21 @@
 @implements IDisposable
 @inject IFlowApiClient Client
 @inject NavigationManager Navigation
+@inject Agentstration.Web.Security.ConsoleRealtimeSession RealtimeSession
+@inject ILogger<FlowRunDetails> Logger
 
 <PageTitle>@(run is null ? "Flow Run" : run.Id) · Agentstration</PageTitle>
-@if (run is null)
+@if (notFound)
+{
+    <ErrorState Title="Flow Run not found" Message="The requested Flow Run does not exist in the current workspace.">
+        <a class="button-secondary" href="/flow-runs">Back to Flow Runs</a>
+    </ErrorState>
+}
+else if (loadError is not null)
+{
+    <ErrorState Title="Unable to load Flow Run" Message="@loadError.Message" ErrorId="@loadError.ErrorId" />
+}
+else if (run is null)
 {
     <LoadingState />
 }
@@ -54,6 +66,10 @@ else
         </article>
     }
     <FlowRunTimeline Events="events" IsLive="@(!run.Status.IsTerminal())" />
+    @if (realtimeError is not null)
+    {
+        <div class="panel realtime-warning" role="status"><span>@realtimeError</span><button class="button-secondary" @onclick="ConnectAsync">Retry live updates</button></div>
+    }
     <section class="designer-layout run-layout">
         <div>
             <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep" />
@@ -84,6 +100,9 @@ else
     private InputRequest? pendingInput;
     private FlowStepRun? selected;
     private Microsoft.AspNetCore.SignalR.Client.HubConnection? hub;
+    private AgentstrationApiException? loadError;
+    private bool notFound;
+    private string? realtimeError;
     private long lastSequence;
     private int streamingRenderScheduled;
     private string responseText = string.Empty;
@@ -94,28 +113,69 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        run = await Client.GetFlowRunAsync(RunId, cancellation.Token);
+        notFound = false;
+        loadError = null;
+        realtimeError = null;
+        try
+        {
+            run = await Client.GetFlowRunAsync(RunId, cancellation.Token);
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            run = null;
+            notFound = true;
+            return;
+        }
+        catch (AgentstrationApiException exception)
+        {
+            run = null;
+            loadError = exception;
+            return;
+        }
         await RefreshInputAsync();
         selected = run.Steps.FirstOrDefault();
         events.Clear();
         eventSequences.Clear();
         lastSequence = 0;
-        await ConnectAsync();
+        await ReplayAsync();
+        if (!run.Status.IsTerminal()) await ConnectAsync();
     }
 
     private async Task ConnectAsync()
     {
         if (hub is not null) await hub.DisposeAsync();
-        hub = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder().WithUrl(Navigation.ToAbsoluteUri("/hubs/flow-runs")).WithAutomaticReconnect().Build();
+        var endpoint = Navigation.ToAbsoluteUri("/hubs/flow-runs");
+        hub = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder()
+            .WithUrl(endpoint, options => RealtimeSession.Configure(endpoint, options))
+            .WithAutomaticReconnect()
+            .Build();
         hub.On<FlowRunEvent>("FlowRunEvent", ApplyEventAsync);
         hub.Reconnected += async _ => await SubscribeAndReplayAsync();
-        await hub.StartAsync(cancellation.Token);
-        await SubscribeAndReplayAsync();
+        try
+        {
+            await hub.StartAsync(cancellation.Token);
+            await SubscribeAndReplayAsync();
+            realtimeError = null;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "Flow Run live updates are unavailable for {FlowRunId}", RunId);
+            realtimeError = "Live updates are unavailable. The persisted event history remains accessible.";
+            await hub.DisposeAsync();
+            hub = null;
+            await ReplayAsync();
+        }
     }
 
     private async Task SubscribeAndReplayAsync()
     {
         await hub!.InvokeAsync("SubscribeAsync", RunId, cancellation.Token);
+        await ReplayAsync();
+    }
+
+    private async Task ReplayAsync()
+    {
         var replay = await Client.GetFlowRunEventsAsync(RunId, lastSequence, cancellation.Token);
         foreach (var runEvent in replay) AddEvent(runEvent);
         if (replay.Count > 0) await RefreshRunAsync();

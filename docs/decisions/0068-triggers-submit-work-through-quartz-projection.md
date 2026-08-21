@@ -1,4 +1,4 @@
-# ADR-0062: Triggers submit Work through a reconstructible Quartz projection
+# ADR-0068: Triggers submit Work through a reconstructible Quartz projection
 
 Status: Accepted — 2026-08-20
 

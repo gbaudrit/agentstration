@@ -121,6 +121,7 @@ public static class DependencyInjection
         services.AddSingleton<IdentityAdministrationService>();
         services.AddSingleton<WorkspaceMembershipAdministrationService>();
         services.AddSingleton<IdentityExperienceService>();
+        services.AddSingleton<PrincipalPreferencesService>();
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
         services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();
         services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();

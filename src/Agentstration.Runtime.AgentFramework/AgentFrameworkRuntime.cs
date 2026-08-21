@@ -31,7 +31,7 @@ public sealed class AgentFrameworkRuntimeFactory(
         var tools = (await context.Tools.ResolveAsync(definition.EffectiveToolNames, cancellationToken))
             .Select(tool => MapTool(tool, context.ToolExecution, ToolContext(definition, revisionId, generation, executionScope)))
             .ToList();
-        var chatClient = await chatClients.ResolveAsync(definition.ModelProfileName, cancellationToken);
+        var chatClient = await chatClients.ResolveAsync(definition.ModelProfileNamespace, definition.ModelProfileName, cancellationToken);
         AIAgent agent = new ChatClientAgent(
             chatClient,
             new ChatClientAgentOptions
@@ -134,7 +134,7 @@ public sealed class AgentFrameworkRuntimeFactory(
         public async Task<AgentExecutionResult> ExecuteAsync(AgentExecutionRequest request, CancellationToken cancellationToken)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(request.Input);
-            var chatClient = await chatClients.ResolveAsync(modelProfileId, cancellationToken);
+            var chatClient = await chatClients.ResolveAsync(definition.ModelProfileNamespace, modelProfileId, cancellationToken);
             var model = chatClient.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
             AIAgent agent = AgentFrameworkRuntimeFactory.Observe(new ChatClientAgent(
                 chatClient,
@@ -156,7 +156,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                         "Run {RunId} uses deployment {Deployment}, provider {ProviderType}/{ProviderName}, and model {ModelName}",
                         request.SessionId,
                         model.Deployment,
-                        model.ProviderType,
+                        model.ContributionId,
                         model.ProviderName,
                         model.ModelName);
                 }
@@ -170,7 +170,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
             var runOptions = new ChatClientAgentRunOptions(chatOptions);
             var response = await agent.RunAsync(request.Input, options: runOptions, cancellationToken: cancellationToken);
-            return new AgentExecutionResult(response.Text, request.SessionId, model?.ProviderType, model?.ModelName, effective);
+            return new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective);
         }
 
         public async IAsyncEnumerable<AgentExecutionEvent> ExecuteEventsAsync(
@@ -180,7 +180,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             ArgumentException.ThrowIfNullOrWhiteSpace(request.Input);
             var executionId = request.SessionId ?? Guid.NewGuid().ToString("N");
             yield return new ExecutionStarted(executionId);
-            var chatClient = await chatClients.ResolveAsync(modelProfileId, cancellationToken);
+            var chatClient = await chatClients.ResolveAsync(definition.ModelProfileNamespace, modelProfileId, cancellationToken);
             var model = chatClient.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
             var mappedTools = tools.Select(tool => MapTool(tool, toolExecution, ToolContext(definition, RevisionId, null, request.ToolExecution))).ToList();
             var agent = AgentFrameworkRuntimeFactory.Observe(new ChatClientAgent(chatClient, instructions: instructions, name: AgentId, description: description, tools: mappedTools), observabilityEnabled);
@@ -202,7 +202,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                     options: new ChatClientAgentRunOptions(chatOptions),
                     cancellationToken: cancellationToken);
                 if (!string.IsNullOrEmpty(response.Text)) yield return new ContentDelta(response.Text);
-                yield return new ExecutionCompleted(new AgentExecutionResult(response.Text, request.SessionId, model?.ProviderType, model?.ModelName, effective));
+                yield return new ExecutionCompleted(new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective));
                 yield break;
             }
             await using var updates = agent.RunStreamingAsync(
@@ -232,7 +232,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                 output.Append(update.Text);
                 yield return new ContentDelta(update.Text);
             }
-            yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ProviderType, model?.ModelName, effective));
+            yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ContributionId, model?.ModelName, effective));
         }
 
         private void ValidateCompatibility(ModelChatClientMetadata? model, ModelExecutionOptions execution)
@@ -248,7 +248,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                 model.Output ?? new ModelOutputOptions(),
                 execution,
                 capabilities,
-                model.ProviderType,
+                model.ContributionId,
                 model.ModelName,
                 RuntimeType,
                 tools.Count > 0);

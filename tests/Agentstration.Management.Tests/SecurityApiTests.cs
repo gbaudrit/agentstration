@@ -18,6 +18,33 @@ public sealed class SecurityApiTests
     private const string ChangedLocalPassword = "A-changed-local-password-84!";
 
     [TestMethod]
+    public async Task AuthenticatedPrincipalCanPersistOwnThemePreference()
+    {
+        await using var factory = Factory("Local");
+        using var browser = UnredirectedClient(factory);
+        await BootstrapAsync(browser, "preferences-user");
+
+        var defaults = await browser.GetFromJsonAsync<PreferencesResponse>("/api/identity/preferences");
+        Assert.AreEqual("System", defaults?.Theme);
+
+        using var updated = await browser.PutAsJsonAsync(
+            "/api/identity/preferences",
+            new { theme = "Dark" });
+        Assert.AreEqual(HttpStatusCode.OK, updated.StatusCode);
+        Assert.AreEqual("Dark", (await updated.Content.ReadFromJsonAsync<PreferencesResponse>())?.Theme);
+        Assert.AreEqual("Dark", (await browser.GetFromJsonAsync<PreferencesResponse>("/api/identity/preferences"))?.Theme);
+
+        using var invalid = await browser.PutAsJsonAsync(
+            "/api/identity/preferences",
+            new { theme = "Sepia" });
+        Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+        using var anonymous = UnredirectedClient(factory);
+        using var unauthorized = await anonymous.GetAsync("/api/identity/preferences");
+        Assert.AreEqual(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+    }
+
+    [TestMethod]
     public async Task LocalAuthenticationPagesBootstrapAndLoginWithAntiforgery()
     {
         await using var factory = Factory("Local");
@@ -784,6 +811,8 @@ public sealed class SecurityApiTests
             AllowAutoRedirect = false,
             HandleCookies = true
         });
+
+    private sealed record PreferencesResponse(string Theme, DateTimeOffset UpdatedAt);
 
     private static async Task BootstrapAsync(HttpClient client, string userName)
     {

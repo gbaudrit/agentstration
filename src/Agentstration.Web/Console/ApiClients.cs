@@ -47,7 +47,11 @@ public interface IRuntimeApiClient
 public interface IAgentRunnerRuntimeClient : IRuntimeApiClient
 {
     Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string agentName, long generation, CancellationToken cancellationToken);
+    Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetAgentReadinessAsync(agentName, generation, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agent runtime readiness.");
     Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string agentName, long generation, CancellationToken cancellationToken);
+    Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? PrepareAgentAsync(agentName, generation, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agent runtime preparation.");
 }
 
 public sealed record ToolGovernanceAuditFilters
@@ -159,7 +163,15 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
     {
         var path = "api/agents?allNamespaces=true&top=1000";
         var page = await ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, path, cancellationToken);
-        return page.Value.Select(agent => new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, agent.Definition.ModelProfile.Name) { Namespace = agent.Namespace }).ToArray();
+        return page.Value.Select(agent =>
+        {
+            var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ResourceKinds.ModelProfile);
+            return new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, modelProfile.Name)
+            {
+                Namespace = agent.Namespace,
+                ModelProfileNamespace = modelProfile.Namespace
+            };
+        }).ToArray();
     }
 
     public async Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken)
@@ -619,20 +631,30 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
     }
 
     public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(string agentName, long generation, CancellationToken cancellationToken) =>
+        GetAgentReadinessAsync(ResourceNamespace.Default, agentName, generation, cancellationToken);
+
+    public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<AgentRuntimeReadinessResponse>(httpClient,
-            $"api/runtime/agents/{Uri.EscapeDataString(agentName)}/readiness?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"{RuntimeAgentPath(@namespace, agentName)}/readiness?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
             cancellationToken);
 
     public async Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(string agentName, long generation, CancellationToken cancellationToken)
+        => await PrepareAgentAsync(ResourceNamespace.Default, agentName, generation, cancellationToken);
+
+    public async Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(ResourceNamespace @namespace, string agentName, long generation, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsync(
-            $"api/runtime/agents/{Uri.EscapeDataString(agentName)}/prepare?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"{RuntimeAgentPath(@namespace, agentName)}/prepare?generation={generation.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
             null,
             cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<PrepareAgentRuntimeResponse>(cancellationToken)
             ?? throw new AgentstrationApiException("Runtime returned an empty preparation response.", Guid.NewGuid().ToString("N"));
     }
+
+    private static string RuntimeAgentPath(ResourceNamespace @namespace, string agentName) => @namespace.IsDefault
+        ? $"api/runtime/agents/{Uri.EscapeDataString(agentName)}"
+        : $"api/runtime/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(agentName)}";
 
     private static async Task<RuntimeRun> ReadRunAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
