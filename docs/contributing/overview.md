@@ -7,7 +7,8 @@ The repository-level [CONTRIBUTING.md](https://github.com/gbaudrit/agentstration
 - add or update MSTest coverage with behavior changes;
 - keep default builds and tests deterministic and offline;
 - update documentation in the same pull request as public behavior;
-- add an ADR for significant architectural choices.
+- add an ADR for significant architectural choices;
+- submit contributions under the repository's Apache License 2.0 terms and preserve third-party notices.
 
 Read [Working on the documentation](documentation.md) for the local Docusaurus workflow.
 Read [GitHub governance](github-governance.md) for branches, checks, security automation, and `main` protection.

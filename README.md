@@ -139,6 +139,10 @@ Agentstration is a **public alpha** under active `0.x` development. Public APIs,
 
 Semantic Versioning is the intended product-versioning policy, but the repository does not yet publish a product version or release tags.
 
+## License
+
+Agentstration is licensed under the [Apache License 2.0](LICENSE). The license includes an explicit patent grant; trademarks and product names are not licensed except as required for customary attribution. See [NOTICE](NOTICE) for attribution information.
+
 ## Contributing
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and the [Security policy](SECURITY.md) before opening a substantial change.

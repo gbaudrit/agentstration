@@ -8,5 +8,6 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <LangVersion>latest</LangVersion>
     <UseLocalAepProjects Condition="'$(UseLocalAepProjects)' == ''">true</UseLocalAepProjects>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   </PropertyGroup>
 </Project>
