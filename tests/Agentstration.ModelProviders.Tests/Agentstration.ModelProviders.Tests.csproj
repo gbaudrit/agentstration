@@ -7,6 +7,7 @@
     <ProjectReference Include="../../src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(UseLocalAepProjects)' != 'true'">
     <PackageReference Include="Agentstration.Aep.Abstractions" />

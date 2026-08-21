@@ -81,6 +81,27 @@ public sealed class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task SeededLocalAiProviderUsesItsAepExtensionEndpoint()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("AI:Provider", "Managed");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.LocalAI:Endpoint", "http://localhost:5285");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+        using var client = factory.CreateClient();
+
+        var provider = await client.GetFromJsonAsync<ModelProviderResource>("/api/modelproviders/localai-local");
+        var extension = await client.GetFromJsonAsync<ExtensionRegistrationResource>("/api/extensionregistrations/localai-extension");
+
+        Assert.IsNotNull(provider);
+        Assert.AreEqual("localai", provider.Definition.ContributionId);
+        Assert.AreEqual("localai-extension", provider.Definition.Extension.Name);
+        Assert.AreEqual(new Uri("http://localhost:5285/"), extension!.Definition.Endpoint);
+    }
+
+    [TestMethod]
     public async Task ReadOnlyProviderApisExposeConfiguredProviderAndUnavailableDiscovery()
     {
         await using var factory = Factory();

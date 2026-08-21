@@ -151,7 +151,7 @@ For the Aspire dashboard and orchestration experience:
 dotnet run --project src/Agentstration.AppHost
 ```
 
-The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to `Ollama:Endpoint` (default `http://localhost:11434`) and the llama.cpp extension to `LlamaCpp:Endpoint` (default `http://localhost:8080`). It provisions neither inference server nor model and requires no Docker for either path. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
+The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to `Ollama:Endpoint` (default `http://localhost:11434`), the llama.cpp extension to `LlamaCpp:Endpoint` (default `http://localhost:8080`), and the LocalAI extension to `LocalAI:Endpoint` (default `http://localhost:8081`). It provisions no inference server or model. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
 
 Or with containers:
 
@@ -161,7 +161,7 @@ docker compose up --build
 
 ## AI modes
 
-The normal `Managed` mode resolves the provider, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; concrete provider names are never host execution modes. The seeded `ollama-local` and `llama-cpp-local` URLs are AEP extension URLs, never native inference-server URLs.
+The normal `Managed` mode resolves the provider, extension registration, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; concrete provider names are never host execution modes. The seeded `ollama-local`, `llama-cpp-local`, and `localai-local` providers reference extension registrations whose URLs are AEP endpoints, never native inference-server URLs.
 
 Use the deterministic offline mode explicitly for tests or fallback diagnostics:
 
@@ -188,6 +188,14 @@ $env:LlamaCpp__Endpoint = "http://localhost:8080"
 dotnet run --project src/Agentstration.AppHost
 ```
 
+For LocalAI, expose an existing server on host port 8081 and create a Model Profile that references one of the chat models returned by its capability endpoint:
+
+```powershell
+$env:LocalAI__Endpoint = "http://localhost:8081"
+# Optional: $env:LocalAI__ApiKey = "..."
+dotnet run --project src/Agentstration.AppHost
+```
+
 See [Model providers](../concepts/model-providers.md) for declarations, capabilities, native options, and limitations.
 
 The Agent Runner uses this resolver through Microsoft Agent Framework, so no Ollama-specific execution path exists in the Runtime Plane. Create a normal durable Runtime Run to exercise the entire declared-agent path:
@@ -210,7 +218,7 @@ $body = @{ prompt = "Reply with one short sentence." } | ConvertTo-Json
 Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5100/api/diagnostics/models/ollama/chat
 ```
 
-`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama and llama.cpp extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no dependency on either concrete provider.
+`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama, llama.cpp, and LocalAI extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no dependency on a concrete provider.
 
 Current limitations are deliberate: credentials are not stored on provider resources, llama.cpp reasoning output is not represented as a distinct AEP content kind, and image input is not yet effective through the AEP-to-`IChatClient` adapter. Separate Flow Runs are not dispatched in parallel and there is no conversation persistence. Other legacy OpenAI-compatible endpoints still use host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 
@@ -226,9 +234,11 @@ Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-l
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/usages
 Invoke-RestMethod http://localhost:5100/api/modelproviders/llama-cpp-local/status
 Invoke-RestMethod http://localhost:5100/api/modelproviders/llama-cpp-local/models
+Invoke-RestMethod http://localhost:5100/api/modelproviders/localai-local/status
+Invoke-RestMethod http://localhost:5100/api/modelproviders/localai-local/models
 ```
 
-Create or edit Ollama and llama.cpp declarations from the Blazor console at `/modelproviders`. Provider URLs must be absolute HTTP(S) extension URLs without embedded credentials, query strings, or fragments. Saving a provider does not require its native inference server to be online; health and installed models remain observed state. Deleting a provider is rejected while a model profile references its exact resource ID.
+Create or edit Ollama, llama.cpp, and LocalAI extension registrations from the Blazor console at `/extensions`, then bind their model-provider contributions at `/modelproviders`. Extension URLs must be absolute HTTP(S) AEP endpoints without embedded credentials, query strings, or fragments. Saving a provider does not require its native inference server to be online; health and installed models remain observed state. LocalAI discovery requires `/v1/models/capabilities` and filters non-chat models. Deleting a provider is rejected while a model profile references its exact resource ID.
 
 Model profiles are durable Management Plane resources with ETag concurrency and usage protection:
 

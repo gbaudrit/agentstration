@@ -110,6 +110,7 @@ public sealed class ExtensionSourceDiscoveryService(
     {
         "Agentstration.Extensions.Ollama" => "ollama-extension",
         "Agentstration.Extensions.LlamaCpp" => "llama-cpp-extension",
+        "Agentstration.Extensions.LocalAI" => "localai-extension",
         _ => Slug(extensionId)
     };
 
@@ -117,6 +118,7 @@ public sealed class ExtensionSourceDiscoveryService(
     {
         "Agentstration.Extensions.Ollama" or "ollama-extension" => "Ollama AEP extension",
         "Agentstration.Extensions.LlamaCpp" or "llama-cpp-extension" => "llama.cpp AEP extension",
+        "Agentstration.Extensions.LocalAI" or "localai-extension" => "LocalAI AEP extension",
         _ => value
     };
 

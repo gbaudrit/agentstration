@@ -32,6 +32,7 @@ src/
   ../aep/                            autonomous future AEP repository subtree
   Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
   Agentstration.Extensions.LlamaCpp/ autonomous AEP-to-llama.cpp service
+  Agentstration.Extensions.LocalAI/  autonomous AEP-to-LocalAI service
   Agentstration.ModelProviders/      provider-neutral model-provider resolution through AEP
   Agentstration.Tools.Mcp/           Tool catalog, AEP-to-MCP resolution, official MCP client
   Agentstration.Runtime.Abstractions/
@@ -69,6 +70,7 @@ Infrastructure -> SQLite control-plane storage + local/MAF runtime adapters
 Web -> ModelProviders -> Aep.MicrosoftExtensionsAI -> Aep.Client
 Extensions.Ollama -> Aep.AspNetCore + OllamaSharp
 Extensions.LlamaCpp -> Aep.AspNetCore + native HTTP
+Extensions.LocalAI -> Aep.AspNetCore + native HTTP
 AppHost -> provider extensions (configured local inference endpoints)
 Runtime.AgentFramework -> runtime abstractions + ModelProviders + Microsoft Agent Framework
 Application -> Work + Work storage abstractions
@@ -269,6 +271,7 @@ An interactive console Run is owned entirely by the Runtime Plane and does not c
 ```text
 Local Ollama installation <--native HTTP-- autonomous Agentstration.Extensions.Ollama
 Local llama-server     <--native HTTP-- autonomous Agentstration.Extensions.LlamaCpp
+LocalAI server         <--native HTTP-- autonomous Agentstration.Extensions.LocalAI
 AppHost --configures native endpoints--> provider extensions
    |--injects AEP extension endpoint--> Agentstration hosts
 Agent modelProfile.resourceId
@@ -282,10 +285,11 @@ Agent modelProfile.resourceId
    -> AEP HTTP/JSON or SSE
    -> selected AEP extension
       |-> Agentstration.Extensions.Ollama -> OllamaSharp -> Ollama
-      `-> Agentstration.Extensions.LlamaCpp -> OpenAI-compatible/native HTTP -> llama-server
+      |-> Agentstration.Extensions.LlamaCpp -> OpenAI-compatible/native HTTP -> llama-server
+      `-> Agentstration.Extensions.LocalAI -> OpenAI-compatible/native HTTP -> LocalAI
 ```
 
-The normal Web and Aspire composition uses the managed profile resolver. A persisted `ExtensionRegistration` is authoritative for an AEP endpoint, source, enabled state, expected identity, and transport credential. A Model Provider explicitly references that registration and selects one model-provider contribution; a Model Profile then selects the model and pins contribution-native option contracts. Runtime resolution separately selects the `aep` adapter and the contribution ID. `Deterministic` remains the explicit offline/test mode. Startup materializes configured and Aspire endpoints as stable read-only registrations and seeds independent `ollama-local` and `llama-cpp-local` bindings when absent. Aspire starts both AEP extensions and configures them to use existing local inference servers; it provisions neither server and downloads no model. Subsequent registration URL changes take effect on the next resolution. Only the concrete extension knows its native API. The profile resource ID remains in the immutable agent revision; no extension endpoint is embedded in an agent or Model Provider.
+The normal Web and Aspire composition uses the managed profile resolver. A persisted `ExtensionRegistration` is authoritative for an AEP endpoint, source, enabled state, expected identity, and transport credential. A Model Provider explicitly references that registration and selects one model-provider contribution; a Model Profile then selects the model and pins contribution-native option contracts. Runtime resolution separately selects the `aep` adapter and the contribution ID. `Deterministic` remains the explicit offline/test mode. Startup materializes configured and Aspire endpoints as stable read-only registrations and seeds independent `ollama-local`, `llama-cpp-local`, and `localai-local` bindings when absent. Aspire starts all three AEP extensions and configures them to use existing local inference servers; it provisions no server and downloads no model. LocalAI filters its heterogeneous catalog through `/v1/models/capabilities` and never forwards provider-owned MCP selection metadata. Subsequent registration URL changes take effect on the next resolution. Only the concrete extension knows its native API. The profile resource ID remains in the immutable agent revision; no extension endpoint is embedded in an agent or Model Provider. See ADR-0067.
 
 ### AEP tool contribution and MCP flow
 
