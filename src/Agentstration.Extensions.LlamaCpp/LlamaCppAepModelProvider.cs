@@ -215,18 +215,18 @@ public sealed class LlamaCppAepModelProvider(HttpClient httpClient) : IAepModelP
         if (options.StopSequences is { Count: > 0 })
             body["stop"] = new JsonArray(options.StopSequences.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());
         if (options.ResponseFormat is { } responseFormat) body["response_format"] = Clone(responseFormat);
-        if (options.AdditionalOptions is not { } additional) return;
+        var additional = options.AdditionalOptions;
 
         JsonObject? chatTemplateKwargs = null;
-        if (additional.TryGetValue("reasoning_enabled", out var reasoningEnabled)
+        if (additional is not null && additional.TryGetValue("reasoning_enabled", out var reasoningEnabled)
             && reasoningEnabled.ValueKind is JsonValueKind.True or JsonValueKind.False)
         {
             chatTemplateKwargs = new JsonObject { ["enable_thinking"] = reasoningEnabled.GetBoolean() };
         }
-        if (additional.TryGetValue("reasoning_effort", out var reasoningEffort) && reasoningEffort.ValueKind == JsonValueKind.String)
+        if (additional is not null && additional.TryGetValue("reasoning_effort", out var reasoningEffort) && reasoningEffort.ValueKind == JsonValueKind.String)
             body["reasoning_effort"] = reasoningEffort.GetString();
 
-        if (additional.TryGetValue("llamacpp", out var native) && native.ValueKind == JsonValueKind.Object)
+        if (options.NativeOptions?.Values is { ValueKind: JsonValueKind.Object } native)
         {
             foreach (var property in native.EnumerateObject())
             {

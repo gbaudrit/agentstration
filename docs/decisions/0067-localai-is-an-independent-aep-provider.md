@@ -1,4 +1,4 @@
-# ADR-0062 — LocalAI is an independent AEP provider
+# ADR-0067 — LocalAI is an independent AEP provider
 
 ## Status
 
@@ -12,10 +12,10 @@ Agentstration supports Ollama and llama.cpp through autonomous AEP extensions. L
 
 - `Agentstration.Extensions.LocalAI` is an autonomous AEP model-provider extension with contribution ID `localai`.
 - The extension has its own HTTP, JSON, SSE, health, discovery, error, and native-option implementation. It does not reference the llama.cpp extension and no shared OpenAI-compatible abstraction is introduced in this increment.
-- Agentstration persists the AEP extension endpoint. `LocalAI:Endpoint` configures the extension's native LocalAI endpoint, and an optional `LocalAI:ApiKey` is supplied only through extension-host configuration.
+- Agentstration persists the AEP endpoint in an `ExtensionRegistration`; the Model Provider binds its `localai` contribution. `LocalAI:Endpoint` configures the extension's native LocalAI endpoint, and an optional `LocalAI:ApiKey` is supplied only through extension-host configuration.
 - Chat uses `/v1/chat/completions`; readiness uses `/readyz`; model discovery requires `/v1/models/capabilities` and exposes only entries that report `chat`.
 - Model capabilities are mapped conservatively. `tools` and `thinking` become AEP tool and reasoning support. Streaming is exposed for chat models. Vision and structured output are not advertised because their effective support varies by LocalAI backend and image input is not effective through the current AEP adapter.
-- LocalAI-native options are allowlisted. The extension never forwards arbitrary metadata, LocalAI MCP server selection, or provider-owned tool injection. Agentstration tools are sent only from the governed AEP tool definitions on the request.
+- LocalAI-native options use the immutable versioned `io.agentstration.localai/model-profile` contract and are allowlisted. The extension never forwards arbitrary metadata, LocalAI MCP server selection, or provider-owned tool injection. Agentstration tools are sent only from the governed AEP tool definitions on the request.
 - Aspire starts the AEP extension and connects it to an existing LocalAI server. It does not provision LocalAI, install a model, or mutate its catalog. The default native host port is `8081` to avoid colliding with the existing llama.cpp default on `8080`.
 
 ## Consequences

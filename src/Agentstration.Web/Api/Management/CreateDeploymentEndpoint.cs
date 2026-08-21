@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Api.Management;
 
@@ -21,7 +22,13 @@ internal sealed class CreateDeploymentEndpoint : IManagementEndpoint
             var stored = await service.CreateDeploymentAsync(
                 name,
                 body.RevisionName,
-                new AgentDeploymentSpec { Environment = body.Environment, RuntimeProfileName = body.RuntimeProfileName, HostingMode = body.HostingMode },
+                new AgentDeploymentSpec
+                {
+                    Environment = body.Environment,
+                    RuntimeProfileName = body.RuntimeProfileName,
+                    RuntimeProfileNamespace = ResourceNamespace.Parse(body.RuntimeProfileNamespace),
+                    HostingMode = body.HostingMode
+                },
                 cancellationToken);
             response.Headers.ETag = stored.ETag;
             response.Headers.Location = $"/api/deployments/{Uri.EscapeDataString(stored.Value.Metadata.Name)}";

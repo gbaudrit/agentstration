@@ -16,23 +16,32 @@ $env:LocalAI__Endpoint = "http://localhost:8081"
 dotnet run --project src/Agentstration.Extensions.LocalAI
 ```
 
-The extension listens on `http://localhost:5280` with its development launch profile. Declare that AEP endpoint as the Model Provider endpoint:
+The extension listens on `http://localhost:5280` with its development launch profile. Register that AEP endpoint, then bind the Model Provider to its `localai` contribution:
 
 ```yaml
+apiVersion: agentstration.io/v1
+kind: ExtensionRegistration
+metadata:
+  name: localai-extension
+definition:
+  displayName: LocalAI AEP extension
+  endpoint: http://localhost:5280
+  expectedExtensionId: Agentstration.Extensions.LocalAI
+---
 apiVersion: agentstration.io/v1
 kind: ModelProvider
 metadata:
   name: localai-local
 definition:
   displayName: LocalAI local
-  providerType: localai
-  endpoint: http://localhost:5280
-  managementMode: external
+  extension:
+    name: localai-extension
+  contributionId: localai
 ```
 
 Model discovery requires LocalAI's additive `/v1/models/capabilities` endpoint and exposes only entries that report `chat`. Tool and thinking flags are mapped per model. Vision is not effective through the current AEP adapter, and structured output is not advertised because LocalAI support varies by backend. Streaming uses OpenAI-compatible SSE Chat Completions.
 
-Only `frequencyPenalty` and `presencePenalty` are accepted under the `localai` provider-options key. Arbitrary LocalAI metadata is rejected: in particular, `metadata.mcp_servers` cannot activate provider-owned MCP tools and bypass Agentstration governance. Portable generation options remain canonical Model Profile fields.
+Only `frequencyPenalty` and `presencePenalty` are accepted by the versioned `io.agentstration.localai/model-profile` option set. Arbitrary LocalAI metadata is rejected: in particular, `metadata.mcp_servers` cannot activate provider-owned MCP tools and bypass Agentstration governance. Portable generation options remain canonical Model Profile fields.
 
 The default tests use fake HTTP. To run the optional real-server smoke test:
 
@@ -90,15 +99,19 @@ definition:
     maxOutputTokens: 1024
   providerOptions:
     llamacpp:
-      minP: 0.05
-      repeatPenalty: 1.1
+      optionSet: io.agentstration.llamacpp/model-profile
+      version: 1.0.0
+      schemaDigest: <digest published by the extension>
+      values:
+        minP: 0.05
+        repeatPenalty: 1.1
 ```
 
 Supported functional capabilities are chat completions, true SSE streaming, model discovery, readiness, schema-constrained structured output, and tool calling when `/props` reports a tool-capable chat template. Reasoning controls are mapped when the model/template supports them, but reasoning remains partial because AEP does not yet expose reasoning content as a distinct content kind. Vision may be reported by llama.cpp discovery but is not effective through the current text/tool AEP adapter. The native `/completion` endpoint is intentionally not exposed as chat; the managed Runtime currently consumes chat completions through `IChatClient`.
 
-The Model Provider page can test the AEP connection and shows discovered models with their reported capabilities. The Model Profile page adds a runtime-independent compatibility diagnosis: it intersects provider, selected model, and AEP adapter capabilities, then checks the profile's reasoning and structured-output requirements. Runtime capabilities and an agent's tool requirements are evaluated later when that agent is resolved, so the profile diagnosis deliberately does not claim full execution compatibility.
+The Model Provider page can test the AEP connection and shows discovered models with their reported capabilities. The Extensions page can persist workspace-owned endpoint registrations and enable, disable, edit, or delete them with optimistic concurrency. It also discovers read-only endpoints declared under `Agentstration:Extensions` (including Aspire service-discovery injection) before a Model Provider exists; it does not scan the network. An observed model-provider contribution can prefill the creation form. The page shows live option-set versions, schema digests, migration paths, and every pinned usage or incompatibility. When an extension publishes a path to its preferred version, the operator can preview the current and proposed envelopes and explicitly apply an ETag-protected migration. The Model Profile page adds a runtime-independent compatibility diagnosis: it intersects provider, selected model, and AEP adapter capabilities, then checks the profile's reasoning and structured-output requirements. Runtime capabilities and an agent's tool requirements are evaluated later when that agent is resolved, so the profile diagnosis deliberately does not claim full execution compatibility.
 
-Provider-specific keys currently mapped by the extension include `minP`, `typicalP`, `repeatPenalty`, `repeatLastN`, `mirostat`, `mirostatTau`, `mirostatEta`, `reasoningFormat`, `reasoningEffort`, `chatTemplateKwargs`, and `additionalOptions`. Portable temperature, top-p, top-k, seed, stop sequences, maximum output tokens, reasoning intent, and output format remain canonical Model Profile fields.
+Provider-specific keys currently mapped by the extension include `minP`, `typicalP`, `repeatPenalty`, `repeatLastN`, `mirostat`, `mirostatTau`, `mirostatEta`, `reasoningFormat`, `reasoningEffort`, `chatTemplateKwargs`, and `additionalOptions`. They live under the versioned envelope's `values` member. Portable temperature, top-p, top-k, seed, stop sequences, maximum output tokens, reasoning intent, and output format remain canonical Model Profile fields.
 
 The default tests use fake HTTP and require no model. To run the optional real-server smoke test:
 

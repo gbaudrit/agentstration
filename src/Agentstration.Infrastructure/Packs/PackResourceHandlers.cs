@@ -17,9 +17,9 @@ internal static class PackProvenance
     {
         var annotations = new Dictionary<string, string>(metadata.Annotations, StringComparer.Ordinal)
         {
-            ["agentstration.io/pack.publisher"] = pack.Publisher,
-            ["agentstration.io/pack.name"] = pack.Name,
-            ["agentstration.io/pack.version"] = version
+            [PackProvenanceAnnotations.Publisher] = pack.Publisher,
+            [PackProvenanceAnnotations.Name] = pack.Name,
+            [PackProvenanceAnnotations.Version] = version
         };
         return metadata with { Namespace = @namespace, Annotations = annotations };
     }
@@ -27,9 +27,9 @@ internal static class PackProvenance
     public static IReadOnlyDictionary<string, string> Add(IReadOnlyDictionary<string, string>? metadata, PackIdentity pack, string version)
     {
         var result = metadata is null ? new Dictionary<string, string>(StringComparer.Ordinal) : new Dictionary<string, string>(metadata, StringComparer.Ordinal);
-        result["agentstration.io/pack.publisher"] = pack.Publisher;
-        result["agentstration.io/pack.name"] = pack.Name;
-        result["agentstration.io/pack.version"] = version;
+        result[PackProvenanceAnnotations.Publisher] = pack.Publisher;
+        result[PackProvenanceAnnotations.Name] = pack.Name;
+        result[PackProvenanceAnnotations.Version] = version;
         return result;
     }
 }

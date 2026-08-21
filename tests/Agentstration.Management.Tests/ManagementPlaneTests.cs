@@ -36,6 +36,8 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual("platform", root.GetProperty("metadata").GetProperty("tags").GetProperty("team").GetString());
         Assert.AreEqual("engineering", root.GetProperty("metadata").GetProperty("annotations").GetProperty("owner").GetString());
         Assert.AreEqual("reasoning-default", root.GetProperty("definition").GetProperty("modelProfile").GetProperty("name").GetString());
+        Assert.AreEqual("maf-default", root.GetProperty("definition").GetProperty("runtimeProfile").GetProperty("name").GetString());
+        Assert.AreEqual("default", root.GetProperty("definition").GetProperty("runtimeProfile").GetProperty("namespace").GetString());
         Assert.IsFalse(root.TryGetProperty("id", out _));
         Assert.IsFalse(root.TryGetProperty("type", out _));
         Assert.IsFalse(root.TryGetProperty("resourceGroup", out _));
@@ -79,6 +81,8 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual(expected.Uid, actual.Uid);
         Assert.AreEqual(expected.Metadata.Name, actual.Metadata.Name);
         Assert.AreEqual("reasoning-default", actual.Definition.ModelProfile.Name);
+        Assert.AreEqual("maf-default", actual.Definition.RuntimeProfile.Name);
+        Assert.AreEqual(ResourceNamespace.Default, actual.Definition.RuntimeProfile.Namespace);
         Assert.AreEqual("internal", actual.Metadata.Tags["tier"]);
     }
 
@@ -90,6 +94,11 @@ public sealed class ManagementPlaneTests
         {
             Uid = Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Generation = 3,
+            Metadata = new ResourceMetadata
+            {
+                Name = "assistant",
+                Namespace = new ResourceNamespace("agentstration.sample-pack")
+            },
             Definition = Agent("assistant").Definition with
             {
                 Instructions = "  Answer carefully.\r\nUse sources.  ",
@@ -105,6 +114,9 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual("Answer carefully.\nUse sources.", first.EffectiveInstructions);
         CollectionAssert.AreEqual(new[] { "alpha", "zeta" }, first.EffectiveToolNames.ToArray());
         Assert.AreEqual("reasoning-default", first.ModelProfileName);
+        Assert.AreEqual(new ResourceNamespace("agentstration.sample-pack"), first.ModelProfileNamespace);
+        Assert.AreEqual("maf-default", first.RuntimeProfileName);
+        Assert.AreEqual(ResourceNamespace.Default, first.RuntimeProfileNamespace);
     }
 
     [TestMethod]

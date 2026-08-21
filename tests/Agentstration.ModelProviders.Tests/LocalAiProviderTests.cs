@@ -42,7 +42,7 @@ public sealed class LocalAiProviderTests
             {
                 Temperature = 0.25f,
                 MaxOutputTokens = 128,
-                AdditionalOptions = new Dictionary<string, JsonElement> { ["localai"] = native }
+                NativeOptions = VersionedOptions(native)
             },
             Tools = [new AepToolDefinition("weather", "Weather", JsonSerializer.SerializeToElement(new { type = "object" }))]
         };
@@ -76,7 +76,7 @@ public sealed class LocalAiProviderTests
         {
             Options = new AepModelOptions
             {
-                AdditionalOptions = new Dictionary<string, JsonElement> { ["localai"] = native }
+                NativeOptions = VersionedOptions(native)
             }
         };
 
@@ -175,6 +175,12 @@ public sealed class LocalAiProviderTests
     }
 
     private static AepChatRequest Request() => new("chat-model", [new AepMessage(AepRole.User, [AepContent.FromText("ping")])]);
+
+    private static AepVersionedOptions VersionedOptions(JsonElement values) => new(
+        LocalAiOptionContracts.ModelProfileOptionSet,
+        LocalAiOptionContracts.Version,
+        LocalAiOptionContracts.ModelProfile.Versions.Single().SchemaDigest,
+        values);
 
     private static HttpClient Client(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) =>
         new(new DelegateHandler(handler)) { BaseAddress = new Uri("http://localhost:8081/") };

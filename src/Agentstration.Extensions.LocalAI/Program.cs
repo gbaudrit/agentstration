@@ -17,11 +17,15 @@ builder.Services.AddHttpClient<LocalAiAepModelProvider>(client =>
     client.Timeout = TimeSpan.FromSeconds(90);
     if (!string.IsNullOrWhiteSpace(apiKey)) client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 });
-builder.Services.AddAgentstrationAep(options => options.Extension = new(
-    "Agentstration.Extensions.LocalAI",
-    "LocalAI",
-    "1.0.0",
-    "Agentstration AEP model-provider extension for a LocalAI server."));
+builder.Services.AddAgentstrationAep(options =>
+{
+    options.Extension = new(
+        "Agentstration.Extensions.LocalAI",
+        "LocalAI",
+        "1.0.0",
+        "Agentstration AEP model-provider extension for a LocalAI server.");
+    options.OptionSets.Add(LocalAiOptionContracts.ModelProfile);
+});
 builder.Services.AddSingleton<IAepModelProvider>(services => services.GetRequiredService<LocalAiAepModelProvider>());
 
 var app = builder.Build();

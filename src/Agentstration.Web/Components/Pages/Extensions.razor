@@ -1,0 +1,420 @@
+@page "/extensions"
+@implements IDisposable
+@inject IExtensionsClient Client
+@inject IModelProfilesClient ProfilesClient
+@inject NotificationState Notifications
+
+<PageTitle>Extensions · Agentstration</PageTitle>
+<PageHeader Title="Extensions" Description="Register AEP endpoints and inspect their immutable option contracts and compatibility with persisted Model Profiles.">
+    <Actions>
+        <button class="button-secondary" @onclick="DiscoverAsync" disabled="@(loading || discovering)">@(discovering ? "Discovering…" : "Discover extensions")</button>
+        <button class="button-primary" @onclick="StartCreate" disabled="@loading">Register endpoint</button>
+    </Actions>
+</PageHeader>
+
+@if (!string.IsNullOrWhiteSpace(discoveryMessage))
+{
+    <p class="inline-info">@discoveryMessage</p>
+}
+
+<section class="panel resource-section">
+    <div class="panel-header">
+        <div><p class="eyebrow">Discovery sources</p><h2>Registered endpoints</h2><p>Workspace-scoped endpoints are persisted and discovered while enabled. Configuration and Aspire sources remain read-only.</p></div>
+        <span>@(registrations?.Count ?? 0) registration(s)</span>
+    </div>
+
+    @if (editing)
+    {
+        <EditForm Model="form" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="form-grid">
+                <label>Name<InputText @bind-Value="form.Name" disabled="@(!creating)" /></label>
+                <label>Namespace<InputText @bind-Value="form.Namespace" disabled="@(!creating)" /></label>
+                <label>Display name<InputText @bind-Value="form.DisplayName" /></label>
+                <label>AEP endpoint<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
+                <label>Expected extension ID<InputText @bind-Value="form.ExpectedExtensionId" /><small>Optional identity pin checked during discovery.</small></label>
+                <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> Enabled for discovery</label>
+            </div>
+            <div class="panel-actions">
+                <button class="button-primary" type="submit" disabled="@saving">@(creating ? "Create registration" : "Save changes")</button>
+                <button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">Cancel</button>
+            </div>
+        </EditForm>
+    }
+    else if (registrations?.Count > 0)
+    {
+        <DataGrid TItem="ExtensionRegistrationResource" Items="registrations">
+            <Header><tr><th>Registration</th><th>Endpoint</th><th>Discovery</th><th>Actions</th></tr></Header>
+            <Row Context="registration"><tr>
+                <td><strong>@registration.Definition.DisplayName</strong><br /><code>@registration.Namespace/@registration.Name</code></td>
+                <td><code>@registration.Definition.Endpoint</code></td>
+                <td><StatusBadge Text="@(registration.Definition.Enabled ? "Enabled" : "Disabled")" Status="@ModelManagementUi.Status(registration.Definition.Enabled ? "available" : "disabled")" /></td>
+                <td>
+                    @if (registration.Definition.Source == ExtensionRegistrationSource.Manual)
+                    {
+                        <button class="button-secondary" @onclick="() => EditAsync(registration)">Edit</button>
+                        <button class="button-secondary" @onclick="() => ToggleAsync(registration)">@(registration.Definition.Enabled ? "Disable" : "Enable")</button>
+                        <button class="button-danger" @onclick="() => RequestDelete(registration)">Delete</button>
+                    }
+                    else
+                    {
+                        <span>Managed by @registration.Definition.Source</span>
+                    }
+                </td>
+            </tr></Row>
+        </DataGrid>
+    }
+    else if (!loading)
+    {
+        <p>No manually registered endpoint. Use <strong>Register endpoint</strong>, application configuration, or Aspire discovery.</p>
+    }
+</section>
+
+<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="Delete extension registration" Message="@DeleteMessage" ConfirmLabel="Delete registration" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
+
+@if (migrationPreview is not null)
+{
+    <section class="panel resource-section">
+        <div class="panel-header">
+            <div><p class="eyebrow">Explicit migration preview</p><h2>@migrationPreview.Value.ProfileNamespace/@migrationPreview.Value.ProfileName</h2><p>No profile value has been changed yet.</p></div>
+            <span>@migrationPreview.Value.Source.Version → @migrationPreview.Value.Target.Version</span>
+        </div>
+        <div class="details-grid">
+            <article><h3>Current options</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Source)</pre></article>
+            <article><h3>Proposed options</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Target)</pre></article>
+        </div>
+        <div class="panel-actions">
+            <button class="button-primary" @onclick="ApplyMigrationAsync" disabled="@migrating">@(migrating ? "Applying…" : "Apply migration")</button>
+            <button class="button-secondary" @onclick="CancelMigration" disabled="@migrating">Cancel</button>
+        </div>
+    </section>
+}
+
+@if (loading && extensions is null)
+{
+    <LoadingState Message="Discovering extensions…" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else if (extensions?.Count == 0)
+{
+    <EmptyState Title="No extensions discovered" Message="Declare an endpoint under Agentstration:Extensions or start the Aspire AppHost to make an AEP extension discoverable." />
+}
+else
+{
+    @foreach (var extension in extensions ?? [])
+    {
+        <section class="panel resource-section">
+            <div class="panel-header">
+                <div>
+                    <p class="eyebrow">AEP extension · <code>@extension.RegistrationNamespace/@extension.RegistrationName</code> · @extension.DiscoverySource</p>
+                    <h2>@(extension.Extension?.Name ?? extension.RegistrationName)</h2>
+                    <p>@(extension.Extension?.Description ?? extension.Details ?? "Extension identity is not currently available.")</p>
+                </div>
+                <StatusBadge Text="@ModelManagementUi.Label(extension.Status)" Status="@ModelManagementUi.Status(extension.Status)" />
+            </div>
+            <dl class="resource-details">
+                <dt>Extension ID</dt><dd><code>@(extension.Extension?.Id ?? "—")</code></dd>
+                <dt>Observed version</dt><dd>@(extension.Extension?.Version ?? "—")</dd>
+                <dt>AEP endpoint</dt><dd><code>@extension.Endpoint</code></dd>
+                <dt>Registration</dt><dd><code>@extension.RegistrationNamespace/@extension.RegistrationName</code></dd>
+                <dt>Model providers</dt><dd>@(extension.Providers.Count == 0 ? "—" : string.Join(", ", extension.Providers.Select(value => $"{value.Namespace}/{value.Name} → {value.ContributionId}")))</dd>
+                <dt>Contributions</dt><dd>@(extension.Contributions.Count == 0 ? "—" : string.Join(", ", extension.Contributions.Select(value => $"{value.Kind}:{value.Id}")))</dd>
+            </dl>
+
+            @if (extension.Contributions.Any(value => value.Kind == "model-provider"))
+            {
+                <div class="panel-actions">
+                    @foreach (var provider in extension.Providers)
+                    {
+                        <a class="button-secondary" href="@ProviderUrl(provider)">Open @provider.Name provider</a>
+                    }
+                    @foreach (var contribution in extension.Contributions.Where(value => value.Kind == "model-provider" && !extension.Providers.Any(provider => provider.ContributionId == value.Id)))
+                    {
+                        <a class="button-primary" href="@ConfigureProviderUrl(extension, contribution)">Configure @contribution.Id provider</a>
+                    }
+                </div>
+            }
+
+            <div class="panel-header"><div><h3>Option contracts</h3><p>Every version and schema digest is immutable.</p></div><span>@extension.OptionSets.Count set(s)</span></div>
+            @if (extension.OptionSets.Count == 0)
+            {
+                <p class="inline-warning">@(extension.Status == "available" ? "This extension does not publish a versioned option contract." : "Contracts are unavailable because the extension could not be inspected.")</p>
+            }
+            else
+            {
+                <DataGrid TItem="ExtensionOptionSetResponse" Items="extension.OptionSets">
+                    <Header><tr><th>Option set</th><th>Target</th><th>Preferred</th><th>Supported versions</th></tr></Header>
+                    <Row Context="optionSet"><tr>
+                        <td><code>@optionSet.Id</code></td>
+                        <td>@optionSet.ContributionKind · <code>@optionSet.ContributionId</code> · @optionSet.Scope</td>
+                        <td>@optionSet.PreferredVersion</td>
+                        <td>@foreach (var version in optionSet.Versions) { <div><strong>@version.Version</strong>@(version.Deprecated ? " · deprecated" : null)<br /><code>@version.SchemaDigest</code><details><summary>JSON Schema</summary><pre class="runner-json">@FormatSchema(version.Schema)</pre></details></div> }</td>
+                    </tr></Row>
+                </DataGrid>
+            }
+
+            <div class="panel-header"><div><h3>Persisted usage</h3><p>Profiles remain pinned to the exact contract version they were authored against.</p></div><span>@extension.Usages.Count profile(s)</span></div>
+            @if (extension.Usages.Count > 0)
+            {
+                <DataGrid TItem="ExtensionOptionUsageResponse" Items="extension.Usages">
+                    <Header><tr><th>Model Profile</th><th>Contract</th><th>Status</th><th>Diagnostics</th></tr></Header>
+                    <Row Context="usage"><tr>
+                        <td><a href="@ProfileUrl(usage)">@usage.ProfileName</a><br /><small>@usage.ProfileNamespace</small></td>
+                        <td>@if (string.IsNullOrWhiteSpace(usage.OptionSet)) { <span>Legacy unversioned options</span> } else { <code>@usage.OptionSet@@@usage.Version</code><br /><small>@ShortDigest(usage.SchemaDigest)</small> }</td>
+                        <td><StatusBadge Text="@ModelManagementUi.Label(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" />
+                            @if (MigrationTarget(extension, usage) is { } targetVersion)
+                            {
+                                <br /><button class="button-secondary" @onclick="() => PreviewMigrationAsync(usage, targetVersion)" disabled="@migrating">Migrate to @targetVersion</button>
+                            }
+                        </td>
+                        <td>@(usage.Issues.Count == 0 ? "Compatible" : string.Join(" ", usage.Issues))</td>
+                    </tr></Row>
+                </DataGrid>
+            }
+            else
+            {
+                <p>No persisted Model Profile uses native options from this extension.</p>
+            }
+        </section>
+    }
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<ExtensionResponse>? extensions;
+    private IReadOnlyList<ExtensionRegistrationResource>? registrations;
+    private AgentstrationApiException? error;
+    private bool loading;
+    private bool discovering;
+    private string? discoveryMessage;
+    private bool saving;
+    private bool editing;
+    private bool creating;
+    private string? etag;
+    private RegistrationForm form = new();
+    private ExtensionRegistrationResource? pendingDelete;
+    private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
+    private bool migrating;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            var extensionsTask = Client.GetExtensionsAsync(cancellation.Token);
+            var registrationsTask = Client.GetRegistrationsAsync(cancellation.Token);
+            await Task.WhenAll(extensionsTask, registrationsTask);
+            extensions = await extensionsTask;
+            registrations = await registrationsTask;
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    private async Task DiscoverAsync()
+    {
+        discovering = true;
+        error = null;
+        discoveryMessage = null;
+        try
+        {
+            var result = await Client.DiscoverAsync(cancellation.Token);
+            await LoadAsync();
+            var available = extensions?.Count(value => value.Status == "available") ?? 0;
+            discoveryMessage = result.Sources == 0
+                ? "Discovery completed: no configured or Aspire extension endpoint source was found."
+                : $"Discovery completed: {result.Sources} source(s), {result.Created} created, {result.Updated} updated, {result.Unchanged} unchanged; {available} extension(s) available.";
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { discovering = false; }
+    }
+
+    private void StartCreate()
+    {
+        form = new();
+        etag = null;
+        creating = true;
+        editing = true;
+    }
+
+    private async Task EditAsync(ExtensionRegistrationResource registration)
+    {
+        try
+        {
+            var snapshot = await Client.GetRegistrationAsync(registration.Namespace, registration.Name, cancellation.Token);
+            form = RegistrationForm.From(snapshot.Value);
+            etag = snapshot.ETag;
+            creating = false;
+            editing = true;
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        error = null;
+        try
+        {
+            if (!Uri.TryCreate(form.Endpoint, UriKind.Absolute, out var endpoint))
+                throw new AgentstrationApiException("The endpoint must be an absolute HTTP(S) URL.", Guid.NewGuid().ToString("N"));
+            var properties = new ExtensionRegistrationProperties { DisplayName = form.DisplayName, Endpoint = endpoint, Enabled = form.Enabled, ExpectedExtensionId = form.ExpectedExtensionId };
+            if (creating)
+                _ = await Client.CreateRegistrationAsync(new(form.Name, properties, form.Namespace), cancellation.Token);
+            else
+                _ = await Client.UpdateRegistrationAsync(ResourceNamespace.Parse(form.Namespace), form.Name, new(properties), etag!, cancellation.Token);
+            editing = false;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { saving = false; }
+    }
+
+    private async Task ToggleAsync(ExtensionRegistrationResource registration)
+    {
+        try
+        {
+            var snapshot = await Client.GetRegistrationAsync(registration.Namespace, registration.Name, cancellation.Token);
+            _ = await Client.UpdateRegistrationAsync(registration.Namespace, registration.Name,
+                new(snapshot.Value.Definition with { Enabled = !snapshot.Value.Definition.Enabled }), snapshot.ETag, cancellation.Token);
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private void RequestDelete(ExtensionRegistrationResource registration) => pendingDelete = registration;
+    private void CancelDelete() => pendingDelete = null;
+    private string DeleteMessage => $"Delete extension registration '{pendingDelete?.Namespace}/{pendingDelete?.Name}'?";
+
+    private async Task DeleteAsync()
+    {
+        var registration = pendingDelete;
+        if (registration is null) return;
+        try
+        {
+            var snapshot = await Client.GetRegistrationAsync(registration.Namespace, registration.Name, cancellation.Token);
+            await Client.DeleteRegistrationAsync(registration.Namespace, registration.Name, snapshot.ETag, cancellation.Token);
+            pendingDelete = null;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private void CancelEdit() => editing = false;
+
+    private async Task PreviewMigrationAsync(ExtensionOptionUsageResponse usage, string targetVersion)
+    {
+        migrating = true;
+        error = null;
+        try
+        {
+            migrationPreview = await ProfilesClient.PreviewOptionMigrationAsync(
+                ResourceNamespace.Parse(usage.ProfileNamespace),
+                usage.ProfileName,
+                targetVersion,
+                cancellation.Token);
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { migrating = false; }
+    }
+
+    private async Task ApplyMigrationAsync()
+    {
+        var preview = migrationPreview;
+        if (preview is null || migrating) return;
+        migrating = true;
+        error = null;
+        try
+        {
+            _ = await ProfilesClient.ApplyOptionMigrationAsync(
+                ResourceNamespace.Parse(preview.Value.ProfileNamespace),
+                preview.Value.ProfileName,
+                preview.Value.Target.Version,
+                preview.ETag,
+                cancellation.Token);
+            Notifications.Add(new NotificationItem(
+                Guid.NewGuid(),
+                "Extension options migrated",
+                $"{preview.Value.ProfileName}: {preview.Value.Source.Version} → {preview.Value.Target.Version}",
+                DateTimeOffset.Now,
+                UiStatus.Success));
+            migrationPreview = null;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { migrating = false; }
+    }
+
+    private void CancelMigration() => migrationPreview = null;
+
+    private static string ShortDigest(string value) => value.Length <= 24 ? value : $"{value[..18]}…{value[^6..]}";
+    private static string FormatSchema(System.Text.Json.JsonElement schema) =>
+        System.Text.Json.JsonSerializer.Serialize(schema, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+    private static string FormatOptions(VersionedExtensionOptions options) =>
+        System.Text.Json.JsonSerializer.Serialize(options, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true });
+    private static string? MigrationTarget(ExtensionResponse extension, ExtensionOptionUsageResponse usage)
+    {
+        var optionSet = extension.OptionSets.SingleOrDefault(value => string.Equals(value.Id, usage.OptionSet, StringComparison.Ordinal));
+        if (optionSet is null || string.Equals(optionSet.PreferredVersion, usage.Version, StringComparison.Ordinal)) return null;
+        return HasMigrationPath(optionSet, usage.Version, optionSet.PreferredVersion) ? optionSet.PreferredVersion : null;
+    }
+    private static bool HasMigrationPath(ExtensionOptionSetResponse optionSet, string source, string target)
+    {
+        var pending = new Queue<string>();
+        var visited = new HashSet<string>(StringComparer.Ordinal) { source };
+        pending.Enqueue(source);
+        while (pending.TryDequeue(out var current))
+        {
+            foreach (var migration in optionSet.Migrations.Where(value => string.Equals(value.FromVersion, current, StringComparison.Ordinal)))
+            {
+                if (string.Equals(migration.ToVersion, target, StringComparison.Ordinal)) return true;
+                if (visited.Add(migration.ToVersion)) pending.Enqueue(migration.ToVersion);
+            }
+        }
+        return false;
+    }
+    private static string ProfileUrl(ExtensionOptionUsageResponse usage) =>
+        $"/modelprofiles/{Uri.EscapeDataString(usage.ProfileName)}?namespace={Uri.EscapeDataString(usage.ProfileNamespace)}";
+    private static string ProviderUrl(ExtensionProviderBindingResponse provider) =>
+        $"/modelproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+    private static string ConfigureProviderUrl(ExtensionResponse extension, ExtensionContributionResponse contribution) =>
+        $"/modelproviders/new?extension={Uri.EscapeDataString(extension.RegistrationName)}&extensionNamespace={Uri.EscapeDataString(extension.RegistrationNamespace)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(extension.Extension?.Name ?? contribution.Id)}";
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private sealed class RegistrationForm
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Name { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Namespace { get; set; } = "default";
+        [System.ComponentModel.DataAnnotations.Required]
+        public string DisplayName { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.Url]
+        public string Endpoint { get; set; } = string.Empty;
+        public bool Enabled { get; set; } = true;
+        public string? ExpectedExtensionId { get; set; }
+
+        public static RegistrationForm From(ExtensionRegistrationResource resource) => new()
+        {
+            Name = resource.Name,
+            Namespace = resource.Namespace.Value,
+            DisplayName = resource.Definition.DisplayName,
+            Endpoint = resource.Definition.Endpoint.AbsoluteUri,
+            Enabled = resource.Definition.Enabled,
+            ExpectedExtensionId = resource.Definition.ExpectedExtensionId
+        };
+    }
+}

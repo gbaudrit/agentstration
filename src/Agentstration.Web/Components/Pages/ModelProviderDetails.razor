@@ -2,12 +2,12 @@
 @page "/modelproviders/{Name}"
 @implements IDisposable
 @inject IModelProvidersClient Client
-@inject ISecretsClient SecretsClient
+@inject IExtensionsClient ExtensionsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 
 <PageTitle>@(IsNew ? "Create model provider" : $"{Name} · Model provider") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? "Create model provider" : model?.DisplayName ?? Name)" Description="Declare the technical endpoint used for health, model discovery and runtime inference.">
+<PageHeader Title="@(IsNew ? "Create model provider" : model?.DisplayName ?? Name)" Description="Bind an AEP extension contribution to a governed Model Provider resource.">
     <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">Delete</button> }<a class="button-secondary" href="/modelproviders">Back</a></Actions>
 </PageHeader>
 
@@ -22,14 +22,10 @@ else
             <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
             <label><span>Namespace</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
             <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
-            <label><span>Provider type</span><InputSelect @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="ollama">Ollama</option><option value="llamacpp">llama.cpp</option><option value="localai">LocalAI</option></InputSelect></label>
-            <label><span>Management mode</span><InputSelect @bind-Value="model.ManagementMode">@foreach (var value in Enum.GetValues<ModelProviderManagementMode>()) { <option value="@value">@value</option> }</InputSelect></label>
+            <label><span>Extension registration</span><select value="@model.ExtensionId" @onchange="ExtensionChanged"><option value="">Select an extension</option>@foreach (var extension in extensions) { <option value="@ExtensionKey(extension)">@extension.RegistrationNamespace/@extension.RegistrationName — @(extension.Extension?.Name ?? extension.RegistrationName)</option> }</select><ValidationMessage For="() => model.ExtensionId" /></label>
+            <label><span>Model-provider contribution</span><select @bind="model.ContributionId"><option value="">Select a contribution</option>@foreach (var contribution in Contributions) { <option value="@contribution.Id">@contribution.Id</option> }</select><ValidationMessage For="() => model.ContributionId" /></label>
         </div></section>
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Connection</p><h2>AEP extension endpoint</h2></div>@if (!IsNew) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@testing">@(testing ? "Testing…" : "Test connection")</button> }</div><div class="form-grid">
-            <label class="form-span-2"><span>AEP extension URL</span><InputText @bind-Value="model.Endpoint" placeholder="http://localhost:5260" /><ValidationMessage For="() => model.Endpoint" /><small>Endpoint of the out-of-process extension contributing this model provider. Agentstration never connects to the native inference server directly.</small></label>
-            <div class="form-span-2"><SecretReferencePicker Items="secretItems" @bind-Value="model.CredentialId" Label="Credential" /> <small>Only the Secret reference is persisted. Local providers can remain uncredentialed.</small></div>
-        </div>@if (status is not null) { <p class="@(status.Status == "available" ? "inline-info" : "inline-warning")">Last test @status.CheckedAt.ToLocalTime().ToString("g"): @ModelManagementUi.Label(status.Status)@if (!string.IsNullOrWhiteSpace(status.Details)) { <span> — @status.Details</span> }</p> }</section>
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Adapter</p><h2>Provider options</h2></div><span>Advanced</span></div><div class="form-grid"><label class="form-span-2"><span>Provider-specific JSON</span><InputTextArea @bind-Value="model.ProviderOptionsJson" rows="7" class="runner-json form-code-editor" /><small>Top-level keys must match <code>@model.ProviderType</code>. Credentials are not accepted here.</small></label></div></section>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Connection</p><h2>Extension-owned endpoint</h2><p>The endpoint, lifecycle mode and credential belong to the selected extension registration.</p></div>@if (!IsNew) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@testing">@(testing ? "Testing…" : "Test connection")</button> }</div>@if (SelectedExtension is { } selected) { <dl class="resource-details"><dt>AEP endpoint</dt><dd><code>@selected.Endpoint</code></dd><dt>Extension ID</dt><dd><code>@(selected.Extension?.Id ?? "Not observed")</code></dd><dt>Source</dt><dd>@selected.DiscoverySource</dd></dl> }@if (status is not null) { <p class="@(status.Status == "available" ? "inline-info" : "inline-warning")">Last test @status.CheckedAt.ToLocalTime().ToString("g"): @ModelManagementUi.Label(status.Status)@if (!string.IsNullOrWhiteSpace(status.Details)) { <span> — @status.Details</span> }</p> }</section>
         <div class="form-actions"><a class="button-secondary" href="/modelproviders">Cancel</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create provider" : "Save changes")</button></div>
     </EditForm>
 
@@ -49,13 +45,20 @@ else
 @code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [SupplyParameterFromQuery(Name = "extension")] public string? SuggestedExtension { get; set; }
+    [SupplyParameterFromQuery(Name = "extensionNamespace")] public string? SuggestedExtensionNamespace { get; set; }
+    [SupplyParameterFromQuery(Name = "contributionId")] public string? SuggestedContributionId { get; set; }
+    [SupplyParameterFromQuery(Name = "displayName")] public string? SuggestedDisplayName { get; set; }
     private readonly CancellationTokenSource cancellation = new();
-    private ModelProviderEditorModel? model; private IReadOnlyList<ModelProviderUsageResponse> usages = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<SecretPickerItem> secretItems = [];
+    private ModelProviderEditorModel? model; private IReadOnlyList<ModelProviderUsageResponse> usages = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private ModelProviderStatusResponse? status; private AgentstrationApiException? error; private string? modelsError; private string? etag; private bool saving; private bool testing; private bool confirmDelete;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private ExtensionResponse? SelectedExtension => model is null ? null : extensions.SingleOrDefault(value => ExtensionKey(value) == model.ExtensionId);
+    private IReadOnlyList<ExtensionContributionResponse> Contributions => SelectedExtension?.Contributions.Where(value => value.Kind == "model-provider").ToArray() ?? [];
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
     protected override Task OnParametersSetAsync() => LoadAsync();
-    private async Task LoadAsync() { error = null; modelsError = null; try { secretItems = (await SecretsClient.GetSecretsAsync(cancellation.Token)).Select(value => new SecretPickerItem(value.Resource.Name, value.Resource.Namespace.Value, value.Resource.Definition.DisplayName, value.Resource.Definition.Vault.Name, value.ValueStatus)).ToArray(); if (IsNew) { model = new ModelProviderEditorModel { Namespace = SelectedNamespace.Value }; return; } var snapshot = await Client.GetModelProviderAsync(SelectedNamespace, Name!, cancellation.Token); model = ModelProviderEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; usages = (await Client.GetModelProviderUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value; await LoadObservedAsync(); } catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProviderEditorModel { Namespace = SelectedNamespace.Value }; } }
+    private async Task LoadAsync() { error = null; modelsError = null; try { extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token); if (IsNew) { var extensionNamespace = SuggestedExtensionNamespace ?? SelectedNamespace.Value; model = new ModelProviderEditorModel { Namespace = SelectedNamespace.Value, ExtensionId = string.IsNullOrWhiteSpace(SuggestedExtension) ? string.Empty : $"{extensionNamespace}:{SuggestedExtension}", ContributionId = SuggestedContributionId ?? string.Empty, DisplayName = SuggestedDisplayName ?? string.Empty }; return; } var snapshot = await Client.GetModelProviderAsync(SelectedNamespace, Name!, cancellation.Token); model = ModelProviderEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; usages = (await Client.GetModelProviderUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value; await LoadObservedAsync(); } catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProviderEditorModel { Namespace = SelectedNamespace.Value }; } }
+    private void ExtensionChanged(ChangeEventArgs args) { if (model is null) return; model.ExtensionId = args.Value?.ToString() ?? string.Empty; if (!Contributions.Any(value => value.Id == model.ContributionId)) model.ContributionId = Contributions.Count == 1 ? Contributions[0].Id : string.Empty; }
     private async Task LoadObservedAsync() { if (model is null) return; var @namespace = ResourceNamespace.Parse(model.Namespace); try { status = await Client.GetProviderStatusAsync(@namespace, model.Name, cancellation.Token); if (status.Status == "available") models = await Client.GetProviderModelsAsync(@namespace, model.Name, cancellation.Token); else models = []; } catch (AgentstrationApiException exception) { modelsError = exception.Message; models = []; } }
     private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var wasNew = IsNew; var @namespace = ResourceNamespace.Parse(model.Namespace); var snapshot = wasNew ? await Client.CreateModelProviderAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateModelProviderAsync(@namespace, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), wasNew ? "Model provider created" : "Model provider updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); if (wasNew) { Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name)); } else { model = ModelProviderEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; await LoadObservedAsync(); } } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
     private async Task TestAsync() { if (model is null || testing) return; testing = true; error = null; try { status = await Client.TestProviderAsync(ResourceNamespace.Parse(model.Namespace), model.Name, cancellation.Token); await LoadObservedAsync(); } catch (AgentstrationApiException exception) { error = exception; } finally { testing = false; } }
@@ -64,5 +67,6 @@ else
     private static string Metadata(AvailableModelResponse item, string key) => item.Metadata.TryGetValue(key, out var value) ? value : "Not reported";
     private static string ProfileUrl(ModelProviderUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.Name)}";
     private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/modelproviders/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
+    private static string ExtensionKey(ExtensionResponse extension) => $"{extension.RegistrationNamespace}:{extension.RegistrationName}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

@@ -6,6 +6,7 @@ public enum PrincipalStatus { Active, Disabled }
 public enum PrincipalKind { Human, Workload }
 public enum MembershipStatus { Active, Suspended }
 public enum PrincipalType { User, Group, ServicePrincipal }
+public enum ThemePreference { System, Light, Dark }
 
 public sealed record Tenant(
     Guid Id,
@@ -29,6 +30,11 @@ public sealed record Principal(
     string? Email,
     PrincipalStatus Status,
     DateTimeOffset CreatedAt);
+
+public sealed record PrincipalPreferences(
+    Guid PrincipalId,
+    ThemePreference Theme,
+    DateTimeOffset UpdatedAt);
 
 public sealed record ExternalIdentity(
     Guid Id,
@@ -213,6 +219,8 @@ public interface IIdentityStore
     Task<Principal?> GetPrincipalAsync(Guid principalId, CancellationToken cancellationToken);
     Task AddPrincipalAsync(Principal principal, CancellationToken cancellationToken);
     Task UpdatePrincipalAsync(Principal principal, CancellationToken cancellationToken);
+    Task<PrincipalPreferences?> GetPrincipalPreferencesAsync(Guid principalId, CancellationToken cancellationToken);
+    Task UpsertPrincipalPreferencesAsync(PrincipalPreferences preferences, CancellationToken cancellationToken);
     Task<ExternalIdentity?> FindExternalIdentityAsync(string issuer, string subject, CancellationToken cancellationToken);
     Task<IReadOnlyList<ExternalIdentity>> ListExternalIdentitiesAsync(Guid principalId, CancellationToken cancellationToken);
     Task AddExternalIdentityAsync(ExternalIdentity externalIdentity, CancellationToken cancellationToken);

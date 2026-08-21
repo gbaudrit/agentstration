@@ -161,7 +161,7 @@ docker compose up --build
 
 ## AI modes
 
-The normal `Managed` mode resolves the provider, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; concrete provider names are never host execution modes. The seeded `ollama-local`, `llama-cpp-local`, and `localai-local` URLs are AEP extension URLs, never native inference-server URLs.
+The normal `Managed` mode resolves the provider, extension registration, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; concrete provider names are never host execution modes. The seeded `ollama-local`, `llama-cpp-local`, and `localai-local` providers reference extension registrations whose URLs are AEP endpoints, never native inference-server URLs.
 
 Use the deterministic offline mode explicitly for tests or fallback diagnostics:
 
@@ -238,7 +238,7 @@ Invoke-RestMethod http://localhost:5100/api/modelproviders/localai-local/status
 Invoke-RestMethod http://localhost:5100/api/modelproviders/localai-local/models
 ```
 
-Create or edit Ollama, llama.cpp, and LocalAI declarations from the Blazor console at `/modelproviders`. Provider URLs must be absolute HTTP(S) extension URLs without embedded credentials, query strings, or fragments. Saving a provider does not require its native inference server to be online; health and installed models remain observed state. LocalAI discovery requires `/v1/models/capabilities` and filters non-chat models. Deleting a provider is rejected while a model profile references its exact resource ID.
+Create or edit Ollama, llama.cpp, and LocalAI extension registrations from the Blazor console at `/extensions`, then bind their model-provider contributions at `/modelproviders`. Extension URLs must be absolute HTTP(S) AEP endpoints without embedded credentials, query strings, or fragments. Saving a provider does not require its native inference server to be online; health and installed models remain observed state. LocalAI discovery requires `/v1/models/capabilities` and filters non-chat models. Deleting a provider is rejected while a model profile references its exact resource ID.
 
 Model profiles are durable Management Plane resources with ETag concurrency and usage protection:
 

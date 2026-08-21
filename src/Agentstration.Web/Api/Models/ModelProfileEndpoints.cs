@@ -122,3 +122,52 @@ internal sealed class ResolveModelProfileEndpoint : IModelManagementEndpoint
             return Results.Ok(ModelManagementHttp.Resolution(await service.ResolveAsync(profile.Value, cancellationToken, includeCapabilityDiagnostics: true)));
         });
 }
+
+internal sealed class PreviewModelProfileOptionMigrationEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/{profileName}/option-migrations/preview", HandleAsync);
+    private static Task<IResult> HandleAsync(
+        string profileName,
+        string? resourceNamespace,
+        PreviewModelProfileOptionMigrationRequest body,
+        HttpResponse response,
+        ModelProfileOptionMigrationService service,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () =>
+        {
+            var preview = await service.PreviewAsync(
+                ModelManagementHttp.Namespace(resourceNamespace),
+                profileName,
+                body.TargetVersion,
+                cancellationToken);
+            response.Headers.ETag = preview.ProfileETag;
+            return Results.Ok(new ModelProfileOptionMigrationPreviewResponse(
+                preview.ProfileName,
+                preview.ProfileNamespace,
+                preview.ProviderType,
+                preview.Source,
+                preview.Target));
+        });
+}
+
+internal sealed class ApplyModelProfileOptionMigrationEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/{profileName}/option-migrations/apply", HandleAsync);
+    private static Task<IResult> HandleAsync(
+        string profileName,
+        string? resourceNamespace,
+        PreviewModelProfileOptionMigrationRequest body,
+        HttpRequest request,
+        HttpResponse response,
+        ModelProfileOptionMigrationService service,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () => ModelManagementHttp.ResourceResult(
+            await service.ApplyAsync(
+                ModelManagementHttp.Namespace(resourceNamespace),
+                profileName,
+                body.TargetVersion,
+                ModelManagementHttp.IfMatch(request),
+                cancellationToken),
+            response,
+            StatusCodes.Status200OK));
+}

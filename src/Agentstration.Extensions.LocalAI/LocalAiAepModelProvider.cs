@@ -203,10 +203,12 @@ public sealed class LocalAiAepModelProvider(HttpClient httpClient) : IAepModelPr
         if (options.StopSequences is { Count: > 0 })
             body["stop"] = new JsonArray(options.StopSequences.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());
         if (options.ResponseFormat is { } responseFormat) body["response_format"] = Clone(responseFormat);
-        if (options.AdditionalOptions is not { } additional) return;
-        if (additional.TryGetValue("reasoning_effort", out var reasoningEffort) && reasoningEffort.ValueKind == JsonValueKind.String)
+        var additional = options.AdditionalOptions;
+        if (additional is not null
+            && additional.TryGetValue("reasoning_effort", out var reasoningEffort)
+            && reasoningEffort.ValueKind == JsonValueKind.String)
             body["reasoning_effort"] = reasoningEffort.GetString();
-        if (!additional.TryGetValue("localai", out var native) || native.ValueKind != JsonValueKind.Object) return;
+        if (options.NativeOptions?.Values is not { ValueKind: JsonValueKind.Object } native) return;
         foreach (var property in native.EnumerateObject())
         {
             var target = property.Name switch
