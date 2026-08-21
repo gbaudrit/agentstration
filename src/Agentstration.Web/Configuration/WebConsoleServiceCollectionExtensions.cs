@@ -163,6 +163,7 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddSingleton<IAuthorizationHandler, WorkspacePermissionHandler>();
         services.AddSingleton<IAuthorizationHandler, WorkspaceResourcePermissionHandler>();
         services.AddSingleton<IAuthorizationHandler, PlatformAdministratorHandler>();
+        services.AddSingleton<ConsoleRealtimeSession>();
         services.AddAuthorizationBuilder()
             .AddPolicy(AgentstrationPolicies.Authenticated, policy => policy.RequireAuthenticatedUser())
             .AddPolicy(AgentstrationPolicies.PlatformAdmin, policy =>
@@ -189,7 +190,9 @@ public static class WebConsoleServiceCollectionExtensions
 
     private static Task ApiStatusOrRedirect(RedirectContext<CookieAuthenticationOptions> context, int statusCode)
     {
-        if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/mcp"))
+        if (context.Request.Path.StartsWithSegments("/api")
+            || context.Request.Path.StartsWithSegments("/hubs")
+            || context.Request.Path.StartsWithSegments("/mcp"))
             context.Response.StatusCode = statusCode;
         else context.Response.Redirect(context.RedirectUri);
         return Task.CompletedTask;
