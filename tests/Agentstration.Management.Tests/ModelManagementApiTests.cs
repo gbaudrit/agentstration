@@ -732,6 +732,109 @@ public sealed class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task DeletingAgentRemovesItsDeploymentAndReleasesRuntimeProfile()
+    {
+        await using var factory = Factory();
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        var runtimes = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
+        var store = factory.Services.GetRequiredService<IControlPlaneStore>();
+        const string agentName = "runtime-cleanup-test";
+        const string runtimeName = "runtime-cleanup-profile";
+        const string deploymentName = "runtime-cleanup-test--g000001";
+
+        var runtime = await runtimes.CreateAsync(new RuntimeProfileResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.RuntimeProfile,
+            Metadata = new ResourceMetadata { Name = runtimeName },
+            Definition = new RuntimeProfileProperties
+            {
+                DisplayName = "Runtime cleanup test",
+                RuntimeType = "microsoft-agent-framework"
+            }
+        }, default);
+        var agent = await agents.PutAgentAsync(new AgentResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = agentName },
+            Definition = new AgentProperties
+            {
+                DisplayName = "Runtime cleanup test",
+                Instructions = "Test deployment cleanup.",
+                ModelProfile = new ResourceReference("reasoning-default")
+            }
+        }, null, true, default);
+        var spec = new AgentDeploymentSpec
+        {
+            Environment = "local",
+            RuntimeProfileName = runtimeName,
+            HostingMode = AgentHostingMode.InProcess
+        };
+        var revision = await agents.CreateRevisionAsync(agentName, spec, default);
+        var deployment = await agents.CreateDeploymentAsync(deploymentName, revision.Value.Metadata.Name, spec, default);
+        _ = await agents.ReconcileAsync(deployment, default);
+
+        Assert.HasCount(1, await runtimes.GetUsagesAsync(runtimeName, default));
+
+        await agents.DeleteAgentAsync(agentName, agent.ETag, default);
+
+        Assert.IsNull(await agents.GetDeploymentAsync(deploymentName, default));
+        Assert.IsEmpty(await runtimes.GetUsagesAsync(runtimeName, default));
+        await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
+        Assert.IsNull(await store.GetAsync<RuntimeProfileResource>(new(ResourceKinds.RuntimeProfile, runtimeName), default));
+    }
+
+    [TestMethod]
+    public async Task DeletingRuntimeProfileCleansUpDeploymentOrphanedByEarlierAgentDeletion()
+    {
+        await using var factory = Factory();
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        var runtimes = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
+        var store = factory.Services.GetRequiredService<IControlPlaneStore>();
+        const string agentName = "orphan-cleanup-test";
+        const string runtimeName = "orphan-cleanup-profile";
+        const string deploymentName = "orphan-cleanup-test--g000001";
+
+        var runtime = await runtimes.CreateAsync(new RuntimeProfileResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.RuntimeProfile,
+            Metadata = new ResourceMetadata { Name = runtimeName },
+            Definition = new RuntimeProfileProperties { DisplayName = "Orphan cleanup test", RuntimeType = "microsoft-agent-framework" }
+        }, default);
+        var agent = await agents.PutAgentAsync(new AgentResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = agentName },
+            Definition = new AgentProperties
+            {
+                DisplayName = "Orphan cleanup test",
+                Instructions = "Test legacy orphan cleanup.",
+                ModelProfile = new ResourceReference("reasoning-default")
+            }
+        }, null, true, default);
+        var spec = new AgentDeploymentSpec
+        {
+            Environment = "local",
+            RuntimeProfileName = runtimeName,
+            HostingMode = AgentHostingMode.InProcess
+        };
+        var revision = await agents.CreateRevisionAsync(agentName, spec, default);
+        var deployment = await agents.CreateDeploymentAsync(deploymentName, revision.Value.Metadata.Name, spec, default);
+        _ = await agents.ReconcileAsync(deployment, default);
+
+        await store.DeleteAsync(new(ResourceKinds.Agent, agentName), agent.ETag, default);
+
+        Assert.IsEmpty(await runtimes.GetUsagesAsync(runtimeName, default));
+        await runtimes.DeleteAsync(runtimeName, runtime.ETag, default);
+
+        Assert.IsNull(await agents.GetDeploymentAsync(deploymentName, default));
+        Assert.IsNull(await runtimes.GetAsync(runtimeName, default));
+    }
+
+    [TestMethod]
     public async Task ModelAndRuntimeApisAddressHomonymousResourcesByNamespace()
     {
         await using var factory = Factory();
