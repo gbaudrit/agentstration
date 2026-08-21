@@ -130,7 +130,9 @@ public sealed record ExecutableAgentDefinition
     public required long AgentVersion { get; init; }
     public required string EffectiveInstructions { get; init; }
     public required string ModelProfileName { get; init; }
+    public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
     public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
     public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
@@ -150,7 +152,11 @@ public sealed record ResolvedRuntimeAgent(
     ExecutableAgentDefinition Definition,
     bool Ready,
     string State,
-    string? Error);
+    string? Error)
+{
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
+    public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
+}
 
 public interface IRuntimeAgentResolver
 {

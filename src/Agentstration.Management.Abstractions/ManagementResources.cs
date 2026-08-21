@@ -36,6 +36,13 @@ public static class PackKinds
     public const string Pack = "Pack";
 }
 
+public static class PackProvenanceAnnotations
+{
+    public const string Publisher = "agentstration.io/pack.publisher";
+    public const string Name = "agentstration.io/pack.name";
+    public const string Version = "agentstration.io/pack.version";
+}
+
 public sealed record PackManifest
 {
     public required string ApiVersion { get; init; }
@@ -85,6 +92,7 @@ public enum PackBindingTargetKind
 {
     [JsonStringEnumMemberName("modelProfile")] ModelProfile,
     [JsonStringEnumMemberName("modelProvider")] ModelProvider,
+    [JsonStringEnumMemberName("runtimeProfile")] RuntimeProfile,
     [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
     [JsonStringEnumMemberName("secret")] Secret
 }
@@ -444,6 +452,7 @@ public record AgentProperties
     public string Handler { get; init; } = "prompt-agent";
     public required string Instructions { get; init; }
     public required ResourceReference ModelProfile { get; init; }
+    public ResourceReference RuntimeProfile { get; init; } = new("maf-default", @namespace: ResourceNamespace.Default);
     public IReadOnlyList<ResourceReference> Tools { get; init; } = [];
     public IReadOnlyList<string> Behaviors { get; init; } = [];
     public IReadOnlyList<string> Middleware { get; init; } = [];
@@ -460,6 +469,7 @@ public sealed record AgentDeploymentSpec
 {
     public required string Environment { get; init; }
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required AgentHostingMode HostingMode { get; init; }
 }
 
@@ -503,7 +513,9 @@ public sealed record ResolvedAgentDefinition
     public required long AgentVersion { get; init; }
     public required string EffectiveInstructions { get; init; }
     public required string ModelProfileName { get; init; }
+    public ResourceNamespace? ModelProfileNamespace { get; init; }
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
     public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
     public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
@@ -518,8 +530,10 @@ public sealed record AgentDeployment : Resource
     public required string RevisionName { get; init; }
     public string? AgentName { get; init; }
     public string? ModelProfileName { get; init; }
+    public ResourceNamespace? ModelProfileNamespace { get; init; }
     public required string Environment { get; init; }
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required AgentHostingMode HostingMode { get; init; }
     public required DesiredAgentState DesiredState { get; init; }
     public required ProvisioningState ProvisioningState { get; init; }

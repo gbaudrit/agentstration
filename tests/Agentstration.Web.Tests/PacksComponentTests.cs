@@ -27,6 +27,23 @@ public sealed class PacksComponentTests
     }
 
     [TestMethod]
+    public void PageSelectsThePackRequestedByResourceNavigation()
+    {
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo("/packs?publisher=agentstration&name=starter");
+
+        var rendered = context.Render<Packs>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(1, rendered.FindAll("tr.selected-pack"));
+            Assert.IsTrue(rendered.Markup.Contains("default/openai-production", StringComparison.Ordinal));
+        });
+    }
+
+    [TestMethod]
     public async Task InstallActionOpensSideEffectFreeArchivePreviewStep()
     {
         using var context = new BunitContext();
@@ -38,6 +55,43 @@ public sealed class PacksComponentTests
 
         Assert.IsTrue(rendered.Markup.Contains("The archive is validated and previewed before any resource is created.", StringComparison.Ordinal));
         Assert.AreEqual("dialog", rendered.Find(".pack-dialog").GetAttribute("role"));
+    }
+
+    [TestMethod]
+    public async Task ArchiveInstallOffersExplicitReplacementForAnInstalledPackIdentity()
+    {
+        using var context = new BunitContext();
+        var client = new FakePacksClient
+        {
+            PreviewResult = new PackInstallationPreview(
+                new PackMetadata
+                {
+                    Publisher = "agentstration",
+                    Name = "starter",
+                    Version = "1.1.0",
+                    DisplayName = "Starter Pack"
+                },
+                [new("agents/assistant.yaml", ResourceKinds.Agent, "assistant", true)],
+                true)
+        };
+        context.Services.AddSingleton<IPacksClient>(client);
+        var rendered = context.Render<Packs>();
+        rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
+
+        await rendered.FindAll("button").First(button => button.TextContent.Contains("Install local Pack", StringComparison.Ordinal)).ClickAsync(new());
+        rendered.FindComponent<Microsoft.AspNetCore.Components.Forms.InputFile>().UploadFiles(
+            InputFileContent.CreateFromBinary([1, 2, 3], "starter-1.1.0.pack.zip", contentType: "application/zip"));
+
+        rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Replace the installed Pack", StringComparison.Ordinal)));
+        var install = rendered.FindAll("button").Single(button => button.TextContent.Contains("Install Pack", StringComparison.Ordinal));
+        Assert.IsTrue(install.HasAttribute("disabled"));
+
+        await rendered.Find(".pack-reinstall-option input").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = true });
+        install = rendered.FindAll("button").Single(button => button.TextContent.Contains("Install Pack", StringComparison.Ordinal));
+        Assert.IsFalse(install.HasAttribute("disabled"));
+        await install.ClickAsync(new());
+
+        Assert.AreEqual(true, client.LastReplaceExisting);
     }
 
     [TestMethod]
@@ -103,6 +157,9 @@ public sealed class PacksComponentTests
 
     private sealed class FakePacksClient : IPacksClient
     {
+        public PackInstallationPreview? PreviewResult { get; init; }
+        public bool? LastReplaceExisting { get; private set; }
+
         private readonly InstalledPackResource pack = new()
         {
             ApiVersion = ManagementApiVersions.CoreV1,
@@ -131,8 +188,13 @@ public sealed class PacksComponentTests
 
         public Task<IReadOnlyList<InstalledPackResource>> GetPacksAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<InstalledPackResource>>([pack]);
         public Task<ResourceSnapshot<InstalledPackResource>> GetPackAsync(string publisher, string name, CancellationToken cancellationToken) => Task.FromResult(new ResourceSnapshot<InstalledPackResource>(pack, "\"etag-1\""));
-        public Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken) =>
+            Task.FromResult(PreviewResult ?? throw new NotSupportedException());
+        public Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, bool replaceExisting, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken)
+        {
+            LastReplaceExisting = replaceExisting;
+            return Task.FromResult(new ResourceSnapshot<InstalledPackResource>(pack, "\"etag-2\""));
+        }
         public Task UninstallAsync(string publisher, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<InstalledPackResource>> AttachSourceAsync(string publisher, string name, byte[] archive, string fileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken) => throw new NotSupportedException();

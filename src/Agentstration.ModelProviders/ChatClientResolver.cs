@@ -1,3 +1,4 @@
+using Agentstration.Resources;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -13,11 +14,14 @@ public sealed class ChatClientResolver(
     ILogger<ChatClientResolver> logger,
     IEnumerable<IModelProviderCapabilitiesResolver>? capabilityResolvers = null) : IChatClientResolver
 {
-    public async ValueTask<IChatClient> ResolveAsync(string modelProfileResourceId, CancellationToken cancellationToken = default)
+    public ValueTask<IChatClient> ResolveAsync(string modelProfileResourceId, CancellationToken cancellationToken = default) =>
+        ResolveAsync(ResourceNamespace.Default, modelProfileResourceId, cancellationToken);
+
+    public async ValueTask<IChatClient> ResolveAsync(ResourceNamespace @namespace, string modelProfileResourceId, CancellationToken cancellationToken = default)
     {
-        var profile = await profiles.GetRequiredAsync(modelProfileResourceId, cancellationToken);
-        var deployment = await deployments.GetRequiredAsync(profile.DeploymentName, cancellationToken);
-        var providerConfiguration = await providerConfigurations.GetRequiredAsync(deployment.ProviderName, cancellationToken);
+        var profile = await profiles.GetRequiredAsync(@namespace, modelProfileResourceId, cancellationToken);
+        var deployment = await deployments.GetRequiredAsync(@namespace, profile.DeploymentName, cancellationToken);
+        var providerConfiguration = await providerConfigurations.GetRequiredAsync(deployment.ProviderNamespace, deployment.ProviderName, cancellationToken);
         var provider = providers.GetRequiredProvider(providerConfiguration.AdapterType);
         var capabilityResolver = capabilityResolvers?.SingleOrDefault(value => value.CanHandle(providerConfiguration.AdapterType));
         var capabilities = capabilityResolver is null

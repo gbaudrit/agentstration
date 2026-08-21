@@ -179,6 +179,13 @@ else
                                                     <option value="@BindingValue(extension.Name, extension.Namespace)">@extension.Definition.DisplayName — @extension.Namespace/@extension.Name</option>
                                                 }
                                             }
+                                            else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile)
+                                            {
+                                                @foreach (var runtimeProfile in runtimeProfiles)
+                                                {
+                                                    <option value="@BindingValue(runtimeProfile.Name, ResourceNamespace.Parse(runtimeProfile.Namespace))">@runtimeProfile.Properties.DisplayName — @runtimeProfile.Namespace/@runtimeProfile.Name · @runtimeProfile.Properties.RuntimeType</option>
+                                                }
+                                            }
                                             else
                                             {
                                                 @foreach (var secret in secrets)
@@ -194,7 +201,13 @@ else
                             }
                         </section>
                     }
-                    @if (preview.AlreadyInstalled) { <p class="error-panel">This Pack identity is already installed in the workspace.</p> }
+                    @if (preview.AlreadyInstalled)
+                    {
+                        <section class="pack-reinstall-option" aria-label="Pack replacement">
+                            <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> Replace the installed Pack</label>
+                            <p class="pack-muted">The existing Pack resources are removed safely, then this archive is installed with the selected bindings. Resources modified since installation remain protected and can block replacement.</p>
+                        </section>
+                    }
                 </section>
             }
             <div class="dialog-actions"><button class="button-secondary" @onclick="CloseInstall">Cancel</button><button class="button-primary" disabled="@(!CanInstall || installing)" @onclick="InstallAsync">@(installing ? "Installing…" : "Install Pack")</button></div>
@@ -244,6 +257,9 @@ else
 <ConfirmationDialog IsOpen="@confirmUninstall" Title="Uninstall Pack?" Message="Managed resources are removed only if they have not changed since installation. Modified resources are preserved and the Pack is marked degraded." ConfirmLabel="Uninstall" OnCancel="() => confirmUninstall = false" OnConfirm="UninstallAsync" />
 
 @code {
+    [SupplyParameterFromQuery(Name = "publisher")] public string? RequestedPublisher { get; set; }
+    [SupplyParameterFromQuery(Name = "name")] public string? RequestedName { get; set; }
+
     private const long MaximumArchiveBytes = 8 * 1024 * 1024;
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<InstalledPackResource>? packs;
@@ -253,6 +269,7 @@ else
     private PackInstallationPreview? preview;
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
     private IReadOnlyList<ModelProviderResponse> modelProviders = [];
+    private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private IReadOnlyList<ExtensionRegistrationResource> extensionRegistrations = [];
     private IReadOnlyList<SecretResponse> secrets = [];
     private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
@@ -263,6 +280,7 @@ else
     private bool installOpen;
     private bool previewing;
     private bool installing;
+    private bool replaceExisting;
     private bool confirmUninstall;
     private bool forkOpen;
     private bool forking;
@@ -276,9 +294,14 @@ else
     private string? forkNotice;
 
     private int AttentionCount => packs?.Count(pack => pack.Definition.State is InstalledPackState.Failed or InstalledPackState.Degraded) ?? 0;
-    private bool CanInstall => preview?.CanInstall == true
+    private bool CanInstall => preview is not null
+        && (preview.CanInstall || preview.AlreadyInstalled && replaceExisting)
         && preview.Bindings.All(binding => !binding.Required || !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)));
-    private string PreviewStatus => preview?.CanInstall != true ? "Conflict" : CanInstall ? "Ready" : "Configuration required";
+    private string PreviewStatus => preview is null ? "Conflict"
+        : preview.Bindings.Any(binding => binding.Required && string.IsNullOrWhiteSpace(SelectedBinding(binding.Name))) ? "Configuration required"
+        : preview.AlreadyInstalled && !replaceExisting ? "Already installed"
+        : CanInstall ? "Ready"
+        : "Conflict";
     private bool CanSubmitFork => !forking
         && !string.IsNullOrWhiteSpace(forkPublisher)
         && !string.IsNullOrWhiteSpace(forkName)
@@ -295,7 +318,14 @@ else
         {
             packs = await Client.GetPacksAsync(cancellation.Token);
             projects = await Client.GetProjectsAsync(cancellation.Token);
-            if (selected is not null)
+            if (!string.IsNullOrWhiteSpace(RequestedPublisher) && !string.IsNullOrWhiteSpace(RequestedName))
+            {
+                var requested = packs.FirstOrDefault(pack =>
+                    string.Equals(pack.Definition.Publisher, RequestedPublisher, StringComparison.Ordinal)
+                    && string.Equals(pack.Definition.PackName, RequestedName, StringComparison.Ordinal));
+                selected = requested is null ? null : await Client.GetPackAsync(requested.Definition.Publisher, requested.Definition.PackName, cancellation.Token);
+            }
+            else if (selected is not null)
             {
                 var match = packs.FirstOrDefault(pack => SameIdentity(pack, selected.Value));
                 selected = match is null ? null : await Client.GetPackAsync(match.Definition.Publisher, match.Definition.PackName, cancellation.Token);
@@ -311,6 +341,7 @@ else
         archive = null;
         archiveName = string.Empty;
         installError = null;
+        replaceExisting = false;
         bindingSelections.Clear();
         installOpen = true;
     }
@@ -327,6 +358,7 @@ else
         preview = null;
         archive = null;
         installError = null;
+        replaceExisting = false;
         archiveName = args.File.Name;
         try
         {
@@ -347,6 +379,8 @@ else
                     modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
                 if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProvider))
                     modelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile))
+                    runtimeProfiles = await Services.GetRequiredService<IRuntimeProfilesClient>().GetRuntimeProfilesAsync(cancellation.Token);
                 if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ExtensionRegistration))
                     extensionRegistrations = await Services.GetRequiredService<IExtensionsClient>().GetRegistrationsAsync(cancellation.Token);
                 if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
@@ -369,7 +403,7 @@ else
                 .Where(binding => !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)))
                 .Select(binding => new PackBindingSelection(binding.Name, ParseBindingTarget(SelectedBinding(binding.Name)!)))
                 .ToArray();
-            selected = await Client.InstallAsync(archive, archiveName, bindings, cancellation.Token);
+            selected = await Client.InstallAsync(archive, archiveName, replaceExisting, bindings, cancellation.Token);
             installOpen = false;
             await LoadAsync();
         }
@@ -462,7 +496,14 @@ else
         if (parts.Length != 2) throw new InvalidOperationException("The selected Pack binding is invalid.");
         return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
     }
-    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model provider", PackBindingTargetKind.ExtensionRegistration => "Extension registration", _ => "Model profile" };
+    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch
+    {
+        PackBindingTargetKind.Secret => "Secret",
+        PackBindingTargetKind.ModelProvider => "Model provider",
+        PackBindingTargetKind.RuntimeProfile => "Runtime profile",
+        PackBindingTargetKind.ExtensionRegistration => "Extension registration",
+        _ => "Model profile"
+    };
     private static string PurposeLabel(PackPurpose purpose) => purpose switch { PackPurpose.Sample => "SAMPLE", PackPurpose.Template => "TEMPLATE", _ => "STANDARD" };
     private static string AudienceLabel(PackAudience audience) => audience switch { PackAudience.Personal => "Personal", PackAudience.Professional => "Professional", _ => "Universal" };
     private static string StateLabel(InstalledPackState state) => state switch { InstalledPackState.Installing => "Installing", InstalledPackState.Installed => "Installed", InstalledPackState.Uninstalling => "Uninstalling", InstalledPackState.Failed => "Failed", _ => "Degraded" };

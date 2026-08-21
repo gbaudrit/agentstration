@@ -118,6 +118,13 @@ else
                                             <option value="@BindingValue(provider.Name, ResourceNamespace.Default)">@provider.Properties.DisplayName — default/@provider.Name</option>
                                         }
                                     }
+                                    else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile)
+                                    {
+                                        @foreach (var runtimeProfile in runtimeProfiles)
+                                        {
+                                            <option value="@BindingValue(runtimeProfile.Name, ResourceNamespace.Parse(runtimeProfile.Namespace))">@runtimeProfile.Properties.DisplayName — @runtimeProfile.Namespace/@runtimeProfile.Name</option>
+                                        }
+                                    }
                                     else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration)
                                     {
                                         @foreach (var extension in extensionRegistrations)
@@ -183,6 +190,7 @@ else
     private PackInstallationPreview? preview;
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
     private IReadOnlyList<ModelProviderResponse> modelProviders = [];
+    private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private IReadOnlyList<ExtensionRegistrationResource> extensionRegistrations = [];
     private IReadOnlyList<SecretResponse> secrets = [];
     private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
@@ -326,6 +334,8 @@ else
             modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
         if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProvider))
             modelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(cancellation.Token);
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile))
+            runtimeProfiles = await Services.GetRequiredService<IRuntimeProfilesClient>().GetRuntimeProfilesAsync(cancellation.Token);
         if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ExtensionRegistration))
             extensionRegistrations = await Services.GetRequiredService<IExtensionsClient>().GetRegistrationsAsync(cancellation.Token);
         if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
@@ -340,7 +350,14 @@ else
         if (parts.Length != 2) throw new InvalidOperationException("The selected Pack binding is invalid.");
         return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
     }
-    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model provider", PackBindingTargetKind.ExtensionRegistration => "Extension registration", _ => "Model profile" };
+    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch
+    {
+        PackBindingTargetKind.Secret => "Secret",
+        PackBindingTargetKind.ModelProvider => "Model provider",
+        PackBindingTargetKind.RuntimeProfile => "Runtime profile",
+        PackBindingTargetKind.ExtensionRegistration => "Extension registration",
+        _ => "Model profile"
+    };
     private string PreviewMessage(string buildVersion) => preview?.CanInstall == true
         ? $"Build {buildVersion} is ready for this workspace."
         : preview?.AlreadyInstalled == true

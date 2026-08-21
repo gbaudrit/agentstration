@@ -11,8 +11,8 @@ public record ResourceDeclaration<TDefinition>
 }
 
 public sealed record AgentResourceRequest : ResourceDeclaration<AgentProperties>;
-public sealed record CreateRevisionRequest(string Environment, string RuntimeProfileName, AgentHostingMode HostingMode);
-public sealed record CreateDeploymentRequest(string RevisionName, string Environment, string RuntimeProfileName, AgentHostingMode HostingMode);
+public sealed record CreateRevisionRequest(string Environment, string RuntimeProfileName, AgentHostingMode HostingMode, string RuntimeProfileNamespace = "default");
+public sealed record CreateDeploymentRequest(string RevisionName, string Environment, string RuntimeProfileName, AgentHostingMode HostingMode, string RuntimeProfileNamespace = "default");
 public sealed record AgentRevisionRunUsageResponse(
     int ActiveRunCount,
     int WaitingForInputCount,

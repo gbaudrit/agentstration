@@ -157,6 +157,7 @@ public sealed class ModelProviderManagementService(
     }
 
     ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredAsync(string name, CancellationToken cancellationToken) => new(GetConfigurationRequiredAsync(name, cancellationToken));
+    ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => new(GetConfigurationRequiredAsync(@namespace, name, cancellationToken));
 
     async ValueTask<IReadOnlyList<ModelProviderConfiguration>> IModelProviderConfigurationStore.ListAsync(CancellationToken cancellationToken) =>
         await Task.WhenAll((await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken))
@@ -349,8 +350,11 @@ public sealed class ModelProfileManagementService(
     }
 
     public async ValueTask<ModelProfileConfiguration> GetRequiredAsync(string name, CancellationToken cancellationToken = default)
+        => await GetRequiredAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    public async ValueTask<ModelProfileConfiguration> GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
     {
-        var profile = await GetAsync(name, cancellationToken) ?? throw new ModelProfileNotFoundException(name);
+        var profile = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProfileNotFoundException($"{@namespace}/{name}");
         return new()
         {
             Name = profile.Value.Metadata.Name,
@@ -363,9 +367,13 @@ public sealed class ModelProfileManagementService(
     }
 
     async ValueTask<ModelDeploymentConfiguration> IModelDeploymentStore.GetRequiredAsync(string name, CancellationToken cancellationToken)
+        => await ((IModelDeploymentStore)this).GetRequiredAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    async ValueTask<ModelDeploymentConfiguration> IModelDeploymentStore.GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        var profile = await GetAsync(name, cancellationToken) ?? throw new ModelDeploymentNotFoundException(name);
-        return new() { Name = profile.Value.Metadata.Name, ProviderName = profile.Value.Definition.Provider.Name, ModelName = profile.Value.Definition.Model.Name, ProviderOptions = profile.Value.Definition.ProviderOptions };
+        var profile = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelDeploymentNotFoundException($"{@namespace}/{name}");
+        var provider = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ResourceKinds.ModelProvider);
+        return new() { Name = profile.Value.Metadata.Name, ProviderName = provider.Name, ProviderNamespace = provider.Namespace, ModelName = profile.Value.Definition.Model.Name, ProviderOptions = profile.Value.Definition.ProviderOptions };
     }
 
     public async Task ValidateReferenceAsync(ResourceReference profileReference, CancellationToken cancellationToken)

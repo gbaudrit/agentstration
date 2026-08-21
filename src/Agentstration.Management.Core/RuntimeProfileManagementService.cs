@@ -91,7 +91,7 @@ public sealed class RuntimeProfileManagementService(
                 ? await store.PutAsync(result.Deployment, deployment.ETag, false, cancellationToken)
                 : deployment;
             await store.DeleteAsync(
-                new ResourceKey(ResourceKinds.AgentDeployment, stored.Value.Metadata.Name, @namespace),
+                new ResourceKey(ResourceKinds.AgentDeployment, stored.Value.Metadata.Name, stored.Value.Namespace),
                 stored.ETag,
                 cancellationToken);
         }
@@ -113,7 +113,7 @@ public sealed class RuntimeProfileManagementService(
         string name,
         CancellationToken cancellationToken) =>
         (await store.ListAllAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken))
-            .Where(value => value.Value.RuntimeProfileName == name && value.Value.Namespace == @namespace)
+            .Where(value => value.Value.RuntimeProfileName == name && value.Value.RuntimeProfileNamespace == @namespace)
             .ToArray();
 
     private static void Validate(RuntimeProfileResource resource)

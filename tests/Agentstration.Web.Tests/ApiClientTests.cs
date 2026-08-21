@@ -415,7 +415,11 @@ public sealed class ApiClientTests
         var @namespace = new ResourceNamespace("agentstration.who-am-i");
         var resource = CreateAgentResource("web-agent") with
         {
-            Metadata = CreateAgentResource("web-agent").Metadata with { Namespace = @namespace }
+            Metadata = CreateAgentResource("web-agent").Metadata with { Namespace = @namespace },
+            Definition = CreateAgentResource("web-agent").Definition with
+            {
+                ModelProfile = new ResourceReference("reasoning-shared", @namespace: new ResourceNamespace("shared.models"))
+            }
         };
         string? requestPathAndQuery = null;
         using var httpClient = new HttpClient(new StubHandler(request =>
@@ -434,6 +438,8 @@ public sealed class ApiClientTests
         Assert.AreEqual("/api/agents?allNamespaces=true&top=1000", requestPathAndQuery);
         Assert.HasCount(1, agents);
         Assert.AreEqual(@namespace, agents[0].Namespace);
+        Assert.AreEqual(new ResourceNamespace("shared.models"), agents[0].ModelProfileNamespace);
+        Assert.AreEqual("/modelprofiles/reasoning-shared?namespace=shared.models", ConsoleResourceUrls.ModelProfile(agents[0].ModelProfileAddress));
         Assert.AreEqual("/namespaces/agentstration.who-am-i/agents/web-agent", agents[0].DetailsUrl);
     }
 
@@ -722,6 +728,27 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public async Task AgentsModelClientKeepsTheAgentNamespace()
+    {
+        Uri? requested = null;
+        var response = new AgentModelResponse(
+            new DeclaredAgentModelResponse(new ModelProfileIdentityResponse("reasoning", "reasoning", Namespace: "shared.models")),
+            new ResolvedAgentModelResponse(null, new ModelReferenceResponse("qwen3:4b"), new EffectiveModelOptionsResponse(new(), new(), new())),
+            "ready", []);
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        var actual = await new AgentsModelApiClient(httpClient).GetAgentModelResolutionAsync(new ResourceNamespace("agentstration.daily-life-assistant"), "concierge", default);
+
+        Assert.AreEqual("shared.models", actual.Declared.ModelProfile.Namespace);
+        Assert.AreEqual("/api/namespaces/agentstration.daily-life-assistant/agents/concierge/model", requested!.AbsolutePath);
+    }
+
+    [TestMethod]
     public void AgentEditorMapsCanonicalReferencesTagsAndTools()
     {
         var model = new AgentEditorModel
@@ -730,6 +757,9 @@ public sealed class ApiClientTests
             DisplayName = "Web Agent",
             Instructions = "Help with web development.",
             ModelProfileName = "reasoning-default",
+            ModelProfileNamespace = "shared.models",
+            RuntimeProfileName = "maf-shared",
+            RuntimeProfileNamespace = "shared.platform",
             ToolNames = "search",
             Tags = "domain=web\nowner=platform"
         };
@@ -737,8 +767,27 @@ public sealed class ApiClientTests
         var request = model.ToRequest();
 
         Assert.AreEqual("reasoning-default", request.Definition.ModelProfile.Name);
+        Assert.AreEqual(new ResourceNamespace("shared.models"), request.Definition.ModelProfile.Namespace);
+        Assert.AreEqual("maf-shared", request.Definition.RuntimeProfile.Name);
+        Assert.AreEqual(new ResourceNamespace("shared.platform"), request.Definition.RuntimeProfile.Namespace);
         Assert.HasCount(1, request.Definition.Tools);
         Assert.AreEqual("web", request.Metadata.Tags["domain"]);
+    }
+
+    [TestMethod]
+    public void AgentEditorMarksOnlyAnEffectiveModelProfileChange()
+    {
+        var model = new AgentEditorModel
+        {
+            ModelProfileName = "default-reasoning",
+            ModelProfileNamespace = "default"
+        };
+        var current = Summary("default-reasoning", "ollama-local", "qwen3:1.7b", "available");
+        var namespaced = current with { Namespace = "shared.models" };
+
+        Assert.IsFalse(model.SelectModelProfile(current));
+        Assert.IsTrue(model.SelectModelProfile(namespaced));
+        Assert.AreEqual("shared.models", model.ModelProfileNamespace);
     }
 
     [TestMethod]
@@ -868,11 +917,18 @@ public sealed class ApiClientTests
 
         var actual = await client.GetAgentReadinessAsync("sql-expert", 4, default);
         var prepared = await client.PrepareAgentAsync("sql-expert", 4, default);
+        var agentNamespace = new ResourceNamespace("agentstration.daily-life-assistant");
+        var namespaced = await client.GetAgentReadinessAsync(agentNamespace, "concierge", 5, default);
+        var namespacedPreparation = await client.PrepareAgentAsync(agentNamespace, "concierge", 5, default);
 
         Assert.IsTrue(actual.Ready);
         Assert.AreEqual("Ready", prepared.State);
+        Assert.IsTrue(namespaced.Ready);
+        Assert.AreEqual("Ready", namespacedPreparation.State);
         StringAssert.Contains(requested[0].PathAndQuery, "/api/runtime/agents/sql-expert/readiness?generation=4");
         StringAssert.Contains(requested[1].PathAndQuery, "/api/runtime/agents/sql-expert/prepare?generation=4");
+        StringAssert.Contains(requested[2].PathAndQuery, "/api/runtime/namespaces/agentstration.daily-life-assistant/agents/concierge/readiness?generation=5");
+        StringAssert.Contains(requested[3].PathAndQuery, "/api/runtime/namespaces/agentstration.daily-life-assistant/agents/concierge/prepare?generation=5");
     }
 
     [TestMethod]

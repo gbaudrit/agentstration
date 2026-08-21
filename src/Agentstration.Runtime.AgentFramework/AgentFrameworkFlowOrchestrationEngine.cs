@@ -271,6 +271,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                 DeploymentId = resolved.DeploymentId,
                 RevisionId = resolved.RevisionId,
                 RuntimeProfileName = resolved.RuntimeProfileName,
+                RuntimeProfileNamespace = resolved.RuntimeProfileNamespace,
                 ModelProfileName = resolved.ModelProfileName
             };
             participants.Add(reference.Id, new ResolvedParticipant(reference.Id, resolved, agent, effectiveBinding));

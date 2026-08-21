@@ -36,6 +36,7 @@ public static class ModelManagementEndpoints
 
         var agents = endpoints.MapGroup("/api/agents");
         GetAgentModelEndpoint.Map(agents);
+        GetAgentModelEndpoint.MapNamespaced(endpoints);
         return endpoints;
     }
 }

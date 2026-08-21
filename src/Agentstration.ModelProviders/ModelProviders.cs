@@ -27,6 +27,7 @@ public sealed record ModelDeploymentConfiguration
 {
     public required string Name { get; init; }
     public required string ProviderName { get; init; }
+    public ResourceNamespace ProviderNamespace { get; init; } = ResourceNamespace.Default;
     public required string ModelName { get; init; }
     public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
 }
@@ -101,16 +102,28 @@ public interface IModelProviderResolver
 public interface IModelProfileStore
 {
     ValueTask<ModelProfileConfiguration> GetRequiredAsync(string name, CancellationToken cancellationToken = default);
+    ValueTask<ModelProfileConfiguration> GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
+        @namespace.IsDefault
+            ? GetRequiredAsync(name, cancellationToken)
+            : ValueTask.FromException<ModelProfileConfiguration>(new ModelProfileNotFoundException($"{@namespace}/{name}"));
 }
 
 public interface IModelDeploymentStore
 {
     ValueTask<ModelDeploymentConfiguration> GetRequiredAsync(string name, CancellationToken cancellationToken = default);
+    ValueTask<ModelDeploymentConfiguration> GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
+        @namespace.IsDefault
+            ? GetRequiredAsync(name, cancellationToken)
+            : ValueTask.FromException<ModelDeploymentConfiguration>(new ModelDeploymentNotFoundException($"{@namespace}/{name}"));
 }
 
 public interface IModelProviderConfigurationStore
 {
     ValueTask<ModelProviderConfiguration> GetRequiredAsync(string name, CancellationToken cancellationToken = default);
+    ValueTask<ModelProviderConfiguration> GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
+        @namespace.IsDefault
+            ? GetRequiredAsync(name, cancellationToken)
+            : ValueTask.FromException<ModelProviderConfiguration>(new ModelProviderConfigurationNotFoundException($"{@namespace}/{name}"));
     ValueTask<IReadOnlyList<ModelProviderConfiguration>> ListAsync(CancellationToken cancellationToken = default);
 }
 
@@ -125,6 +138,10 @@ public interface IModelProviderDiscovery
 public interface IChatClientResolver
 {
     ValueTask<IChatClient> ResolveAsync(string modelProfileName, CancellationToken cancellationToken = default);
+    ValueTask<IChatClient> ResolveAsync(ResourceNamespace @namespace, string modelProfileName, CancellationToken cancellationToken = default) =>
+        @namespace.IsDefault
+            ? ResolveAsync(modelProfileName, cancellationToken)
+            : ValueTask.FromException<IChatClient>(new ModelProfileNotFoundException($"{@namespace}/{modelProfileName}"));
 }
 
 public sealed class ModelProviderResolver(IEnumerable<IModelProvider> providers) : IModelProviderResolver

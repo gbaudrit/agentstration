@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -52,6 +53,31 @@ public sealed class ChatClientResolverTests
         Assert.AreEqual("qwen3:1.7b", chatClient.Options?.ModelId);
         Assert.AreEqual(0.2f, chatClient.Options?.Temperature);
         Assert.AreEqual(1000, chatClient.Options?.MaxOutputTokens);
+    }
+
+    [TestMethod]
+    public async Task ResolverPreservesProfileAndProviderNamespaces()
+    {
+        var profileNamespace = new ResourceNamespace("agentstration.sample-pack");
+        var providerNamespace = new ResourceNamespace("shared.providers");
+        using var chatClient = new StubChatClient();
+        var profiles = new StubProfileStore();
+        var deployments = new StubDeploymentStore(providerNamespace: providerNamespace);
+        var providers = new StubProviderStore(providerNamespace: providerNamespace);
+        var resolver = new ChatClientResolver(
+            profiles,
+            deployments,
+            providers,
+            new ModelProviderResolver([new RecordingProvider(chatClient)]),
+            new GenAiObservabilityOptions { Enabled = false },
+            NullLoggerFactory.Instance,
+            NullLogger<ChatClientResolver>.Instance);
+
+        _ = await resolver.ResolveAsync(profileNamespace, ProfileId);
+
+        Assert.AreEqual(profileNamespace, profiles.RequestedNamespace);
+        Assert.AreEqual(profileNamespace, deployments.RequestedNamespace);
+        Assert.AreEqual(providerNamespace, providers.RequestedNamespace);
     }
 
     [TestMethod]
@@ -126,7 +152,15 @@ public sealed class ChatClientResolverTests
 
     private sealed class StubProfileStore(bool configured = true) : IModelProfileStore
     {
+        public ResourceNamespace? RequestedNamespace { get; private set; }
+
         public ValueTask<ModelProfileConfiguration> GetRequiredAsync(string resourceId, CancellationToken cancellationToken = default) =>
+            GetRequiredAsync(ResourceNamespace.Default, resourceId, cancellationToken);
+
+        public ValueTask<ModelProfileConfiguration> GetRequiredAsync(ResourceNamespace @namespace, string resourceId, CancellationToken cancellationToken = default)
+        {
+            RequestedNamespace = @namespace;
+            return
             configured && string.Equals(resourceId, ProfileId, StringComparison.Ordinal)
                 ? ValueTask.FromResult(new ModelProfileConfiguration
                 {
@@ -135,27 +169,41 @@ public sealed class ChatClientResolverTests
                     Generation = new ModelGenerationOptions { Temperature = 0.2, MaxOutputTokens = 1000 }
                 })
                 : ValueTask.FromException<ModelProfileConfiguration>(new ModelProfileNotFoundException(resourceId));
+        }
     }
 
-    private sealed class StubDeploymentStore(bool configured = true) : IModelDeploymentStore
+    private sealed class StubDeploymentStore(bool configured = true, ResourceNamespace? providerNamespace = null) : IModelDeploymentStore
     {
+        public ResourceNamespace? RequestedNamespace { get; private set; }
+
         public ValueTask<ModelDeploymentConfiguration> GetRequiredAsync(string name, CancellationToken cancellationToken = default) =>
+            GetRequiredAsync(ResourceNamespace.Default, name, cancellationToken);
+
+        public ValueTask<ModelDeploymentConfiguration> GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
+        {
+            RequestedNamespace = @namespace;
+            return
             configured && string.Equals(name, ProfileId, StringComparison.Ordinal)
                 ? ValueTask.FromResult(new ModelDeploymentConfiguration
                 {
                     Name = ProfileId,
                     ProviderName = ProviderId,
+                    ProviderNamespace = providerNamespace ?? ResourceNamespace.Default,
                     ModelName = "qwen3:1.7b"
                 })
                 : ValueTask.FromException<ModelDeploymentConfiguration>(new ModelDeploymentNotFoundException(name));
+        }
     }
 
-    private sealed class StubProviderStore(bool configured = true) : IModelProviderConfigurationStore
+    private sealed class StubProviderStore(bool configured = true, ResourceNamespace? providerNamespace = null) : IModelProviderConfigurationStore
     {
-        private static readonly ModelProviderConfiguration Provider = new()
+        public ResourceNamespace? RequestedNamespace { get; private set; }
+
+        private ModelProviderConfiguration Provider => new()
         {
             Uid = Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Name = "ollama-local",
+            Namespace = providerNamespace ?? ResourceNamespace.Default,
             AdapterType = "ollama",
             ContributionId = "ollama",
             Extension = new ResourceReference("ollama-extension"),
@@ -163,9 +211,16 @@ public sealed class ChatClientResolverTests
         };
 
         public ValueTask<ModelProviderConfiguration> GetRequiredAsync(string name, CancellationToken cancellationToken = default) =>
+            GetRequiredAsync(ResourceNamespace.Default, name, cancellationToken);
+
+        public ValueTask<ModelProviderConfiguration> GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
+        {
+            RequestedNamespace = @namespace;
+            return
             configured && string.Equals(name, ProviderId, StringComparison.Ordinal)
                 ? ValueTask.FromResult(Provider)
                 : ValueTask.FromException<ModelProviderConfiguration>(new ModelProviderConfigurationNotFoundException(name));
+        }
 
         public ValueTask<IReadOnlyList<ModelProviderConfiguration>> ListAsync(CancellationToken cancellationToken = default) =>
             ValueTask.FromResult<IReadOnlyList<ModelProviderConfiguration>>(configured ? [Provider] : []);

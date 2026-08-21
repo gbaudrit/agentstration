@@ -59,6 +59,7 @@ public sealed record RuntimeExecutionBinding
     public required string DeploymentId { get; init; }
     public required string RevisionId { get; init; }
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required string ModelProfileName { get; init; }
 }
 

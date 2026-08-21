@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
@@ -12,10 +13,24 @@ public sealed class AgentEditorModel
     public string? Description { get; set; }
     [Required] public string Handler { get; set; } = "prompt-agent";
     [Required] public string Instructions { get; set; } = string.Empty;
-    [Required] public string ModelProfileName { get; set; } = "reasoning-default";
+    [Required] public string ModelProfileName { get; set; } = string.Empty;
+    [Required] public string ModelProfileNamespace { get; set; } = ResourceNamespace.Default.Value;
+    [Required] public string RuntimeProfileName { get; set; } = string.Empty;
+    [Required] public string RuntimeProfileNamespace { get; set; } = ResourceNamespace.Default.Value;
     public string ToolNames { get; set; } = string.Empty;
     public string Tags { get; set; } = string.Empty;
     public string Annotations { get; set; } = string.Empty;
+
+    public bool SelectModelProfile(ModelProfileSummaryResponse profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        if (string.Equals(ModelProfileName, profile.Name, StringComparison.Ordinal)
+            && string.Equals(ModelProfileNamespace, profile.Namespace, StringComparison.Ordinal))
+            return false;
+        ModelProfileName = profile.Name;
+        ModelProfileNamespace = profile.Namespace;
+        return true;
+    }
 
     public AgentResourceRequest ToRequest()
     {
@@ -33,7 +48,8 @@ public sealed class AgentEditorModel
                 Description = NullIfWhiteSpace(Description),
                 Handler = Handler.Trim(),
                 Instructions = Instructions.Trim(),
-                ModelProfile = new ResourceReference(ModelProfileName.Trim()),
+                ModelProfile = new ResourceReference(ModelProfileName.Trim(), @namespace: ResourceNamespace.Parse(ModelProfileNamespace)),
+                RuntimeProfile = new ResourceReference(RuntimeProfileName.Trim(), @namespace: ResourceNamespace.Parse(RuntimeProfileNamespace)),
                 Tools = tools
             }
         };
@@ -47,6 +63,9 @@ public sealed class AgentEditorModel
         Handler = resource.Definition.Handler,
         Instructions = resource.Definition.Instructions,
         ModelProfileName = resource.Definition.ModelProfile.Name,
+        ModelProfileNamespace = (resource.Definition.ModelProfile.Namespace ?? resource.Namespace).Value,
+        RuntimeProfileName = resource.Definition.RuntimeProfile.Name,
+        RuntimeProfileNamespace = (resource.Definition.RuntimeProfile.Namespace ?? resource.Namespace).Value,
         ToolNames = string.Join(Environment.NewLine, resource.Definition.Tools.Select(tool => tool.Name)),
         Tags = Format(resource.Metadata.Tags),
         Annotations = Format(resource.Metadata.Annotations)

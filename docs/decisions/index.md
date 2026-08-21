@@ -95,3 +95,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 63. [ADR-0063 — Extension registrations are managed discovery sources](0063-extension-registrations-are-managed-discovery-sources.md)
 64. [ADR-0064 — Extension option migrations are explicit](0064-extension-option-migrations-are-explicit.md)
 65. [ADR-0065 — Model Providers bind registered extension contributions](0065-model-providers-bind-extension-contributions.md)
+66. [ADR-0066 — Pack Runtime Profile bindings drive local deployment](0066-pack-runtime-profile-bindings-drive-local-deployment.md)

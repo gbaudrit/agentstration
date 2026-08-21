@@ -88,7 +88,8 @@ public sealed class WorkspacePackResourceCatalog(
         var agent = stored.Value;
         var dependencies = new List<PackCompositionDependency>
         {
-            BindingDependency(agent.Definition.ModelProfile, agent.Namespace, ResourceKinds.ModelProfile, PackBindingTargetKind.ModelProfile, "modelProfile")
+            BindingDependency(agent.Definition.ModelProfile, agent.Namespace, ResourceKinds.ModelProfile, PackBindingTargetKind.ModelProfile, "modelProfile"),
+            BindingDependency(agent.Definition.RuntimeProfile, agent.Namespace, ResourceKinds.RuntimeProfile, PackBindingTargetKind.RuntimeProfile, "runtimeProfile")
         };
         dependencies.AddRange(agent.Definition.Tools.Select(tool => UnsupportedDependency(tool, agent.Namespace, ResourceKinds.Tool, "tool")));
         return new(AgentItem(agent) with { DependencyCount = dependencies.Count }, dependencies);
@@ -179,8 +180,11 @@ public sealed class WorkspacePackResourceCatalog(
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Accepted }
         };
         var node = JsonSerializer.SerializeToNode(clean, JsonOptions)!.AsObject();
-        var target = agent.Definition.ModelProfile.Resolve(agent.Namespace, ResourceKinds.ModelProfile);
-        node["definition"]!.AsObject()["modelProfile"] = ReferenceNode(bindings, target);
+        var definition = node["definition"]!.AsObject();
+        var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ResourceKinds.ModelProfile);
+        var runtimeProfile = agent.Definition.RuntimeProfile.Resolve(agent.Namespace, ResourceKinds.RuntimeProfile);
+        definition["modelProfile"] = ReferenceNode(bindings, modelProfile);
+        definition["runtimeProfile"] = ReferenceNode(bindings, runtimeProfile);
         return ToElement(node);
     }
 
@@ -368,7 +372,14 @@ public sealed class WorkspacePackResourceCatalog(
     private static IReadOnlyDictionary<string, string> WithoutProvenance(IReadOnlyDictionary<string, string> values) => values.Where(pair => !pair.Key.StartsWith("agentstration.io/pack.", StringComparison.Ordinal)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     private static string DisplayName(Resource value) => value switch { ModelProviderResource provider => provider.Definition.DisplayName, RuntimeProfileResource runtime => runtime.Definition.DisplayName, VaultResource vault => vault.Definition.DisplayName, ToolProviderResource provider => provider.Definition.DisplayName, ToolResource tool => tool.Definition.DisplayName, _ => value.Name };
     private static bool Dynamic(string value) => value.StartsWith("${", StringComparison.Ordinal);
-    private static string BindingLabel(PackBindingTargetKind kind) => kind switch { PackBindingTargetKind.Secret => "Secret", PackBindingTargetKind.ModelProvider => "Model Provider", PackBindingTargetKind.ExtensionRegistration => "Extension registration", _ => "Model Profile" };
+    private static string BindingLabel(PackBindingTargetKind kind) => kind switch
+    {
+        PackBindingTargetKind.Secret => "Secret",
+        PackBindingTargetKind.ModelProvider => "Model Provider",
+        PackBindingTargetKind.RuntimeProfile => "Runtime Profile",
+        PackBindingTargetKind.ExtensionRegistration => "Extension registration",
+        _ => "Model Profile"
+    };
     private static int KindOrder(string kind) => kind switch { ResourceKinds.Entry => 10, ResourceKinds.Flow => 20, ResourceKinds.Agent => 30, ResourceKinds.ModelProfile => 40, ResourceKinds.ModelProvider => 50, ResourceKinds.RuntimeProfile => 60, ResourceKinds.Secret => 70, _ => 100 };
     private static JsonSerializerOptions CreateJsonOptions() { var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }; options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)); return options; }
 }

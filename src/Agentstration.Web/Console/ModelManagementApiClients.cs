@@ -108,6 +108,8 @@ public interface IModelProfilesClient
 public interface IAgentsModelClient
 {
     Task<AgentModelResponse> GetAgentModelResolutionAsync(string agentName, CancellationToken cancellationToken);
+    Task<AgentModelResponse> GetAgentModelResolutionAsync(ResourceNamespace @namespace, string agentName, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetAgentModelResolutionAsync(agentName, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agents.");
 }
 
 public interface IRuntimeProfilesClient
@@ -331,7 +333,14 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
 public sealed class AgentsModelApiClient(HttpClient httpClient) : IAgentsModelClient
 {
     public Task<AgentModelResponse> GetAgentModelResolutionAsync(string agentName, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<AgentModelResponse>(httpClient, $"api/agents/{Uri.EscapeDataString(agentName)}/model", cancellationToken);
+        GetAgentModelResolutionAsync(ResourceNamespace.Default, agentName, cancellationToken);
+
+    public Task<AgentModelResponse> GetAgentModelResolutionAsync(ResourceNamespace @namespace, string agentName, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<AgentModelResponse>(httpClient,
+            @namespace.IsDefault
+                ? $"api/agents/{Uri.EscapeDataString(agentName)}/model"
+                : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(agentName)}/model",
+            cancellationToken);
 }
 
 public sealed class RuntimeProfilesApiClient(HttpClient httpClient) : IRuntimeProfilesClient

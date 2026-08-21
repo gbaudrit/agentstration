@@ -22,11 +22,11 @@
     {
         <label>
             <span>Model profile</span>
-            <select value="@Value" @onchange="SelectAsync" aria-label="Model profile">
+            <select value="@CurrentValue" @onchange="SelectAsync" aria-label="Model profile">
                 <option value="">Select a model profile</option>
                 @foreach (var profile in filtered)
                 {
-                    <option value="@profile.Id" disabled="@ModelManagementUi.IsInvalid(profile)">@OptionLabel(profile)</option>
+                    <option value="@ProfileValue(profile)" disabled="@ModelManagementUi.IsInvalid(profile)">@OptionLabel(profile)</option>
                 }
             </select>
         </label>
@@ -35,7 +35,7 @@
     @if (Selected is not null)
     {
         <article class="model-summary-card">
-            <div><p class="eyebrow">Selected model profile</p><strong>@Selected.Properties.DisplayName</strong><code>@Selected.Name</code></div>
+            <div><p class="eyebrow">Selected model profile</p><strong>@Selected.Properties.DisplayName</strong><code>@Selected.Namespace/@Selected.Name</code></div>
             <dl class="compact-details">
                 <dt>Provider</dt><dd>@(Selected.Properties.Provider.DisplayName ?? Selected.Properties.Provider.Name)</dd>
                 <dt>Model</dt><dd>@Selected.Properties.Model.Name</dd>
@@ -60,8 +60,10 @@
 
 @code {
     [Parameter] public string? Value { get; set; }
+    [Parameter] public string Namespace { get; set; } = ResourceNamespace.Default.Value;
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public EventCallback<ModelProfileSummaryResponse?> SelectedChanged { get; set; }
+    [Parameter] public bool SelectFirstWhenMissing { get; set; }
 
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<ModelProfileSummaryResponse> profiles = [];
@@ -69,7 +71,10 @@
     private AgentstrationApiException? error;
     private string search = string.Empty;
     private bool loading;
-    private ModelProfileSummaryResponse? Selected => profiles.FirstOrDefault(item => string.Equals(item.Id, Value, StringComparison.OrdinalIgnoreCase));
+    private string CurrentValue => string.IsNullOrWhiteSpace(Value) ? string.Empty : $"{ResourceNamespace.Parse(Namespace).Value}:{Value}";
+    private ModelProfileSummaryResponse? Selected => profiles.FirstOrDefault(item =>
+        string.Equals(item.Name, Value, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(item.Namespace, ResourceNamespace.Parse(Namespace).Value, StringComparison.Ordinal));
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -81,7 +86,13 @@
         {
             profiles = await Client.GetModelProfilesAsync(null, null, null, cancellation.Token);
             ApplyFilter();
-            await SelectedChanged.InvokeAsync(Selected);
+            var selected = Selected;
+            if (selected is null && SelectFirstWhenMissing)
+            {
+                selected = profiles.FirstOrDefault(profile => !ModelManagementUi.IsInvalid(profile));
+                if (selected is not null) await ValueChanged.InvokeAsync(selected.Name);
+            }
+            await SelectedChanged.InvokeAsync(selected);
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
@@ -98,17 +109,19 @@
     private async Task SelectAsync(ChangeEventArgs args)
     {
         var value = args.Value?.ToString() ?? string.Empty;
-        var selected = profiles.FirstOrDefault(item => string.Equals(item.Id, value, StringComparison.OrdinalIgnoreCase));
+        var selected = profiles.FirstOrDefault(item => string.Equals(ProfileValue(item), value, StringComparison.Ordinal));
         if (selected is not null && ModelManagementUi.IsInvalid(selected)) return;
-        await ValueChanged.InvokeAsync(value);
+        await ValueChanged.InvokeAsync(selected?.Name ?? string.Empty);
         await SelectedChanged.InvokeAsync(selected);
     }
 
     private static string OptionLabel(ModelProfileSummaryResponse item) =>
-        $"{item.Properties.DisplayName} — {item.Name} · {item.Properties.Provider.Name} / {item.Properties.Model.Name} · {ModelManagementUi.Label(item.Properties.Status)}";
+        $"{item.Properties.DisplayName} — {item.Namespace}/{item.Name} · {item.Properties.Provider.Name} / {item.Properties.Model.Name} · {ModelManagementUi.Label(item.Properties.Status)}";
+
+    private static string ProfileValue(ModelProfileSummaryResponse item) => $"{item.Namespace}:{item.Name}";
 
     private static string ProfileUrl(ModelProfileSummaryResponse item) =>
-        $"/modelprofiles/{Uri.EscapeDataString(item.Name)}";
+        ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(item.Namespace), ResourceKinds.ModelProfile, item.Name));
 
     public void Dispose()
     {

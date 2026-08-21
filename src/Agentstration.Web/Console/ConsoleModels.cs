@@ -8,6 +8,8 @@ namespace Agentstration.Web.Console;
 public sealed record AgentSummary(string Id, string Name, string Type, string Version, string Status, IReadOnlyList<string> Capabilities, string Runtime, DateTimeOffset LastActivity, string ModelProfile = "Not configured")
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
+    public ResourceAddress ModelProfileAddress => ResourceAddress.Create(ModelProfileNamespace, Agentstration.Management.Abstractions.ResourceKinds.ModelProfile, ModelProfile);
     public string DetailsUrl => Namespace.IsDefault
         ? $"/agents/{Uri.EscapeDataString(Id)}"
         : $"/namespaces/{Uri.EscapeDataString(Namespace.Value)}/agents/{Uri.EscapeDataString(Id)}";
@@ -30,6 +32,20 @@ public static class ConsoleResourceUrls
     public static string Entry(EntryId id) => id.Namespace.IsDefault
         ? $"/entries/{Uri.EscapeDataString(id.Value)}"
         : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/entries/{Uri.EscapeDataString(id.Value)}";
+
+    public static string ModelProfile(ResourceAddress address)
+    {
+        var path = $"/modelprofiles/{Uri.EscapeDataString(address.Name)}";
+        return address.Namespace.IsDefault
+            ? path
+            : $"{path}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
+    }
+
+    public static string RuntimeProfile(ResourceAddress address)
+    {
+        var path = $"/runtimeprofiles/{Uri.EscapeDataString(address.Name)}";
+        return $"{path}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
+    }
 }
 public sealed record ExecutionSummary(string Id, string Agent, string? Flow, Guid? WorkItemId, string Status, DateTimeOffset StartedAt, TimeSpan? Duration, string? Result, string? Error);
 public sealed record ManagementSummary(int Agents, int Configurations, int Revisions, int Policies, string DesiredState);
