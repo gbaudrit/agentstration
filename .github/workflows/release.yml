@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  DOCKER_IMAGE: gbaudrit/agentstration
+  DOCKER_IMAGE: agentstration/agentstration
 
 concurrency:
   group: release-${{ github.ref }}

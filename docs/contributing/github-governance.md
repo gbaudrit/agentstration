@@ -85,7 +85,7 @@ After CodeQL and Dependency Review have completed successfully and their reposit
 
 The root `Directory.Build.props` is the product-version source of truth. A release requires a matching notes file under `docs/releases/` and a tag named `v<version>` on a commit already contained in `main`. The release workflow rejects mismatched versions and non-main commits before building artifacts.
 
-Docker Hub publication requires an existing `gbaudrit/agentstration` repository and these GitHub Actions repository secrets:
+Docker Hub publication requires an existing `agentstration/agentstration` repository and these GitHub Actions repository secrets:
 
 - `DOCKERHUB_USERNAME`: the Docker Hub account allowed to push the repository;
 - `DOCKERHUB_TOKEN`: a scoped Docker Hub access token with write permission. Do not store an account password.
