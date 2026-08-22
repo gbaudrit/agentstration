@@ -85,6 +85,11 @@ After CodeQL and Dependency Review have completed successfully and their reposit
 
 The root `Directory.Build.props` is the product-version source of truth. A release requires a matching notes file under `docs/releases/` and a tag named `v<version>` on a commit already contained in `main`. The release workflow rejects mismatched versions and non-main commits before building artifacts.
 
+Docker Hub publication requires an existing `gbaudrit/agentstration` repository and these GitHub Actions repository secrets:
+
+- `DOCKERHUB_USERNAME`: the Docker Hub account allowed to push the repository;
+- `DOCKERHUB_TOKEN`: a scoped Docker Hub access token with write permission. Do not store an account password.
+
 For example, after the release change has merged and all required checks have passed:
 
 ```powershell
@@ -94,4 +99,4 @@ git tag -a v0.1.0-alpha.1 -m "Agentstration 0.1.0-alpha.1"
 git push origin v0.1.0-alpha.1
 ```
 
-GitHub Actions then repeats restore, Release build, and tests; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; and creates a GitHub prerelease using the version-specific notes. Do not move or reuse a published tag. Correct a failed release through a reviewed commit and a new prerelease identifier.
+GitHub Actions then repeats restore, Release build, and tests; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. Alpha releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag. Correct a failed release through a reviewed commit and a new prerelease identifier.

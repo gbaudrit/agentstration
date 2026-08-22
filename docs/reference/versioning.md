@@ -17,7 +17,7 @@ Agentstration uses Semantic Versioning: `MAJOR.MINOR.PATCH`, with prereleases su
 
 The product version is centralized in the root `Directory.Build.props`. The autonomous AEP workspace keeps its own package version under `aep/`; changing the Agentstration product version does not change the AEP protocol or packages.
 
-Product prereleases use annotated Git tags named `v<version>`. Pushing a matching tag from a commit contained in `main` runs the release workflow, repeats the offline Release build and test suite, publishes framework-dependent server and Workplace archives, writes SHA-256 checksums, and creates a GitHub prerelease from the matching file under `docs/releases/`. A tag that disagrees with the central version or does not point into `main` fails closed.
+Product prereleases use annotated Git tags named `v<version>`. Pushing a matching tag from a commit contained in `main` runs the release workflow, repeats the offline Release build and test suite, publishes framework-dependent server and Workplace archives, writes SHA-256 checksums, pushes a multi-platform server/Console image to Docker Hub, and creates a GitHub prerelease from the matching file under `docs/releases/`. A tag that disagrees with the central version or does not point into `main` fails closed. Prereleases publish an immutable version container tag and a moving channel tag such as `alpha`, but never `latest`.
 
 ## HTTP API version
 
