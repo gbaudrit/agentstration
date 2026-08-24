@@ -236,7 +236,7 @@ public sealed class DependencyTests
     {
         var assemblies = new[]
         {
-            typeof(Agentstration.Resources.ResourceKey).Assembly,
+            typeof(Agentstration.Resources.ResourceAddress).Assembly,
             typeof(WorkplaceService).Assembly,
             typeof(IControlPlaneStore).Assembly,
             typeof(AgentManagementService).Assembly
