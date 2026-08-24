@@ -8,8 +8,10 @@ using Agentstration.Runtime.Core;
 using Agentstration.Tools.Mcp;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Web.Tests;
@@ -18,22 +20,32 @@ namespace Agentstration.Web.Tests;
 public sealed class McpToolCatalogTests
 {
     [TestMethod]
-    public async Task ServerMcpEndpointRemainsAvailableWithoutLegacyPlatformTools()
+    public void ServerMcpEndpointRemainsAvailableWithoutLegacyPlatformTools()
     {
-        await using var host = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
-        var provider = Provider();
-        var adapter = Adapter(host);
+        using var host = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = host.CreateClient();
+        var routes = host.Services.GetServices<EndpointDataSource>()
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText ?? string.Empty)
+            .ToArray();
+        Assert.IsTrue(routes.Any(route => route.StartsWith("/mcp", StringComparison.Ordinal)));
 
-        var discovery = await adapter.DiscoverAsync(provider, default);
-
-        Assert.IsTrue(discovery.Capabilities["tools"]);
-        Assert.IsEmpty(discovery.Tools);
         var legacyTools = new[]
         {
             "list_workspaces", "list_inboxes", "ingest_text", "ingest_url", "search_memory",
             "create_mission", "get_mission", "list_mission_runs", "run_mission_now"
         };
-        Assert.IsFalse(discovery.Tools.Any(tool => legacyTools.Contains(tool.ExternalId, StringComparer.Ordinal)));
+        var publishedToolNames = typeof(global::Program).Assembly.GetTypes()
+            .SelectMany(type => type.GetMethods())
+            .SelectMany(method => method.CustomAttributes)
+            .Where(attribute => attribute.AttributeType.Name == "McpServerToolAttribute")
+            .SelectMany(attribute => attribute.NamedArguments)
+            .Where(argument => argument.MemberName == "Name")
+            .Select(argument => argument.TypedValue.Value?.ToString() ?? string.Empty)
+            .ToArray();
+        Assert.IsFalse(publishedToolNames.Any(name => legacyTools.Contains(name, StringComparer.OrdinalIgnoreCase)));
+        Assert.IsNull(typeof(global::Program).Assembly.GetType("Agentstration.Web.PlatformMcpTools"));
     }
 
     [TestMethod]
@@ -71,13 +83,21 @@ public sealed class McpToolCatalogTests
     [TestMethod]
     public async Task ApprovalGovernanceIsRetainedAsProviderNeutralMetadata()
     {
-        await using var host = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        await using var host = new WebApplicationFactory<UtilitiesExtension::Program>();
         var provider = Provider();
-        var tool = Tool(provider.Metadata.Name) with
+        var baseline = Tool(provider.Metadata.Name);
+        var tool = baseline with
         {
-            Definition = Tool(provider.Metadata.Name).Definition with { RequiresApproval = true }
+            Metadata = new ResourceMetadata { Name = "local.hash_compute" },
+            Definition = baseline.Definition with { ExternalId = "hash_compute", RequiresApproval = true }
         };
-        var catalog = new McpToolCatalog(new FakeStore(provider, tool), Adapter(host));
+        var configuration = new ConfigurationBuilder().Build();
+        var adapter = new ToolProviderAdapter(
+            new ConfigurationAepExtensionEndpointResolver(configuration),
+            new ConfigurationToolProviderEnvironmentResolver(configuration),
+            new TestHttpClientFactory(host.Server.CreateHandler()),
+            NullLoggerFactory.Instance);
+        var catalog = new McpToolCatalog(new FakeStore(provider, tool), adapter);
 
         var runtime = (await catalog.ResolveAsync([tool.Metadata.Name])).Single();
 
