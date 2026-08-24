@@ -4,28 +4,50 @@
 @inject IAgentstrationEventStream EventStream
 @inject PlatformStatusState PlatformState
 <PageTitle>Overview · Agentstration</PageTitle>
-<PageHeader Title="Platform overview" Eyebrow="Operations center" Description="Live operational posture across management, runtime, work and flows." />
+<PageHeader Title="Platform overview" Eyebrow="Operations center">
+    <Status>
+        @if (snapshot is not null)
+        {
+            <StatusBadge Text="@snapshot.Status" Status="@PlatformDashboardService.ToStatus(snapshot.Status)" />
+        }
+    </Status>
+</PageHeader>
 @if (loading) { <LoadingState /> }
 else if (error is not null) { <ErrorState Message="@error" ErrorId="@errorId" /> }
 else if (snapshot is not null)
 {
-    <section class="metric-grid" aria-label="Platform metrics">
-        <MetricCard Label="Known agents" Value="@snapshot.KnownAgents.ToString()" Detail="Managed definitions" Status="UiStatus.Info" />
-        <MetricCard Label="Active agents" Value="@snapshot.ActiveAgents.ToString()" Detail="Ready for work" Status="UiStatus.Success" />
-        <MetricCard Label="Executions" Value="@snapshot.RunningExecutions.ToString()" Detail="Currently running" Status="UiStatus.Info" />
-        <MetricCard Label="Open work" Value="@snapshot.OpenWorkItems.ToString()" Detail="Needs attention" Status="UiStatus.Warning" />
-        <MetricCard Label="Active flows" Value="@snapshot.ActiveFlows.ToString()" Detail="Published and enabled" Status="UiStatus.Success" />
-        <MetricCard Label="Platform" Value="@snapshot.Status" Detail="Aggregate health" Status="@PlatformDashboardService.ToStatus(snapshot.Status)" />
+    <section class="overview-metric-grid" aria-label="Platform metrics">
+        <MetricCard Label="Defined agents" Value="@snapshot.DefinedAgents.ToString()" Status="UiStatus.Info" Url="/agents" />
+        <MetricCard Label="Ready deployments" Value="@($"{snapshot.ReadyDeployments}/{snapshot.DesiredDeployments}")" Detail="Ready / desired" Status="@(snapshot.ReadyDeployments == snapshot.DesiredDeployments && snapshot.DesiredDeployments > 0 ? UiStatus.Success : UiStatus.Warning)" Url="/deployments" />
+        <MetricCard Label="Runtime runs" Value="@snapshot.RunningRuntimeRuns.ToString()" Status="UiStatus.Info" Url="/runtime-runs" />
+        <MetricCard Label="Tasks running" Value="@snapshot.RunningTasks.ToString()" Status="UiStatus.Info" Url="/tasks" />
+        <MetricCard Label="Needs attention" Value="@snapshot.AttentionCount.ToString()" Status="@(snapshot.AttentionCount == 0 ? UiStatus.Success : UiStatus.Warning)" Url="#needs-attention" />
+        <MetricCard Label="Enabled flows" Value="@snapshot.EnabledFlows.ToString()" Status="UiStatus.Success" Url="/flows" />
+        <MetricCard Label="Enabled triggers" Value="@snapshot.EnabledTriggers.ToString()" Detail="@($"{snapshot.FailedTriggers} failed last firing")" Status="@(snapshot.FailedTriggers == 0 ? UiStatus.Success : UiStatus.Danger)" Url="/triggers" />
+        <MetricCard Label="Model providers" Value="@snapshot.ReadyModelProviders.ToString()" Detail="@($"{snapshot.UnavailableModelProviders} unavailable")" Status="@(snapshot.UnavailableModelProviders == 0 ? UiStatus.Success : UiStatus.Warning)" Url="/modelproviders" />
     </section>
     <section class="dashboard-grid">
-        <article class="panel"><div class="panel-header"><h2>Latest events</h2><a href="/events">Open event stream →</a></div><EventList Items="events" /></article>
-        <article class="panel"><div class="panel-header"><h2>Component health</h2><a href="/runtime">Inspect runtime →</a></div><div class="health-list">@foreach (var component in snapshot.Components) { <HealthIndicator Label="@component.Name" StatusText="@component.Detail" Status="@component.Severity" /> }</div></article>
+        <article class="panel"><div class="panel-header"><h2>Latest run events</h2><a href="/run-events">Open run activity →</a></div>@if (eventsUnavailable) { <EmptyState Title="Run events unavailable" Message="" /> } else { <EventList Items="events" /> }</article>
+        <article class="panel" id="needs-attention"><div class="panel-header"><h2>Needs attention</h2><a href="/deployments">Inspect deployments →</a></div>@if (snapshot.AttentionItems.Count == 0) { <EmptyState Title="No issues" Message="" /> } else { <div class="health-list">@foreach (var component in snapshot.AttentionItems) { <HealthIndicator Label="@component.Name" StatusText="@component.Detail" Status="@component.Severity" /> }</div> }</article>
+    </section>
+    <section class="panel dashboard-sources">
+        <div class="panel-header"><h2>Dashboard data sources</h2></div>
+        <div class="dashboard-source-grid">
+            @foreach (var source in snapshot.Sources)
+            {
+                <a class="dashboard-source-item" href="@source.Url">
+                    <HealthIndicator Label="@source.Name" StatusText="@source.Detail" Status="@source.Severity" />
+                    <span class="dashboard-source-arrow" aria-hidden="true">→</span>
+                </a>
+            }
+        </div>
     </section>
 }
 @code {
     private readonly CancellationTokenSource cancellation = new();
-    private PlatformSnapshot? snapshot; private IReadOnlyList<EventListItem> events = []; private bool loading = true; private string? error; private string? errorId;
-    protected override async Task OnInitializedAsync() { try { var dashboardTask = Dashboard.GetAsync(cancellation.Token); var eventsTask = EventStream.GetRecentEventsAsync(cancellation.Token); await Task.WhenAll(dashboardTask, eventsTask); snapshot = await dashboardTask; events = await eventsTask; PlatformState.Set(PlatformDashboardService.ToStatus(snapshot.Status), snapshot.Status); } catch (AgentstrationApiException exception) { error = exception.Message; errorId = exception.ErrorId; PlatformState.Set(UiStatus.Danger, "Unavailable"); } finally { loading = false; } }
+    private PlatformSnapshot? snapshot; private IReadOnlyList<EventListItem> events = []; private bool loading = true, eventsUnavailable; private string? error; private string? errorId;
+    protected override async Task OnInitializedAsync() { try { var dashboardTask = Dashboard.GetAsync(cancellation.Token); var eventsTask = LoadEventsAsync(); snapshot = await dashboardTask; await eventsTask; PlatformState.Set(PlatformDashboardService.ToStatus(snapshot.Status), snapshot.Status); } catch (AgentstrationApiException exception) { error = exception.Message; errorId = exception.ErrorId; PlatformState.Set(UiStatus.Danger, "Unavailable"); } finally { loading = false; } }
+    private async Task LoadEventsAsync() { try { events = (await EventStream.GetRecentEventsAsync(cancellation.Token)).Take(5).ToArray(); } catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { throw; } catch (Exception) { eventsUnavailable = true; } }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }
 

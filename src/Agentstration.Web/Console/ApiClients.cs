@@ -19,6 +19,8 @@ namespace Agentstration.Web.Console;
 public interface IManagementApiClient
 {
     Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<DeploymentSummary>> GetDeploymentsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<TriggerResource>> GetTriggersAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetAgentAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agents.");
@@ -34,11 +36,11 @@ public interface IAgentRunnerManagementClient
 
 public interface IRuntimeApiClient
 {
-    Task<IReadOnlyList<RuntimeInstanceSummary>> GetInstancesAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken);
     Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken);
     Task<RuntimeRun> GetRunAsync(string runId, CancellationToken cancellationToken);
     Task<IReadOnlyList<RuntimeRun>> GetRunsAsync(string? agentResourceId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken);
     IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, CancellationToken cancellationToken);
     Task<RuntimeRun> CancelRunAsync(string runId, CancellationToken cancellationToken);
     Task<RuntimeRun> RetryRunAsync(string runId, CancellationToken cancellationToken);
@@ -154,7 +156,6 @@ public sealed record FlowResourceSnapshot(FlowResponse Value, string ETag);
 public interface IAgentstrationEventStream
 {
     Task<IReadOnlyList<EventListItem>> GetRecentEventsAsync(CancellationToken cancellationToken);
-    IAsyncEnumerable<EventListItem> SubscribeAsync(CancellationToken cancellationToken);
 }
 
 public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiClient, IAgentRunnerManagementClient
@@ -173,6 +174,27 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
             };
         }).ToArray();
     }
+
+    public async Task<IReadOnlyList<DeploymentSummary>> GetDeploymentsAsync(CancellationToken cancellationToken)
+    {
+        var page = await ApiResponse.ReadAsync<PagedResponse<AgentDeployment>>(httpClient, "api/deployments?top=1000", cancellationToken);
+        return page.Value.Select(deployment => new DeploymentSummary(
+            deployment.Metadata.Name,
+            deployment.AgentName ?? "—",
+            deployment.Namespace.Value,
+            deployment.OperationalState.ToString(),
+            deployment.DesiredState.ToString(),
+            deployment.HostingMode.ToString(),
+            deployment.Environment,
+            deployment.RuntimeProfileName,
+            deployment.RevisionName,
+            deployment.ObservedRevisionName,
+            deployment.UpdatedAt,
+            deployment.LastError)).ToArray();
+    }
+
+    public async Task<IReadOnlyList<TriggerResource>> GetTriggersAsync(CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<TriggerResource[]>(httpClient, "api/triggers", cancellationToken);
 
     public async Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken)
         => await GetAgentAsync(ResourceNamespace.Default, name, cancellationToken);
@@ -556,12 +578,6 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task<IReadOnlyList<RuntimeInstanceSummary>> GetInstancesAsync(CancellationToken cancellationToken)
-    {
-        _ = await ApiResponse.ReadAsync<HealthResponse>(httpClient, "health", cancellationToken);
-        return [new("local-runtime", "Shared runtime", "Ready", "InProcess", "local", "Idle", 0, 0)];
-    }
-
     public async Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken)
     {
         var runs = await GetRunsAsync(null, cancellationToken);
@@ -592,6 +608,11 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
         var page = await ApiResponse.ReadAsync<RuntimeRunPageResponse>(httpClient, $"api/runtime/runs{query}", cancellationToken);
         return page.Value;
     }
+
+    public async Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<RuntimeRunEvent[]>(httpClient,
+            $"api/runtime/runs/{Uri.EscapeDataString(runId)}/eventHistory?afterSequence={Math.Max(0, afterSequence)}",
+            cancellationToken);
 
     public async IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -663,7 +684,6 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
             ?? throw new AgentstrationApiException("Runtime returned an empty run response.", Guid.NewGuid().ToString("N"));
     }
 
-    private sealed record HealthResponse(string Status);
 }
 
 public sealed class ToolGovernanceAuditApiClient(HttpClient httpClient) : IToolGovernanceAuditClient

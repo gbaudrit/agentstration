@@ -8,11 +8,10 @@ using Agentstration.Management.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
-using Agentstration.Web.Components.Models;
 
 namespace Agentstration.Web.Console;
 
-public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiClient, IRuntimeApiClient, IFlowApiClient, IAgentstrationEventStream
+public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiClient, IRuntimeApiClient, IFlowApiClient
 {
     private static readonly WorkspaceId MockWorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
     private static readonly RuntimeRunScope MockRuntimeScope = new(
@@ -81,11 +80,11 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
 
     public Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken) => Result(new ManagementSummary(0, agents.Count, agents.Values.Sum(item => checked((int)item.Value.Generation)), 0, "Managed"), cancellationToken);
 
-    public Task<IReadOnlyList<RuntimeInstanceSummary>> GetInstancesAsync(CancellationToken cancellationToken) => Result<IReadOnlyList<RuntimeInstanceSummary>>(
-    [
-        new("runtime-local-01", ".NET Expert · SQL Expert", "Ready", "InProcess", "local / pid 4128", "2 active runs", 18.2, 284),
-        new("runtime-local-02", "Triage Router", "Degraded", "SharedHost", "local / pid 4128", "Waiting", 4.7, 126, "Model response latency above threshold")
-    ], cancellationToken);
+    public Task<IReadOnlyList<DeploymentSummary>> GetDeploymentsAsync(CancellationToken cancellationToken) =>
+        Result<IReadOnlyList<DeploymentSummary>>([], cancellationToken);
+
+    public Task<IReadOnlyList<TriggerResource>> GetTriggersAsync(CancellationToken cancellationToken) =>
+        Result<IReadOnlyList<TriggerResource>>([], cancellationToken);
 
     public Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken)
     {
@@ -135,6 +134,14 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
             .OrderByDescending(run => run.Status.CreatedAt)
             .ToArray();
         return Task.FromResult<IReadOnlyList<RuntimeRun>>(values);
+    }
+
+    public Task<IReadOnlyList<RuntimeRunEvent>> GetRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return runEvents.TryGetValue(runId, out var values)
+            ? Task.FromResult<IReadOnlyList<RuntimeRunEvent>>(values.Where(item => item.Sequence > Math.Max(0, afterSequence)).ToArray())
+            : Task.FromException<IReadOnlyList<RuntimeRunEvent>>(Error(HttpStatusCode.NotFound, "run_not_found", $"Runtime run '{runId}' was not found."));
     }
 
     public async IAsyncEnumerable<RuntimeRunEvent> ObserveRunAsync(string runId, long afterSequence, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -246,20 +253,6 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
         new("run-a944", "SQL Expert", null, Guid.Parse("86b42b89-c322-4cd8-a013-fe8ceec49b68"), "Completed", Now.AddHours(-2), TimeSpan.FromMinutes(1.4), "Completed successfully", null),
         new("run-113d", "Triage Router", "Smart triage", null, "Failed", Now.AddHours(-4), TimeSpan.FromSeconds(12), null, "Runtime connection interrupted")
     ], cancellationToken);
-
-    public Task<IReadOnlyList<EventListItem>> GetRecentEventsAsync(CancellationToken cancellationToken) => Result<IReadOnlyList<EventListItem>>(
-    [
-        new(Now.AddSeconds(-18), "Information", "Runtime", "ExecutionStarted", "Engineering review started", "run-7f8a"),
-        new(Now.AddMinutes(-2), "Warning", "Runtime", "HealthChanged", "Triage runtime is degraded", "runtime-local-02"),
-        new(Now.AddHours(-1), "Error", "Flow", "StepFailed", "Routing step could not reach its runtime", "run-113d")
-    ], cancellationToken);
-
-    public async IAsyncEnumerable<EventListItem> SubscribeAsync([EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        await Task.CompletedTask;
-        cancellationToken.ThrowIfCancellationRequested();
-        yield break;
-    }
 
     private static Task<T> Result<T>(T value, CancellationToken cancellationToken)
     {

@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
@@ -389,6 +390,7 @@ public sealed class RuntimeRunTests
         };
 
         var readiness = await client.GetFromJsonAsync<AgentRuntimeReadinessResponse>($"/api/runtime/agents/sql-expert/readiness?generation={agent.Generation}");
+        var deployments = await client.GetFromJsonAsync<PagedResponse<AgentDeployment>>("/api/deployments?top=100");
 
         using var createdResponse = await client.PostAsJsonAsync("/api/runtime/runs", request);
         Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);
@@ -407,12 +409,18 @@ public sealed class RuntimeRunTests
             await Task.Delay(100);
         }
         var eventStream = await client.GetStringAsync($"/api/runtime/runs/{created.Id}/events");
+        var eventHistory = await client.GetFromJsonAsync<RuntimeRunEvent[]>($"/api/runtime/runs/{created.Id}/eventHistory?afterSequence=0");
         var workAfter = await client.GetFromJsonAsync<WorkItemPageResponse>("/api/work/workitems?top=100");
 
         Assert.AreEqual(RuntimeRunState.Succeeded, completed!.Status.State);
         Assert.IsTrue(readiness?.Ready);
+        Assert.IsNotNull(deployments);
+        Assert.IsTrue(deployments.Value.Any(deployment => deployment.AgentName == "sql-expert" && deployment.OperationalState == OperationalState.Ready));
         StringAssert.Contains(eventStream, "event: ResponseDelta");
         StringAssert.Contains(eventStream, "event: RunCompleted");
+        Assert.IsNotNull(eventHistory);
+        Assert.IsTrue(eventHistory.Any(item => item.Kind == RuntimeRunEventKind.ResponseDelta));
+        Assert.AreEqual(RuntimeRunEventKind.RunCompleted, eventHistory[^1].Kind);
         Assert.AreEqual(workBefore!.Value.Count, workAfter!.Value.Count);
     }
 
