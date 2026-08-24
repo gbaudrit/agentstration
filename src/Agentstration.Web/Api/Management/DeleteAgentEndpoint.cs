@@ -8,8 +8,8 @@ internal sealed class DeleteAgentEndpoint : IManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapDelete("/agents/{name}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanManageAgents);
-        group.MapDelete("/namespaces/{namespace}/agents/{name}", HandleNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanManageAgents);
+        group.MapDelete("/agents/{name}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
+        group.MapDelete("/namespaces/{namespace}/agents/{name}", HandleNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
     }
 
     private static Task<IResult> HandleNamespacedAsync(string @namespace, string name, HttpRequest request, AgentManagementService service, CancellationToken cancellationToken) =>

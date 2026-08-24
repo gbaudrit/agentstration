@@ -98,3 +98,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 66. [ADR-0066 — Pack Runtime Profile bindings drive local deployment](0066-pack-runtime-profile-bindings-drive-local-deployment.md)
 67. [ADR-0067 — LocalAI is an independent AEP provider](0067-localai-is-an-independent-aep-provider.md)
 68. [ADR-0068 — Triggers submit Work through a reconstructible Quartz projection](0068-triggers-submit-work-through-quartz-projection.md)
+69. [ADR-0069 — Personal access tokens are revocable Workspace delegations](0069-personal-access-tokens-are-revocable-workspace-delegations.md)

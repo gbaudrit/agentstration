@@ -13,15 +13,15 @@ public static class WorkEndpoints
     public static IEndpointRouteBuilder MapAgentstrationWorkApi(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/work/workitems").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
-        group.MapPost("/", CreateAsync);
-        group.MapGet("/", ListAsync);
-        group.MapGet("/{workItemId:guid}", GetAsync);
-        group.MapPost("/{workItemId:guid}/cancel", CancelAsync);
-        group.MapPost("/{workItemId:guid}/messages", AddMessageAsync);
-        group.MapPost("/{workItemId:guid}/input", ProvideInputAsync);
-        group.MapPost("/{workItemId:guid}/approval", SubmitApprovalAsync);
-        group.MapGet("/{workItemId:guid}/events", GetEventsAsync);
-        group.MapGet("/{workItemId:guid}/result", GetResultAsync);
+        group.MapPost("/", CreateAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
+        group.MapGet("/", ListAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        group.MapGet("/{workItemId:guid}", GetAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        group.MapPost("/{workItemId:guid}/cancel", CancelAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
+        group.MapPost("/{workItemId:guid}/messages", AddMessageAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
+        group.MapPost("/{workItemId:guid}/input", ProvideInputAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
+        group.MapPost("/{workItemId:guid}/approval", SubmitApprovalAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
+        group.MapGet("/{workItemId:guid}/events", GetEventsAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        group.MapGet("/{workItemId:guid}/result", GetResultAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
         return endpoints;
     }
 

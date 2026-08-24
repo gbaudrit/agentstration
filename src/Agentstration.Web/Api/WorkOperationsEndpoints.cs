@@ -14,20 +14,20 @@ public static class WorkOperationsEndpoints
     public static IEndpointRouteBuilder MapAgentstrationWorkOperationsApi(this IEndpointRouteBuilder endpoints)
     {
         var tasks = endpoints.MapGroup("/api/tasks").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
-        tasks.MapGet("/", ListAsync);
-        tasks.MapGet("/summary", SummaryAsync);
-        tasks.MapGet("/{taskId:guid}", DetailAsync);
-        tasks.MapGet("/{taskId:guid}/activities", ActivitiesAsync);
-        tasks.MapGet("/{taskId:guid}/flow-runs", FlowRunsAsync);
-        tasks.MapGet("/{taskId:guid}/flow-runs/{runId}", FlowRunAsync);
-        tasks.MapGet("/{taskId:guid}/pending-actions", PendingActionsAsync);
+        tasks.MapGet("/", ListAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        tasks.MapGet("/summary", SummaryAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        tasks.MapGet("/{taskId:guid}", DetailAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        tasks.MapGet("/{taskId:guid}/activities", ActivitiesAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        tasks.MapGet("/{taskId:guid}/flow-runs", FlowRunsAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        tasks.MapGet("/{taskId:guid}/flow-runs/{runId}", FlowRunAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        tasks.MapGet("/{taskId:guid}/pending-actions", PendingActionsAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
         tasks.MapPost("/{taskId:guid}/pending-actions/{actionId:guid}/respond", RespondPendingActionAsync)
             .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanRunFlows);
-        tasks.MapGet("/{taskId:guid}/results", ResultsAsync);
-        tasks.MapGet("/{taskId:guid}/artifacts", ArtifactsAsync);
-        tasks.MapPost("/{taskId:guid}/pause", PauseAsync);
-        tasks.MapPost("/{taskId:guid}/resume", ResumeAsync);
-        tasks.MapPost("/{taskId:guid}/cancel", CancelAsync);
+        tasks.MapGet("/{taskId:guid}/results", ResultsAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        tasks.MapGet("/{taskId:guid}/artifacts", ArtifactsAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        tasks.MapPost("/{taskId:guid}/pause", PauseAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
+        tasks.MapPost("/{taskId:guid}/resume", ResumeAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
+        tasks.MapPost("/{taskId:guid}/cancel", CancelAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
         return endpoints;
     }
 

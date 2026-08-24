@@ -1,5 +1,7 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
@@ -16,6 +18,77 @@ public sealed class SecurityApiTests
 {
     private const string LocalPassword = "A-strong-local-password-42!";
     private const string ChangedLocalPassword = "A-changed-local-password-84!";
+
+    [TestMethod]
+    public async Task PersonalAccessTokenIsWorkspaceScopedPermissionLimitedAndRevocable()
+    {
+        await using var factory = Factory("Local");
+        using var browser = UnredirectedClient(factory);
+        await BootstrapAsync(browser, "pat-user");
+        var context = await browser.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.IsNotNull(context);
+
+        using var createdResponse = await browser.PostAsJsonAsync("/api/identity/pat", new
+        {
+            name = "Read-only automation",
+            workspaceId = context.Context.WorkspaceId,
+            permissions = new[] { AuthorizationPermissions.ResourcesRead },
+            expiresAt = DateTimeOffset.UtcNow.AddDays(30)
+        });
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        using var created = JsonDocument.Parse(await createdResponse.Content.ReadAsStringAsync());
+        var token = created.RootElement.GetProperty("token").GetString();
+        var tokenId = created.RootElement.GetProperty("metadata").GetProperty("id").GetGuid();
+        Assert.IsNotNull(token);
+        Assert.StartsWith(PersonalAccessTokenService.TokenPrefix, token, StringComparison.Ordinal);
+
+        using var listResponse = await browser.GetAsync("/api/identity/pat");
+        Assert.AreEqual(HttpStatusCode.OK, listResponse.StatusCode);
+        var listedJson = await listResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(token, listedJson, StringComparison.Ordinal);
+        StringAssert.Contains(listedJson, "Read-only automation");
+
+        using var tokenClient = UnredirectedClient(factory);
+        tokenClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        tokenClient.DefaultRequestHeaders.Add("X-Agentstration-Workspace", context.Context.WorkspaceId.ToString("D"));
+        using var allowed = await tokenClient.GetAsync("/api/agents");
+        using var deniedByScope = await tokenClient.GetAsync("/api/flowRuns");
+        using var deniedAdministration = await tokenClient.GetAsync("/api/identity/pat");
+        Assert.AreEqual(HttpStatusCode.OK, allowed.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Forbidden, deniedByScope.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Forbidden, deniedAdministration.StatusCode);
+
+        using var crossWorkspace = UnredirectedClient(factory);
+        crossWorkspace.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        crossWorkspace.DefaultRequestHeaders.Add("X-Agentstration-Workspace", Guid.NewGuid().ToString("D"));
+        using var deniedWorkspace = await crossWorkspace.GetAsync("/api/agents");
+        Assert.AreEqual(HttpStatusCode.Forbidden, deniedWorkspace.StatusCode);
+
+        using var revoked = await browser.DeleteAsync($"/api/identity/pat/{tokenId:D}");
+        Assert.AreEqual(HttpStatusCode.NoContent, revoked.StatusCode);
+        using var deniedAfterRevocation = await tokenClient.GetAsync("/api/agents");
+        Assert.AreEqual(HttpStatusCode.Unauthorized, deniedAfterRevocation.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenPageUsesAntiforgeryAndNeverDisplaysExistingSecrets()
+    {
+        await using var factory = Factory("Local");
+        using var browser = UnredirectedClient(factory);
+        await BootstrapAsync(browser, "pat-page-user");
+
+        using var page = await browser.GetAsync("/account/pat");
+        Assert.AreEqual(HttpStatusCode.OK, page.StatusCode);
+        var html = await page.Content.ReadAsStringAsync();
+        StringAssert.Contains(html, "Personal access tokens");
+        StringAssert.Contains(html, "Create a token");
+        _ = AntiforgeryToken(html);
+
+        using var missingAntiforgery = await browser.PostAsync(
+            "/account/pat?handler=RevokeAll",
+            new FormUrlEncodedContent([]));
+        Assert.AreEqual(HttpStatusCode.BadRequest, missingAntiforgery.StatusCode);
+    }
 
     [TestMethod]
     public async Task AuthenticatedPrincipalCanPersistOwnThemePreference()

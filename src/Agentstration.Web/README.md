@@ -93,6 +93,8 @@ Authenticated users can read and update their own profile preferences through `G
 
 The Console exposes `/settings/profile` for reviewing the current Principal and explicitly selecting the system, light, or dark appearance. The selection is saved immediately through the same preference state used by the Console and Workplace shell theme controls. Credential management remains isolated at `/account/security`.
 
+Personal access tokens are managed at `/account/pat` and through `/api/identity/pat`. Each token is bound to one Workspace, expires within 365 days, and can only reduce the caller's live permissions. The secret is shown once and only a digest is stored. Token creation and revocation require an interactive session; PATs cannot administer PATs or obtain Platform administrator access.
+
 Platform administrators can list, create, enable, and disable local accounts from **Organization > Members** or `/api/identity/accounts`. Member details manage the current Workspace role through `/api/identity/workspaces/{workspaceId}/memberships`; the service prevents removal or demotion of the final Owner.
 
 Member details also manage the instance-level Platform administrator grant. The lifecycle API under `/api/identity/platform-administrators` supports listing, granting, and revoking administrators while preventing self-lockout and removal of the last active administrator. Transfer administration by granting and authenticating the successor before that successor disables or revokes the predecessor.

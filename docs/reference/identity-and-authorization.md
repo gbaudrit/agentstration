@@ -5,7 +5,7 @@ sidebar_position: 7
 
 # Identity and authorization reference
 
-This document is the consolidated description of the identity vertical implemented in Agentstration. It describes current behavior, not a target architecture. The normative decisions are ADR-0042 through ADR-0047.
+This document is the consolidated description of the identity vertical implemented in Agentstration. It describes current behavior, not a target architecture. The normative decisions are ADR-0042 through ADR-0047 and ADR-0069.
 
 ## Delivered scope
 
@@ -15,6 +15,7 @@ Agentstration now provides:
 - interactive OIDC authentication and JWT Bearer validation through standard ASP.NET Core handlers;
 - a provider-neutral Agentstration `Principal` resolved from every authenticated caller;
 - Principal-scoped profile preferences shared by Console and Workplace;
+- revocable, permission-limited and Workspace-scoped personal access tokens;
 - exact external identity mapping by `(Issuer, Subject)`;
 - canonical Tenant and Workspace memberships;
 - built-in Workspace roles and contextual permissions;
@@ -34,9 +35,11 @@ flowchart TB
     Local[Local ASP.NET Core Identity account] --> Cookie[Application cookie]
     OIDC[External OIDC provider] --> OidcCookie[OIDC application cookie]
     OAuth[OAuth client] --> Bearer[JWT Bearer access token]
+    PAT[Personal access token] --> PatClaims[Validated PAT ClaimsPrincipal]
     Cookie --> Claims[Validated ClaimsPrincipal]
     OidcCookie --> Claims
     Bearer --> Claims
+    PatClaims --> Resolver
     Claims --> Resolver[PrincipalResolutionMiddleware]
     Resolver -->|local AccountId| LocalLink[LocalIdentity]
     Resolver -->|exact iss + sub| ExternalLink[ExternalIdentity]
@@ -106,9 +109,9 @@ Set `Agentstration:Authentication:Mode` to one of:
 
 | Mode | Interactive authentication | API authentication | Availability |
 | --- | --- | --- | --- |
-| `Local` | ASP.NET Core Identity application cookie | application cookie for the standalone same-session API | default, offline |
-| `Oidc` | OIDC authorization code with PKCE, persisted application cookie | JWT Bearer or trusted same-instance cookie | requires configured provider |
-| `Hybrid` | local Identity or explicit OIDC challenge | JWT Bearer or trusted same-instance cookie | local and external accounts |
+| `Local` | ASP.NET Core Identity application cookie | application cookie or PAT | default, offline |
+| `Oidc` | OIDC authorization code with PKCE, persisted application cookie | JWT Bearer, PAT, or trusted same-instance cookie | requires configured provider |
+| `Hybrid` | local Identity or explicit OIDC challenge | JWT Bearer, PAT, or trusted same-instance cookie | local and external accounts |
 | `Development` | isolated deterministic development handler | same development scheme | Development/Testing only |
 | `Disabled` | no authenticated caller | none | Development/Testing only |
 
@@ -133,7 +136,7 @@ UseAuthentication
     -> UseAuthorization
 ```
 
-`PrincipalResolutionMiddleware` resolves a local account through the dedicated AccountId claim, or an external caller through exact `iss + sub`. A missing link, missing Principal, or disabled Principal does not produce an Agentstration principal feature.
+`PrincipalResolutionMiddleware` resolves a local account through the dedicated AccountId claim, an external caller through exact `iss + sub`, or a validated PAT through the trusted Principal and Workspace claims produced by the PAT authentication handler. A missing link, missing Principal, disabled Principal, revoked PAT, or expired PAT does not produce an Agentstration principal feature.
 
 For a resolved active Principal, the middleware loads active Workspace memberships and selects a Workspace in this order:
 
@@ -207,20 +210,29 @@ Membership administration supports list, assignment/change, and removal. It crea
 | Policy | Requirement |
 | --- | --- |
 | `agentstration:authenticated` | authenticated `ClaimsPrincipal` |
+| `agentstration:interactive-user` | authenticated caller that is not using a PAT |
 | `agentstration:platform-admin` | persisted Platform administrator grant for the resolved Principal |
 | `agentstration:workspace-reader` | `workspaces/read` in the current context |
 | `agentstration:workspace-admin` | `workspaces/write` in the current context |
 | `agentstration:authorization-reader` | `authorization/read` in the current context |
 | `agentstration:authorization-admin` | `authorization/write` in the current context |
-| `agentstration:agents:read` | `resources/read` in the current context |
-| `agentstration:agents:manage` | `resources/write` in the current context |
-| `agentstration:agents:run` | `runs/execute` in the current context |
+| `agentstration:resources:read` | `resources/read` in the current context |
+| `agentstration:resources:write` | `resources/write` in the current context |
+| `agentstration:resources:delete` | `resources/delete` in the current context |
 | `agentstration:runs:read` | `runs/read` in the current context |
-| `agentstration:flows:run` | `runs/execute` in the current context |
+| `agentstration:runs:execute` | `runs/execute` in the current context |
 
 `WorkspacePermissionHandler` evaluates contextual requests. `WorkspaceResourcePermissionHandler` additionally verifies that a loaded Workspace resource matches the Principal, Tenant, and selected Workspace. Endpoints declare policies; they do not inspect provider claims or implement role rules.
 
-The protected business verticals cover Management Agent list/get/put/delete routes, Identity and Workspace administration, and direct FlowRun creation, reading, events, cancellation, and queued execution. Flow execution persists the server-resolved Tenant, Workspace, and Principal scope and revalidates `runs/execute` in the worker. Runtime, Work, Workplace, MCP, SignalR, AEP, and legacy content routes do not yet have complete canonical Workspace authorization coverage.
+The protected business verticals cover Management resources, Flow, Runtime, Work and Workplace HTTP routes. Flow execution persists the server-resolved Tenant, Workspace, and Principal scope and revalidates `runs/execute` in the worker. MCP, SignalR, AEP, and legacy content routes still require a separate complete authorization review.
+
+## Personal access tokens
+
+PATs are delegated credentials for scripts and CLI clients. They are bound to one active human Principal and exactly one Workspace. Their effective authorization is always the intersection of the live RBAC result and the token allow-list; a token can reduce access but never increase it.
+
+Supported permissions are `workspaces/read`, `resources/read`, `resources/write`, `resources/delete`, `runs/read`, and `runs/execute`. Expiration is mandatory and limited to 365 days. The complete `agt_pat_…` Bearer value is returned once. Only its SHA-256 digest and a non-secret prefix are persisted. A revoked or expired token, a disabled Principal or Workspace, and an inactive Workspace membership all fail authentication immediately.
+
+PAT administration is deliberately interactive: a PAT cannot create, list, revoke, or use Platform administration. The owner can revoke one or all tokens; a Platform administrator can list metadata and revoke one or all tokens of another Principal. Revocation affects the next request and does not interrupt already-running work.
 
 ## Platform administrator lifecycle
 
@@ -255,7 +267,7 @@ There is no auto-linking by email, IdP tenant-to-Workspace mapping, provider use
 | `GET /api/auth/bootstrap` | anonymous | report one-time initialization state |
 | `POST /api/auth/bootstrap` | anonymous until initialized | create the first local administrator |
 | `POST /api/auth/local/login` | anonymous | local password sign-in |
-| `POST /api/auth/logout` | authenticated | end the current application session |
+| `POST /api/auth/logout` | InteractiveUser | end the current application session |
 | `GET /api/auth/oidc/login` | anonymous | start the configured OIDC challenge |
 
 ### Accounts and instance administration
@@ -278,7 +290,7 @@ There is no auto-linking by email, IdP tenant-to-Workspace mapping, provider use
 | Method and route | Policy | Purpose |
 | --- | --- | --- |
 | `GET /api/identity/context` | WorkspaceReader | return current Principal/Tenant/Workspace context |
-| `POST /api/identity/context/workspace` | authenticated plus service validation | select an accessible Workspace |
+| `POST /api/identity/context/workspace` | InteractiveUser plus service validation | select an accessible Workspace |
 | `GET /api/identity/organization` | AuthorizationReader | return current Tenant administration view |
 | `GET /api/identity/workspaces` | AuthorizationReader | list Workspaces |
 | `GET /api/identity/workspaces/{workspaceId}` | resource-based WorkspaceReader | read the selected Workspace |
@@ -292,8 +304,20 @@ There is no auto-linking by email, IdP tenant-to-Workspace mapping, provider use
 
 | Method and route | Policy | Purpose |
 | --- | --- | --- |
-| `GET /api/identity/preferences` | Authenticated resolved Principal | read the caller's preferences, defaulting to `System` |
-| `PUT /api/identity/preferences` | Authenticated resolved Principal | replace the caller's typed preferences |
+| `GET /api/identity/preferences` | InteractiveUser | read the caller's preferences, defaulting to `System` |
+| `PUT /api/identity/preferences` | InteractiveUser | replace the caller's typed preferences |
+
+### Personal access tokens
+
+| Method and route | Policy | Purpose |
+| --- | --- | --- |
+| `GET /api/identity/pat` | InteractiveUser | list the caller's non-secret PAT metadata |
+| `POST /api/identity/pat` | InteractiveUser | create a Workspace-scoped PAT and return its secret once |
+| `DELETE /api/identity/pat/{tokenId}` | InteractiveUser | revoke one of the caller's PATs |
+| `DELETE /api/identity/pat` | InteractiveUser | revoke all of the caller's PATs |
+| `GET /api/identity/principals/{principalId}/pat` | PlatformAdmin | list another Principal's PAT metadata |
+| `DELETE /api/identity/principals/{principalId}/pat/{tokenId}` | PlatformAdmin | revoke one PAT for another Principal |
+| `DELETE /api/identity/principals/{principalId}/pat` | PlatformAdmin | revoke all PATs for another Principal |
 
 API cookie handlers return 401/403 instead of redirecting. Independently deployed API clients should use audience-bound Bearer tokens.
 
@@ -305,6 +329,7 @@ The delivered UI includes:
 - `/login`: local form and/or OIDC action according to mode;
 - `/logout` and `/access-denied`;
 - `/account/security`: password change and sign-out-other-sessions;
+- `/account/pat`: create, inspect and revoke Workspace-scoped personal access tokens;
 - `/settings/organization/workspaces`: Workspace administration;
 - `/settings/organization/members`: local account creation, listing, enable/disable, and member navigation;
 - `/settings/organization/members/{principalId}`: Principal details, current Workspace role, membership removal, Platform administrator grant/revoke, and external identity link/unlink;
@@ -337,7 +362,7 @@ Remote or independently deployed APIs must leave this setting disabled and use B
 | Data | Default store |
 | --- | --- |
 | ASP.NET Core Identity accounts, credentials, lockout, tokens | `.agentstration/identity.db` |
-| Principals, preferences, links, Tenants, Workspaces, memberships, roles, grants, audit | `.agentstration/control-plane.db` |
+| Principals, preferences, links, Tenants, Workspaces, memberships, roles, grants, PAT metadata/digests, audit | `.agentstration/control-plane.db` |
 | Data Protection key ring | `.agentstration/data-protection-keys/` |
 
 `ConnectionStrings:Identity` overrides the Identity database. `Agentstration:Authentication:DataProtectionKeysPath` overrides the key directory.
@@ -367,6 +392,9 @@ external-identity.linked
 external-identity.unlinked
 workspace-membership.set
 workspace-membership.removed
+personal-access-token.created
+personal-access-token.revoked
+personal-access-token.revoked-all
 ```
 
 Audit records never contain passwords, password-policy errors, usernames, email addresses, issuer, subject, claims, tokens, prompts, or arbitrary request details. Records have no cascading foreign keys, so later account lifecycle changes cannot erase history. The first read model returns at most 200 latest events. Pagination, retention, export, cryptographic sealing, and SIEM delivery remain future work.
@@ -389,6 +417,7 @@ The offline MSTest suite covers:
 - Identity migration, legacy baseline verification, partial-schema refusal, and durable restart behavior;
 - Data Protection persistence and trusted Console-cookie forwarding boundaries;
 - per-Principal preference isolation, authenticated preference API validation, and UI theme persistence;
+- one-time PAT disclosure, hashed persistence, mandatory expiry, permission intersection, cross-Workspace denial, interactive-only administration and revocation;
 - durable security audit restart behavior and sensitive-value exclusion;
 - architecture rules preventing provider IAM SDKs, credential fields, or ASP.NET Identity dependencies in neutral layers.
 
@@ -399,7 +428,7 @@ dotnet build Agentstration.slnx --configuration Release --no-restore
 dotnet test Agentstration.slnx --configuration Release --no-build
 
 Build: 0 warnings, 0 errors
-Tests: 414 passed, 0 failed, 1 optional integration test skipped
+Tests: 461 passed, 0 failed, 2 optional provider integration tests skipped
 ```
 
 Tests require no Internet connection, external IdP, live model, or cloud service.
@@ -412,6 +441,7 @@ Tests require no Internet connection, external IdP, live model, or cloud service
 - local account deletion, retention, and anonymization policy;
 - password recovery/confirmation delivery channel, MFA, and passkeys;
 - workload authentication and authorization;
+- workload/service credentials distinct from human-delegated PATs;
 - complete Flow, Runtime, Work, Workplace, MCP, SignalR, AEP, and legacy-content authorization coverage;
 - reconciliation of the canonical Management Workspace ID with legacy content and Work/Workplace Workspace identities;
 - multi-writer database enforcement for last-Owner, last-PlatformAdmin, and final-authentication-method invariants;
@@ -425,3 +455,4 @@ Tests require no Internet connection, external IdP, live model, or cloud service
 - [ADR-0045 — Security events are an append-only Management log](../decisions/0045-security-events-are-an-append-only-management-log.md)
 - [ADR-0046 — Platform administration is explicitly transferable](../decisions/0046-platform-administration-is-explicitly-transferable.md)
 - [ADR-0047 — External identities are explicitly linked to Principals](../decisions/0047-external-identities-are-explicitly-linked-to-principals.md)
+- [ADR-0069 — Personal access tokens are revocable Workspace delegations](../decisions/0069-personal-access-tokens-are-revocable-workspace-delegations.md)

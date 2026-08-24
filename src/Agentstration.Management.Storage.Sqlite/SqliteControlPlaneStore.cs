@@ -22,6 +22,7 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     internal DbSet<RoleDefinitionRow> RoleDefinitions => Set<RoleDefinitionRow>();
     internal DbSet<RoleAssignmentRow> RoleAssignments => Set<RoleAssignmentRow>();
     internal DbSet<SecurityAuditRow> SecurityAuditEvents => Set<SecurityAuditRow>();
+    internal DbSet<PersonalAccessTokenRow> PersonalAccessTokens => Set<PersonalAccessTokenRow>();
     internal DbSet<TriggerOccurrenceRow> TriggerOccurrences => Set<TriggerOccurrenceRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -90,6 +91,37 @@ public sealed class SqliteControlPlaneStore(
             cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_AgentRevisionLookup ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.agentUid'), json_extract(Payload, '$.agentVersion'))",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS PersonalAccessTokens (
+                Id TEXT NOT NULL CONSTRAINT PK_PersonalAccessTokens PRIMARY KEY,
+                PrincipalId TEXT NOT NULL,
+                WorkspaceId TEXT NOT NULL,
+                Name TEXT NOT NULL,
+                TokenPrefix TEXT NOT NULL,
+                SecretHash BLOB NOT NULL,
+                PermissionsJson TEXT NOT NULL,
+                CreatedAt TEXT NOT NULL,
+                ExpiresAt TEXT NOT NULL,
+                LastUsedAt TEXT NULL,
+                RevokedAt TEXT NULL,
+                CONSTRAINT FK_PersonalAccessTokens_Users_PrincipalId FOREIGN KEY (PrincipalId) REFERENCES Users (Id) ON DELETE CASCADE,
+                CONSTRAINT FK_PersonalAccessTokens_Workspaces_WorkspaceId FOREIGN KEY (WorkspaceId) REFERENCES Workspaces (Id) ON DELETE CASCADE
+            )
+            """,
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_PersonalAccessTokens_TokenPrefix ON PersonalAccessTokens (TokenPrefix)",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_PersonalAccessTokens_PrincipalId ON PersonalAccessTokens (PrincipalId)",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_PersonalAccessTokens_WorkspaceId ON PersonalAccessTokens (WorkspaceId)",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_PersonalAccessTokens_ExpiresAt ON PersonalAccessTokens (ExpiresAt)",
             cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_DeploymentRevision ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.revisionName'))",
@@ -398,6 +430,7 @@ public static class SqliteControlPlaneServiceCollectionExtensions
         services.AddSingleton<SqliteIdentityStore>();
         services.AddSingleton<IIdentityStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());
         services.AddSingleton<ISecurityAuditStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());
+        services.AddSingleton<IPersonalAccessTokenStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());
         return services;
     }
 }
