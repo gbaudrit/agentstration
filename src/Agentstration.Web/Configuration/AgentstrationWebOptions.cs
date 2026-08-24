@@ -3,7 +3,6 @@ namespace Agentstration.Web.Configuration;
 public sealed class AgentstrationWebOptions
 {
     public const string SectionName = "Agentstration";
-    public bool UseSimulatedData { get; set; } = true;
     public ApiEndpointOptions ManagementApi { get; set; } = new();
     public ApiEndpointOptions RuntimeApi { get; set; } = new();
     public ApiEndpointOptions WorkApi { get; set; } = new();

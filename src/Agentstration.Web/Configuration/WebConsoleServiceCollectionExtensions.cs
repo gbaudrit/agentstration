@@ -34,17 +34,8 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 
         var configured = configuration.GetSection(AgentstrationWebOptions.SectionName).Get<AgentstrationWebOptions>() ?? new();
-        if (configured.UseSimulatedData)
-        {
-            services.AddScoped<MockApiClient>();
-            services.AddScoped<IRuntimeApiClient>(provider => provider.GetRequiredService<MockApiClient>());
-            services.AddScoped<IAgentstrationEventStream>(provider => provider.GetRequiredService<MockApiClient>());
-        }
-        else
-        {
-            AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi);
-            services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
-        }
+        AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi);
+        services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
 
         // Tasks are always real Work API resources, even when unrelated Console
         // projections still use deterministic demonstration data.
@@ -58,9 +49,8 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi);
         AddClient<ToolGovernanceAuditApiClient, IToolGovernanceAuditClient>(services, configured.RuntimeApi);
 
-        // Agent and model management always use the canonical HTTP APIs so that
-        // edits and Runtime activation observe the same persisted generations and
-        // profiles, even when unrelated dashboard widgets use simulated data.
+        // Agent and model management use the canonical HTTP APIs so edits,
+        // deployments, and Runtime activation observe the same persisted state.
         AddClient<ManagementApiClient, IManagementApiClient>(services, configured.ManagementApi);
         AddClient<HttpUserPreferencesClient, IUserPreferencesClient>(services, configured.ManagementApi);
         AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
@@ -244,8 +234,8 @@ public static class WebConsoleServiceCollectionExtensions
         return builder;
     }
 
-    private static bool Validate(AgentstrationWebOptions options) => ValidateEndpoint(options.WorkApi) && (options.UseSimulatedData ||
-        ValidateEndpoint(options.ManagementApi) && ValidateEndpoint(options.RuntimeApi) && ValidateEndpoint(options.FlowApi)) &&
+    private static bool Validate(AgentstrationWebOptions options) => ValidateEndpoint(options.WorkApi) &&
+        ValidateEndpoint(options.ManagementApi) && ValidateEndpoint(options.RuntimeApi) && ValidateEndpoint(options.FlowApi) &&
         (string.IsNullOrWhiteSpace(options.WorkplaceBaseUrl) || Uri.TryCreate(options.WorkplaceBaseUrl, UriKind.Absolute, out var workplace) && workplace.Scheme is "http" or "https");
 
     private static bool ValidateEndpoint(ApiEndpointOptions options) =>
