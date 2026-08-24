@@ -14,57 +14,58 @@ public static class WorkplaceEndpoints
 {
     public static IEndpointRouteBuilder MapAgentstrationWorkplaceApi(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/workplace/workspaces", ListWorkspacesAsync);
+        endpoints.MapGet("/api/workplace/workspaces", ListWorkspacesAsync)
+            .RequireAuthorization(AgentstrationPolicies.WorkspaceReader);
         var workspaces = endpoints.MapGroup("/api/workspaces/{workspaceName}")
             .RequireAuthorization(AgentstrationPolicies.Authenticated)
             .AddEndpointFilter(RequireCurrentWorkspaceAsync);
-        workspaces.MapGet("", GetWorkspaceAsync);
-        workspaces.MapGet("/dashboards", ListDashboardsAsync);
-        workspaces.MapGet("/dashboards/{dashboardName}", GetDashboardAsync);
-        workspaces.MapGet("/dashboard", GetDefaultDashboardAsync);
-        endpoints.MapGet("/api/entries", ListEntriesAsync);
-        endpoints.MapGet("/api/entries/{entryName}", GetEntryAsync);
-        endpoints.MapGet("/api/management/entries", ListEntryDraftsAsync);
-        endpoints.MapGet("/api/management/entries/{entryName}", GetEntryDraftAsync);
-        endpoints.MapPut("/api/management/entries/{entryName}", PutEntryDraftAsync);
-        endpoints.MapPost("/api/management/entries/{entryName}/validate", ValidateEntryDraftAsync);
-        endpoints.MapPost("/api/management/entries/{entryName}/publish", PublishEntryDraftAsync);
-        endpoints.MapGet("/api/namespaces/{namespace}/entries/{entryName}", GetNamespacedEntryAsync);
-        endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}", GetNamespacedEntryDraftAsync);
-        endpoints.MapPut("/api/namespaces/{namespace}/management/entries/{entryName}", PutNamespacedEntryDraftAsync);
-        endpoints.MapPost("/api/namespaces/{namespace}/management/entries/{entryName}/publish", PublishNamespacedEntryDraftAsync);
-        endpoints.MapGet("/api/management/entries/{entryName}/dependencies", GetEntryDependenciesAsync);
-        endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}/dependencies", GetNamespacedEntryDependenciesAsync);
-        endpoints.MapGet("/api/resources", ListResourcesAsync);
+        workspaces.MapGet("", GetWorkspaceAsync).RequireAuthorization(AgentstrationPolicies.WorkspaceReader);
+        workspaces.MapGet("/dashboards", ListDashboardsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        workspaces.MapGet("/dashboards/{dashboardName}", GetDashboardAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        workspaces.MapGet("/dashboard", GetDefaultDashboardAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        endpoints.MapGet("/api/entries", ListEntriesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        endpoints.MapGet("/api/entries/{entryName}", GetEntryAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        endpoints.MapGet("/api/management/entries", ListEntryDraftsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        endpoints.MapGet("/api/management/entries/{entryName}", GetEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        endpoints.MapPut("/api/management/entries/{entryName}", PutEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        endpoints.MapPost("/api/management/entries/{entryName}/validate", ValidateEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        endpoints.MapPost("/api/management/entries/{entryName}/publish", PublishEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        endpoints.MapGet("/api/namespaces/{namespace}/entries/{entryName}", GetNamespacedEntryAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}", GetNamespacedEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        endpoints.MapPut("/api/namespaces/{namespace}/management/entries/{entryName}", PutNamespacedEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        endpoints.MapPost("/api/namespaces/{namespace}/management/entries/{entryName}/publish", PublishNamespacedEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        endpoints.MapGet("/api/management/entries/{entryName}/dependencies", GetEntryDependenciesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}/dependencies", GetNamespacedEntryDependenciesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        endpoints.MapGet("/api/resources", ListResourcesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         var dashboardManagement = endpoints.MapGroup("/api/management/workspaces/{workspaceName}/dashboards")
-            .RequireAuthorization(AgentstrationPolicies.WorkspaceAdmin)
+            .RequireAuthorization(AgentstrationPolicies.Authenticated)
             .AddEndpointFilter(RequireCurrentWorkspaceAsync);
-        dashboardManagement.MapGet("", ListDashboardDraftsAsync);
-        dashboardManagement.MapGet("/{dashboardName}", GetDashboardDraftAsync);
-        dashboardManagement.MapPut("/{dashboardName}", PutDashboardDraftAsync);
-        dashboardManagement.MapPost("/{dashboardName}/publish", PublishDashboardDraftAsync);
-        dashboardManagement.MapDelete("/{dashboardName}", DeleteDashboardAsync);
+        dashboardManagement.MapGet("", ListDashboardDraftsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        dashboardManagement.MapGet("/{dashboardName}", GetDashboardDraftAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        dashboardManagement.MapPut("/{dashboardName}", PutDashboardDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        dashboardManagement.MapPost("/{dashboardName}/publish", PublishDashboardDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        dashboardManagement.MapDelete("/{dashboardName}", DeleteDashboardAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
         workspaces.MapPost("/entries/{entryName}/interactions", SubmitEntryAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         workspaces.MapPost("/namespaces/{namespace}/entries/{entryName}/interactions", SubmitNamespacedEntryAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
-        workspaces.MapGet("/interactions", ListInteractionsAsync);
-        workspaces.MapGet("/interactions/{interactionId:guid}", GetInteractionAsync);
-        workspaces.MapGet("/interactions/{interactionId:guid}/messages", GetMessagesAsync);
+        workspaces.MapGet("/interactions", ListInteractionsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/interactions/{interactionId:guid}", GetInteractionAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/interactions/{interactionId:guid}/messages", GetMessagesAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapPost("/interactions/{interactionId:guid}/messages", AddMessageAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
-        workspaces.MapGet("/interactions/{interactionId:guid}/pending-actions", GetPendingActionsAsync);
+        workspaces.MapGet("/interactions/{interactionId:guid}/pending-actions", GetPendingActionsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapPost("/interactions/{interactionId:guid}/pending-actions/{pendingActionId:guid}/responses", RespondPendingActionAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
-        workspaces.MapGet("/tasks", ListTasksAsync);
-        workspaces.MapGet("/tasks/{taskId:guid}", GetTaskAsync);
-        workspaces.MapPost("/tasks/{taskId:guid}/pause", PauseTaskAsync);
-        workspaces.MapPost("/tasks/{taskId:guid}/resume", ResumeTaskAsync);
-        workspaces.MapPost("/tasks/{taskId:guid}/cancel", CancelTaskAsync);
-        workspaces.MapGet("/tasks/{taskId:guid}/activities", GetActivitiesAsync);
-        workspaces.MapGet("/tasks/{taskId:guid}/results", GetResultsAsync);
-        workspaces.MapGet("/tasks/{taskId:guid}/artifacts", GetArtifactsAsync);
-        workspaces.MapGet("/tasks/{taskId:guid}/artifacts/{artifactId:guid}/content", GetArtifactContentAsync);
-        workspaces.MapGet("/notifications", GetNotificationsAsync);
-        workspaces.MapGet("/notifications/unread-count", GetUnreadCountAsync);
-        workspaces.MapPost("/notifications/{notificationId:guid}/read", MarkReadAsync);
-        workspaces.MapPost("/notifications/read-all", MarkAllReadAsync);
+        workspaces.MapGet("/tasks", ListTasksAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/tasks/{taskId:guid}", GetTaskAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapPost("/tasks/{taskId:guid}/pause", PauseTaskAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/tasks/{taskId:guid}/resume", ResumeTaskAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/tasks/{taskId:guid}/cancel", CancelTaskAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapGet("/tasks/{taskId:guid}/activities", GetActivitiesAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/tasks/{taskId:guid}/results", GetResultsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/tasks/{taskId:guid}/artifacts", GetArtifactsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/tasks/{taskId:guid}/artifacts/{artifactId:guid}/content", GetArtifactContentAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/notifications", GetNotificationsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/notifications/unread-count", GetUnreadCountAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapPost("/notifications/{notificationId:guid}/read", MarkReadAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/notifications/read-all", MarkAllReadAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         return endpoints;
     }
 

@@ -17,7 +17,7 @@ public static class AuthenticationEndpoints
         group.MapGet("/bootstrap", BootstrapStatusAsync).AllowAnonymous();
         group.MapPost("/bootstrap", BootstrapAsync).AllowAnonymous();
         group.MapPost("/local/login", LoginAsync).AllowAnonymous();
-        group.MapPost("/logout", LogoutAsync).RequireAuthorization(AgentstrationPolicies.Authenticated);
+        group.MapPost("/logout", LogoutAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapGet("/oidc/login", OidcLogin).AllowAnonymous();
         return endpoints;
     }

@@ -8,8 +8,8 @@ namespace Agentstration.Web.Api.Runtime;
 
 internal sealed class GetAgentRuntimeReadinessEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/{agentName}/readiness", HandleAsync);
-    public static void MapNamespaced(RouteGroupBuilder group) => group.MapGet("/{agentName}/readiness", HandleNamespacedAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{agentName}/readiness", HandleAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadResources);
+    public static void MapNamespaced(RouteGroupBuilder group) => group.MapGet("/{agentName}/readiness", HandleNamespacedAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadResources);
 
     private static Task<IResult> HandleAsync(
         string agentName,

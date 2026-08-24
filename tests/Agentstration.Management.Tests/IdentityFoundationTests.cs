@@ -57,6 +57,106 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
+    public async Task PersonalAccessTokenStoresOnlyAHashAndRevocationIsDurable()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
+        var store = fixture.Services.GetRequiredService<IPersonalAccessTokenStore>();
+
+        var created = await service.CreateAsync(
+            new(
+                "Test token",
+                fixture.Context.Current.WorkspaceId,
+                [AuthorizationPermissions.ResourcesRead],
+                DateTimeOffset.UtcNow.AddDays(30)),
+            default);
+        var secret = created.Token[(created.Metadata.TokenPrefix.Length + 1)..];
+        var credential = await store.GetCredentialAsync(created.Metadata.Id, default);
+
+        Assert.IsNotNull(credential);
+        CollectionAssert.AreEqual(PersonalAccessTokenService.HashSecret(secret), credential.SecretHash);
+        Assert.IsFalse(System.Text.Encoding.UTF8.GetString(credential.SecretHash).Contains(secret, StringComparison.Ordinal));
+        Assert.IsTrue(await service.RevokeCurrentAsync(created.Metadata.Id, default));
+        Assert.IsNotNull((await store.GetCredentialAsync(created.Metadata.Id, default))?.Token.RevokedAt);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenRestrictionIntersectsLiveWorkspacePermissions()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var authorization = fixture.Services.GetRequiredService<IAuthorizationService>();
+        var current = fixture.Context.Current;
+        var restricted = current with
+        {
+            Restriction = new AuthorizationRestriction(
+                Guid.NewGuid(),
+                current.WorkspaceId,
+                new HashSet<string>([AuthorizationPermissions.ResourcesRead], StringComparer.Ordinal))
+        };
+
+        var permissions = await authorization.GetPermissionsAsync(restricted, default);
+        Assert.IsTrue(permissions.Contains(AuthorizationPermissions.ResourcesRead));
+        Assert.IsFalse(permissions.Contains(AuthorizationPermissions.ResourcesWrite));
+
+        var wrongWorkspace = restricted with { WorkspaceId = Guid.NewGuid() };
+        Assert.AreEqual(0, (await authorization.GetPermissionsAsync(wrongWorkspace, default)).Count);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenCannotManagePersonalAccessTokens()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
+        var current = fixture.Context.Current;
+        fixture.Context.Initialize(current with
+        {
+            Restriction = new AuthorizationRestriction(
+                Guid.NewGuid(),
+                current.WorkspaceId,
+                new HashSet<string>([AuthorizationPermissions.ResourcesRead], StringComparer.Ordinal))
+        });
+
+        await Assert.ThrowsAsync<AuthorizationDeniedException>(() => service.ListCurrentAsync(default));
+    }
+
+    [TestMethod]
+    public async Task PlatformAdministratorCanRevokeAnotherPrincipalsPersonalAccessToken()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
+        var store = fixture.Services.GetRequiredService<IPersonalAccessTokenStore>();
+        var identities = fixture.Services.GetRequiredService<IIdentityStore>();
+        var current = fixture.Context.Current;
+        var now = DateTimeOffset.UtcNow;
+        var principal = new Principal(
+            Guid.NewGuid(),
+            PrincipalKind.Human,
+            "Token owner",
+            null,
+            PrincipalStatus.Active,
+            now);
+        var token = new PersonalAccessToken(
+            Guid.NewGuid(),
+            principal.Id,
+            current.WorkspaceId,
+            "Automation",
+            $"{PersonalAccessTokenService.TokenPrefix}{Guid.NewGuid():N}",
+            [AuthorizationPermissions.ResourcesRead],
+            now,
+            now.AddDays(30),
+            null,
+            null);
+        await identities.AddPrincipalAsync(principal, default);
+        await identities.AddPlatformAdministratorAsync(new PlatformAdministrator(current.PrincipalId, now), default);
+        await store.AddAsync(
+            new PersonalAccessTokenCredential(token, PersonalAccessTokenService.HashSecret("secret")),
+            default);
+
+        Assert.IsTrue(await service.RevokeAsPlatformAdministratorAsync(principal.Id, token.Id, default));
+        Assert.IsNotNull((await store.GetCredentialAsync(token.Id, default))?.Token.RevokedAt);
+    }
+
+    [TestMethod]
     public async Task BootstrapRepairsMissingWorkspaceMembershipAndOwnerAssignment()
     {
         await using var fixture = await IdentityFixture.CreateAsync();

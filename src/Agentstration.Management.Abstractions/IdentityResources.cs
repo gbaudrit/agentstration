@@ -110,7 +110,11 @@ public static class AuthorizationScopes
     public static string Workspace(Guid workspaceId) => $"/workspaces/{workspaceId:D}";
 }
 
-public sealed record RequestContext(Guid PrincipalId, Guid TenantId, Guid WorkspaceId)
+public sealed record RequestContext(
+    Guid PrincipalId,
+    Guid TenantId,
+    Guid WorkspaceId,
+    AuthorizationRestriction? Restriction = null)
 {
     public Guid UserId => PrincipalId;
 }
