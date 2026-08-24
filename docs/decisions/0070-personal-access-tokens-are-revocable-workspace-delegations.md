@@ -1,4 +1,4 @@
-# ADR-0069: Personal access tokens are revocable Workspace delegations
+# ADR-0070: Personal access tokens are revocable Workspace delegations
 
 Status: Accepted — 2026-08-24
 

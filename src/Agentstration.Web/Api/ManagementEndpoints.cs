@@ -22,6 +22,7 @@ public static class ManagementEndpoints
         PurgeAgentRevisionEndpoint.Map(group);
         CreateDeploymentEndpoint.Map(group);
         GetDeploymentEndpoint.Map(group);
+        ListDeploymentsEndpoint.Map(group);
         StartDeploymentEndpoint.Map(group);
         StopDeploymentEndpoint.Map(group);
         ReconcileDeploymentEndpoint.Map(group);

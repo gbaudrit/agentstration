@@ -5,7 +5,7 @@ sidebar_position: 7
 
 # Identity and authorization reference
 
-This document is the consolidated description of the identity vertical implemented in Agentstration. It describes current behavior, not a target architecture. The normative decisions are ADR-0042 through ADR-0047 and ADR-0069.
+This document is the consolidated description of the identity vertical implemented in Agentstration. It describes current behavior, not a target architecture. The normative decisions are ADR-0042 through ADR-0047 and ADR-0070.
 
 ## Delivered scope
 
@@ -455,4 +455,4 @@ Tests require no Internet connection, external IdP, live model, or cloud service
 - [ADR-0045 — Security events are an append-only Management log](../decisions/0045-security-events-are-an-append-only-management-log.md)
 - [ADR-0046 — Platform administration is explicitly transferable](../decisions/0046-platform-administration-is-explicitly-transferable.md)
 - [ADR-0047 — External identities are explicitly linked to Principals](../decisions/0047-external-identities-are-explicitly-linked-to-principals.md)
-- [ADR-0069 — Personal access tokens are revocable Workspace delegations](../decisions/0069-personal-access-tokens-are-revocable-workspace-delegations.md)
+- [ADR-0070 — Personal access tokens are revocable Workspace delegations](../decisions/0070-personal-access-tokens-are-revocable-workspace-delegations.md)

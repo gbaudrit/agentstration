@@ -13,7 +13,6 @@ public static class ManagementDemoData
         var extensions = services.GetRequiredService<ExtensionRegistrationManagementService>();
         var extensionDiscovery = services.GetRequiredService<ExtensionSourceDiscoveryService>();
         var profiles = services.GetRequiredService<ModelProfileManagementService>();
-        var runtimes = services.GetRequiredService<RuntimeProfileManagementService>();
         var store = services.GetRequiredService<IControlPlaneStore>();
         var configuration = services.GetRequiredService<IConfiguration>();
         _ = await extensionDiscovery.DiscoverAsync(cancellationToken);
@@ -65,27 +64,6 @@ public static class ManagementDemoData
                     DisplayName = "LocalAI via AEP",
                     Extension = new ResourceReference("localai-extension"),
                     ContributionId = "localai"
-                }
-            }, cancellationToken);
-        }
-
-        if (await runtimes.GetAsync("maf-default", cancellationToken) is null)
-        {
-            await runtimes.CreateAsync(new RuntimeProfileResource
-            {
-                ApiVersion = ManagementApiVersions.CoreV1,
-                Kind = ResourceKinds.RuntimeProfile,
-                Metadata = new ResourceMetadata { Name = "maf-default" },
-                Definition = new RuntimeProfileProperties
-                {
-                    DisplayName = "Microsoft Agent Framework",
-                    RuntimeType = "microsoft-agent-framework",
-                    Execution = new RuntimeExecutionDefaults
-                    {
-                        SessionMode = RuntimeSessionMode.Transient,
-                        ToolInvocation = RuntimeToolInvocationMode.Automatic,
-                        Streaming = StreamingMode.Automatic
-                    }
                 }
             }, cancellationToken);
         }
@@ -149,7 +127,7 @@ public static class ManagementDemoData
 
         var revisions = await store.ListAllAsync<AgentRevision>(ResourceKinds.AgentRevision, cancellationToken);
         var revision = revisions.Where(value => value.Value.AgentUid == agent.Value.Uid).OrderByDescending(value => value.Value.CreatedAt).FirstOrDefault();
-        var spec = new AgentDeploymentSpec { Environment = "local", RuntimeProfileName = "maf-default", HostingMode = AgentHostingMode.InProcess };
+        var spec = new AgentDeploymentSpec { Environment = "local", RuntimeProfileName = "maf-builtin", HostingMode = AgentHostingMode.InProcess };
         revision ??= await management.CreateRevisionAsync(name, spec, cancellationToken);
         var deployment = await management.GetDeploymentAsync(name, cancellationToken)
             ?? await management.CreateDeploymentAsync(name, revision.Value.Metadata.Name, spec, cancellationToken);
