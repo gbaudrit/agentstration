@@ -85,6 +85,7 @@ builder.Services.AddAgentstrationModelProviders(
     useManagedProfileResolver);
 builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
+builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddRazorPages();
@@ -161,6 +162,7 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 app.UseAuthentication();
 app.UseMiddleware<PrincipalResolutionMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
+app.UseMiddleware<StandardManagementDataMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
@@ -196,6 +198,7 @@ await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Life
 await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 if (app.Services.GetRequiredService<ICurrentRequestContext>().IsInitialized)
 {
+    await app.Services.GetRequiredService<StandardRuntimeProfileSeeder>().EnsureAsync(app.Lifetime.ApplicationStopping);
     await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
     if (!app.Environment.IsEnvironment("Testing"))
         await InteractiveFlowDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);

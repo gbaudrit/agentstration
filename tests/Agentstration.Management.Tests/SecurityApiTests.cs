@@ -324,8 +324,15 @@ public sealed class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.Conflict, repeated.StatusCode);
 
         using var agents = await client.GetAsync("/api/agents");
+        var standardRuntime = await client.GetFromJsonAsync<RuntimeProfileResource>("/api/runtimeprofiles/maf-builtin");
         using var platform = await client.GetAsync("/api/identity/platform");
         Assert.AreEqual(HttpStatusCode.OK, agents.StatusCode);
+        Assert.IsNotNull(standardRuntime);
+        Assert.AreEqual("microsoft-agent-framework", standardRuntime.Definition.RuntimeType);
+        Assert.AreEqual(RuntimeSessionMode.Transient, standardRuntime.Definition.Execution.SessionMode);
+        Assert.AreEqual(RuntimeToolInvocationMode.Automatic, standardRuntime.Definition.Execution.ToolInvocation);
+        Assert.AreEqual(StreamingMode.Automatic, standardRuntime.Definition.Execution.Streaming);
+        Assert.AreEqual("true", standardRuntime.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
         Assert.AreEqual(HttpStatusCode.OK, platform.StatusCode);
 
         await using var scope = factory.Services.CreateAsyncScope();
