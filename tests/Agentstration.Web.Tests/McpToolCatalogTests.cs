@@ -18,24 +18,22 @@ namespace Agentstration.Web.Tests;
 public sealed class McpToolCatalogTests
 {
     [TestMethod]
-    public async Task GenericHttpProviderDiscoversAndInvokesOfficialMcpTool()
+    public async Task ServerMcpEndpointRemainsAvailableWithoutLegacyPlatformTools()
     {
         await using var host = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         var provider = Provider();
-        var tool = Tool(provider.Metadata.Name);
         var adapter = Adapter(host);
-        var store = new FakeStore(provider, tool);
-        var catalog = new McpToolCatalog(store, adapter);
 
         var discovery = await adapter.DiscoverAsync(provider, default);
-        var runtime = (await catalog.ResolveAsync([tool.Metadata.Name])).Single();
-        var pipeline = new ToolExecutionPipeline(new McpToolInvoker(store, adapter));
-        var result = await pipeline.ExecuteAsync(Context(runtime));
 
-        Assert.IsTrue(discovery.Tools.Any(value => value.ExternalId == "list_workspaces"));
         Assert.IsTrue(discovery.Capabilities["tools"]);
-        Assert.IsFalse(runtime is AITool);
-        Assert.IsNotNull(result);
+        Assert.IsEmpty(discovery.Tools);
+        var legacyTools = new[]
+        {
+            "list_workspaces", "list_inboxes", "ingest_text", "ingest_url", "search_memory",
+            "create_mission", "get_mission", "list_mission_runs", "run_mission_now"
+        };
+        Assert.IsFalse(discovery.Tools.Any(tool => legacyTools.Contains(tool.ExternalId, StringComparer.Ordinal)));
     }
 
     [TestMethod]
