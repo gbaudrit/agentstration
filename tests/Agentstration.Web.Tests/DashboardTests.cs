@@ -1,12 +1,15 @@
+using Agentstration.Flow;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json;
 
 namespace Agentstration.Web.Tests;
 
@@ -77,8 +80,9 @@ public sealed class DashboardTests
         Assert.AreEqual("Partially unavailable", snapshot.Status);
         Assert.AreEqual(2, snapshot.RunningTasks);
         Assert.AreEqual(1, snapshot.AttentionCount);
-        var source = snapshot.Sources.Single(item => item.Name == "Runtime Runs");
+        var source = snapshot.Sources.Single(item => item.Name == "Agents Run");
         Assert.AreEqual(UiStatus.Danger, source.Severity);
+        Assert.AreEqual("/agent-runs", source.Url);
     }
 
     [TestMethod]
@@ -97,6 +101,38 @@ public sealed class DashboardTests
 
         Assert.AreEqual("No active deployments", snapshot.Status);
         Assert.AreEqual(UiStatus.Info, PlatformDashboardService.ToStatus(snapshot.Status));
+    }
+
+    [TestMethod]
+    public async Task DashboardReportsRunningAndInputWaitingFlowRuns()
+    {
+        var fake = new MockApiClient(new FixedTimeProvider(Now),
+        [
+            CreateFlowRun("flowrun-running", FlowRunStatus.Running),
+            CreateFlowRun("flowrun-waiting", FlowRunStatus.WaitingForInput)
+        ]);
+        var service = new PlatformDashboardService(
+            new StubManagementClient([], [], []),
+            fake,
+            new StubWorkClient(new(0, 0, 0, 0, 0)),
+            fake,
+            new StubModelProvidersClient([]),
+            NullLogger<PlatformDashboardService>.Instance);
+
+        var load = service.Start(CancellationToken.None);
+        var snapshot = await load.Snapshot;
+        var metric = await load.FlowRuns;
+
+        Assert.AreEqual(1, snapshot.RunningFlowRuns);
+        Assert.AreEqual(1, snapshot.WaitingForInputFlowRuns);
+        Assert.AreEqual(1, snapshot.AttentionCount);
+        Assert.AreEqual("1", metric.Value);
+        Assert.AreEqual("1 awaiting input", metric.Detail);
+        Assert.AreEqual(UiStatus.Warning, metric.Status);
+        var attention = snapshot.AttentionItems.Single();
+        Assert.AreEqual("approval-flow", attention.Name);
+        Assert.AreEqual("Input required", attention.Status);
+        Assert.AreEqual("/flow-runs/flowrun-waiting", attention.Url);
     }
 
     [TestMethod]
@@ -147,6 +183,26 @@ public sealed class DashboardTests
         name,
         name,
         new ModelProviderPropertiesResponse(name, "aep", "local", "extension", "default", "configured", status, null, 1));
+
+    private static FlowRun CreateFlowRun(string id, FlowRunStatus status)
+    {
+        var workspaceId = new WorkspaceId(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var flowId = new FlowId("approval-flow");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-a"));
+        return new FlowRun
+        {
+            WorkspaceId = workspaceId,
+            Id = id,
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Status = status,
+            Trigger = FlowRunTrigger.Manual,
+            Scope = new FlowRunScope(Guid.Parse("22222222-2222-2222-2222-222222222222"), workspaceId, Guid.Parse("33333333-3333-3333-3333-333333333333")),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = Now,
+            DefinitionSnapshot = new FlowVersion(workspaceId, flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now)
+        };
+    }
 
     private sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
     {

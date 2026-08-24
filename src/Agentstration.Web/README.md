@@ -21,7 +21,7 @@ The current design system includes `StatusBadge`, `HealthIndicator`, `MetricCard
 dotnet run --project src/Agentstration.Web
 ```
 
-Open `http://localhost:5100`. Port `5080` belongs to Work API. The console provides Overview, Management, Agents, Model Profiles, Model Providers, Agent Deployments, Tasks, Flows, Runtime Runs, Flow Runs, Run Events, and Settings. Existing Workspaces, Ingest, and Missions routes remain available for the original content vertical.
+Open `http://localhost:5100`. Port `5080` belongs to Work API. The console provides Overview, Management, Agents, Model Profiles, Model Providers, Agent Deployments, Tasks, Flows, Agents Run, Flow Run, Run Events, and Settings. Existing Workspaces, Ingest, and Missions routes remain available for the original content vertical.
 
 ## Management resource editing
 

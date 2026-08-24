@@ -73,6 +73,8 @@ public sealed record PlatformSnapshot
     public int FailedTasks { get; init; }
     public int CompletedTasksLast24Hours { get; init; }
     public int EnabledFlows { get; init; }
+    public int RunningFlowRuns { get; init; }
+    public int WaitingForInputFlowRuns { get; init; }
     public int EnabledTriggers { get; init; }
     public int FailedTriggers { get; init; }
     public int ReadyModelProviders { get; init; }
@@ -81,4 +83,15 @@ public sealed record PlatformSnapshot
     public IReadOnlyList<ComponentHealth> AttentionItems { get; init; } = [];
     public IReadOnlyList<ComponentHealth> Sources { get; init; } = [];
 }
+public sealed record DashboardMetric(string Value, string? Detail, UiStatus Status);
+public sealed record PlatformDashboardLoad(
+    Task<DashboardMetric> DefinedAgents,
+    Task<DashboardMetric> ReadyDeployments,
+    Task<DashboardMetric> RuntimeRuns,
+    Task<DashboardMetric> RunningTasks,
+    Task<DashboardMetric> NeedsAttention,
+    Task<DashboardMetric> FlowRuns,
+    Task<DashboardMetric> EnabledTriggers,
+    Task<DashboardMetric> ModelProviders,
+    Task<PlatformSnapshot> Snapshot);
 public sealed record ComponentHealth(string Name, string Status, string Detail, UiStatus Severity, string? Url = null);

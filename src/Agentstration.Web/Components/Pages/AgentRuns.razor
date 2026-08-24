@@ -1,7 +1,6 @@
-@page "/runtime-runs"
+@page "/agent-runs"
 @implements IDisposable
 @inject IRuntimeApiClient Client
-<PageTitle>Runtime runs · Agentstration</PageTitle><PageHeader Title="Runtime runs" Description="Inspect technical agent runs, their duration and runtime outcome." />
+<PageTitle>Agents Run · Agentstration</PageTitle><PageHeader Title="Agents Run" Description="Inspect technical agent runs, their duration and runtime outcome." />
 @if(items is null){<LoadingState/>}else{<DataGrid TItem="ExecutionSummary" Items="items"><Header><tr><th>Run</th><th>Agent</th><th>Status</th><th>Started</th><th>Duration</th><th>Outcome</th></tr></Header><Row Context="item"><tr><td><code>@item.Id</code></td><td><strong>@item.Agent</strong></td><td><StatusBadge Text="@item.Status" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.StartedAt.LocalDateTime.ToString("g")</td><td>@(item.Duration?.ToString("g")??"Live")</td><td>@(item.Error??item.Result??"—")</td></tr></Row></DataGrid>}
 @code{private readonly CancellationTokenSource cancellation=new();private IReadOnlyList<ExecutionSummary>? items;protected override async Task OnInitializedAsync()=>items=await Client.GetExecutionsAsync(cancellation.Token);public void Dispose(){cancellation.Cancel();cancellation.Dispose();}}
-

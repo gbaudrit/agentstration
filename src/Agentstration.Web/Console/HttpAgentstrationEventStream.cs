@@ -74,7 +74,8 @@ public sealed class HttpAgentstrationEventStream(
         "Runtime",
         runEvent.Kind.ToString(),
         RuntimeSummary(run, runEvent),
-        run.Id);
+        run.Id,
+        Url: $"/runs/{Uri.EscapeDataString(run.Id)}");
 
     internal static EventListItem FromFlow(FlowRun run, FlowRunEvent runEvent) => new(
         runEvent.Timestamp,
@@ -82,7 +83,8 @@ public sealed class HttpAgentstrationEventStream(
         "Flow",
         runEvent.Type.ToString(),
         FlowSummary(run, runEvent),
-        run.Id);
+        run.Id,
+        Url: $"/flow-runs/{Uri.EscapeDataString(run.Id)}");
 
     private static string RuntimeLevel(RuntimeRunEvent runEvent) => runEvent.Kind switch
     {

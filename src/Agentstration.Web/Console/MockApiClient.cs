@@ -11,7 +11,7 @@ using Agentstration.Runtime.Contracts;
 
 namespace Agentstration.Web.Console;
 
-public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiClient, IRuntimeApiClient, IFlowApiClient
+public sealed class MockApiClient(TimeProvider timeProvider, IReadOnlyList<FlowRun>? configuredFlowRuns = null) : IManagementApiClient, IRuntimeApiClient, IFlowApiClient
 {
     private static readonly WorkspaceId MockWorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
     private static readonly RuntimeRunScope MockRuntimeScope = new(
@@ -21,6 +21,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
     private readonly Dictionary<string, ResourceSnapshot<AgentResource>> agents = CreateAgents();
     private readonly Dictionary<string, RuntimeRun> runs = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<RuntimeRunEvent>> runEvents = new(StringComparer.Ordinal);
+    private readonly IReadOnlyList<FlowRun> flowRuns = configuredFlowRuns ?? [];
     private DateTimeOffset Now => timeProvider.GetUtcNow();
 
     public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken)
@@ -216,7 +217,7 @@ public sealed class MockApiClient(TimeProvider timeProvider) : IManagementApiCli
     public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) =>
         Result<IReadOnlyList<FlowVersionResponse>>([], cancellationToken);
     public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken) =>
-        Result<IReadOnlyList<FlowRun>>([], cancellationToken);
+        Result<IReadOnlyList<FlowRun>>(flowRuns.Where(run => flowId is null || run.FlowId.Value == flowId).ToArray(), cancellationToken);
     public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) =>
         Task.FromException<FlowRun>(new KeyNotFoundException($"Simulated Flow Run '{runId}' was not found."));
     public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
