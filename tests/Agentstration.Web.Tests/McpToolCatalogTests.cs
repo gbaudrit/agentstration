@@ -177,12 +177,12 @@ public sealed class McpToolCatalogTests
     {
         ApiVersion = ManagementApiVersions.CoreV1,
         Kind = ResourceKinds.Tool,
-        Metadata = new ResourceMetadata { Name = "local.list_workspaces" },
+        Metadata = new ResourceMetadata { Name = "local.sample_tool" },
         Definition = new ToolResourceProperties
         {
             DisplayName = "List workspaces",
             Provider = new ResourceReference(providerId),
-            ExternalId = "list_workspaces",
+            ExternalId = "sample_tool",
             Enabled = true,
             Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch },
             Schema = new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object" }) }
