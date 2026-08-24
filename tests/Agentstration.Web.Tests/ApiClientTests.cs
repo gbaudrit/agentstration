@@ -901,7 +901,8 @@ public sealed class ApiClientTests
         using var httpClient = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = JsonContent.Create(new PagedResponse<AgentDeployment>([deployment], null))
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new ManagementApiClient(httpClient);
 
         var actual = await client.GetDeploymentsAsync(default);
@@ -923,7 +924,8 @@ public sealed class ApiClientTests
         {
             requested = request.RequestUri;
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(expected) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new RuntimeApiClient(httpClient);
 
         var actual = await client.GetRunEventsAsync("run-test", 7, default);
