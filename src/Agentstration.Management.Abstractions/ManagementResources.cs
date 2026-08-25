@@ -29,6 +29,7 @@ public static class ResourceKinds
     public const string Tool = "Tool";
     public const string ToolProvider = "ToolProvider";
     public const string ToolExecutionHook = "ToolExecutionHook";
+    public const string Trigger = "Trigger";
 }
 
 public static class PackKinds
@@ -41,6 +42,11 @@ public static class PackProvenanceAnnotations
     public const string Publisher = "agentstration.io/pack.publisher";
     public const string Name = "agentstration.io/pack.name";
     public const string Version = "agentstration.io/pack.version";
+}
+
+public static class ResourceProvenanceAnnotations
+{
+    public const string BuiltIn = "agentstration.io/builtin";
 }
 
 public sealed record PackManifest
@@ -452,7 +458,7 @@ public record AgentProperties
     public string Handler { get; init; } = "prompt-agent";
     public required string Instructions { get; init; }
     public required ResourceReference ModelProfile { get; init; }
-    public ResourceReference RuntimeProfile { get; init; } = new("maf-default", @namespace: ResourceNamespace.Default);
+    public ResourceReference RuntimeProfile { get; init; } = new("maf-builtin", @namespace: ResourceNamespace.Default);
     public IReadOnlyList<ResourceReference> Tools { get; init; } = [];
     public IReadOnlyList<string> Behaviors { get; init; } = [];
     public IReadOnlyList<string> Middleware { get; init; } = [];

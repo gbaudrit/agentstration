@@ -4,6 +4,8 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.19.1" />
+    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.19.1" />
     <PackageVersion Include="Agentstration.Aep.Abstractions" Version="0.1.0" />
     <PackageVersion Include="Agentstration.Aep.AspNetCore" Version="0.1.0" />
     <PackageVersion Include="Agentstration.Aep.Client" Version="0.1.0" />
@@ -18,11 +20,9 @@
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.4" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.4" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.4" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.3" />
-    <PackageVersion Include="Microsoft.Extensions.AI.Evaluation" Version="10.8.0" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.10" />
@@ -36,7 +36,6 @@
     <PackageVersion Include="ModelContextProtocol" Version="2.0.0" />
     <PackageVersion Include="MessagePack" Version="3.1.8" />
     <PackageVersion Include="MSTest" Version="4.3.3" />
-    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />

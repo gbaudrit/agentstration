@@ -34,7 +34,7 @@ public sealed class PackTests
         var agent = catalog.Single(item => item.Resource.Kind == ResourceKinds.Agent && item.Resource.Name == "dotnet-expert");
         var modelProfile = catalog.Single(item => item.Resource.Kind == ResourceKinds.ModelProfile && item.Resource.Name == "reasoning-default");
         var modelProvider = catalog.Single(item => item.Resource.Kind == ResourceKinds.ModelProvider && item.Resource.Name == "ollama-local");
-        var runtimeProfile = catalog.Single(item => item.Resource.Kind == ResourceKinds.RuntimeProfile && item.Resource.Name == "maf-default");
+        var runtimeProfile = catalog.Single(item => item.Resource.Kind == ResourceKinds.RuntimeProfile && item.Resource.Name == "maf-builtin");
         Assert.AreEqual(PackCompositionAvailability.Selectable, agent.Availability);
         Assert.AreEqual(PackCompositionAvailability.Selectable, modelProfile.Availability);
         Assert.AreEqual(PackCompositionAvailability.Selectable, modelProvider.Availability);
@@ -91,7 +91,7 @@ public sealed class PackTests
         Assert.HasCount(4, project.Definition.SourceResources);
         Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ResourceKinds.ModelProfile && resource.Name == "reasoning-default"));
         Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ResourceKinds.ModelProvider && resource.Name == "ollama-local"));
-        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ResourceKinds.RuntimeProfile && resource.Name == "maf-default"));
+        Assert.IsTrue(project.Definition.SourceResources.Any(resource => resource.Kind == ResourceKinds.RuntimeProfile && resource.Name == "maf-builtin"));
     }
 
     [TestMethod]
@@ -531,7 +531,7 @@ public sealed class PackTests
             "who-am-i.pack.zip",
             [
                 new PackBindingSelection("conversational-model", new("reasoning-default", @namespace: ResourceNamespace.Default)),
-                new PackBindingSelection("local-runtime", new("maf-default", @namespace: ResourceNamespace.Default))
+                new PackBindingSelection("local-runtime", new("maf-builtin", @namespace: ResourceNamespace.Default))
             ]);
         using var installResponse = await client.PostAsync("/api/packs", installContent);
         Assert.AreEqual(HttpStatusCode.Created, installResponse.StatusCode, await installResponse.Content.ReadAsStringAsync());
@@ -541,7 +541,7 @@ public sealed class PackTests
         Assert.AreEqual(new ResourceNamespace("agentstration.who-am-i"), installed.Definition.Namespace);
         Assert.HasCount(5, installed.Definition.ManagedResources);
         Assert.AreEqual("reasoning-default", installed.Definition.Bindings.Single(binding => binding.Name == "conversational-model").Target.Name);
-        Assert.AreEqual("maf-default", installed.Definition.Bindings.Single(binding => binding.Name == "local-runtime").Target.Name);
+        Assert.AreEqual("maf-builtin", installed.Definition.Bindings.Single(binding => binding.Name == "local-runtime").Target.Name);
         Assert.IsTrue(installed.Definition.ManagedResources.All(resource => resource.Namespace == installed.Definition.Namespace));
         Assert.IsNotNull(installed.Definition.SourceArtifact);
 
@@ -627,7 +627,7 @@ public sealed class PackTests
                 Bindings:
                 [
                     new PackBindingSelection("conversational-model", new("reasoning-default", @namespace: ResourceNamespace.Default)),
-                    new PackBindingSelection("local-runtime", new("maf-default", @namespace: ResourceNamespace.Default))
+                    new PackBindingSelection("local-runtime", new("maf-builtin", @namespace: ResourceNamespace.Default))
                 ]));
         Assert.AreEqual(HttpStatusCode.Created, localInstallResponse.StatusCode, await localInstallResponse.Content.ReadAsStringAsync());
         var localInstallation = await localInstallResponse.Content.ReadFromJsonAsync<InstalledPackResource>();

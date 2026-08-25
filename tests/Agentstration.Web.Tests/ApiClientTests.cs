@@ -106,12 +106,11 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
-    public void AgentManagementAndRunnerUseCanonicalHttpClientsWhenDashboardSimulationIsEnabled()
+    public void ConsoleUsesCanonicalHttpClients()
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Agentstration:UseSimulatedData"] = "true",
             ["Agentstration:ManagementApi:BaseAddress"] = "http://localhost:5080/",
             ["Agentstration:RuntimeApi:BaseAddress"] = "http://localhost:5080/"
         }).Build();
@@ -126,6 +125,7 @@ public sealed class ApiClientTests
         Assert.IsInstanceOfType<WorkApiClient>(scope.ServiceProvider.GetRequiredService<IWorkApiClient>());
         Assert.IsInstanceOfType<EntryAdministrationApiClient>(scope.ServiceProvider.GetRequiredService<IEntryAdministrationApiClient>());
         Assert.IsInstanceOfType<PacksApiClient>(scope.ServiceProvider.GetRequiredService<IPacksClient>());
+        Assert.IsInstanceOfType<HttpAgentstrationEventStream>(scope.ServiceProvider.GetRequiredService<IAgentstrationEventStream>());
         Assert.IsInstanceOfType<ConsoleResourceSearchProvider>(scope.ServiceProvider.GetRequiredService<IResourceSearchProvider>());
     }
 
@@ -148,6 +148,34 @@ public sealed class ApiClientTests
         Assert.AreEqual("Review API", items[0].Title);
         Assert.AreEqual("Running", items[0].Status);
         Assert.AreEqual("personal", items[0].Owner);
+    }
+
+    [TestMethod]
+    public async Task WorkClientRespondsToTaskScopedPendingActionWithoutInteractionToken()
+    {
+        var taskId = Guid.NewGuid();
+        var actionId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        HttpMethod? method = null;
+        string? path = null;
+        string? body = null;
+        var contract = new PendingActionContract(actionId, workspaceId, null, taskId, "run-1", PendingActionKind.ConfirmationRequired, PendingActionStatus.Completed, "Approve", null, [], DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow, 2);
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            method = request.Method;
+            path = request.RequestUri!.AbsolutePath;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(contract) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        var actual = await new WorkApiClient(httpClient).RespondTaskPendingActionAsync(taskId, actionId, new Dictionary<string, JsonElement> { ["confirmed"] = JsonSerializer.SerializeToElement(true) }, default);
+
+        Assert.AreEqual(HttpMethod.Post, method);
+        Assert.AreEqual($"/api/tasks/{taskId}/pending-actions/{actionId}/respond", path);
+        StringAssert.Contains(body, "confirmed");
+        Assert.AreEqual(actionId, actual.Id);
+        Assert.IsNull(actual.InteractionId);
     }
 
     [TestMethod]
@@ -848,6 +876,63 @@ public sealed class ApiClientTests
         Assert.AreEqual("partial response", state.Response);
         Assert.AreEqual(RuntimeRunState.Succeeded, state.State);
         Assert.HasCount(3, state.Events);
+    }
+
+    [TestMethod]
+    public async Task ManagementClientMapsPersistedAgentDeploymentsWithoutInventedMetrics()
+    {
+        var updatedAt = new DateTimeOffset(2026, 8, 21, 9, 30, 0, TimeSpan.Zero);
+        var deployment = new AgentDeployment
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.AgentDeployment,
+            Metadata = new ResourceMetadata { Name = "sql-expert--g000007", Namespace = new ResourceNamespace("engineering") },
+            RevisionName = "sql-expert--000007",
+            AgentName = "sql-expert",
+            Environment = "local",
+            RuntimeProfileName = "maf-default",
+            HostingMode = AgentHostingMode.InProcess,
+            DesiredState = DesiredAgentState.Running,
+            ProvisioningState = ProvisioningState.Succeeded,
+            OperationalState = OperationalState.Ready,
+            ObservedRevisionName = "sql-expert--000007",
+            UpdatedAt = updatedAt
+        };
+        using var httpClient = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new PagedResponse<AgentDeployment>([deployment], null))
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new ManagementApiClient(httpClient);
+
+        var actual = await client.GetDeploymentsAsync(default);
+
+        Assert.HasCount(1, actual);
+        Assert.AreEqual("sql-expert--g000007", actual[0].Id);
+        Assert.AreEqual("engineering", actual[0].Namespace);
+        Assert.AreEqual("Ready", actual[0].Status);
+        Assert.AreEqual("maf-default", actual[0].RuntimeProfile);
+        Assert.AreEqual(updatedAt, actual[0].UpdatedAt);
+    }
+
+    [TestMethod]
+    public async Task RuntimeClientReadsPersistedEventHistoryAfterTheRequestedSequence()
+    {
+        Uri? requested = null;
+        var expected = new[] { RunEvent(8, RuntimeRunEventKind.RunCompleted, state: RuntimeRunState.Succeeded) };
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(expected) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new RuntimeApiClient(httpClient);
+
+        var actual = await client.GetRunEventsAsync("run-test", 7, default);
+
+        Assert.HasCount(1, actual);
+        Assert.AreEqual(RuntimeRunEventKind.RunCompleted, actual[0].Kind);
+        Assert.AreEqual("/api/runtime/runs/run-test/eventHistory?afterSequence=7", requested!.PathAndQuery);
     }
 
     [TestMethod]

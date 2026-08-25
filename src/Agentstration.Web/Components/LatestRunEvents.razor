@@ -1,0 +1,62 @@
+@implements IDisposable
+@inject IAgentstrationEventStream EventStream
+
+<article class="panel">
+    <div class="panel-header"><h2>Latest run events</h2><a href="/run-events">Open run activity →</a></div>
+    @if (loading)
+    {
+        <LoadingState Message="Loading run events…" />
+    }
+    else if (unavailable)
+    {
+        <EmptyState Title="Run events unavailable" Message="" />
+    }
+    else
+    {
+        <EventList Items="events" />
+    }
+</article>
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<EventListItem> events = [];
+    private bool loading = true;
+    private bool unavailable;
+    private bool disposed;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await LoadEventsAsync();
+        if (!disposed)
+            await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadEventsAsync()
+    {
+        try
+        {
+            events = (await EventStream.GetRecentEventsAsync(cancellation.Token)).Take(5).ToArray();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            unavailable = true;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

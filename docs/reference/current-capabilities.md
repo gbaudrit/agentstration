@@ -38,6 +38,39 @@ flowchart LR
 
 The management plane is the source of truth for agent definitions and desired state; runtime `AIAgent` instances are reconstructible. The Work Plane owns the functional lifecycle, interactions, history, and result of each `WorkItem`. Its architectural principle is **Microsoft-first, provider-neutral, cloud-optional**.
 
+## Schedule Triggers
+
+Agentstration can submit autonomous Work from a declarative Workspace-scoped `Trigger`. Trigger owns **when**, Work owns **what**, Flow owns **how**, and Runtime owns execution. Automation is not a second runtime.
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: Trigger
+metadata:
+  name: morning-summary
+definition:
+  displayName: Morning summary
+  enabled: false
+  source:
+    kind: schedule
+    schedule:
+      type: cron
+      expression: "0 0 8 ? * MON-FRI"
+      timeZone: Europe/Paris
+  target:
+    kind: flow
+    flow:
+      name: daily-report
+  input: {}
+  misfirePolicy: fireOnce
+  concurrencyPolicy: skip
+```
+
+V1 supports once, interval and Quartz cron schedules, strict IANA time zones, ETag CRUD, enable/disable, `Run now`, next/last observed status and durable occurrence history. A Trigger can explicitly target a Flow in any namespace of its Workspace, including an installed Pack namespace; cross-Workspace resolution remains forbidden. Quartz registrations live in a separate local SQLite JobStore and are reconciled from Trigger resources after restart. A deterministic occurrence/Work identity prevents duplicate local submission for the same scheduled instant. Current owner authorization is re-evaluated at every firing and fails closed after revocation.
+
+The Console exposes a searchable `/triggers` list, a guided schedule editor with Flow selection, IANA time zones and occurrence preview, plus a detail view for desired state, observed status, occurrence history, enable/disable and `Run now`. The Management API exposes `/api/triggers` and namespaced equivalents. A scheduled Work becomes an autonomous Task without a fabricated Entry or Interaction. Human input uses the existing task-scoped PendingAction panel and notification path directly from Task details.
+
+See [ADR-0068](../decisions/0068-triggers-submit-work-through-quartz-projection.md) for policies, guarantees and V1 limits.
+
 Packs are a Management/distribution concept above these planes: they install ordinary resources into deterministic `publisher.name` namespaces and retain provenance, but they are never run. Local ZIP installation, source/fork coexistence, installed-Pack inventory, compensating failure handling, modification-safe uninstall, and six resource handlers are implemented through the Management API. See [Pack format and lifecycle](packs.md).
 
 ## Declarative agent resources
@@ -109,7 +142,7 @@ Agents
 
 The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. Its local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary. Orchestration Runs can suspend durably for text, choice, or confirmation input, survive process reconstruction through opaque SQLite-backed MAF checkpoints, and resume with the exact Flow snapshot and Agent revisions selected at first execution.
 
-The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework. The existing ingestion, memory, mission, REST, Razor, and MCP verticals remain available as product capabilities.
+The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework.
 
 ## Prerequisites
 
@@ -127,7 +160,7 @@ The most direct route is:
 dotnet run --project src/Agentstration.Web
 ```
 
-Open the Console at `http://localhost:5100`. The same process hosts all Management, Runtime, Flow, Work, Workplace, content, MCP, and SignalR surfaces. Data is persisted to `src/Agentstration.Web/.agentstration/data.json` and is intentionally ignored by Git.
+Open the Console at `http://localhost:5100`. The same process hosts the Management, Runtime, Flow, Work, Workplace, generic MCP, and SignalR surfaces. Module-owned SQLite databases and file artifacts live under `src/Agentstration.Web/.agentstration` by default.
 
 The end-user Workplace remains an autonomous UI host. Start the authoritative server and UI in separate terminals:
 
@@ -253,7 +286,7 @@ Model profiles separate portable `generation`, `reasoning`, and `output` intent 
 
 The seeded `reasoning-default` profile references the stable `ollama-local` provider resource and `qwen3:1.7b`. Profiles remain valid when Ollama or a selected model is temporarily unavailable; only structurally invalid profiles are rejected. An in-use profile cannot be deleted. Agent definitions continue to persist only the model-profile resource ID.
 
-The Blazor console exposes this vertical through `/modelproviders`, `/modelprofiles`, `/runtimeprofiles`, the agent editor, and the Agent Runner. Provider pages create and edit declarations, test connectivity, show dynamic models and usages, and enforce ETag/deletion protection. Model profile pages edit all canonical inference categories; runtime profile pages manage session, tool invocation, streaming, and runtime-specific options with ETag conflict and usage protection. The runner shows the resolved runtime profile and lets an advanced run choose its streaming mode. The reusable agent picker saves only `modelProfile.resourceId`; agent details render the declared profile separately from the resolved provider and model.
+The Blazor console exposes this vertical through `/modelproviders`, `/modelprofiles`, `/runtimeprofiles`, the agent editor, and the Agent Runner. Provider pages create and edit declarations, test connectivity, show dynamic models and usages, and enforce ETag/deletion protection. Model profile pages edit all canonical inference categories; runtime profile pages manage session, tool invocation, streaming, and runtime-specific options with ETag conflict and usage protection. Each active Workspace receives the `maf-builtin` Microsoft Agent Framework Runtime Profile automatically. Resources shipped with Agentstration use the `-builtin` suffix and the `agentstration.io/builtin: "true"` provenance annotation; this identifies their origin without making them implicit defaults. The runner shows the resolved runtime profile and lets an advanced run choose its streaming mode. The reusable agent picker saves only `modelProfile.resourceId`; agent details render the declared profile separately from the resolved provider and model.
 
 ## REST quickstart
 
@@ -293,39 +326,6 @@ Invoke-RestMethod "http://localhost:5100/api/runtime/runs/$($run.id)"
 Run history and ordered events are stored independently in `.agentstration/runtime-plane.db`. The console exposes Quick Run, advanced context/parameters, SSE progress, cancellation, retry, trace and raw inspection from each agent page.
 
 Agent management and Agent Runner always call the canonical Management and Runtime APIs, even when the remaining console dashboard uses simulated projections. Saving an agent activates its current generation; **Reconcile runtime** retries that idempotent activation manually. A successful replacement is made ready before superseded instances are deprovisioned. A Run resolves the current persisted Model Profile, invokes the deployment model through Microsoft Agent Framework and the selected provider, and records the provider, model, temperature, and maximum output tokens actually used. Advanced overrides accept only `temperature` and `maxOutputTokens`; provider, endpoint, and model overrides are rejected.
-
-### Content and missions
-
-List the seeded workspace and inbox:
-
-```powershell
-$workspace = Invoke-RestMethod http://localhost:5100/api/workspaces | Select-Object -First 1
-$inbox = Invoke-RestMethod "http://localhost:5100/api/workspaces/$($workspace.id.value)/inboxes" | Select-Object -First 1
-```
-
-Ingest text and inspect the asynchronous result:
-
-```powershell
-$body = @{ text = "Microsoft Agent Framework enables provider-neutral agent workflows." } | ConvertTo-Json
-$accepted = Invoke-RestMethod -Method Post -ContentType application/json -Body $body "http://localhost:5100/api/workspaces/$($workspace.id.value)/inboxes/$($inbox.id.value)/items"
-Start-Sleep -Seconds 1
-Invoke-RestMethod "http://localhost:5100/api/workspaces/$($workspace.id.value)/items/$($accepted.itemId.value)"
-```
-
-Search memory:
-
-```powershell
-$search = @{ query = "agent"; limit = 20 } | ConvertTo-Json
-Invoke-RestMethod -Method Post -ContentType application/json -Body $search "http://localhost:5100/api/workspaces/$($workspace.id.value)/memory/search"
-```
-
-Create and run a deterministic monitoring mission:
-
-```powershell
-$missionBody = @{ name="Price watch"; objective="Notify below 300"; sourceUrl="demo://product/coffee-machine"; frequencyMinutes=360; threshold=300 } | ConvertTo-Json
-$mission = Invoke-RestMethod -Method Post -ContentType application/json -Body $missionBody "http://localhost:5100/api/workspaces/$($workspace.id.value)/missions"
-Invoke-RestMethod -Method Post "http://localhost:5100/api/workspaces/$($workspace.id.value)/missions/$($mission.id.value)/run"
-```
 
 ### Work plane
 
@@ -376,7 +376,7 @@ The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5100/mcp`. 
 }
 ```
 
-Tools: `list_workspaces`, `list_inboxes`, `ingest_text`, `ingest_url`, `search_memory`, `create_mission`, `get_mission`, `list_mission_runs`, and `run_mission_now`.
+The server endpoint remains available as generic MCP infrastructure, but it currently publishes no built-in platform tools. Governed external MCP and AEP tool providers continue to be discovered and executed through the Tool catalog.
 
 ## Runtime and MAF observability
 
@@ -427,24 +427,7 @@ dotnet build Agentstration.slnx --configuration Release
 dotnet test Agentstration.slnx --configuration Release
 ```
 
-Warnings are errors, .NET analyzers are enabled, and NuGet audit findings fail restore. The test suite covers the two verticals, workspace isolation, idempotency, raw preservation, routing, agent failure, MCP surface, REST startup, and dependency rules.
-
-## AI evaluation
-
-`Agentstration.Evaluation` contains an offline evaluator built on `Microsoft.Extensions.AI.Evaluation`. The evaluation suite runs the real ingestion and content-processing workflow with the deterministic chat client, then measures:
-
-- valid structured output;
-- lexical summary groundedness against the preserved source;
-- required-fact coverage;
-- expected-category coverage.
-
-Cases are versioned in `tests/Agentstration.Evaluation.Tests/Data/content-workflow-cases.json`. Run the deterministic suite with:
-
-```powershell
-dotnet test tests/Agentstration.Evaluation.Tests --configuration Release
-```
-
-This baseline is intentionally offline and cost-free. LLM-as-judge quality evaluators and report generation remain opt-in future extensions; they must not make the default test suite depend on a remote model.
+Warnings are errors, .NET analyzers are enabled, and NuGet audit findings fail restore. The test suite covers Management, Work, Workplace, Flow, Runtime, Triggers, Packs, Agents, workspace isolation, MCP infrastructure, REST startup, and dependency rules.
 
 ## Current boundaries
 

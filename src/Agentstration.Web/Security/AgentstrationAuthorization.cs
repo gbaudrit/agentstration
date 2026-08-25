@@ -11,11 +11,16 @@ public static class AgentstrationPolicies
     public const string WorkspaceAdmin = "agentstration:workspace-admin";
     public const string AuthorizationReader = "agentstration:authorization-reader";
     public const string AuthorizationAdmin = "agentstration:authorization-admin";
-    public const string CanReadAgents = "agentstration:agents:read";
-    public const string CanManageAgents = "agentstration:agents:manage";
-    public const string CanRunAgents = "agentstration:agents:run";
+    public const string InteractiveUser = "agentstration:interactive-user";
+    public const string CanReadResources = "agentstration:resources:read";
+    public const string CanWriteResources = "agentstration:resources:write";
+    public const string CanDeleteResources = "agentstration:resources:delete";
     public const string CanReadRuns = "agentstration:runs:read";
-    public const string CanRunFlows = "agentstration:flows:run";
+    public const string CanExecuteRuns = "agentstration:runs:execute";
+    public const string CanReadAgents = CanReadResources;
+    public const string CanManageAgents = CanWriteResources;
+    public const string CanRunAgents = CanExecuteRuns;
+    public const string CanRunFlows = CanExecuteRuns;
 }
 
 public sealed record WorkspacePermissionRequirement(string Permission) : IAuthorizationRequirement;
@@ -23,6 +28,17 @@ public sealed record WorkspacePermissionRequirement(string Permission) : IAuthor
 public sealed record ResolvedPrincipalFeature(Principal Principal);
 
 public sealed record PlatformAdministratorRequirement : IAuthorizationRequirement;
+public sealed record InteractiveUserRequirement : IAuthorizationRequirement;
+
+public sealed class InteractiveUserHandler : AuthorizationHandler<InteractiveUserRequirement>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, InteractiveUserRequirement requirement)
+    {
+        if (!context.User.HasClaim(claim => claim.Type == PersonalAccessTokenClaimTypes.TokenId))
+            context.Succeed(requirement);
+        return Task.CompletedTask;
+    }
+}
 
 public sealed class PlatformAdministratorHandler(
     IPlatformAuthorizationService authorization,
@@ -31,7 +47,8 @@ public sealed class PlatformAdministratorHandler(
     protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, PlatformAdministratorRequirement requirement)
     {
         var feature = httpContextAccessor.HttpContext?.Features.Get<ResolvedPrincipalFeature>();
-        if (feature is not null && await authorization.IsPlatformAdministratorAsync(
+        if (!context.User.HasClaim(claim => claim.Type == PersonalAccessTokenClaimTypes.TokenId)
+            && feature is not null && await authorization.IsPlatformAdministratorAsync(
                 feature.Principal.Id,
                 httpContextAccessor.HttpContext!.RequestAborted))
             context.Succeed(requirement);

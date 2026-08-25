@@ -23,7 +23,10 @@ public sealed class WorkplaceFlowInputProjectionSink(
     public async Task PublishRequestedAsync(FlowRun run, InputRequest request, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(run.InteractionId, out var interactionId))
+        {
+            await PublishTaskScopedAsync(run, request, cancellationToken);
             return;
+        }
 
         try
         {
@@ -121,6 +124,64 @@ public sealed class WorkplaceFlowInputProjectionSink(
         {
             logger.LogError(exception, "Could not project input request {InputRequestId} for Flow Run {FlowRunId} into Workplace", request.Id, run.Id);
         }
+    }
+
+    private async Task PublishTaskScopedAsync(FlowRun run, InputRequest request, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(run.WorkTaskId, out var taskId)) return;
+        try
+        {
+            var workspaceId = run.WorkspaceId;
+            var workTaskId = new WorkTaskId(taskId);
+            var stored = await workItems.GetAsync(workspaceId, workTaskId.ToWorkItemId(), cancellationToken);
+            if (stored is null || stored.Value.Metadata.GetValueOrDefault("origin") != "trigger") return;
+            var actionId = new PendingActionId(DeterministicGuid(request.Id));
+            var existing = await repository.GetPendingActionAsync(workspaceId, actionId, cancellationToken);
+            if (existing is not null) return;
+            var now = timeProvider.GetUtcNow();
+            var kind = request.Type switch
+            {
+                InputRequestType.Choice => PendingActionKind.ChoiceRequired,
+                InputRequestType.Confirmation => PendingActionKind.ConfirmationRequired,
+                _ => PendingActionKind.InputRequired
+            };
+            var action = new PendingAction
+            {
+                Id = actionId,
+                WorkspaceId = workspaceId,
+                InteractionId = null,
+                WorkTaskId = workTaskId,
+                FlowRunId = run.Id,
+                ExternalInputRequestId = request.Id,
+                Kind = kind,
+                Title = request.Prompt,
+                Description = "The automated work needs a response before it can continue.",
+                Fields = Fields(request),
+                CreatedAt = request.CreatedAt,
+                ExpiresAt = request.ExpiresAt,
+                ResumeTokenHash = HashToken(NewToken())
+            };
+            await repository.CreatePendingActionAsync(action, cancellationToken);
+            if (stored.Value.Status == WorkItemStatus.Running && stored.Value.CurrentExecutionId is { } executionId)
+                await workItems.ApplyExecutionEventAsync(new WorkExecutionInputRequested(Guid.NewGuid(), workspaceId, stored.Value.Id, executionId, now, request.Prompt), cancellationToken);
+            var notification = new WorkNotification
+            {
+                Id = WorkNotificationId.New(),
+                WorkspaceId = workspaceId,
+                Kind = WorkNotificationKind.ActionRequired,
+                Title = request.Prompt,
+                Message = "Automated work is waiting for your response.",
+                CreatedAt = now,
+                WorkTaskId = workTaskId,
+                PendingActionId = action.Id,
+                ActionUrl = $"/tasks/{workTaskId}"
+            };
+            await repository.CreateNotificationAsync(notification, cancellationToken);
+            await PublishAsync(new NotificationCreatedEvent(EventId(), workspaceId.Value, Sequence(), now, notification), cancellationToken);
+            await PublishAsync(new PendingActionCreatedEvent(EventId(), workspaceId.Value, Sequence(), now, WorkplaceService.ToContract(action)), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception) { logger.LogError(exception, "Could not project autonomous input request {InputRequestId} for Flow Run {FlowRunId}", request.Id, run.Id); }
     }
 
     private static IReadOnlyList<EntryFieldDefinition> Fields(InputRequest request) => request.Type switch

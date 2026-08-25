@@ -677,7 +677,7 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
     public async Task CreatePendingActionAsync(PendingAction action, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        context.PendingActions.Add(new PendingActionDocument { Id = action.Id.ToString(), WorkspaceId = action.WorkspaceId.ToString(), InteractionId = action.InteractionId.ToString(), WorkTaskId = action.WorkTaskId?.ToString(), Status = action.Status, ResumeTokenHash = action.ResumeTokenHash, CreatedAt = action.CreatedAt, Version = action.Version, Payload = JsonSerializer.Serialize(action, JsonOptions) });
+        context.PendingActions.Add(new PendingActionDocument { Id = action.Id.ToString(), WorkspaceId = action.WorkspaceId.ToString(), InteractionId = action.InteractionId?.ToString() ?? string.Empty, WorkTaskId = action.WorkTaskId?.ToString(), Status = action.Status, ResumeTokenHash = action.ResumeTokenHash, CreatedAt = action.CreatedAt, Version = action.Version, Payload = JsonSerializer.Serialize(action, JsonOptions) });
         await context.SaveChangesAsync(cancellationToken);
     }
 
@@ -695,12 +695,19 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         return payloads.Select(Deserialize<PendingAction>).OrderBy(value => value.CreatedAt).ToArray();
     }
 
+    public async Task<IReadOnlyList<PendingAction>> ListPendingActionsForTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.PendingActions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString() && value.WorkTaskId == taskId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<PendingAction>).OrderBy(value => value.CreatedAt).ToArray();
+    }
+
     public async Task SavePendingActionAsync(PendingAction action, long expectedVersion, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await context.PendingActions.SingleOrDefaultAsync(value => value.WorkspaceId == action.WorkspaceId.ToString() && value.Id == action.Id.ToString(), cancellationToken) ?? throw new KeyNotFoundException($"Pending action '{action.Id}' was not found.");
         if (document.Version != expectedVersion) throw new WorkplaceConcurrencyException("The PendingAction version is stale.");
-        document.Status = action.Status; document.Version = action.Version; document.Payload = JsonSerializer.Serialize(action, JsonOptions);
+        document.Status = action.Status; document.Version = action.Version; document.InteractionId = action.InteractionId?.ToString() ?? string.Empty; document.WorkTaskId = action.WorkTaskId?.ToString(); document.Payload = JsonSerializer.Serialize(action, JsonOptions);
         await context.SaveChangesAsync(cancellationToken);
     }
 

@@ -25,6 +25,6 @@ else
     private string EmptyTitle => Filtered ? "No task matches these filters" : "No tasks yet";
     private string EmptyMessage => Filtered ? "Clear or adjust the operational filters." : "Tasks created from Workplace will appear here.";
     private static string ShortResource(string value) => value[(value.LastIndexOf('/') + 1)..];
-    private static string ShortId(Guid value) => value.ToString("N")[..8];
+    private static string ShortId(Guid? value) => value is null ? "Autonomous" : value.Value.ToString("N")[..8];
     private static string Relative(DateTimeOffset value) { var elapsed = DateTimeOffset.UtcNow - value.ToUniversalTime(); return elapsed.TotalMinutes < 1 ? "Just now" : elapsed.TotalHours < 1 ? $"{(int)elapsed.TotalMinutes}m ago" : elapsed.TotalDays < 1 ? $"{(int)elapsed.TotalHours}h ago" : value.ToLocalTime().ToString("d MMM yyyy"); }
 }
