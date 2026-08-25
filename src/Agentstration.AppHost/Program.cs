@@ -1,4 +1,14 @@
 var builder = DistributedApplication.CreateBuilder(args);
+var slot = builder.Configuration["Agentstration:Slot"] ?? "main";
+if (!System.Text.RegularExpressions.Regex.IsMatch(slot, "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"))
+{
+    throw new InvalidOperationException("Agentstration:Slot must contain only lowercase letters, digits, and internal hyphens (maximum 63 characters).");
+}
+
+var defaultSlotDataPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", ".agentstration", "slots", slot));
+var slotDataPath = Path.GetFullPath(builder.Configuration["Agentstration:SlotDataPath"] ?? defaultSlotDataPath);
+Directory.CreateDirectory(slotDataPath);
+
 var ollamaEndpoint = builder.Configuration["Ollama:Endpoint"] ?? "http://localhost:11434";
 if (!Uri.TryCreate(ollamaEndpoint, UriKind.Absolute, out var parsedOllamaEndpoint)
     || (parsedOllamaEndpoint.Scheme != Uri.UriSchemeHttp && parsedOllamaEndpoint.Scheme != Uri.UriSchemeHttps))
@@ -19,17 +29,29 @@ if (!Uri.TryCreate(localAiEndpoint, UriKind.Absolute, out var parsedLocalAiEndpo
 }
 
 var ollamaExtension = builder.AddProject<Projects.Agentstration_Extensions_Ollama>("ollama-extension")
+    .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Ollama__Endpoint", parsedOllamaEndpoint.AbsoluteUri)
     .WithHttpHealthCheck("/health");
 var llamaCppExtension = builder.AddProject<Projects.Agentstration_Extensions_LlamaCpp>("llama-cpp-extension")
+    .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("LlamaCpp__Endpoint", parsedLlamaCppEndpoint.AbsoluteUri)
     .WithHttpHealthCheck("/health");
 var localAiExtension = builder.AddProject<Projects.Agentstration_Extensions_LocalAI>("localai-extension")
+    .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("LocalAI__Endpoint", parsedLocalAiEndpoint.AbsoluteUri)
     .WithHttpHealthCheck("/health");
-var utilitiesExtension = builder.AddProject<Projects.Agentstration_Extensions_Utilities>("utilities-extension").WithHttpHealthCheck("/health");
+var utilitiesExtension = builder.AddProject<Projects.Agentstration_Extensions_Utilities>("utilities-extension")
+    .WithEnvironment("Agentstration__Slot", slot)
+    .WithHttpHealthCheck("/health");
 
 var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-console")
+    .WithEnvironment("Agentstration__Slot", slot)
+    .WithEnvironment("Agentstration__SlotDataPath", slotDataPath)
+    .WithEnvironment("Data__Path", Path.Combine(slotDataPath, "data.json"))
+    .WithEnvironment("Data__ControlPlanePath", Path.Combine(slotDataPath, "control-plane.db"))
+    .WithEnvironment("Data__WorkPlanePath", Path.Combine(slotDataPath, "work-plane.db"))
+    .WithEnvironment("Data__FlowPath", Path.Combine(slotDataPath, "flow-plane.db"))
+    .WithEnvironment("Data__RuntimePath", Path.Combine(slotDataPath, "runtime-plane.db"))
     .WithEnvironment("ConnectionStrings__ollama-extension", ollamaExtension.GetEndpoint("http"))
     .WithEnvironment("ConnectionStrings__llama-cpp-extension", llamaCppExtension.GetEndpoint("http"))
     .WithEnvironment("ConnectionStrings__localai-extension", localAiExtension.GetEndpoint("http"))
@@ -53,6 +75,7 @@ console
     .WithEnvironment("Agentstration__FlowApi__ForwardSessionCookie", "true");
 
 var workplace = builder.AddProject<Projects.Agentstration_Workplace_Web>("agentstration-workplace")
+    .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Agentstration__ApiBaseUrl", console.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WaitFor(console);
