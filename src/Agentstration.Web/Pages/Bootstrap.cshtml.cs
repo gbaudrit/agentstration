@@ -5,10 +5,12 @@ using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 
 namespace Agentstration.Web.Pages;
 
+[AllowAnonymous]
 public sealed class BootstrapModel(
     LocalBootstrapCoordinator bootstrap,
     UserManager<LocalIdentityUser> users,

@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
 
@@ -10,24 +11,24 @@ internal sealed class PackEndpoints : IManagementEndpoint
 
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/packs/preview", PreviewAsync);
-        group.MapPost("/packs", InstallAsync);
-        group.MapGet("/packs", ListAsync);
-        group.MapGet("/packs/{publisher}/{name}", GetAsync);
-        group.MapPost("/packs/{publisher}/{name}/source", AttachSourceAsync);
-        group.MapPost("/packs/{publisher}/{name}/fork", ForkAsync);
-        group.MapDelete("/packs/{publisher}/{name}", UninstallAsync);
-        group.MapGet("/pack-projects/composer/resources", ListCompositionResourcesAsync);
-        group.MapPost("/pack-projects/composer/preview", PreviewCompositionAsync);
-        group.MapPost("/pack-projects", CreateProjectFromWorkspaceAsync);
-        group.MapGet("/pack-projects", ListProjectsAsync);
-        group.MapGet("/pack-projects/{projectId:guid}", GetProjectAsync);
-        group.MapPut("/pack-projects/{projectId:guid}", UpdateProjectAsync);
-        group.MapPost("/pack-projects/{projectId:guid}/builds", BuildAsync);
-        group.MapGet("/pack-projects/{projectId:guid}/builds", ListBuildsAsync);
-        group.MapGet("/pack-projects/{projectId:guid}/builds/{buildId:guid}/download", DownloadBuildAsync);
-        group.MapPost("/pack-projects/{projectId:guid}/builds/{buildId:guid}/preview", PreviewBuildAsync);
-        group.MapPost("/pack-projects/{projectId:guid}/builds/{buildId:guid}/install", InstallBuildAsync);
+        group.MapPost("/packs/preview", PreviewAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPost("/packs", InstallAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapGet("/packs", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/packs/{publisher}/{name}", GetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPost("/packs/{publisher}/{name}/source", AttachSourceAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapPost("/packs/{publisher}/{name}/fork", ForkAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapDelete("/packs/{publisher}/{name}", UninstallAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
+        group.MapGet("/pack-projects/composer/resources", ListCompositionResourcesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPost("/pack-projects/composer/preview", PreviewCompositionAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPost("/pack-projects", CreateProjectFromWorkspaceAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapGet("/pack-projects", ListProjectsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/pack-projects/{projectId:guid}", GetProjectAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPut("/pack-projects/{projectId:guid}", UpdateProjectAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapPost("/pack-projects/{projectId:guid}/builds", BuildAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapGet("/pack-projects/{projectId:guid}/builds", ListBuildsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/pack-projects/{projectId:guid}/builds/{buildId:guid}/download", DownloadBuildAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPost("/pack-projects/{projectId:guid}/builds/{buildId:guid}/preview", PreviewBuildAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPost("/pack-projects/{projectId:guid}/builds/{buildId:guid}/install", InstallBuildAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     }
 
     private static Task<IResult> PreviewAsync(

@@ -164,6 +164,9 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddSingleton<IAuthorizationHandler, InteractiveUserHandler>();
         services.AddSingleton<ConsoleRealtimeSession>();
         services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build())
             .AddPolicy(AgentstrationPolicies.Authenticated, policy => policy.RequireAuthenticatedUser())
             .AddPolicy(AgentstrationPolicies.PlatformAdmin, policy =>
             {
