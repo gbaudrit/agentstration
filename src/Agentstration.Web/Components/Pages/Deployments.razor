@@ -1,0 +1,6 @@
+@page "/deployments"
+@implements IDisposable
+@inject IManagementApiClient Client
+<PageTitle>Deployments · Agentstration</PageTitle><PageHeader Title="Agent deployments" Description="Persisted desired and observed Runtime state for deployed agent revisions." />
+@if (items is null) { <LoadingState Message="Loading deployments…" /> } else { <DataGrid TItem="DeploymentSummary" Items="items"><Header><tr><th>Deployment</th><th>Agent</th><th>Status</th><th>Hosting</th><th>Runtime profile</th><th>Revision</th><th>Updated</th><th>Error</th></tr></Header><Row Context="item"><tr><td><code>@item.Id</code><br/><small>@item.Namespace</small></td><td>@item.Agent</td><td><StatusBadge Text="@item.Status" Status="@PlatformDashboardService.ToStatus(item.Status)" /><br/><small>Desired: @item.DesiredState</small></td><td>@item.HostingMode<br/><small>@item.Environment</small></td><td>@item.RuntimeProfile</td><td><code>@(item.ObservedRevision ?? item.Revision)</code></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td>@(item.Error ?? "—")</td></tr></Row></DataGrid> }
+@code { private readonly CancellationTokenSource cancellation = new(); private IReadOnlyList<DeploymentSummary>? items; protected override async Task OnInitializedAsync()=>items=await Client.GetDeploymentsAsync(cancellation.Token); public void Dispose(){cancellation.Cancel();cancellation.Dispose();} }

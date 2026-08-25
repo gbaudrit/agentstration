@@ -8,8 +8,8 @@ namespace Agentstration.Web.Api.Runtime;
 
 internal sealed class PrepareAgentRuntimeEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapPost("/{agentName}/prepare", HandleAsync);
-    public static void MapNamespaced(RouteGroupBuilder group) => group.MapPost("/{agentName}/prepare", HandleNamespacedAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/{agentName}/prepare", HandleAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanWriteResources);
+    public static void MapNamespaced(RouteGroupBuilder group) => group.MapPost("/{agentName}/prepare", HandleNamespacedAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanWriteResources);
 
     private static Task<IResult> HandleAsync(
         string agentName,

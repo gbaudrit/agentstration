@@ -36,7 +36,7 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual("platform", root.GetProperty("metadata").GetProperty("tags").GetProperty("team").GetString());
         Assert.AreEqual("engineering", root.GetProperty("metadata").GetProperty("annotations").GetProperty("owner").GetString());
         Assert.AreEqual("reasoning-default", root.GetProperty("definition").GetProperty("modelProfile").GetProperty("name").GetString());
-        Assert.AreEqual("maf-default", root.GetProperty("definition").GetProperty("runtimeProfile").GetProperty("name").GetString());
+        Assert.AreEqual("maf-builtin", root.GetProperty("definition").GetProperty("runtimeProfile").GetProperty("name").GetString());
         Assert.AreEqual("default", root.GetProperty("definition").GetProperty("runtimeProfile").GetProperty("namespace").GetString());
         Assert.IsFalse(root.TryGetProperty("id", out _));
         Assert.IsFalse(root.TryGetProperty("type", out _));
@@ -81,7 +81,7 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual(expected.Uid, actual.Uid);
         Assert.AreEqual(expected.Metadata.Name, actual.Metadata.Name);
         Assert.AreEqual("reasoning-default", actual.Definition.ModelProfile.Name);
-        Assert.AreEqual("maf-default", actual.Definition.RuntimeProfile.Name);
+        Assert.AreEqual("maf-builtin", actual.Definition.RuntimeProfile.Name);
         Assert.AreEqual(ResourceNamespace.Default, actual.Definition.RuntimeProfile.Namespace);
         Assert.AreEqual("internal", actual.Metadata.Tags["tier"]);
     }
@@ -115,7 +115,7 @@ public sealed class ManagementPlaneTests
         CollectionAssert.AreEqual(new[] { "alpha", "zeta" }, first.EffectiveToolNames.ToArray());
         Assert.AreEqual("reasoning-default", first.ModelProfileName);
         Assert.AreEqual(new ResourceNamespace("agentstration.sample-pack"), first.ModelProfileNamespace);
-        Assert.AreEqual("maf-default", first.RuntimeProfileName);
+        Assert.AreEqual("maf-builtin", first.RuntimeProfileName);
         Assert.AreEqual(ResourceNamespace.Default, first.RuntimeProfileNamespace);
     }
 
@@ -202,7 +202,7 @@ public sealed class ManagementPlaneTests
     private static AgentDeploymentSpec LocalSpec() => new()
     {
         Environment = "local",
-        RuntimeProfileName = "maf-default",
+        RuntimeProfileName = "maf-builtin",
         HostingMode = AgentHostingMode.InProcess
     };
 

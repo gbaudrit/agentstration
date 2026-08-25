@@ -12,3 +12,4 @@ The repository-level [CONTRIBUTING.md](https://github.com/gbaudrit/agentstration
 
 Read [Working on the documentation](documentation.md) for the local Docusaurus workflow.
 Read [GitHub governance](github-governance.md) for branches, checks, security automation, and `main` protection.
+Read [Development slots](development-slots.md) to run multiple Git worktrees as isolated local Aspire instances.

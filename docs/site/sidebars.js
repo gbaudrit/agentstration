@@ -90,6 +90,7 @@ const sidebars = {
       label: 'Contributing',
       items: [
         'contributing/overview',
+        'contributing/development-slots',
         'contributing/documentation',
         'contributing/github-governance',
       ],

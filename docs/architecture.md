@@ -16,14 +16,11 @@ src/
   Agentstration.Workplace.Components/ reusable Workplace business components
   Agentstration.Workplace.Web/    standalone end-user Blazor host
   Agentstration.Application/      use cases and module contracts
-  Agentstration.Domain/           entities, typed identifiers, domain events
-  Agentstration.Evaluation/       offline workflow quality evaluators
   Agentstration.Flow/             provider-neutral Flow definitions and references
   Agentstration.Flow.Application/ Flow CRUD, publication, activation, resolution
   Agentstration.Flow.Contracts/   public Flow API contracts
   Agentstration.Flow.Storage.Abstractions/
   Agentstration.Flow.Storage.Sqlite/
-  Agentstration.Contracts/        transport-neutral request/response contracts
   Agentstration.Infrastructure/   JSON/EF storage, AI, HTTP, event bus, queues
   Agentstration.Management.Abstractions/ canonical resources, ports, events, resolved specs
   Agentstration.Management.Core/  Management validation, use cases, revisions, deployments
@@ -48,7 +45,6 @@ src/
 tests/
   Agentstration.Application.Tests/
   Agentstration.ArchitectureTests/
-  Agentstration.Evaluation.Tests/
   Agentstration.Management.Tests/
   Agentstration.Web.Tests/
   Agentstration.Web.Components.Tests/
@@ -59,8 +55,8 @@ docs/decisions/
 Core dependency direction:
 
 ```text
-Web ---> Infrastructure ---> Application ---> Contracts ---> Domain
-  \-----------------------------> Application -------------> Domain
+Web ---> Infrastructure ---> Application ---> Work
+Web ---> Management / Flow / Runtime public boundaries
 
 Web -> Management contracts + core
 Management.Core -> Management.Abstractions + Runtime.Abstractions
@@ -84,7 +80,7 @@ Runtime.Storage.Sqlite -> Runtime.Abstractions + EF Core SQLite
 Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 ```
 
-`Domain` contains no Management types and has no framework dependency. Canonical Management resources and provider-neutral ports live in `Management.Abstractions`; validation and use cases live in `Management.Core`. SQLite and EF Core are confined to `Management.Storage.Sqlite`. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
+Canonical Management resources and provider-neutral ports live in `Management.Abstractions`; validation and use cases live in `Management.Core`. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
 
 `Agentstration.Resources` contains the neutral namespace/address value types shared by Management, Flow, Work, and Runtime boundaries. Resource identity is `(workspace, namespace, kind, name)` and existing callers implicitly use `default`. Relative references inherit their owner's namespace; explicit cross-namespace references retain the supplied namespace. See ADR-0035.
 
@@ -102,18 +98,14 @@ Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 | Flows | typed graph drafts, typed orchestration authoring, immutable versions, durable Runs, opaque SQLite-backed runtime state, interactive input suspension/recovery, visual editors and SignalR replay | distributed dispatch, arbitrary graph waits, HumanApproval nodes, and provider-level effect idempotency |
 | Flow storage | independent readable JSON documents, ETags, active/current definition separation | migrations, indirect reference projections |
 | Identity | local accounts, Principal mapping, Principal preferences, Workspace memberships/RBAC, bootstrap, account security, append-only security audit | external-account provisioning/linking, recovery, workload authentication |
-| Workspaces | workspace and inbox lifecycle | teams, organizations, policies |
-| Ingestion | text, JSON, multipart file, URL, hash deduplication | webhooks, email, connectors |
-| Memory | normalized content, summaries, categories, search contract | facts, relations, embeddings, conversations |
 | Routing | deterministic stateless decision | rule catalog and LLM router |
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
 | Scheduling | Workspace-scoped Trigger resources, durable occurrences, Quartz.NET persistent SQLite projection, startup reconciliation, explicit misfire/concurrency policy and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
 | Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog, and an Agentstration-owned runtime execution boundary before MCP `tools/call` | richer permissions, credentials, connection policies, and execution hooks |
-| Notifications | internal notification record/event | email, Teams, webhook channels |
-| MCP | nine tools reusing application services | resources and authorization |
-| Evaluation | deterministic `Microsoft.Extensions.AI.Evaluation` metrics and versioned content-workflow dataset | LLM-as-judge quality/safety evaluators and reports |
-| Observability | OTel traces/metrics/log correlation tags | dashboards, SLOs, evaluation telemetry |
+| Notifications | Work and Workplace notification records | email, Teams, webhook channels |
+| MCP | generic governed MCP provider/client infrastructure; no built-in legacy platform tools | managed server-side tools and authorization |
+| Observability | OTel traces/metrics/log correlation tags | dashboards and SLOs |
 
 ## Principal contracts
 
@@ -128,53 +120,18 @@ public interface IAgentRuntime
     Task<AgentExecutionResult> RunAsync(AgentExecutionRequest request, CancellationToken cancellationToken);
 }
 
-public interface IMemoryStore { Task AddAsync(MemoryEntry entry, CancellationToken cancellationToken); }
-public interface IMemorySearch { Task<IReadOnlyList<MemoryEntry>> SearchAsync(WorkspaceId workspaceId, string query, int limit, CancellationToken cancellationToken); }
-public interface IBlobStore { Task<string> PutAsync(WorkspaceId workspaceId, string name, Stream content, CancellationToken cancellationToken); }
-public interface IEmbeddingStore { Task UpsertAsync(WorkspaceId workspaceId, Guid id, ReadOnlyMemory<float> embedding, CancellationToken cancellationToken); }
 public interface ITriggerSchedulerProjection { Task ReconcileAsync(TriggerResource trigger, CancellationToken cancellationToken); }
 ```
 
-Other important contracts are `IPlatformStore`, `IEventBus`, `IEventHandler<T>`, `IItemProcessingQueue`, `IContentSourceReader`, and `IObservationTool`. Expected business failures use `Result<T>`; unexpected infrastructure failures remain exceptions and are translated at the HTTP boundary.
+Other important contracts are owned by their Management, Flow, Runtime, Work, Tool, Pack and identity modules. Expected business failures use explicit module results or exceptions translated at the HTTP boundary.
 
 ## Initial data model
 
-The executable model includes `Workspace`, `Inbox`, `Item`, `RawContent`, `NormalizedContent`, `MemoryEntry`, `Mission`, `MissionRun`, `Notification`, and `AuditEntry`. The wider model reserves `User`, `WorkspaceMember`, `AgentDefinition`, `AgentRun`, `WorkflowDefinition`, `WorkflowRun`, `Schedule`, and `ToolDefinition` for later increments.
+The executable model is split across canonical Management resources, Work Items and Workplace interactions, Flow definitions and runs, Runtime Runs, identity records, Packs, Triggers, Tools and module-owned notifications and artifacts.
 
-Every workspace-owned record carries `WorkspaceId`. Queries require it alongside the entity identifier. Runtime runs, Flow definitions and runs, Work items, events, queues, cancellation state, and artifacts preserve that scope end to end; storage identities are composite where identifiers may repeat across workspaces. HTTP scope comes from the authenticated request context rather than caller-controlled payload or query values, and background workers re-authorize the durable scope before execution. Key indexes in the PostgreSQL model cover `(WorkspaceId, Slug)`, `(WorkspaceId, InboxId, ContentHash)`, `(WorkspaceId, Status, CreatedAt)`, `(WorkspaceId, ItemId, CreatedAt)`, and `(WorkspaceId, MissionId, StartedAt)`. See ADR-0050.
-
-Raw content is append-only from the workflow's perspective. Normalization and AI results are separate records. Content hash plus inbox scope provides ingestion idempotency.
+Every workspace-owned record carries `WorkspaceId`. Queries require it alongside the entity identifier. Runtime runs, Flow definitions and runs, Work items, events, queues, cancellation state, and artifacts preserve that scope end to end; storage identities are composite where identifiers may repeat across workspaces. HTTP scope comes from the authenticated request context rather than caller-controlled payload or query values, and background workers re-authorize the durable scope before execution. See ADR-0050 and ADR-0053.
 
 ## Main flows
-
-### Content vertical
-
-```text
-REST / UI / MCP
-  -> IngestionService validates, hashes, saves raw source
-  -> ItemReceived through in-process event bus
-  -> bounded Channel queue (HTTP returns 202)
-  -> ItemProcessingWorker
-  -> deterministic router
-  -> normalize
-  -> IAgentRuntime -> IChatClient
-  -> MemoryEntry
-  -> ItemProcessed
-```
-
-### Monitoring vertical
-
-```text
-REST / UI / MCP (manual legacy vertical)
-  -> MissionService
-  -> IObservationTool (demo sequence in MVP)
-  -> MissionRun + observation MemoryEntry
-  -> compare previous observation
-  -> threshold satisfied and changed
-  -> Notification + NotificationRequested
-```
-
-The historical Mission polling worker is no longer started. It belongs to the legacy monitoring vertical and is not reused for proactive Work.
 
 ### Trigger vertical
 
@@ -339,13 +296,9 @@ Runtime adapters expose normalized `AgentExecutionEvent` values rather than MAF 
 
 Agent CRUD and Agent Runner always use canonical Management and Runtime HTTP clients, independently of simulated dashboard projections. This prevents a simulated agent generation from being activated against a different persisted generation. Before enabling Run the console combines `/api/agents/{name}/model` with `/api/runtime/agents/{name}/readiness`. Save-and-apply or **Reconcile runtime** calls `/prepare`, which creates or reuses the current revision and local deployment and reconciles it. At execution time the MAF adapter resolves the current profile again, merges profile defaults with the only supported overrides (`temperature`, `maxOutputTokens`), selects the deployment model through `ChatOptions.ModelId`, and records the actual provider/model/effective options on the durable Run.
 
-### URL security flow
-
-The reader only accepts absolute HTTP(S), rejects credentials, loopback, private/link-local/multicast addresses after DNS resolution, uses a 15-second timeout, streams headers first, and enforces a 2 MiB limit. Redirect revalidation is a planned hardening item; public deployment should disable automatic redirects until each hop is checked.
-
 ## Observability
 
-Activity sources exist for ingestion, workflows, missions, Runtime Runs, Microsoft Agent Framework agents, and resolved model chat clients. A Runtime Run span carries the run, agent, generation, deployment, origin, and model-profile correlation identifiers. Its MAF `invoke_agent` span contains the provider-neutral agent execution, and its GenAI child span represents the effective request made through `IChatClient`; the existing `HttpClient` instrumentation remains the network-level child span.
+Activity sources exist for Work, Flow Runs, Runtime Runs, Microsoft Agent Framework agents, and resolved model chat clients. A Runtime Run span carries the run, agent, generation, deployment, origin, and model-profile correlation identifiers. Its MAF `invoke_agent` span contains the provider-neutral agent execution, and its GenAI child span represents the effective request made through `IChatClient`; the existing `HttpClient` instrumentation remains the network-level child span.
 
 MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and is enabled by `Observability:GenAI:Enabled`, which defaults to `true`. OpenTelemetry sensitive-data capture is explicitly disabled in code: raw documents, prompts, responses, tool arguments, tool results, credentials, and authorization headers are not emitted by the normal telemetry pipeline. Operational logs use scopes carrying the Run and agent identifiers and export through OTLP alongside traces and metrics when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Aspire supplies the local dashboard endpoint.
 
@@ -355,16 +308,16 @@ MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and i
 
 The Management boundary persists a `Tenant -> Workspace` hierarchy and a global `User -> TenantMembership -> RoleAssignment -> RoleDefinition` authorization model in the SQLite control-plane database. Management resource rows carry explicit tenant and workspace scope columns in addition to their JSON payload. Store reads, writes, lists, and deletes are filtered by the initialized request context.
 
-In explicit Development mode, standalone startup creates or repairs the development Principal and its `local / personal` context. `personal` is only the seeded Workspace name and has no capability semantics. In the default Local mode, a fresh instance instead exposes a one-time Web bootstrap that creates the first ASP.NET Core Identity account, its Principal, the initial tenant and workspace, Workspace Owner assignment, and Platform administrator grant. No default credential exists. The request pipeline resolves the authenticated identity, validates the workspace selection stored in an HTTP-only cookie, and installs it as an ambient request context for the request. Principal-scoped presentation preferences are stored separately from credentials and Workspace authorization; Console and Workplace currently share the persisted `System`, `Light`, or `Dark` theme selection. The Console exposes a dynamic workspace selector plus General, Workspaces, Members, Access Control, and PlatformAdmin-only Security audit views. Platform administration can be transferred explicitly to another active Principal; self-revocation, self-disable, and removal of the last active administrator are rejected. Platform administrators can also link exact OIDC `(Issuer, Subject)` pairs to existing human Principals without email matching or provider-specific types. Authentication and authorization mutations append structured identifier-only events to the Management Control Plane. Management HTTP routes use `/api/...`; workspace scope comes from the authorized context. See ADR-0042, ADR-0045, ADR-0046, ADR-0047, and ADR-0049.
+In explicit Development mode, standalone startup creates or repairs the development Principal and its `local / personal` context. `personal` is only the seeded Workspace name and has no capability semantics. In the default Local mode, a fresh instance instead exposes a one-time Web bootstrap that creates the first ASP.NET Core Identity account, its Principal, the initial tenant and workspace, Workspace Owner assignment, and Platform administrator grant. No default credential exists. The request pipeline resolves the authenticated identity, validates the workspace selection stored in an HTTP-only cookie, and installs it as an ambient request context for the request. A global fallback policy requires authentication; only health, bootstrap, authentication entry points, the corresponding Razor Pages, and their static assets are explicitly anonymous. HTTP APIs declare contextual RBAC policies, while MCP tool calls require `runs/execute` and both Workplace and Flow Run SignalR hubs require `runs/read`. Principal-scoped presentation preferences are stored separately from credentials and Workspace authorization; Console and Workplace currently share the persisted `System`, `Light`, or `Dark` theme selection. The Console exposes a dynamic workspace selector plus General, Workspaces, Members, Access Control, and PlatformAdmin-only Security audit views. Platform administration can be transferred explicitly to another active Principal; self-revocation, self-disable, and removal of the last active administrator are rejected. Platform administrators can also link exact OIDC `(Issuer, Subject)` pairs to existing human Principals without email matching or provider-specific types. Authentication and authorization mutations append structured identifier-only events to the Management Control Plane. Management HTTP routes use `/api/...`; workspace scope comes from the authorized context. See ADR-0042, ADR-0045, ADR-0046, ADR-0047, and ADR-0049.
 
 SQLite schema evolution for the workspace-scope hardening increment is reset-only: existing generated databases are not altered or backfilled and must be deleted and reseeded. See ADR-0050.
 
 ## Implementation plan
 
-1. **Delivered foundation:** solution conventions, domain/application boundaries, local content store, API/UI/MCP, OTel, Aspire, and tests.
+1. **Delivered foundation:** solution conventions, explicit module boundaries, API/UI/MCP infrastructure, OTel, Aspire, and tests.
 2. **Delivered management vertical:** direct agent definitions, deterministic compilation, immutable revisions, SQLite control-plane storage, deployments, ETags, concise REST API, and pagination.
 3. **Delivered runtime vertical:** isolated Microsoft Agent Framework adapter, in-process/shared-host provisioners, runtime registry, periodic reconciliation, single-agent routing, execution, and standalone sample data.
-4. **Delivered content and monitoring verticals:** ingestion, memory/search, deterministic/OpenAI-compatible AI, missions, change detection, and internal notifications.
+4. **Retired legacy vertical:** the historical content ingestion, memory search and Mission monitoring stack was removed after the Management, Work, Flow, Runtime and Trigger modules superseded its responsibilities. See ADR-0071.
 5. **Delivered Work vertical:** domain-controlled lifecycle, typed identifiers, interactions, idempotent Runtime events, independent SQLite persistence, local execution gateway, canonical REST API, metrics, traces, and tests.
 6. **Delivered Flow authoring vertical:** independent projects, typed seven-step graphs, draft revisions and ETags, structural/resource/expression validation, YAML/JSON source, immutable publication, visual authoring, Work references, OpenAPI, and SQLite.
 7. **Delivered Flow Runtime vertical:** durable FlowRun contracts and event history, immutable draft/published snapshots, bounded sequential typed-graph execution, input validation, cancellation, SignalR replay, telemetry, and the Flow-centered console.

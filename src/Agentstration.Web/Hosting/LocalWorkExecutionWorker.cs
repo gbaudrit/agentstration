@@ -13,6 +13,7 @@ public sealed class LocalWorkExecutionWorker(
     WorkItemService workItems,
     AgentExecutionCoordinator agentExecution,
     FlowRunService flowRuns,
+    IFlowRunExecutionScope executionScopes,
     TimeProvider timeProvider,
     ILogger<LocalWorkExecutionWorker> logger) : BackgroundService
 {
@@ -22,6 +23,10 @@ public sealed class LocalWorkExecutionWorker(
         {
             try
             {
+                var scope = execution.Request.ExecutionScope
+                    ?? throw new WorkValidationException("work_execution_scope_required", "Work execution requires a durable Workspace scope.");
+                await executionScopes.ValidateAsync(scope, stoppingToken);
+                using var activeExecutionScope = executionScopes.Enter(scope);
                 if (execution.Request.Flow is not null)
                 {
                     await ExecuteFlowAsync(execution, stoppingToken);
@@ -76,8 +81,7 @@ public sealed class LocalWorkExecutionWorker(
             prompt = execution.Request.Instruction,
             inputs = execution.Request.Inputs.Select(value => value.Structured ?? JsonSerializer.SerializeToElement(value.Text)).ToArray()
         });
-        var scope = execution.Request.ExecutionScope
-            ?? throw new WorkValidationException("work_execution_scope_required", "A Flow-backed Work execution requires a durable Workspace scope.");
+        var scope = execution.Request.ExecutionScope!;
         var created = await flowRuns.CreateAsync(
             flow.FlowId, flow.UseActiveVersion ? null : flow.Version, "local", FlowRunTrigger.WorkItem,
             "workplace",

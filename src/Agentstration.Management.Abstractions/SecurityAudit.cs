@@ -24,6 +24,9 @@ public static class SecurityAuditActions
     public const string WorkspaceMembershipRemoved = "workspace-membership.removed";
     public const string AgentRevisionPurged = "agent-revision.purged";
     public const string AgentRevisionForcePurged = "agent-revision.force-purged";
+    public const string PersonalAccessTokenCreated = "personal-access-token.created";
+    public const string PersonalAccessTokenRevoked = "personal-access-token.revoked";
+    public const string PersonalAccessTokensRevoked = "personal-access-token.revoked-all";
 }
 
 public sealed record SecurityAuditEvent(

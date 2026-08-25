@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
-    <ProjectReference Include="../Agentstration.Domain/Agentstration.Domain.csproj" />
     <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
     <ProjectReference Include="../Agentstration.Flow.Storage.Sqlite/Agentstration.Flow.Storage.Sqlite.csproj" />
     <ProjectReference Include="../Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
@@ -16,14 +15,8 @@
     <ProjectReference Include="../Agentstration.Work.Storage.Sqlite/Agentstration.Work.Storage.Sqlite.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.Http" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Quartz.Extensions.Hosting" />
     <PackageReference Include="Quartz.Serialization.SystemTextJson" />
   </ItemGroup>

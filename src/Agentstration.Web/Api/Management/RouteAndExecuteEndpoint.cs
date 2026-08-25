@@ -1,11 +1,13 @@
 using Agentstration.Infrastructure;
 using Agentstration.Management.Contracts;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
 
 internal sealed class RouteAndExecuteEndpoint : IManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapPost("/routing/invoke", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/routing/invoke", HandleAsync)
+        .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
 
     private static Task<IResult> HandleAsync(
         RouteAndExecuteRequest body,
