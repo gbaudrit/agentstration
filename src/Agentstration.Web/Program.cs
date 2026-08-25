@@ -85,7 +85,7 @@ builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
 builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
-builder.Services.AddOpenApi();
+builder.Services.AddAgentstrationOpenApi();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSignalR();
@@ -152,7 +152,7 @@ if (genAiObservability.HttpPayloadCapture.Enabled)
 }
 app.UseExceptionHandler();
 app.UseStatusCodePages();
-if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapOpenApi();
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapAgentstrationOpenApi();
 app.UseAuthentication();
 app.UseMiddleware<PrincipalResolutionMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
