@@ -75,8 +75,13 @@ public static class OpenApiConfiguration
                 await DocumentSuccessResponseAsync(operation, context, method, path, cancellationToken);
 
                 var allowsAnonymous = metadata.OfType<IAllowAnonymous>().Any();
-                var requiresAuthorization = !allowsAnonymous && metadata.OfType<IAuthorizeData>().Any();
-                if (!requiresAuthorization) return;
+                if (allowsAnonymous) return;
+                var policyProvider = context.ApplicationServices.GetRequiredService<IAuthorizationPolicyProvider>();
+                var effectivePolicy = await AuthorizationPolicy.CombineAsync(
+                    policyProvider,
+                    metadata.OfType<IAuthorizeData>(),
+                    metadata.OfType<AuthorizationPolicy>());
+                if (effectivePolicy is null) return;
 
                 operation.Security =
                 [

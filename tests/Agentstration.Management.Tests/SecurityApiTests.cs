@@ -20,6 +20,72 @@ public sealed class SecurityApiTests
     private const string ChangedLocalPassword = "A-changed-local-password-84!";
 
     [TestMethod]
+    public async Task HttpMcpAndSignalRBoundariesEnforceTheRoleAndPatMatrix()
+    {
+        await using var factory = Factory("Local");
+        using var administrator = UnredirectedClient(factory);
+        await BootstrapAsync(administrator, "boundary-owner");
+        var context = await administrator.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.IsNotNull(context);
+
+        var viewer = await CreateAccountAsync(administrator, context.Context.WorkspaceId, "boundary-viewer", BuiltInIdentityRoles.Viewer);
+        _ = await CreateAccountAsync(administrator, context.Context.WorkspaceId, "boundary-member", BuiltInIdentityRoles.Member);
+        _ = await CreateAccountAsync(administrator, context.Context.WorkspaceId, "boundary-admin", BuiltInIdentityRoles.Admin);
+        using var platformGrant = await administrator.PutAsync($"/api/identity/platform-administrators/{viewer.PrincipalId:D}", null);
+        Assert.AreEqual(HttpStatusCode.OK, platformGrant.StatusCode);
+
+        using var patResponse = await administrator.PostAsJsonAsync("/api/identity/pat", new
+        {
+            name = "Boundary read-only token",
+            workspaceId = context.Context.WorkspaceId,
+            permissions = new[] { AuthorizationPermissions.ResourcesRead },
+            expiresAt = DateTimeOffset.UtcNow.AddDays(1)
+        });
+        Assert.AreEqual(HttpStatusCode.Created, patResponse.StatusCode);
+        using var patDocument = JsonDocument.Parse(await patResponse.Content.ReadAsStringAsync());
+        var pat = patDocument.RootElement.GetProperty("token").GetString();
+        Assert.IsNotNull(pat);
+
+        using var anonymous = UnredirectedClient(factory);
+        using var viewerClient = UnredirectedClient(factory);
+        using var memberClient = UnredirectedClient(factory);
+        using var adminClient = UnredirectedClient(factory);
+        using var patClient = UnredirectedClient(factory);
+        await LoginAsync(viewerClient, "boundary-viewer", LocalPassword);
+        await LoginAsync(memberClient, "boundary-member", LocalPassword);
+        await LoginAsync(adminClient, "boundary-admin", LocalPassword);
+        patClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", pat);
+        patClient.DefaultRequestHeaders.Add("X-Agentstration-Workspace", context.Context.WorkspaceId.ToString("D"));
+
+        var resourceRead = new AccessProbe("resources/read", () => new(HttpMethod.Get, "/api/modelproviders"));
+        var resourceWrite = new AccessProbe("resources/write", () => Json(HttpMethod.Post, "/api/modelproviders", "{}"));
+        var resourceDelete = new AccessProbe("resources/delete", () => new(HttpMethod.Delete, "/api/modelproviders/missing"));
+        var runsExecute = new AccessProbe("runs/execute", () => new(HttpMethod.Post, "/api/triggers/missing/run"));
+        var hubRead = new AccessProbe("SignalR runs/read", () => new(HttpMethod.Post, "/hubs/workplace/negotiate?negotiateVersion=1") { Content = new ByteArrayContent([]) });
+        var probes = new[] { resourceRead, resourceWrite, resourceDelete, runsExecute, hubRead };
+
+        await AssertAccessMatrixAsync(anonymous, probes, [false, false, false, false, false]);
+        await AssertAccessMatrixAsync(viewerClient, probes, [true, false, false, false, true]);
+        await AssertAccessMatrixAsync(memberClient, probes, [true, false, false, true, true]);
+        await AssertAccessMatrixAsync(adminClient, probes, [true, true, true, true, true]);
+        await AssertAccessMatrixAsync(patClient, probes, [true, false, false, false, false]);
+        foreach (var deniedClient in new[] { anonymous, viewerClient, patClient })
+        {
+            using var deniedMcp = await deniedClient.SendAsync(Json(HttpMethod.Post, "/mcp", "{}"));
+            Assert.IsTrue(deniedMcp.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden);
+        }
+
+        using var platformAccess = await viewerClient.GetAsync("/api/identity/platform");
+        Assert.AreEqual(HttpStatusCode.OK, platformAccess.StatusCode);
+        using var workspaceWriteStillDenied = await viewerClient.SendAsync(resourceWrite.Request());
+        Assert.AreEqual(HttpStatusCode.Forbidden, workspaceWriteStillDenied.StatusCode,
+            "PlatformAdmin must not imply Workspace resource permissions.");
+        using var vaultInitialization = await viewerClient.PostAsync("/api/vaults/missing/initialize", null);
+        Assert.AreNotEqual(HttpStatusCode.Unauthorized, vaultInitialization.StatusCode);
+        Assert.AreNotEqual(HttpStatusCode.Forbidden, vaultInitialization.StatusCode);
+    }
+
+    [TestMethod]
     public async Task PersonalAccessTokenIsWorkspaceScopedPermissionLimitedAndRevocable()
     {
         await using var factory = Factory("Local");
@@ -910,6 +976,46 @@ public sealed class SecurityApiTests
         using var response = await client.PostAsJsonAsync("/api/auth/local/login", new { userName, password });
         Assert.AreEqual(HttpStatusCode.NoContent, response.StatusCode);
     }
+
+    private static async Task<LocalAccountView> CreateAccountAsync(HttpClient administrator, Guid workspaceId, string userName, string role)
+    {
+        using var response = await administrator.PostAsJsonAsync("/api/identity/accounts/", new
+        {
+            userName,
+            password = LocalPassword,
+            displayName = userName,
+            workspaceId,
+            role
+        });
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
+        return await response.Content.ReadFromJsonAsync<LocalAccountView>()
+            ?? throw new InvalidOperationException("The created local account response was empty.");
+    }
+
+    private static HttpRequestMessage Json(HttpMethod method, string uri, string json) => new(method, uri)
+    {
+        Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+    };
+
+    private static async Task AssertAccessMatrixAsync(HttpClient client, IReadOnlyList<AccessProbe> probes, IReadOnlyList<bool> expected)
+    {
+        for (var index = 0; index < probes.Count; index++)
+        {
+            using var response = await client.SendAsync(probes[index].Request());
+            if (expected[index])
+            {
+                Assert.AreNotEqual(HttpStatusCode.Unauthorized, response.StatusCode, $"{probes[index].Name} unexpectedly required authentication.");
+                Assert.AreNotEqual(HttpStatusCode.Forbidden, response.StatusCode, $"{probes[index].Name} unexpectedly denied authorization.");
+            }
+            else
+            {
+                Assert.IsTrue(response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden,
+                    $"{probes[index].Name} unexpectedly crossed the authorization boundary with status {(int)response.StatusCode}.");
+            }
+        }
+    }
+
+    private sealed record AccessProbe(string Name, Func<HttpRequestMessage> Request);
 
     private static FormUrlEncodedContent ChangePasswordForm(
         string? antiforgeryToken,

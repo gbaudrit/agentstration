@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
 
@@ -9,18 +10,18 @@ internal static class ToolProviderEndpoints
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         var providers = endpoints.MapGroup("/api/toolproviders");
-        providers.MapGet("/", ListProvidersAsync);
-        providers.MapGet("/{providerName}", GetProviderAsync);
-        providers.MapPost("/", CreateProviderAsync);
-        providers.MapPut("/{providerName}", PutProviderAsync);
-        providers.MapPost("/{providerName}/test", TestAsync);
-        providers.MapPost("/{providerName}/refresh", RefreshAsync);
-        providers.MapGet("/{providerName}/tools", ListProviderToolsAsync);
+        providers.MapGet("/", ListProvidersAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        providers.MapGet("/{providerName}", GetProviderAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        providers.MapPost("/", CreateProviderAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        providers.MapPut("/{providerName}", PutProviderAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        providers.MapPost("/{providerName}/test", TestAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        providers.MapPost("/{providerName}/refresh", RefreshAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        providers.MapGet("/{providerName}/tools", ListProviderToolsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
 
         var tools = endpoints.MapGroup("/api/tools");
-        tools.MapGet("/", ListToolsAsync);
-        tools.MapGet("/{toolName}", GetToolAsync);
-        tools.MapPut("/{toolName}/enabled", SetEnabledAsync);
+        tools.MapGet("/", ListToolsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        tools.MapGet("/{toolName}", GetToolAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        tools.MapPut("/{toolName}/enabled", SetEnabledAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     }
 
     private static Task<IResult> ListProvidersAsync(ToolManagementService service, CancellationToken cancellationToken) =>

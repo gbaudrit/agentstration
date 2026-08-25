@@ -1,16 +1,96 @@
 using System.Net;
 using System.Text.Json;
 using Agentstration.Web.Configuration;
+using Agentstration.Web.Security;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Agentstration.Web.Tests;
 
 [TestClass]
 public sealed class OpenApiTests
 {
+    [TestMethod]
+    public async Task EveryApplicationBoundaryHasAnEffectivePolicyOrIsExplicitlyAnonymous()
+    {
+        await using var factory = CreateFactory();
+        var options = factory.Services.GetRequiredService<IOptions<AuthorizationOptions>>().Value;
+        Assert.IsNotNull(options.FallbackPolicy);
+        Assert.IsTrue(options.FallbackPolicy.Requirements.OfType<DenyAnonymousAuthorizationRequirement>().Any());
+        var provider = factory.Services.GetRequiredService<IAuthorizationPolicyProvider>();
+        var endpoints = factory.Services.GetServices<EndpointDataSource>()
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Where(endpoint => IsApplicationBoundary(endpoint.RoutePattern.RawText))
+            .ToArray();
+
+        var missing = new List<string>();
+        foreach (var endpoint in endpoints)
+        {
+            if (endpoint.Metadata.OfType<IAllowAnonymous>().Any()) continue;
+            var policy = await AuthorizationPolicy.CombineAsync(
+                provider,
+                endpoint.Metadata.OfType<IAuthorizeData>(),
+                endpoint.Metadata.OfType<AuthorizationPolicy>());
+            if (policy is null) missing.Add(endpoint.RoutePattern.RawText ?? endpoint.DisplayName ?? "<unknown>");
+        }
+
+        Assert.IsEmpty(missing, $"Routes without an effective authorization policy:{Environment.NewLine}{string.Join(Environment.NewLine, missing)}");
+
+        var anonymous = endpoints
+            .Where(endpoint => endpoint.Metadata.OfType<IAllowAnonymous>().Any())
+            .Select(endpoint => NormalizeRoute(endpoint.RoutePattern.RawText))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        CollectionAssert.AreEquivalent(
+            new[] { "health", "api/auth/bootstrap", "api/auth/local/login", "api/auth/oidc/login", "login", "bootstrap", "access-denied" },
+            anonymous);
+    }
+
+    [TestMethod]
+    public async Task SecuritySensitiveRoutesDeclareTheirContextualPolicies()
+    {
+        await using var factory = CreateFactory();
+        var endpoints = factory.Services.GetServices<EndpointDataSource>()
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .ToArray();
+        var expected = new (string Method, string Route, string Policy)[]
+        {
+            ("POST", "/api/routing/invoke", AgentstrationPolicies.CanExecuteRuns),
+            ("POST", "/api/triggers/{name}/run", AgentstrationPolicies.CanExecuteRuns),
+            ("GET", "/api/triggers/{name}/occurrences", AgentstrationPolicies.CanReadRuns),
+            ("GET", "/api/modelproviders", AgentstrationPolicies.CanReadResources),
+            ("POST", "/api/modelproviders", AgentstrationPolicies.CanWriteResources),
+            ("DELETE", "/api/modelproviders/{providerName}", AgentstrationPolicies.CanDeleteResources),
+            ("POST", "/api/modelproviders/{providerName}/test", AgentstrationPolicies.CanExecuteRuns),
+            ("POST", "/api/extensions/discover", AgentstrationPolicies.CanWriteResources),
+            ("POST", "/api/toolproviders/{providerName}/test", AgentstrationPolicies.CanExecuteRuns),
+            ("POST", "/api/toolproviders/{providerName}/refresh", AgentstrationPolicies.CanWriteResources),
+            ("DELETE", "/api/toolexecutionhooks/{hookName}", AgentstrationPolicies.CanDeleteResources),
+            ("POST", "/api/vaults/{name}/initialize", AgentstrationPolicies.PlatformAdmin),
+            ("DELETE", "/api/secrets/{name}/value", AgentstrationPolicies.CanDeleteResources),
+            ("POST", "/mcp", AgentstrationPolicies.CanExecuteRuns)
+        };
+
+        foreach (var item in expected)
+        {
+            var matches = endpoints.Where(endpoint =>
+                string.Equals(NormalizeRoute(endpoint.RoutePattern.RawText), NormalizeRoute(item.Route), StringComparison.OrdinalIgnoreCase)
+                && endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods.Contains(item.Method, StringComparer.OrdinalIgnoreCase) == true).ToArray();
+            Assert.HasCount(1, matches, $"Expected exactly one registered endpoint for {item.Method} {item.Route}.");
+            var endpoint = matches[0];
+            Assert.IsTrue(endpoint.Metadata.OfType<IAuthorizeData>().Any(data => string.Equals(data.Policy, item.Policy, StringComparison.Ordinal)),
+                $"{item.Method} {item.Route} must declare policy '{item.Policy}'.");
+        }
+    }
+
     [TestMethod]
     public async Task OpenApiDocumentCoversEveryRegisteredHttpApiRoute()
     {
@@ -161,6 +241,17 @@ public sealed class OpenApiTests
     private static bool IsApiRoute(string? route) => route is not null
         && (route.Equals("health", StringComparison.OrdinalIgnoreCase)
             || route.StartsWith("api/", StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsApplicationBoundary(string? route)
+    {
+        var normalized = NormalizeRoute(route);
+        return normalized is "health" or "login" or "bootstrap" or "access-denied"
+            || normalized.StartsWith("api/", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("mcp", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeRoute(string? route) => (route ?? string.Empty).Trim('/');
 
     private static bool IsHttpMethod(string value) => value is "get" or "post" or "put" or "delete" or "patch" or "head" or "options" or "trace";
 

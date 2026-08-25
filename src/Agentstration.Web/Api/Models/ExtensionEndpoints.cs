@@ -2,6 +2,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Web.Hosting;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
 
@@ -9,14 +10,14 @@ public static class ExtensionEndpoints
 {
     public static void Map(IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/extensions", ListAsync);
-        endpoints.MapPost("/api/extensions/discover", DiscoverAsync);
+        endpoints.MapGet("/api/extensions", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        endpoints.MapPost("/api/extensions/discover", DiscoverAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         var registrations = endpoints.MapGroup("/api/extensionregistrations");
-        registrations.MapGet("/", ListRegistrationsAsync);
-        registrations.MapGet("/{registrationName}", GetRegistrationAsync);
-        registrations.MapPost("/", CreateRegistrationAsync);
-        registrations.MapPut("/{registrationName}", PutRegistrationAsync);
-        registrations.MapDelete("/{registrationName}", DeleteRegistrationAsync);
+        registrations.MapGet("/", ListRegistrationsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        registrations.MapGet("/{registrationName}", GetRegistrationAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        registrations.MapPost("/", CreateRegistrationAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        registrations.MapPut("/{registrationName}", PutRegistrationAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        registrations.MapDelete("/{registrationName}", DeleteRegistrationAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
     }
 
     private static Task<IResult> DiscoverAsync(

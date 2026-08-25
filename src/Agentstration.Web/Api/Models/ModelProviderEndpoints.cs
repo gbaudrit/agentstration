@@ -1,12 +1,13 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
 
 internal sealed class ListModelProvidersEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
     private static Task<IResult> HandleAsync(ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -17,7 +18,7 @@ internal sealed class ListModelProvidersEndpoint : IModelManagementEndpoint
 
 internal sealed class GetModelProviderEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
     private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -29,7 +30,7 @@ internal sealed class GetModelProviderEndpoint : IModelManagementEndpoint
 
 internal sealed class CreateModelProviderEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapPost("/", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     private static Task<IResult> HandleAsync(CreateModelProviderRequest body, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -47,7 +48,7 @@ internal sealed class CreateModelProviderEndpoint : IModelManagementEndpoint
 
 internal sealed class PutModelProviderEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapPut("/{providerName}", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapPut("/{providerName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, PutModelProviderRequest body, HttpRequest request, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () => ModelManagementHttp.ResourceResult(
             await service.PutAsync(ModelManagementHttp.Namespace(resourceNamespace), providerName, body.Properties, ModelManagementHttp.IfMatch(request), cancellationToken),
@@ -57,7 +58,7 @@ internal sealed class PutModelProviderEndpoint : IModelManagementEndpoint
 
 internal sealed class DeleteModelProviderEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapDelete("/{providerName}", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapDelete("/{providerName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
     private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, HttpRequest request, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -68,7 +69,7 @@ internal sealed class DeleteModelProviderEndpoint : IModelManagementEndpoint
 
 internal sealed class GetModelProviderUsagesEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/usages", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/usages", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
     private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -82,7 +83,7 @@ internal sealed class GetModelProviderUsagesEndpoint : IModelManagementEndpoint
 
 internal sealed class TestModelProviderEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapPost("/{providerName}/test", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/{providerName}/test", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
     private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -93,7 +94,7 @@ internal sealed class TestModelProviderEndpoint : IModelManagementEndpoint
 
 internal sealed class ListProviderModelsEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/models", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/models", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
     private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -105,7 +106,7 @@ internal sealed class ListProviderModelsEndpoint : IModelManagementEndpoint
 
 internal sealed class GetModelProviderStatusEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/status", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}/status", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
     private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
