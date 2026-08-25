@@ -33,7 +33,6 @@ public sealed class ModelManagementApiTests
         using var response = await client.GetAsync("/health");
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-        Assert.IsNotNull(factory.Services.GetRequiredService<Agentstration.Application.IAgentRuntime>());
         Assert.IsInstanceOfType<ChatClientResolver>(factory.Services.GetRequiredService<IChatClientResolver>());
     }
 

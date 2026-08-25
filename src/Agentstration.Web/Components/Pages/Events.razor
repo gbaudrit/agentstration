@@ -1,8 +1,0 @@
-@page "/events"
-@implements IDisposable
-@inject IAgentstrationEventStream Stream
-<PageTitle>Events · Agentstration</PageTitle><PageHeader Title="Event stream" Description="Operational events with source, level and correlation context." />
-<FilterBar><SearchBox Value="search" ValueChanged="value=>search=value" Placeholder="Search events" /><select @bind="level" aria-label="Filter event level"><option value="">All levels</option><option>Information</option><option>Warning</option><option>Error</option></select><StatusBadge Text="Stream prepared" Status="UiStatus.Info" /></FilterBar>
-@if(items is null){<LoadingState Message="Opening event stream…"/>}else{<article class="panel"><EventList Items="Filtered" /></article>}
-@code{private readonly CancellationTokenSource cancellation=new();private IReadOnlyList<EventListItem>? items;private string search="",level="";private IReadOnlyList<EventListItem> Filtered=>items?.Where(item=>(string.IsNullOrWhiteSpace(search)||item.Summary.Contains(search,StringComparison.OrdinalIgnoreCase)||item.Source.Contains(search,StringComparison.OrdinalIgnoreCase))&&(string.IsNullOrWhiteSpace(level)||item.Level==level)).ToArray()??[];protected override async Task OnInitializedAsync()=>items=await Stream.GetRecentEventsAsync(cancellation.Token);public void Dispose(){cancellation.Cancel();cancellation.Dispose();}}
-

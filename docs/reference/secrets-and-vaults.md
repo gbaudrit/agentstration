@@ -24,7 +24,7 @@ flowchart LR
 
 The browser does not generate, receive, or display the master key. The authenticated administrator request only tells the server to initialize the Vault. The server generates 32 cryptographically random bytes, Base64-encodes them, and creates the key file using create-only semantics. A concurrent or repeated request cannot overwrite an existing key.
 
-By default the generated file is `secrets/master.key`, beside the configured `Data:Path`. For example, with the default Web data path it is under `src/Agentstration.Web/.agentstration/secrets/master.key`. If `AGENTSTRATION_MASTER_KEY_FILE` is set, that exact path is used instead.
+By default the generated file is `secrets/master.key` under the configured `Data:Directory`. For example, with the default Web data directory it is under `src/Agentstration.Web/.agentstration/secrets/master.key`. If `AGENTSTRATION_MASTER_KEY_FILE` is set, that exact path is used instead.
 
 The operation is available only to the `Administrator` policy. Its response contains the status and absolute key-file path, never the key material.
 

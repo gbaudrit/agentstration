@@ -1,25 +1,14 @@
-using Agentstration.Application;
-using Agentstration.Application.Ingestion;
-using Agentstration.Application.Memory;
-using Agentstration.Application.Missions;
-using Agentstration.Application.Routing;
 using Agentstration.Application.Work;
-using Agentstration.Application.Workflows;
-using Agentstration.Application.Workspaces;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Storage.Sqlite;
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
-using Agentstration.Infrastructure.Ingestion;
-using Agentstration.Infrastructure.Missions;
 using Agentstration.Infrastructure.Packs;
-using Agentstration.Infrastructure.Persistence;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
-using Agentstration.Infrastructure.Workflows;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
@@ -47,8 +36,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddAgentstration(
         this IServiceCollection services,
-        string dataPath,
-        bool inMemory = false,
+        string dataDirectory,
         AiProviderOptions? aiOptions = null,
         string? controlPlaneConnectionString = null,
         string? workPlaneConnectionString = null,
@@ -63,15 +51,7 @@ public static class DependencyInjection
         services.TryAddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton(new GenAiObservabilityOptions());
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();
-        if (inMemory) services.AddSingleton<IPlatformStore, InMemoryPlatformStore>();
-        else services.AddSingleton<IPlatformStore>(_ => new JsonFilePlatformStore(dataPath));
-        services.AddSingleton<IEventBus, InProcessEventBus>();
         services.AddSingleton<IManagementEventPublisher, InProcessManagementEventPublisher>();
-        services.AddSingleton<IItemProcessingQueue, ItemProcessingQueue>();
-        services.AddSingleton<IIntentRouter, DeterministicIntentRouter>();
-        services.AddSingleton<MemoryService>();
-        services.AddSingleton<IMemoryStore>(provider => provider.GetRequiredService<MemoryService>());
-        services.AddSingleton<IMemorySearch>(provider => provider.GetRequiredService<MemoryService>());
         aiOptions ??= new AiProviderOptions("Deterministic", new Uri("http://localhost/"), "deterministic", null);
         services.AddSingleton(aiOptions);
         var useManagedProfileResolver = string.Equals(aiOptions.Provider, "Managed", StringComparison.OrdinalIgnoreCase);
@@ -85,19 +65,9 @@ public static class DependencyInjection
                 .AddHttpMessageHandler<GenAiHttpPayloadCaptureHandler>();
             services.AddSingleton<IChatClient>(provider => provider.GetRequiredService<OpenAiCompatibleChatClient>());
         }
-        services.AddSingleton<MicrosoftExtensionsAiAgentRuntime>();
-        services.AddSingleton<Agentstration.Application.IAgentRuntime>(provider => provider.GetRequiredService<MicrosoftExtensionsAiAgentRuntime>());
-        services.AddSingleton<IObservationTool, DemoObservationTool>();
-        services.AddHttpClient("ingestion", client => client.Timeout = TimeSpan.FromSeconds(15));
-        services.AddSingleton<IContentSourceReader, SafeHttpContentSourceReader>();
-        services.AddSingleton<WorkspaceService>();
-        services.AddSingleton<IngestionService>();
-        services.AddSingleton<ContentProcessingWorkflow>();
-        services.AddSingleton<MissionService>();
-        services.AddSingleton<IEventHandler<Domain.ItemReceived>, ItemReceivedHandler>();
-        controlPlaneConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "control-plane.db")}";
+        controlPlaneConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "control-plane.db")}";
         services.AddSqliteControlPlane(controlPlaneConnectionString);
-        var secretPath = Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "secrets");
+        var secretPath = Path.Combine(dataDirectory, "secrets");
         services.AddSingleton(_ => new EnvironmentMasterKeyProvider(Path.Combine(secretPath, "master.key")));
         services.AddSingleton<IMasterKeyProvider>(provider => provider.GetRequiredService<EnvironmentMasterKeyProvider>());
         services.AddSingleton<ISecretVaultProvider>(provider => new LocalSecretVaultProvider(
@@ -122,6 +92,7 @@ public static class DependencyInjection
         services.AddSingleton<WorkspaceMembershipAdministrationService>();
         services.AddSingleton<IdentityExperienceService>();
         services.AddSingleton<PrincipalPreferencesService>();
+        services.AddSingleton<PersonalAccessTokenService>();
         services.AddSingleton<IAgentDefinitionCompiler, AgentDefinitionCompiler>();
         services.AddSingleton<IRuntimeAgentResolver, ControlPlaneRuntimeAgentResolver>();
         services.AddSingleton<IModelProfileReferenceValidator, DeferredModelProfileReferenceValidator>();
@@ -144,7 +115,7 @@ public static class DependencyInjection
         services.AddSingleton<AgentManagementService>();
         services.AddSingleton<AgentExecutionCoordinator>();
         services.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
-        services.AddSingleton<IPackArtifactStore>(_ => new FileSystemPackArtifactStore(Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "pack-artifacts")));
+        services.AddSingleton<IPackArtifactStore>(_ => new FileSystemPackArtifactStore(Path.Combine(dataDirectory, "pack-artifacts")));
         services.AddSingleton<IPackResourceHandler, ModelProviderPackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, RuntimeProfilePackResourceHandler>();
         services.AddSingleton<IPackResourceHandler, ModelProfilePackResourceHandler>();
@@ -165,7 +136,7 @@ public static class DependencyInjection
         services.AddSingleton<ITriggerSchedulerProjection, QuartzTriggerScheduler>();
         services.AddSingleton<TriggerManagementService>();
         services.AddSingleton<TriggerFiringService>();
-        var schedulerConnectionString = $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "scheduler.db")}";
+        var schedulerConnectionString = $"Data Source={Path.Combine(dataDirectory, "scheduler.db")}";
         services.AddSingleton<IHostedService>(_ => new QuartzSqliteSchemaInitializer(schedulerConnectionString));
         services.AddQuartz(configuration =>
         {
@@ -180,7 +151,7 @@ public static class DependencyInjection
         });
         services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
         services.AddHostedService<TriggerSchedulerReconciler>();
-        runtimeConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "runtime-plane.db")}";
+        runtimeConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "runtime-plane.db")}";
         services.AddSqliteRuntimeRuns(runtimeConnectionString);
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
@@ -191,16 +162,16 @@ public static class DependencyInjection
         services.AddSingleton<IToolGovernanceAuditReader, ToolGovernanceAuditReader>();
         services.AddSingleton<IToolExecutionPipeline, ToolExecutionPipeline>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
-        workPlaneConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "work-plane.db")}";
+        workPlaneConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "work-plane.db")}";
         services.AddSqliteWorkPlane(workPlaneConnectionString);
-        services.AddSingleton<IArtifactStore>(_ => new FileSystemArtifactStore(Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "artifacts")));
+        services.AddSingleton<IArtifactStore>(_ => new FileSystemArtifactStore(Path.Combine(dataDirectory, "artifacts")));
         services.AddSingleton<LocalWorkExecutionGateway>();
         services.AddSingleton<IWorkExecutionGateway>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<ILocalWorkExecutionQueue>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<WorkItemService>();
         services.AddSingleton<WorkplaceService>();
         services.AddSingleton<IWorkTaskEventSink, WorkplaceProjectionSink>();
-        flowConnectionString ??= $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "flow-plane.db")}";
+        flowConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "flow-plane.db")}";
         services.AddSqliteFlowStorage(flowConnectionString);
         services.AddSingleton<FlowService>();
         services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();

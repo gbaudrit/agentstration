@@ -729,7 +729,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         AgentVersion = 1,
         EffectiveInstructions = "Focus on SQL Server.",
         ModelProfileName = "reasoning-default",
-        RuntimeProfileName = "maf-default",
+        RuntimeProfileName = "maf-builtin",
         EffectiveToolNames = [],
         MiddlewareIds = [],
         ContextProviderIds = [],

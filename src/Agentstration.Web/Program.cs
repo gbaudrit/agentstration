@@ -1,7 +1,4 @@
-using Agentstration.Application.Ingestion;
-using Agentstration.Application.Missions;
 using Agentstration.Application.Work;
-using Agentstration.Application.Workflows;
 using Agentstration.Flow.Application;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
@@ -41,17 +38,18 @@ genAiObservability.Validate(builder.Environment.IsDevelopment());
 var toolExecutionCapture = builder.Configuration.GetSection("Agentstration:ToolExecution").Get<ToolExecutionCaptureOptions>() ?? new();
 toolExecutionCapture.Validate();
 builder.Services.AddSingleton(toolExecutionCapture);
-var dataPath = builder.Configuration["Data:Path"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "data.json");
+var dataDirectory = builder.Configuration["Data:Directory"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration");
+Directory.CreateDirectory(dataDirectory);
 var identityConnectionString = builder.Configuration.GetConnectionString("Identity")
     ?? (builder.Environment.IsEnvironment("Testing")
         ? $"Data Source={Path.Combine(Path.GetTempPath(), $"agentstration-identity-tests-{Guid.NewGuid():N}.db")}"
-        : $"Data Source={Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "identity.db")}");
+        : $"Data Source={Path.Combine(dataDirectory, "identity.db")}");
 var dataProtectionKeysPath = configuredAuthentication.DataProtectionKeysPath;
 if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 {
     dataProtectionKeysPath = builder.Environment.IsEnvironment("Testing")
         ? Path.Combine(Path.GetTempPath(), $"agentstration-data-protection-tests-{Guid.NewGuid():N}")
-        : Path.Combine(Path.GetDirectoryName(dataPath) ?? ".", "data-protection-keys");
+        : Path.Combine(dataDirectory, "data-protection-keys");
 }
 var aiProvider = builder.Configuration["AI:Provider"] ?? "Managed";
 var useManagedProfileResolver = string.Equals(aiProvider, "Managed", StringComparison.OrdinalIgnoreCase);
@@ -79,12 +77,13 @@ var runtimePath = builder.Environment.IsEnvironment("Testing")
     : builder.Configuration["Data:RuntimePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "runtime-plane.db");
 var runtimeDirectory = Path.GetDirectoryName(runtimePath);
 if (!string.IsNullOrWhiteSpace(runtimeDirectory)) Directory.CreateDirectory(runtimeDirectory);
-builder.Services.AddAgentstration(dataPath, builder.Environment.IsEnvironment("Testing"), aiOptions, $"Data Source={controlPlanePath}", $"Data Source={workPlanePath}", $"Data Source={flowPath}", $"Data Source={runtimePath}");
+builder.Services.AddAgentstration(dataDirectory, aiOptions, $"Data Source={controlPlanePath}", $"Data Source={workPlanePath}", $"Data Source={flowPath}", $"Data Source={runtimePath}");
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
 builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
+builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddRazorPages();
@@ -101,7 +100,6 @@ builder.Services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRu
 builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>();
 builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);
 builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
-builder.Services.AddHostedService<ItemProcessingWorker>();
 builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
 builder.Services.AddHostedService<LocalWorkExecutionWorker>();
 builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
@@ -124,9 +122,6 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddSource(
-                IngestionService.ActivitySource.Name,
-                ContentProcessingWorkflow.ActivitySource.Name,
-                MissionService.ActivitySource.Name,
                 WorkItemService.ActivitySource.Name,
                 RuntimeRunService.ActivitySource.Name,
                 FlowRunService.ActivitySource.Name,
@@ -161,12 +156,12 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 app.UseAuthentication();
 app.UseMiddleware<PrincipalResolutionMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
+app.UseMiddleware<StandardManagementDataMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 app.MapAgentstrationAuthentication();
 app.MapAgentstrationLocalAccountAdministration();
-app.MapAgentstrationApi();
 app.MapAgentstrationIdentityApi();
 app.MapAgentstrationManagementApi();
 app.MapAgentstrationModelManagementApi();
@@ -196,11 +191,11 @@ await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Life
 await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 if (app.Services.GetRequiredService<ICurrentRequestContext>().IsInitialized)
 {
+    await app.Services.GetRequiredService<StandardRuntimeProfileSeeder>().EnsureAsync(app.Lifetime.ApplicationStopping);
     await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
     if (!app.Environment.IsEnvironment("Testing"))
         await InteractiveFlowDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
     await WorkplaceDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
-    await DemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
 }
 await app.RunAsync();
 

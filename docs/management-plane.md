@@ -18,7 +18,7 @@ Agentstration.Management.Storage.Sqlite
   EF Core and SQLite implementation of the control-plane store
 ```
 
-Neither the general `Agentstration.Domain` nor `Agentstration.Application` project owns Management code. Both central Management projects remain independent of Microsoft Agent Framework; concrete agent materialization stays in the Runtime plane.
+`Agentstration.Application` does not own Management code. Both central Management projects remain independent of Microsoft Agent Framework; concrete agent materialization stays in the Runtime plane.
 
 The standalone host exposes these Minimal API routes:
 

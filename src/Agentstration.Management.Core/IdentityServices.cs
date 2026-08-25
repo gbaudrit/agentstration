@@ -386,6 +386,13 @@ public sealed class PermissionAuthorizationService(IIdentityStore store) : IAuth
             var role = await store.GetRoleDefinitionAsync(assignment.RoleDefinitionId, cancellationToken);
             if (role is not null) permissions.UnionWith(role.Permissions);
         }
+        if (context.Restriction is { } restriction)
+        {
+            if (restriction.WorkspaceId != context.WorkspaceId)
+                permissions.Clear();
+            else
+                permissions.IntersectWith(restriction.Permissions);
+        }
         return permissions;
     }
 

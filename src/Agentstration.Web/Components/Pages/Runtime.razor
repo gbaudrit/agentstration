@@ -1,7 +1,0 @@
-@page "/runtime"
-@implements IDisposable
-@inject IRuntimeApiClient Client
-<PageTitle>Runtime · Agentstration</PageTitle><PageHeader Title="Runtime plane" Description="Actual agent instances, availability, activity and resource posture." />
-@if (items is null) { <LoadingState Message="Connecting to runtime…" /> } else { <DataGrid TItem="RuntimeInstanceSummary" Items="items"><Header><tr><th>Instance</th><th>Agents</th><th>Status</th><th>Hosting</th><th>Activity</th><th>Resources</th><th>Error</th></tr></Header><Row Context="item"><tr><td><code>@item.Id</code></td><td>@item.Agent</td><td><StatusBadge Text="@item.Status" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.HostingMode<br/><small>@item.Location</small></td><td>@item.Activity</td><td>@item.CpuPercent.ToString("0.0")% CPU · @item.MemoryMb.ToString("0") MB</td><td>@(item.Error ?? "—")</td></tr></Row></DataGrid> }
-@code { private readonly CancellationTokenSource cancellation = new(); private IReadOnlyList<RuntimeInstanceSummary>? items; protected override async Task OnInitializedAsync()=>items=await Client.GetInstancesAsync(cancellation.Token); public void Dispose(){cancellation.Cancel();cancellation.Dispose();} }
-

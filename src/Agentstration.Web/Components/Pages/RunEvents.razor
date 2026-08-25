@@ -1,0 +1,8 @@
+@page "/run-events"
+@implements IDisposable
+@inject IAgentstrationEventStream Stream
+<PageTitle>Run events · Agentstration</PageTitle><PageHeader Title="Run events" Description="Recent lifecycle events from persisted Runtime and Flow run journals." />
+<FilterBar><SearchBox Value="search" ValueChanged="value=>search=value" Placeholder="Search run events" /><select @bind="level" aria-label="Filter event level"><option value="">All levels</option><option>Information</option><option>Warning</option><option>Error</option></select><StatusBadge Text="Persisted journals" Status="UiStatus.Info" /></FilterBar>
+@if(items is null){<LoadingState Message="Loading run events…"/>}else{<article class="panel"><EventList Items="Filtered" /></article>}
+@code{private readonly CancellationTokenSource cancellation=new();private IReadOnlyList<EventListItem>? items;private string search="",level="";private IReadOnlyList<EventListItem> Filtered=>items?.Where(item=>(string.IsNullOrWhiteSpace(search)||item.Summary.Contains(search,StringComparison.OrdinalIgnoreCase)||item.Source.Contains(search,StringComparison.OrdinalIgnoreCase)||item.Type.Contains(search,StringComparison.OrdinalIgnoreCase)||(item.CorrelationId?.Contains(search,StringComparison.OrdinalIgnoreCase)??false))&&(string.IsNullOrWhiteSpace(level)||item.Level==level)).ToArray()??[];protected override async Task OnInitializedAsync()=>items=await Stream.GetRecentEventsAsync(cancellation.Token);public void Dispose(){cancellation.Cancel();cancellation.Dispose();}}
+

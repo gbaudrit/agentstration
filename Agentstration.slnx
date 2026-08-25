@@ -8,9 +8,6 @@
   <Folder Name="/src/">
     <Project Path="src/Agentstration.AppHost/Agentstration.AppHost.csproj" />
     <Project Path="src/Agentstration.Application/Agentstration.Application.csproj" />
-    <Project Path="src/Agentstration.Contracts/Agentstration.Contracts.csproj" />
-    <Project Path="src/Agentstration.Domain/Agentstration.Domain.csproj" />
-    <Project Path="src/Agentstration.Evaluation/Agentstration.Evaluation.csproj" />
     <Project Path="src/Agentstration.Flow/Agentstration.Flow.csproj" />
     <Project Path="src/Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
     <Project Path="src/Agentstration.Flow.Contracts/Agentstration.Flow.Contracts.csproj" />
@@ -51,7 +48,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/Agentstration.Application.Tests/Agentstration.Application.Tests.csproj" />
     <Project Path="tests/Agentstration.ArchitectureTests/Agentstration.ArchitectureTests.csproj" />
-    <Project Path="tests/Agentstration.Evaluation.Tests/Agentstration.Evaluation.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Tests/Agentstration.Management.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
     <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />

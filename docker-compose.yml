@@ -6,7 +6,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       AI__Provider: Deterministic
-      Data__Path: /data/data.json
+      Data__Directory: /data
       Data__ControlPlanePath: /data/control-plane.db
       Data__WorkPlanePath: /data/work-plane.db
       Data__FlowPath: /data/flow-plane.db
