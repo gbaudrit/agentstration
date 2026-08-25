@@ -7,7 +7,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app/publish .
 ENV ASPNETCORE_URLS=http://+:8080
-ENV Data__Path=/data/data.json
+ENV Data__Directory=/data
 EXPOSE 8080
 VOLUME ["/data"]
 ENTRYPOINT ["dotnet", "Agentstration.Web.dll"]

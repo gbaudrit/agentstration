@@ -352,8 +352,7 @@ public sealed class IdentityFoundationTests
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddAgentstration(
-                Path.Combine(directory, "content.json"),
-                inMemory: true,
+                directory,
                 controlPlaneConnectionString: $"Data Source={Path.Combine(directory, "control-plane.db")}");
             var provider = services.BuildServiceProvider();
             await provider.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);

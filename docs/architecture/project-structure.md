@@ -4,9 +4,7 @@ The solution groups domain contracts, use cases, adapters, storage, and hosts in
 
 ```text
 src/
-  Agentstration.Domain/               Core content and mission model
-  Agentstration.Contracts/            Transport-neutral contracts
-  Agentstration.Application/          Use cases and ports
+  Agentstration.Application/          Work and Workplace use cases
   Agentstration.Infrastructure/       Local adapters and composition support
   Agentstration.Management.*/         Management resources, use cases, SQLite
   Agentstration.Runtime.*/            Runtime contracts, core, local and MAF adapters
