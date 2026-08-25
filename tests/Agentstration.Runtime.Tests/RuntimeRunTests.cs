@@ -396,7 +396,7 @@ public sealed class RuntimeRunTests
         Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);
         var created = await createdResponse.Content.ReadFromJsonAsync<RuntimeRun>();
         Assert.IsNotNull(created);
-        var current = factory.Services.GetRequiredService<ICurrentRequestContext>().Current;
+        var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         Assert.AreEqual(new RuntimeRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId), created.Properties.Scope);
         Assert.AreEqual(current.PrincipalId.ToString("D"), created.Properties.Initiator);
         Assert.IsNull(typeof(CreateRuntimeRunRequest).GetProperty("Initiator"));

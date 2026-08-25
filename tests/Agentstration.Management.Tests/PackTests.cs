@@ -322,6 +322,8 @@ public sealed class PackTests
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         var runtimeNamespace = new ResourceNamespace("shared.platform");
         var runtimeProfiles = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
         var runtime = await runtimeProfiles.CreateAsync(new RuntimeProfileResource
@@ -411,6 +413,8 @@ public sealed class PackTests
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         await using var archive = CreateZip(new Dictionary<string, string>
         {
             ["pack.yaml"] = Manifest("profiles/pack-runtime.yaml"),
@@ -739,6 +743,11 @@ public sealed class PackTests
         content.Headers.Add("X-Pack-File-Name", fileName);
         return content;
     }
+
+    private static Task<RequestContext> GetBootstrapContextAsync(WebApplicationFactory<Program> factory) =>
+        factory.Services
+            .GetRequiredService<ILocalEnvironmentBootstrapper>()
+            .EnsureInitializedAsync(default);
 
     private static MultipartFormDataContent InstallationContent(
         byte[] bytes,

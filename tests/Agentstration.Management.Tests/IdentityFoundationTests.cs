@@ -14,9 +14,25 @@ namespace Agentstration.Management.Tests;
 public sealed class IdentityFoundationTests
 {
     [TestMethod]
+    public async Task BootstrapReturnsOwnerContextWithoutPublishingItGlobally()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, fixture.Context.AccessMode);
+        Assert.ThrowsExactly<InvalidOperationException>(() => _ = fixture.Context.Current);
+
+        var context = await fixture.Bootstrap.EnsureInitializedAsync(default);
+
+        Assert.AreEqual(fixture.InitialContext, context);
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, fixture.Context.AccessMode);
+        Assert.ThrowsExactly<InvalidOperationException>(() => _ = fixture.Context.Current);
+    }
+
+    [TestMethod]
     public async Task EmptyDatabaseBootstrapsOnceAndUsesStableIds()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var first = fixture.Context.Current;
         var store = fixture.Services.GetRequiredService<IIdentityStore>();
 
@@ -34,6 +50,7 @@ public sealed class IdentityFoundationTests
     public async Task PrincipalPreferencesArePersistedPerPrincipal()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var store = fixture.Services.GetRequiredService<IIdentityStore>();
         var firstPrincipalId = fixture.Context.Current.PrincipalId;
         var secondPrincipal = new Principal(
@@ -60,6 +77,7 @@ public sealed class IdentityFoundationTests
     public async Task PersonalAccessTokenStoresOnlyAHashAndRevocationIsDurable()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
         var store = fixture.Services.GetRequiredService<IPersonalAccessTokenStore>();
 
@@ -84,6 +102,7 @@ public sealed class IdentityFoundationTests
     public async Task PersonalAccessTokenRestrictionIntersectsLiveWorkspacePermissions()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var authorization = fixture.Services.GetRequiredService<IAuthorizationService>();
         var current = fixture.Context.Current;
         var restricted = current with
@@ -106,9 +125,10 @@ public sealed class IdentityFoundationTests
     public async Task PersonalAccessTokenCannotManagePersonalAccessTokens()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
         var current = fixture.Context.Current;
-        fixture.Context.Initialize(current with
+        using var restrictedScope = fixture.Context.Push(current with
         {
             Restriction = new AuthorizationRestriction(
                 Guid.NewGuid(),
@@ -123,6 +143,7 @@ public sealed class IdentityFoundationTests
     public async Task PlatformAdministratorCanRevokeAnotherPrincipalsPersonalAccessToken()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
         var store = fixture.Services.GetRequiredService<IPersonalAccessTokenStore>();
         var identities = fixture.Services.GetRequiredService<IIdentityStore>();
@@ -160,24 +181,26 @@ public sealed class IdentityFoundationTests
     public async Task BootstrapRepairsMissingWorkspaceMembershipAndOwnerAssignment()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var original = fixture.Context.Current;
         await fixture.ExecuteSqlAsync("DELETE FROM RoleAssignments; DELETE FROM TenantMemberships; DELETE FROM Workspaces;");
 
-        await fixture.Bootstrap.EnsureInitializedAsync(default);
+        var repaired = await fixture.Bootstrap.EnsureInitializedAsync(default);
 
-        var repaired = fixture.Context.Current;
         var store = fixture.Services.GetRequiredService<IIdentityStore>();
         Assert.AreEqual(original.TenantId, repaired.TenantId);
         Assert.AreEqual(original.UserId, repaired.UserId);
         Assert.AreNotEqual(original.WorkspaceId, repaired.WorkspaceId);
         Assert.IsNotNull(await store.FindMembershipAsync(repaired.TenantId, repaired.UserId, default));
         Assert.AreEqual(1, (await store.ListRoleAssignmentsAsync(repaired.TenantId, repaired.UserId, default)).Count);
+        Assert.AreEqual(original, fixture.Context.Current, "Bootstrap must not replace the ambient request scope.");
     }
 
     [TestMethod]
     public async Task DuplicateTenantMembershipIsRejected()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var context = fixture.Context.Current;
         var store = fixture.Services.GetRequiredService<IIdentityStore>();
         var duplicate = new TenantMembership(Guid.NewGuid(), context.TenantId, context.UserId, MembershipStatus.Active, DateTimeOffset.UtcNow);
@@ -189,6 +212,7 @@ public sealed class IdentityFoundationTests
     public async Task TenantOwnerInheritsWorkspaceAccessButReaderCannotWriteAndUnassignedUserCannotRead()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var context = fixture.Context.Current;
         var store = fixture.Services.GetRequiredService<IIdentityStore>();
         var authorization = fixture.Services.GetRequiredService<IAuthorizationService>();
@@ -217,6 +241,7 @@ public sealed class IdentityFoundationTests
     public async Task ResourceLookupIsExplicitlyWorkspaceAndTenantScoped()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var identity = fixture.Services.GetRequiredService<IIdentityStore>();
         var resources = fixture.Services.GetRequiredService<IControlPlaneStore>();
         var first = fixture.Context.Current;
@@ -226,37 +251,36 @@ public sealed class IdentityFoundationTests
 
         var key = new ResourceKey(ResourceKinds.RuntimeProfile, "shared");
         await resources.PutAsync(Profile("shared", first), null, true, default);
-        fixture.Context.Initialize(first with { WorkspaceId = secondWorkspace.Id });
-        var second = fixture.Context.Current;
-        await resources.PutAsync(Profile("shared", second), null, true, default);
-
-        Assert.IsNotNull(await resources.GetAsync<RuntimeProfileResource>(key, default));
+        var second = first with { WorkspaceId = secondWorkspace.Id };
+        using (fixture.Context.Push(second))
+        {
+            await resources.PutAsync(Profile("shared", second), null, true, default);
+            Assert.IsNotNull(await resources.GetAsync<RuntimeProfileResource>(key, default));
+        }
 
         var otherTenant = new Tenant(Guid.NewGuid(), "other", "Other", TenantStatus.Active, now);
         await identity.AddTenantAsync(otherTenant, default);
         var otherWorkspace = new Workspace(Guid.NewGuid(), otherTenant.Id, "default", "Default", WorkspaceStatus.Active, now);
         await identity.AddWorkspaceAsync(otherWorkspace, default);
-        fixture.Context.Initialize(second with { TenantId = otherTenant.Id, WorkspaceId = otherWorkspace.Id });
-        Assert.IsNull(await resources.GetAsync<RuntimeProfileResource>(key, default));
+        using (fixture.Context.Push(second with { TenantId = otherTenant.Id, WorkspaceId = otherWorkspace.Id }))
+            Assert.IsNull(await resources.GetAsync<RuntimeProfileResource>(key, default));
     }
 
     [TestMethod]
-    public void RequestContextScopeIsAmbientAndRestoresTheStandaloneFallback()
+    public void RequestContextScopeIsAmbientAndRestoresUnavailableState()
     {
         var accessor = new CurrentRequestContext();
-        var fallback = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        var selected = fallback with { WorkspaceId = Guid.NewGuid() };
-        accessor.Initialize(fallback);
+        var selected = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
         using (accessor.Push(selected)) Assert.AreEqual(selected, accessor.Current);
-        Assert.AreEqual(fallback, accessor.Current);
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, accessor.AccessMode);
+        Assert.IsFalse(accessor.IsInitialized);
+        Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
     }
 
     [TestMethod]
-    public void ExplicitSystemScopeIsGlobalAndRestoresTheWorkspaceFallback()
+    public void ExplicitSystemScopeRestoresUnavailableState()
     {
         var accessor = new CurrentRequestContext();
-        var fallback = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        accessor.Initialize(fallback);
 
         using (accessor.PushSystem())
         {
@@ -265,14 +289,15 @@ public sealed class IdentityFoundationTests
             Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
         }
 
-        Assert.AreEqual(ControlPlaneAccessMode.Workspace, accessor.AccessMode);
-        Assert.AreEqual(fallback, accessor.Current);
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, accessor.AccessMode);
+        Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
     }
 
     [TestMethod]
     public async Task WorkspaceCreationDoesNotRequireAResourceGroup()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var administration = fixture.Services.GetRequiredService<IdentityAdministrationService>();
         var store = fixture.Services.GetRequiredService<IIdentityStore>();
 
@@ -305,6 +330,7 @@ public sealed class IdentityFoundationTests
     public async Task ExternalIdentityUsesIssuerAndSubjectAndIgnoresEmailChanges()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var store = fixture.Services.GetRequiredService<IIdentityStore>();
         var resolver = fixture.Services.GetRequiredService<IPrincipalResolver>();
         var now = DateTimeOffset.UtcNow;
@@ -335,15 +361,18 @@ public sealed class IdentityFoundationTests
     private sealed class IdentityFixture : IAsyncDisposable
     {
         private readonly string directory;
-        private IdentityFixture(string directory, ServiceProvider services)
+        private IdentityFixture(string directory, ServiceProvider services, RequestContext initialContext)
         {
             this.directory = directory;
             Services = services;
+            InitialContext = initialContext;
         }
 
         public ServiceProvider Services { get; }
+        public RequestContext InitialContext { get; }
         public CurrentRequestContext Context => Services.GetRequiredService<CurrentRequestContext>();
         public ILocalEnvironmentBootstrapper Bootstrap => Services.GetRequiredService<ILocalEnvironmentBootstrapper>();
+        public IDisposable OpenScope() => Context.Push(InitialContext);
 
         public static async Task<IdentityFixture> CreateAsync()
         {
@@ -356,8 +385,8 @@ public sealed class IdentityFoundationTests
                 controlPlaneConnectionString: $"Data Source={Path.Combine(directory, "control-plane.db")}");
             var provider = services.BuildServiceProvider();
             await provider.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);
-            await provider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
-            return new IdentityFixture(directory, provider);
+            var initialContext = await provider.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+            return new IdentityFixture(directory, provider, initialContext);
         }
 
         public async Task ExecuteSqlAsync(string sql)

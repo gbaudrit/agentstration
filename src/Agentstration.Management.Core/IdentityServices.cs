@@ -15,20 +15,17 @@ public sealed class LocalBootstrapOptions
     public string ExternalIdentitySubject { get; set; } = DevelopmentSubject;
 }
 
-public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestContextInitializer, IRequestContextScopeFactory
+public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestContextScopeFactory
 {
     private readonly AsyncLocal<AmbientRequestContext?> ambient = new();
-    private RequestContext? fallback;
     public bool IsInitialized => AccessMode == ControlPlaneAccessMode.Workspace;
-    public ControlPlaneAccessMode AccessMode => ambient.Value?.AccessMode
-        ?? (fallback is null ? ControlPlaneAccessMode.Unavailable : ControlPlaneAccessMode.Workspace);
+    public ControlPlaneAccessMode AccessMode => ambient.Value?.AccessMode ?? ControlPlaneAccessMode.Unavailable;
     public RequestContext Current => ambient.Value switch
     {
         { AccessMode: ControlPlaneAccessMode.Workspace, Context: not null } value => value.Context,
         { AccessMode: ControlPlaneAccessMode.System } => throw new InvalidOperationException("System operations do not have a workspace request context."),
-        _ => fallback ?? throw new InvalidOperationException("The request context has not been initialized.")
+        _ => throw new InvalidOperationException("The request context has not been initialized.")
     };
-    public void Initialize(RequestContext context) => fallback = context;
     public IDisposable Push(RequestContext context) => Push(new AmbientRequestContext(ControlPlaneAccessMode.Workspace, context));
     public IDisposable PushSystem() => Push(new AmbientRequestContext(ControlPlaneAccessMode.System, null));
 
@@ -311,13 +308,12 @@ public sealed class PlatformAuthorizationService(IIdentityStore store) : IPlatfo
 
 public sealed class LocalEnvironmentBootstrapper(
     IIdentityStore store,
-    IRequestContextInitializer contextInitializer,
     TimeProvider timeProvider,
     LocalBootstrapOptions options) : ILocalEnvironmentBootstrapper
 {
     public static readonly Guid OwnerRoleId = new("65c86c44-4c42-4e33-91d4-2d8d13bdd681");
 
-    public async Task EnsureInitializedAsync(CancellationToken cancellationToken)
+    public async Task<RequestContext> EnsureInitializedAsync(CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow();
         var tenant = await store.FindTenantByNameAsync(options.TenantName, cancellationToken);
@@ -360,7 +356,7 @@ public sealed class LocalEnvironmentBootstrapper(
         if (!assignments.Any(value => value.RoleDefinitionId == owner.Id && string.Equals(value.Scope, tenantScope, StringComparison.Ordinal)))
             await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), tenant.Id, principal.Id, PrincipalType.User, owner.Id, tenantScope), cancellationToken);
 
-        contextInitializer.Initialize(new RequestContext(principal.Id, tenant.Id, workspace.Id));
+        return new RequestContext(principal.Id, tenant.Id, workspace.Id);
     }
 }
 

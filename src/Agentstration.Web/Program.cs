@@ -179,24 +179,27 @@ app.MapStaticAssets().AllowAnonymous();
 app.MapRazorPages();
 app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode()
     .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
-await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
-if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase)
-    || string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Oidc, StringComparison.OrdinalIgnoreCase))
-    await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
-await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-if (app.Services.GetRequiredService<ICurrentRequestContext>().IsInitialized)
+RequestContext? bootstrapContext = null;
+var startupScopes = app.Services.GetRequiredService<IRequestContextScopeFactory>();
+using (startupScopes.PushSystem())
 {
-    await app.Services.GetRequiredService<StandardRuntimeProfileSeeder>().EnsureAsync(app.Lifetime.ApplicationStopping);
-    await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
-    if (!app.Environment.IsEnvironment("Testing"))
-        await InteractiveFlowDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
-    await WorkplaceDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+    await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+    await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
+    if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Oidc, StringComparison.OrdinalIgnoreCase))
+        bootstrapContext = await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
+    await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+    await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+    await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+    await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+    await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 }
+if (bootstrapContext is not null)
+    await WorkspaceStartupData.InitializeAsync(
+        app.Services,
+        bootstrapContext,
+        includeInteractiveDemo: !app.Environment.IsEnvironment("Testing"),
+        app.Lifetime.ApplicationStopping);
 await app.RunAsync();
 
 public partial class Program;
