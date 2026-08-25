@@ -32,15 +32,16 @@ else if (Filtered.Count == 0)
 else
 {
     <DataGrid TItem="AgentSummary" Items="Filtered">
-        <Header><tr><th>Agent</th><th>Definition</th><th>Model profile</th><th>Deployment</th><th>Last activity</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></Header>
+        <Header><tr><th>Agent</th><th>Namespace</th><th>Definition</th><th>Model profile</th><th>Deployment</th><th>Last activity</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></Header>
         <Row Context="item"><tr>
             <td><a class="resource-name-link" href="@EditUrl(item)">@item.Name</a><span class="resource-secondary"><code>@TechnicalName(item)</code></span></td>
+            <td><code>@item.Namespace.Value</code></td>
             <td><strong>@ResourceName(item.Type)</strong><span class="resource-secondary">generation @item.Version</span></td>
             <td><a class="text-button" href="@ModelProfileUrl(item)">@ResourceName(item.ModelProfile)</a></td>
             <td><span>@item.Runtime</span><span class="resource-secondary">Desired generation @item.Version</span></td>
             <td>@LastActivity(item.LastActivity)</td>
             <td><StatusIndicator Text="@StatusPresentation.Label(item.Status)" Status="@StatusPresentation.Tone(item.Status)" /></td>
-            <td><div class="table-actions"><a class="text-button" href="@RunUrl(item)">Run</a><details class="row-actions-menu"><summary aria-label="More actions for @item.Name">•••</summary><div><a href="@EditUrl(item)">Open</a><a href="@RunUrl(item)">Run</a><a href="@EditUrl(item)#definition">Edit definition</a><button type="button" @onclick="() => selected = item">Quick inspect</button><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">Delete</button></div></details></div></td>
+            <td><div class="table-actions">@if(item.Namespace.IsDefault){<a class="text-button" href="@RunUrl(item)">Run</a>}<details class="row-actions-menu"><summary aria-label="More actions for @item.Name">•••</summary><div><a href="@EditUrl(item)">Open</a>@if(item.Namespace.IsDefault){<a href="@RunUrl(item)">Run</a><a href="@EditUrl(item)#definition">Edit definition</a><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">Delete</button>}<button type="button" @onclick="() => selected = item">Quick inspect</button></div></details></div></td>
         </tr></Row>
     </DataGrid>
 }
@@ -49,8 +50,8 @@ else
 {
     <aside class="quick-inspector" aria-label="Agent quick inspector">
         <header><div><p class="eyebrow">Agent</p><h2>@selected.Name</h2><StatusIndicator Text="@StatusPresentation.Label(selected.Status)" Status="@StatusPresentation.Tone(selected.Status)" /></div><button class="icon-button" @onclick="() => selected = null" aria-label="Close inspector">×</button></header>
-        <dl class="resource-details resource-section"><dt>Definition</dt><dd>@ResourceName(selected.Type) · generation @selected.Version</dd><dt>Model profile</dt><dd>@ResourceName(selected.ModelProfile)</dd><dt>Deployment</dt><dd>@selected.Runtime</dd><dt>Resource ID</dt><dd><code>@selected.Id</code></dd></dl>
-        <div class="quick-inspector-actions"><a class="button-primary" href="@RunUrl(selected)">Run agent</a><a class="button-secondary" href="@EditUrl(selected)">Open details</a></div>
+        <dl class="resource-details resource-section"><dt>Namespace</dt><dd><code>@selected.Namespace.Value</code></dd><dt>Definition</dt><dd>@ResourceName(selected.Type) · generation @selected.Version</dd><dt>Model profile</dt><dd>@ResourceName(selected.ModelProfile)</dd><dt>Deployment</dt><dd>@selected.Runtime</dd><dt>Resource ID</dt><dd><code>@selected.Id</code></dd></dl>
+        <div class="quick-inspector-actions">@if(selected.Namespace.IsDefault){<a class="button-primary" href="@RunUrl(selected)">Run agent</a>}<a class="button-secondary" href="@EditUrl(selected)">Open details</a></div>
     </aside>
 }
 
@@ -70,6 +71,7 @@ else
         (string.IsNullOrWhiteSpace(search)
             || item.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
             || item.Id.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || item.Namespace.Value.Contains(search, StringComparison.OrdinalIgnoreCase)
             || item.ModelProfile.Contains(search, StringComparison.OrdinalIgnoreCase)
             || item.Capabilities.Any(capability => capability.Contains(search, StringComparison.OrdinalIgnoreCase)))
         && (string.IsNullOrWhiteSpace(status) || string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase))).ToArray() ?? [];
@@ -110,9 +112,9 @@ else
         }
     }
 
-    private static string EditUrl(AgentSummary item) => $"/agents/{Uri.EscapeDataString(item.Id)}";
+    private static string EditUrl(AgentSummary item) => item.DetailsUrl;
     private static string RunUrl(AgentSummary item) => $"{EditUrl(item)}/run";
-    private static string ModelProfileUrl(AgentSummary item) => $"/modelprofiles/{Uri.EscapeDataString(item.ModelProfile)}";
+    private static string ModelProfileUrl(AgentSummary item) => ConsoleResourceUrls.ModelProfile(item.ModelProfileAddress);
     private static string TechnicalName(AgentSummary item) => item.Id;
     private static string ResourceName(string resourceId) => resourceId;
     private static string LastActivity(DateTimeOffset value) => value == DateTimeOffset.MinValue ? "No activity reported" : value.LocalDateTime.ToString("g");

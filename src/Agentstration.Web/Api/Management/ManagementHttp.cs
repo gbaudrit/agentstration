@@ -10,6 +10,26 @@ internal static class ManagementHttp
         try { return await action(); }
         catch (ControlPlaneResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
         catch (ControlPlaneConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
+        catch (AgentRevisionPurgeBlockedException exception)
+        {
+            var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+            {
+                Type = "https://agentstration.dev/problems/agent-revision-purge-blocked",
+                Title = "agent_revision_purge_blocked",
+                Status = StatusCodes.Status409Conflict,
+                Detail = exception.Message
+            };
+            problem.Extensions["impact"] = exception.Impact;
+            return Results.Problem(problem);
+        }
+        catch (PackNotFoundException exception) { return Results.Problem(statusCode: 404, title: "pack_not_found", detail: exception.Message); }
+        catch (KeyNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
+        catch (PackValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
+        catch (PackAlreadyInstalledException exception) { return Results.Problem(statusCode: 409, title: "pack_already_installed", detail: exception.Message); }
+        catch (PackResourceConflictException exception) { return Results.Problem(statusCode: 409, title: "pack_resource_conflict", detail: exception.Message); }
+        catch (PackResourceModifiedException exception) { return Results.Problem(statusCode: 409, title: "pack_resource_modified", detail: exception.Message); }
+        catch (TriggerValidationException exception) { return Results.Problem(statusCode: 422, title: exception.Code, detail: exception.Message); }
+        catch (TriggerExecutionException exception) { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
         catch (AgentDefinitionValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
         catch (ModelProfileValidationException exception)
         {
@@ -24,6 +44,7 @@ internal static class ManagementHttp
             return Results.Problem(problem);
         }
         catch (ArgumentException exception) { return Results.Problem(statusCode: 400, title: "validation_failed", detail: exception.Message); }
+        catch (InvalidDataException exception) { return Results.Problem(statusCode: 400, title: "pack_archive_invalid", detail: exception.Message); }
         catch (InvalidOperationException exception) { return Results.Problem(statusCode: 409, title: "operation_conflict", detail: exception.Message); }
     }
 

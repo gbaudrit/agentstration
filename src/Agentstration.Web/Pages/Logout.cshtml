@@ -1,0 +1,16 @@
+@page "/logout"
+@model LogoutModel
+@{
+    ViewData["Title"] = "Sign out";
+}
+
+<header class="auth-heading">
+    <p class="eyebrow">Current session</p>
+    <h1>Sign out?</h1>
+    <p>You will need to authenticate again to access the Agentstration console.</p>
+</header>
+
+<form method="post" class="auth-actions">
+    <button type="submit" class="primary-action">Sign out</button>
+    <a href="/" class="secondary-action">Cancel</a>
+</form>

@@ -1,7 +1,0 @@
-@page "/ingest"
-@rendermode InteractiveServer
-@inject IPlatformStore Store
-@inject IngestionService Service
-<PageTitle>Ingest</PageTitle><h1>Ingest content</h1>
-<div class="form"><label>Workspace <select @bind="workspace"><option value="">Select</option>@foreach (var value in workspaces){<option value="@value.Id">@value.Name</option>}</select></label><label>Inbox ID <input @bind="inbox" /></label><label>Text <textarea @bind="content"></textarea></label><label>URL (instead of text) <input @bind="url" /></label><button @onclick="SubmitAsync">Queue item</button><span>@message</span></div>
-@code { private IReadOnlyList<Agentstration.Domain.Workspace> workspaces=[]; private string workspace="", inbox="", content="", url="", message=""; protected override async Task OnInitializedAsync(){workspaces=await Store.ListWorkspacesAsync(default); var first=workspaces.FirstOrDefault(); if(first is not null){workspace=first.Id.ToString(); inbox=(await Store.ListInboxesAsync(first.Id,default)).FirstOrDefault()?.Id.ToString()??"";}} private async Task SubmitAsync(){if(!Guid.TryParse(workspace,out var w)||!Guid.TryParse(inbox,out var i)){message="Select a workspace and inbox.";return;} var result=await Service.IngestAsync(new WorkspaceId(w),new InboxId(i),content,url,null,"text/plain",default);message=result.IsSuccess?$"Queued {result.Value!.ItemId}":result.Error!.Message;} }

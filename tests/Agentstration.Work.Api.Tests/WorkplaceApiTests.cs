@@ -41,10 +41,9 @@ public sealed class WorkplaceApiTests
             using (var createdFlow = await client.PostAsJsonAsync("/api/flows/", new CreateFlowRequest(
                 apiFlowName,
                 "Created through the canonical Flow API.",
-                Agentstration.Flow.FlowKind.Direct,
                 "1.0.0",
                 true,
-                new Agentstration.Flow.DirectFlowSpec(new Agentstration.Flow.FlowTargetReference(
+                new Agentstration.Flow.DirectFlowDefinition(new Agentstration.Flow.FlowTargetReference(
                     Agentstration.Flow.FlowTargetKind.Agent,
                     "dotnet-expert")))))
             {
@@ -83,9 +82,13 @@ public sealed class WorkplaceApiTests
             using (var dependencyScope = factory.Services.CreateScope())
             {
                 var management = dependencyScope.ServiceProvider.GetRequiredService<AgentManagementService>();
+                var identityStore = dependencyScope.ServiceProvider.GetRequiredService<IIdentityStore>();
+                var tenant = await identityStore.FindTenantByNameAsync("local", default);
+                var workspace = await identityStore.FindWorkspaceByNameAsync(tenant!.Id, "personal", default);
+                var workspaceId = new Agentstration.Resources.WorkspaceId(workspace!.Id);
                 var agent = await management.GetAgentAsync(administered.Value.Binding.ResourceId, default);
                 Assert.IsNotNull(agent);
-                var directFlow = await dependencyScope.ServiceProvider.GetRequiredService<Agentstration.Flow.Application.FlowService>().GetAsync(new Agentstration.Flow.FlowId("system-direct-agent-dotnet-expert"), default);
+                var directFlow = await dependencyScope.ServiceProvider.GetRequiredService<Agentstration.Flow.Application.FlowService>().GetAsync(workspaceId, new Agentstration.Flow.FlowId("system-direct-agent-dotnet-expert"), default);
                 Assert.IsNotNull(directFlow);
                 Assert.AreEqual(agent.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), directFlow.Value.Metadata["sourceAgentGeneration"]);
                 Assert.AreEqual($"1.0.{agent.Value.Generation - 1}", administered.Published.ResolvedTarget.Version);
@@ -93,15 +96,15 @@ public sealed class WorkplaceApiTests
                 Assert.AreEqual("resource_in_use", exception.Code);
 
                 var flows = dependencyScope.ServiceProvider.GetRequiredService<FlowService>();
-                var systemDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(directFlow.Value.Id, directFlow.ETag, default));
+                var systemDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(workspaceId, directFlow.Value.Id, directFlow.ETag, default));
                 Assert.AreEqual("system_flow_managed", systemDelete.Code);
-                var referencedFlow = await flows.GetAsync(new("universal-router"), default);
+                var referencedFlow = await flows.GetAsync(workspaceId, new("universal-router"), default);
                 Assert.IsNotNull(referencedFlow);
-                var referencedDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(referencedFlow.Value.Id, referencedFlow.ETag, default));
+                var referencedDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(workspaceId, referencedFlow.Value.Id, referencedFlow.ETag, default));
                 Assert.AreEqual("flow_in_use", referencedDelete.Code);
-                var schemaFlow = await flows.CreateAsync(new CreateFlowCommand(
-                    "schema-flow", null, Agentstration.Flow.FlowKind.Direct, "1.0.0", true,
-                    new Agentstration.Flow.DirectFlowSpec(new Agentstration.Flow.FlowTargetReference(Agentstration.Flow.FlowTargetKind.Agent, administered.Value.Binding.ResourceId))), default);
+                var schemaFlow = await flows.CreateAsync(workspaceId, new CreateFlowCommand(
+                    "schema-flow", null, "1.0.0", true,
+                    new Agentstration.Flow.DirectFlowDefinition(new Agentstration.Flow.FlowTargetReference(Agentstration.Flow.FlowTargetKind.Agent, administered.Value.Binding.ResourceId))), default);
                 var graph = new Agentstration.Flow.FlowGraphDefinition
                 {
                     EntryStep = "input",
@@ -109,8 +112,8 @@ public sealed class WorkplaceApiTests
                     Steps = [new Agentstration.Flow.InputFlowStepDefinition { Name = "input" }, new Agentstration.Flow.OutputFlowStepDefinition { Name = "output" }],
                     Transitions = [new("complete", "input", "completed", "output")]
                 };
-                await flows.UpdateAsync(new("schema-flow"), new UpdateFlowCommand(null, Agentstration.Flow.FlowKind.Direct, "1.0.0", true, schemaFlow.Value.Spec, Graph: graph), schemaFlow.ETag, default);
-                await flows.PublishVersionAsync(new("schema-flow"), "1.0.0", activate: true, default);
+                await flows.UpdateAsync(workspaceId, new("schema-flow"), new UpdateFlowCommand(null, "1.0.0", true, schemaFlow.Value.Definition, Graph: graph), schemaFlow.ETag, default);
+                await flows.PublishVersionAsync(workspaceId, new("schema-flow"), "1.0.0", activate: true, default);
             }
 
             var incompatibleInput = administered.Value with
@@ -159,21 +162,12 @@ public sealed class WorkplaceApiTests
             Assert.AreEqual("Unpublished name", workplaceAfterPublish?.DisplayName);
             Assert.IsFalse(string.IsNullOrWhiteSpace(workplaceAfterPublish?.ResolvedTarget.Version));
 
-            var workspaceDraft = await client.GetFromJsonAsync<WorkplaceWorkspaceDraftResponse>("/api/management/workspaces/personal");
-            Assert.IsNotNull(workspaceDraft?.Published);
-            using var workspaceSaved = await client.PutAsJsonAsync("/api/management/workspaces/personal", workspaceDraft!.Value with { DisplayName = "Unpublished workspace" });
-            workspaceSaved.EnsureSuccessStatusCode();
-            var workspaceBeforePublish = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse>("/api/workspaces/personal");
-            Assert.AreNotEqual("Unpublished workspace", workspaceBeforePublish?.DisplayName);
-            using var workspacePublished = await client.PostAsync("/api/management/workspaces/personal/publish", null);
-            workspacePublished.EnsureSuccessStatusCode();
-            var workspaceAfterPublish = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse>("/api/workspaces/personal");
-            Assert.AreEqual("Unpublished workspace", workspaceAfterPublish?.DisplayName);
-            Assert.AreEqual(1, workspaceAfterPublish?.Entries.Count(value => value.Role == WorkspaceEntryRole.Primary));
+            var defaultDashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>("/api/workspaces/personal/dashboard");
+            Assert.AreEqual(1, defaultDashboard?.Entries.Count(value => value.Role == DashboardItemRole.Primary));
 
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/personal/entries/universal-request/interactions",
-                new CreateInteractionRequest("personal", new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement("Explain records briefly.") }));
+                new CreateInteractionRequest(new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement("Explain records briefly.") }));
             submittedResponse.EnsureSuccessStatusCode();
             var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
             Assert.IsNotNull(submitted?.Task);
@@ -181,7 +175,7 @@ public sealed class WorkplaceApiTests
             Assert.IsNotNull(outputs.Results.Single().FlowRunId);
             using var scope = factory.Services.CreateScope();
             var flowRuns = scope.ServiceProvider.GetRequiredService<FlowRunService>();
-            var run = await flowRuns.GetAsync(outputs.Results.Single().FlowRunId!, default);
+            var run = await flowRuns.GetAsync(new Agentstration.Resources.WorkspaceId(submitted.Task.WorkspaceId), outputs.Results.Single().FlowRunId!, default);
             Assert.IsNotNull(run);
             Assert.AreEqual("system-direct-agent-dotnet-expert", run.Value.FlowId.Value);
             Assert.AreEqual(Agentstration.Flow.FlowRunStatus.Succeeded, run.Value.Status);
@@ -208,7 +202,7 @@ public sealed class WorkplaceApiTests
             using var client = factory.CreateClient();
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/personal/entries/quick-answer/interactions",
-                new CreateInteractionRequest("personal", new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement("Remember this idea.") }));
+                new CreateInteractionRequest(new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement("Remember this idea.") }));
             submittedResponse.EnsureSuccessStatusCode();
             var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
             Assert.IsNotNull(submitted);
@@ -249,7 +243,7 @@ public sealed class WorkplaceApiTests
             using var client = factory.CreateClient();
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/personal/entries/prepare-report/interactions",
-                new CreateInteractionRequest("personal", new Dictionary<string, JsonElement>
+                new CreateInteractionRequest(new Dictionary<string, JsonElement>
                 {
                     ["request"] = JsonSerializer.SerializeToElement("Prepare a monthly report about sales performance.")
                 }));
@@ -261,7 +255,7 @@ public sealed class WorkplaceApiTests
             var firstOutputs = await WaitForOutputsAsync(client, submitted.Task.Id, 1);
             var firstFlowRunId = firstOutputs.Results.Single().FlowRunId;
             Assert.IsFalse(string.IsNullOrWhiteSpace(firstFlowRunId));
-            var idle = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}");
+            var idle = await WaitForInteractionStatusAsync(client, submitted.Interaction.Id, InteractionStatus.Idle);
             Assert.AreEqual(InteractionStatus.Idle, idle?.Status);
 
             using var continuationResponse = await client.PostAsJsonAsync(
@@ -274,7 +268,7 @@ public sealed class WorkplaceApiTests
             using (var scope = factory.Services.CreateScope())
             {
                 var workItems = scope.ServiceProvider.GetRequiredService<WorkItemService>();
-                var page = await workItems.QueryAsync(new WorkItemQuery(Take: 50), default);
+                var page = await workItems.QueryAsync(new WorkItemQuery(new Agentstration.Resources.WorkspaceId(submitted.Task.WorkspaceId), Take: 50), default);
                 var child = page.Items.Select(value => value.Value).Single(value => value.Metadata.ContainsKey("workplace.continuation"));
                 Assert.AreEqual(firstFlowRunId, child.Metadata["workplace.parentFlowRunId"]);
                 Assert.AreEqual(submitted.Interaction.Id.ToString(), child.Metadata["workplace.interactionId"]);
@@ -282,27 +276,26 @@ public sealed class WorkplaceApiTests
 
             var outputs = await WaitForOutputsAsync(client, submitted.Task.Id, 2);
             Assert.HasCount(2, outputs.Results);
-            Assert.HasCount(2, outputs.Artifacts);
+            Assert.HasCount(0, outputs.Artifacts, "Conversation results must not be duplicated as synthetic deliverables.");
             Assert.AreEqual(1, outputs.Results[0].Sequence);
             Assert.AreEqual(2, outputs.Results[1].Sequence);
             Assert.AreNotEqual(outputs.Results[0].FlowRunId, outputs.Results[1].FlowRunId);
-            Assert.AreEqual("executive-summary.txt", outputs.Artifacts[1].Name);
             using (var scope = factory.Services.CreateScope())
             {
                 var flowRuns = scope.ServiceProvider.GetRequiredService<FlowRunService>();
-                var secondRun = await flowRuns.GetAsync(outputs.Results[1].FlowRunId!, default);
+                var secondRun = await flowRuns.GetAsync(new Agentstration.Resources.WorkspaceId(submitted.Task.WorkspaceId), outputs.Results[1].FlowRunId!, default);
                 Assert.IsNotNull(secondRun);
                 Assert.AreEqual(firstFlowRunId, secondRun.Value.ParentFlowRunId);
                 Assert.AreEqual(submitted.Interaction.Id.ToString(), secondRun.Value.InteractionId);
                 Assert.AreEqual(submitted.Task.Id.ToString(), secondRun.Value.WorkTaskId);
             }
-            var continuedInteraction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}");
+            var continuedInteraction = await WaitForInteractionStatusAsync(client, submitted.Interaction.Id, InteractionStatus.Idle);
             Assert.AreEqual(InteractionStatus.Idle, continuedInteraction?.Status);
             Assert.AreEqual(outputs.Results[1].FlowRunId, continuedInteraction?.LastFlowRunId);
             var messages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/messages");
             var storedMessages = messages ?? [];
             Assert.IsTrue(storedMessages.Any(value => value.Content == "Make it shorter and suitable for executives."));
-            Assert.IsTrue(storedMessages.Any(value => value.Role == ConversationRole.Agentstration && value.Content.Contains("Executive version is ready", StringComparison.Ordinal)));
+            Assert.IsTrue(storedMessages.Any(value => value.Role == ConversationRole.Agentstration && value.Content == outputs.Results[1].Content.GetString()), "The conversation must carry the user-facing result instead of a duplicate readiness message.");
             var history = await client.GetFromJsonAsync<InteractionPageResponse>("/api/workspaces/personal/interactions?take=10");
             Assert.IsTrue(history!.Value.Any(value => value.Id == submitted.Interaction.Id));
 
@@ -310,9 +303,9 @@ public sealed class WorkplaceApiTests
             Assert.IsTrue(workspaces?.Any(value => value.Name == "personal"));
             var operationalPage = await client.GetFromJsonAsync<WorkTaskOperationsPageResponse>("/api/tasks?page=1&pageSize=1&sort=updatedAt&direction=desc&status=Completed&search=report");
             Assert.IsNotNull(operationalPage); Assert.HasCount(1, operationalPage.Items); Assert.AreEqual(1, operationalPage.TotalCount);
-            Assert.AreEqual(2, operationalPage.Items[0].FlowRunCount); Assert.AreEqual(2, operationalPage.Items[0].ResultCount); Assert.AreEqual(2, operationalPage.Items[0].ArtifactCount);
+            Assert.AreEqual(2, operationalPage.Items[0].FlowRunCount); Assert.AreEqual(2, operationalPage.Items[0].ResultCount); Assert.AreEqual(0, operationalPage.Items[0].ArtifactCount);
             var detail = await client.GetFromJsonAsync<WorkTaskOperationsDetailResponse>($"/api/tasks/{submitted.Task.Id}");
-            Assert.IsNotNull(detail); Assert.HasCount(2, detail.FlowRuns); Assert.AreEqual(firstFlowRunId, detail.FlowRuns[1].ParentFlowRunId); Assert.HasCount(2, detail.Results); Assert.HasCount(2, detail.Artifacts);
+            Assert.IsNotNull(detail); Assert.HasCount(2, detail.FlowRuns); Assert.AreEqual(firstFlowRunId, detail.FlowRuns[1].ParentFlowRunId); Assert.HasCount(2, detail.Results); Assert.HasCount(0, detail.Artifacts);
             var supervisedRun = await client.GetFromJsonAsync<Agentstration.Flow.FlowRun>($"/api/tasks/{submitted.Task.Id}/flow-runs/{detail.FlowRuns[0].Id}");
             Assert.AreEqual(submitted.Task.Id.ToString(), supervisedRun?.WorkTaskId);
             using var foreignRunResponse = await client.GetAsync($"/api/tasks/{Guid.NewGuid()}/flow-runs/{detail.FlowRuns[0].Id}");
@@ -320,7 +313,7 @@ public sealed class WorkplaceApiTests
             var artifactJson = await client.GetStringAsync($"/api/tasks/{submitted.Task.Id}/artifacts");
             Assert.IsFalse(artifactJson.Contains("storageKey", StringComparison.OrdinalIgnoreCase));
             var otherWorkspace = await client.GetFromJsonAsync<WorkTaskOperationsPageResponse>("/api/tasks?workspaceId=other&page=1&pageSize=25");
-            Assert.AreEqual(0, otherWorkspace?.TotalCount);
+            Assert.AreEqual(operationalPage.TotalCount, otherWorkspace?.TotalCount, "A caller-supplied workspaceId must not change the authenticated workspace scope.");
             var outOfRange = await client.GetFromJsonAsync<WorkTaskOperationsPageResponse>("/api/tasks?page=999&pageSize=25");
             Assert.HasCount(0, outOfRange!.Items);
             var counters = await client.GetFromJsonAsync<WorkTaskOperationsCountersResponse>("/api/tasks/summary");
@@ -334,7 +327,7 @@ public sealed class WorkplaceApiTests
     }
 
     [TestMethod]
-    public async Task PendingActionUsesSingleUseTokenAndCompletesWithWorkspaceScopedDeliverables()
+    public async Task PendingActionUsesSingleUseTokenAndDoesNotInventDeliverables()
     {
         var dataDirectory = Path.Combine(Path.GetTempPath(), "agentstration-work-api-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dataDirectory);
@@ -349,7 +342,6 @@ public sealed class WorkplaceApiTests
             var taskCreated = new TaskCompletionSource<TaskCreatedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
             var taskStatusChanged = new TaskCompletionSource<TaskStatusChangedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
             var resultAdded = new TaskCompletionSource<TaskResultAddedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var artifactAdded = new TaskCompletionSource<TaskArtifactAddedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
             var pendingResolved = new TaskCompletionSource<PendingActionResolvedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
             await using var connection = new HubConnectionBuilder()
                 .WithUrl("http://localhost/hubs/workplace", options =>
@@ -361,14 +353,13 @@ public sealed class WorkplaceApiTests
             connection.On<TaskCreatedEvent>("TaskCreated", value => taskCreated.TrySetResult(value));
             connection.On<TaskStatusChangedEvent>("TaskStatusChanged", value => taskStatusChanged.TrySetResult(value));
             connection.On<TaskResultAddedEvent>("TaskResultAdded", value => resultAdded.TrySetResult(value));
-            connection.On<TaskArtifactAddedEvent>("TaskArtifactAdded", value => artifactAdded.TrySetResult(value));
             connection.On<PendingActionResolvedEvent>("PendingActionResolved", value => pendingResolved.TrySetResult(value));
             await connection.StartAsync();
             await connection.InvokeAsync("SubscribeAsync", "personal", 0L);
 
             using var submittedResponse = await client.PostAsJsonAsync(
                 "/api/workspaces/personal/entries/guided-request/interactions",
-                new CreateInteractionRequest("personal", new Dictionary<string, JsonElement>
+                new CreateInteractionRequest(new Dictionary<string, JsonElement>
                 {
                     ["request"] = JsonSerializer.SerializeToElement("Summarize the standalone Workplace increment")
                 }));
@@ -437,25 +428,15 @@ public sealed class WorkplaceApiTests
                 activities = await client.GetFromJsonAsync<WorkTaskActivity[]>($"/api/workspaces/personal/tasks/{completedTask.Id}/activities") ?? [];
                 results = await client.GetFromJsonAsync<WorkTaskResult[]>($"/api/workspaces/personal/tasks/{completedTask.Id}/results") ?? [];
                 artifacts = await client.GetFromJsonAsync<WorkTaskArtifact[]>($"/api/workspaces/personal/tasks/{completedTask.Id}/artifacts") ?? [];
-                if (activities.Any(value => value.Type == WorkTaskActivityType.TaskCompleted) && results.Length == 1 && artifacts.Length == 1) break;
+                if (activities.Any(value => value.Type == WorkTaskActivityType.TaskCompleted) && results.Length == 1) break;
                 await Task.Delay(20);
             }
             Assert.IsTrue(activities!.Any(value => value.Type == WorkTaskActivityType.TaskCompleted));
             Assert.HasCount(1, results);
-            Assert.HasCount(1, artifacts);
-            var artifact = artifacts.Single();
+            Assert.HasCount(0, artifacts, "A plain conversation result is not an artifact.");
             Assert.AreEqual(completedTask.Id, (await taskStatusChanged.Task.WaitAsync(TimeSpan.FromSeconds(5))).TaskId);
             Assert.AreEqual(completedTask.Id, (await resultAdded.Task.WaitAsync(TimeSpan.FromSeconds(5))).Result.WorkTaskId.Value);
-            var artifactEvent = await artifactAdded.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.AreEqual(completedTask.Id, artifactEvent.Artifact.WorkTaskId);
             Assert.IsNull(typeof(WorkTaskArtifactEventContract).GetProperty("StorageKey"));
-
-            using var artifactResponse = await client.GetAsync($"/api/workspaces/personal/tasks/{completedTask.Id}/artifacts/{artifact.Id.Value}/content");
-            artifactResponse.EnsureSuccessStatusCode();
-            Assert.IsFalse(string.IsNullOrWhiteSpace(await artifactResponse.Content.ReadAsStringAsync()));
-
-            using var crossWorkspaceArtifact = await client.GetAsync($"/api/workspaces/other/tasks/{completedTask.Id}/artifacts/{artifact.Id.Value}/content");
-            Assert.AreEqual(HttpStatusCode.NotFound, crossWorkspaceArtifact.StatusCode);
 
             var notifications = await client.GetFromJsonAsync<WorkNotificationPageResponse>("/api/workspaces/personal/notifications?unreadOnly=true");
             Assert.IsTrue(notifications!.Value.Count >= 2);
@@ -485,9 +466,24 @@ public sealed class WorkplaceApiTests
         {
             results = await client.GetFromJsonAsync<WorkTaskResult[]>($"/api/workspaces/personal/tasks/{taskId}/results") ?? [];
             artifacts = await client.GetFromJsonAsync<WorkTaskArtifact[]>($"/api/workspaces/personal/tasks/{taskId}/artifacts") ?? [];
-            if (results.Length >= count && artifacts.Length >= count) return (results, artifacts);
+            if (results.Length >= count) return (results, artifacts);
             await Task.Delay(25);
         }
         return (results, artifacts);
+    }
+
+    private static async Task<InteractionResponse?> WaitForInteractionStatusAsync(
+        HttpClient client,
+        Guid interactionId,
+        InteractionStatus expectedStatus)
+    {
+        InteractionResponse? interaction = null;
+        for (var attempt = 0; attempt < 150; attempt++)
+        {
+            interaction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{interactionId}");
+            if (interaction?.Status == expectedStatus) return interaction;
+            await Task.Delay(25);
+        }
+        return interaction;
     }
 }

@@ -4,17 +4,20 @@ Several independent versions coexist in Agentstration. They must not be substitu
 
 | Version | Example | What changes it |
 | --- | --- | --- |
-| Product version | `0.7.0` | A product release under Semantic Versioning. |
+| Product version | `0.1.0-alpha.1` | A product release under Semantic Versioning. |
 | HTTP API version | Current unversioned `/api` routes | A breaking HTTP contract change, not every product release. |
 | Resource `apiVersion` | `agentstration.io/v1` | The schema of a declarative Management resource. |
 | Resource revision/generation | Agent generation `3` | A change to one resource instance or immutable snapshot. |
+| Pack version | `agentstration/price-watch/1.2.0` | A release of one coherent distribution bundle. |
 | Documentation version | `Next`, later `1.x` | A supported major documentation line. |
 
 ## Product version
 
-Agentstration intends to use Semantic Versioning: `MAJOR.MINOR.PATCH`, with prereleases such as `0.7.0-alpha.1`, `0.7.0-beta.1`, and `0.7.0-rc.1`. During `0.x`, public contracts remain under development.
+Agentstration uses Semantic Versioning: `MAJOR.MINOR.PATCH`, with prereleases such as `0.1.0-alpha.1`, `0.1.0-beta.1`, and `0.1.0-rc.1`. During `0.x`, public contracts remain under development.
 
-The repository currently has no central product version property and no Git release tags. This documentation records the policy without inventing or changing a current release number.
+The product version is centralized in the root `Directory.Build.props`. The autonomous AEP workspace keeps its own package version under `aep/`; changing the Agentstration product version does not change the AEP protocol or packages.
+
+Product prereleases use annotated Git tags named `v<version>`. Pushing a matching tag from a commit contained in `main` runs the release workflow, repeats the offline Release build and test suite, publishes framework-dependent server and Workplace archives, writes SHA-256 checksums, pushes a multi-platform server/Console image to Docker Hub, and creates a GitHub prerelease from the matching file under `docs/releases/`. A tag that disagrees with the central version or does not point into `main` fails closed. Prereleases publish an immutable version container tag and a moving channel tag such as `alpha`, but never `latest`.
 
 ## HTTP API version
 
@@ -33,6 +36,10 @@ An Agent's internal generation changes when its functional declaration changes. 
 ## Flow versions
 
 Flow publication uses immutable semantic versions such as `1.0.0`. This is the version of one Flow definition, not the product version.
+
+## Pack versions
+
+A Pack version identifies one release of a coherent resource bundle. Its conceptual coordinate is `publisher/name/version`, and the initial policy is Semantic Versioning. It does not replace the `apiVersion`, generation, ETag, or immutable publication version of any resource contained by the Pack. Local archive installation is implemented; dependency resolution and Pack updates remain planned.
 
 ## Documentation versions
 

@@ -2,28 +2,29 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
-using Agentstration.Application;
-using Agentstration.Domain;
-using Agentstration.Management.Abstractions;
-using Agentstration.Evaluation;
+using Agentstration.Application.Work;
+using Agentstration.Extensions.LlamaCpp;
+using Agentstration.Extensions.LocalAI;
+using Agentstration.Extensions.Ollama;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Storage.Abstractions;
-using Agentstration.Management.Core;
+using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.ModelProviders;
-using Agentstration.Extensions.Ollama;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Components;
 using Agentstration.Workplace.Web;
-using Agentstration.Web.Console;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.ArchitectureTests;
 
@@ -31,30 +32,51 @@ namespace Agentstration.ArchitectureTests;
 public sealed class DependencyTests
 {
     [TestMethod]
-    public void DomainHasNoInfrastructureOrFrameworkDependencies()
+    public void WorkplaceRealtimeClientIsScopedPerBlazorCircuit()
     {
-        var references = typeof(Agentstration.Domain.Workspace).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
-        Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal) || name.Contains("Agents.AI", StringComparison.Ordinal) || name.Contains("Infrastructure", StringComparison.Ordinal)));
+        var services = new ServiceCollection();
+        services.AddAgentstrationWorkplaceClient(new Uri("http://localhost:5100"), new Uri("http://localhost:5100/hubs/workplace"));
+
+        var descriptor = services.Single(value => value.ServiceType == typeof(WorkplaceRealtimeClient));
+
+        Assert.AreEqual(ServiceLifetime.Scoped, descriptor.Lifetime);
+    }
+
+    [TestMethod]
+    public void WorkplacePagesDoNotAddNestedMainLandmarks()
+    {
+        var pages = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Workplace.Web", "Components", "Pages");
+        var violations = Directory.EnumerateFiles(pages, "*.razor")
+            .Where(path => File.ReadAllText(path).Contains("<main", StringComparison.OrdinalIgnoreCase))
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"WorkplaceLayout already owns the main landmark: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
+    public void WorkplaceComponentsUseStandaloneHostRoutes()
+    {
+        var components = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Workplace.Components");
+        var violations = Directory.EnumerateFiles(components, "*.razor")
+            .Where(path => File.ReadAllText(path).Contains("/workplace/tasks", StringComparison.OrdinalIgnoreCase))
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        Assert.IsEmpty(violations, $"Workplace task links must use /tasks: {string.Join(", ", violations)}");
     }
 
     [TestMethod]
     public void ApplicationDoesNotReferenceInfrastructureOrWeb()
     {
-        var references = typeof(IPlatformStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
-        Assert.IsFalse(references.Any(name => name!.Contains("Infrastructure", StringComparison.Ordinal) || name.Contains("Agentstration.Web", StringComparison.Ordinal)));
-    }
-
-    [TestMethod]
-    public void EvaluationDoesNotReferenceInfrastructureOrWeb()
-    {
-        var references = typeof(ContentWorkflowEvaluator).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var references = typeof(WorkplaceService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Infrastructure", StringComparison.Ordinal) || name.Contains("Agentstration.Web", StringComparison.Ordinal)));
     }
 
     [TestMethod]
     public void ApplicationDoesNotReferenceConcreteStorageOrRuntimeAdapters()
     {
-        var references = typeof(IPlatformStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var references = typeof(WorkplaceService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Storage.Sqlite", StringComparison.Ordinal)
             || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
@@ -72,6 +94,8 @@ public sealed class DependencyTests
     {
         var references = typeof(IModelProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
+            || name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || name.Contains("LocalAI", StringComparison.Ordinal)
             || name.Contains("Aspire", StringComparison.Ordinal)
             || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
@@ -84,7 +108,9 @@ public sealed class DependencyTests
         Assert.IsFalse(assemblies.SelectMany(value => value.GetReferencedAssemblies()).Any(reference =>
             reference.Name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || reference.Name.Contains("Microsoft.Extensions.AI", StringComparison.Ordinal)
-            || reference.Name.Contains("Ollama", StringComparison.Ordinal)));
+            || reference.Name.Contains("Ollama", StringComparison.Ordinal)
+            || reference.Name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || reference.Name.Contains("LocalAI", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -92,7 +118,9 @@ public sealed class DependencyTests
     {
         var references = typeof(AepChatClient).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
-            || name.Contains("Ollama", StringComparison.Ordinal)));
+            || name.Contains("Ollama", StringComparison.Ordinal)
+            || name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || name.Contains("LocalAI", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -105,10 +133,33 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void AgentFrameworkRuntimeDoesNotReferenceOllama()
+    public void LlamaCppExtensionDoesNotReferenceRuntimeMafOllamaOrAspireHosting()
+    {
+        var references = typeof(LlamaCppAepModelProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || name.Contains("Ollama", StringComparison.Ordinal)
+            || name.Contains("Aspire.Hosting", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void LocalAiExtensionDoesNotReferenceRuntimeMafOtherProvidersOrAspireHosting()
+    {
+        var references = typeof(LocalAiAepModelProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || name.Contains("Ollama", StringComparison.Ordinal)
+            || name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || name.Contains("Aspire.Hosting", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void AgentFrameworkRuntimeDoesNotReferenceConcreteModelProviders()
     {
         var references = typeof(AgentFrameworkRuntimeFactory).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
-        Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)));
+        Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
+            || name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || name.Contains("LocalAI", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -181,6 +232,50 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void NeutralLayersDoNotReferenceIdentityProviderSdksOrAspNetAuthentication()
+    {
+        var assemblies = new[]
+        {
+            typeof(Agentstration.Resources.ResourceAddress).Assembly,
+            typeof(WorkplaceService).Assembly,
+            typeof(IControlPlaneStore).Assembly,
+            typeof(AgentManagementService).Assembly
+        };
+        var forbidden = new[] { "Azure.Identity", "Microsoft.Identity", "Keycloak", "Zitadel", "Auth0", "WorkOS", "OpenIddict", "Microsoft.AspNetCore.Authentication", "Microsoft.AspNetCore.Identity" };
+
+        Assert.IsFalse(assemblies.SelectMany(value => value.GetReferencedAssemblies())
+            .Any(reference => forbidden.Any(value => reference.Name!.Contains(value, StringComparison.OrdinalIgnoreCase))));
+    }
+
+    [TestMethod]
+    public void PrincipalContainsNoCredentialMaterial()
+    {
+        var forbidden = new[] { "password", "hash", "salt", "token", "secret", "credential", "recovery", "mfa" };
+        Assert.IsFalse(typeof(Principal).GetProperties().Any(property =>
+            forbidden.Any(value => property.Name.Contains(value, StringComparison.OrdinalIgnoreCase))));
+    }
+
+    [TestMethod]
+    public void SecurityAuditEventsContainNoCredentialOrMutablePersonalAttributes()
+    {
+        var forbidden = new[] { "password", "hash", "salt", "token", "secret", "credential", "recovery", "mfa", "email", "username", "claim" };
+        Assert.IsFalse(typeof(SecurityAuditEvent).GetProperties().Any(property =>
+            forbidden.Any(value => property.Name.Contains(value, StringComparison.OrdinalIgnoreCase))));
+    }
+
+    [TestMethod]
+    public void ApiEndpointsDoNotImplementClaimOrRoleAuthorizationLogic()
+    {
+        var apiRoot = Path.Combine(FindRepositoryRoot(), "src", "Agentstration.Web", "Api");
+        var forbidden = new[] { "User.IsInRole", "User.Claims", "User.FindFirst", "ClaimTypes." };
+        var violations = Directory.EnumerateFiles(apiRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => forbidden.Any(value => File.ReadAllText(path).Contains(value, StringComparison.Ordinal)))
+            .Select(Path.GetFileName)
+            .ToArray();
+        Assert.IsEmpty(violations, $"Endpoint authorization must remain policy based: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
     public void WorkPlaneCoreDoesNotReferenceInfrastructureRuntimeOrFrameworks()
     {
         var references = typeof(WorkItem).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
@@ -204,6 +299,8 @@ public sealed class DependencyTests
         Assert.IsFalse(assemblies.SelectMany(assembly => assembly.GetReferencedAssemblies()).Any(reference =>
             reference.Name!.Contains("Azure", StringComparison.Ordinal)
             || reference.Name.Contains("Ollama", StringComparison.Ordinal)
+            || reference.Name.Contains("LlamaCpp", StringComparison.Ordinal)
+            || reference.Name.Contains("LocalAI", StringComparison.Ordinal)
             || reference.Name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || reference.Name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
             || reference.Name.Contains("Storage.Sqlite", StringComparison.Ordinal)
@@ -345,7 +442,8 @@ public sealed class DependencyTests
         var references = typeof(FlowService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Storage.Sqlite", StringComparison.Ordinal)
             || name.Contains("Agentstration.Web", StringComparison.Ordinal)
-            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)));
+            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
     }
 
     [TestMethod]

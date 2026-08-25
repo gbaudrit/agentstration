@@ -31,7 +31,7 @@ else
         @foreach (var member in view.Members)
         {
             <article>
-                <p><strong>@member.User.DisplayName</strong> <StatusBadge Text="@member.Membership.Status.ToString()" Status="UiStatus.Success" /></p>
+                <p><strong>@member.Principal.DisplayName</strong> <StatusBadge Text="@member.Membership.Status.ToString()" Status="UiStatus.Success" /></p>
                 @foreach (var role in member.Roles)
                 {
                     <p><span>@role.Role.DisplayName</span><br /><small>@role.Scope</small></p>

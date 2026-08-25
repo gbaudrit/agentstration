@@ -1,0 +1,80 @@
+@page "/triggers"
+@rendermode InteractiveServer
+@using Agentstration.Management.Abstractions
+@using Agentstration.Management.Core
+@using Agentstration.Resources
+@inject TriggerManagementService Management
+@inject ConsoleContextState ContextState
+
+<PageTitle>Triggers · Agentstration</PageTitle>
+<PageHeader Title="Triggers" Description="Schedule autonomous Work through the existing Flow runtime.">
+    <Metadata><span>@Filtered.Count Trigger(s)</span><span>@EnabledCount enabled</span><span>@AttentionCount requiring attention</span></Metadata>
+    <Actions>@if (CanManage) { <a class="button-primary" href="/triggers/new">New Trigger</a> }</Actions>
+</PageHeader>
+
+@if (loading)
+{
+    <LoadingState Message="Loading Triggers…" />
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <ErrorState Title="Triggers unavailable" Message="@error" OnRetry="LoadAsync" />
+}
+else
+{
+    <div class="filter-bar">
+        <SearchBox @bind-Value="search" Placeholder="Search Trigger or Flow" />
+        <select @bind="state" aria-label="Filter Trigger state">
+            <option value="">State: All</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option><option value="attention">Requires attention</option>
+        </select>
+        <select @bind="scheduleType" aria-label="Filter schedule type">
+            <option value="">Schedule: All</option><option value="once">Once</option><option value="interval">Interval</option><option value="cron">Cron</option>
+        </select>
+    </div>
+
+    @if (items.Count == 0)
+    {
+        <EmptyState Title="No Triggers" Message="Create a disabled schedule, review it, then enable it explicitly.">@if (CanManage) { <a class="button-primary" href="/triggers/new">Create Trigger</a> }</EmptyState>
+    }
+    else if (Filtered.Count == 0)
+    {
+        <EmptyState Title="No matching Triggers" Message="Adjust the search or filters." />
+    }
+    else
+    {
+        <DataGrid TItem="StoredResource<TriggerResource>" Items="Filtered">
+            <Header><tr><th>Trigger</th><th>State</th><th>Schedule</th><th>Target</th><th>Next occurrence</th><th>Last outcome</th><th></th></tr></Header>
+            <Row Context="stored"><tr>
+                <td><strong><a href="@DetailsUrl(stored.Value)">@stored.Value.Definition.DisplayName</a></strong><small class="table-secondary">@stored.Value.Namespace.Value/@stored.Value.Name</small></td>
+                <td><StatusBadge Text="@(stored.Value.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(stored.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /></td>
+                <td>@TriggerUi.ScheduleLabel(stored.Value.Definition.Source.Schedule)</td>
+                <td><a class="text-button" href="@FlowUrl(stored.Value)">@stored.Value.Definition.Target.Flow?.Name</a></td>
+                <td>@TriggerUi.FormatDate(stored.Value.Observed.NextOccurrenceAt)</td>
+                <td><StatusBadge Text="@stored.Value.Observed.LastOutcome.ToString()" Status="@OutcomeStatus(stored.Value.Observed.LastOutcome)" />@if (stored.Value.Observed.LastErrorCode is { } errorCode) { <small class="table-secondary">@errorCode</small> }</td>
+                <td><a class="text-button" href="@DetailsUrl(stored.Value)">Open</a>@if (CanManage) { <a class="text-button" href="@EditUrl(stored.Value)">Edit</a> }</td>
+            </tr></Row>
+        </DataGrid>
+    }
+}
+
+@code {
+    private IReadOnlyList<StoredResource<TriggerResource>> items = [];
+    private bool loading = true;
+    private string? error;
+    private string search = "", state = "", scheduleType = "";
+    private bool CanManage => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private int EnabledCount => items.Count(value => value.Value.Definition.Enabled);
+    private int AttentionCount => items.Count(value => value.Value.Observed.LastOutcome == TriggerLastOutcome.Failed);
+    private IReadOnlyList<StoredResource<TriggerResource>> Filtered => items
+        .Where(value => string.IsNullOrWhiteSpace(search) || value.Value.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || value.Value.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) || (value.Value.Definition.Target.Flow?.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(value => state switch { "enabled" => value.Value.Definition.Enabled, "disabled" => !value.Value.Definition.Enabled, "attention" => value.Value.Observed.LastOutcome == TriggerLastOutcome.Failed, _ => true })
+        .Where(value => string.IsNullOrWhiteSpace(scheduleType) || string.Equals(value.Value.Definition.Source.Schedule?.Type.ToString(), scheduleType, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(value => value.Value.Observed.NextOccurrenceAt ?? DateTimeOffset.MaxValue).ThenBy(value => value.Value.Definition.DisplayName, StringComparer.OrdinalIgnoreCase).ToArray();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private async Task LoadAsync() { loading = true; error = null; try { items = await Management.ListAsync(CancellationToken.None); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
+    private static string DetailsUrl(TriggerResource value) => $"/triggers/{Uri.EscapeDataString(value.Name)}";
+    private static string EditUrl(TriggerResource value) => $"{DetailsUrl(value)}/edit";
+    private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace)); }
+    private static UiStatus OutcomeStatus(TriggerLastOutcome outcome) => outcome switch { TriggerLastOutcome.Submitted => UiStatus.Success, TriggerLastOutcome.Skipped => UiStatus.Warning, TriggerLastOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
+}

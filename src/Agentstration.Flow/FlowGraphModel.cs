@@ -5,7 +5,9 @@ using System.Text.Json.Serialization;
 
 namespace Agentstration.Flow;
 
-public sealed record FlowResourceReference(string ResourceId, string VersionStrategy = "UseDeploymentVersion", long? Version = null);
+using Agentstration.Resources;
+
+public sealed record FlowResourceReference(string ResourceId, string VersionStrategy = "UseDeploymentVersion", long? Version = null, ResourceNamespace? Namespace = null);
 public sealed record FlowNodePosition(double X, double Y);
 public sealed record FlowViewportMetadata(double X, double Y, double Zoom = 1);
 public sealed record FlowDesignerMetadata
@@ -102,6 +104,7 @@ public sealed record FlowGraphDefinition
 
 public sealed record FlowDraft
 {
+    public required Agentstration.Resources.WorkspaceId WorkspaceId { get; init; }
     public required string Id { get; init; }
     public required FlowId FlowId { get; init; }
     public required string DisplayName { get; init; }

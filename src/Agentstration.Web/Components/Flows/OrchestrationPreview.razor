@@ -1,0 +1,44 @@
+<div class="orchestration-preview-layout">
+    <div>
+        <FlowTopologyViewer Graph="Topology" SelectedKey="selectedKey" SelectedKeyChanged="SelectNode" />
+        @if (SelectedNode is null)
+        {
+            <p class="muted orchestration-preview-hint">Select a node to inspect its details.</p>
+        }
+    </div>
+    @if (SelectedNode is not null)
+    {
+        <aside class="orchestration-node-details" aria-live="polite">
+            <div class="panel-header">
+                <h3>@SelectedNode.Label</h3>
+                <button type="button" @onclick="ClearSelection" aria-label="Close node details">×</button>
+            </div>
+            <dl class="details-list">
+                <dt>Type</dt><dd>@SelectedNode.Type</dd>
+                @if (SelectedNode.Subtitle is not null) { <dt>Role</dt><dd>@SelectedNode.Subtitle</dd> }
+                @if (SelectedNode.IsInitial) { <dt>Entry</dt><dd>Initial participant</dd> }
+                @if (SelectedAgent is not null)
+                {
+                    <dt>Resource</dt><dd><code>@SelectedAgent.Id</code></dd>
+                    <dt>Model profile</dt><dd>@SelectedAgent.ModelProfile</dd>
+                    <dt>Status</dt><dd>@SelectedAgent.Status</dd>
+                    @if (SelectedAgent.Capabilities.Count > 0) { <dt>Capabilities</dt><dd>@string.Join(", ", SelectedAgent.Capabilities)</dd> }
+                }
+            </dl>
+        </aside>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public OrchestrationEditorModel Model { get; set; } = null!;
+    [Parameter] public IReadOnlyList<AgentSummary> Agents { get; set; } = [];
+    private string? selectedKey;
+    private FlowTopologyGraph Topology => FlowTopologyProjector.Project(Model.CreatePreviewDefinition());
+    private FlowTopologyNode? SelectedNode => Topology.FindBySelection(selectedKey);
+    private AgentSummary? SelectedAgent => SelectedNode?.Type == "agent"
+        ? Agents.FirstOrDefault(agent => agent.Id == SelectedNode.SelectionKey)
+        : null;
+
+    private void SelectNode(string key) => selectedKey = key;
+    private void ClearSelection() => selectedKey = null;
+}

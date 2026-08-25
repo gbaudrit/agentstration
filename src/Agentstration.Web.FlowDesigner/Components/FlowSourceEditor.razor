@@ -35,11 +35,13 @@
 
     private async Task Changed(ModelContentChangedEvent _)
     {
+        if (IsReadOnly) return;
         if (editor is not null) await ValueChanged.InvokeAsync(await editor.GetValue());
     }
 
     private async Task Apply()
     {
+        if (IsReadOnly) return;
         var value = editor is null ? Value : await editor.GetValue();
         await ApplyRequested.InvokeAsync(value);
     }

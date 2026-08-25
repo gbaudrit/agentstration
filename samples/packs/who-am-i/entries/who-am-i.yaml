@@ -1,0 +1,45 @@
+apiVersion: agentstration.io/v1
+kind: Entry
+metadata:
+  name: who-am-i
+definition:
+  displayName: Who Am I?
+  description: Open the conversational shell of the Who Am I? sample.
+  presentation:
+    kind: prompt
+    placeholder: Ask a yes-or-no question or make an identity guess…
+    icon: gamepad
+    allowAttachments: false
+    allowVoiceInput: false
+    participants:
+      visibility: visible
+    progress:
+      visibility: hidden
+    task:
+      display: hidden
+    results:
+      display: auto
+    suggestions:
+      - label: Start a game
+        value: Explain the rules and start a new game.
+      - label: Ask a question
+        value: Is this a real person?
+    fields:
+      - name: request
+        type: prompt
+        label: Your turn
+        description: Ask one yes-or-no question or propose an identity.
+        placeholder: Is this person a scientist?
+        required: true
+        order: 0
+        role: primaryInput
+  binding:
+    kind: flow
+    resourceId: who-am-i-game
+  behavior:
+    taskCreationMode: automatic
+    allowConversation: true
+    streamResponse: true
+    conversation:
+      enabled: true
+  publish: true

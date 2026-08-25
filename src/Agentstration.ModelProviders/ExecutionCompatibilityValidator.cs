@@ -20,37 +20,35 @@ public sealed class ExecutionCompatibilityException(IReadOnlyList<ExecutionCapab
 public static class ExecutionCompatibilityValidator
 {
     public static void Validate(
-        ModelProfileProperties profile,
+        ModelReasoningOptions reasoning,
+        ModelOutputOptions output,
         ModelExecutionOptions execution,
         EffectiveCapabilities capabilities,
         string provider,
         string model,
         string runtime,
-        bool toolsRequested = false,
-        string? endpointMode = null)
+        bool toolsRequested = false)
     {
-        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(reasoning);
+        ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(execution);
         ArgumentNullException.ThrowIfNull(capabilities);
         var issues = new List<ExecutionCapabilityIssue>();
-        if (profile.Reasoning.Mode == ReasoningMode.Enabled)
+        if (reasoning.Mode == ReasoningMode.Enabled)
         {
             Require("reasoning", capabilities.Reasoning.Support, "Reasoning was requested but is not supported by the effective execution chain.", issues);
-            if (profile.Reasoning.Effort is { } effort
+            if (reasoning.Effort is { } effort
                 && capabilities.Reasoning.SupportedEfforts.Count > 0
                 && !capabilities.Reasoning.SupportedEfforts.Contains(effort.ToString()))
                 Add("reasoning.effort", capabilities.Reasoning.Support, $"Reasoning effort '{effort}' is not supported by the effective execution chain.", issues);
         }
-        if (profile.Output.Format != ModelOutputFormat.Text)
+        if (output.Format != ModelOutputFormat.Text)
             Require("structuredOutput", capabilities.StructuredOutput.Support, "Structured output was requested but is not supported by the effective execution chain.", issues);
-        if (profile.Output.Strict && capabilities.StructuredOutput.Support is CapabilitySupport.Unsupported or CapabilitySupport.Partial)
+        if (output.Strict && capabilities.StructuredOutput.Support is CapabilitySupport.Unsupported or CapabilitySupport.Partial)
             Add("structuredOutput.strict", capabilities.StructuredOutput.Support, "Strict structured output requires full effective support.", issues);
         if (toolsRequested) Require("tools", capabilities.Tools.Support, "Tool calling was requested but is not supported by the effective execution chain.", issues);
-        if (execution.Streaming == RuntimeStreamingMode.Enabled)
+        if (execution.Streaming != RuntimeStreamingMode.Disabled)
             Require("streaming", capabilities.Streaming.Support, "Streaming was requested but is not supported by the effective execution chain.", issues);
-        if (string.Equals(runtime, "microsoft-agent-framework", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(endpointMode, "generate", StringComparison.OrdinalIgnoreCase))
-            Add("endpointMode", CapabilitySupport.Unsupported, "Ollama endpointMode 'generate' is incompatible with the Microsoft Agent Framework runtime.", issues);
         if (issues.Count > 0) throw new ExecutionCompatibilityException(issues);
 
         void Require(string capability, CapabilitySupport support, string message, ICollection<ExecutionCapabilityIssue> target)

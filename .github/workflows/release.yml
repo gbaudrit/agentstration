@@ -1,0 +1,158 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  DOCKER_IMAGE: agentstration/agentstration
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-and-release:
+    name: Validate and publish prerelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out tagged revision
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Validate tag and release notes
+        id: version
+        shell: pwsh
+        run: |
+          $version = (dotnet msbuild src/Agentstration.Web/Agentstration.Web.csproj -nologo -getProperty:Version).Trim()
+          if ($version -notmatch '^0\.1\.0-alpha\.\d+$') {
+            throw "Only the 0.1.0 alpha release line is enabled; resolved version was '$version'."
+          }
+          if ($env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Tag '$env:GITHUB_REF_NAME' does not match product version 'v$version'."
+          }
+          $notes = "docs/releases/$version.md"
+          if (-not (Test-Path -LiteralPath $notes)) {
+            throw "Release notes '$notes' are missing."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "notes=$notes" >> $env:GITHUB_OUTPUT
+      - name: Require a commit from main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Restore
+        run: dotnet restore Agentstration.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Build
+        run: dotnet build Agentstration.slnx --configuration Release --no-restore
+      - name: Test
+        run: dotnet test Agentstration.slnx --configuration Release --no-build
+      - name: Restore autonomous AEP SDK
+        run: dotnet restore aep/Aep.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Build autonomous AEP SDK
+        run: dotnet build aep/Aep.slnx --configuration Release --no-restore
+      - name: Test autonomous AEP SDK
+        run: dotnet test aep/Aep.slnx --configuration Release --no-build
+      - name: Publish framework-dependent applications
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $server = "artifacts/agentstration-server-$version"
+          $workplace = "artifacts/agentstration-workplace-$version"
+          dotnet publish src/Agentstration.Web/Agentstration.Web.csproj --configuration Release --no-restore --no-build -p:UseAppHost=false --output $server
+          dotnet publish src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj --configuration Release --no-restore --no-build -p:UseAppHost=false --output $workplace
+          Copy-Item LICENSE "$server/LICENSE"
+          Copy-Item LICENSE "$workplace/LICENSE"
+          Copy-Item '${{ steps.version.outputs.notes }}' "$server/RELEASE_NOTES.md"
+          Copy-Item '${{ steps.version.outputs.notes }}' "$workplace/RELEASE_NOTES.md"
+          Compress-Archive -Path "$server/*" -DestinationPath "$server.zip"
+          Compress-Archive -Path "$workplace/*" -DestinationPath "$workplace.zip"
+          Remove-Item -Recurse -Force -LiteralPath $server, $workplace
+      - name: Write SHA-256 checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem artifacts/*.zip | Sort-Object Name | ForEach-Object {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Set-Content -Encoding utf8NoBOM artifacts/SHA256SUMS
+      - name: Require Docker Hub credentials
+        shell: pwsh
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:DOCKERHUB_USERNAME)) {
+            throw "Repository secret DOCKERHUB_USERNAME is required."
+          }
+          if ([string]::IsNullOrWhiteSpace($env:DOCKERHUB_TOKEN)) {
+            throw "Repository secret DOCKERHUB_TOKEN is required."
+          }
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Compute container metadata
+        id: container-metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=alpha
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.licenses=Apache-2.0
+      - name: Build and push multi-platform image
+        id: container
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.container-metadata.outputs.tags }}
+          labels: ${{ steps.container-metadata.outputs.labels }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Record container image provenance
+        shell: pwsh
+        run: |
+          @(
+            "image=docker.io/${{ env.DOCKER_IMAGE }}"
+            "immutableTag=${{ steps.version.outputs.version }}"
+            "channelTag=alpha"
+            "digest=${{ steps.container.outputs.digest }}"
+            "platforms=linux/amd64,linux/arm64"
+          ) | Set-Content -Encoding utf8NoBOM artifacts/container-image.txt
+      - name: Upload validated release artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: agentstration-${{ steps.version.outputs.version }}
+          path: artifacts/*
+          if-no-files-found: error
+      - name: Create GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          artifacts/*.zip artifacts/SHA256SUMS artifacts/container-image.txt
+          --verify-tag
+          --prerelease
+          --title "Agentstration ${{ steps.version.outputs.version }}"
+          --notes-file "${{ steps.version.outputs.notes }}"

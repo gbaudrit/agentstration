@@ -2,9 +2,11 @@ namespace Agentstration.Management.Abstractions;
 
 public enum TenantStatus { Active, Disabled }
 public enum WorkspaceStatus { Active, Disabled }
-public enum UserStatus { Active, Disabled }
+public enum PrincipalStatus { Active, Disabled }
+public enum PrincipalKind { Human, Workload }
 public enum MembershipStatus { Active, Suspended }
 public enum PrincipalType { User, Group, ServicePrincipal }
+public enum ThemePreference { System, Light, Dark }
 
 public sealed record Tenant(
     Guid Id,
@@ -21,18 +23,46 @@ public sealed record Workspace(
     WorkspaceStatus Status,
     DateTimeOffset CreatedAt);
 
-public sealed record User(
+public sealed record Principal(
     Guid Id,
-    string? ExternalSubject,
+    PrincipalKind Kind,
     string DisplayName,
     string? Email,
-    UserStatus Status,
+    PrincipalStatus Status,
     DateTimeOffset CreatedAt);
+
+public sealed record PrincipalPreferences(
+    Guid PrincipalId,
+    ThemePreference Theme,
+    DateTimeOffset UpdatedAt);
+
+public sealed record ExternalIdentity(
+    Guid Id,
+    string Issuer,
+    string Subject,
+    Guid PrincipalId,
+    DateTimeOffset LinkedAt);
+
+public sealed record LocalIdentity(
+    Guid AccountId,
+    Guid PrincipalId,
+    DateTimeOffset LinkedAt);
+
+public sealed record PlatformAdministrator(
+    Guid PrincipalId,
+    DateTimeOffset GrantedAt);
 
 public sealed record TenantMembership(
     Guid Id,
     Guid TenantId,
-    Guid UserId,
+    Guid PrincipalId,
+    MembershipStatus Status,
+    DateTimeOffset JoinedAt);
+
+public sealed record WorkspaceMembership(
+    Guid Id,
+    Guid WorkspaceId,
+    Guid PrincipalId,
     MembershipStatus Status,
     DateTimeOffset JoinedAt);
 
@@ -80,7 +110,14 @@ public static class AuthorizationScopes
     public static string Workspace(Guid workspaceId) => $"/workspaces/{workspaceId:D}";
 }
 
-public sealed record RequestContext(Guid UserId, Guid TenantId, Guid WorkspaceId);
+public sealed record RequestContext(
+    Guid PrincipalId,
+    Guid TenantId,
+    Guid WorkspaceId,
+    AuthorizationRestriction? Restriction = null)
+{
+    public Guid UserId => PrincipalId;
+}
 public enum ControlPlaneAccessMode { Unavailable, Workspace, System }
 
 public interface ICurrentRequestContext
@@ -112,11 +149,52 @@ public interface IRequestContextInitializer
 public interface IRequestContextScopeFactory
 {
     IDisposable Push(RequestContext context);
+    IDisposable PushSystem();
 }
 
-public interface IIdentityProvider
+public interface IPrincipalResolver
 {
-    Task<User> ResolveCurrentUserAsync(CancellationToken cancellationToken);
+    Task<Principal?> ResolveAsync(string issuer, string subject, CancellationToken cancellationToken);
+    Task<Principal?> ResolveLocalAsync(Guid accountId, CancellationToken cancellationToken);
+}
+
+public sealed record InitialPrincipalProvisioning(
+    Guid AccountId,
+    Guid PrincipalId,
+    string DisplayName,
+    string? Email);
+
+public sealed record InitialPrincipalProvisioningResult(
+    Principal Principal,
+    Tenant Tenant,
+    Workspace Workspace);
+
+public interface IInitialPrincipalProvisioner
+{
+    Task<InitialPrincipalProvisioningResult> ProvisionAsync(InitialPrincipalProvisioning request, CancellationToken cancellationToken);
+}
+
+public sealed record LocalPrincipalProvisioning(
+    Guid AccountId,
+    Guid PrincipalId,
+    Guid WorkspaceId,
+    string Role,
+    string DisplayName,
+    string? Email);
+
+public interface ILocalPrincipalProvisioner
+{
+    Task<Principal> ProvisionAsync(LocalPrincipalProvisioning request, CancellationToken cancellationToken);
+}
+
+public interface IPlatformAuthorizationService
+{
+    Task<bool> IsPlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);
+}
+
+public interface IPlatformAdministratorPolicy
+{
+    Task<IAsyncDisposable> AcquireDisableLeaseAsync(Guid principalId, CancellationToken cancellationToken);
 }
 
 public interface ILocalEnvironmentBootstrapper
@@ -138,25 +216,43 @@ public interface IIdentityStore
     Task<IReadOnlyList<Tenant>> ListTenantsAsync(CancellationToken cancellationToken);
     Task AddTenantAsync(Tenant tenant, CancellationToken cancellationToken);
     Task<Workspace?> FindWorkspaceByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken);
+    Task<Workspace?> GetWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken);
     Task<Workspace?> GetWorkspaceAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Workspace>> ListWorkspacesAsync(Guid tenantId, CancellationToken cancellationToken);
     Task AddWorkspaceAsync(Workspace workspace, CancellationToken cancellationToken);
-    Task<User?> FindUserByExternalSubjectAsync(string externalSubject, CancellationToken cancellationToken);
-    Task<User?> GetUserAsync(Guid userId, CancellationToken cancellationToken);
-    Task AddUserAsync(User user, CancellationToken cancellationToken);
-    Task<TenantMembership?> FindMembershipAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
+    Task<Principal?> GetPrincipalAsync(Guid principalId, CancellationToken cancellationToken);
+    Task AddPrincipalAsync(Principal principal, CancellationToken cancellationToken);
+    Task UpdatePrincipalAsync(Principal principal, CancellationToken cancellationToken);
+    Task<PrincipalPreferences?> GetPrincipalPreferencesAsync(Guid principalId, CancellationToken cancellationToken);
+    Task UpsertPrincipalPreferencesAsync(PrincipalPreferences preferences, CancellationToken cancellationToken);
+    Task<ExternalIdentity?> FindExternalIdentityAsync(string issuer, string subject, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ExternalIdentity>> ListExternalIdentitiesAsync(Guid principalId, CancellationToken cancellationToken);
+    Task AddExternalIdentityAsync(ExternalIdentity externalIdentity, CancellationToken cancellationToken);
+    Task RemoveExternalIdentityAsync(Guid principalId, Guid externalIdentityId, CancellationToken cancellationToken);
+    Task<LocalIdentity?> FindLocalIdentityAsync(Guid accountId, CancellationToken cancellationToken);
+    Task<LocalIdentity?> FindLocalIdentityByPrincipalAsync(Guid principalId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<LocalIdentity>> ListLocalIdentitiesAsync(CancellationToken cancellationToken);
+    Task AddLocalIdentityAsync(LocalIdentity localIdentity, CancellationToken cancellationToken);
+    Task<bool> IsPlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);
+    Task<PlatformAdministrator?> GetPlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PlatformAdministrator>> ListPlatformAdministratorsAsync(CancellationToken cancellationToken);
+    Task AddPlatformAdministratorAsync(PlatformAdministrator administrator, CancellationToken cancellationToken);
+    Task RemovePlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken);
+    Task<TenantMembership?> FindMembershipAsync(Guid tenantId, Guid principalId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TenantMembership>> ListMembershipsAsync(Guid tenantId, CancellationToken cancellationToken);
     Task AddMembershipAsync(TenantMembership membership, CancellationToken cancellationToken);
+    Task<WorkspaceMembership?> FindWorkspaceMembershipAsync(Guid workspaceId, Guid principalId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkspaceMembership>> ListWorkspaceMembershipsAsync(Guid principalId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<WorkspaceMembership>> ListWorkspaceMembersAsync(Guid workspaceId, CancellationToken cancellationToken);
+    Task AddWorkspaceMembershipAsync(WorkspaceMembership membership, CancellationToken cancellationToken);
+    Task UpdateWorkspaceMembershipAsync(WorkspaceMembership membership, CancellationToken cancellationToken);
+    Task RemoveWorkspaceMembershipAsync(Guid membershipId, CancellationToken cancellationToken);
     Task<RoleDefinition?> FindRoleDefinitionByNameAsync(string name, CancellationToken cancellationToken);
     Task<RoleDefinition?> GetRoleDefinitionAsync(Guid roleDefinitionId, CancellationToken cancellationToken);
     Task AddRoleDefinitionAsync(RoleDefinition roleDefinition, CancellationToken cancellationToken);
     Task<IReadOnlyList<RoleAssignment>> ListRoleAssignmentsAsync(Guid tenantId, Guid principalId, CancellationToken cancellationToken);
     Task AddRoleAssignmentAsync(RoleAssignment roleAssignment, CancellationToken cancellationToken);
-}
-
-public interface IResourceScopeMigrator
-{
-    Task BackfillUnscopedResourcesAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken);
+    Task RemoveRoleAssignmentAsync(Guid roleAssignmentId, CancellationToken cancellationToken);
 }
 
 public sealed class AuthorizationDeniedException(string permission)

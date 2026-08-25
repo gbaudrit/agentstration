@@ -1,10 +1,12 @@
-using System.Text.Json;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Runtime.AgentFramework;
@@ -18,38 +20,97 @@ public sealed class AgentFrameworkRuntimeFactory(
 
     public string Handler => "prompt-agent";
 
+    internal async Task<AIAgent> CreateAgentAsync(
+        ExecutableAgentDefinition definition,
+        string revisionId,
+        long generation,
+        AgentRuntimeContext context,
+        ToolExecutionScope? executionScope,
+        CancellationToken cancellationToken)
+    {
+        var tools = (await context.Tools.ResolveAsync(definition.EffectiveToolNames, cancellationToken))
+            .Select(tool => MapTool(tool, context.ToolExecution, ToolContext(definition, revisionId, generation, executionScope)))
+            .ToList();
+        var chatClient = await chatClients.ResolveAsync(definition.ModelProfileNamespace, definition.ModelProfileName, cancellationToken);
+        AIAgent agent = new ChatClientAgent(
+            chatClient,
+            new ChatClientAgentOptions
+            {
+                Id = definition.AgentId.ToString("N"),
+                Name = definition.AgentKey,
+                Description = definition.Description,
+                ChatOptions = new Microsoft.Extensions.AI.ChatOptions
+                {
+                    Instructions = definition.EffectiveInstructions,
+                    Tools = tools
+                }
+            });
+        return Observe(agent, observability.Enabled);
+    }
+
     public async Task<IAgentRuntime> CreateAsync(ExecutableAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var tools = (await context.Tools.ResolveAsync(definition.EffectiveToolNames, cancellationToken))
-            .Select(MapTool)
             .ToList();
         return new AgentFrameworkRuntime(
+            definition,
             definition.AgentKey,
             revisionId,
             definition.ModelProfileName,
             definition.EffectiveInstructions,
             definition.Description,
             tools,
+            context.ToolExecution,
             chatClients,
             observability.Enabled,
             loggerFactory.CreateLogger<AgentFrameworkRuntime>());
     }
 
-    private static Microsoft.Extensions.AI.AITool MapTool(IAgentTool tool) =>
-        tool.GetService(typeof(Microsoft.Extensions.AI.AITool)) as Microsoft.Extensions.AI.AITool
-        ?? Microsoft.Extensions.AI.AIFunctionFactory.Create(
-            (JsonElement? arguments, CancellationToken cancellationToken) => tool.InvokeAsync(arguments, cancellationToken),
-            tool.Name,
-            tool.Description);
+    internal static AITool MapTool(IAgentTool tool, IToolExecutionPipeline pipeline, ToolExecutionContext template)
+    {
+        AIFunction function = new AgentstrationToolFunction(tool, pipeline, template);
+        return tool.RequiresApproval ? new ApprovalRequiredAIFunction(function) : function;
+    }
+
+    private static ToolExecutionContext ToolContext(
+        ExecutableAgentDefinition definition,
+        string? revisionId,
+        long? generation,
+        ToolExecutionScope? scope) => new()
+        {
+            OwnerKind = scope?.OwnerKind ?? ToolExecutionOwnerKind.Unspecified,
+            ToolCallId = "pending",
+            InvocationId = "pending",
+            ToolId = "pending",
+            ToolName = "pending",
+            TenantId = scope?.TenantId,
+            WorkspaceId = scope?.WorkspaceId,
+            PrincipalId = scope?.PrincipalId,
+            RunId = scope?.ExecutionId,
+            AgentId = definition.AgentKey,
+            AgentVersion = definition.AgentVersion,
+            AgentGeneration = generation ?? scope?.AgentGeneration,
+            AgentRevisionId = revisionId,
+            CorrelationId = scope?.CorrelationId,
+            PersistArguments = scope?.PersistArguments
+        };
+
+    private static AIAgent Observe(AIAgent agent, bool enabled) => enabled
+        ? agent.AsBuilder()
+            .UseOpenTelemetry(TelemetrySourceName, telemetry => telemetry.EnableSensitiveData = false)
+            .Build()
+        : agent;
 
     private sealed class AgentFrameworkRuntime(
+        ExecutableAgentDefinition definition,
         string agentId,
         string revisionId,
         string modelProfileId,
         string instructions,
         string? description,
-        IList<Microsoft.Extensions.AI.AITool> tools,
+        IList<IAgentTool> tools,
+        IToolExecutionPipeline toolExecution,
         IChatClientResolver chatClients,
         bool observabilityEnabled,
         ILogger<AgentFrameworkRuntime> logger) : IAgentRuntime
@@ -73,14 +134,14 @@ public sealed class AgentFrameworkRuntimeFactory(
         public async Task<AgentExecutionResult> ExecuteAsync(AgentExecutionRequest request, CancellationToken cancellationToken)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(request.Input);
-            var chatClient = await chatClients.ResolveAsync(modelProfileId, cancellationToken);
+            var chatClient = await chatClients.ResolveAsync(definition.ModelProfileNamespace, modelProfileId, cancellationToken);
             var model = chatClient.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
-            AIAgent agent = Observe(new ChatClientAgent(
+            AIAgent agent = AgentFrameworkRuntimeFactory.Observe(new ChatClientAgent(
                 chatClient,
                 instructions: instructions,
                 name: AgentId,
                 description: description,
-                tools: tools), observabilityEnabled);
+                tools: tools.Select(tool => MapTool(tool, toolExecution, ToolContext(definition, RevisionId, null, request.ToolExecution))).ToList()), observabilityEnabled);
             if (logger.IsEnabled(LogLevel.Information))
             {
                 logger.LogInformation(
@@ -95,7 +156,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                         "Run {RunId} uses deployment {Deployment}, provider {ProviderType}/{ProviderName}, and model {ModelName}",
                         request.SessionId,
                         model.Deployment,
-                        model.ProviderType,
+                        model.ContributionId,
                         model.ProviderName,
                         model.ModelName);
                 }
@@ -103,11 +164,13 @@ public sealed class AgentFrameworkRuntimeFactory(
             var generation = model?.Generation;
             var effective = new ModelExecutionOptions(
                 request.Options?.Temperature ?? (generation?.Temperature is double temperature ? checked((float)temperature) : null),
-                request.Options?.MaxOutputTokens ?? generation?.MaxOutputTokens);
+                request.Options?.MaxOutputTokens ?? generation?.MaxOutputTokens,
+                Streaming: RuntimeStreamingMode.Disabled);
+            ValidateCompatibility(model, effective);
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
             var runOptions = new ChatClientAgentRunOptions(chatOptions);
             var response = await agent.RunAsync(request.Input, options: runOptions, cancellationToken: cancellationToken);
-            return new AgentExecutionResult(response.Text, request.SessionId, model?.ProviderType, model?.ModelName, effective);
+            return new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective);
         }
 
         public async IAsyncEnumerable<AgentExecutionEvent> ExecuteEventsAsync(
@@ -117,9 +180,10 @@ public sealed class AgentFrameworkRuntimeFactory(
             ArgumentException.ThrowIfNullOrWhiteSpace(request.Input);
             var executionId = request.SessionId ?? Guid.NewGuid().ToString("N");
             yield return new ExecutionStarted(executionId);
-            var chatClient = await chatClients.ResolveAsync(modelProfileId, cancellationToken);
+            var chatClient = await chatClients.ResolveAsync(definition.ModelProfileNamespace, modelProfileId, cancellationToken);
             var model = chatClient.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
-            var agent = Observe(new ChatClientAgent(chatClient, instructions: instructions, name: AgentId, description: description, tools: tools), observabilityEnabled);
+            var mappedTools = tools.Select(tool => MapTool(tool, toolExecution, ToolContext(definition, RevisionId, null, request.ToolExecution))).ToList();
+            var agent = AgentFrameworkRuntimeFactory.Observe(new ChatClientAgent(chatClient, instructions: instructions, name: AgentId, description: description, tools: mappedTools), observabilityEnabled);
             var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, request.Options);
             var effective = new ModelExecutionOptions(
                 chatOptions.Temperature,
@@ -129,6 +193,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                 checked((int?)chatOptions.Seed),
                 chatOptions.StopSequences?.ToArray(),
                 request.Execution?.Streaming ?? request.Options?.Streaming ?? RuntimeStreamingMode.Automatic);
+            ValidateCompatibility(model, effective);
             var output = new StringBuilder();
             if (effective.Streaming == RuntimeStreamingMode.Disabled)
             {
@@ -137,7 +202,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                     options: new ChatClientAgentRunOptions(chatOptions),
                     cancellationToken: cancellationToken);
                 if (!string.IsNullOrEmpty(response.Text)) yield return new ContentDelta(response.Text);
-                yield return new ExecutionCompleted(new AgentExecutionResult(response.Text, request.SessionId, model?.ProviderType, model?.ModelName, effective));
+                yield return new ExecutionCompleted(new AgentExecutionResult(response.Text, request.SessionId, model?.ContributionId, model?.ModelName, effective));
                 yield break;
             }
             await using var updates = agent.RunStreamingAsync(
@@ -167,14 +232,71 @@ public sealed class AgentFrameworkRuntimeFactory(
                 output.Append(update.Text);
                 yield return new ContentDelta(update.Text);
             }
-            yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ProviderType, model?.ModelName, effective));
+            yield return new ExecutionCompleted(new AgentExecutionResult(output.ToString(), request.SessionId, model?.ContributionId, model?.ModelName, effective));
         }
 
-        private static AIAgent Observe(AIAgent agent, bool enabled) => enabled
-            ? agent.AsBuilder()
-                .UseOpenTelemetry(TelemetrySourceName, telemetry => telemetry.EnableSensitiveData = false)
-                .Build()
-            : agent;
+        private void ValidateCompatibility(ModelChatClientMetadata? model, ModelExecutionOptions execution)
+        {
+            if (model?.ProviderCapabilities is null || model.ModelCapabilities is null || model.AdapterCapabilities is null) return;
+            var capabilities = EffectiveCapabilityResolver.Intersect(
+                model.ProviderCapabilities,
+                model.ModelCapabilities,
+                Capabilities,
+                model.AdapterCapabilities);
+            ExecutionCompatibilityValidator.Validate(
+                model.Reasoning ?? new ModelReasoningOptions(),
+                model.Output ?? new ModelOutputOptions(),
+                execution,
+                capabilities,
+                model.ContributionId,
+                model.ModelName,
+                RuntimeType,
+                tools.Count > 0);
+        }
+
+    }
+
+    private sealed class AgentstrationToolFunction(
+        IAgentTool tool,
+        IToolExecutionPipeline pipeline,
+        ToolExecutionContext template) : AIFunction
+    {
+        public override string Name => tool.Name;
+        public override string Description => tool.Description ?? string.Empty;
+        public override JsonElement JsonSchema => tool.InputSchema;
+        public override JsonElement? ReturnJsonSchema => tool.OutputSchema;
+
+        protected override async ValueTask<object?> InvokeCoreAsync(
+            AIFunctionArguments arguments,
+            CancellationToken cancellationToken)
+        {
+            var serializedArguments = JsonSerializer.SerializeToElement(
+                arguments.ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal));
+            var nativeCallId = arguments.Context?.Values
+                .OfType<FunctionInvocationContext>()
+                .Select(value => value.CallContent.CallId)
+                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+            var callId = nativeCallId ?? StableCallId(template, tool, serializedArguments);
+            return await pipeline.ExecuteAsync(template with
+            {
+                ToolCallId = callId,
+                InvocationId = Guid.NewGuid().ToString("N"),
+                ToolId = tool.Id,
+                ToolName = tool.Name,
+                ToolProviderId = tool.ProviderId,
+                ExternalToolId = tool.ExternalId,
+                Arguments = serializedArguments
+            }, cancellationToken);
+        }
+
+        private static string StableCallId(
+            ToolExecutionContext context,
+            IAgentTool descriptor,
+            JsonElement arguments)
+        {
+            var source = string.Join('\n', context.RunId, context.AgentRevisionId, descriptor.Id, arguments.GetRawText());
+            return $"tool-{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))).ToLowerInvariant()}";
+        }
     }
 }
 

@@ -1,8 +1,9 @@
-using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Flow.Application;
 
@@ -23,15 +24,23 @@ public interface IFlowAgentExecutor
 
 public interface IFlowRunQueue
 {
-    ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken);
-    IAsyncEnumerable<string> ReadAllAsync(CancellationToken cancellationToken);
+    ValueTask EnqueueAsync(FlowRunQueueItem item, CancellationToken cancellationToken);
+    IAsyncEnumerable<FlowRunQueueItem> ReadAllAsync(CancellationToken cancellationToken);
+}
+
+public sealed record FlowRunQueueItem(string RunId, FlowRunScope Scope);
+
+public interface IFlowRunExecutionScope
+{
+    ValueTask ValidateAsync(FlowRunScope scope, CancellationToken cancellationToken);
+    IDisposable Enter(FlowRunScope scope);
 }
 
 public interface IFlowRunCancellationRegistry
 {
-    CancellationToken Register(string runId, CancellationToken stoppingToken);
-    bool Cancel(string runId);
-    void Complete(string runId);
+    CancellationToken Register(FlowRunKey key, CancellationToken stoppingToken);
+    bool Cancel(FlowRunKey key);
+    void Complete(FlowRunKey key);
 }
 
 public interface IFlowRunEventSink
@@ -44,16 +53,66 @@ public sealed class NullFlowRunEventSink : IFlowRunEventSink
     public Task PublishAsync(FlowRunEvent runEvent, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+public sealed class CompositeFlowRunEventSink(IReadOnlyList<IFlowRunEventSink> sinks) : IFlowRunEventSink
+{
+    public async Task PublishAsync(FlowRunEvent runEvent, CancellationToken cancellationToken)
+    {
+        foreach (var sink in sinks)
+            await sink.PublishAsync(runEvent, cancellationToken);
+    }
+}
+
+public interface IFlowInputRequestSink
+{
+    Task PublishRequestedAsync(FlowRun run, InputRequest request, CancellationToken cancellationToken);
+}
+
+public sealed record FlowRunExecutionOptions
+{
+    public TimeSpan OrchestrationTimeout { get; init; } = TimeSpan.FromMinutes(10);
+    public TimeSpan InputRequestTimeout { get; init; } = TimeSpan.FromDays(7);
+    public TimeSpan ExecutionLeaseDuration { get; init; } = TimeSpan.FromMinutes(15);
+}
+
+public sealed record FlowRevisionUsage(
+    string RevisionId,
+    int ActiveRunCount,
+    int WaitingForInputCount,
+    int HistoricalRunCount,
+    IReadOnlyList<string> ActiveRunIds,
+    IReadOnlyList<FlowRevisionRunImpact> ActiveRuns);
+
+public sealed record FlowRevisionRunImpact(
+    WorkspaceId WorkspaceId,
+    string RunId,
+    FlowRunStatus Status,
+    int PendingInputRequestCount);
+
+public sealed class InputRequestAlreadyResolvedException(string requestId)
+    : Exception($"Input Request '{requestId}' has already been resolved.");
+
 public sealed class FlowRunService(
     IFlowRepository repository,
     IFlowRunQueue queue,
     IFlowRunCancellationRegistry cancellations,
     IFlowAgentExecutor agents,
+    IFlowOrchestrationEngine orchestrations,
     IExpressionParser expressionParser,
     IExpressionEvaluator expressions,
     IFlowRunEventSink eventSink,
-    TimeProvider timeProvider)
+    IFlowRunExecutionScope executionScope,
+    TimeProvider timeProvider,
+    FlowRunExecutionOptions? executionOptions = null,
+    IFlowInputRequestSink? inputRequestSink = null)
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly FlowRunExecutionOptions executionOptions = executionOptions is null
+        ? new()
+        : executionOptions.OrchestrationTimeout > TimeSpan.Zero
+          && executionOptions.InputRequestTimeout > TimeSpan.Zero
+          && executionOptions.ExecutionLeaseDuration > executionOptions.OrchestrationTimeout
+            ? executionOptions
+            : throw new ArgumentOutOfRangeException(nameof(executionOptions), "Execution and input timeouts must be positive, and the execution lease must exceed the orchestration timeout.");
     public static readonly ActivitySource ActivitySource = new("Agentstration.Flow");
     public static readonly Meter Meter = new("Agentstration.Flow");
     private static readonly Counter<long> RunsCreated = Meter.CreateCounter<long>("agentstration.flow.runs.created");
@@ -62,12 +121,39 @@ public sealed class FlowRunService(
     private static readonly Histogram<double> RunDuration = Meter.CreateHistogram<double>("agentstration.flow.run.duration", "s");
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
-        var page = await repository.ListRunsAsync(null, null, 0, 1000, cancellationToken);
-        foreach (var run in page.Items.Where(item => item.Value.Status is FlowRunStatus.Pending or FlowRunStatus.Running))
-            await queue.EnqueueAsync(run.Value.Id, cancellationToken);
+        const int pageSize = 200;
+        var now = timeProvider.GetUtcNow();
+        for (var skip = 0; ; skip += pageSize)
+        {
+            var keys = await repository.ListRecoverableRunsAsync(skip, pageSize, cancellationToken);
+            foreach (var key in keys)
+            {
+                var run = await repository.GetRunAsync(key.WorkspaceId, key.RunId, cancellationToken)
+                    ?? throw new FlowRunNotFoundException(key.RunId);
+                if (run.Value.Status == FlowRunStatus.WaitingForInput)
+                {
+                    var pending = await repository.ListInputRequestsAsync(key.WorkspaceId, key.RunId, InputRequestStatus.Pending, cancellationToken);
+                    var expired = pending.FirstOrDefault(value => value.Value.ExpiresAt <= now);
+                    if (expired is not null)
+                    {
+                        await ExpireInputAsync(run, expired, now, cancellationToken);
+                        continue;
+                    }
+                    if (inputRequestSink is not null)
+                        foreach (var request in pending)
+                            await inputRequestSink.PublishRequestedAsync(run.Value, request.Value, cancellationToken);
+                    if ((await repository.ListInputRequestsAsync(key.WorkspaceId, key.RunId, InputRequestStatus.Answered, cancellationToken)).Count > 0)
+                        await queue.EnqueueAsync(new(run.Value.Id, run.Value.Scope), cancellationToken);
+                    continue;
+                }
+                if (run.Value.Status == FlowRunStatus.Pending
+                    || run.Value.Status == FlowRunStatus.Running && run.Value.ExecutionLeaseExpiresAt <= now)
+                    await queue.EnqueueAsync(new(run.Value.Id, run.Value.Scope), cancellationToken);
+            }
+            if (keys.Count < pageSize) break;
+        }
     }
-
-    public async Task<StoredFlowRun> CreateAsync(
+    public Task<StoredFlowRun> CreateAsync(
         FlowId flowId,
         string? version,
         string? deploymentResourceId,
@@ -75,8 +161,9 @@ public sealed class FlowRunService(
         string? startedBy,
         string? correlationId,
         JsonElement input,
-        CancellationToken cancellationToken)
-        => await CreateAsync(flowId, version, deploymentResourceId, trigger, startedBy, correlationId, input, null, null, null, null, cancellationToken);
+        FlowRunScope scope,
+        CancellationToken cancellationToken) =>
+        CreateAsync(flowId, version, deploymentResourceId, trigger, startedBy, correlationId, input, null, null, null, null, scope, cancellationToken);
 
     public async Task<StoredFlowRun> CreateAsync(
         FlowId flowId,
@@ -90,13 +177,15 @@ public sealed class FlowRunService(
         string? interactionId,
         string? workTaskId,
         string? triggerMessageId,
+        FlowRunScope scope,
         CancellationToken cancellationToken)
     {
-        var resolved = await ResolveVersionAsync(flowId, version, cancellationToken);
+        var resolved = await ResolveVersionAsync(scope.WorkspaceId, flowId, version, cancellationToken);
         ValidateInput(resolved.Graph?.InputSchema, input);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
         {
+            WorkspaceId = scope.WorkspaceId,
             Id = $"flowrun-{Guid.NewGuid():N}",
             FlowId = flowId,
             FlowVersion = resolved.Version,
@@ -108,6 +197,7 @@ public sealed class FlowRunService(
             InteractionId = interactionId,
             WorkTaskId = workTaskId,
             TriggerMessageId = triggerMessageId,
+            Scope = scope,
             Input = input.Clone(),
             CreatedAt = now,
             DefinitionSnapshot = resolved,
@@ -118,43 +208,176 @@ public sealed class FlowRunService(
         };
         var stored = await repository.CreateRunAsync(run, cancellationToken);
         RunsCreated.Add(1, new KeyValuePair<string, object?>("flow.definition.state", run.DefinitionState.ToString()));
-        await EmitAsync(run.Id, FlowRunEventType.FlowRunCreated, null, JsonSerializer.SerializeToElement(new { run.Status, run.DefinitionState }), cancellationToken);
-        await queue.EnqueueAsync(run.Id, cancellationToken);
+        await EmitAsync(run.WorkspaceId, run.Id, FlowRunEventType.FlowRunCreated, null, JsonSerializer.SerializeToElement(new { run.Status, run.DefinitionState }), cancellationToken);
+        await queue.EnqueueAsync(new(run.Id, run.Scope), cancellationToken);
         return stored;
     }
 
-    public async Task<StoredFlowRun> CreateDraftAsync(FlowDraft draft, FlowRunTrigger trigger, string? startedBy, string? correlationId, JsonElement input, CancellationToken cancellationToken)
+    public async Task<StoredFlowRun> CreateDraftAsync(FlowDraft draft, FlowRunTrigger trigger, string? startedBy, string? correlationId, JsonElement input, FlowRunScope scope, CancellationToken cancellationToken)
     {
+        if (draft.WorkspaceId != scope.WorkspaceId)
+            throw new FlowValidationException("flow_run_scope_mismatch", "The Flow Draft and execution scope must belong to the same Workspace.");
         ValidateInput(draft.Definition.InputSchema, input);
         var validationVersion = $"0.0.0-draft.{draft.Revision}";
-        var snapshot = new FlowVersion(draft.FlowId, validationVersion, draft.Description, FlowKind.Routing, FlowDraftSnapshotAdapter.ToRoutingSpec(draft.Definition), draft.Tags,
+        var snapshot = new FlowVersion(draft.WorkspaceId, draft.FlowId, validationVersion, draft.Description, FlowDraftSnapshotAdapter.ToRoutingDefinition(draft.Definition), draft.Tags,
             timeProvider.GetUtcNow(), draft.Definition, draft.DefinitionHash);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
         {
-            Id = $"flowrun-{Guid.NewGuid():N}", FlowId = draft.FlowId, FlowVersion = validationVersion, DefinitionState = FlowDefinitionState.Draft,
-            DraftRevision = draft.Revision, DefinitionHash = draft.DefinitionHash, DefinitionSnapshotId = $"snapshot-{Guid.NewGuid():N}", DeploymentResourceId = "designer",
-            Trigger = trigger, StartedBy = string.IsNullOrWhiteSpace(startedBy) ? "local-user" : startedBy,
+            WorkspaceId = scope.WorkspaceId,
+            Id = $"flowrun-{Guid.NewGuid():N}",
+            FlowId = draft.FlowId,
+            FlowVersion = validationVersion,
+            DefinitionState = FlowDefinitionState.Draft,
+            DraftRevision = draft.Revision,
+            DefinitionHash = draft.DefinitionHash,
+            DefinitionSnapshotId = $"snapshot-{Guid.NewGuid():N}",
+            DeploymentResourceId = "designer",
+            Trigger = trigger,
+            StartedBy = string.IsNullOrWhiteSpace(startedBy) ? "local-user" : startedBy,
             CorrelationId = string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString("N") : correlationId,
-            Input = input.Clone(), CreatedAt = now, DefinitionSnapshot = snapshot, Steps = CreateSteps(snapshot, input)
+            Scope = scope,
+            Input = input.Clone(),
+            CreatedAt = now,
+            DefinitionSnapshot = snapshot,
+            Steps = CreateSteps(snapshot, input)
         };
         var stored = await repository.CreateRunAsync(run, cancellationToken);
         RunsCreated.Add(1, new KeyValuePair<string, object?>("flow.definition.state", run.DefinitionState.ToString()));
-        await EmitAsync(run.Id, FlowRunEventType.FlowRunCreated, null, JsonSerializer.SerializeToElement(new { run.Status, run.DefinitionState, run.DraftRevision }), cancellationToken);
-        await queue.EnqueueAsync(run.Id, cancellationToken);
+        await EmitAsync(run.WorkspaceId, run.Id, FlowRunEventType.FlowRunCreated, null, JsonSerializer.SerializeToElement(new { run.Status, run.DefinitionState, run.DraftRevision }), cancellationToken);
+        await queue.EnqueueAsync(new(run.Id, run.Scope), cancellationToken);
         return stored;
     }
 
-    public Task<StoredFlowRun?> GetAsync(string runId, CancellationToken cancellationToken) => repository.GetRunAsync(runId, cancellationToken);
+    public Task<StoredFlowRun?> GetAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) => repository.GetRunAsync(workspaceId, runId, cancellationToken);
 
-    public Task<FlowRunPage> ListAsync(FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken) =>
-        repository.ListRunsAsync(flowId, status, skip, take, cancellationToken);
-
-    public async Task<StoredFlowRun> CancelAsync(string runId, CancellationToken cancellationToken)
+    public async Task<StoredFlowRun?> GetAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)
     {
-        var stored = await RequiredAsync(runId, cancellationToken);
+        var stored = await repository.GetRunAsync(scope.WorkspaceId, runId, cancellationToken);
+        return stored is not null && HasScope(stored.Value, scope) ? stored : null;
+    }
+
+    public Task<FlowRunPage> ListAsync(FlowId? flowId, FlowRunStatus? status, int skip, int take, FlowRunScope scope, CancellationToken cancellationToken) =>
+        repository.ListRunsAsync(scope.WorkspaceId, flowId, status, skip, take, cancellationToken);
+
+    public async Task<IReadOnlyList<StoredInputRequest>> ListInputsAsync(
+        string runId,
+        InputRequestStatus? status,
+        FlowRunScope scope,
+        CancellationToken cancellationToken)
+    {
+        _ = await RequiredAsync(scope.WorkspaceId, runId, cancellationToken);
+        return await repository.ListInputRequestsAsync(scope.WorkspaceId, runId, status, cancellationToken);
+    }
+
+    public async Task<StoredInputRequest?> GetInputAsync(
+        string runId,
+        string requestId,
+        FlowRunScope scope,
+        CancellationToken cancellationToken)
+    {
+        _ = await RequiredAsync(scope.WorkspaceId, runId, cancellationToken);
+        return await repository.GetInputRequestAsync(scope.WorkspaceId, runId, requestId, cancellationToken);
+    }
+
+    public async Task<StoredInputRequest> RespondAsync(
+        string runId,
+        string requestId,
+        JsonElement value,
+        string principalId,
+        FlowRunScope scope,
+        CancellationToken cancellationToken)
+    {
+        var run = await RequiredAsync(scope.WorkspaceId, runId, cancellationToken);
+        if (!HasScope(run.Value, scope)) throw new FlowRunNotFoundException(runId);
+        return await RespondAsync(run, requestId, value, principalId, cancellationToken);
+    }
+
+    public async Task<StoredInputRequest> RespondAsync(
+        string runId,
+        string requestId,
+        JsonElement value,
+        string principalId,
+        WorkspaceId workspaceId,
+        CancellationToken cancellationToken)
+    {
+        var run = await RequiredAsync(workspaceId, runId, cancellationToken);
+        return await RespondAsync(run, requestId, value, principalId, cancellationToken);
+    }
+
+    private async Task<StoredInputRequest> RespondAsync(
+        StoredFlowRun run,
+        string requestId,
+        JsonElement value,
+        string principalId,
+        CancellationToken cancellationToken)
+    {
+        var runId = run.Value.Id;
+        var workspaceId = run.Value.WorkspaceId;
+        if (run.Value.Status != FlowRunStatus.WaitingForInput)
+            throw new FlowValidationException("input_request_run_not_waiting", "The Flow Run is not waiting for external input.");
+        var stored = await repository.GetInputRequestAsync(workspaceId, runId, requestId, cancellationToken)
+            ?? throw new FlowValidationException("input_request_not_found", $"Input Request '{requestId}' was not found.");
+        if (stored.Value.Status != InputRequestStatus.Pending)
+            throw new InputRequestAlreadyResolvedException(requestId);
+        var now = timeProvider.GetUtcNow();
+        if (stored.Value.ExpiresAt <= now)
+        {
+            await ExpireInputAsync(run, stored, now, cancellationToken);
+            throw new FlowValidationException("input_request_expired", "The Input Request has expired.");
+        }
+        ValidateInputResponse(stored.Value, value);
+        StoredInputRequest answered;
+        try
+        {
+            answered = await repository.UpdateInputRequestAsync(stored.Value with
+            {
+                Status = InputRequestStatus.Answered,
+                Response = new InputResponse(now, value.Clone(), string.IsNullOrWhiteSpace(principalId) ? "local-user" : principalId)
+            }, stored.ETag, cancellationToken);
+        }
+        catch (FlowConcurrencyException)
+        {
+            throw new InputRequestAlreadyResolvedException(requestId);
+        }
+        await EmitAsync(workspaceId, runId, FlowRunEventType.InputReceived, stored.Value.Source,
+            JsonSerializer.SerializeToElement(new { requestId, principalId = answered.Value.Response!.PrincipalId }), cancellationToken);
+        await queue.EnqueueAsync(new(runId, run.Value.Scope), cancellationToken);
+        return answered;
+    }
+
+    public async Task ExpireDueInputsAsync(CancellationToken cancellationToken)
+    {
+        var now = timeProvider.GetUtcNow();
+        const int pageSize = 200;
+        for (var skip = 0; ; skip += pageSize)
+        {
+            var keys = await repository.ListRecoverableRunsAsync(skip, pageSize, cancellationToken);
+            foreach (var key in keys)
+            {
+                var run = await repository.GetRunAsync(key.WorkspaceId, key.RunId, cancellationToken);
+                if (run?.Value.Status != FlowRunStatus.WaitingForInput) continue;
+                var pending = await repository.ListInputRequestsAsync(key.WorkspaceId, key.RunId, InputRequestStatus.Pending, cancellationToken);
+                var expired = pending.FirstOrDefault(value => value.Value.ExpiresAt <= now);
+                if (expired is not null) await ExpireInputAsync(run, expired, now, cancellationToken);
+            }
+            if (keys.Count < pageSize) break;
+        }
+    }
+
+    public async Task<FlowRevisionUsage> GetRevisionUsageAsync(string revisionId, CancellationToken cancellationToken)
+        => await RevisionRetention().GetUsageAsync(revisionId, cancellationToken);
+
+    public async Task<FlowRevisionUsage> ForceTerminateRevisionRunsAsync(string revisionId, CancellationToken cancellationToken)
+        => await RevisionRetention().ForceTerminateAsync(revisionId, cancellationToken);
+
+    private FlowRevisionRetentionService RevisionRetention() => new(repository, cancellations, eventSink, timeProvider);
+
+    public async Task<StoredFlowRun> CancelAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)
+    {
+        var stored = await RequiredAsync(scope.WorkspaceId, runId, cancellationToken);
         if (stored.Value.Status.IsTerminal()) return stored;
-        cancellations.Cancel(runId);
+        cancellations.Cancel(new FlowRunKey(scope.WorkspaceId, runId));
         var now = timeProvider.GetUtcNow();
         var steps = stored.Value.Steps.Select(step => step.Status is FlowStepRunStatus.NotStarted or FlowStepRunStatus.Running
             ? step with { Status = FlowStepRunStatus.Cancelled, CompletedAt = now }
@@ -164,68 +387,131 @@ public sealed class FlowRunService(
             Status = FlowRunStatus.Cancelled,
             CompletedAt = now,
             Error = new FlowRunError("flow_run_cancelled", "The Flow Run was cancelled."),
-            Steps = steps
+            Steps = steps,
+            ExecutionLeaseId = null,
+            ExecutionLeaseExpiresAt = null
         }, stored.ETag, cancellationToken);
-        await EmitAsync(runId, FlowRunEventType.FlowRunCancelled, null, null, cancellationToken);
+        foreach (var input in await repository.ListInputRequestsAsync(scope.WorkspaceId, runId, InputRequestStatus.Pending, cancellationToken))
+            await repository.UpdateInputRequestAsync(input.Value with { Status = InputRequestStatus.Cancelled }, input.ETag, cancellationToken);
+        await EmitAsync(scope.WorkspaceId, runId, FlowRunEventType.FlowRunCancelled, null, null, cancellationToken);
         return cancelled;
     }
 
-    public async Task ExecuteAsync(string runId, CancellationToken stoppingToken)
+    public async Task ExecuteAsync(FlowRunQueueItem item, CancellationToken stoppingToken)
     {
-        var stored = await RequiredAsync(runId, stoppingToken);
+        var runId = item.RunId;
+        var workspaceId = item.Scope.WorkspaceId;
+        var stored = await RequiredAsync(workspaceId, runId, stoppingToken);
+        if (stored.Value.Scope != item.Scope || stored.Value.WorkspaceId != workspaceId)
+            throw new FlowValidationException("flow_run_scope_mismatch", "The queued Flow execution scope does not match the persisted Run.");
         if (stored.Value.Status.IsTerminal()) return;
+        var now = timeProvider.GetUtcNow();
+        if (stored.Value.Status == FlowRunStatus.Running && stored.Value.ExecutionLeaseExpiresAt > now) return;
+        var wasWaiting = stored.Value.Status == FlowRunStatus.WaitingForInput;
+        StoredInputRequest? answeredInput = null;
+        if (wasWaiting)
+        {
+            answeredInput = (await repository.ListInputRequestsAsync(workspaceId, runId, InputRequestStatus.Answered, stoppingToken)).LastOrDefault();
+            if (answeredInput is null) return;
+        }
         using var activity = ActivitySource.StartActivity("flow.run.execute", ActivityKind.Internal);
         activity?.SetTag("flow.id", stored.Value.FlowId.Value);
         activity?.SetTag("flow.run.id", runId);
+        activity?.SetTag("agentstration.workspace.id", workspaceId.ToString());
         activity?.SetTag("flow.version", stored.Value.FlowVersion);
         activity?.SetTag("flow.definition.state", stored.Value.DefinitionState.ToString());
-        var runToken = cancellations.Register(runId, stoppingToken);
+        var key = new FlowRunKey(workspaceId, runId);
+        var runToken = cancellations.Register(key, stoppingToken);
+        using var timeout = stored.Value.DefinitionSnapshot.Definition is OrchestrationFlowDefinition
+            ? new CancellationTokenSource(executionOptions.OrchestrationTimeout, timeProvider)
+            : null;
+        using var executionTimeoutLink = timeout is null
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(runToken, timeout.Token);
+        var executionToken = executionTimeoutLink?.Token ?? runToken;
+        IDisposable? activeExecutionScope = null;
         try
         {
-            stored = await SaveAsync(stored, stored.Value with { Status = FlowRunStatus.Running, StartedAt = timeProvider.GetUtcNow() }, stoppingToken);
-            await EmitAsync(runId, FlowRunEventType.FlowRunStarted, null, null, stoppingToken);
+            await executionScope.ValidateAsync(stored.Value.Scope, stoppingToken);
+            activeExecutionScope = executionScope.Enter(stored.Value.Scope);
+            try
+            {
+                stored = await SaveAsync(stored, stored.Value with
+                {
+                    Status = FlowRunStatus.Running,
+                    StartedAt = stored.Value.StartedAt ?? now,
+                    ExecutionLeaseId = Guid.NewGuid().ToString("N"),
+                    ExecutionLeaseExpiresAt = now + executionOptions.ExecutionLeaseDuration
+                }, stoppingToken);
+            }
+            catch (FlowConcurrencyException)
+            {
+                return;
+            }
+            await EmitAsync(workspaceId, runId, wasWaiting ? FlowRunEventType.FlowRunResumed : FlowRunEventType.FlowRunStarted, null, null, stoppingToken);
             if (stored.Value.DefinitionSnapshot.Graph is not null)
             {
                 await ExecuteGraphAsync(stored, stoppingToken, runToken);
                 return;
             }
+            if (stored.Value.DefinitionSnapshot.Definition is OrchestrationFlowDefinition orchestration)
+            {
+                await ExecuteOrchestrationAsync(stored, orchestration, answeredInput?.Value, stoppingToken, executionToken);
+                return;
+            }
             stored = await CompleteSimpleStepAsync(stored, "Input", stored.Value.Input, null, runToken);
 
-            var target = SelectTarget(stored.Value.DefinitionSnapshot.Spec, stored.Value.Input);
-            if (stored.Value.DefinitionSnapshot.Spec is RoutingFlowSpec)
+            var target = SelectTarget(stored.Value.DefinitionSnapshot.Definition, stored.Value.Input);
+            if (stored.Value.DefinitionSnapshot.Definition is RoutingFlowDefinition)
             {
                 stored = await CompleteSimpleStepAsync(stored, "Router", JsonSerializer.SerializeToElement(new { selectedAgent = target.Id }), target.Id, runToken);
             }
 
             stored = await StartStepAsync(stored, "Agent", runToken);
-            var execution = await agents.ExecuteAsync(target, stored.Value.Input, stored.Value.CorrelationId!, runToken);
+            var execution = await agents.ExecuteAsync(target with { Namespace = target.Namespace ?? stored.Value.FlowId.Namespace }, stored.Value.Input, stored.Value.CorrelationId!, runToken);
             stored = await FinishAgentStepAsync(stored, execution, runToken);
             stored = await CompleteSimpleStepAsync(stored, "Output", execution.Output, null, runToken);
             var completedAt = timeProvider.GetUtcNow();
-            await SaveAsync(stored, stored.Value with { Status = FlowRunStatus.Succeeded, Output = execution.Output.Clone(), CompletedAt = completedAt }, stoppingToken);
+            await SaveAsync(stored, stored.Value with
+            {
+                Status = FlowRunStatus.Succeeded,
+                Output = execution.Output.Clone(),
+                CompletedAt = completedAt,
+                ExecutionLeaseId = null,
+                ExecutionLeaseExpiresAt = null
+            }, stoppingToken);
             RecordCompletion(stored.Value.CreatedAt, completedAt, stored.Value.DefinitionState);
-            await EmitAsync(runId, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
+            await EmitAsync(workspaceId, runId, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
+        }
+        catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true && !runToken.IsCancellationRequested)
+        {
+            await FailAsync(workspaceId, runId, FlowRunStatus.TimedOut, "flow_run_timed_out", "The Flow Run exceeded its execution timeout.", stoppingToken);
         }
         catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
         {
-            await FailAsync(runId, FlowRunStatus.Cancelled, "flow_run_cancelled", "The Flow Run was cancelled.", stoppingToken);
+            await FailAsync(workspaceId, runId, FlowRunStatus.Cancelled, "flow_run_cancelled", "The Flow Run was cancelled.", stoppingToken);
+        }
+        catch (FlowValidationException exception)
+        {
+            await FailAsync(workspaceId, runId, FlowRunStatus.Failed, exception.Code, exception.Message, stoppingToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            await FailAsync(runId, FlowRunStatus.Failed, "flow_run_execution_failed", "The Flow Run could not complete.", stoppingToken, exception.Message);
+            await FailAsync(workspaceId, runId, FlowRunStatus.Failed, "flow_run_execution_failed", "The Flow Run could not complete.", stoppingToken, exception.Message);
         }
         finally
         {
-            cancellations.Complete(runId);
+            activeExecutionScope?.Dispose();
+            cancellations.Complete(key);
         }
     }
 
-    public async IAsyncEnumerable<FlowRun> ObserveAsync(string runId, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<FlowRun> ObserveAsync(string runId, FlowRunScope scope, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         string? etag = null;
         while (!cancellationToken.IsCancellationRequested)
         {
-            var stored = await RequiredAsync(runId, cancellationToken);
+            var stored = await RequiredAsync(scope.WorkspaceId, runId, cancellationToken);
             if (!string.Equals(etag, stored.ETag, StringComparison.Ordinal))
             {
                 etag = stored.ETag;
@@ -236,29 +522,199 @@ public sealed class FlowRunService(
         }
     }
 
-    public Task<IReadOnlyList<FlowRunEvent>> ListEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
-        repository.ListRunEventsAsync(runId, afterSequence, cancellationToken);
+    public Task<IReadOnlyList<FlowRunEvent>> ListEventsAsync(FlowRunScope scope, string runId, long afterSequence, CancellationToken cancellationToken) =>
+        repository.ListRunEventsAsync(scope.WorkspaceId, runId, afterSequence, cancellationToken);
 
-    private async Task<FlowVersion> ResolveVersionAsync(FlowId flowId, string? version, CancellationToken cancellationToken)
+    private async Task<FlowVersion> ResolveVersionAsync(WorkspaceId workspaceId, FlowId flowId, string? version, CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(version))
-            return (await repository.GetVersionAsync(flowId, version, cancellationToken))?.Value
+            return (await repository.GetVersionAsync(workspaceId, flowId, version, cancellationToken))?.Value
                 ?? throw new FlowValidationException("flow_version_not_found", $"Published Flow version '{version}' was not found.");
-        var definition = await repository.GetAsync(flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
+        var definition = await repository.GetAsync(workspaceId, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
         if (definition.Value.ActiveVersion is null)
             throw new FlowValidationException("flow_active_version_required", "A Flow Run requires a published active version.");
-        return (await repository.GetVersionAsync(flowId, definition.Value.ActiveVersion, cancellationToken))?.Value
+        return (await repository.GetVersionAsync(workspaceId, flowId, definition.Value.ActiveVersion, cancellationToken))?.Value
             ?? throw new FlowValidationException("flow_version_not_found", $"Published Flow version '{definition.Value.ActiveVersion}' was not found.");
     }
 
     private static IReadOnlyList<FlowStepRun> CreateSteps(FlowVersion version, JsonElement input)
     {
         if (version.Graph is not null) return version.Graph.Steps.Select(step => new FlowStepRun { StepName = step.Name, StepType = step.Type(), DeclaredInput = step is InputFlowStepDefinition ? input.Clone() : StepDeclaredInput(step) }).ToArray();
+        if (version.Definition is OrchestrationFlowDefinition orchestration)
+        {
+            return
+            [
+                new FlowStepRun { StepName = "Input", StepType = "input", DeclaredInput = input.Clone() },
+                .. orchestration.Participants.Select(participant => new FlowStepRun
+                {
+                    StepName = participant.Id,
+                    StepType = "agent",
+                    DeclaredInput = input.Clone(),
+                    AgentResourceId = participant.Id
+                }),
+                new FlowStepRun { StepName = "Output", StepType = "output" }
+            ];
+        }
         var steps = new List<FlowStepRun> { new() { StepName = "Input", StepType = "input", DeclaredInput = input.Clone() } };
-        if (version.Spec is RoutingFlowSpec) steps.Add(new() { StepName = "Router", StepType = "router", DeclaredInput = input.Clone() });
+        if (version.Definition is RoutingFlowDefinition) steps.Add(new() { StepName = "Router", StepType = "router", DeclaredInput = input.Clone() });
         steps.Add(new() { StepName = "Agent", StepType = "agent", DeclaredInput = input.Clone() });
         steps.Add(new() { StepName = "Output", StepType = "output" });
         return steps;
+    }
+
+    private async Task ExecuteOrchestrationAsync(
+        StoredFlowRun initial,
+        OrchestrationFlowDefinition definition,
+        InputRequest? answeredInput,
+        CancellationToken stoppingToken,
+        CancellationToken runToken)
+    {
+        var stored = initial.Value.RuntimeState is null
+            ? await CompleteSimpleStepAsync(initial, "Input", initial.Value.Input, null, runToken)
+            : initial;
+        var started = new HashSet<string>(StringComparer.Ordinal);
+        FlowOrchestrationResult? result = null;
+        var suspended = false;
+        var request = new FlowOrchestrationExecutionRequest(
+            stored.Value.WorkspaceId,
+            stored.Value.Id,
+            QualifyOrchestrationTargets(definition, stored.Value.FlowId.Namespace),
+            stored.Value.Input,
+            stored.Value.CorrelationId!,
+            stored.Value.RuntimeBindings,
+            stored.Value.RuntimeState,
+            answeredInput,
+            stored.Value.Scope);
+
+        await foreach (var executionEvent in orchestrations.ExecuteAsync(request, runToken))
+        {
+            switch (executionEvent)
+            {
+                case FlowRuntimeBindingsResolved resolved:
+                    if (stored.Value.RuntimeBindings.Count == 0)
+                        stored = await SaveAsync(stored, stored.Value with { RuntimeBindings = resolved.Bindings }, runToken);
+                    else if (!stored.Value.RuntimeBindings.SequenceEqual(resolved.Bindings))
+                        throw new FlowValidationException("flow_runtime_binding_changed", "The runtime attempted to change immutable bindings for an existing Flow Run.");
+                    break;
+                case FlowExternalInputRequested input:
+                    var existing = (await repository.ListInputRequestsAsync(stored.Value.WorkspaceId, stored.Value.Id, null, runToken))
+                        .FirstOrDefault(value => string.Equals(value.Value.RuntimeRequestId, input.RuntimeRequestId, StringComparison.Ordinal));
+                    var inputRequest = existing?.Value ?? new InputRequest
+                    {
+                        WorkspaceId = stored.Value.WorkspaceId,
+                        Id = $"input-{Guid.NewGuid():N}",
+                        RunId = stored.Value.Id,
+                        Source = input.Source,
+                        RuntimeRequestId = input.RuntimeRequestId,
+                        Prompt = input.Prompt,
+                        Type = input.Type,
+                        Options = input.Options,
+                        CreatedAt = timeProvider.GetUtcNow(),
+                        ExpiresAt = timeProvider.GetUtcNow() + executionOptions.InputRequestTimeout
+                    };
+                    if (existing is null) await repository.CreateInputRequestAsync(inputRequest, runToken);
+                    stored = await SaveAsync(stored, stored.Value with
+                    {
+                        Status = FlowRunStatus.WaitingForInput,
+                        RuntimeState = input.RuntimeState,
+                        ExecutionLeaseId = null,
+                        ExecutionLeaseExpiresAt = null
+                    }, runToken);
+                    await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.InputRequested, input.Source,
+                        JsonSerializer.SerializeToElement(new { inputRequest.Id, inputRequest.Prompt, inputRequest.Type, inputRequest.ExpiresAt }), runToken);
+                    if (inputRequestSink is not null)
+                        await inputRequestSink.PublishRequestedAsync(stored.Value, inputRequest, runToken);
+                    suspended = true;
+                    break;
+                case FlowParticipantTurnStarted turn:
+                    if (started.Add(turn.ParticipantId))
+                        stored = await StartStepAsync(stored, turn.ParticipantId, runToken);
+                    await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.ParticipantTurnStarted, turn.ParticipantId,
+                        JsonSerializer.SerializeToElement(new { turn = turn.Turn }), runToken);
+                    break;
+                case FlowParticipantDelta delta:
+                    if (started.Add(delta.ParticipantId))
+                        stored = await StartStepAsync(stored, delta.ParticipantId, runToken);
+                    await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.StepOutputDelta, delta.ParticipantId,
+                        JsonSerializer.SerializeToElement(new { content = delta.Content }), runToken);
+                    break;
+                case FlowParticipantTurnCompleted turn:
+                    await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.ParticipantTurnCompleted, turn.ParticipantId,
+                        JsonSerializer.SerializeToElement(new { turn = turn.Turn }), runToken);
+                    break;
+                case FlowParticipantCompleted completed:
+                    if (started.Add(completed.Result.ParticipantId))
+                        stored = await StartStepAsync(stored, completed.Result.ParticipantId, runToken);
+                    stored = await FinishParticipantStepAsync(stored, completed.Result, runToken);
+                    break;
+                case FlowExecutionCompleted completed:
+                    result = completed.Result;
+                    break;
+            }
+        }
+
+        if (suspended) return;
+        if (result is null)
+            throw new FlowValidationException("flow_orchestration_output_missing", "The orchestration completed without a final output.");
+        var output = JsonSerializer.SerializeToElement(result, JsonOptions);
+
+        var now = timeProvider.GetUtcNow();
+        var skipped = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.NotStarted && step.StepType == "agent"
+            ? step with { Status = FlowStepRunStatus.Skipped, CompletedAt = now }
+            : step).ToArray();
+        stored = await SaveAsync(stored, stored.Value with { Steps = skipped }, runToken);
+        stored = await CompleteSimpleStepAsync(stored, "Output", output, null, runToken);
+        await SaveAsync(stored, stored.Value with
+        {
+            Status = FlowRunStatus.Succeeded,
+            Output = output.Clone(),
+            CompletedAt = now,
+            ExecutionLeaseId = null,
+            ExecutionLeaseExpiresAt = null
+        }, stoppingToken);
+        RecordCompletion(stored.Value.CreatedAt, now, stored.Value.DefinitionState);
+        await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
+    }
+
+    private static OrchestrationFlowDefinition QualifyOrchestrationTargets(
+        OrchestrationFlowDefinition definition,
+        ResourceNamespace ownerNamespace)
+    {
+        var participants = definition.Participants
+            .Select(participant => participant.Namespace is null
+                ? participant with { Namespace = ownerNamespace }
+                : participant)
+            .ToArray();
+        var pattern = definition.Pattern is MagenticOrchestrationPattern magentic && magentic.Manager.Namespace is null
+            ? magentic with { Manager = magentic.Manager with { Namespace = ownerNamespace } }
+            : definition.Pattern;
+        return definition with { Participants = participants, Pattern = pattern };
+    }
+
+    private async Task<StoredFlowRun> FinishParticipantStepAsync(
+        StoredFlowRun stored,
+        FlowParticipantResult result,
+        CancellationToken token)
+    {
+        var now = timeProvider.GetUtcNow();
+        var steps = stored.Value.Steps.Select(step => step.StepName == result.ParticipantId ? step with
+        {
+            Status = FlowStepRunStatus.Succeeded,
+            ResolvedInput = stored.Value.Input.Clone(),
+            Output = result.Output.Clone(),
+            CompletedAt = now,
+            AgentResourceId = result.AgentResourceId,
+            AgentVersion = result.AgentVersion,
+            ModelProfileResourceId = result.ModelProfileResourceId,
+            Provider = result.Provider,
+            Tools = result.Tools,
+            Usage = result.Usage,
+            Logs = [.. step.Logs, $"{result.ParticipantId} completed after {result.Turns.Count} turn(s)."]
+        } : step).ToArray();
+        var updated = await SaveAsync(stored, stored.Value with { Steps = steps }, token);
+        await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.StepRunCompleted, result.ParticipantId,
+            JsonSerializer.SerializeToElement(new { turns = result.Turns.Count }), token);
+        return updated;
     }
 
     private async Task ExecuteGraphAsync(StoredFlowRun initial, CancellationToken stoppingToken, CancellationToken runToken)
@@ -295,7 +751,7 @@ public sealed class FlowRunService(
                     var resolvedInput = agent.InputMapping is null ? stored.Value.Input.Clone() : await ResolveJsonAsync(agent.InputMapping.Value, context, runToken);
                     try
                     {
-                        agentResult = await agents.ExecuteAsync(new FlowTargetReference(FlowTargetKind.Agent, agentId), resolvedInput, stored.Value.CorrelationId!, runToken);
+                        agentResult = await agents.ExecuteAsync(new FlowTargetReference(FlowTargetKind.Agent, agentId, Namespace: agent.Agent.Namespace ?? stored.Value.FlowId.Namespace), resolvedInput, stored.Value.CorrelationId!, runToken);
                         output = agentResult.Output.Clone(); eventName = "completed";
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -326,15 +782,25 @@ public sealed class FlowRunService(
             else if (agentResult is not null) stored = await FinishAgentStepAsync(stored, agentResult, runToken, transition?.Id, step.Name);
             else stored = await FinishGraphStepAsync(stored, step.Name, output, transition?.Id, runToken);
             if (step is OutputFlowStepDefinition) break;
+            if (transition is null && stepError is not null)
+                throw new FlowValidationException(stepError.Code, stepError.Details ?? stepError.Message);
             if (transition is null) throw new FlowValidationException("flow_transition_missing", $"No '{eventName}' transition leaves step '{step.Name}'.");
             currentName = transition.ToStep;
         }
         if (finalOutput is null) throw new FlowValidationException("flow_output_missing", "The Flow completed without reaching an Output step.");
         var now = timeProvider.GetUtcNow();
         var finalSteps = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.NotStarted ? step with { Status = FlowStepRunStatus.Skipped, CompletedAt = now } : step).ToArray();
-        await SaveAsync(stored, stored.Value with { Status = FlowRunStatus.Succeeded, Output = finalOutput.Value.Clone(), CompletedAt = now, Steps = finalSteps }, stoppingToken);
+        await SaveAsync(stored, stored.Value with
+        {
+            Status = FlowRunStatus.Succeeded,
+            Output = finalOutput.Value.Clone(),
+            CompletedAt = now,
+            Steps = finalSteps,
+            ExecutionLeaseId = null,
+            ExecutionLeaseExpiresAt = null
+        }, stoppingToken);
         RecordCompletion(stored.Value.CreatedAt, now, stored.Value.DefinitionState);
-        await EmitAsync(stored.Value.Id, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
+        await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.FlowRunCompleted, null, null, stoppingToken);
     }
 
     private async Task<StoredFlowRun> FinishGraphStepAsync(StoredFlowRun stored, string name, JsonElement? output, string? transition, CancellationToken token)
@@ -342,7 +808,7 @@ public sealed class FlowRunService(
         var now = timeProvider.GetUtcNow();
         var steps = stored.Value.Steps.Select(step => step.StepName == name ? step with { Status = FlowStepRunStatus.Succeeded, ResolvedInput = stored.Value.Input.Clone(), Output = output?.Clone(), SelectedTransition = transition, CompletedAt = now, Logs = [.. step.Logs, $"{name} completed."] } : step).ToArray();
         var updated = await SaveAsync(stored, stored.Value with { Steps = steps }, token);
-        await EmitAsync(stored.Value.Id, FlowRunEventType.StepRunCompleted, name, JsonSerializer.SerializeToElement(new { transition }), token);
+        await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.StepRunCompleted, name, JsonSerializer.SerializeToElement(new { transition }), token);
         return updated;
     }
 
@@ -351,7 +817,7 @@ public sealed class FlowRunService(
         var now = timeProvider.GetUtcNow();
         var steps = stored.Value.Steps.Select(step => step.StepName == name ? step with { Status = FlowStepRunStatus.Failed, ResolvedInput = stored.Value.Input.Clone(), Output = output?.Clone(), SelectedTransition = transition, CompletedAt = now, Error = error, Logs = [.. step.Logs, $"{name} failed: {error.Message}"] } : step).ToArray();
         var updated = await SaveAsync(stored, stored.Value with { Steps = steps }, token);
-        await EmitAsync(stored.Value.Id, FlowRunEventType.StepRunFailed, name, JsonSerializer.SerializeToElement(new { transition, error.Code, error.Message }), token);
+        await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.StepRunFailed, name, JsonSerializer.SerializeToElement(new { transition, error.Code, error.Message }), token);
         return updated;
     }
 
@@ -467,6 +933,19 @@ public sealed class FlowRunService(
         }
     }
 
+    private static void ValidateInputResponse(InputRequest request, JsonElement value)
+    {
+        switch (request.Type)
+        {
+            case InputRequestType.Text when value.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(value.GetString()):
+                throw new FlowValidationException("input_response_invalid", "A non-empty text response is required.");
+            case InputRequestType.Choice when value.ValueKind != JsonValueKind.String || !request.Options.Contains(value.GetString()!, StringComparer.Ordinal):
+                throw new FlowValidationException("input_response_invalid", "The response must be one of the available choices.");
+            case InputRequestType.Confirmation when value.ValueKind is not JsonValueKind.True and not JsonValueKind.False:
+                throw new FlowValidationException("input_response_invalid", "A boolean confirmation response is required.");
+        }
+    }
+
     private static void RecordCompletion(DateTimeOffset createdAt, DateTimeOffset completedAt, FlowDefinitionState definitionState)
     {
         var tag = new KeyValuePair<string, object?>("flow.definition.state", definitionState.ToString());
@@ -474,10 +953,10 @@ public sealed class FlowRunService(
         RunDuration.Record(Math.Max(0, (completedAt - createdAt).TotalSeconds), tag);
     }
 
-    private static FlowTargetReference SelectTarget(FlowSpec spec, JsonElement input) => spec switch
+    private static FlowTargetReference SelectTarget(FlowDefinition definition, JsonElement input) => definition switch
     {
-        DirectFlowSpec direct => direct.Target,
-        RoutingFlowSpec routing => routing.Destinations.FirstOrDefault(destination => InputContains(input, destination.Id))
+        DirectFlowDefinition direct => direct.Target,
+        RoutingFlowDefinition routing => routing.Destinations.FirstOrDefault(destination => InputContains(input, destination.Id))
             ?? routing.Fallback ?? routing.Destinations[0],
         _ => throw new FlowValidationException("flow_run_kind_unsupported", "This first execution increment supports Direct and Routing Flows.")
     };
@@ -500,7 +979,7 @@ public sealed class FlowRunService(
             Logs = [.. step.Logs, $"{name} completed."]
         } : step).ToArray();
         var updated = await SaveAsync(stored, stored.Value with { Steps = steps }, token);
-        await EmitAsync(stored.Value.Id, FlowRunEventType.StepRunCompleted, name, JsonSerializer.SerializeToElement(new { transition }), token);
+        await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.StepRunCompleted, name, JsonSerializer.SerializeToElement(new { transition }), token);
         return updated;
     }
 
@@ -516,7 +995,7 @@ public sealed class FlowRunService(
             Logs = [.. step.Logs, $"{name} started."]
         } : step).ToArray();
         var updated = await SaveAsync(stored, stored.Value with { Steps = steps }, token);
-        await EmitAsync(stored.Value.Id, FlowRunEventType.StepRunStarted, name, null, token);
+        await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.StepRunStarted, name, null, token);
         return updated;
     }
 
@@ -539,32 +1018,57 @@ public sealed class FlowRunService(
             Logs = [.. step.Logs, .. execution.Logs, "Agent completed."]
         } : step).ToArray();
         var updated = await SaveAsync(stored, stored.Value with { Steps = steps }, token);
-        await EmitAsync(stored.Value.Id, FlowRunEventType.StepRunCompleted, stepName, JsonSerializer.SerializeToElement(new { selectedTransition }), token);
+        await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.StepRunCompleted, stepName, JsonSerializer.SerializeToElement(new { selectedTransition }), token);
         return updated;
     }
 
-    private async Task FailAsync(string runId, FlowRunStatus status, string code, string message, CancellationToken token, string? details = null)
+    private async Task FailAsync(WorkspaceId workspaceId, string runId, FlowRunStatus status, string code, string message, CancellationToken token, string? details = null)
     {
-        var stored = await RequiredAsync(runId, token);
+        var stored = await RequiredAsync(workspaceId, runId, token);
         if (stored.Value.Status.IsTerminal()) return;
         var now = timeProvider.GetUtcNow();
         var error = new FlowRunError(code, message, details);
         var steps = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.Running
             ? step with { Status = status == FlowRunStatus.Cancelled ? FlowStepRunStatus.Cancelled : FlowStepRunStatus.Failed, CompletedAt = now, Error = error }
             : step).ToArray();
-        await SaveAsync(stored, stored.Value with { Status = status, CompletedAt = now, Error = error, Steps = steps }, token);
-        if (status == FlowRunStatus.Failed)
+        await SaveAsync(stored, stored.Value with
+        {
+            Status = status,
+            CompletedAt = now,
+            Error = error,
+            Steps = steps,
+            ExecutionLeaseId = null,
+            ExecutionLeaseExpiresAt = null
+        }, token);
+        if (status is FlowRunStatus.Failed or FlowRunStatus.TimedOut)
             RunsFailed.Add(1, new KeyValuePair<string, object?>("flow.definition.state", stored.Value.DefinitionState.ToString()));
         RunDuration.Record(Math.Max(0, (now - stored.Value.CreatedAt).TotalSeconds), new KeyValuePair<string, object?>("flow.status", status.ToString()));
-        await EmitAsync(runId, status == FlowRunStatus.Cancelled ? FlowRunEventType.FlowRunCancelled : FlowRunEventType.FlowRunFailed,
+        var eventType = status switch
+        {
+            FlowRunStatus.Cancelled => FlowRunEventType.FlowRunCancelled,
+            FlowRunStatus.TimedOut => FlowRunEventType.FlowRunTimedOut,
+            _ => FlowRunEventType.FlowRunFailed
+        };
+        await EmitAsync(workspaceId, runId, eventType,
             steps.FirstOrDefault(step => step.Status == FlowStepRunStatus.Failed)?.StepName, JsonSerializer.SerializeToElement(error), token);
     }
 
-    private Task<StoredFlowRun> SaveAsync(StoredFlowRun stored, FlowRun value, CancellationToken token) => repository.UpdateRunAsync(value, stored.ETag, token);
-    private async Task<StoredFlowRun> RequiredAsync(string id, CancellationToken token) => await repository.GetRunAsync(id, token) ?? throw new FlowRunNotFoundException(id);
-    private async Task EmitAsync(string runId, FlowRunEventType type, string? stepId, JsonElement? payload, CancellationToken token)
+    private async Task ExpireInputAsync(StoredFlowRun run, StoredInputRequest input, DateTimeOffset now, CancellationToken token)
     {
-        var runEvent = await repository.AppendRunEventAsync(new FlowRunEvent(runId, 0, type, stepId, payload?.Clone(), timeProvider.GetUtcNow()), token);
+        await repository.UpdateInputRequestAsync(input.Value with { Status = InputRequestStatus.Expired }, input.ETag, token);
+        await EmitAsync(run.Value.WorkspaceId, run.Value.Id, FlowRunEventType.InputExpired, input.Value.Source,
+            JsonSerializer.SerializeToElement(new { input.Value.Id, input.Value.ExpiresAt }), token);
+        await FailAsync(run.Value.WorkspaceId, run.Value.Id, FlowRunStatus.TimedOut, "input_request_timed_out", "The Flow Run timed out while waiting for external input.", token);
+    }
+
+    private Task<StoredFlowRun> SaveAsync(StoredFlowRun stored, FlowRun value, CancellationToken token) => repository.UpdateRunAsync(value, stored.ETag, token);
+    private async Task<StoredFlowRun> RequiredAsync(WorkspaceId workspaceId, string id, CancellationToken token) => await repository.GetRunAsync(workspaceId, id, token) ?? throw new FlowRunNotFoundException(id);
+    private async Task<StoredFlowRun> RequiredAsync(string id, FlowRunScope scope, CancellationToken token) =>
+        await GetAsync(id, scope, token) ?? throw new FlowRunNotFoundException(id);
+    private static bool HasScope(FlowRun run, FlowRunScope scope) => run.Scope == scope;
+    private async Task EmitAsync(WorkspaceId workspaceId, string runId, FlowRunEventType type, string? stepId, JsonElement? payload, CancellationToken token)
+    {
+        var runEvent = await repository.AppendRunEventAsync(new FlowRunEvent(workspaceId, runId, 0, type, stepId, payload?.Clone(), timeProvider.GetUtcNow()), token);
         await eventSink.PublishAsync(runEvent, token);
     }
 }

@@ -62,8 +62,10 @@
                     }
                 }
                 <EnvironmentSwitcher />
-                <button class="icon-button" @onclick="Preferences.ToggleTheme" aria-label="Toggle color theme">@(Preferences.IsDarkTheme ? "☀" : "◐")</button>
+                <button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="Toggle color theme" title="@(Preferences.Error ?? $"Theme: {Preferences.Theme}")"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button>
                 <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="Notifications"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
+                <a class="icon-button" href="/account/security" aria-label="Account security" title="Account security"><UiIcon Name="shield-check" /></a>
+                <a class="icon-button" href="/logout" aria-label="Sign out" title="Sign out"><UiIcon Name="log-out" /></a>
             </div>
         </header>
         <main class="content" id="main-content">@Body</main>
@@ -123,9 +125,10 @@
     [
         new("", [new("Overview", "/", "⌂")]),
         new("Build", [new("Agents", "/agents", "◎", "agent"), new("Model profiles", "/modelprofiles", "◇", "model"), new("Flows", "/flows", "⌘", "flow"), new("Entries", "/entries", "↳", "work")]),
-        new("Operate", [new("Runtimes", "/runtime", "◉", "runtime"), new("Executions", "/executions", "▶", "execution"), new("Flow runs", "/flowruns", "▷", "flow"), new("Tasks", "/tasks", "✓", "work"), new("Events", "/events", "≋")]),
-        new("Configure", [new("Workplace setup", "/workspaces", "▦", "work"), new("Tools", "/tools", "⌁", "tool"), new("Model providers", "/modelproviders", "⬡", "model"), new("Runtime profiles", "/runtimeprofiles", "◈", "runtime")]),
-        new("System", [new("Organization", "/settings/organization", "♙"), new("Settings", "/settings", "⚙")])
+        new("Operate", [new("Triggers", "/triggers", "◷", "work"), new("Deployments", "/deployments", "◉", "runtime"), new("Tasks", "/tasks", "✓", "work")]),
+        new("Runs", [new("Agents Run", "/agent-runs", "▶", "execution"), new("Flow Run", "/flow-runs", "▷", "flow"), new("Run events", "/run-events", "≋")]),
+        new("Configure", [new("Workplace setup", "/workspaces", "▦", "work"), new("Packs", "/packs", "▣"), new("Tools", "/tools", "⌁", "tool"), new("Model providers", "/modelproviders", "⬡", "model"), new("Runtime profiles", "/runtimeprofiles", "◈", "runtime"), new("Secrets", "/secrets", "◆")]),
+        new("System", [new("Extensions", "/extensions", "⬢"), new("Organization", "/settings/organization", "♙"), new("Profile", "/settings/profile", "○"), new("Settings", "/settings", "⚙")])
     ];
 
     private static readonly CommandItem[] Commands =
@@ -139,19 +142,27 @@
         new("Create flow", "/flows/new", "+", "Command", "new workflow"),
         new("Entries", "/entries", "↳", "Build", "workplace entry"),
         new("Create entry", "/entries/new", "+", "Command", "new workplace entry"),
-        new("Runtimes", "/runtime", "◉", "Operate", "runtime"),
-        new("Executions", "/executions", "▶", "Operate", "runs history"),
-        new("Flow runs", "/flowruns", "▷", "Operate", "workflow executions"),
+        new("Deployments", "/deployments", "◉", "Operate", "agent runtime deployments"),
+        new("Agents Run", "/agent-runs", "▶", "Runs", "agent execution history"),
+        new("Flow runs", "/flow-runs", "▷", "Runs", "workflow executions"),
         new("Tasks", "/tasks", "✓", "Operate", "work tasks supervision"),
-        new("Events", "/events", "≋", "Operate", "activity notifications"),
+        new("Triggers", "/triggers", "◷", "Operate", "schedule automation"),
+        new("Run events", "/run-events", "≋", "Runs", "persisted runtime flow activity"),
         new("Model providers", "/modelproviders", "⬡", "Configure", "providers"),
         new("Tools", "/tools", "⌁", "Configure", "tool catalog providers MCP AEP"),
         new("Create tool provider", "/tools/providers/new", "+", "Command", "new MCP AEP provider"),
         new("Workplace setup", "/workspaces", "▦", "Configure", "workspace composition primary entries"),
+        new("Packs", "/packs", "▣", "Configure", "package distribution install archive resources"),
         new("Create model provider", "/modelproviders/new", "+", "Command", "new provider"),
         new("Runtime profiles", "/runtimeprofiles", "◈", "Configure", "runtime configuration"),
         new("Create runtime profile", "/runtimeprofiles/new", "+", "Command", "new runtime profile"),
+        new("Secrets", "/secrets", "◆", "Configure", "credentials Vaults write only"),
+        new("Create Secret", "/secrets/new", "+", "Command", "new credential"),
+        new("Vaults", "/vaults", "▰", "Configure", "secret storage providers"),
+        new("Create Vault", "/vaults/new", "+", "Command", "new secret storage"),
         new("Settings", "/settings", "⚙", "System", "configuration"),
+        new("Profile settings", "/settings/profile", "○", "System", "appearance theme personal preferences"),
+        new("Extensions", "/extensions", "⬢", "System", "AEP option contracts compatibility"),
         new("Organization", "/settings/organization", "♙", "System", "tenant organization"),
         new("Organization workspaces", "/settings/organization/workspaces", "▦", "System", "tenant workspaces"),
         new("Organization members", "/settings/organization/members", "♙", "System", "users memberships roles")
@@ -159,6 +170,7 @@
 
     private IJSObjectReference? commandModule;
     private IJSObjectReference? contextModule;
+    private IJSObjectReference? themeModule;
     private IJSObjectReference? commandRegistration;
     private DotNetObjectReference<MainLayout>? selfReference;
     private ElementReference commandInput;
@@ -203,7 +215,9 @@
         PlatformStatus.Changed += StateHasChanged;
         ContextState.Changed += OnContextChanged;
         NavigationManager.LocationChanged += OnLocationChanged;
-        await ContextState.LoadAsync(lifetimeCancellation.Token);
+        await Task.WhenAll(
+            ContextState.LoadAsync(lifetimeCancellation.Token),
+            Preferences.LoadAsync(lifetimeCancellation.Token));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -212,6 +226,8 @@
         {
             commandModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/command-palette.js");
             contextModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/context-selector.js");
+            themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/theme-preferences.js");
+            Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
             selfReference = DotNetObjectReference.Create(this);
             commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", selfReference);
         }
@@ -297,6 +313,7 @@
     }
 
     private bool switchingWorkspace;
+    private Task ToggleThemeAsync() => Preferences.ToggleThemeAsync(lifetimeCancellation.Token);
     private async Task SelectWorkspaceAsync(ChangeEventArgs args)
     {
         if (contextModule is null || !Guid.TryParse(args.Value?.ToString(), out var workspaceId) || workspaceId == ContextState.Current?.WorkspaceId) return;
@@ -337,6 +354,7 @@
             }
             if (commandModule is not null) await commandModule.DisposeAsync();
             if (contextModule is not null) await contextModule.DisposeAsync();
+            if (themeModule is not null) await themeModule.DisposeAsync();
         }
         catch (JSDisconnectedException) { }
         selfReference?.Dispose();

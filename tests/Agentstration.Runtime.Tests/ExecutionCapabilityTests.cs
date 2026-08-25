@@ -33,17 +33,16 @@ public sealed class ExecutionCapabilityTests
             Capabilities(CapabilitySupport.Unsupported, new HashSet<string>()) with { Streaming = new() });
 
         var exception = Assert.ThrowsExactly<ExecutionCompatibilityException>(() => ExecutionCompatibilityValidator.Validate(
-            profile,
+            profile.Reasoning,
+            profile.Output,
             new ModelExecutionOptions(Streaming: RuntimeStreamingMode.Enabled),
             capabilities,
             "ollama",
             "qwen3:8b",
-            "microsoft-agent-framework",
-            endpointMode: "generate"));
+            "microsoft-agent-framework"));
 
         Assert.IsTrue(exception.Issues.Any(issue => issue.Capability == "reasoning"));
         Assert.IsTrue(exception.Issues.Any(issue => issue.Capability == "streaming"));
-        Assert.IsTrue(exception.Issues.Any(issue => issue.Capability == "endpointMode"));
         Assert.IsTrue(exception.Issues.All(issue => issue.Provider == "ollama" && issue.Model == "qwen3:8b"));
     }
 

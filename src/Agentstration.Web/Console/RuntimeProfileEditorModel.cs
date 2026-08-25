@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
@@ -10,6 +11,7 @@ public sealed class RuntimeProfileEditorModel
     private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
     [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
     public string Name { get; set; } = string.Empty;
+    [Required] public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
     [Required] public string DisplayName { get; set; } = string.Empty;
     [Required] public string RuntimeType { get; set; } = "microsoft-agent-framework";
     public RuntimeSessionMode SessionMode { get; set; } = RuntimeSessionMode.Transient;
@@ -17,7 +19,7 @@ public sealed class RuntimeProfileEditorModel
     public StreamingMode Streaming { get; set; } = StreamingMode.Automatic;
     public string? RuntimeOptionsJson { get; set; }
 
-    public CreateRuntimeProfileRequest ToCreateRequest() => new(Name.Trim(), ToProperties());
+    public CreateRuntimeProfileRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value);
     public PutRuntimeProfileRequest ToPutRequest() => new(ToProperties());
     public RuntimeProfileProperties ToProperties() => new()
     {
@@ -30,6 +32,7 @@ public sealed class RuntimeProfileEditorModel
     public static RuntimeProfileEditorModel FromResource(RuntimeProfileResource resource) => new()
     {
         Name = resource.Name,
+        Namespace = resource.Namespace.Value,
         DisplayName = resource.Definition.DisplayName,
         RuntimeType = resource.Definition.RuntimeType,
         SessionMode = resource.Definition.Execution.SessionMode,

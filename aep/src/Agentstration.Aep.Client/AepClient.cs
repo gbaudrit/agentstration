@@ -11,6 +11,8 @@ public interface IAepClient
     Task<AepManifest> GetManifestAsync(CancellationToken cancellationToken = default);
     Task<AepHealth> GetHealthAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<string, AepCapabilityDescriptor>> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+    Task<AepConfigurationCatalog> GetConfigurationAsync(CancellationToken cancellationToken = default);
+    Task<AepOptionMigrationResponse> MigrateOptionsAsync(AepOptionMigrationRequest request, CancellationToken cancellationToken = default);
 }
 
 public interface IAepModelProvidersClient
@@ -40,6 +42,27 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
 
     public async Task<IReadOnlyDictionary<string, AepCapabilityDescriptor>> GetCapabilitiesAsync(CancellationToken cancellationToken = default) =>
         (await DiscoverAsync(cancellationToken)).Capabilities;
+
+    public async Task<AepConfigurationCatalog> GetConfigurationAsync(CancellationToken cancellationToken = default)
+    {
+        var manifest = await DiscoverAsync(cancellationToken);
+        if (!manifest.Capabilities.TryGetValue(AepCapabilityNames.Configuration, out var capability))
+            return new AepConfigurationCatalog([]);
+        var endpoint = string.IsNullOrWhiteSpace(capability.Endpoint) ? AepProtocol.ConfigurationPath : capability.Endpoint;
+        using var response = await SendAsync(HttpMethod.Get, endpoint, null, cancellationToken);
+        return await ReadAsync<AepConfigurationCatalog>(response, cancellationToken);
+    }
+
+    public async Task<AepOptionMigrationResponse> MigrateOptionsAsync(
+        AepOptionMigrationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var manifest = await DiscoverAsync(cancellationToken);
+        if (!manifest.Capabilities.ContainsKey(AepCapabilityNames.Configuration))
+            throw new AepProtocolException("configuration_unsupported", "The extension does not publish configuration contracts.");
+        using var response = await SendAsync(HttpMethod.Post, AepProtocol.ConfigurationMigrationPath, request, cancellationToken);
+        return await ReadAsync<AepOptionMigrationResponse>(response, cancellationToken);
+    }
 
     public async Task<IReadOnlyList<AepModelProviderDescriptor>> ListModelProvidersAsync(CancellationToken cancellationToken = default)
     {
@@ -87,17 +110,19 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
         catch (HttpRequestException exception) { throw new AepProtocolException("extension_unreachable", "The AEP extension is unreachable.", innerException: exception); }
         using (response)
         {
-        await EnsureSuccessAsync(response, cancellationToken);
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var reader = new StreamReader(stream);
-        while (await reader.ReadLineAsync(cancellationToken) is { } line)
-        {
-            if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
-            var data = line[5..].TrimStart();
-            if (data.Length == 0) continue;
-            yield return JsonSerializer.Deserialize<AepChatUpdate>(data, AepProtocol.JsonOptions)
-                ?? throw new AepProtocolException("invalid_response", "The extension returned an empty streaming update.");
-        }
+            await EnsureSuccessAsync(response, cancellationToken);
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var reader = new StreamReader(stream);
+            while (await reader.ReadLineAsync(cancellationToken) is { } line)
+            {
+                if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
+                var data = line[5..].TrimStart();
+                if (data.Length == 0) continue;
+                var update = JsonSerializer.Deserialize<AepChatUpdate>(data, AepProtocol.JsonOptions)
+                    ?? throw new AepProtocolException("invalid_response", "The extension returned an empty streaming update.");
+                yield return update;
+                if (update.FinishReason is not null) yield break;
+            }
         }
     }
 

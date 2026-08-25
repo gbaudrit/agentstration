@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Abstractions;
 
@@ -15,12 +16,239 @@ public static class ResourceKinds
     public const string AgentRevision = "AgentRevision";
     public const string AgentDeployment = "AgentDeployment";
     public const string Flow = "Flow";
+    public const string Entry = "Entry";
     public const string ManagementOperation = "ManagementOperation";
+    public const string InstalledPack = "InstalledPack";
+    public const string PackConfiguration = "PackConfiguration";
     public const string ModelProvider = "ModelProvider";
+    public const string ExtensionRegistration = "ExtensionRegistration";
     public const string ModelProfile = "ModelProfile";
     public const string RuntimeProfile = "RuntimeProfile";
+    public const string Secret = "Secret";
+    public const string Vault = "Vault";
     public const string Tool = "Tool";
     public const string ToolProvider = "ToolProvider";
+    public const string ToolExecutionHook = "ToolExecutionHook";
+    public const string Trigger = "Trigger";
+}
+
+public static class PackKinds
+{
+    public const string Pack = "Pack";
+}
+
+public static class PackProvenanceAnnotations
+{
+    public const string Publisher = "agentstration.io/pack.publisher";
+    public const string Name = "agentstration.io/pack.name";
+    public const string Version = "agentstration.io/pack.version";
+}
+
+public static class ResourceProvenanceAnnotations
+{
+    public const string BuiltIn = "agentstration.io/builtin";
+}
+
+public sealed record PackManifest
+{
+    public required string ApiVersion { get; init; }
+    public required string Kind { get; init; }
+    public PackMetadata Metadata { get; init; } = new();
+    public required PackDefinition Definition { get; init; }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<PackAudience>))]
+public enum PackAudience
+{
+    [JsonStringEnumMemberName("universal")] Universal,
+    [JsonStringEnumMemberName("personal")] Personal,
+    [JsonStringEnumMemberName("professional")] Professional
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<PackPurpose>))]
+public enum PackPurpose
+{
+    [JsonStringEnumMemberName("standard")] Standard,
+    [JsonStringEnumMemberName("sample")] Sample,
+    [JsonStringEnumMemberName("template")] Template
+}
+
+public sealed record PackMetadata
+{
+    public string Name { get; init; } = string.Empty;
+    public string Publisher { get; init; } = string.Empty;
+    public string Version { get; init; } = string.Empty;
+    public PackAudience Audience { get; init; } = PackAudience.Universal;
+    public PackPurpose Purpose { get; init; } = PackPurpose.Standard;
+    public string? DisplayName { get; init; }
+    public string? Description { get; init; }
+    public IReadOnlyList<string> Categories { get; init; } = [];
+    public IReadOnlyList<string> Tags { get; init; } = [];
+}
+
+public sealed record PackDefinition
+{
+    public IReadOnlyList<string> Resources { get; init; } = [];
+    public IReadOnlyList<PackRequirement> Requirements { get; init; } = [];
+    public IReadOnlyList<PackBindingRequirement> Bindings { get; init; } = [];
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<PackBindingTargetKind>))]
+public enum PackBindingTargetKind
+{
+    [JsonStringEnumMemberName("modelProfile")] ModelProfile,
+    [JsonStringEnumMemberName("modelProvider")] ModelProvider,
+    [JsonStringEnumMemberName("runtimeProfile")] RuntimeProfile,
+    [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
+    [JsonStringEnumMemberName("secret")] Secret
+}
+
+public sealed record PackBindingRequirement
+{
+    public required string Name { get; init; }
+    public required PackBindingTargetKind TargetKind { get; init; }
+    public string? DisplayName { get; init; }
+    public string? Description { get; init; }
+    public bool Required { get; init; } = true;
+}
+
+public sealed record PackBindingSelection(string Name, ResourceReference Target);
+
+public sealed record PackBuildInstallRequest(
+    bool ReplaceExisting = false,
+    IReadOnlyList<PackBindingSelection>? Bindings = null);
+
+public sealed record PackBindingResolution(
+    string Name,
+    PackBindingTargetKind TargetKind,
+    ResourceReference Target);
+
+public sealed record PackBindingUsage(string ResourceKind, string ResourceName, string Path);
+
+public sealed record PackBindingPreview(
+    string Name,
+    PackBindingTargetKind TargetKind,
+    string DisplayName,
+    string? Description,
+    bool Required,
+    IReadOnlyList<PackBindingUsage> UsedBy,
+    ResourceReference? Target,
+    bool TargetAvailable)
+{
+    public bool IsResolved => !Required || TargetAvailable;
+}
+
+public sealed record PackRequirement
+{
+    public string? Capability { get; init; }
+    public string? Pack { get; init; }
+    public string? Version { get; init; }
+}
+
+public readonly record struct PackIdentity(string Publisher, string Name)
+{
+    public string ResourceName => $"{Publisher.Length}-{Publisher}-{Name}";
+    public ResourceNamespace Namespace => new($"{Publisher}.{Name}");
+    public override string ToString() => $"{Publisher}/{Name}";
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<InstalledPackState>))]
+public enum InstalledPackState
+{
+    [JsonStringEnumMemberName("installing")] Installing,
+    [JsonStringEnumMemberName("installed")] Installed,
+    [JsonStringEnumMemberName("uninstalling")] Uninstalling,
+    [JsonStringEnumMemberName("failed")] Failed,
+    [JsonStringEnumMemberName("degraded")] Degraded
+}
+
+public sealed record ManagedPackResource
+{
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public required string Kind { get; init; }
+    public required string Name { get; init; }
+    public required string Path { get; init; }
+    public required string VersionToken { get; init; }
+}
+
+public sealed record InstalledPackProperties
+{
+    public required string Publisher { get; init; }
+    public required string PackName { get; init; }
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public required string Version { get; init; }
+    public PackAudience Audience { get; init; } = PackAudience.Universal;
+    public PackPurpose Purpose { get; init; } = PackPurpose.Standard;
+    public string? DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required string Source { get; init; }
+    public PackArtifactReference? SourceArtifact { get; init; }
+    public required DateTimeOffset InstalledAt { get; init; }
+    public InstalledPackState State { get; init; } = InstalledPackState.Installing;
+    public IReadOnlyList<PackBindingResolution> Bindings { get; init; } = [];
+    public IReadOnlyList<ManagedPackResource> ManagedResources { get; init; } = [];
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+public sealed record InstalledPackResource : Resource
+{
+    public InstalledPackProperties Definition { get; init; } = null!;
+}
+
+public sealed record PackConfigurationProperties
+{
+    public required string Publisher { get; init; }
+    public required string PackName { get; init; }
+    public IReadOnlyList<PackBindingResolution> Bindings { get; init; } = [];
+    public required DateTimeOffset UpdatedAt { get; init; }
+}
+
+public sealed record PackConfigurationResource : Resource
+{
+    public PackConfigurationProperties Definition { get; init; } = null!;
+}
+
+public sealed record PackResourceDocument(
+    string Path,
+    string ApiVersion,
+    string Kind,
+    string Name,
+    JsonElement Manifest);
+
+public sealed record PackArchive(
+    PackManifest Manifest,
+    IReadOnlyList<PackResourceDocument> Resources,
+    string Source,
+    ReadOnlyMemory<byte> Content = default);
+
+public sealed record PackResourcePreview(string Path, string Kind, string Name, bool AlreadyExists);
+
+public sealed record PackInstallationPreview(
+    PackMetadata Metadata,
+    IReadOnlyList<PackResourcePreview> Resources,
+    bool AlreadyInstalled)
+{
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public IReadOnlyList<PackBindingPreview> Bindings { get; init; } = [];
+    public bool CanInstall => !AlreadyInstalled && Resources.All(resource => !resource.AlreadyExists);
+    public bool RequiresConfiguration => Bindings.Any(binding => !binding.IsResolved);
+}
+
+public interface IPackArchiveReader
+{
+    Task<PackArchive> ReadAsync(Stream archive, string source, CancellationToken cancellationToken);
+}
+
+public interface IPackResourceHandler
+{
+    string Kind { get; }
+    int InstallOrder { get; }
+    Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken);
+    Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
+    Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, ResourceNamespace @namespace, string packVersion, CancellationToken cancellationToken);
+    Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
+    Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken);
 }
 
 public sealed record ToolTypeReference(string Extension, string Id);
@@ -89,6 +317,7 @@ public sealed record ToolResourceProperties
     public string? Description { get; init; }
     public ToolTypeReference? ToolType { get; init; }
     public bool Enabled { get; init; } = true;
+    public bool RequiresApproval { get; init; }
     public IReadOnlyDictionary<string, JsonElement> Metadata { get; init; } = new Dictionary<string, JsonElement>();
     public ResourceReference? Provider { get; init; }
     public string? ExternalId { get; init; }
@@ -99,6 +328,33 @@ public sealed record ToolResourceProperties
 public sealed record ToolResource : Resource
 {
     public ToolResourceProperties Definition { get; init; } = null!;
+}
+
+public static class ToolExecutionHookHandlers
+{
+    public const string Deny = "deny";
+}
+
+public sealed record ToolExecutionHookSelector
+{
+    public IReadOnlyList<string> Tools { get; init; } = [];
+    public IReadOnlyList<string> Providers { get; init; } = [];
+    public IReadOnlyList<string> Agents { get; init; } = [];
+}
+
+public sealed record ToolExecutionHookProperties
+{
+    public required string DisplayName { get; init; }
+    public bool Enabled { get; init; } = true;
+    public int Order { get; init; }
+    public required string Handler { get; init; }
+    public ToolExecutionHookSelector Selector { get; init; } = new();
+    public IReadOnlyDictionary<string, JsonElement> Configuration { get; init; } = new Dictionary<string, JsonElement>();
+}
+
+public sealed record ToolExecutionHookResource : Resource
+{
+    public ToolExecutionHookProperties Definition { get; init; } = null!;
 }
 
 public sealed record DiscoveredToolDescriptor(
@@ -122,21 +378,23 @@ public interface IToolProviderDiscovery
 
 public sealed record ResourceMetadata
 {
+    public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public string Name { get; init; } = string.Empty;
     public IReadOnlyDictionary<string, string> Tags { get; init; } = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, string> Annotations { get; init; } = new Dictionary<string, string>();
 }
 
-public readonly record struct ResourceKey(string Kind, string Name)
+public readonly record struct ResourceKey(string Kind, string Name, ResourceNamespace Namespace = default)
 {
-    public static ResourceKey Create(string kind, string name)
+    public static ResourceKey Create(string kind, string name, ResourceNamespace @namespace = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return new(kind, name);
+        return new(kind, name, @namespace);
     }
 
-    public override string ToString() => $"{Kind}/{Name}";
+    public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
+    public override string ToString() => Address.ToString();
 }
 
 public abstract record Resource
@@ -146,6 +404,10 @@ public abstract record Resource
     public string Kind { get; init; } = string.Empty;
     public ResourceMetadata Metadata { get; init; } = new();
     [JsonIgnore] public string Name => Metadata.Name;
+    [JsonIgnore]
+    public ResourceNamespace Namespace => Metadata.Namespace;
+    [JsonIgnore]
+    public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
     public Guid TenantId { get; init; }
     public Guid WorkspaceId { get; init; }
     public long Generation { get; init; }
@@ -180,10 +442,13 @@ public sealed record ResourceStatus
 
 public sealed record ResourceReference
 {
-    public ResourceReference(string name, string? workspaceRef = null) { Name = name; WorkspaceRef = workspaceRef; }
+    public ResourceReference(string name, string? workspaceRef = null, ResourceNamespace? @namespace = null) { Name = name; WorkspaceRef = workspaceRef; Namespace = @namespace; }
     public string Name { get; init; }
     public string? WorkspaceRef { get; init; }
     [JsonIgnore] public string ResourceId => Name;
+    public ResourceNamespace? Namespace { get; init; }
+    public ResourceAddress Resolve(ResourceNamespace ownerNamespace, string kind) =>
+        ResourceAddress.Create(Namespace ?? ownerNamespace, kind, Name);
 }
 
 public record AgentProperties
@@ -193,6 +458,7 @@ public record AgentProperties
     public string Handler { get; init; } = "prompt-agent";
     public required string Instructions { get; init; }
     public required ResourceReference ModelProfile { get; init; }
+    public ResourceReference RuntimeProfile { get; init; } = new("maf-builtin", @namespace: ResourceNamespace.Default);
     public IReadOnlyList<ResourceReference> Tools { get; init; } = [];
     public IReadOnlyList<string> Behaviors { get; init; } = [];
     public IReadOnlyList<string> Middleware { get; init; } = [];
@@ -209,6 +475,7 @@ public sealed record AgentDeploymentSpec
 {
     public required string Environment { get; init; }
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required AgentHostingMode HostingMode { get; init; }
 }
 
@@ -233,6 +500,7 @@ public enum AgentIdentityType { None, SystemAssigned, UserAssigned, External }
 
 public sealed record AgentRevision : Resource
 {
+    public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
     public required Guid AgentUid { get; init; }
     public required string AgentName { get; init; }
     public required long AgentVersion { get; init; }
@@ -251,7 +519,9 @@ public sealed record ResolvedAgentDefinition
     public required long AgentVersion { get; init; }
     public required string EffectiveInstructions { get; init; }
     public required string ModelProfileName { get; init; }
+    public ResourceNamespace? ModelProfileNamespace { get; init; }
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
     public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
     public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
@@ -262,11 +532,14 @@ public sealed record ResolvedAgentDefinition
 
 public sealed record AgentDeployment : Resource
 {
+    public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
     public required string RevisionName { get; init; }
     public string? AgentName { get; init; }
     public string? ModelProfileName { get; init; }
+    public ResourceNamespace? ModelProfileNamespace { get; init; }
     public required string Environment { get; init; }
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required AgentHostingMode HostingMode { get; init; }
     public required DesiredAgentState DesiredState { get; init; }
     public required ProvisioningState ProvisioningState { get; init; }
@@ -292,20 +565,68 @@ public sealed record ModelSelection
     public required string Name { get; init; }
 }
 
-public enum ModelProviderManagementMode { External, Aspire }
+[JsonConverter(typeof(JsonStringEnumConverter<ExtensionRegistrationSource>))]
+public enum ExtensionRegistrationSource
+{
+    [JsonStringEnumMemberName("manual")] Manual,
+    [JsonStringEnumMemberName("configuration")] Configuration,
+    [JsonStringEnumMemberName("aspire")] Aspire
+}
 
 public sealed record ModelProviderProperties
 {
     public required string DisplayName { get; init; }
-    public required string ProviderType { get; init; }
-    public required Uri Endpoint { get; init; }
-    public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public required ResourceReference Extension { get; init; }
+    public required string ContributionId { get; init; }
 }
 
 public sealed record ModelProviderResource : Resource
 {
     public ModelProviderProperties Definition { get; init; } = null!;
+}
+
+public sealed record ExtensionRegistrationProperties
+{
+    public required string DisplayName { get; init; }
+    public required Uri Endpoint { get; init; }
+    public bool Enabled { get; init; } = true;
+    public string? ExpectedExtensionId { get; init; }
+    public ExtensionRegistrationSource Source { get; init; } = ExtensionRegistrationSource.Manual;
+    public ResourceReference? Credential { get; init; }
+}
+
+public sealed record ExtensionRegistrationResource : Resource
+{
+    public ExtensionRegistrationProperties Definition { get; init; } = null!;
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<SecretType>))]
+public enum SecretType { [JsonStringEnumMemberName("opaque")] Opaque }
+
+public sealed record VaultProperties
+{
+    public required string DisplayName { get; init; }
+    public required string ProviderType { get; init; }
+    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+}
+
+public sealed record VaultResource : Resource
+{
+    public VaultProperties Definition { get; init; } = null!;
+}
+
+public sealed record SecretProperties
+{
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required ResourceReference Vault { get; init; }
+    public required string Key { get; init; }
+    public SecretType SecretType { get; init; } = SecretType.Opaque;
+}
+
+public sealed record SecretResource : Resource
+{
+    public SecretProperties Definition { get; init; } = null!;
 }
 
 public sealed record ModelGenerationOptions
@@ -336,6 +657,16 @@ public sealed record ModelOutputOptions
     public bool Strict { get; init; }
 }
 
+public sealed record VersionedExtensionOptions
+{
+    public string OptionSet { get; init; } = string.Empty;
+    public string Version { get; init; } = string.Empty;
+    public string SchemaDigest { get; init; } = string.Empty;
+    public JsonElement Values { get; init; }
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public IDictionary<string, JsonElement>? LegacyValues { get; init; }
+}
+
 public sealed record ModelProfileProperties
 {
     public required string DisplayName { get; init; }
@@ -345,7 +676,7 @@ public sealed record ModelProfileProperties
     public ModelGenerationOptions Generation { get; init; } = new();
     public ModelReasoningOptions Reasoning { get; init; } = new();
     public ModelOutputOptions Output { get; init; } = new();
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
 }
 
 public sealed record ModelProfileResource : Resource

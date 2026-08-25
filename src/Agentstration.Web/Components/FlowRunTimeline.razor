@@ -1,0 +1,166 @@
+@using System.Globalization
+@using System.Text
+
+<article class="panel flow-run-timeline">
+    <div class="flow-timeline-header">
+        <div><p class="eyebrow">Execution trace</p><h2>Execution timeline</h2></div>
+        <div class="flow-timeline-summary">
+            @if (IsLive) { <span class="flow-live-indicator"><span></span>Live</span> }
+            <span>@Events.Count event(s)</span>
+        </div>
+    </div>
+    <div class="flow-timeline-tabs" role="tablist" aria-label="Execution timeline views">
+        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Activity)" class="@(activeView == TimelineView.Activity ? "active" : null)" @onclick="() => activeView = TimelineView.Activity">Activity</button>
+        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Raw)" class="@(activeView == TimelineView.Raw ? "active" : null)" @onclick="() => activeView = TimelineView.Raw">Raw events</button>
+    </div>
+    @if (Events.Count == 0)
+    {
+        <div class="flow-timeline-empty">Waiting for execution events…</div>
+    }
+    else if (activeView == TimelineView.Activity)
+    {
+        <ol class="flow-timeline-list" aria-live="polite">
+            @foreach (var item in Activity)
+            {
+                <li class="flow-timeline-item @Tone(item.Type)">
+                    <time datetime="@item.Timestamp.ToString("O", CultureInfo.InvariantCulture)">@item.Timestamp.ToLocalTime().ToString("T", CultureInfo.CurrentCulture)</time>
+                    <span class="flow-timeline-node"></span>
+                    <div class="flow-timeline-content">
+                        <strong>@Title(item)</strong>
+                        @if (item.IsStream)
+                        {
+                            <pre class="flow-stream-output">@(string.IsNullOrEmpty(item.Text) ? "Waiting for output…" : item.Text)</pre>
+                            <small>@item.Count delta(s) · #@item.FirstSequence–@item.LastSequence</small>
+                        }
+                        else
+                        {
+                            @if (!string.IsNullOrWhiteSpace(item.Detail)) { <p>@item.Detail</p> }
+                            <small>#@item.FirstSequence · @item.Type</small>
+                        }
+                    </div>
+                </li>
+            }
+        </ol>
+    }
+    else
+    {
+        <div class="flow-raw-toolbar">
+            <label><span class="sr-only">Filter event type</span><select @bind="rawType"><option value="">All event types</option>@foreach (var type in Enum.GetNames<FlowRunEventType>()) { <option value="@type">@type</option> }</select></label>
+            <span>Showing @VisibleRawEvents.Count of @FilteredRawEvents.Count</span>
+        </div>
+        <ol class="flow-raw-events">
+            @foreach (var runEvent in VisibleRawEvents)
+            {
+                <li><time>@runEvent.Timestamp.ToLocalTime().ToString("T", CultureInfo.CurrentCulture)</time><strong>@(runEvent.StepId is null ? runEvent.Type : $"{runEvent.StepId} · {runEvent.Type}")</strong><code>#@runEvent.Sequence</code><span>@Payload(runEvent.Payload)</span></li>
+            }
+        </ol>
+        @if (VisibleRawEvents.Count < FilteredRawEvents.Count)
+        {
+            <button type="button" class="button-secondary flow-load-events" @onclick="LoadMoreRawEvents">Load 200 older events</button>
+        }
+    }
+</article>
+
+@code {
+    private const int RawPageSize = 200;
+    private TimelineView activeView;
+    private string rawType = string.Empty;
+    private int rawLimit = RawPageSize;
+
+    [Parameter] public IReadOnlyList<FlowRunEvent> Events { get; set; } = [];
+    [Parameter] public bool IsLive { get; set; }
+
+    private IReadOnlyList<TimelineItem> Activity => BuildActivity(Events);
+    private IReadOnlyList<FlowRunEvent> FilteredRawEvents => Events.Where(value => string.IsNullOrEmpty(rawType) || string.Equals(value.Type.ToString(), rawType, StringComparison.Ordinal)).OrderBy(value => value.Sequence).ToArray();
+    private IReadOnlyList<FlowRunEvent> VisibleRawEvents => FilteredRawEvents.TakeLast(rawLimit).ToArray();
+
+    private void LoadMoreRawEvents() => rawLimit += RawPageSize;
+
+    private static IReadOnlyList<TimelineItem> BuildActivity(IReadOnlyList<FlowRunEvent> events)
+    {
+        var activity = new List<TimelineItem>();
+        foreach (var runEvent in events.OrderBy(value => value.Sequence))
+        {
+            if (runEvent.Type == FlowRunEventType.StepOutputDelta)
+            {
+                var text = DeltaText(runEvent.Payload);
+                if (activity.LastOrDefault() is { IsStream: true } current && string.Equals(current.StepId, runEvent.StepId, StringComparison.Ordinal)) current.Append(text, runEvent.Sequence);
+                else activity.Add(TimelineItem.Stream(runEvent, text));
+                continue;
+            }
+            activity.Add(TimelineItem.Event(runEvent, Payload(runEvent.Payload)));
+        }
+        return activity;
+    }
+
+    private static string Title(TimelineItem item) => item.IsStream ? $"{item.StepId ?? "Step"} · Streaming output" : item.Type switch
+    {
+        FlowRunEventType.FlowRunCreated => "Flow run created",
+        FlowRunEventType.FlowRunStarted => "Flow run started",
+        FlowRunEventType.FlowRunResumed => "Flow run resumed",
+        FlowRunEventType.InputRequested => "Response requested",
+        FlowRunEventType.InputReceived => "Response received",
+        FlowRunEventType.InputExpired => "Response request expired",
+        FlowRunEventType.StepRunStarted => $"{item.StepId ?? "Step"} started",
+        FlowRunEventType.ParticipantTurnStarted => $"{item.StepId ?? "Participant"} started a turn",
+        FlowRunEventType.ParticipantTurnCompleted => $"{item.StepId ?? "Participant"} completed a turn",
+        FlowRunEventType.StepRunCompleted => $"{item.StepId ?? "Step"} completed",
+        FlowRunEventType.StepRunFailed => $"{item.StepId ?? "Step"} failed",
+        FlowRunEventType.FlowRunCompleted => "Flow run completed",
+        FlowRunEventType.FlowRunFailed => "Flow run failed",
+        FlowRunEventType.FlowRunCancelled => "Flow run cancelled",
+        FlowRunEventType.FlowRunTimedOut => "Flow run timed out",
+        _ => item.Type.ToString()
+    };
+
+    private static string Tone(FlowRunEventType type) => type switch
+    {
+        FlowRunEventType.FlowRunCompleted or FlowRunEventType.StepRunCompleted => "flow-timeline-success",
+        FlowRunEventType.FlowRunFailed or FlowRunEventType.StepRunFailed => "flow-timeline-danger",
+        FlowRunEventType.FlowRunCancelled or FlowRunEventType.FlowRunTimedOut or FlowRunEventType.InputExpired => "flow-timeline-warning",
+        FlowRunEventType.FlowRunStarted or FlowRunEventType.FlowRunResumed or FlowRunEventType.InputRequested or FlowRunEventType.InputReceived or FlowRunEventType.StepRunStarted or FlowRunEventType.ParticipantTurnStarted or FlowRunEventType.StepOutputDelta => "flow-timeline-info",
+        _ => string.Empty
+    };
+
+    private static string DeltaText(JsonElement? payload)
+    {
+        if (payload is null) return string.Empty;
+        var value = payload.Value;
+        if (value.ValueKind == JsonValueKind.String) return value.GetString() ?? string.Empty;
+        if (value.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in value.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.String && property.Name is "delta" or "text" or "content" or "value") return property.Value.GetString() ?? string.Empty;
+            }
+        }
+        return Payload(payload);
+    }
+
+    private static string Payload(JsonElement? payload)
+    {
+        if (payload is null) return string.Empty;
+        var value = payload.Value;
+        return value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : value.GetRawText();
+    }
+
+    private enum TimelineView { Activity, Raw }
+
+    private sealed class TimelineItem
+    {
+        private readonly StringBuilder text = new();
+        private TimelineItem(FlowRunEvent runEvent, bool isStream, string initialText) { Type = runEvent.Type; StepId = runEvent.StepId; Timestamp = runEvent.Timestamp; FirstSequence = runEvent.Sequence; LastSequence = runEvent.Sequence; IsStream = isStream; text.Append(initialText); Detail = isStream ? string.Empty : initialText; }
+        public FlowRunEventType Type { get; }
+        public string? StepId { get; }
+        public DateTimeOffset Timestamp { get; }
+        public long FirstSequence { get; }
+        public long LastSequence { get; private set; }
+        public bool IsStream { get; }
+        public string Text => text.ToString();
+        public string Detail { get; }
+        public int Count { get; private set; } = 1;
+        public static TimelineItem Stream(FlowRunEvent runEvent, string text) => new(runEvent, true, text);
+        public static TimelineItem Event(FlowRunEvent runEvent, string detail) => new(runEvent, false, detail);
+        public void Append(string value, long sequence) { text.Append(value); LastSequence = sequence; Count++; }
+    }
+}

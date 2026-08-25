@@ -1,0 +1,35 @@
+apiVersion: agentstration.io/v1
+kind: Pack
+metadata:
+  name: who-am-i
+  publisher: agentstration
+  version: 0.1.0
+  audience: personal
+  purpose: sample
+  displayName: Who Am I?
+  description: Installs the resource skeleton for a conversational multi-agent guessing game.
+  categories:
+    - games
+    - samples
+  tags:
+    - conversation
+    - multi-agent
+    - human-in-the-loop
+definition:
+  bindings:
+    - name: conversational-model
+      targetKind: modelProfile
+      displayName: Conversational model
+      description: Model profile used by the three game agents.
+      required: true
+    - name: local-runtime
+      targetKind: runtimeProfile
+      displayName: Local runtime
+      description: Runtime profile used to execute the game agents locally.
+      required: true
+  resources:
+    - agents/who-am-i-secret.yaml
+    - agents/who-am-i-ai-player.yaml
+    - agents/who-am-i-judge.yaml
+    - flows/who-am-i-game.yaml
+    - entries/who-am-i.yaml

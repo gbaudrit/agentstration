@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
 using Agentstration.Management.Contracts;
+using Agentstration.Management.Core;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Api.Management;
 
@@ -20,7 +21,13 @@ internal sealed class CreateAgentRevisionEndpoint : IManagementEndpoint
             ManagementHttp.RequireApiVersion(request);
             var stored = await service.CreateRevisionAsync(
                 name,
-                new AgentDeploymentSpec { Environment = body.Environment, RuntimeProfileName = body.RuntimeProfileName, HostingMode = body.HostingMode },
+                new AgentDeploymentSpec
+                {
+                    Environment = body.Environment,
+                    RuntimeProfileName = body.RuntimeProfileName,
+                    RuntimeProfileNamespace = ResourceNamespace.Parse(body.RuntimeProfileNamespace),
+                    HostingMode = body.HostingMode
+                },
                 cancellationToken);
             return ManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);
         });

@@ -1,39 +1,59 @@
-using Agentstration.Application.Ingestion;
-using Agentstration.Application.Missions;
-using Agentstration.Application.Workflows;
-using Agentstration.Management.Core;
-using Agentstration.Management.Abstractions;
-using Agentstration.ModelProviders;
-using Agentstration.Runtime.Core;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
+using Agentstration.Infrastructure.Flows;
+using Agentstration.Management.Abstractions;
+using Agentstration.Management.Core;
+using Agentstration.ModelProviders;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.Core;
+using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Web;
 using Agentstration.Web.Components;
 using Agentstration.Web.Configuration;
-using Agentstration.Web.Hosting;
-using ModelContextProtocol.AspNetCore;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Logs;
-using OpenTelemetry.Trace;
-using Agentstration.Runtime.AgentFramework;
 using Agentstration.Web.Features.Flows;
 using Agentstration.Web.Features.Workplace;
+using Agentstration.Web.Hosting;
 using Agentstration.Work;
+using ModelContextProtocol.AspNetCore;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton(builder.Configuration.GetSection("Agentstration:Bootstrap").Get<LocalBootstrapOptions>() ?? new LocalBootstrapOptions());
+var bootstrapOptions = builder.Configuration.GetSection("Agentstration:Bootstrap").Get<LocalBootstrapOptions>() ?? new LocalBootstrapOptions();
+var configuredAuthentication = builder.Configuration.GetSection("Agentstration:Authentication").Get<Agentstration.Web.Configuration.AuthenticationOptions>() ?? new();
+if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
+{
+    bootstrapOptions.ExternalIdentityIssuer = configuredAuthentication.DevelopmentIssuer;
+    bootstrapOptions.ExternalIdentitySubject = configuredAuthentication.DevelopmentSubject;
+    bootstrapOptions.PrincipalDisplayName = configuredAuthentication.DevelopmentDisplayName;
+}
+builder.Services.AddSingleton(bootstrapOptions);
 var genAiObservability = builder.Configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new();
 genAiObservability.Validate(builder.Environment.IsDevelopment());
-var dataPath = builder.Configuration["Data:Path"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "data.json");
+var toolExecutionCapture = builder.Configuration.GetSection("Agentstration:ToolExecution").Get<ToolExecutionCaptureOptions>() ?? new();
+toolExecutionCapture.Validate();
+builder.Services.AddSingleton(toolExecutionCapture);
+var dataDirectory = builder.Configuration["Data:Directory"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration");
+Directory.CreateDirectory(dataDirectory);
+var identityConnectionString = builder.Configuration.GetConnectionString("Identity")
+    ?? (builder.Environment.IsEnvironment("Testing")
+        ? $"Data Source={Path.Combine(Path.GetTempPath(), $"agentstration-identity-tests-{Guid.NewGuid():N}.db")}"
+        : $"Data Source={Path.Combine(dataDirectory, "identity.db")}");
+var dataProtectionKeysPath = configuredAuthentication.DataProtectionKeysPath;
+if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    dataProtectionKeysPath = builder.Environment.IsEnvironment("Testing")
+        ? Path.Combine(Path.GetTempPath(), $"agentstration-data-protection-tests-{Guid.NewGuid():N}")
+        : Path.Combine(dataDirectory, "data-protection-keys");
+}
 var aiProvider = builder.Configuration["AI:Provider"] ?? "Managed";
-var useManagedProfileResolver = string.Equals(aiProvider, "Managed", StringComparison.OrdinalIgnoreCase)
-    || string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase);
-var defaultAiEndpoint = string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase)
-    ? "http://localhost:11434"
-    : "http://localhost:11434/v1/";
+var useManagedProfileResolver = string.Equals(aiProvider, "Managed", StringComparison.OrdinalIgnoreCase);
+const string defaultAiEndpoint = "http://localhost:11434/v1/";
 var aiEndpoint = builder.Configuration["AI:Endpoint"] ?? defaultAiEndpoint;
 if (!Uri.TryCreate(aiEndpoint.EndsWith('/') ? aiEndpoint : aiEndpoint + '/', UriKind.Absolute, out var parsedAiEndpoint)) throw new InvalidOperationException("AI:Endpoint must be an absolute URL.");
 var aiOptions = new AiProviderOptions(aiProvider, parsedAiEndpoint, builder.Configuration["AI:Model"] ?? "phi4-mini", builder.Configuration["AI:ApiKey"]);
@@ -57,25 +77,34 @@ var runtimePath = builder.Environment.IsEnvironment("Testing")
     : builder.Configuration["Data:RuntimePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "runtime-plane.db");
 var runtimeDirectory = Path.GetDirectoryName(runtimePath);
 if (!string.IsNullOrWhiteSpace(runtimeDirectory)) Directory.CreateDirectory(runtimeDirectory);
-builder.Services.AddAgentstration(dataPath, builder.Environment.IsEnvironment("Testing"), aiOptions, $"Data Source={controlPlanePath}", $"Data Source={workPlanePath}", $"Data Source={flowPath}", $"Data Source={runtimePath}");
+builder.Services.AddAgentstration(dataDirectory, aiOptions, $"Data Source={controlPlanePath}", $"Data Source={workPlanePath}", $"Data Source={flowPath}", $"Data Source={runtimePath}");
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
 builder.Services.AddAgentstrationModelManagement();
+builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
+builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSignalR();
-builder.Services.AddSingleton<IFlowRunEventSink, SignalRFlowRunEventSink>();
+builder.Services.AddAgentstrationLocalIdentity(identityConnectionString, dataProtectionKeysPath);
+builder.Services.AddSingleton<SignalRFlowRunEventSink>();
+builder.Services.AddSingleton<WorkplaceFlowConversationProjectionSink>();
+builder.Services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRunEventSink(
+[
+    provider.GetRequiredService<WorkplaceFlowConversationProjectionSink>(),
+    provider.GetRequiredService<SignalRFlowRunEventSink>()
+]));
 builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>();
-builder.Services.AddAgentstrationWebConsole(builder.Configuration);
+builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);
 builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
-builder.Services.AddHostedService<ItemProcessingWorker>();
-builder.Services.AddHostedService<MissionSchedulerWorker>();
 builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
 builder.Services.AddHostedService<LocalWorkExecutionWorker>();
 builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
 builder.Services.AddHostedService<FlowRunExecutionWorker>();
+builder.Services.AddHostedService<FlowRunRecoveryWorker>();
 
 var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 builder.Logging.AddOpenTelemetry(logging =>
@@ -93,9 +122,6 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddSource(
-                IngestionService.ActivitySource.Name,
-                ContentProcessingWorkflow.ActivitySource.Name,
-                MissionService.ActivitySource.Name,
                 WorkItemService.ActivitySource.Name,
                 RuntimeRunService.ActivitySource.Name,
                 FlowRunService.ActivitySource.Name,
@@ -126,13 +152,16 @@ if (genAiObservability.HttpPayloadCapture.Enabled)
 }
 app.UseExceptionHandler();
 app.UseStatusCodePages();
-app.UseMiddleware<RequestContextMiddleware>();
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapOpenApi();
 app.UseAuthentication();
+app.UseMiddleware<PrincipalResolutionMiddleware>();
+app.UseMiddleware<RequestContextMiddleware>();
+app.UseMiddleware<StandardManagementDataMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
-app.MapAgentstrationApi();
+app.MapAgentstrationAuthentication();
+app.MapAgentstrationLocalAccountAdministration();
 app.MapAgentstrationIdentityApi();
 app.MapAgentstrationManagementApi();
 app.MapAgentstrationModelManagementApi();
@@ -141,22 +170,33 @@ app.MapAgentstrationWorkplaceApi();
 app.MapAgentstrationWorkOperationsApi();
 app.MapAgentstrationFlowApi();
 app.MapAgentstrationRuntimeApi();
-app.MapHub<FlowRunHub>("/hubs/flow-runs");
+app.MapAgentstrationToolGovernanceAuditApi();
+app.MapHub<FlowRunHub>("/hubs/flow-runs").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
 app.MapHub<WorkplaceHub>("/hubs/workplace");
 if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();
 app.MapMcp("/mcp");
 app.MapStaticAssets();
-app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode();
+app.MapRazorPages();
+app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode()
+    .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
 await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
+await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
+if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase)
+    || string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Oidc, StringComparison.OrdinalIgnoreCase))
+    await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
 await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
-await WorkplaceDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
-await DemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+if (app.Services.GetRequiredService<ICurrentRequestContext>().IsInitialized)
+{
+    await app.Services.GetRequiredService<StandardRuntimeProfileSeeder>().EnsureAsync(app.Lifetime.ApplicationStopping);
+    await ManagementDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+    if (!app.Environment.IsEnvironment("Testing"))
+        await InteractiveFlowDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+    await WorkplaceDemoData.SeedAsync(app.Services, app.Lifetime.ApplicationStopping);
+}
 await app.RunAsync();
 
 public partial class Program;

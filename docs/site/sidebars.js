@@ -23,6 +23,7 @@ const sidebars = {
         'concepts/management-plane',
         'concepts/runtime-plane',
         'concepts/resources',
+        'concepts/packs',
         'concepts/resource-identifiers',
         'concepts/tenants',
         'concepts/workspaces',
@@ -32,6 +33,7 @@ const sidebars = {
         'concepts/model-providers',
         'concepts/model-profiles',
         'concepts/flows',
+        'concepts/flow-modes',
         'concepts/interactions',
         'concepts/work-tasks',
         'concepts/flow-runs',
@@ -62,8 +64,11 @@ const sidebars = {
         'reference/versioning',
         'reference/api/overview',
         'reference/resources/overview',
+        'reference/packs',
         'reference/resources/agents',
+        'reference/secrets-and-vaults',
         'reference/configuration',
+        'reference/identity-and-authorization',
         'reference/current-capabilities',
       ],
     },
@@ -75,8 +80,19 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Releases',
+      items: [
+        'releases/0.1.0-alpha.1',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Contributing',
-      items: ['contributing/overview', 'contributing/documentation'],
+      items: [
+        'contributing/overview',
+        'contributing/documentation',
+        'contributing/github-governance',
+      ],
     },
   ],
 };

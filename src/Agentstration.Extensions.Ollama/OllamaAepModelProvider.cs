@@ -68,7 +68,11 @@ public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClie
             var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
             if (!string.IsNullOrWhiteSpace(model.Details?.ParameterSize)) metadata["parameterSize"] = model.Details.ParameterSize;
             if (!string.IsNullOrWhiteSpace(model.Details?.QuantizationLevel)) metadata["quantization"] = model.Details.QuantizationLevel;
-            return new AepModelDescriptor(name, name, ["chat"], metadata);
+            return new AepModelDescriptor(
+                name,
+                name,
+                ["chat", "streaming", "tools", "reasoning", "structuredOutput", "vision"],
+                metadata);
         }).Where(value => !string.IsNullOrWhiteSpace(value.Id)).ToArray();
     }
 
@@ -120,13 +124,15 @@ public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClie
         };
         if (request.Tools is { Count: > 0 })
             options.Tools = request.Tools.Select(tool => (AITool)AIFunctionFactory.CreateDeclaration(tool.Name, tool.Description, tool.Parameters)).ToList();
-        ApplyNativeOptions(options, request.Options?.AdditionalOptions);
+        ApplyNativeOptions(options, request.Options?.NativeOptions);
         return options;
     }
 
-    private static void ApplyNativeOptions(ChatOptions options, IReadOnlyDictionary<string, JsonElement>? values)
+    private static void ApplyNativeOptions(ChatOptions options, AepVersionedOptions? nativeOptions)
     {
-        if (values is null || !values.TryGetValue("ollama", out var root) || root.ValueKind != JsonValueKind.Object) return;
+        if (nativeOptions is null) return;
+        var root = nativeOptions.Values;
+        if (root.ValueKind != JsonValueKind.Object) return;
         options.AdditionalProperties ??= [];
         foreach (var item in root.EnumerateObject())
         {

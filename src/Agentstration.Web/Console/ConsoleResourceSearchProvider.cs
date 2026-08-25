@@ -1,6 +1,6 @@
+using Agentstration.Management.Abstractions;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
-using Agentstration.Management.Abstractions;
 
 namespace Agentstration.Web.Console;
 
@@ -8,6 +8,7 @@ public sealed class ConsoleResourceSearchProvider(
     IManagementApiClient management,
     IModelProfilesClient modelProfiles,
     IModelProvidersClient modelProviders,
+    ISecretsClient secrets,
     IRuntimeProfilesClient runtimeProfiles,
     IFlowApiClient flows,
     IRuntimeApiClient runtime,
@@ -48,21 +49,25 @@ public sealed class ConsoleResourceSearchProvider(
             var profilesTask = SafeLoadAsync("model profiles", token => modelProfiles.GetModelProfilesAsync(null, null, null, token), cancellationToken);
             var providersTask = SafeLoadAsync("model providers", token => modelProviders.GetModelProvidersAsync(token), cancellationToken);
             var runtimeProfilesTask = SafeLoadAsync("runtime profiles", token => runtimeProfiles.GetRuntimeProfilesAsync(token), cancellationToken);
+            var secretsTask = SafeLoadAsync("secrets", token => secrets.GetSecretsAsync(token), cancellationToken);
+            var vaultsTask = SafeLoadAsync("vaults", token => secrets.GetVaultsAsync(token), cancellationToken);
             var flowsTask = SafeLoadAsync("flows", token => flows.GetFlowsAsync(token), cancellationToken);
-            var runtimesTask = SafeLoadAsync("runtimes", token => runtime.GetInstancesAsync(token), cancellationToken);
+            var deploymentsTask = SafeLoadAsync("deployments", token => management.GetDeploymentsAsync(token), cancellationToken);
             var executionsTask = SafeLoadAsync("executions", token => runtime.GetExecutionsAsync(token), cancellationToken);
             var workTask = SafeLoadAsync("work items", token => work.GetWorkItemsAsync(token), cancellationToken);
 
-            await Task.WhenAll(agentsTask, profilesTask, providersTask, runtimeProfilesTask, flowsTask, runtimesTask, executionsTask, workTask);
+            await Task.WhenAll(agentsTask, profilesTask, providersTask, runtimeProfilesTask, secretsTask, vaultsTask, flowsTask, deploymentsTask, executionsTask, workTask);
 
             cache =
             [
                 .. agentsTask.Result.Select(ToResult),
-                .. profilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model profile", item.Id, $"/modelprofiles/{Escape(item.Name)}", item.Properties.Status, "◇", $"{item.Name} {item.Properties.Model.Name}")),
-                .. providersTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model provider", item.Id, $"/modelproviders/{Escape(item.Name)}", item.Properties.Status, "⬡", $"{item.Name} {item.Properties.ProviderType}")),
-                .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, $"/runtimeprofiles/{Escape(item.Name)}", "Configured", "◈", $"{item.Name} {item.Properties.RuntimeType}")),
-                .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, $"/flows/{Escape(item.Id)}", item.Status, "⌘", $"{item.Kind} {item.Version}")),
-                .. runtimesTask.Result.Select(item => new ResourceSearchResult(item.Id, "Runtime", item.Id, "/runtime", item.Status, "◉", $"{item.Agent} {item.Location}")),
+                .. profilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model profile", item.Id, ResourceUrl("modelprofiles", item.Namespace, item.Name), item.Properties.Status, "◇", $"{item.Namespace} {item.Name} {item.Properties.Model.Name}")),
+                .. providersTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Model provider", item.Id, ResourceUrl("modelproviders", item.Namespace, item.Name), item.Properties.Status, "⬡", $"{item.Namespace} {item.Name} {item.Properties.ContributionId}")),
+                .. runtimeProfilesTask.Result.Select(item => new ResourceSearchResult(item.Properties.DisplayName, "Runtime profile", item.Id, ResourceUrl("runtimeprofiles", item.Namespace, item.Name), "Configured", "◈", $"{item.Namespace} {item.Name} {item.Properties.RuntimeType}")),
+                .. secretsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Secret", item.Resource.Address.ToString(), $"/secrets/{Escape(item.Resource.Name)}", item.ValueStatus, "◆", $"{item.Resource.Name} {item.Resource.Definition.Vault.Name}")),
+                .. vaultsTask.Result.Select(item => new ResourceSearchResult(item.Resource.Definition.DisplayName, "Vault", item.Resource.Address.ToString(), $"/vaults/{Escape(item.Resource.Name)}", item.Status, "▰", $"{item.Resource.Name} {item.Resource.Definition.ProviderType}")),
+                .. flowsTask.Result.Select(item => new ResourceSearchResult(item.Name, "Flow", item.Id, item.DetailsUrl, item.Status, "⌘", $"{item.Namespace.Value} {item.Kind} {item.Version}")),
+                .. deploymentsTask.Result.Select(item => new ResourceSearchResult(item.Id, "Deployment", item.Id, "/deployments", item.Status, "◉", $"{item.Agent} {item.Namespace} {item.HostingMode} {item.RuntimeProfile}")),
                 .. executionsTask.Result.Select(item => new ResourceSearchResult(item.Id, "Execution", item.Id, $"/runs/{Escape(item.Id)}", item.Status, "▶", $"{item.Agent} {item.Flow}")),
                 .. workTask.Result.Select(item => new ResourceSearchResult(item.Title, "Task", item.Id.ToString(), $"/tasks/{item.Id}", item.Status, "✓", $"{item.Type} {item.Owner}"))
             ];
@@ -88,7 +93,7 @@ public sealed class ConsoleResourceSearchProvider(
 
     private static ResourceSearchResult ToResult(AgentSummary item)
     {
-        return new ResourceSearchResult(item.Name, "Agent", item.Id, $"/agents/{Escape(item.Id)}", StatusPresentation.Label(item.Status), "◎", $"{item.Id} {item.ModelProfile}");
+        return new ResourceSearchResult(item.Name, "Agent", item.Id, item.DetailsUrl, StatusPresentation.Label(item.Status), "◎", $"{item.Namespace.Value} {item.Id} {item.ModelProfile}");
     }
 
     private static bool Matches(ResourceSearchResult item, string query) =>
@@ -99,4 +104,7 @@ public sealed class ConsoleResourceSearchProvider(
         || (item.SearchText?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
 
     private static string Escape(string value) => Uri.EscapeDataString(value);
+
+    private static string ResourceUrl(string resourceType, string resourceNamespace, string name) =>
+        $"/{resourceType}/{Escape(name)}?namespace={Escape(resourceNamespace)}";
 }

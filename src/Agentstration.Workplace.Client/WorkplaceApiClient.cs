@@ -11,11 +11,15 @@ public interface IWorkplaceApiClient
 {
     Task<IReadOnlyList<WorkplaceWorkspaceResponse>> ListWorkspacesAsync(CancellationToken token);
     Task<WorkplaceWorkspaceResponse> GetWorkspaceAsync(string workspaceName, CancellationToken token);
-    Task<EntryResponse> GetEntryAsync(string entryName, CancellationToken token);
-    Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, string entryName, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token);
+    Task<IReadOnlyList<WorkplaceDashboardResponse>> ListDashboardsAsync(string workspaceName, CancellationToken token);
+    Task<WorkplaceDashboardResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken token);
+    Task<WorkplaceDashboardResponse> GetDefaultDashboardAsync(string workspaceName, CancellationToken token);
+    Task<EntryResponse> GetEntryAsync(EntryId entryId, CancellationToken token);
+    Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, EntryId entryId, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token);
     Task<InteractionResponse> GetInteractionAsync(string workspaceName, Guid interactionId, CancellationToken token);
     Task<IReadOnlyList<InteractionResponse>> ListInteractionsAsync(string workspaceName, int take, CancellationToken token);
     Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(string workspaceName, Guid interactionId, CancellationToken token);
+    Task<IReadOnlyList<PendingActionContract>> ListPendingActionsAsync(string workspaceName, Guid interactionId, CancellationToken token);
     Task<AddConversationMessageResponse> AddMessageAsync(string workspaceName, Guid interactionId, string content, CancellationToken token);
     Task<PendingActionResolutionResponse> RespondAsync(string workspaceName, Guid interactionId, Guid actionId, string resumeToken, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token);
     Task<IReadOnlyList<WorkTaskResponse>> ListTasksAsync(string workspaceName, WorkTaskStatus? status, CancellationToken token);
@@ -35,13 +39,17 @@ public interface IWorkplaceApiClient
 
 public sealed class WorkplaceApiClient(HttpClient httpClient) : IWorkplaceApiClient
 {
-    public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> ListWorkspacesAsync(CancellationToken token) => await httpClient.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>($"api/workplace/workspaces?api-version={WorkplaceApiVersions.V20260805}", token) ?? [];
+    public async Task<IReadOnlyList<WorkplaceWorkspaceResponse>> ListWorkspacesAsync(CancellationToken token) => await httpClient.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("api/workplace/workspaces", token) ?? [];
     public Task<WorkplaceWorkspaceResponse> GetWorkspaceAsync(string workspaceName, CancellationToken token) => GetAsync<WorkplaceWorkspaceResponse>($"api/workspaces/{E(workspaceName)}", token);
-    public Task<EntryResponse> GetEntryAsync(string entryName, CancellationToken token) => GetAsync<EntryResponse>($"api/entries/{E(entryName)}", token);
-    public async Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, string entryName, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token) => await PostAsync<CreateInteractionRequest, EntrySubmissionResponse>($"api/workspaces/{E(workspaceName)}/entries/{E(entryName)}/interactions", new CreateInteractionRequest(workspaceName, values), token);
+    public async Task<IReadOnlyList<WorkplaceDashboardResponse>> ListDashboardsAsync(string workspaceName, CancellationToken token) => await httpClient.GetFromJsonAsync<WorkplaceDashboardResponse[]>($"api/workspaces/{E(workspaceName)}/dashboards", token) ?? [];
+    public Task<WorkplaceDashboardResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken token) => GetAsync<WorkplaceDashboardResponse>($"api/workspaces/{E(workspaceName)}/dashboards/{E(dashboardName)}", token);
+    public Task<WorkplaceDashboardResponse> GetDefaultDashboardAsync(string workspaceName, CancellationToken token) => GetAsync<WorkplaceDashboardResponse>($"api/workspaces/{E(workspaceName)}/dashboard", token);
+    public Task<EntryResponse> GetEntryAsync(EntryId entryId, CancellationToken token) => GetAsync<EntryResponse>($"api/{EntryPath(entryId)}", token);
+    public async Task<EntrySubmissionResponse> SubmitAsync(string workspaceName, EntryId entryId, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token) => await PostAsync<CreateInteractionRequest, EntrySubmissionResponse>($"api/workspaces/{E(workspaceName)}/{EntryPath(entryId)}/interactions", new CreateInteractionRequest(values), token);
     public Task<InteractionResponse> GetInteractionAsync(string workspaceName, Guid interactionId, CancellationToken token) => GetAsync<InteractionResponse>($"api/workspaces/{E(workspaceName)}/interactions/{interactionId}", token);
     public async Task<IReadOnlyList<InteractionResponse>> ListInteractionsAsync(string workspaceName, int take, CancellationToken token) => (await GetAsync<InteractionPageResponse>($"api/workspaces/{E(workspaceName)}/interactions?take={Math.Clamp(take, 1, 100)}", token)).Value;
     public async Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(string workspaceName, Guid interactionId, CancellationToken token) => await httpClient.GetFromJsonAsync<ConversationMessage[]>($"api/workspaces/{E(workspaceName)}/interactions/{interactionId}/messages", token) ?? [];
+    public async Task<IReadOnlyList<PendingActionContract>> ListPendingActionsAsync(string workspaceName, Guid interactionId, CancellationToken token) => await httpClient.GetFromJsonAsync<PendingActionContract[]>($"api/workspaces/{E(workspaceName)}/interactions/{interactionId}/pending-actions", token) ?? [];
     public Task<AddConversationMessageResponse> AddMessageAsync(string workspaceName, Guid interactionId, string content, CancellationToken token) => PostAsync<AddConversationMessageRequest, AddConversationMessageResponse>($"api/workspaces/{E(workspaceName)}/interactions/{interactionId}/messages", new(content), token);
     public Task<PendingActionResolutionResponse> RespondAsync(string workspaceName, Guid interactionId, Guid actionId, string resumeToken, IReadOnlyDictionary<string, JsonElement> values, CancellationToken token) => PostAsync<PendingActionResponseRequest, PendingActionResolutionResponse>($"api/workspaces/{E(workspaceName)}/interactions/{interactionId}/pending-actions/{actionId}/responses", new(resumeToken, values), token);
     public async Task<IReadOnlyList<WorkTaskResponse>> ListTasksAsync(string workspaceName, WorkTaskStatus? status, CancellationToken token) { var suffix = status is null ? string.Empty : $"?status={status}"; return (await GetAsync<WorkTaskPageResponse>($"api/workspaces/{E(workspaceName)}/tasks{suffix}", token)).Value; }
@@ -61,12 +69,14 @@ public sealed class WorkplaceApiClient(HttpClient httpClient) : IWorkplaceApiCli
     private async Task<T> GetAsync<T>(string uri, CancellationToken token) => await httpClient.GetFromJsonAsync<T>(uri, token) ?? throw new InvalidOperationException($"The Work API returned no {typeof(T).Name} payload.");
     private async Task<TResponse> PostAsync<TRequest, TResponse>(string uri, TRequest body, CancellationToken token) { using var response = await httpClient.PostAsJsonAsync(uri, body, token); response.EnsureSuccessStatusCode(); return (await response.Content.ReadFromJsonAsync<TResponse>(token))!; }
     private async Task<T> PostEmptyAsync<T>(string uri, CancellationToken token) { using var response = await httpClient.PostAsync(uri, null, token); response.EnsureSuccessStatusCode(); return (await response.Content.ReadFromJsonAsync<T>(token))!; }
+    private static string EntryPath(EntryId entryId) => entryId.Namespace.IsDefault ? $"entries/{E(entryId.Value)}" : $"namespaces/{E(entryId.Namespace.Value)}/entries/{E(entryId.Value)}";
     private static string E(string value) => Uri.EscapeDataString(value);
 }
 
 public sealed class WorkplaceRealtimeClient : IAsyncDisposable
 {
     private readonly HubConnection connection;
+    private readonly SemaphoreSlim subscriptionGate = new(1, 1);
     private string? workspaceId;
     private long lastSequence;
 
@@ -113,14 +123,36 @@ public sealed class WorkplaceRealtimeClient : IAsyncDisposable
 
     public async Task StartAsync(string workspace, long afterSequence, CancellationToken token)
     {
-        workspaceId = workspace;
-        lastSequence = Math.Max(lastSequence, afterSequence);
-        if (connection.State == HubConnectionState.Disconnected) await connection.StartAsync(token);
-        await connection.InvokeAsync("SubscribeAsync", workspace, lastSequence, token);
-        StateChanged?.Invoke(connection.State);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspace);
+        await subscriptionGate.WaitAsync(token);
+        try
+        {
+            if (connection.State == HubConnectionState.Disconnected) await connection.StartAsync(token);
+            if (workspaceId is not null && !string.Equals(workspaceId, workspace, StringComparison.Ordinal))
+            {
+                await connection.InvokeAsync("UnsubscribeAsync", workspaceId, token);
+                lastSequence = afterSequence;
+            }
+            else
+            {
+                lastSequence = Math.Max(lastSequence, afterSequence);
+            }
+
+            workspaceId = workspace;
+            await connection.InvokeAsync("SubscribeAsync", workspace, lastSequence, token);
+            StateChanged?.Invoke(connection.State);
+        }
+        finally
+        {
+            subscriptionGate.Release();
+        }
     }
 
-    public ValueTask DisposeAsync() => connection.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await connection.DisposeAsync();
+        subscriptionGate.Dispose();
+    }
 
     private sealed class CompositeRegistration(IReadOnlyList<IDisposable> registrations) : IDisposable
     {
@@ -140,9 +172,10 @@ public sealed class WorkplaceRealtimeClient : IAsyncDisposable
 
 public static class WorkplaceClientServiceCollectionExtensions
 {
-    public static IServiceCollection AddAgentstrationWorkplaceClient(this IServiceCollection services, Uri apiBaseUrl, Uri hubUrl)
+    public static IHttpClientBuilder AddAgentstrationWorkplaceClient(this IServiceCollection services, Uri apiBaseUrl, Uri hubUrl)
     {
-        services.AddHttpClient<IWorkplaceApiClient, WorkplaceApiClient>(client => client.BaseAddress = apiBaseUrl);
-        services.AddSingleton(_ => new WorkplaceRealtimeClient(hubUrl)); return services;
+        var builder = services.AddHttpClient<IWorkplaceApiClient, WorkplaceApiClient>(client => client.BaseAddress = apiBaseUrl);
+        services.AddScoped(_ => new WorkplaceRealtimeClient(hubUrl));
+        return builder;
     }
 }

@@ -34,4 +34,4 @@ The current documentation line is **Next**. Do not create Docusaurus snapshots f
 
 ## Publication
 
-The site is configured for `https://docs.agentstration.io`. The validation workflow runs on documentation pull requests. The publication workflow is manual until GitHub Pages is enabled for GitHub Actions and the custom-domain DNS is configured. It requires no repository secret beyond GitHub's standard Pages token.
+The site is configured for `https://docs.agentstration.io`. Pull requests validate the production build without publishing it. A push or manual workflow run from `main` publishes the same build through GitHub Pages after Pages is enabled for GitHub Actions and the custom-domain DNS is configured. It requires no repository secret beyond GitHub's standard Pages token.

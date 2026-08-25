@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Resources;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -15,16 +16,17 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
     private static readonly ISerializer YamlSerializer = new SerializerBuilder().WithNamingConvention(CamelCaseNamingConvention.Instance).DisableAliases().Build();
     private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder().WithNamingConvention(CamelCaseNamingConvention.Instance).Build();
 
-    public async Task<StoredFlowDraft> CreateAsync(CreateFlowDraftCommand command, CancellationToken cancellationToken)
+    public async Task<StoredFlowDraft> CreateAsync(WorkspaceId workspaceId, CreateFlowDraftCommand command, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(command.DisplayName);
         var id = new FlowId(command.Name);
-        if (await repository.GetDraftAsync(id, cancellationToken) is not null || await repository.GetAsync(id, cancellationToken) is not null)
+        if (await repository.GetDraftAsync(workspaceId, id, cancellationToken) is not null || await repository.GetAsync(workspaceId, id, cancellationToken) is not null)
             throw new FlowConcurrencyException($"Flow '{id}' already exists.");
         var now = timeProvider.GetUtcNow();
         var graph = FlowDraftTemplates.Create(command.Template);
         var draft = new FlowDraft
         {
+            WorkspaceId = workspaceId,
             Id = $"{command.Name}-draft",
             FlowId = id,
             DisplayName = command.DisplayName,
@@ -35,17 +37,17 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
             UpdatedAt = now,
             UpdatedBy = command.UpdatedBy
         };
-        FlowValidator.Validate(new FlowDefinition(id, command.Name, command.Description, FlowKind.Routing, "0.1.0", true, null,
-            FlowDraftSnapshotAdapter.ToRoutingSpec(graph), Copy(command.Tags), now, now, command.DisplayName, graph));
-        await flows.CreateAsync(new CreateFlowCommand(command.Name, command.Description, FlowKind.Routing, "0.1.0", true, FlowDraftSnapshotAdapter.ToRoutingSpec(graph), command.Tags), cancellationToken);
+        FlowValidator.Validate(new FlowResource(workspaceId, id, command.Name, command.Description, "0.1.0", true, null,
+            FlowDraftSnapshotAdapter.ToRoutingDefinition(graph), Copy(command.Tags), now, now, command.DisplayName, graph));
+        await flows.CreateAsync(workspaceId, new CreateFlowCommand(command.Name, command.Description, "0.1.0", true, FlowDraftSnapshotAdapter.ToRoutingDefinition(graph), command.Tags), cancellationToken);
         return await repository.CreateDraftAsync(draft, cancellationToken);
     }
 
-    public Task<StoredFlowDraft?> GetAsync(FlowId flowId, CancellationToken cancellationToken) => repository.GetDraftAsync(flowId, cancellationToken);
+    public Task<StoredFlowDraft?> GetAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken) => repository.GetDraftAsync(workspaceId, flowId, cancellationToken);
 
-    public async Task<StoredFlowDraft> SaveAsync(FlowId flowId, UpdateFlowDraftCommand command, string expectedETag, CancellationToken cancellationToken)
+    public async Task<StoredFlowDraft> SaveAsync(WorkspaceId workspaceId, FlowId flowId, UpdateFlowDraftCommand command, string expectedETag, CancellationToken cancellationToken)
     {
-        var stored = await RequiredAsync(flowId, cancellationToken);
+        var stored = await RequiredAsync(workspaceId, flowId, cancellationToken);
         var updated = stored.Value with
         {
             DisplayName = command.DisplayName,
@@ -59,35 +61,35 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
         return await repository.UpdateDraftAsync(updated, expectedETag, cancellationToken);
     }
 
-    public async ValueTask<FlowValidationResult> ValidateAsync(FlowId flowId, CancellationToken cancellationToken)
+    public async ValueTask<FlowValidationResult> ValidateAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken)
     {
-        var draft = await RequiredAsync(flowId, cancellationToken);
+        var draft = await RequiredAsync(workspaceId, flowId, cancellationToken);
         return await validator.ValidateAsync(draft.Value.Definition, new FlowValidationContext(), cancellationToken);
     }
 
-    public async Task<StoredFlowVersion> PublishAsync(FlowId flowId, string version, string? releaseNotes, bool activate, CancellationToken cancellationToken)
+    public async Task<StoredFlowVersion> PublishAsync(WorkspaceId workspaceId, FlowId flowId, string version, string? releaseNotes, bool activate, CancellationToken cancellationToken)
     {
-        var draft = await RequiredAsync(flowId, cancellationToken);
+        var draft = await RequiredAsync(workspaceId, flowId, cancellationToken);
         var validation = await validator.ValidateAsync(draft.Value.Definition, new FlowValidationContext(), cancellationToken);
         if (!validation.IsValid) throw new FlowValidationException("flow_validation_failed", "The Flow Draft contains validation errors and cannot be published.");
-        var definition = await repository.GetAsync(flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
-        await flows.UpdateAsync(flowId, new UpdateFlowCommand(draft.Value.Description, FlowKind.Routing, version, true, FlowDraftSnapshotAdapter.ToRoutingSpec(draft.Value.Definition), draft.Value.Tags,
+        var definition = await repository.GetAsync(workspaceId, flowId, cancellationToken) ?? throw new FlowNotFoundException(flowId);
+        await flows.UpdateAsync(workspaceId, flowId, new UpdateFlowCommand(draft.Value.Description, version, true, FlowDraftSnapshotAdapter.ToRoutingDefinition(draft.Value.Definition), draft.Value.Tags,
             draft.Value.Definition, draft.Value.DisplayName), definition.ETag, cancellationToken);
-        return await flows.PublishVersionAsync(flowId, version, activate, cancellationToken, releaseNotes);
+        return await flows.PublishVersionAsync(workspaceId, flowId, version, activate, cancellationToken, releaseNotes);
     }
 
-    public async Task<StoredFlowDraft> CreateFromVersionAsync(FlowId flowId, string version, string updatedBy, CancellationToken cancellationToken)
+    public async Task<StoredFlowDraft> CreateFromVersionAsync(WorkspaceId workspaceId, FlowId flowId, string version, string updatedBy, CancellationToken cancellationToken)
     {
-        var published = await repository.GetVersionAsync(flowId, version, cancellationToken) ?? throw new FlowValidationException("flow_version_not_found", $"Flow version '{version}' was not found.");
+        var published = await repository.GetVersionAsync(workspaceId, flowId, version, cancellationToken) ?? throw new FlowValidationException("flow_version_not_found", $"Flow version '{version}' was not found.");
         if (published.Value.Graph is null) throw new FlowValidationException("flow_version_graph_missing", "This legacy Flow version has no editable graph definition.");
-        var current = await RequiredAsync(flowId, cancellationToken);
+        var current = await RequiredAsync(workspaceId, flowId, cancellationToken);
         var updated = current.Value with { Definition = published.Value.Graph, Revision = current.Value.Revision + 1, UpdatedAt = timeProvider.GetUtcNow(), UpdatedBy = updatedBy };
         return await repository.UpdateDraftAsync(updated, current.ETag, cancellationToken);
     }
 
-    public async Task<string> GetSourceAsync(FlowId flowId, string format, CancellationToken cancellationToken)
+    public async Task<string> GetSourceAsync(WorkspaceId workspaceId, FlowId flowId, string format, CancellationToken cancellationToken)
     {
-        var draft = await RequiredAsync(flowId, cancellationToken);
+        var draft = await RequiredAsync(workspaceId, flowId, cancellationToken);
         return format.Equals("json", StringComparison.OrdinalIgnoreCase)
             ? JsonSerializer.Serialize(draft.Value.Definition, IndentedJsonOptions)
             : ToYaml(draft.Value.Definition);
@@ -119,7 +121,7 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
         return YamlSerializer.Serialize(normalized);
     }
 
-    private async Task<StoredFlowDraft> RequiredAsync(FlowId flowId, CancellationToken token) => await repository.GetDraftAsync(flowId, token) ?? throw new FlowNotFoundException(flowId);
+    private async Task<StoredFlowDraft> RequiredAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken token) => await repository.GetDraftAsync(workspaceId, flowId, token) ?? throw new FlowNotFoundException(flowId);
     private static IReadOnlyDictionary<string, string> Copy(IReadOnlyDictionary<string, string>? source) => source is null ? new Dictionary<string, string>() : new Dictionary<string, string>(source, StringComparer.Ordinal);
 
     private static object? NormalizeYaml(object? value) => value switch

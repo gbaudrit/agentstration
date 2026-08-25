@@ -1,7 +1,9 @@
+using Agentstration.Web.Components;
 using Agentstration.Work;
 using Agentstration.Workplace.Components;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Workplace.Components.Tests;
 
@@ -50,9 +52,38 @@ public sealed class PendingActionPanelTests
     }
 
     [TestMethod]
+    public async Task ConversationModeRendersInputAsAnAssistantTurn()
+    {
+        using var context = new BunitContext();
+        PendingActionAnswer? answer = null;
+        var action = new RequestInputAction(
+            "What should the report focus on?",
+            "A short answer is enough.",
+            [new EntryFieldDefinition { Name = "focus", Type = EntryFieldType.Textarea, Required = true }],
+            PendingActionId.New(),
+            "opaque-token");
+        var rendered = context.Render<PendingActionPanel>(parameters => parameters
+            .Add(value => value.Action, action)
+            .Add(value => value.ConversationMode, true)
+            .Add(value => value.OnSubmit, EventCallback.Factory.Create<PendingActionAnswer>(this, value => answer = value)));
+
+        Assert.AreEqual(1, rendered.FindAll(".pending-author-avatar").Count);
+        Assert.IsTrue(rendered.Markup.Contains("Agentstration", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("Response needed", StringComparison.Ordinal));
+        Assert.AreEqual(0, rendered.FindAll(".panel-header").Count);
+        Assert.IsFalse(rendered.Markup.Contains("Action required", StringComparison.Ordinal));
+
+        await rendered.Find("textarea").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "Revenue trends" });
+        await rendered.FindAll("button").Single(value => value.TextContent == "Continue").ClickAsync(new());
+        Assert.AreEqual("Revenue trends", answer?.Values["focus"].GetString());
+    }
+
+    [TestMethod]
     public void WorkplaceLayoutUsesTheConsoleDesignSystemShell()
     {
         using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddAgentstrationWebComponents();
         var rendered = context.Render<WorkplaceLayout>(parameters => parameters
             .Add(value => value.Body, builder => builder.AddContent(0, "Workplace content")));
 

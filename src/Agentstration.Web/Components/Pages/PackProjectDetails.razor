@@ -1,0 +1,373 @@
+@page "/pack-projects/{ProjectId:guid}"
+@implements IDisposable
+@inject IPacksClient Client
+@inject ConsoleContextState ContextState
+@inject IServiceProvider Services
+@inject NavigationManager Navigation
+
+<PageTitle>@(project?.Value.Definition.DisplayName ?? "Pack Project") · Agentstration</PageTitle>
+
+@if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else if (project is null)
+{
+    <LoadingState Message="Loading Pack Project…" />
+}
+else
+{
+    <PageHeader Title="@(project.Value.Definition.DisplayName ?? project.Value.Definition.PackName)" Description="Edit metadata, create immutable builds, then install them directly into an authorized local workspace.">
+        <Actions>
+            <button class="button-secondary" @onclick="BackToPacks">Back to Packs</button>
+            <button class="button-secondary" disabled="@(busy || !dirty)" @onclick="SaveAsync">Save</button>
+            <button class="button-primary" disabled="@busy" @onclick="BuildAsync">@(building ? "Building…" : "Build Pack")</button>
+        </Actions>
+    </PageHeader>
+
+    <section class="studio-layout">
+        <div class="panel studio-editor">
+            <div class="panel-header"><div><p class="eyebrow">Project definition</p><h2>Manifest metadata</h2></div><StatusBadge Text="@project.Value.Definition.State.ToString()" Status="@ProjectTone" /></div>
+            <div class="studio-grid">
+                <label>Publisher<input value="@project.Value.Definition.Publisher" disabled /></label>
+                <label>Name<input value="@project.Value.Definition.PackName" disabled /></label>
+                <label>Version<input @bind="version" @bind:after="MarkDirty" /></label>
+                <label>Display name<input @bind="displayName" @bind:after="MarkDirty" /></label>
+            </div>
+            <label class="studio-field">Description<textarea rows="4" @bind="description" @bind:after="MarkDirty"></textarea></label>
+            <div class="studio-grid">
+                <label>Audience
+                    <select @bind="audience" @bind:after="MarkDirty">
+                        <option value="@PackAudience.Universal">Universal</option>
+                        <option value="@PackAudience.Personal">Personal</option>
+                        <option value="@PackAudience.Professional">Professional</option>
+                    </select>
+                </label>
+                <label>Purpose
+                    <select @bind="purpose" @bind:after="MarkDirty">
+                        <option value="@PackPurpose.Standard">Standard</option>
+                        <option value="@PackPurpose.Sample">Sample</option>
+                        <option value="@PackPurpose.Template">Template</option>
+                    </select>
+                </label>
+                <label>Categories<input @bind="categories" @bind:after="MarkDirty" placeholder="game, sample" /></label>
+                <label>Tags<input @bind="tags" @bind:after="MarkDirty" placeholder="local, experimental" /></label>
+            </div>
+            <dl class="resource-details studio-origin">
+                @if (project.Value.Definition.Origin is { } origin)
+                {
+                    <dt>Forked from</dt><dd><code>@origin.Publisher/@origin.Name</code> · @origin.Version</dd>
+                }
+                else
+                {
+                    <dt>Source</dt><dd>Workspace resource snapshot</dd>
+                    <dt>Resources</dt><dd>@project.Value.Definition.SourceResources.Count</dd>
+                }
+                <dt>Source hash</dt><dd><code>@ShortHash(project.Value.Definition.SourceArtifact.Sha256)</code></dd>
+                <dt>Revision</dt><dd>@project.Value.Definition.Revision</dd>
+            </dl>
+            @if (project.Value.Definition.SourceResources.Count > 0)
+            {
+                <div class="studio-source-resources">
+                    @foreach (var resource in project.Value.Definition.SourceResources)
+                    {
+                        <span><code>@resource.Kind/@resource.Name</code><small>@(resource.ExplicitlySelected ? "Selected" : "Dependency")</small></span>
+                    }
+                </div>
+            }
+            @if (message is not null) { <p class="@(hasError ? "error-panel" : "studio-message")" role="status">@message</p> }
+        </div>
+
+        <aside class="panel studio-install">
+            <div class="panel-header"><div><p class="eyebrow">Local deployment</p><h2>Current workspace</h2></div></div>
+            <strong>@(ContextState.Current?.WorkspaceDisplayName ?? "Current workspace")</strong>
+            @if (preview is not null) { <p class="studio-namespace"><span>Namespace</span><code>@preview.Namespace</code></p> }
+            <p class="studio-hint">Preview and installation read the stored build directly. No download or re-upload is required.</p>
+            @if (selectedBuild is null)
+            {
+                <div class="studio-empty-preview"><span>1</span><p>Preview a build from the table below to prepare its installation.</p></div>
+            }
+            else if (preview is not null)
+            {
+                <div class="studio-selected-build"><span>Selected build</span><strong>@selectedBuild.Definition.Version</strong><code>@ShortHash(selectedBuild.Definition.Artifact.Sha256)</code></div>
+                <div class="studio-preview">
+                    <StatusBadge Text="@PreviewStatus" Status="@(CanInstall ? UiStatus.Success : UiStatus.Warning)" />
+                    <span>@preview.Resources.Count resources · @preview.Resources.Count(resource => resource.AlreadyExists) conflicts</span>
+                </div>
+                @if (preview.Bindings.Count > 0)
+                {
+                    <section class="studio-bindings" aria-label="Pack resource bindings">
+                        <div><strong>Resource bindings</strong><small>Selections are retained for this Pack identity.</small></div>
+                        @foreach (var binding in preview.Bindings)
+                        {
+                            <label>
+                                <span>@binding.DisplayName <small>@(binding.Required ? "Required" : "Optional") · @BindingKindLabel(binding.TargetKind)</small></span>
+                                <select value="@SelectedBinding(binding.Name)" @onchange="args => BindingChanged(binding.Name, args)">
+                                    <option value="">Select a @BindingKindLabel(binding.TargetKind).ToLowerInvariant()</option>
+                                    @if (binding.TargetKind == PackBindingTargetKind.ModelProfile)
+                                    {
+                                        @foreach (var profile in modelProfiles)
+                                        {
+                                            <option value="@BindingValue(profile.Name, ResourceNamespace.Parse(profile.Namespace))">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option>
+                                        }
+                                    }
+                                    else if (binding.TargetKind == PackBindingTargetKind.ModelProvider)
+                                    {
+                                        @foreach (var provider in modelProviders)
+                                        {
+                                            <option value="@BindingValue(provider.Name, ResourceNamespace.Default)">@provider.Properties.DisplayName — default/@provider.Name</option>
+                                        }
+                                    }
+                                    else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile)
+                                    {
+                                        @foreach (var runtimeProfile in runtimeProfiles)
+                                        {
+                                            <option value="@BindingValue(runtimeProfile.Name, ResourceNamespace.Parse(runtimeProfile.Namespace))">@runtimeProfile.Properties.DisplayName — @runtimeProfile.Namespace/@runtimeProfile.Name</option>
+                                        }
+                                    }
+                                    else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration)
+                                    {
+                                        @foreach (var extension in extensionRegistrations)
+                                        {
+                                            <option value="@BindingValue(extension.Name, extension.Namespace)">@extension.Definition.DisplayName — @extension.Namespace/@extension.Name</option>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        @foreach (var secret in secrets)
+                                        {
+                                            <option value="@BindingValue(secret.Resource.Name, secret.Resource.Namespace)">@secret.Resource.Definition.DisplayName — @secret.Resource.Name (@secret.ValueStatus)</option>
+                                        }
+                                    }
+                                </select>
+                            </label>
+                        }
+                    </section>
+                }
+                @if (preview.AlreadyInstalled)
+                {
+                    <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> Reinstall this Pack build</label>
+                    <p class="studio-warning">Resources modified since the previous installation are preserved and can still block replacement.</p>
+                }
+            }
+            <button class="button-primary" disabled="@(selectedBuild is null || busy || !CanInstall)" @onclick="InstallAsync">@(installing ? "Installing…" : "Install locally")</button>
+        </aside>
+    </section>
+
+    <section class="panel studio-builds">
+        <div class="panel-header"><div><p class="eyebrow">Immutable artifacts</p><h2>Builds</h2></div><span class="studio-hint">Each build is content-addressed and reproducible from its project revision.</span></div>
+        @if (builds is null)
+        {
+            <LoadingState Message="Loading builds…" />
+        }
+        else if (builds.Count == 0)
+        {
+            <EmptyState Title="No build yet" Message="Save the project metadata, then create the first immutable Pack artifact." />
+        }
+        else
+        {
+            <DataGrid TItem="PackProjectBuildResource" Items="builds">
+                <Header><tr><th>Version</th><th>Revision</th><th>Created</th><th>Artifact</th><th></th></tr></Header>
+                <Row Context="build"><tr class="@(selectedBuild?.Uid == build.Uid ? "selected-build" : null)">
+                    <td><strong>@build.Definition.Version</strong></td>
+                    <td>@build.Definition.ProjectRevision</td>
+                    <td>@build.Definition.CreatedAt.ToLocalTime().ToString("g")</td>
+                    <td><code>@ShortHash(build.Definition.Artifact.Sha256)</code><br /><small>@FormatBytes(build.Definition.Artifact.Length)</small></td>
+                    <td class="studio-action-cell"><div class="studio-actions"><button class="text-button" @onclick="() => PreviewAsync(build)">Preview</button><a class="text-button" href="@DownloadPath(build)">Download</a></div></td>
+                </tr></Row>
+            </DataGrid>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public Guid ProjectId { get; set; }
+
+    private readonly CancellationTokenSource cancellation = new();
+    private ResourceSnapshot<PackProjectResource>? project;
+    private IReadOnlyList<PackProjectBuildResource>? builds;
+    private PackProjectBuildResource? selectedBuild;
+    private PackInstallationPreview? preview;
+    private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
+    private IReadOnlyList<ModelProviderResponse> modelProviders = [];
+    private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
+    private IReadOnlyList<ExtensionRegistrationResource> extensionRegistrations = [];
+    private IReadOnlyList<SecretResponse> secrets = [];
+    private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
+    private AgentstrationApiException? error;
+    private string version = string.Empty;
+    private PackAudience audience = PackAudience.Universal;
+    private PackPurpose purpose = PackPurpose.Standard;
+    private string displayName = string.Empty;
+    private string? description;
+    private string categories = string.Empty;
+    private string tags = string.Empty;
+    private string? message;
+    private bool hasError;
+    private bool dirty;
+    private bool busy;
+    private bool building;
+    private bool installing;
+    private bool replaceExisting;
+    private bool CanInstall => preview is not null
+        && (preview.CanInstall || replaceExisting && preview.AlreadyInstalled)
+        && preview.Bindings.All(binding => !binding.Required || !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)));
+    private string PreviewStatus => preview is null ? "Not previewed"
+        : preview.Bindings.Any(binding => binding.Required && string.IsNullOrWhiteSpace(SelectedBinding(binding.Name))) ? "Configuration required"
+        : preview.CanInstall ? "Ready"
+        : preview.AlreadyInstalled ? "Already installed"
+        : "Conflicts";
+    private UiStatus ProjectTone => project?.Value.Definition.State == PackProjectState.Built ? UiStatus.Success : UiStatus.Info;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            if (ContextState.Current is null) await ContextState.LoadAsync(cancellation.Token);
+            project = await Client.GetProjectAsync(ProjectId, cancellation.Token);
+            builds = await Client.GetBuildsAsync(ProjectId, cancellation.Token);
+            var definition = project.Value.Definition;
+            version = definition.Version;
+            audience = definition.Audience;
+            purpose = definition.Purpose;
+            displayName = definition.DisplayName ?? string.Empty;
+            description = definition.Description;
+            categories = string.Join(", ", definition.Categories);
+            tags = string.Join(", ", definition.Tags);
+            dirty = false;
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private void MarkDirty() { dirty = true; message = null; preview = null; selectedBuild = null; bindingSelections.Clear(); }
+    private async Task SaveAsync()
+    {
+        if (project is null) return;
+        await ExecuteAsync(async () =>
+        {
+            project = await Client.UpdateProjectAsync(ProjectId,
+                new(version.Trim(), EmptyToNull(displayName), EmptyToNull(description), Split(categories), Split(tags), audience, purpose), project.ETag, cancellation.Token);
+            dirty = false;
+            message = "Project saved.";
+        });
+    }
+
+    private async Task BuildAsync()
+    {
+        building = true;
+        try
+        {
+            if (dirty) await SaveAsync();
+            if (hasError) return;
+            await ExecuteAsync(async () =>
+            {
+                selectedBuild = await Client.BuildAsync(ProjectId, cancellation.Token);
+                builds = await Client.GetBuildsAsync(ProjectId, cancellation.Token);
+                project = await Client.GetProjectAsync(ProjectId, cancellation.Token);
+                preview = await Client.PreviewBuildAsync(ProjectId, selectedBuild.Uid, cancellation.Token);
+                await ConfigureBindingsAsync();
+                replaceExisting = false;
+                message = PreviewMessage(selectedBuild.Definition.Version);
+            });
+        }
+        finally { building = false; }
+    }
+
+    private async Task PreviewAsync(PackProjectBuildResource build)
+    {
+        selectedBuild = build;
+        replaceExisting = false;
+        await ExecuteAsync(async () =>
+        {
+            preview = await Client.PreviewBuildAsync(ProjectId, build.Uid, cancellation.Token);
+            await ConfigureBindingsAsync();
+            message = PreviewMessage(build.Definition.Version);
+        });
+    }
+
+    private async Task InstallAsync()
+    {
+        if (selectedBuild is null || !CanInstall) return;
+        installing = true;
+        try
+        {
+            await ExecuteAsync(async () =>
+            {
+                var bindings = preview!.Bindings
+                    .Where(binding => !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)))
+                    .Select(binding => new PackBindingSelection(binding.Name, ParseBindingTarget(SelectedBinding(binding.Name)!)))
+                    .ToArray();
+                var installed = await Client.InstallBuildAsync(ProjectId, selectedBuild.Uid, replaceExisting, bindings, cancellation.Token);
+                preview = await Client.PreviewBuildAsync(ProjectId, selectedBuild.Uid, cancellation.Token);
+                await ConfigureBindingsAsync();
+                replaceExisting = false;
+                message = $"Installed {installed.Value.Definition.Publisher}/{installed.Value.Definition.PackName} in the selected workspace.";
+            });
+        }
+        finally { installing = false; }
+    }
+
+    private async Task ExecuteAsync(Func<Task> operation)
+    {
+        busy = true;
+        hasError = false;
+        message = null;
+        try { await operation(); }
+        catch (AgentstrationApiException exception) { hasError = true; message = exception.Message; }
+        finally { busy = false; }
+    }
+
+    private string DownloadPath(PackProjectBuildResource build) => $"/api/pack-projects/{ProjectId:D}/builds/{build.Uid:D}/download";
+    private async Task ConfigureBindingsAsync()
+    {
+        bindingSelections.Clear();
+        if (preview is null || preview.Bindings.Count == 0) return;
+        foreach (var binding in preview.Bindings)
+        {
+            if (binding.TargetAvailable && binding.Target is not null)
+                bindingSelections[binding.Name] = BindingValue(binding.Target.Name, binding.Target.Namespace ?? ResourceNamespace.Default);
+        }
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProfile))
+            modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProvider))
+            modelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(cancellation.Token);
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile))
+            runtimeProfiles = await Services.GetRequiredService<IRuntimeProfilesClient>().GetRuntimeProfilesAsync(cancellation.Token);
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ExtensionRegistration))
+            extensionRegistrations = await Services.GetRequiredService<IExtensionsClient>().GetRegistrationsAsync(cancellation.Token);
+        if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
+            secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
+    }
+    private string? SelectedBinding(string name) => bindingSelections.GetValueOrDefault(name);
+    private void BindingChanged(string name, ChangeEventArgs args) => bindingSelections[name] = args.Value?.ToString() ?? string.Empty;
+    private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
+    private static ResourceReference ParseBindingTarget(string value)
+    {
+        var parts = value.Split(':', 2);
+        if (parts.Length != 2) throw new InvalidOperationException("The selected Pack binding is invalid.");
+        return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
+    }
+    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch
+    {
+        PackBindingTargetKind.Secret => "Secret",
+        PackBindingTargetKind.ModelProvider => "Model provider",
+        PackBindingTargetKind.RuntimeProfile => "Runtime profile",
+        PackBindingTargetKind.ExtensionRegistration => "Extension registration",
+        _ => "Model profile"
+    };
+    private string PreviewMessage(string buildVersion) => preview?.CanInstall == true
+        ? $"Build {buildVersion} is ready for this workspace."
+        : preview?.AlreadyInstalled == true
+            ? $"Build {buildVersion} is already installed. Enable reinstall to replace it."
+            : $"Build {buildVersion} conflicts with resources already installed in namespace '{preview?.Namespace}'.";
+    private void BackToPacks() => Navigation.NavigateTo("/packs");
+    private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static IReadOnlyList<string> Split(string value) => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    private static string ShortHash(string hash) => hash.Length <= 16 ? hash : $"{hash[..12]}…{hash[^4..]}";
+    private static string FormatBytes(long bytes) => bytes < 1024 ? $"{bytes} B" : $"{bytes / 1024d:F1} KB";
+
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

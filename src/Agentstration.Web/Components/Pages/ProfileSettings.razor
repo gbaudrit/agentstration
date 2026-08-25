@@ -1,0 +1,99 @@
+@page "/settings/profile"
+@implements IDisposable
+@inject ConsoleContextState ContextState
+@inject UserPreferencesState Preferences
+
+<PageTitle>Profile settings · Agentstration</PageTitle>
+<PageHeader Eyebrow="Personal settings" Title="Profile settings" Description="Review and personalize the preferences attached to your Agentstration Principal." />
+
+<section class="profile-settings-layout">
+    <article class="panel profile-settings-panel">
+        <div class="profile-heading">
+            <span class="profile-avatar" aria-hidden="true">@ProfileInitial</span>
+            <div>
+                <p class="eyebrow">Current profile</p>
+                <h2>@ProfileName</h2>
+                <p>These settings follow your Agentstration profile, independently of the authentication method you use.</p>
+            </div>
+        </div>
+
+        <div class="profile-section-heading">
+            <div>
+                <h2>Appearance</h2>
+                <p>Choose how the Console is displayed for this profile.</p>
+            </div>
+            @if (Preferences.IsSaving)
+            {
+                <span class="profile-save-state" role="status">Saving…</span>
+            }
+        </div>
+
+        <div class="theme-options" role="radiogroup" aria-label="Color theme">
+            @foreach (var option in ThemeOptions)
+            {
+                <button type="button"
+                        class="theme-option @(Preferences.Theme == option.Theme ? "selected" : null)"
+                        role="radio"
+                        aria-checked="@(Preferences.Theme == option.Theme)"
+                        disabled="@Preferences.IsSaving"
+                        @onclick="() => SelectThemeAsync(option.Theme)">
+                    <span class="theme-preview theme-preview-@option.CssName" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                    </span>
+                    <span class="theme-option-copy">
+                        <strong>@option.Label</strong>
+                        <small>@option.Description</small>
+                    </span>
+                    <span class="theme-selection" aria-hidden="true">@(Preferences.Theme == option.Theme ? "✓" : null)</span>
+                </button>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Preferences.Error))
+        {
+            <p class="profile-error" role="alert">@Preferences.Error</p>
+        }
+    </article>
+
+    <aside class="panel account-security-panel">
+        <p class="eyebrow">Account</p>
+        <h2>Security</h2>
+        <p>Credentials, password and authentication methods are managed separately from profile preferences.</p>
+        <a class="button-secondary" href="/account/security">Manage account security</a>
+        <a class="button-secondary" href="/account/pat">Manage personal access tokens</a>
+    </aside>
+</section>
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+
+    private static readonly ThemeOption[] ThemeOptions =
+    [
+        new(UserTheme.System, "System", "Follow the preference of this device.", "system"),
+        new(UserTheme.Light, "Light", "Always use the light appearance.", "light"),
+        new(UserTheme.Dark, "Dark", "Always use the dark appearance.", "dark")
+    ];
+
+    private string ProfileName => ContextState.Current?.UserDisplayName ?? "Current user";
+    private string ProfileInitial => ProfileName.Trim() is { Length: > 0 } value
+        ? value[..1].ToUpperInvariant()
+        : "?";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Preferences.IsLoaded)
+        {
+            await Preferences.LoadAsync(cancellation.Token);
+        }
+    }
+
+    private Task SelectThemeAsync(UserTheme theme) => Preferences.SetThemeAsync(theme, cancellation.Token);
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private sealed record ThemeOption(UserTheme Theme, string Label, string Description, string CssName);
+}

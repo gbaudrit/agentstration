@@ -1,7 +1,8 @@
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
 using Agentstration.Management.Contracts;
+using Agentstration.Management.Core;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Agentstration.Web.Api.Models;
@@ -20,6 +21,14 @@ internal static class ModelManagementHttp
                 new Dictionary<string, object?> { ["references"] = exception.Usages });
         }
         catch (ModelProviderValidationException exception) { return Problem("model-provider-invalid", "Invalid model provider", 422, exception.Message); }
+        catch (ExtensionRegistrationNotFoundException exception) { return Problem("extension-registration-not-found", "Extension registration not found", 404, exception.Message); }
+        catch (ExtensionRegistrationInUseException exception) { return Problem("extension-registration-in-use", "Extension registration in use", 409, exception.Message); }
+        catch (ExtensionRegistrationValidationException exception) { return Problem("extension-registration-invalid", "Invalid extension registration", 422, exception.Message); }
+        catch (ModelProfileOptionMigrationException exception)
+        {
+            var status = string.Equals(exception.Code, "extension_unavailable", StringComparison.Ordinal) ? 503 : 422;
+            return Problem(exception.Code, "Model profile option migration failed", status, exception.Message);
+        }
         catch (ControlPlaneResourceNotFoundException exception) { return Problem("model-profile-not-found", "Resource not found", 404, exception.Message); }
         catch (ControlPlaneConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
         catch (RuntimeProfileInUseException exception)
@@ -29,6 +38,7 @@ internal static class ModelManagementHttp
         }
         catch (RuntimeProfileValidationException exception) { return Problem("runtime-profile-invalid", "Invalid runtime profile", 422, exception.Message); }
         catch (ToolResourceValidationException exception) { return Problem("tool-resource-invalid", "Invalid tool resource", 422, exception.Message); }
+        catch (ToolExecutionHookValidationException exception) { return Problem("tool-execution-hook-invalid", "Invalid Tool execution hook", 422, exception.Message); }
         catch (ToolProviderDiscoveryFailedException exception) { return Problem("tool-provider-unavailable", "Tool provider unavailable", 503, exception.Message); }
         catch (ModelProfileInUseException exception)
         {
@@ -59,6 +69,12 @@ internal static class ModelManagementHttp
         return Results.Json(stored.Value, statusCode: statusCode);
     }
 
+    public static IResult ResourceResult(StoredResource<ExtensionRegistrationResource> stored, HttpResponse response, int statusCode)
+    {
+        response.Headers.ETag = stored.ETag;
+        return Results.Json(stored.Value, statusCode: statusCode);
+    }
+
     public static IResult ResourceResult(StoredResource<RuntimeProfileResource> stored, HttpResponse response, int statusCode)
     {
         response.Headers.ETag = stored.ETag;
@@ -77,16 +93,24 @@ internal static class ModelManagementHttp
         return Results.Json(stored.Value, statusCode: statusCode);
     }
 
+    public static IResult ResourceResult(StoredResource<ToolExecutionHookResource> stored, HttpResponse response, int statusCode)
+    {
+        response.Headers.ETag = stored.ETag;
+        return Results.Json(stored.Value, statusCode: statusCode);
+    }
+
     public static string? IfMatch(HttpRequest request) => request.Headers.IfMatch.FirstOrDefault();
+    public static ResourceNamespace Namespace(string? value) => ResourceNamespace.Parse(value);
 
     public static ModelProfileResolutionResponse Resolution(ModelProfileResolution resolution) => new(
-        new ModelProfileIdentityResponse(resolution.Profile.Metadata.Name, resolution.Profile.Metadata.Name, resolution.Profile.Definition.DisplayName),
+        new ModelProfileIdentityResponse(resolution.Profile.Metadata.Name, resolution.Profile.Metadata.Name, resolution.Profile.Definition.DisplayName, resolution.Profile.Namespace.Value),
         resolution.Provider is null ? null : new ModelProviderReferenceResponse(
             resolution.Profile.Definition.Provider.Name,
             resolution.Provider.Name,
             resolution.Provider.DisplayName,
-            resolution.Provider.ProviderType,
-            resolution.ProviderHealth.Status),
+            resolution.Provider.ContributionId,
+            resolution.ProviderHealth.Status,
+            resolution.Profile.Definition.Provider.Resolve(resolution.Profile.Namespace, ResourceKinds.ModelProvider).Namespace.Value),
         new ModelReferenceResponse(
             resolution.Profile.Definition.Model.Name,
             resolution.Model?.Status ?? (resolution.Status == "modelUnavailable" ? "unavailable" : "unknown"),
@@ -96,7 +120,42 @@ internal static class ModelManagementHttp
             resolution.Profile.Definition.Reasoning,
             resolution.Profile.Definition.Output),
         resolution.Status,
-        resolution.Warnings);
+        resolution.Warnings,
+        Capabilities(resolution),
+        resolution.Incompatibilities?.Select(issue => new ModelCompatibilityIssueResponse(
+            issue.Capability,
+            Support(issue.EffectiveSupport),
+            issue.Message)).ToArray() ?? []);
+
+    private static IReadOnlyList<ModelCapabilityResponse> Capabilities(ModelProfileResolution resolution)
+    {
+        if (resolution.CapabilityLevels is null || resolution.EffectiveCapabilities is null) return [];
+        var levels = resolution.CapabilityLevels;
+        var effective = resolution.EffectiveCapabilities;
+        return
+        [
+            Capability("Streaming", levels.Provider.Streaming, levels.Model.Streaming, levels.Adapter.Streaming, effective.Streaming),
+            Capability("Tools", levels.Provider.Tools, levels.Model.Tools, levels.Adapter.Tools, effective.Tools),
+            Capability("Structured output", levels.Provider.StructuredOutput, levels.Model.StructuredOutput, levels.Adapter.StructuredOutput, effective.StructuredOutput),
+            new ModelCapabilityResponse(
+                "Reasoning",
+                Support(levels.Provider.Reasoning.Support),
+                Support(levels.Model.Reasoning.Support),
+                Support(levels.Adapter.Reasoning.Support),
+                Support(effective.Reasoning.Support),
+                effective.Reasoning.SupportedEfforts.Order(StringComparer.OrdinalIgnoreCase).ToArray())
+        ];
+    }
+
+    private static ModelCapabilityResponse Capability(
+        string name,
+        Agentstration.Runtime.Abstractions.FeatureCapability provider,
+        Agentstration.Runtime.Abstractions.FeatureCapability model,
+        Agentstration.Runtime.Abstractions.FeatureCapability adapter,
+        Agentstration.Runtime.Abstractions.FeatureCapability effective) =>
+        new(name, Support(provider.Support), Support(model.Support), Support(adapter.Support), Support(effective.Support), []);
+
+    private static string Support(Agentstration.Runtime.Abstractions.CapabilitySupport support) => support.ToString().ToLowerInvariant();
 
     private static IResult Problem(
         string type,

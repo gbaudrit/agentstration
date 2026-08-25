@@ -6,6 +6,8 @@ using Agentstration.Runtime.Contracts;
 
 namespace Agentstration.Web.Console;
 
+public enum ToolArgumentRetentionMode { Inherit, Retain, DoNotRetain }
+
 public sealed class AgentRunnerModel
 {
     [Required, StringLength(100_000, MinimumLength = 1)]
@@ -14,6 +16,7 @@ public sealed class AgentRunnerModel
     public string? Context { get; set; }
     public string? RuntimeParameters { get; set; }
     public RuntimeStreamingMode Streaming { get; set; } = RuntimeStreamingMode.Automatic;
+    public ToolArgumentRetentionMode ToolArgumentRetention { get; set; }
     [Range(1, 600)] public int TimeoutSeconds { get; set; } = 120;
 
     public CreateRuntimeRunRequest ToRequest(AgentResource agent)
@@ -49,7 +52,7 @@ public sealed class AgentRunnerModel
         }
         return new CreateRuntimeRunRequest
         {
-            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation),
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation) { Namespace = agent.Namespace },
             Input = new RuntimeRunInput
             {
                 Messages = [new RuntimeRunMessage(RuntimeMessageRole.User, Prompt)],
@@ -59,6 +62,12 @@ public sealed class AgentRunnerModel
             {
                 Mode = RuntimeExecutionMode.Interactive,
                 Streaming = Streaming,
+                PersistToolArguments = ToolArgumentRetention switch
+                {
+                    ToolArgumentRetentionMode.Retain => true,
+                    ToolArgumentRetentionMode.DoNotRetain => false,
+                    _ => null
+                },
                 TimeoutSeconds = TimeoutSeconds,
                 Parameters = parameters
             },
@@ -74,6 +83,11 @@ public sealed class AgentRunnerState
     public string Response { get; private set; } = string.Empty;
     public RuntimeRunState State { get; private set; } = RuntimeRunState.Pending;
     public IReadOnlyList<RuntimeRunEvent> Events => events;
+    public IReadOnlyList<RuntimeToolCall> ToolCalls => (Run?.Status.ToolCalls ?? [])
+        .Concat(events.Where(runEvent => runEvent.ToolCall is not null).Select(runEvent => runEvent.ToolCall!))
+        .GroupBy(toolCall => toolCall.Id, StringComparer.Ordinal)
+        .Select(group => group.Last())
+        .ToArray();
     public long LastSequence => events.Count == 0 ? 0 : events[^1].Sequence;
 
     public void Reset(RuntimeRun run)
@@ -86,16 +100,24 @@ public sealed class AgentRunnerState
 
     public void Apply(RuntimeRunEvent runEvent)
     {
-        if (events.Any(item => item.EventId == runEvent.EventId)) return;
-        events.Add(runEvent);
+        if (!AddEvent(runEvent)) return;
         if (runEvent.Kind == RuntimeRunEventKind.ResponseDelta && runEvent.Content is not null) Response += runEvent.Content;
         if (runEvent.State is { } state) State = state;
     }
+
+    public void Restore(RuntimeRunEvent runEvent) => AddEvent(runEvent);
 
     public void Refresh(RuntimeRun run)
     {
         Run = run;
         State = run.Status.State;
         if (string.IsNullOrEmpty(Response)) Response = run.Status.Response ?? string.Empty;
+    }
+
+    private bool AddEvent(RuntimeRunEvent runEvent)
+    {
+        if (events.Any(item => item.EventId == runEvent.EventId)) return false;
+        events.Add(runEvent);
+        return true;
     }
 }

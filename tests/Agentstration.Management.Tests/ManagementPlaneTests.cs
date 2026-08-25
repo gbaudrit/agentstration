@@ -1,8 +1,9 @@
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
-using Agentstration.Management.Core;
 using Agentstration.Management.Contracts;
+using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Resources;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -35,6 +36,8 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual("platform", root.GetProperty("metadata").GetProperty("tags").GetProperty("team").GetString());
         Assert.AreEqual("engineering", root.GetProperty("metadata").GetProperty("annotations").GetProperty("owner").GetString());
         Assert.AreEqual("reasoning-default", root.GetProperty("definition").GetProperty("modelProfile").GetProperty("name").GetString());
+        Assert.AreEqual("maf-builtin", root.GetProperty("definition").GetProperty("runtimeProfile").GetProperty("name").GetString());
+        Assert.AreEqual("default", root.GetProperty("definition").GetProperty("runtimeProfile").GetProperty("namespace").GetString());
         Assert.IsFalse(root.TryGetProperty("id", out _));
         Assert.IsFalse(root.TryGetProperty("type", out _));
         Assert.IsFalse(root.TryGetProperty("resourceGroup", out _));
@@ -78,6 +81,8 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual(expected.Uid, actual.Uid);
         Assert.AreEqual(expected.Metadata.Name, actual.Metadata.Name);
         Assert.AreEqual("reasoning-default", actual.Definition.ModelProfile.Name);
+        Assert.AreEqual("maf-builtin", actual.Definition.RuntimeProfile.Name);
+        Assert.AreEqual(ResourceNamespace.Default, actual.Definition.RuntimeProfile.Namespace);
         Assert.AreEqual("internal", actual.Metadata.Tags["tier"]);
     }
 
@@ -89,6 +94,11 @@ public sealed class ManagementPlaneTests
         {
             Uid = Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Generation = 3,
+            Metadata = new ResourceMetadata
+            {
+                Name = "assistant",
+                Namespace = new ResourceNamespace("agentstration.sample-pack")
+            },
             Definition = Agent("assistant").Definition with
             {
                 Instructions = "  Answer carefully.\r\nUse sources.  ",
@@ -104,6 +114,9 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual("Answer carefully.\nUse sources.", first.EffectiveInstructions);
         CollectionAssert.AreEqual(new[] { "alpha", "zeta" }, first.EffectiveToolNames.ToArray());
         Assert.AreEqual("reasoning-default", first.ModelProfileName);
+        Assert.AreEqual(new ResourceNamespace("agentstration.sample-pack"), first.ModelProfileNamespace);
+        Assert.AreEqual("maf-builtin", first.RuntimeProfileName);
+        Assert.AreEqual(ResourceNamespace.Default, first.RuntimeProfileNamespace);
     }
 
     [TestMethod]
@@ -149,6 +162,29 @@ public sealed class ManagementPlaneTests
         Assert.AreEqual("preserve-me", loaded.Value.Metadata.Annotations["note"]);
     }
 
+    [TestMethod]
+    public async Task SqliteStoreIsolatesHomonymousResourcesByNamespace()
+    {
+        await using var fixture = await StoreFixture.CreateAsync();
+        var firstNamespace = new ResourceNamespace("team-a");
+        var secondNamespace = new ResourceNamespace("team-b");
+        var first = Agent("assistant") with { Metadata = new ResourceMetadata { Namespace = firstNamespace, Name = "assistant" } };
+        var second = Agent("assistant") with { Metadata = new ResourceMetadata { Namespace = secondNamespace, Name = "assistant" } };
+
+        await fixture.Store.PutAsync(first, null, true, default);
+        await fixture.Store.PutAsync(second, null, true, default);
+
+        var loadedFirst = await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", firstNamespace), default);
+        var loadedSecond = await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", secondNamespace), default);
+        Assert.AreEqual(firstNamespace, loadedFirst?.Value.Namespace);
+        Assert.AreEqual(secondNamespace, loadedSecond?.Value.Namespace);
+        Assert.IsNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant"), default));
+
+        await fixture.Store.DeleteAsync(new ResourceKey(ResourceKinds.Agent, "assistant", firstNamespace), loadedFirst!.ETag, default);
+        Assert.IsNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", firstNamespace), default));
+        Assert.IsNotNull(await fixture.Store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, "assistant", secondNamespace), default));
+    }
+
     private static AgentResource Agent(string name) => new()
     {
         ApiVersion = ManagementApiVersions.CoreV1,
@@ -166,7 +202,7 @@ public sealed class ManagementPlaneTests
     private static AgentDeploymentSpec LocalSpec() => new()
     {
         Environment = "local",
-        RuntimeProfileName = "maf-default",
+        RuntimeProfileName = "maf-builtin",
         HostingMode = AgentHostingMode.InProcess
     };
 

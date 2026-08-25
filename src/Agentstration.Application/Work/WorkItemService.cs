@@ -1,13 +1,15 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Agentstration.Flow;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
-using Agentstration.Flow;
 using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Application.Work;
 
 public sealed record SubmitWorkItemCommand(
+    WorkspaceId WorkspaceId,
     string Type,
     string Instruction,
     string? Title = null,
@@ -18,14 +20,16 @@ public sealed record SubmitWorkItemCommand(
     IReadOnlyDictionary<string, string>? Metadata = null,
     IReadOnlyList<WorkInput>? Inputs = null,
     IReadOnlyList<WorkAttachment>? Attachments = null,
-    FlowReference? Flow = null);
+    FlowReference? Flow = null,
+    WorkItemId? Id = null);
 
 public sealed class WorkItemService(
     IWorkItemRepository repository,
     IWorkExecutionGateway executionGateway,
     TimeProvider timeProvider,
     ILogger<WorkItemService> logger,
-    IEnumerable<IWorkTaskEventSink> eventSinks)
+    IEnumerable<IWorkTaskEventSink> eventSinks,
+    IEnumerable<IWorkExecutionScopeAccessor> executionScopeAccessors)
 {
     public static readonly ActivitySource ActivitySource = new("Agentstration.Work");
     public static readonly Meter Meter = new("Agentstration.Work");
@@ -55,14 +59,18 @@ public sealed class WorkItemService(
         using var activity = ActivitySource.StartActivity("work.submit");
         var now = timeProvider.GetUtcNow();
         var item = WorkItem.Create(
-            WorkItemId.New(), command.Type, command.Instruction, now, command.Title, command.Description,
+            command.Id ?? WorkItemId.New(), command.WorkspaceId, command.Type, command.Instruction, now, command.Title, command.Description,
             command.RequesterIdentity, command.CorrelationId, command.Metadata, command.RequestedAgentId, command.Inputs, command.Attachments, command.Flow);
         activity?.SetTag("work.item.id", item.Id.ToString());
         activity?.SetTag("work.correlation.id", item.CorrelationId.ToString());
+        var executionScope = executionScopeAccessors.Select(accessor => accessor.Current).FirstOrDefault(scope => scope is not null);
+        if (item.Flow is not null && executionScope is null)
+            throw new WorkValidationException("work_execution_scope_required", "Flow-backed work requires an authenticated execution scope.");
         await repository.CreateAsync(item, cancellationToken);
 
         var accepted = await executionGateway.RequestExecutionAsync(new WorkExecutionRequest(
-            item.Id, item.CorrelationId, item.Type, item.Instruction, item.RequestedAgentId, item.Inputs, item.Attachments, item.Metadata, item.Flow), cancellationToken);
+            item.Id, item.WorkspaceId, item.CorrelationId, item.Type, item.Instruction, item.RequestedAgentId, item.Inputs, item.Attachments, item.Metadata, item.Flow,
+            executionScope), cancellationToken);
         var expectedVersion = item.Version;
         item.MarkQueued(accepted.ExecutionId, accepted.SelectedAgentId, accepted.EventId, accepted.AcceptedAt);
         var stored = await repository.SaveAsync(item, expectedVersion, cancellationToken);
@@ -74,7 +82,7 @@ public sealed class WorkItemService(
         return stored;
     }
 
-    public Task<StoredWorkItem?> GetAsync(WorkItemId id, CancellationToken cancellationToken) => repository.GetAsync(id, cancellationToken);
+    public Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken) => repository.GetAsync(workspaceId, id, cancellationToken);
     public Task<WorkItemPage> QueryAsync(WorkItemQuery query, CancellationToken cancellationToken) => repository.QueryAsync(query, cancellationToken);
 
     public async Task<StoredWorkItem> ApplyExecutionEventAsync(WorkExecutionEvent executionEvent, CancellationToken cancellationToken)
@@ -82,8 +90,11 @@ public sealed class WorkItemService(
         ArgumentNullException.ThrowIfNull(executionEvent);
         using var activity = ActivitySource.StartActivity("work.apply-runtime-event");
         activity?.SetTag("work.item.id", executionEvent.WorkItemId.ToString());
+        activity?.SetTag("agentstration.workspace.id", executionEvent.WorkspaceId.ToString());
         activity?.SetTag("work.execution.id", executionEvent.ExecutionId.ToString());
-        var stored = await GetRequiredAsync(executionEvent.WorkItemId, cancellationToken);
+        var stored = await GetRequiredAsync(executionEvent.WorkspaceId, executionEvent.WorkItemId, cancellationToken);
+        if (stored.Value.WorkspaceId != executionEvent.WorkspaceId)
+            throw new WorkTransitionException("workspace_mismatch", "The runtime event belongs to another workspace.");
         var expectedVersion = stored.Value.Version;
         if (!stored.Value.ApplyRuntimeEvent(executionEvent)) return stored;
         StoredWorkItem updated;
@@ -93,7 +104,7 @@ public sealed class WorkItemService(
         }
         catch (WorkItemConcurrencyException)
         {
-            var latest = await GetRequiredAsync(executionEvent.WorkItemId, cancellationToken);
+            var latest = await GetRequiredAsync(executionEvent.WorkspaceId, executionEvent.WorkItemId, cancellationToken);
             if (latest.Value.History.Any(value => value.EventId == executionEvent.EventId)) return latest;
             throw;
         }
@@ -108,9 +119,9 @@ public sealed class WorkItemService(
         return updated;
     }
 
-    public async Task<StoredWorkItem> CancelAsync(WorkItemId id, string? authorId, CancellationToken cancellationToken)
+    public async Task<StoredWorkItem> CancelAsync(WorkspaceId workspaceId, WorkItemId id, string? authorId, CancellationToken cancellationToken)
     {
-        var stored = await GetRequiredAsync(id, cancellationToken);
+        var stored = await GetRequiredAsync(workspaceId, id, cancellationToken);
         var expectedVersion = stored.Value.Version;
         stored.Value.Cancel(authorId, Guid.NewGuid(), timeProvider.GetUtcNow());
         var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
@@ -119,9 +130,9 @@ public sealed class WorkItemService(
         return updated;
     }
 
-    public async Task<StoredWorkItem> AddMessageAsync(WorkItemId id, string content, string? authorId, CancellationToken cancellationToken)
+    public async Task<StoredWorkItem> AddMessageAsync(WorkspaceId workspaceId, WorkItemId id, string content, string? authorId, CancellationToken cancellationToken)
     {
-        var stored = await GetRequiredAsync(id, cancellationToken);
+        var stored = await GetRequiredAsync(workspaceId, id, cancellationToken);
         var expectedVersion = stored.Value.Version;
         stored.Value.AddMessage(content, authorId, Guid.NewGuid(), timeProvider.GetUtcNow());
         var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
@@ -129,9 +140,9 @@ public sealed class WorkItemService(
         return updated;
     }
 
-    public async Task<StoredWorkItem> PauseAsync(WorkItemId id, CancellationToken cancellationToken)
+    public async Task<StoredWorkItem> PauseAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken)
     {
-        var stored = await GetRequiredAsync(id, cancellationToken);
+        var stored = await GetRequiredAsync(workspaceId, id, cancellationToken);
         var expectedVersion = stored.Value.Version;
         if (!stored.Value.Pause(Guid.NewGuid(), timeProvider.GetUtcNow())) return stored;
         var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
@@ -139,9 +150,9 @@ public sealed class WorkItemService(
         return updated;
     }
 
-    public async Task<StoredWorkItem> ResumeAsync(WorkItemId id, CancellationToken cancellationToken)
+    public async Task<StoredWorkItem> ResumeAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken)
     {
-        var stored = await GetRequiredAsync(id, cancellationToken);
+        var stored = await GetRequiredAsync(workspaceId, id, cancellationToken);
         var expectedVersion = stored.Value.Version;
         if (!stored.Value.Resume(Guid.NewGuid(), timeProvider.GetUtcNow())) return stored;
         var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
@@ -149,9 +160,9 @@ public sealed class WorkItemService(
         return updated;
     }
 
-    public async Task<StoredWorkItem> ProvideInputAsync(WorkItemId id, WorkInput input, string? authorId, CancellationToken cancellationToken)
+    public async Task<StoredWorkItem> ProvideInputAsync(WorkspaceId workspaceId, WorkItemId id, WorkInput input, string? authorId, CancellationToken cancellationToken)
     {
-        var stored = await GetRequiredAsync(id, cancellationToken);
+        var stored = await GetRequiredAsync(workspaceId, id, cancellationToken);
         var expectedVersion = stored.Value.Version;
         stored.Value.ProvideInput(input, authorId, Guid.NewGuid(), timeProvider.GetUtcNow());
         var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
@@ -159,9 +170,9 @@ public sealed class WorkItemService(
         return updated;
     }
 
-    public async Task<StoredWorkItem> SubmitApprovalAsync(WorkItemId id, WorkApprovalDecision decision, string? authorId, string? comment, CancellationToken cancellationToken)
+    public async Task<StoredWorkItem> SubmitApprovalAsync(WorkspaceId workspaceId, WorkItemId id, WorkApprovalDecision decision, string? authorId, string? comment, CancellationToken cancellationToken)
     {
-        var stored = await GetRequiredAsync(id, cancellationToken);
+        var stored = await GetRequiredAsync(workspaceId, id, cancellationToken);
         var expectedVersion = stored.Value.Version;
         stored.Value.SubmitApproval(decision, authorId, comment, Guid.NewGuid(), timeProvider.GetUtcNow());
         var updated = await repository.SaveAsync(stored.Value, expectedVersion, cancellationToken);
@@ -169,8 +180,8 @@ public sealed class WorkItemService(
         return updated;
     }
 
-    private async Task<StoredWorkItem> GetRequiredAsync(WorkItemId id, CancellationToken cancellationToken) =>
-        await repository.GetAsync(id, cancellationToken) ?? throw new KeyNotFoundException($"Work item '{id}' was not found.");
+    private async Task<StoredWorkItem> GetRequiredAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken) =>
+        await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new KeyNotFoundException($"Work item '{id}' was not found in workspace '{workspaceId}'.");
 
     private async Task PublishAsync(WorkItem item, CancellationToken cancellationToken)
     {

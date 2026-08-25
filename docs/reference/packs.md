@@ -1,0 +1,216 @@
+# Pack format and lifecycle
+
+> **Status:** implemented local V1 contract. Advanced dependencies, updates, signatures, Gallery, and Marketplace behavior remain planned.
+
+## Definition
+
+An Agentstration Pack is a versioned, distributable unit that groups a coherent set of zero or more Agentstration resources with the metadata needed to install, configure, update, and uninstall them. A one-resource Pack is valid; the format does not impose artificial granularity.
+
+The Pack belongs to the Management/distribution plane and is not a Runtime primitive.
+
+Every Pack declares one audience:
+
+- `personal` for everyday individual use;
+- `professional` for governed work and organizational use;
+- `universal` when the same experience is intentionally suitable in both contexts.
+
+Audience is presentation and discovery metadata. It does not create a separate Pack kind, runtime, installation path, or security boundary. Manifests that predate this field default to `universal`.
+
+Every Pack also has one purpose:
+
+- `sample` demonstrates an Agentstration capability or orchestration pattern;
+- `template` is a starting point intended to be forked and customized;
+- `standard` is a regular Pack without a special usage designation.
+
+Purpose is discovery and presentation metadata. It does not imply support, certification, production readiness, or a distinct lifecycle. Manifests that predate this field default to `standard`.
+
+Every installation uses the namespace `publisher.name`. For example, `agentstration/who-am-i` installs into `agentstration.who-am-i`. Publisher and Pack names use lowercase ASCII letters, digits and `-`, which makes this mapping direct and collision-free. Resource `metadata.name` values are not prefixed or rewritten.
+
+## Archive
+
+```text
+price-watch/
+├── pack.yaml
+├── README.md
+├── flows/
+│   └── price-watch.yaml
+├── agents/
+│   └── product-analyzer.yaml
+└── entries/
+    └── price-watch.yaml
+```
+
+The manifest shape is:
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: Pack
+metadata:
+  name: price-watch
+  publisher: agentstration
+  version: 1.0.0
+  audience: personal
+  purpose: standard
+  displayName: Price Watch
+  description: Monitor product prices and notify at a configured threshold.
+  categories: [shopping, automation]
+  tags: [price, monitoring]
+definition:
+  bindings:
+    - name: conversational-model
+      targetKind: modelProfile
+      displayName: Conversational model
+      required: true
+  resources:
+    - flows/price-watch.yaml
+    - agents/product-analyzer.yaml
+    - entries/price-watch.yaml
+```
+
+`pack.yaml` uses the same `metadata` and typed `definition` envelope as other Agentstration manifests, while remaining a distribution artifact rather than a runtime-capable resource. Every path in `definition.resources` resolves inside the archive and points to an ordinary manifest with its own `apiVersion`, `kind`, metadata, and kind-specific body. Absolute paths, parent traversal, links escaping the archive, duplicate canonical resources, and unbounded archive expansion must be rejected.
+
+## Versioning
+
+The Pack version initially follows Semantic Versioning. It versions the bundle, not its contained resources. These values remain independent:
+
+| Value | Meaning |
+| --- | --- |
+| Pack version | Version of the distributed set. |
+| Resource `apiVersion` | Schema used to read one manifest. |
+| Resource generation, ETag, or version | Lifecycle or concurrency value owned by that resource's module. |
+| Product version | Version of Agentstration itself. |
+
+## Installed state and provenance
+
+The instance records an `InstalledPack` management record containing at least:
+
+- publisher, Pack name, and installed version;
+- the deterministic installation namespace;
+- installation source and timestamp;
+- explicit installation state;
+- the managed resources and their installed fingerprints or revisions.
+
+Per-resource provenance must answer which Pack owns the resource, which Pack version supplied it, and whether the current resource still matches the installed content. This evidence enables later `managed`, `detached`, `overridden`, or `conflict` policies without silently destroying local changes.
+
+## Supported resources
+
+Local V1 installs these resource kinds in dependency-safe order:
+
+1. `ModelProvider`;
+2. `RuntimeProfile`;
+3. `ModelProfile`;
+4. `Agent`;
+5. `Flow`;
+6. `Entry`.
+
+Every contained resource uses `apiVersion: agentstration.io/v1`, the declared `kind`, `metadata.name`, and a typed `definition`. Management resources retain their normal definition shape. Pack Flow and Entry definitions use their existing domain properties under the same envelope. Unsupported kinds are rejected before any mutation.
+
+Unqualified references between contained resources resolve relative to the Pack namespace. A dependency outside the Pack must carry an explicit namespace; shared standalone resources normally use `namespace: default`. A fork changes the Pack coordinate and therefore installs the same local resource names into a different namespace without conflicting with its source.
+
+The Console Flow catalog includes both workspace Flows from the default namespace and installed Pack Flows from their Pack namespaces. Namespaced Flows can be inspected and run from the Console; direct authoring remains limited to default-namespace workspace Flows.
+
+## Requirements and configuration
+
+A manifest may describe dependencies on another Pack, a platform capability, or an integration/provider capability. Local V1 rejects every non-empty `requirements` list because dependency resolution is not yet available; it does not silently install or configure a sensitive integration. Pack-to-Pack and capability resolution are deferred.
+
+An installation may consequently be ready, need configuration, or report a missing requirement. Pack-wide configuration remains distinct from Work input: global limits and connections belong to installation configuration, while values for one Task or Automation belong to that Work instance.
+
+### Resource bindings
+
+A Pack can declare logical bindings for workspace resources that must be selected at installation time. V1 supports `modelProfile` and `secret` targets. A contained resource references a declaration instead of embedding an environment-specific resource name:
+
+```yaml
+definition:
+  modelProfile:
+    binding: conversational-model
+```
+
+The installer shows every binding, the contained resources that use it, and the currently selected workspace target. It then replaces the placeholder with a normal explicit `ResourceReference` before delegating validation and creation to the resource owner.
+
+Selections are stored against the stable `publisher/name` Pack identity and survive uninstall and reinstall. Updating the Pack version therefore reuses available selections. A fork has a different identity: it keeps the logical requirements but asks for its own selections.
+
+A Secret binding stores only the Secret resource namespace and name. Secret values remain in the selected Vault and are never included in the archive, preview, installed Pack, or browser state. Deleting a selected target makes the binding unavailable and blocks a required installation until a replacement is chosen.
+
+## Creating a Pack from workspace resources
+
+The Console exposes **Create from workspace** from the Packs page. The Composer lists the resources visible in the current workspace and distinguishes three states:
+
+- `Agent`, `Flow`, `Entry`, `ModelProfile`, `ModelProvider`, and `RuntimeProfile` resources are selectable;
+- an unselected Model Profile or Model Provider referenced by selected content becomes an installation binding;
+- Secrets are always binding targets and their values are never copied;
+- vaults and tools remain visible but unsupported.
+
+The Composer uses a two-panel workspace: available resources remain on the left and Pack contents move to the right. A resource appears in only one panel. The right panel separates **Your selection** from **Included automatically** and explains the dependency path responsible for every automatic inclusion. Every action recomputes the complete dependency closure; there is no separate review action to forget.
+
+Removing a direct selection drops it from the Pack only when no other selected resource requires it. Otherwise the action is labelled **Leave as dependency**, and the resource moves to the automatic group instead of appearing to disappear and return. **Keep explicitly** promotes an automatic dependency to a direct selection so that it remains when its current parent is later removed. For example, adding an Entry displays its Flow and the Agents used by that Flow with paths such as `Required by Entry X → Flow main`. An Agent's Model Profile remains a binding until that profile is added to the Pack; the included profile's provider follows the same rule. Provider credentials always remain Secret bindings. Runtime Profiles are selected explicitly because they are associated with deployments rather than Agent definitions. Missing or unsupported dependencies block creation and are shown progressively before any artifact is written.
+
+Creating the project takes an immutable snapshot of the reviewed resources, generates a validated source archive, and records both explicitly selected resources and automatically included dependencies. The original workspace resources remain unchanged. Later edits in the workspace do not silently alter that project revision; create another project or refresh the composition explicitly in a future authoring increment.
+
+The first increment accepts resources from the default workspace namespace. A Pack built from the resulting project installs into its normal identity-derived namespace, so the source resources and installed copy do not conflict.
+
+## V1 lifecycle
+
+```text
+Read local archive
+  -> validate archive and manifest
+  -> validate every resource with its owning module
+  -> validate supported requirements
+  -> apply resources
+  -> record provenance
+  -> record InstalledPack
+```
+
+Validation completes before mutation. Application must be an explicit durable operation: it either succeeds coherently or records enough state to compensate or resume. Direct cross-store writes that bypass module validation are not allowed.
+
+Uninstall checks Pack dependencies, live resource references, ownership, and local modifications. It removes only still-managed resources and then the InstalledPack record. Detached or changed resources are preserved unless a later explicit conflict policy authorizes another outcome.
+
+The executable local increment covers:
+
+1. a local archive and `Pack` manifest;
+2. bounded archive and manifest validation;
+3. resource installation through owning services;
+4. per-resource provenance;
+5. installed-Pack listing;
+6. safe uninstall;
+7. independent Pack versions.
+
+Advanced dependencies, update/merge policy, signatures, verified publishers, Gallery clients, ratings, licensing, payment, and Marketplace policy are outside V1.
+
+## HTTP API
+
+The authorized Management API exposes:
+
+```text
+POST   /api/packs/preview
+POST   /api/packs
+GET    /api/packs
+GET    /api/packs/{publisher}/{name}
+DELETE /api/packs/{publisher}/{name}
+
+GET    /api/pack-projects/composer/resources
+POST   /api/pack-projects/composer/preview
+POST   /api/pack-projects
+```
+
+The Composer catalog endpoint returns the current workspace inventory and each resource's authoring availability. Preview accepts selected resource keys and returns the dependency closure, generated binding requirements, archive paths, and validation issues. Project creation accepts the Pack coordinate, presentation metadata, and the same selection; the server recomputes validation rather than trusting a previous browser preview.
+
+`POST /api/packs/preview` and `POST /api/packs` accept a ZIP body with `Content-Type: application/zip` or `application/octet-stream`. Preview performs the complete archive and resource validation, reports existing-resource conflicts, and makes no changes. `X-Pack-File-Name` records a display-safe local source name. Compressed input is limited to 8 MiB; the reader permits at most 128 files, 4 MiB per expanded file, and 16 MiB total expanded content. Absolute paths, parent traversal, duplicate paths, and symbolic links are rejected.
+
+Install the version-controlled offline example from the repository root:
+
+```powershell
+Compress-Archive -Path samples/packs/offline-runtime/* -DestinationPath offline-runtime.zip
+Invoke-RestMethod -Method Post -ContentType application/zip -InFile offline-runtime.zip -Headers @{ "X-Pack-File-Name" = "offline-runtime.zip" } http://localhost:5100/api/packs
+Invoke-RestMethod http://localhost:5100/api/packs
+Invoke-RestMethod -Method Delete http://localhost:5100/api/packs/agentstration/offline-runtime
+```
+
+Installation refuses to replace an existing resource in the same namespace. It records progress after every applied resource and compensates in reverse order on failure. Uninstall compares each current ETag or module version token with its installation evidence; modified resources are preserved and the Pack becomes `degraded`.
+
+The repository also contains `samples/packs/who-am-i`, a five-resource distribution smoke test with three role-specific Agents, a Direct Flow, and a conversational Entry. Namespaced Agents and Flows appear in their global Console catalogs. The first local Flow run prepares the referenced Agent generation in the same namespace, so installing a Pack does not need to create mutable runtime deployments eagerly. The sample deliberately documents rather than conceals the remaining execution gaps: Workspace exposure, multi-agent turns, private state, and generic human-input suspension are not supplied by Pack V1.
+
+## Distribution and trust
+
+A Pack can eventually come from a local file, URL, repository, private Gallery, or public Gallery. The format does not depend on any one source and local offline installation remains required.
+
+Packs are untrusted input. Installation must show the publisher, resources to be created or changed, declared requirements, and relevant tools or integrations before applying sensitive changes. Hashes, signatures, verified publishers, permissions, and trust levels are later hardening layers, not reasons to make remote distribution mandatory.

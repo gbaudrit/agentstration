@@ -1,0 +1,513 @@
+@page "/packs"
+@implements IDisposable
+@inject IPacksClient Client
+@inject IServiceProvider Services
+@inject NavigationManager Navigation
+
+<PageTitle>Packs · Agentstration</PageTitle>
+<PageHeader Title="Packs" Description="Install and govern versioned bundles of Agentstration resources. Packs distribute configuration; they are not runtime execution units.">
+    <Actions>
+        <button class="button-secondary" disabled="@loading" @onclick="LoadAsync">Refresh</button>
+        <a class="button-secondary" href="/pack-projects/new">Create from workspace</a>
+        <button class="button-primary" @onclick="OpenInstall">Install local Pack</button>
+    </Actions>
+</PageHeader>
+
+@if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+}
+else if (packs is null)
+{
+    <LoadingState Message="Loading installed Packs…" />
+}
+else
+{
+    <section class="metric-grid pack-metrics" aria-label="Pack metrics">
+        <MetricCard Label="Installed Packs" Value="@packs.Count.ToString()" Detail="Current workspace" Status="UiStatus.Info" />
+        <MetricCard Label="Managed resources" Value="@packs.Sum(pack => pack.Definition.ManagedResources.Count).ToString()" Detail="Created from Packs" Status="UiStatus.Success" />
+        <MetricCard Label="Requires attention" Value="@AttentionCount.ToString()" Detail="Failed or degraded" Status="@(AttentionCount == 0 ? UiStatus.Neutral : UiStatus.Warning)" />
+        <MetricCard Label="Pack Projects" Value="@(projects?.Count.ToString() ?? "—")" Detail="Local authoring" Status="UiStatus.Info" />
+    </section>
+
+    @if (packs.Count == 0)
+    {
+        <EmptyState Title="No Packs installed" Message="Install a local .zip Pack to add a validated set of resources to this workspace.">
+            <button class="button-primary" @onclick="OpenInstall">Install local Pack</button>
+        </EmptyState>
+    }
+    else
+    {
+        <DataGrid TItem="InstalledPackResource" Items="packs">
+            <Header><tr><th>Pack</th><th>Purpose</th><th>Audience</th><th>Version</th><th>Status</th><th>Resources</th><th>Installed</th><th></th></tr></Header>
+            <Row Context="pack"><tr class="@(IsSelected(pack) ? "selected-pack" : null)">
+                <td><strong>@DisplayName(pack)</strong><br /><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></td>
+                <td><span class="pack-kind">@PurposeLabel(pack.Definition.Purpose)</span></td>
+                <td>@AudienceLabel(pack.Definition.Audience)</td>
+                <td><code>@pack.Definition.Version</code></td>
+                <td><StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" /></td>
+                <td>@pack.Definition.ManagedResources.Count</td>
+                <td><time datetime="@pack.Definition.InstalledAt.ToString("O")">@pack.Definition.InstalledAt.ToLocalTime().ToString("g")</time></td>
+                <td><button class="text-button" @onclick="() => SelectAsync(pack)">Inspect</button></td>
+            </tr></Row>
+        </DataGrid>
+    }
+
+    @if (selected is not null)
+    {
+        <section class="panel pack-details" aria-label="Selected Pack details">
+            <div class="panel-header">
+                <div><p class="eyebrow">Installed Pack</p><h2>@DisplayName(selected.Value)</h2></div>
+                <div class="pack-detail-actions"><StatusBadge Text="@StateLabel(selected.Value.Definition.State)" Status="@StateTone(selected.Value.Definition.State)" /><button class="button-secondary" @onclick="OpenFork">Fork</button><button class="button-danger" @onclick="() => confirmUninstall = true">Uninstall</button></div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.Description)) { <p>@selected.Value.Definition.Description</p> }
+            <dl class="resource-details pack-facts">
+                <dt>Identity</dt><dd><code>@selected.Value.Definition.Publisher/@selected.Value.Definition.PackName</code></dd>
+                <dt>Namespace</dt><dd><code>@selected.Value.Definition.Namespace</code></dd>
+                <dt>Version</dt><dd>@selected.Value.Definition.Version</dd>
+                <dt>Purpose</dt><dd><span class="pack-kind">@PurposeLabel(selected.Value.Definition.Purpose)</span></dd>
+                <dt>Audience</dt><dd>@AudienceLabel(selected.Value.Definition.Audience)</dd>
+                <dt>Source</dt><dd>@selected.Value.Definition.Source</dd>
+                <dt>Installed</dt><dd>@selected.Value.Definition.InstalledAt.ToLocalTime().ToString("F")</dd>
+            </dl>
+            <h3>Resource bindings</h3>
+            @if (selected.Value.Definition.Bindings.Count == 0) { <p class="pack-muted">This Pack does not declare external resource bindings.</p> }
+            else
+            {
+                <div class="pack-binding-list">
+                    @foreach (var binding in selected.Value.Definition.Bindings)
+                    {
+                        <article>
+                            <span class="pack-kind">@BindingKindLabel(binding.TargetKind)</span>
+                            <div><strong>@binding.Name</strong><small><code>@BindingTarget(binding.Target)</code></small></div>
+                            <StatusBadge Text="Configured" Status="UiStatus.Success" />
+                        </article>
+                    }
+                </div>
+            }
+            <h3>Managed resources</h3>
+            @if (selected.Value.Definition.ManagedResources.Count == 0) { <p class="pack-muted">This Pack does not currently manage any resources.</p> }
+            else
+            {
+                <div class="pack-resource-list">
+                    @foreach (var resource in selected.Value.Definition.ManagedResources)
+                    {
+                        <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div></article>
+                    }
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.ErrorMessage)) { <p class="error-panel">@selected.Value.Definition.ErrorMessage</p> }
+        </section>
+    }
+
+    @if (projects is { Count: > 0 })
+    {
+        <section class="panel pack-details" aria-label="Pack Projects">
+            <div class="panel-header"><div><p class="eyebrow">Local authoring</p><h2>Pack Projects</h2></div></div>
+            <div class="pack-resource-list">
+                @foreach (var project in projects)
+                {
+                    <article><span class="pack-kind">Project</span><div><strong>@project.Definition.DisplayName</strong><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @project.Definition.Version · @PurposeLabel(project.Definition.Purpose) · @AudienceLabel(project.Definition.Audience)</small></div><button class="text-button" @onclick="() => OpenProject(project.Uid)">Open</button></article>
+                }
+            </div>
+        </section>
+    }
+}
+
+@if (installOpen)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CloseInstall">
+        <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-install-title" @onclick:stopPropagation="true">
+            <div class="panel-header"><div><p class="eyebrow">Local archive</p><h2 id="pack-install-title">Install a Pack</h2></div><button class="icon-button" @onclick="CloseInstall" aria-label="Close">×</button></div>
+            <p class="pack-muted">Choose a Pack .zip. The archive is validated and previewed before any resource is created.</p>
+            <label class="pack-file-picker">
+                <span>Select archive</span>
+                <InputFile OnChange="ReadArchiveAsync" accept=".zip,application/zip" disabled="@(previewing || installing)" />
+                <small>Maximum compressed size: 8 MB.</small>
+            </label>
+            @if (previewing) { <LoadingState Message="Validating archive…" /> }
+            @if (installError is not null) { <p class="error-panel" role="alert">@installError</p> }
+            @if (preview is not null)
+            {
+                <section class="pack-preview">
+                    <div class="panel-header"><div><strong>@(preview.Metadata.DisplayName ?? preview.Metadata.Name)</strong><small><code>@preview.Metadata.Publisher/@preview.Metadata.Name</code> · @preview.Metadata.Version · @PurposeLabel(preview.Metadata.Purpose) · @AudienceLabel(preview.Metadata.Audience)</small></div><StatusBadge Text="@PreviewStatus" Status="@(CanInstall ? UiStatus.Success : UiStatus.Warning)" /></div>
+                    @if (!string.IsNullOrWhiteSpace(preview.Metadata.Description)) { <p>@preview.Metadata.Description</p> }
+                    <div class="pack-resource-list compact">
+                        @foreach (var resource in preview.Resources)
+                        {
+                            <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div>@if (resource.AlreadyExists) { <StatusBadge Text="Exists" Status="UiStatus.Warning" /> }</article>
+                        }
+                    </div>
+                    @if (preview.Bindings.Count > 0)
+                    {
+                        <section class="pack-bindings" aria-labelledby="pack-bindings-title">
+                            <div class="pack-bindings-heading">
+                                <div><p class="eyebrow">Installation configuration</p><h3 id="pack-bindings-title">Resource bindings</h3></div>
+                                <span>@preview.Bindings.Count binding(s)</span>
+                            </div>
+                            <p class="pack-muted">Choose workspace resources for the logical requirements declared by this Pack. Secret values never leave their Vault.</p>
+                            @foreach (var binding in preview.Bindings)
+                            {
+                                <article class="pack-binding-editor">
+                                    <div class="pack-binding-copy">
+                                        <span class="pack-kind">@BindingKindLabel(binding.TargetKind)</span>
+                                        <div><strong>@binding.DisplayName</strong><small><code>@binding.Name</code>@(binding.Required ? " · Required" : " · Optional")</small></div>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(binding.Description)) { <p>@binding.Description</p> }
+                                    <label>
+                                        <span>Workspace resource</span>
+                                        <select value="@SelectedBinding(binding.Name)" @onchange="args => BindingChanged(binding.Name, args)">
+                                            <option value="">Select a @BindingKindLabel(binding.TargetKind).ToLowerInvariant()</option>
+                                            @if (binding.TargetKind == PackBindingTargetKind.ModelProfile)
+                                            {
+                                                @foreach (var profile in modelProfiles)
+                                                {
+                                                    <option value="@BindingValue(profile.Name, ResourceNamespace.Parse(profile.Namespace))">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name · @profile.Properties.Provider.Name / @profile.Properties.Model.Name</option>
+                                                }
+                                            }
+                                            else if (binding.TargetKind == PackBindingTargetKind.ModelProvider)
+                                            {
+                                                @foreach (var provider in modelProviders)
+                                                {
+                                                    <option value="@BindingValue(provider.Name, ResourceNamespace.Default)">@provider.Properties.DisplayName — default/@provider.Name · @provider.Properties.ContributionId</option>
+                                                }
+                                            }
+                                            else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration)
+                                            {
+                                                @foreach (var extension in extensionRegistrations)
+                                                {
+                                                    <option value="@BindingValue(extension.Name, extension.Namespace)">@extension.Definition.DisplayName — @extension.Namespace/@extension.Name</option>
+                                                }
+                                            }
+                                            else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile)
+                                            {
+                                                @foreach (var runtimeProfile in runtimeProfiles)
+                                                {
+                                                    <option value="@BindingValue(runtimeProfile.Name, ResourceNamespace.Parse(runtimeProfile.Namespace))">@runtimeProfile.Properties.DisplayName — @runtimeProfile.Namespace/@runtimeProfile.Name · @runtimeProfile.Properties.RuntimeType</option>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                @foreach (var secret in secrets)
+                                                {
+                                                    <option value="@BindingValue(secret.Resource.Name, secret.Resource.Namespace)">@secret.Resource.Definition.DisplayName — @secret.Resource.Namespace/@secret.Resource.Name (@secret.ValueStatus)</option>
+                                                }
+                                            }
+                                        </select>
+                                    </label>
+                                    <small>Used by @string.Join(", ", binding.UsedBy.Select(resource => $"{resource.ResourceKind}/{resource.ResourceName}"))</small>
+                                    @if (binding.Target is not null && !binding.TargetAvailable) { <p class="inline-warning">The previously selected resource is no longer available. Choose a replacement.</p> }
+                                </article>
+                            }
+                        </section>
+                    }
+                    @if (preview.AlreadyInstalled)
+                    {
+                        <section class="pack-reinstall-option" aria-label="Pack replacement">
+                            <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> Replace the installed Pack</label>
+                            <p class="pack-muted">The existing Pack resources are removed safely, then this archive is installed with the selected bindings. Resources modified since installation remain protected and can block replacement.</p>
+                        </section>
+                    }
+                </section>
+            }
+            <div class="dialog-actions"><button class="button-secondary" @onclick="CloseInstall">Cancel</button><button class="button-primary" disabled="@(!CanInstall || installing)" @onclick="InstallAsync">@(installing ? "Installing…" : "Install Pack")</button></div>
+        </section>
+    </div>
+}
+
+@if (forkOpen && selected is not null)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CloseFork">
+        <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-fork-title" @onclick:stopPropagation="true">
+            <div class="panel-header"><div><p class="eyebrow">Editable copy</p><h2 id="pack-fork-title">Fork @DisplayName(selected.Value)</h2></div><button class="icon-button" @onclick="CloseFork" aria-label="Close">×</button></div>
+            <p class="pack-muted">The exact installed archive becomes the immutable source of a local Pack Project. Its resources are not duplicated until you install a build.</p>
+            @if (selected.Value.Definition.SourceArtifact is null)
+            {
+                <section class="pack-source-recovery" aria-labelledby="pack-source-title">
+                    <div class="pack-source-icon" aria-hidden="true">↥</div>
+                    <div>
+                        <h3 id="pack-source-title">Source archive required</h3>
+                        <p>This Pack was installed before source retention was enabled. Select its original ZIP once; Agentstration verifies its identity, version, and resource inventory before attaching it.</p>
+                    </div>
+                    <label class="pack-source-picker">
+                        <span>@(sourceAttaching ? "Verifying archive…" : "Select original Pack ZIP")</span>
+                        <InputFile OnChange="AttachSourceAsync" accept=".zip,application/zip" disabled="@sourceAttaching" />
+                    </label>
+                </section>
+                @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }
+                <div class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">Cancel</button></div>
+            }
+            else
+            {
+                @if (forkNotice is not null) { <p class="pack-success" role="status">@forkNotice</p> }
+                <div class="form-grid pack-fork-grid">
+                    <label><span>Publisher</span><input @bind="forkPublisher" autocomplete="off" spellcheck="false" /></label>
+                    <label><span>Name</span><input @bind="forkName" autocomplete="off" spellcheck="false" /></label>
+                    <label><span>Version</span><input @bind="forkVersion" autocomplete="off" spellcheck="false" /></label>
+                    <label><span>Display name</span><input @bind="forkDisplayName" /></label>
+                    <label class="form-span-2"><span>Description</span><textarea rows="3" @bind="forkDescription"></textarea></label>
+                </div>
+                @if (forkError is not null) { <p class="error-panel" role="alert">@forkError</p> }
+                <div class="dialog-actions"><button class="button-secondary" @onclick="CloseFork">Cancel</button><button class="button-primary" disabled="@(!CanSubmitFork)" @onclick="ForkAsync">@(forking ? "Creating…" : "Create Pack Project")</button></div>
+            }
+        </section>
+    </div>
+}
+
+<ConfirmationDialog IsOpen="@confirmUninstall" Title="Uninstall Pack?" Message="Managed resources are removed only if they have not changed since installation. Modified resources are preserved and the Pack is marked degraded." ConfirmLabel="Uninstall" OnCancel="() => confirmUninstall = false" OnConfirm="UninstallAsync" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "publisher")] public string? RequestedPublisher { get; set; }
+    [SupplyParameterFromQuery(Name = "name")] public string? RequestedName { get; set; }
+
+    private const long MaximumArchiveBytes = 8 * 1024 * 1024;
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<InstalledPackResource>? packs;
+    private IReadOnlyList<PackProjectResource>? projects;
+    private ResourceSnapshot<InstalledPackResource>? selected;
+    private AgentstrationApiException? error;
+    private PackInstallationPreview? preview;
+    private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
+    private IReadOnlyList<ModelProviderResponse> modelProviders = [];
+    private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
+    private IReadOnlyList<ExtensionRegistrationResource> extensionRegistrations = [];
+    private IReadOnlyList<SecretResponse> secrets = [];
+    private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
+    private byte[]? archive;
+    private string archiveName = string.Empty;
+    private string? installError;
+    private bool loading;
+    private bool installOpen;
+    private bool previewing;
+    private bool installing;
+    private bool replaceExisting;
+    private bool confirmUninstall;
+    private bool forkOpen;
+    private bool forking;
+    private bool sourceAttaching;
+    private string forkPublisher = "local";
+    private string forkName = string.Empty;
+    private string forkVersion = "0.1.0-dev.1";
+    private string forkDisplayName = string.Empty;
+    private string? forkDescription;
+    private string? forkError;
+    private string? forkNotice;
+
+    private int AttentionCount => packs?.Count(pack => pack.Definition.State is InstalledPackState.Failed or InstalledPackState.Degraded) ?? 0;
+    private bool CanInstall => preview is not null
+        && (preview.CanInstall || preview.AlreadyInstalled && replaceExisting)
+        && preview.Bindings.All(binding => !binding.Required || !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)));
+    private string PreviewStatus => preview is null ? "Conflict"
+        : preview.Bindings.Any(binding => binding.Required && string.IsNullOrWhiteSpace(SelectedBinding(binding.Name))) ? "Configuration required"
+        : preview.AlreadyInstalled && !replaceExisting ? "Already installed"
+        : CanInstall ? "Ready"
+        : "Conflict";
+    private bool CanSubmitFork => !forking
+        && !string.IsNullOrWhiteSpace(forkPublisher)
+        && !string.IsNullOrWhiteSpace(forkName)
+        && !string.IsNullOrWhiteSpace(forkVersion)
+        && !string.IsNullOrWhiteSpace(forkDisplayName);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            packs = await Client.GetPacksAsync(cancellation.Token);
+            projects = await Client.GetProjectsAsync(cancellation.Token);
+            if (!string.IsNullOrWhiteSpace(RequestedPublisher) && !string.IsNullOrWhiteSpace(RequestedName))
+            {
+                var requested = packs.FirstOrDefault(pack =>
+                    string.Equals(pack.Definition.Publisher, RequestedPublisher, StringComparison.Ordinal)
+                    && string.Equals(pack.Definition.PackName, RequestedName, StringComparison.Ordinal));
+                selected = requested is null ? null : await Client.GetPackAsync(requested.Definition.Publisher, requested.Definition.PackName, cancellation.Token);
+            }
+            else if (selected is not null)
+            {
+                var match = packs.FirstOrDefault(pack => SameIdentity(pack, selected.Value));
+                selected = match is null ? null : await Client.GetPackAsync(match.Definition.Publisher, match.Definition.PackName, cancellation.Token);
+            }
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    private void OpenInstall()
+    {
+        preview = null;
+        archive = null;
+        archiveName = string.Empty;
+        installError = null;
+        replaceExisting = false;
+        bindingSelections.Clear();
+        installOpen = true;
+    }
+
+    private void CloseInstall()
+    {
+        if (installing) return;
+        installOpen = false;
+    }
+
+    private async Task ReadArchiveAsync(InputFileChangeEventArgs args)
+    {
+        previewing = true;
+        preview = null;
+        archive = null;
+        installError = null;
+        replaceExisting = false;
+        archiveName = args.File.Name;
+        try
+        {
+            await using var input = args.File.OpenReadStream(MaximumArchiveBytes, cancellation.Token);
+            await using var output = new MemoryStream();
+            await input.CopyToAsync(output, cancellation.Token);
+            archive = output.ToArray();
+            preview = await Client.PreviewAsync(archive, archiveName, cancellation.Token);
+            bindingSelections.Clear();
+            foreach (var binding in preview.Bindings)
+            {
+                if (binding.TargetAvailable && binding.Target is not null)
+                    bindingSelections[binding.Name] = BindingValue(binding.Target.Name, binding.Target.Namespace ?? ResourceNamespace.Default);
+            }
+            if (preview.Bindings.Count > 0)
+            {
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProfile))
+                    modelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ModelProvider))
+                    modelProviders = await Services.GetRequiredService<IModelProvidersClient>().GetModelProvidersAsync(cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile))
+                    runtimeProfiles = await Services.GetRequiredService<IRuntimeProfilesClient>().GetRuntimeProfilesAsync(cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.ExtensionRegistration))
+                    extensionRegistrations = await Services.GetRequiredService<IExtensionsClient>().GetRegistrationsAsync(cancellation.Token);
+                if (preview.Bindings.Any(binding => binding.TargetKind == PackBindingTargetKind.Secret))
+                    secrets = await Services.GetRequiredService<ISecretsClient>().GetSecretsAsync(cancellation.Token);
+            }
+        }
+        catch (AgentstrationApiException exception) { installError = exception.Message; }
+        catch (IOException exception) { installError = exception.Message; }
+        finally { previewing = false; }
+    }
+
+    private async Task InstallAsync()
+    {
+        if (archive is null || !CanInstall) return;
+        installing = true;
+        installError = null;
+        try
+        {
+            var bindings = preview!.Bindings
+                .Where(binding => !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)))
+                .Select(binding => new PackBindingSelection(binding.Name, ParseBindingTarget(SelectedBinding(binding.Name)!)))
+                .ToArray();
+            selected = await Client.InstallAsync(archive, archiveName, replaceExisting, bindings, cancellation.Token);
+            installOpen = false;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { installError = exception.Message; }
+        finally { installing = false; }
+    }
+
+    private async Task SelectAsync(InstalledPackResource pack)
+    {
+        error = null;
+        try { selected = await Client.GetPackAsync(pack.Definition.Publisher, pack.Definition.PackName, cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private void OpenFork()
+    {
+        if (selected is null) return;
+        forkPublisher = "local";
+        forkName = $"{selected.Value.Definition.PackName}-fork";
+        forkVersion = "0.1.0-dev.1";
+        forkDisplayName = $"{DisplayName(selected.Value)} (Fork)";
+        forkDescription = selected.Value.Definition.Description;
+        forkError = null;
+        forkNotice = null;
+        forkOpen = true;
+    }
+
+    private void CloseFork() { if (!forking) forkOpen = false; }
+
+    private async Task ForkAsync()
+    {
+        if (selected is null) return;
+        forking = true;
+        forkError = null;
+        try
+        {
+            var project = await Client.ForkAsync(selected.Value.Definition.Publisher, selected.Value.Definition.PackName,
+                new(forkPublisher.Trim(), forkName.Trim(), forkVersion.Trim(), forkDisplayName.Trim(), forkDescription?.Trim()), cancellation.Token);
+            Navigation.NavigateTo($"/pack-projects/{project.Value.Uid:D}");
+        }
+        catch (AgentstrationApiException exception) { forkError = exception.Message; }
+        finally { forking = false; }
+    }
+
+    private async Task AttachSourceAsync(InputFileChangeEventArgs args)
+    {
+        if (selected is null) return;
+        sourceAttaching = true;
+        forkError = null;
+        forkNotice = null;
+        try
+        {
+            await using var input = args.File.OpenReadStream(MaximumArchiveBytes, cancellation.Token);
+            await using var output = new MemoryStream();
+            await input.CopyToAsync(output, cancellation.Token);
+            selected = await Client.AttachSourceAsync(selected.Value.Definition.Publisher, selected.Value.Definition.PackName,
+                output.ToArray(), args.File.Name, selected.ETag, cancellation.Token);
+            forkNotice = "Source archive verified and attached. You can now create the Pack Project.";
+        }
+        catch (AgentstrationApiException exception) { forkError = exception.Message; }
+        catch (IOException exception) { forkError = exception.Message; }
+        finally { sourceAttaching = false; }
+    }
+
+    private void OpenProject(Guid projectId) => Navigation.NavigateTo($"/pack-projects/{projectId:D}");
+
+    private async Task UninstallAsync()
+    {
+        if (selected is null) return;
+        confirmUninstall = false;
+        try
+        {
+            await Client.UninstallAsync(selected.Value.Definition.Publisher, selected.Value.Definition.PackName, selected.ETag, cancellation.Token);
+            selected = null;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+    }
+
+    private bool IsSelected(InstalledPackResource pack) => selected is not null && SameIdentity(pack, selected.Value);
+    private static bool SameIdentity(InstalledPackResource left, InstalledPackResource right) => left.Definition.Publisher == right.Definition.Publisher && left.Definition.PackName == right.Definition.PackName;
+    private static string DisplayName(InstalledPackResource pack) => pack.Definition.DisplayName ?? pack.Definition.PackName;
+    private string? SelectedBinding(string name) => bindingSelections.GetValueOrDefault(name);
+    private void BindingChanged(string name, ChangeEventArgs args) => bindingSelections[name] = args.Value?.ToString() ?? string.Empty;
+    private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
+    private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";
+    private static ResourceReference ParseBindingTarget(string value)
+    {
+        var parts = value.Split(':', 2);
+        if (parts.Length != 2) throw new InvalidOperationException("The selected Pack binding is invalid.");
+        return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
+    }
+    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch
+    {
+        PackBindingTargetKind.Secret => "Secret",
+        PackBindingTargetKind.ModelProvider => "Model provider",
+        PackBindingTargetKind.RuntimeProfile => "Runtime profile",
+        PackBindingTargetKind.ExtensionRegistration => "Extension registration",
+        _ => "Model profile"
+    };
+    private static string PurposeLabel(PackPurpose purpose) => purpose switch { PackPurpose.Sample => "SAMPLE", PackPurpose.Template => "TEMPLATE", _ => "STANDARD" };
+    private static string AudienceLabel(PackAudience audience) => audience switch { PackAudience.Personal => "Personal", PackAudience.Professional => "Professional", _ => "Universal" };
+    private static string StateLabel(InstalledPackState state) => state switch { InstalledPackState.Installing => "Installing", InstalledPackState.Installed => "Installed", InstalledPackState.Uninstalling => "Uninstalling", InstalledPackState.Failed => "Failed", _ => "Degraded" };
+    private static UiStatus StateTone(InstalledPackState state) => state switch { InstalledPackState.Installed => UiStatus.Success, InstalledPackState.Failed => UiStatus.Danger, InstalledPackState.Degraded => UiStatus.Warning, _ => UiStatus.Info };
+
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

@@ -7,46 +7,46 @@ namespace Agentstration.Runtime.Local;
 
 public sealed class LocalRuntimeRunQueue : IRuntimeRunQueue
 {
-    private readonly Channel<string> queue = Channel.CreateBounded<string>(new BoundedChannelOptions(256)
+    private readonly Channel<RuntimeRunQueueItem> queue = Channel.CreateBounded<RuntimeRunQueueItem>(new BoundedChannelOptions(256)
     {
         FullMode = BoundedChannelFullMode.Wait,
         SingleReader = true,
         SingleWriter = false
     });
 
-    public ValueTask EnqueueAsync(string runId, CancellationToken cancellationToken) => queue.Writer.WriteAsync(runId, cancellationToken);
+    public ValueTask EnqueueAsync(RuntimeRunQueueItem item, CancellationToken cancellationToken) => queue.Writer.WriteAsync(item, cancellationToken);
 
-    public async IAsyncEnumerable<string> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<RuntimeRunQueueItem> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await foreach (var runId in queue.Reader.ReadAllAsync(cancellationToken)) yield return runId;
+        await foreach (var item in queue.Reader.ReadAllAsync(cancellationToken)) yield return item;
     }
 }
 
 public sealed class LocalRuntimeRunCancellationRegistry : IRuntimeRunCancellationRegistry, IDisposable
 {
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> sources = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<RuntimeRunKey, CancellationTokenSource> sources = new();
 
-    public CancellationToken Register(string runId, CancellationToken stoppingToken)
+    public CancellationToken Register(RuntimeRunKey key, CancellationToken stoppingToken)
     {
         var source = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        if (!sources.TryAdd(runId, source))
+        if (!sources.TryAdd(key, source))
         {
             source.Dispose();
-            throw new InvalidOperationException($"Runtime run '{runId}' is already executing.");
+            throw new InvalidOperationException($"Runtime run '{key.RunId}' is already executing in Workspace '{key.WorkspaceId}'.");
         }
         return source.Token;
     }
 
-    public bool Cancel(string runId)
+    public bool Cancel(RuntimeRunKey key)
     {
-        if (!sources.TryGetValue(runId, out var source)) return false;
+        if (!sources.TryGetValue(key, out var source)) return false;
         source.Cancel();
         return true;
     }
 
-    public void Complete(string runId)
+    public void Complete(RuntimeRunKey key)
     {
-        if (sources.TryRemove(runId, out var source)) source.Dispose();
+        if (sources.TryRemove(key, out var source)) source.Dispose();
     }
 
     public void Dispose()

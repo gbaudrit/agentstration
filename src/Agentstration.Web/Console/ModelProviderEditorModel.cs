@@ -1,56 +1,44 @@
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
 public sealed class ModelProviderEditorModel
 {
-    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
-
     [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
     public string Name { get; set; } = string.Empty;
+    [Required] public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
     [Required] public string DisplayName { get; set; } = string.Empty;
-    [Required] public string ProviderType { get; set; } = "ollama";
-    [Required, Url] public string Endpoint { get; set; } = "http://localhost:5260";
-    public ModelProviderManagementMode ManagementMode { get; set; } = ModelProviderManagementMode.External;
-    public string? ProviderOptionsJson { get; set; }
+    [Required] public string ExtensionId { get; set; } = string.Empty;
+    [Required] public string ContributionId { get; set; } = string.Empty;
 
-    public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties());
+    public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value);
     public PutModelProviderRequest ToPutRequest() => new(ToProperties());
 
-    public ModelProviderProperties ToProperties()
+    public ModelProviderProperties ToProperties() => new()
     {
-        if (!Uri.TryCreate(Endpoint.Trim(), UriKind.Absolute, out var endpoint)
-            || endpoint.Scheme is not ("http" or "https"))
-            throw new ArgumentException("Endpoint must be an absolute HTTP(S) URL.");
-        return new ModelProviderProperties
-        {
-            DisplayName = DisplayName.Trim(),
-            ProviderType = ProviderType.Trim(),
-            Endpoint = endpoint,
-            ManagementMode = ManagementMode,
-            ProviderOptions = ParseOptions(ProviderOptionsJson)
-        };
-    }
+        DisplayName = DisplayName.Trim(),
+        Extension = ParseExtension(ExtensionId),
+        ContributionId = ContributionId.Trim()
+    };
 
     public static ModelProviderEditorModel FromResource(ModelProviderResource resource) => new()
     {
         Name = resource.Name,
+        Namespace = resource.Namespace.Value,
         DisplayName = resource.Definition.DisplayName,
-        ProviderType = resource.Definition.ProviderType,
-        Endpoint = resource.Definition.Endpoint.AbsoluteUri.TrimEnd('/'),
-        ManagementMode = resource.Definition.ManagementMode,
-        ProviderOptionsJson = resource.Definition.ProviderOptions.Count == 0
-            ? null
-            : JsonSerializer.Serialize(resource.Definition.ProviderOptions, IndentedJson)
+        ExtensionId = $"{(resource.Definition.Extension.Namespace ?? resource.Namespace).Value}:{resource.Definition.Extension.Name}",
+        ContributionId = resource.Definition.ContributionId
     };
 
-    private static IReadOnlyDictionary<string, JsonElement> ParseOptions(string? value)
+    private static ResourceReference ParseExtension(string value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return new Dictionary<string, JsonElement>();
-        try { return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(value) ?? new Dictionary<string, JsonElement>(); }
-        catch (JsonException exception) { throw new ArgumentException("Provider options must be a JSON object.", exception); }
+        if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("An extension registration is required.");
+        var separator = value.IndexOf(':');
+        if (separator <= 0 || separator == value.Length - 1) throw new ArgumentException("Extension selection is invalid.");
+        var @namespace = ResourceNamespace.Parse(value[..separator]);
+        return new ResourceReference(value[(separator + 1)..], @namespace: @namespace.IsDefault ? null : @namespace);
     }
 }

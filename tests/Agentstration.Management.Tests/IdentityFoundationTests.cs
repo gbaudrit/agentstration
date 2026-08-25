@@ -1,12 +1,12 @@
+using System.Net;
+using System.Net.Http.Json;
 using Agentstration.Infrastructure;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
-using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using System.Net;
-using System.Net.Http.Json;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
 
@@ -26,7 +26,134 @@ public sealed class IdentityFoundationTests
         Assert.AreEqual(1, (await store.ListTenantsAsync(default)).Count);
         Assert.AreEqual(1, (await store.ListWorkspacesAsync(first.TenantId, default)).Count);
         Assert.IsNotNull(await store.FindMembershipAsync(first.TenantId, first.UserId, default));
+        Assert.IsNotNull(await store.FindWorkspaceMembershipAsync(first.WorkspaceId, first.PrincipalId, default));
         Assert.AreEqual(1, (await store.ListRoleAssignmentsAsync(first.TenantId, first.UserId, default)).Count);
+    }
+
+    [TestMethod]
+    public async Task PrincipalPreferencesArePersistedPerPrincipal()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var firstPrincipalId = fixture.Context.Current.PrincipalId;
+        var secondPrincipal = new Principal(
+            Guid.NewGuid(),
+            PrincipalKind.Human,
+            "Second user",
+            null,
+            PrincipalStatus.Active,
+            DateTimeOffset.UtcNow);
+        await store.AddPrincipalAsync(secondPrincipal, default);
+
+        await store.UpsertPrincipalPreferencesAsync(
+            new PrincipalPreferences(firstPrincipalId, ThemePreference.Dark, DateTimeOffset.UtcNow),
+            default);
+        await store.UpsertPrincipalPreferencesAsync(
+            new PrincipalPreferences(secondPrincipal.Id, ThemePreference.Light, DateTimeOffset.UtcNow),
+            default);
+
+        Assert.AreEqual(ThemePreference.Dark, (await store.GetPrincipalPreferencesAsync(firstPrincipalId, default))?.Theme);
+        Assert.AreEqual(ThemePreference.Light, (await store.GetPrincipalPreferencesAsync(secondPrincipal.Id, default))?.Theme);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenStoresOnlyAHashAndRevocationIsDurable()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
+        var store = fixture.Services.GetRequiredService<IPersonalAccessTokenStore>();
+
+        var created = await service.CreateAsync(
+            new(
+                "Test token",
+                fixture.Context.Current.WorkspaceId,
+                [AuthorizationPermissions.ResourcesRead],
+                DateTimeOffset.UtcNow.AddDays(30)),
+            default);
+        var secret = created.Token[(created.Metadata.TokenPrefix.Length + 1)..];
+        var credential = await store.GetCredentialAsync(created.Metadata.Id, default);
+
+        Assert.IsNotNull(credential);
+        CollectionAssert.AreEqual(PersonalAccessTokenService.HashSecret(secret), credential.SecretHash);
+        Assert.IsFalse(System.Text.Encoding.UTF8.GetString(credential.SecretHash).Contains(secret, StringComparison.Ordinal));
+        Assert.IsTrue(await service.RevokeCurrentAsync(created.Metadata.Id, default));
+        Assert.IsNotNull((await store.GetCredentialAsync(created.Metadata.Id, default))?.Token.RevokedAt);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenRestrictionIntersectsLiveWorkspacePermissions()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var authorization = fixture.Services.GetRequiredService<IAuthorizationService>();
+        var current = fixture.Context.Current;
+        var restricted = current with
+        {
+            Restriction = new AuthorizationRestriction(
+                Guid.NewGuid(),
+                current.WorkspaceId,
+                new HashSet<string>([AuthorizationPermissions.ResourcesRead], StringComparer.Ordinal))
+        };
+
+        var permissions = await authorization.GetPermissionsAsync(restricted, default);
+        Assert.IsTrue(permissions.Contains(AuthorizationPermissions.ResourcesRead));
+        Assert.IsFalse(permissions.Contains(AuthorizationPermissions.ResourcesWrite));
+
+        var wrongWorkspace = restricted with { WorkspaceId = Guid.NewGuid() };
+        Assert.AreEqual(0, (await authorization.GetPermissionsAsync(wrongWorkspace, default)).Count);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenCannotManagePersonalAccessTokens()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
+        var current = fixture.Context.Current;
+        fixture.Context.Initialize(current with
+        {
+            Restriction = new AuthorizationRestriction(
+                Guid.NewGuid(),
+                current.WorkspaceId,
+                new HashSet<string>([AuthorizationPermissions.ResourcesRead], StringComparer.Ordinal))
+        });
+
+        await Assert.ThrowsAsync<AuthorizationDeniedException>(() => service.ListCurrentAsync(default));
+    }
+
+    [TestMethod]
+    public async Task PlatformAdministratorCanRevokeAnotherPrincipalsPersonalAccessToken()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var service = fixture.Services.GetRequiredService<PersonalAccessTokenService>();
+        var store = fixture.Services.GetRequiredService<IPersonalAccessTokenStore>();
+        var identities = fixture.Services.GetRequiredService<IIdentityStore>();
+        var current = fixture.Context.Current;
+        var now = DateTimeOffset.UtcNow;
+        var principal = new Principal(
+            Guid.NewGuid(),
+            PrincipalKind.Human,
+            "Token owner",
+            null,
+            PrincipalStatus.Active,
+            now);
+        var token = new PersonalAccessToken(
+            Guid.NewGuid(),
+            principal.Id,
+            current.WorkspaceId,
+            "Automation",
+            $"{PersonalAccessTokenService.TokenPrefix}{Guid.NewGuid():N}",
+            [AuthorizationPermissions.ResourcesRead],
+            now,
+            now.AddDays(30),
+            null,
+            null);
+        await identities.AddPrincipalAsync(principal, default);
+        await identities.AddPlatformAdministratorAsync(new PlatformAdministrator(current.PrincipalId, now), default);
+        await store.AddAsync(
+            new PersonalAccessTokenCredential(token, PersonalAccessTokenService.HashSecret("secret")),
+            default);
+
+        Assert.IsTrue(await service.RevokeAsPlatformAdministratorAsync(principal.Id, token.Id, default));
+        Assert.IsNotNull((await store.GetCredentialAsync(token.Id, default))?.Token.RevokedAt);
     }
 
     [TestMethod]
@@ -70,18 +197,20 @@ public sealed class IdentityFoundationTests
         var now = DateTimeOffset.UtcNow;
         var reader = new RoleDefinition(Guid.NewGuid(), "Reader-test", "Reader", [AuthorizationPermissions.ResourcesRead], false);
         await store.AddRoleDefinitionAsync(reader, default);
-        var readerUser = new User(Guid.NewGuid(), "reader-test", "Reader", null, UserStatus.Active, now);
-        await store.AddUserAsync(readerUser, default);
-        await store.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), context.TenantId, readerUser.Id, MembershipStatus.Active, now), default);
-        await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), context.TenantId, readerUser.Id, PrincipalType.User, reader.Id, AuthorizationScopes.Workspace(context.WorkspaceId)), default);
-        var readerContext = context with { UserId = readerUser.Id };
+        var readerPrincipal = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Reader", null, PrincipalStatus.Active, now);
+        await store.AddPrincipalAsync(readerPrincipal, default);
+        await store.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), context.TenantId, readerPrincipal.Id, MembershipStatus.Active, now), default);
+        await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), context.WorkspaceId, readerPrincipal.Id, MembershipStatus.Active, now), default);
+        await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), context.TenantId, readerPrincipal.Id, PrincipalType.User, reader.Id, AuthorizationScopes.Workspace(context.WorkspaceId)), default);
+        var readerContext = context with { PrincipalId = readerPrincipal.Id };
         Assert.IsTrue(await authorization.HasPermissionAsync(readerContext, AuthorizationPermissions.ResourcesRead, default));
         Assert.IsFalse(await authorization.HasPermissionAsync(readerContext, AuthorizationPermissions.ResourcesWrite, default));
 
-        var unassigned = new User(Guid.NewGuid(), "unassigned-test", "Unassigned", null, UserStatus.Active, now);
-        await store.AddUserAsync(unassigned, default);
+        var unassigned = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Unassigned", null, PrincipalStatus.Active, now);
+        await store.AddPrincipalAsync(unassigned, default);
         await store.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), context.TenantId, unassigned.Id, MembershipStatus.Active, now), default);
-        Assert.IsFalse(await authorization.HasPermissionAsync(context with { UserId = unassigned.Id }, AuthorizationPermissions.ResourcesRead, default));
+        await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), context.WorkspaceId, unassigned.Id, MembershipStatus.Active, now), default);
+        Assert.IsFalse(await authorization.HasPermissionAsync(context with { PrincipalId = unassigned.Id }, AuthorizationPermissions.ResourcesRead, default));
     }
 
     [TestMethod]
@@ -123,6 +252,24 @@ public sealed class IdentityFoundationTests
     }
 
     [TestMethod]
+    public void ExplicitSystemScopeIsGlobalAndRestoresTheWorkspaceFallback()
+    {
+        var accessor = new CurrentRequestContext();
+        var fallback = new RequestContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        accessor.Initialize(fallback);
+
+        using (accessor.PushSystem())
+        {
+            Assert.AreEqual(ControlPlaneAccessMode.System, accessor.AccessMode);
+            Assert.IsFalse(accessor.IsInitialized);
+            Assert.ThrowsExactly<InvalidOperationException>(() => _ = accessor.Current);
+        }
+
+        Assert.AreEqual(ControlPlaneAccessMode.Workspace, accessor.AccessMode);
+        Assert.AreEqual(fallback, accessor.Current);
+    }
+
+    [TestMethod]
     public async Task WorkspaceCreationDoesNotRequireAResourceGroup()
     {
         await using var fixture = await IdentityFixture.CreateAsync();
@@ -152,6 +299,27 @@ public sealed class IdentityFoundationTests
 
         var denied = await client.PostAsJsonAsync("/api/identity/context/workspace", new { workspaceId = Guid.NewGuid() });
         Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ExternalIdentityUsesIssuerAndSubjectAndIgnoresEmailChanges()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+        var store = fixture.Services.GetRequiredService<IIdentityStore>();
+        var resolver = fixture.Services.GetRequiredService<IPrincipalResolver>();
+        var now = DateTimeOffset.UtcNow;
+        var first = new Principal(Guid.NewGuid(), PrincipalKind.Human, "First", "before@example.test", PrincipalStatus.Active, now);
+        var second = new Principal(Guid.NewGuid(), PrincipalKind.Human, "Second", null, PrincipalStatus.Active, now);
+        await store.AddPrincipalAsync(first, default);
+        await store.AddPrincipalAsync(second, default);
+        await store.AddExternalIdentityAsync(new ExternalIdentity(Guid.NewGuid(), "https://issuer-a.test", "same-subject", first.Id, now), default);
+        await store.AddExternalIdentityAsync(new ExternalIdentity(Guid.NewGuid(), "https://issuer-b.test", "same-subject", second.Id, now), default);
+
+        Assert.AreEqual(first.Id, (await resolver.ResolveAsync("https://issuer-a.test", "same-subject", default))?.Id);
+        Assert.AreEqual(second.Id, (await resolver.ResolveAsync("https://issuer-b.test", "same-subject", default))?.Id);
+
+        await store.UpdatePrincipalAsync(first with { Email = "after@example.test" }, default);
+        Assert.AreEqual(first.Id, (await resolver.ResolveAsync("https://issuer-a.test", "same-subject", default))?.Id);
     }
 
     private static RuntimeProfileResource Profile(string id, RequestContext context) => new()
@@ -184,8 +352,7 @@ public sealed class IdentityFoundationTests
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddAgentstration(
-                Path.Combine(directory, "content.json"),
-                inMemory: true,
+                directory,
                 controlPlaneConnectionString: $"Data Source={Path.Combine(directory, "control-plane.db")}");
             var provider = services.BuildServiceProvider();
             await provider.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);

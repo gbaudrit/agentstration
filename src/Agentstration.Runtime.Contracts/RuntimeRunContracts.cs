@@ -8,7 +8,6 @@ public sealed record CreateRuntimeRunRequest
     public required RuntimeRunInput Input { get; init; }
     public RuntimeExecutionOptions Execution { get; init; } = new();
     public RuntimeRunOrigin Origin { get; init; } = RuntimeRunOrigin.Api;
-    public string? Initiator { get; init; }
 }
 
 public sealed record RuntimeRunPageResponse(IReadOnlyList<RuntimeRun> Value, string? NextLink = null);

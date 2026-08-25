@@ -1,11 +1,16 @@
 @page "/entries/{Name}"
+@page "/namespaces/{EntryNamespace}/entries/{Name}"
+@using Agentstration.Resources
 @rendermode InteractiveServer
 @inject IEntryAdministrationApiClient Client
 @inject NavigationManager Navigation
 
 <PageTitle>@(IsNew ? "Create Entry" : displayName) · Agentstration</PageTitle>
 <PageHeader Eyebrow="Workplace Entry" Title="@(IsNew ? "Create Entry" : displayName)" Description="Configure how this Entry appears in Workplace and which executable Flow it resolves to.">
-    <Actions><a class="button-secondary" href="/entries">Back to Entries</a></Actions>
+    <Actions>
+        @if (!IsNew && published is not null) { <a class="button-primary" href="@WorkspaceConfigurationUrl">Use in Workplace</a> }
+        <a class="button-secondary" href="/entries">Back to Entries</a>
+    </Actions>
 </PageHeader>
 
 @if (loading)
@@ -24,9 +29,14 @@ else
         }
     </div>
 
+    @if (!EntryResourceNamespace.IsDefault)
+    {
+        <p class="muted">This published Entry is managed by its namespaced Pack source. Its definition is read-only here, but it can be added to a Workplace workspace.</p>
+    }
+
     <div class="entry-tabs">
         <ResourceTabs Label="Entry sections">
-            @foreach (var tab in Tabs)
+            @foreach (var tab in AvailableTabs)
             {
                 <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="entry-tab-panel" class="@(activeTab == tab ? "active" : null)" data-testid="@($"entry-tab-{tab.ToString().ToLowerInvariant()}")" @onclick="() => SelectTab(tab)">@TabLabel(tab)</button>
             }
@@ -66,9 +76,9 @@ else
                     <p class="eyebrow">Usage</p>
                     <h2>Workplace availability</h2>
                     <dl class="entry-facts">
-                        <dt>Published workspaces</dt><dd>@PublishedUsages.Count</dd>
+                        <dt>Published dashboards</dt><dd>@PublishedUsages.Count</dd>
                         <dt>Primary in</dt><dd>@PrimaryUsages.Count</dd>
-                        <dt>Workspaces</dt><dd>@UsageSummary</dd>
+                        <dt>Dashboards</dt><dd>@UsageSummary</dd>
                         <dt>Last publication</dt><dd>@FormatDate(published?.PublishedAt)</dd>
                     </dl>
                 </article>
@@ -109,6 +119,16 @@ else
             </section>
 
             <section class="panel form-section">
+                <div class="panel-header"><div><p class="eyebrow">Execution experience</p><h2>Interaction presentation</h2><p>These settings change Workplace only; the published Flow remains unchanged.</p></div></div>
+                <div class="form-grid">
+                    <label><span>Participants</span><select data-testid="participants-visibility" @bind="participantsVisibility">@foreach (var value in Enum.GetValues<EntryParticipantVisibility>()) { <option value="@value">@value</option> }</select></label>
+                    <label><span>Progress</span><select data-testid="progress-visibility" @bind="progressVisibility">@foreach (var value in Enum.GetValues<EntryProgressVisibility>()) { <option value="@value">@value</option> }</select></label>
+                    <label><span>Task</span><select data-testid="task-display" @bind="taskDisplay">@foreach (var value in Enum.GetValues<EntryTaskDisplay>()) { <option value="@value">@value</option> }</select></label>
+                    <label><span>Results</span><select data-testid="results-display" @bind="resultDisplay">@foreach (var value in Enum.GetValues<EntryResultDisplay>()) { <option value="@value">@value</option> }</select></label>
+                </div>
+            </section>
+
+            <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">Fields</p><h2>Input schema</h2></div><button class="button-secondary" data-testid="add-field" type="button" @onclick="AddField">Add field</button></div>
                 <div class="entry-card-list">
                     @for (var index = 0; index < fields.Count; index++)
@@ -140,7 +160,7 @@ else
                 <div class="panel-header"><div><p class="eyebrow">Execution</p><h2>Binding and resolved target</h2></div></div>
                 <div class="form-grid">
                     <label><span>Target kind</span><select data-testid="target-kind" value="@bindingKind" @onchange="BindingKindChanged"><option value="Agent">Agent</option><option value="Flow">Flow</option></select></label>
-                    <label><span>Target resource</span><select data-testid="target-resource" @bind="resourceId"><option value="">Select a @bindingKind</option>@foreach (var resource in resources) { <option value="@resource.ResourceId">@resource.Name · @resource.Version · @resource.State</option> }</select></label>
+                    <label><span>Target resource</span><select data-testid="target-resource" @bind="resourceId"><option value="">Select a @bindingKind</option>@foreach (var resource in resources) { <option value="@ResourceKey(resource)">@resource.Name · @resource.Namespace · @resource.Version · @resource.State</option> }</select></label>
                 </div>
                 @if (bindingKind == EntryBindingKind.Agent) { <p class="resource-hint">Agentstration will publish a system-managed Direct Agent Flow. Workplace and Runtime only receive the resulting Flow reference.</p> }
                 <div class="entry-resolution-grid">
@@ -185,9 +205,9 @@ else
                     else { <div class="entry-card-list">@foreach (var dependency in dependencies) { <article class="entry-usage-card"><strong>@FriendlyResourceName(dependency.ResourceId)</strong><span>@dependency.ResourceType · @FriendlyRelationship(dependency.Relationship)</span><details><summary>Resource ID</summary><code>@dependency.ResourceId</code></details></article> }</div> }
                 </article>
                 <article class="panel form-section">
-                    <div class="panel-header"><div><p class="eyebrow">Used by</p><h2>Published workspaces</h2></div><StatusBadge Text="@PublishedUsages.Count.ToString()" Status="UiStatus.Neutral" /></div>
-                    @if (PublishedUsages.Count == 0) { <p class="entry-empty-copy">This Entry is not used by a published Workspace.</p> }
-                    else { <div class="entry-card-list">@foreach (var usage in PublishedUsages) { var reference = UsageReference(usage)!; <article class="entry-usage-card"><strong>@usage.Published!.DisplayName</strong><span>@reference.Role · position @(reference.Order + 1)</span><details><summary>Workspace resource ID</summary><code>@usage.Published.Id.Value</code></details></article> }</div> }
+                    <div class="panel-header"><div><p class="eyebrow">Used by</p><h2>Published dashboards</h2></div><StatusBadge Text="@PublishedUsages.Count.ToString()" Status="UiStatus.Neutral" /></div>
+                    @if (PublishedUsages.Count == 0) { <p class="entry-empty-copy">This Entry is not used by a published Dashboard.</p> }
+                    else { <div class="entry-card-list">@foreach (var usage in PublishedUsages) { var reference = UsageReference(usage)!; <article class="entry-usage-card"><strong>@usage.Published!.DisplayName</strong><span>@reference.Role · position @(reference.Order + 1)</span><details><summary>Dashboard resource ID</summary><code>@usage.Published.Id.Value</code></details></article> }</div> }
                 </article>
             </section>
         }
@@ -207,14 +227,22 @@ else
 
 @code {
     [Parameter] public string Name { get; set; } = "new";
+    [Parameter] public string? EntryNamespace { get; set; }
     private static readonly EntryTab[] Tabs = Enum.GetValues<EntryTab>();
+    private static readonly EntryTab[] NamespacedTabs = [EntryTab.Overview, EntryTab.Preview, EntryTab.Usage, EntryTab.Versions];
     private bool IsNew => string.Equals(Name, "new", StringComparison.OrdinalIgnoreCase);
+    private ResourceNamespace EntryResourceNamespace => string.IsNullOrWhiteSpace(EntryNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(EntryNamespace);
+    private IReadOnlyList<EntryTab> AvailableTabs => EntryResourceNamespace.IsDefault ? Tabs : NamespacedTabs;
     private bool loading = true, busy, hasError;
     private long draftRevision = 1;
     private string resourceName = "", displayName = "", description = "", placeholder = "Ask Agentstration", resourceId = "", message = "";
     private EntryTab activeTab = EntryTab.Overview;
     private EntryBindingKind bindingKind = EntryBindingKind.Agent;
     private EntryPresentationKind presentationKind = EntryPresentationKind.Prompt;
+    private EntryParticipantVisibility participantsVisibility = EntryParticipantVisibility.Hidden;
+    private EntryProgressVisibility progressVisibility = EntryProgressVisibility.Compact;
+    private EntryTaskDisplay taskDisplay = EntryTaskDisplay.Auto;
+    private EntryResultDisplay resultDisplay = EntryResultDisplay.Auto;
     private TaskCreationMode taskMode = TaskCreationMode.Automatic;
     private bool allowConversation = true, streamResponse = true, allowAttachments;
     private readonly List<EditorField> fields = [new() { Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true, Primary = true }];
@@ -224,55 +252,66 @@ else
     private EntryValidationResponse? validation;
     private IReadOnlyList<ResourcePickerItem> resources = [];
     private IReadOnlyList<EntryDependencyResponse> dependencies = [];
-    private IReadOnlyList<WorkplaceWorkspaceDraftResponse> workspaces = [];
-    private ResourcePickerItem? SelectedResource => resources.FirstOrDefault(value => value.ResourceId == resourceId);
+    private IReadOnlyList<WorkplaceWorkspaceResponse> workspaces = [];
+    private IReadOnlyList<WorkplaceDashboardDraftResponse> dashboards = [];
+    private ResourcePickerItem? SelectedResource => resources.FirstOrDefault(value => ResourceKey(value) == resourceId) ?? resources.FirstOrDefault(value => value.ResourceId == resourceId);
     private string? SelectedModelProfile => SelectedResource?.Details?.GetValueOrDefault("modelProfile");
     private string BindingResourceName => SelectedResource?.Name ?? (string.IsNullOrWhiteSpace(resourceId) ? "Not selected" : FriendlyResourceName(resourceId));
     private string ResolvedFlowName => published is null ? "Resolved on publication" : FriendlyResourceName(published.ResolvedTarget.FlowResourceId);
-    private IReadOnlyList<WorkplaceWorkspaceDraftResponse> PublishedUsages => workspaces.Where(value => UsageReference(value) is not null).ToArray();
-    private IReadOnlyList<WorkplaceWorkspaceDraftResponse> PrimaryUsages => PublishedUsages.Where(value => UsageReference(value)?.Role == WorkspaceEntryRole.Primary).ToArray();
+    private IReadOnlyList<WorkplaceDashboardDraftResponse> PublishedUsages => dashboards.Where(value => UsageReference(value) is not null).ToArray();
+    private IReadOnlyList<WorkplaceDashboardDraftResponse> PrimaryUsages => PublishedUsages.Where(value => UsageReference(value)?.Role == DashboardItemRole.Primary).ToArray();
     private string UsageSummary => PublishedUsages.Count == 0 ? "Not used" : string.Join(", ", PublishedUsages.Take(3).Select(value => value.Published!.DisplayName));
+    private string WorkspaceConfigurationUrl => $"/workspaces?entry={Uri.EscapeDataString(EntryIdValue)}&entryNamespace={Uri.EscapeDataString(EntryResourceNamespace.Value)}";
     private string PublishedBindingSummary => publishedBinding is null ? "Not retained" : $"{publishedBinding.Kind} · {FriendlyResourceName(publishedBinding.ResourceId)}";
-    private EntryResource PreviewDefinition => new() { Id = new(string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName), Name = string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName, DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Entry preview" : displayName, Description = description, Presentation = Presentation(), ResolvedTarget = published?.ResolvedTarget ?? new("preview", "1.0.0"), Behavior = Behavior() };
+    private EntryResource PreviewDefinition => new() { WorkspaceId = CurrentWorkspaceId, Id = new(string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName), Name = string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName, DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Entry preview" : displayName, Description = description, Presentation = Presentation(), ResolvedTarget = published?.ResolvedTarget ?? new("preview", "1.0.0"), Behavior = Behavior() };
 
     protected override async Task OnInitializedAsync()
     {
         if (!IsNew)
         {
-            var response = await Client.GetEntryAsync(Name, default); var draft = response.Value; published = response.Published; publishedBinding = draft.PublishedBinding; draftRevision = draft.Revision;
-            resourceName = draft.Name; displayName = draft.DisplayName; description = draft.Description ?? ""; placeholder = draft.Presentation.Placeholder ?? ""; presentationKind = draft.Presentation.Kind; bindingKind = draft.Binding.Kind; resourceId = draft.Binding.ResourceId; taskMode = draft.Behavior.TaskCreationMode; allowConversation = draft.Behavior.AllowConversation; streamResponse = draft.Behavior.StreamResponse; allowAttachments = draft.Presentation.AllowAttachments;
+            var response = await Client.GetEntryAsync(EntryResourceNamespace, Name, default); var draft = response.Value; published = response.Published; publishedBinding = draft.PublishedBinding; draftRevision = draft.Revision;
+            resourceName = draft.Name; displayName = draft.DisplayName; description = draft.Description ?? ""; placeholder = draft.Presentation.Placeholder ?? ""; presentationKind = draft.Presentation.Kind; participantsVisibility = draft.Presentation.Participants.Visibility; progressVisibility = draft.Presentation.Progress.Visibility; taskDisplay = draft.Presentation.Task.Display; resultDisplay = draft.Presentation.Results.Display; bindingKind = draft.Binding.Kind; resourceId = draft.Binding.ResourceId; taskMode = draft.Behavior.TaskCreationMode; allowConversation = draft.Behavior.AllowConversation; streamResponse = draft.Behavior.StreamResponse; allowAttachments = draft.Presentation.AllowAttachments;
             fields.Clear(); fields.AddRange(draft.Presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")) }));
             suggestions.Clear(); suggestions.AddRange(draft.Presentation.Suggestions.Select(value => new EditorSuggestion { Label = value.Label, Value = value.Value }));
-            dependencies = await Client.GetDependenciesAsync(Name, default);
+            dependencies = await Client.GetDependenciesAsync(EntryResourceNamespace, Name, default);
         }
-        workspaces = await Client.GetWorkspacesAsync(default);
+        await LoadDashboardUsagesAsync();
         await LoadResourcesAsync(); loading = false;
     }
 
     private void SelectTab(EntryTab tab) { activeTab = tab; message = ""; }
     private static string TabId(EntryTab tab) => $"entry-tab-{tab.ToString().ToLowerInvariant()}";
     private static string TabLabel(EntryTab tab) => tab.ToString();
-    private WorkspaceEntryReference? UsageReference(WorkplaceWorkspaceDraftResponse workspace) => workspace.Published?.Entries.FirstOrDefault(value => string.Equals(value.EntryResourceId.Value, EntryIdValue, StringComparison.Ordinal));
+    private DashboardEntryReference? UsageReference(WorkplaceDashboardDraftResponse dashboard) => dashboard.Published?.Entries.FirstOrDefault(value => value.EntryResourceId == new EntryId(EntryIdValue, EntryResourceNamespace));
+    private async Task LoadDashboardUsagesAsync()
+    {
+        workspaces = await Client.GetWorkspacesAsync(default);
+        var values = new List<WorkplaceDashboardDraftResponse>();
+        foreach (var workspace in workspaces) values.AddRange(await Client.GetDashboardsAsync(workspace.Name, default));
+        dashboards = values;
+    }
     private string EntryIdValue => resourceName;
     private static string FormatDate(DateTimeOffset? value) => value is null || value == default ? "Not published" : value.Value.LocalDateTime.ToString("g");
     private static string FriendlyResourceName(string value) => value[(value.LastIndexOf('/') + 1)..];
     private static string FriendlyRelationship(string value) => value == "ResolvedTarget" ? "Resolved target" : value;
     private static string FieldTitle(EditorField field) => string.IsNullOrWhiteSpace(field.Label) ? (string.IsNullOrWhiteSpace(field.Name) ? "Untitled field" : field.Name) : field.Label;
     private async Task BindingKindChanged(ChangeEventArgs args) { bindingKind = Enum.Parse<EntryBindingKind>(args.Value?.ToString() ?? "Agent"); resourceId = ""; await LoadResourcesAsync(); }
-    private async Task LoadResourcesAsync() => resources = await Client.GetResourcesAsync(bindingKind, default);
+    private async Task LoadResourcesAsync() { resources = await Client.GetResourcesAsync(bindingKind, default); var selected = SelectedResource; if (selected is not null) resourceId = ResourceKey(selected); }
+    private static string ResourceKey(ResourcePickerItem resource) => $"{resource.Namespace.Value}:{resource.ResourceId}";
     private void AddField() => fields.Add(new EditorField { Name = $"field{fields.Count + 1}", Label = "New field", Type = EntryFieldType.Text, Primary = fields.Count == 0 });
     private void RemoveField(EditorField field) { fields.Remove(field); if (fields.Count > 0 && fields.All(value => !value.Primary)) fields[0].Primary = true; }
     private void SetPrimary(EditorField field) { foreach (var value in fields) value.Primary = ReferenceEquals(value, field); }
     private void MoveField(EditorField field, int offset) { var index = fields.IndexOf(field); var target = index + offset; if (index < 0 || target < 0 || target >= fields.Count) return; fields.RemoveAt(index); fields.Insert(target, field); }
     private void AddSuggestion() => suggestions.Add(new EditorSuggestion { Label = "Suggestion", Value = "" });
     private void RemoveSuggestion(EditorSuggestion suggestion) => suggestions.Remove(suggestion);
-    private EntryPresentation Presentation() => new() { Kind = presentationKind, Placeholder = placeholder, AllowAttachments = allowAttachments, Fields = fields.Select((value, index) => new EntryFieldDefinition { Name = value.Name.Trim(), Label = string.IsNullOrWhiteSpace(value.Label) ? null : value.Label.Trim(), Type = value.Type, Required = value.Required, Role = value.Primary ? EntryFieldRole.PrimaryInput : EntryFieldRole.Standard, Order = index, Options = ParseOptions(value.Options), Validation = value.Type is EntryFieldType.Prompt or EntryFieldType.Text or EntryFieldType.Textarea or EntryFieldType.Conversation ? new EntryFieldValidation(1, 10_000) : null }).ToArray(), Suggestions = suggestions.Where(value => !string.IsNullOrWhiteSpace(value.Label) && !string.IsNullOrWhiteSpace(value.Value)).Select(value => new EntrySuggestion(value.Label.Trim(), value.Value.Trim())).ToArray() };
+    private EntryPresentation Presentation() => new() { Kind = presentationKind, Placeholder = placeholder, AllowAttachments = allowAttachments, Participants = new(participantsVisibility), Progress = new(progressVisibility), Task = new(taskDisplay), Results = new(resultDisplay), Fields = fields.Select((value, index) => new EntryFieldDefinition { Name = value.Name.Trim(), Label = string.IsNullOrWhiteSpace(value.Label) ? null : value.Label.Trim(), Type = value.Type, Required = value.Required, Role = value.Primary ? EntryFieldRole.PrimaryInput : EntryFieldRole.Standard, Order = index, Options = ParseOptions(value.Options), Validation = value.Type is EntryFieldType.Prompt or EntryFieldType.Text or EntryFieldType.Textarea or EntryFieldType.Conversation ? new EntryFieldValidation(1, 10_000) : null }).ToArray(), Suggestions = suggestions.Where(value => !string.IsNullOrWhiteSpace(value.Label) && !string.IsNullOrWhiteSpace(value.Value)).Select(value => new EntrySuggestion(value.Label.Trim(), value.Value.Trim())).ToArray() };
     private static IReadOnlyList<EntryFieldOption> ParseOptions(string options) => options.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(value => { var parts = value.Split(':', 2, StringSplitOptions.TrimEntries); return new EntryFieldOption(parts[0], parts.Length == 2 ? parts[1] : parts[0]); }).ToArray();
     private EntryBehavior Behavior() => new(taskMode, allowConversation, streamResponse, new EntryConversationBehavior(allowConversation));
-    private EntryDraft Draft() => new() { Id = new(EntryIdValue), Name = resourceName.Trim(), DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Presentation = Presentation(), Binding = new(bindingKind, resourceId), PublishedBinding = publishedBinding, Behavior = Behavior(), Revision = draftRevision };
+    private Agentstration.Resources.WorkspaceId CurrentWorkspaceId => new(workspaces.FirstOrDefault()?.Id ?? published?.WorkspaceId.Value ?? Guid.Empty);
+    private EntryDraft Draft() => new() { WorkspaceId = CurrentWorkspaceId, Id = new(EntryIdValue, EntryResourceNamespace), Name = resourceName.Trim(), DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Presentation = Presentation(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace), PublishedBinding = publishedBinding, Behavior = Behavior(), Revision = draftRevision };
     private async Task SaveAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; publishedBinding = saved.PublishedBinding; message = $"Draft revision {saved.Revision} saved. Workplace is unchanged."; if (IsNew) Navigation.NavigateTo($"/entries/{saved.Name}", forceLoad: true); }); }
     private async Task ValidateAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(resourceName, default); message = validation.IsValid ? "Entry is valid and ready to publish." : "Validation found errors."; hasError = !validation.IsValid; }); }
-    private async Task PublishAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(resourceName, default); if (!validation.IsValid) { hasError = true; message = "Resolve validation errors before publication."; return; } published = await Client.PublishEntryAsync(resourceName, default); publishedBinding = new(bindingKind, resourceId); dependencies = await Client.GetDependenciesAsync(resourceName, default); workspaces = await Client.GetWorkspacesAsync(default); message = $"Published Entry v{published.Version} with pinned Flow {published.ResolvedTarget.Version}."; }); }
+    private async Task PublishAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(resourceName, default); if (!validation.IsValid) { hasError = true; message = "Resolve validation errors before publication."; return; } published = await Client.PublishEntryAsync(resourceName, default); publishedBinding = saved.Binding; dependencies = await Client.GetDependenciesAsync(resourceName, default); await LoadDashboardUsagesAsync(); message = $"Published Entry v{published.Version} with pinned Flow {published.ResolvedTarget.Version}."; }); }
     private async Task ExecuteAsync(Func<Task> action) { busy = true; hasError = false; message = ""; try { await action(); } catch (Exception exception) { hasError = true; message = exception.Message; } finally { busy = false; } }
     private Task PreviewSubmitted(IReadOnlyDictionary<string, JsonElement> _) => Task.CompletedTask;
     private enum EntryTab { Overview, Definition, Preview, Usage, Versions }

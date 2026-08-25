@@ -17,12 +17,17 @@ public sealed class DevelopmentAuthenticationHandler(
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!webOptions.Value.Authentication.DevelopmentMode || !environment.IsDevelopment()) return Task.FromResult(AuthenticateResult.NoResult());
+        var authentication = webOptions.Value.Authentication;
+        if (string.Equals(authentication.Mode, AuthenticationOptions.Disabled, StringComparison.OrdinalIgnoreCase))
+            return Task.FromResult(AuthenticateResult.NoResult());
+        if (!string.Equals(authentication.Mode, AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase)
+            || (!environment.IsDevelopment() && !environment.IsEnvironment("Testing")))
+            return Task.FromResult(AuthenticateResult.NoResult());
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, "local-operator"),
-            new Claim(ClaimTypes.Name, "Local operator"),
-            new Claim(ClaimTypes.Role, "Administrator")
+            new Claim("iss", authentication.DevelopmentIssuer),
+            new Claim("sub", authentication.DevelopmentSubject),
+            new Claim(ClaimTypes.Name, authentication.DevelopmentDisplayName)
         };
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName));
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, SchemeName)));

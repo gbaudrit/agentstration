@@ -19,12 +19,16 @@ public static class ManagementEndpoints
         GetAgentEndpoint.Map(group);
         DeleteAgentEndpoint.Map(group);
         CreateAgentRevisionEndpoint.Map(group);
+        PurgeAgentRevisionEndpoint.Map(group);
         CreateDeploymentEndpoint.Map(group);
         GetDeploymentEndpoint.Map(group);
+        ListDeploymentsEndpoint.Map(group);
         StartDeploymentEndpoint.Map(group);
         StopDeploymentEndpoint.Map(group);
         ReconcileDeploymentEndpoint.Map(group);
         RouteAndExecuteEndpoint.Map(group);
+        PackEndpoints.Map(group);
+        TriggerEndpoints.Map(group);
     }
 }
 
@@ -42,7 +46,9 @@ public sealed class ManagementAuthorizationFilter(
         var method = invocationContext.HttpContext.Request.Method;
         var permission = HttpMethods.IsGet(method) || HttpMethods.IsHead(method)
             ? AuthorizationPermissions.ResourcesRead
-            : AuthorizationPermissions.ResourcesWrite;
+            : HttpMethods.IsDelete(method)
+                ? AuthorizationPermissions.ResourcesDelete
+                : AuthorizationPermissions.ResourcesWrite;
         if (!await authorization.HasPermissionAsync(context, permission, invocationContext.HttpContext.RequestAborted))
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "permission_denied", detail: $"Permission '{permission}' is required.");
         return await next(invocationContext);

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Flow;
+using Agentstration.Resources;
 
 namespace Agentstration.Work;
 
@@ -26,7 +27,11 @@ public sealed record WorkAttachment(string Name, WorkContentReference Content, l
 public sealed record WorkInput(string? Text = null, JsonElement? Structured = null, IReadOnlyDictionary<string, string>? Metadata = null);
 public sealed record WorkMessage(Guid Id, long Sequence, WorkInteractionOrigin Origin, string? AuthorId, string Content, DateTimeOffset CreatedAt);
 public sealed record WorkInteraction(Guid Id, long Sequence, WorkInteractionKind Kind, WorkInteractionOrigin Origin, string? AuthorId, string? Content, double? Progress, DateTimeOffset CreatedAt);
-public sealed record WorkArtifact(string Name, WorkContentReference Content, IReadOnlyDictionary<string, string>? Metadata = null);
+public sealed record WorkArtifact(
+    string Name,
+    WorkContentReference Content,
+    IReadOnlyDictionary<string, string>? Metadata = null,
+    long? Size = null);
 public sealed record WorkResultContent(string? Text = null, JsonElement? Structured = null, string? MediaType = null);
 public sealed record WorkResult(IReadOnlyList<WorkResultContent> Contents, IReadOnlyList<WorkArtifact> Artifacts, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset CreatedAt);
 public sealed record WorkError(string Code, string Message, WorkErrorCategory Category, bool IsRecoverable, DateTimeOffset OccurredAt, WorkExecutionId? ExecutionId = null, string? TechnicalDetails = null);
@@ -44,6 +49,7 @@ public sealed class WorkTransitionException(string code, string message) : Inval
 
 public sealed record WorkItemSnapshot(
     WorkItemId Id,
+    WorkspaceId WorkspaceId,
     string Type,
     string? Title,
     string Instruction,

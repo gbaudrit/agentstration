@@ -6,13 +6,21 @@ Entry authoring and Entry execution are deliberately different contracts. The Co
 
 Agent bindings are normalized through hidden, system-managed Direct Agent Flows. Workplace renders these Entries exactly like Flow-bound Entries and submits through the same Work API. Work API creates a WorkItem and FlowRun in both cases; the Flow engine invokes the Agent and maps its output into the existing Work result and Workplace action contracts. Workplace does not receive the administrative binding or any provider/runtime object.
 
-The primary input is declared explicitly with `EntryFieldRole.PrimaryInput`; it is unrelated to the Workspace's Primary Entry role. The latter remains exclusively on `WorkspaceEntryReference`.
+The primary input is declared explicitly with `EntryFieldRole.PrimaryInput`; it is unrelated to a Dashboard's Primary presentation role. The latter remains exclusively on `DashboardEntryReference`.
+
+## Workspace and Dashboard
+
+Workspace is the functional boundary for Interactions, Tasks, Conversations, Notifications, and Dashboards. Dashboard is the UX composition of namespaced Entry references, roles, and order. Entry remains independent from every Dashboard that displays it, and its published `ResolvedTarget` remains an immutable Flow reference.
+
+`home` is only the default seeded Dashboard (`IsDefault = true`), and `personal` is only a Workspace name. Neither name activates engine behavior. Workplace routes make both selections explicit with `/w/{workspace}/d/{dashboard}`; `/` resolves the configured default Workspace and then its default Dashboard. Switching Dashboard does not move or filter Workspace work state.
+
+Pack installation only makes namespaced published Entries available for explicit Dashboard selection. It does not add them to Home.
 
 Entry dependency inspection exposes both the administration binding and the resolved Flow. Agent and user Flow deletion are rejected while a published Entry references them, and a system-managed Direct Agent Flow cannot be deleted independently.
 
 ## Iteration 3 UX
 
-The third increment turns the existing functional vertical into one continuous end-user journey without changing its boundaries. Home is organized around a visually emphasized Primary Entry, followed by configured Standard Entries, then the current Interaction, recent Tasks, and attention-first notifications. Primary is a Workspace presentation role only: `EntryRenderer` remains the single generic Prompt/Form renderer and `PrimaryEntryContainer` supplies visual emphasis without introducing a new business type.
+The third increment turns the existing functional vertical into one continuous end-user journey without changing its boundaries. A Dashboard is organized around an optional visually emphasized Primary Entry, followed by Featured and Standard Entries, then the current Interaction, recent Tasks, and attention-first notifications. Primary is a Dashboard presentation role only: `EntryRenderer` remains the single generic Prompt/Form renderer and `PrimaryEntryContainer` supplies visual emphasis without introducing a new business type.
 
 ## Iteration 4 durable conversation
 
@@ -20,11 +28,11 @@ The Console supervises these durable Tasks through Work API. It does not reuse W
 
 An Entry now opens a durable Interaction rather than a terminal Task funnel. The active conversation has a permanent composer after immediate replies, during non-blocking work, and after results or artifacts. A completed Task moves its Interaction to `Idle`; it does not close it. `New request` returns to the Primary Entry while the previous Interaction remains available under Recent conversations.
 
-`prepare-report` applies the standard detail level by default and starts work immediately. A follow-up such as “Make it shorter and suitable for executives” is accepted asynchronously, builds a controlled `InteractionContinuationContext`, and starts a new FlowRun. The new run records its terminal predecessor as `ParentFlowRunId`, retains the Interaction, public Task, and triggering message identifiers, and never reopens the previous FlowRun. The same public Task then exposes Initial report, Executive version, and later revisions as successive results with matching versioned artifacts.
+`prepare-report` applies the standard detail level by default and starts work immediately. A follow-up such as “Make it shorter and suitable for executives” is accepted asynchronously, builds a controlled `InteractionContinuationContext`, and starts a new FlowRun. The new run records its terminal predecessor as `ParentFlowRunId`, retains the Interaction, public Task, and triggering message identifiers, and never reopens the previous FlowRun. The same public Task then exposes the successive results. Artifacts appear only when the Work result explicitly declares a durable deliverable; conversation text is never converted into a synthetic file.
 
 Continuation execution uses a child WorkItem internally. Workplace projects that execution onto the anchor WorkTask, so the user sees one living Task rather than technical run records. The context contains recent functional messages and result/artifact references only; it excludes persistence entities, runtime internals, providers, models, technical prompts, and traces. An optional Entry continuation target can override the initial target, but the initial target remains the default.
 
-Simple PendingActions are conversation-native. `guided-request` asks for a style with one-click Choice buttons; confirmation is also one click, and Input uses a small inline composer. The chosen value is recorded as a user message. Blocking questions disable the permanent composer with an explanation until resolved.
+Simple PendingActions are conversation-native. Their prompt is rendered as an Agentstration turn rather than an operations panel. `guided-request` asks for a style with one-click Choice buttons; confirmation is also one click, and Input uses a small inline composer. The chosen value is recorded as a user message. Blocking questions disable the permanent composer with an explanation until resolved.
 
 The Work API adds recent Interaction listing and makes message continuation explicit:
 
@@ -37,7 +45,7 @@ The POST returns `202 Accepted` with the accepted message, updated Interaction, 
 
 Prompt Entries provide declarative suggestions that fill the composer without submitting, multiline input, an explicit send action, loading/disabled states, and Ctrl/Command+Enter submission. Unsupported attachment controls stay hidden. Pending actions appear inside the conversation that caused them; their single-use raw resume token stays in the initiating browser response and is never persisted or exposed by later Interaction reads.
 
-When an Interaction becomes a Task, Workplace keeps the user in context with an inline Task card. Task detail uses functional activity labels, conversation context, readable results, downloadable artifact cards, and conditional Task actions. Storage keys, Flow Run identifiers, provider/runtime details, and raw JSON infrastructure views are not part of the default experience.
+When an Interaction becomes a Task, Workplace keeps the user in context with an inline Task card when `task.display` is explicitly visible or automatic presentation detects actionable, interrupted, durable, or substantial work. Automatic presentation keeps short execution conversational; durable means at least one minute of observed Work history, while substantial means multiple completed progress milestones or multiple deliverables. Explicit hidden presentation remains authoritative. Participant turn boundaries become durable functional progress activities with generic labels such as “Preparing a response” and “Response prepared”. An Entry that exposes participants can compose “Alice is preparing a response” from the same activity; hidden-participant Entries never expose the participant identifier. Compact progress retains the current functional activity but suppresses terminal lifecycle markers already conveyed by the answer, pending action, result, or artifact; detailed progress retains the complete functional history. Task detail folds completed progress start/end pairs into finished steps and keeps unresolved work as the current step. It also uses conversation context, readable results, downloadable artifact cards, and conditional Task actions. Storage keys, Flow Run identifiers, provider/runtime details, node names, and raw JSON infrastructure views are not part of the default experience.
 
 The shell continues to reuse the Console design system and icon language, with end-user vocabulary and a responsive composition: wide two-column workspace, tablet stacking, and a touch-friendly single column with bottom navigation below 620 px. Loading, empty, disconnected-realtime, API-unavailable, expired-action, failure, cancellation, no-result, and no-artifact states remain explicit. SignalR updates only the affected active conversation, Task, or notification summary; REST remains authoritative after reconnect.
 
@@ -76,9 +84,11 @@ The correlation chain is:
 
 ```text
 InteractionId → WorkTaskId → WorkExecutionId → FlowRunId → runtime execution
+
+For the shipped local topology, Workplace Web is a separate Interactive Server host while Work and Flow APIs remain in the authoritative Agentstration host. Its server-side API client forwards only the Agentstration session-cookie chunks and Workspace-selection cookie to the exact configured API origin; redirects are disabled. The API remains responsible for authenticating the cookie, resolving the canonical Management context, and authorizing `runs/execute`. A Flow-backed Work submission without that context is rejected before a WorkItem or FlowRun is queued. This cookie relay is intentionally limited to the local, same-session topology. A Workplace deployed independently must authenticate API calls through a standard mechanism such as OAuth Bearer; it must not forward cookies to a broader set of origins.
 ```
 
-Conversation messages use the functional roles `User`, `Agentstration`, and `System`; these labels are not identity records. Exact submitted JSON and attachments remain attached to the Interaction. Results, activities, notifications, and artifact metadata are separate durable projections. Artifact bytes are stored under the configured local data directory through `IArtifactStore` and are downloaded only through a workspace-scoped API route.
+Conversation messages use the functional roles `User`, `Agentstration`, and `System`; these labels are not identity records. Exact submitted JSON and attachments remain attached to the Interaction. Results, activities, notifications, and artifact metadata are separate durable projections. An execution producer persists artifact bytes through `IArtifactStore` before returning its `WorkResult`; the resulting opaque storage key, media type, and length are carried by `WorkArtifact` and projected without copying. Downloads remain behind a workspace-scoped API route.
 
 ## Pending actions and resume
 
@@ -86,7 +96,7 @@ Conversation messages use the functional roles `User`, `Agentstration`, and `Sys
 
 The server creates a cryptographically random resume token and persists only its SHA-256 hash. The raw token is returned once inside the corresponding structured action. Public PendingAction DTOs and SignalR events never expose the hash. A response must match Workspace, Interaction, PendingAction and token; the action is then completed atomically and cannot be replayed. Expected failures use Problem Details: invalid input/token is `400`, missing/cross-workspace resources are `404`, and expired/already-resolved actions are `409`.
 
-Stable action discriminators are `respond`, `requestInput`, `requestConfirmation`, `requestChoice`, `createTask`, `showResult`, and `showError`. The `prepare-report` demo Entry exercises two server-side suspensions (choice, then confirmation), creates a Task, runs the deterministic local Flow, and produces a result plus a downloadable text artifact. `quick-answer` demonstrates an Interaction completed without a Task.
+Stable action discriminators are `respond`, `requestInput`, `requestConfirmation`, `requestChoice`, `createTask`, `showResult`, and `showError`. The `prepare-report` demo Entry exercises two server-side suspensions (choice, then confirmation), creates a Task, and runs the deterministic local Flow. Its synthesis remains in the conversation and its structured result projection; no downloadable artifact is invented. `quick-answer` demonstrates an Interaction completed without a Task.
 
 ## HTTP and real time
 
@@ -115,8 +125,8 @@ The client reconnects automatically, explicitly rejoins its Workspace group, and
 
 Workplace deliberately reuses the Console design system from `Agentstration.Web.Components`: typography, tokens, panels, buttons, badges, empty/loading/error states, brand lockup, responsive breakpoints, sidebar, top bar, and compact mobile composition. Workplace keeps end-user vocabulary and navigation (`Home`, `Tasks`, `Notifications`) while matching the Console visual language.
 
-The home view renders the Primary Entry as the central intention surface, configured Standard Entries as secondary shortcuts, PendingAction panels in the active conversation, inline and recent Tasks, and an attention-first notification summary. Task detail exposes conversation, functional progression, readable results, deliverables, and conditional pause/resume/cancel actions. Flow Run and runtime implementation details are not part of the default Workplace presentation.
+The Dashboard view renders an optional Primary Entry as the central intention surface, configured Featured and Standard Entries, PendingAction panels in the active conversation, inline and recent Tasks, and an attention-first notification summary. Task detail exposes conversation, functional progression, readable results, deliverables, and conditional pause/resume/cancel actions. Flow Run and runtime implementation details are not part of the default Workplace presentation.
 
 ## Validation
 
-The offline suite covers direct Task execution, one-click PendingAction resume, invalid and single-use tokens, non-persistence of raw resume tokens, Workspace isolation, deterministic completion, continuation to a parented immutable FlowRun, multiple results, versioned filesystem artifacts, immediate-response follow-up, and cross-workspace artifact denial. Component tests cover generic Primary/Standard Entry rendering, suggestion confirmation, permanent composer states, inline pending actions, resolved answers, successive outputs, functional progression, and artifact information boundaries. Architecture tests enforce that Workplace Web cannot reference Console or server implementation assemblies and that Work API has no Console assembly dependency.
+The offline suite covers direct Task execution, one-click PendingAction resume, invalid and single-use tokens, non-persistence of raw resume tokens, Workspace isolation, deterministic completion, continuation to a parented immutable FlowRun, multiple results, explicit artifact projection, immediate-response follow-up, and cross-workspace artifact-store isolation. Component tests cover generic Primary/Standard Entry rendering, suggestion confirmation, permanent composer states, inline pending actions, resolved answers, successive outputs, functional progression, result de-duplication, and artifact information boundaries. Architecture tests enforce that Workplace Web cannot reference Console or server implementation assemblies and that Work API has no Console assembly dependency.

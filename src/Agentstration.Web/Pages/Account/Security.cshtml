@@ -1,0 +1,63 @@
+@page "/account/security"
+@model Agentstration.Web.Pages.Account.SecurityModel
+@{
+    ViewData["Title"] = "Account security";
+}
+
+<header class="auth-heading">
+    <p class="eyebrow">Account</p>
+    <h1>Security</h1>
+    @if (Model.Account is not null)
+    {
+        <p>Signed in as <strong>@Model.Account.UserName</strong>@if (!string.IsNullOrWhiteSpace(Model.Account.Email)) { <span> · @Model.Account.Email</span> }</p>
+    }
+</header>
+
+@if (Model.StatusMessage is not null)
+{
+    <p class="status-message" role="status">@Model.StatusMessage</p>
+}
+
+@if (Model.Account is null)
+{
+    <p class="account-unavailable">This session is not backed by a local account. Password security is managed by your external identity provider.</p>
+    <a href="/account/pat" class="secondary-action">Manage personal access tokens</a>
+    <a href="/" class="secondary-action">Return to the console</a>
+}
+else
+{
+    <section class="security-section">
+        <h2>Change password</h2>
+        <p>Changing your password signs out every other session while keeping this browser connected.</p>
+        <form method="post" asp-page-handler="ChangePassword" class="auth-form">
+            <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+            <label asp-for="Input.CurrentPassword"></label>
+            <input asp-for="Input.CurrentPassword" autocomplete="current-password" />
+            <span asp-validation-for="Input.CurrentPassword" class="field-error"></span>
+            <label asp-for="Input.NewPassword"></label>
+            <input asp-for="Input.NewPassword" autocomplete="new-password" />
+            <span asp-validation-for="Input.NewPassword" class="field-error"></span>
+            <p class="password-guidance">Use at least 12 characters with uppercase, lowercase, number and symbol.</p>
+            <label asp-for="Input.ConfirmPassword"></label>
+            <input asp-for="Input.ConfirmPassword" autocomplete="new-password" />
+            <span asp-validation-for="Input.ConfirmPassword" class="field-error"></span>
+            <button type="submit" class="primary-action">Change password</button>
+        </form>
+    </section>
+
+    <section class="security-section security-section-separated">
+        <h2>Active sessions</h2>
+        <p>Invalidate every other cookie issued for this account. This browser remains signed in.</p>
+        <form method="post" asp-page-handler="SignOutOtherSessions">
+            <button type="submit" class="secondary-action">Sign out other sessions</button>
+        </form>
+    </section>
+
+    <section class="security-section security-section-separated">
+        <h2>Personal access tokens</h2>
+        <p>Create revocable, Workspace-scoped credentials for scripts and command-line clients.</p>
+        <a href="/account/pat" class="secondary-action">Manage personal access tokens</a>
+    </section>
+
+    <a href="/" class="auth-back-link">← Return to the console</a>
+}

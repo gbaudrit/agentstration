@@ -4,7 +4,8 @@ obj/
 .idea/
 .vscode/
 TestResults/
-.agentstration/
+artifacts/
+.agentstration*/
 *.user
 *.suo
 *.db

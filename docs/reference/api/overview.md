@@ -17,7 +17,6 @@ Current API families include:
 - Work Items under `/api/work/workitems`;
 - Workplace routes under `/api/workspaces/{workspaceName}`;
 - Flow definitions and Runs under `/api/flows` and `/api/flowRuns`;
-- model providers/profiles and runtime profiles under `/api/...`;
-- the earlier content, memory, and mission routes under `/api/workspaces/{workspaceId}`.
+- model providers/profiles and runtime profiles under `/api/...`.
 
 Problem Details, ETags/conditional writes, pagination, and `202 Accepted` are used where their implemented boundary requires them. API versioning is explained in [Versioning strategy](../versioning.md).

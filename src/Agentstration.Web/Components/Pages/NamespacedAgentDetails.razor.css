@@ -1,0 +1,33 @@
+.namespaced-agent-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 4px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.namespaced-agent-status {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.namespaced-deployment-details {
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface-2);
+}
+
+@media (max-width: 720px) {
+    .namespaced-agent-actions {
+        justify-content: stretch;
+    }
+
+    .namespaced-agent-actions > * {
+        flex: 1 1 100%;
+    }
+}

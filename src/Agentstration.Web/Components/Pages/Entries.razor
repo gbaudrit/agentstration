@@ -15,7 +15,7 @@ else
         @foreach (var item in items)
         {
             <article class="row">
-                <div><strong><a href="@($"/entries/{item.Value.Name}")">@item.Value.DisplayName</a></strong><small>@item.Value.Binding.Kind · @ResourceName(item.Value.Binding.ResourceId)</small></div>
+                <div><strong><a href="@ConsoleResourceUrls.Entry(item.Value.Id)">@item.Value.DisplayName</a></strong><small>Namespace: @item.Value.Id.Namespace · @item.Value.Binding.Kind · @ResourceName(item.Value.Binding.ResourceId)</small></div>
                 <StatusBadge Text="@(item.Published is null ? "Draft" : $"Published v{item.Published.Version}")" Status="@(item.Published is null ? UiStatus.Warning : UiStatus.Success)" />
             </article>
         }

@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject IModelProfilesClient Client
 @inject IModelProvidersClient ProvidersClient
+@inject IExtensionsClient ExtensionsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 
@@ -26,6 +27,7 @@ else
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Profile resource</h2></div>@if (resolution is not null) { <StatusBadge Text="@ModelManagementUi.Label(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
             <div class="form-grid">
                 <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
+                <label><span>Namespace</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
                 <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
                 <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>
@@ -33,7 +35,7 @@ else
 
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Model selection</p><h2>Provider and model</h2></div></div>
             <div class="form-grid">
-                <label><span>Provider</span><select value="@model.ProviderName" @onchange="ProviderChangedAsync"><option value="">Select a provider</option>@foreach (var provider in providers) { <option value="@provider.Name">@provider.Properties.DisplayName — @provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
+                <label><span>Provider</span><select value="@SelectedProvider" @onchange="ProviderChangedAsync"><option value="">Select a provider</option>@foreach (var provider in providers) { <option value="@ProviderKey(provider)">@provider.Properties.DisplayName — @provider.Namespace/@provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
                 <label><span>Model</span><select @bind="model.ModelName" disabled="@loadingModels"><option value="">@(loadingModels ? "Loading models…" : "Select a model")</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — not currently discovered</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @ModelManagementUi.Label(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
             </div>
             @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderName)) { <p class="inline-warning">No model is currently reported by this provider. An existing model name may remain configured while the provider is unavailable.</p> }
@@ -63,10 +65,42 @@ else
             </div>
         </section>
 
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Adapter</p><h2>Provider options</h2></div><span>Advanced</span></div>
-            <div class="form-grid">
-                <label class="form-span-2"><span>Provider-specific JSON</span><InputTextArea @bind-Value="model.ProviderOptionsJson" rows="8" class="runner-json form-code-editor" /><small>Top-level keys must match the selected provider type, for example <code>ollama</code>.</small></label>
-            </div>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Adapter</p><h2>Provider options</h2></div><span>@(optionEditor is null ? "Advanced" : $"{optionEditor.Contract.Id}@{optionEditor.Version.Version}")</span></div>
+            @if (optionEditor is { CanGuide: true } && !rawOptions)
+            {
+                <div class="form-grid">
+                    <label class="checkbox-field form-span-2"><input type="checkbox" checked="@optionEditor.Enabled" @onchange="SetProviderOptionsEnabled" /><span>Configure provider-native options</span></label>
+                    @if (optionEditor.Enabled)
+                    {
+                        @foreach (var field in optionEditor.Fields)
+                        {
+                            @if (field.Kind == ExtensionOptionFieldKind.Toggle)
+                            {
+                                <label class="checkbox-field"><input type="checkbox" checked="@BooleanValue(field)" @onchange="args => SetBooleanOption(field, args)" /><span>@FieldLabel(field)</span></label>
+                            }
+                            else if (field.AllowedValues.Count > 0)
+                            {
+                                <label><span>@FieldLabel(field)</span><select value="@field.Value" @onchange="args => SetOption(field, args.Value?.ToString())"><option value="">Provider default</option>@foreach (var value in field.AllowedValues) { <option value="@value">@value</option> }</select>@FieldHelp(field)</label>
+                            }
+                            else if (field.Kind is ExtensionOptionFieldKind.JsonObject or ExtensionOptionFieldKind.JsonValue)
+                            {
+                                <label class="form-span-2"><span>@FieldLabel(field)</span><textarea rows="5" class="runner-json form-code-editor" value="@field.Value" @onchange="args => SetOption(field, args.Value?.ToString())"></textarea>@FieldHelp(field)</label>
+                            }
+                            else
+                            {
+                                <label><span>@FieldLabel(field)</span><input type="@(field.Kind is ExtensionOptionFieldKind.WholeNumber or ExtensionOptionFieldKind.DecimalNumber ? "number" : "text")" value="@field.Value" min="@field.Minimum" max="@field.Maximum" step="@(field.Kind == ExtensionOptionFieldKind.WholeNumber ? "1" : "any")" @onchange="args => SetOption(field, args.Value?.ToString())" />@FieldHelp(field)</label>
+                            }
+                        }
+                    }
+                </div>
+                <div class="panel-actions"><button class="button-secondary" type="button" @onclick="() => rawOptions = true">Edit raw JSON</button><a class="text-button" href="/extensions">Inspect contract</a></div>
+            }
+            else
+            {
+                @if (optionEditor?.UnavailableReason is { } reason) { <p class="inline-warning">@reason</p> }
+                <div class="form-grid"><label class="form-span-2"><span>Provider-specific JSON</span><InputTextArea @bind-Value="model.ProviderOptionsJson" rows="8" class="runner-json form-code-editor" /><small>Each provider value pins <code>optionSet</code>, <code>version</code>, <code>schemaDigest</code>, and <code>values</code>.</small></label></div>
+                @if (optionEditor?.CanGuide == true) { <div class="panel-actions"><button class="button-secondary" type="button" @onclick="UseGuidedOptions">Return to guided editor</button></div> }
+            }
         </section>
 
         <div class="form-actions"><a class="button-secondary" href="/modelprofiles">Cancel</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create profile" : "Save changes")</button></div>
@@ -75,12 +109,30 @@ else
     @if (!IsNew)
     {
         <section class="details-grid resource-section">
-            <article class="panel"><div class="panel-header"><div><p class="eyebrow">Overview</p><h2>Effective resolution</h2></div></div>
-                @if (resolution is null) { <p>Resolution is not available.</p> } else { <dl class="resource-details"><dt>Declared profile</dt><dd>@resolution.Profile.DisplayName <code>@resolution.Profile.Name</code></dd><dt>Resolved provider</dt><dd>@(resolution.Provider?.DisplayName ?? resolution.Provider?.Name ?? "Not resolved")</dd><dt>Resolved model</dt><dd>@resolution.Model.Name</dd><dt>Status</dt><dd>@ModelManagementUi.Label(resolution.Status)</dd><dt>Streaming capability</dt><dd>@(resolution.Model.Capabilities?.Contains("streaming", StringComparer.OrdinalIgnoreCase) == true ? "Declared by model" : "Not declared by model")</dd><dt>Tool capability</dt><dd>@(resolution.Model.Capabilities?.Contains("tools", StringComparer.OrdinalIgnoreCase) == true ? "Declared by model" : "Not declared by model")</dd></dl>@foreach (var item in resolution.Warnings) { <p class="inline-warning">@item</p> } }
+            <article class="panel"><div class="panel-header"><div><p class="eyebrow">Overview</p><h2>Effective resolution</h2></div><button class="button-secondary" type="button" @onclick="RefreshResolutionAsync" disabled="@diagnosing">@(diagnosing ? "Checking…" : "Refresh diagnosis")</button></div>
+                @if (resolution is null) { <p>Resolution is not available.</p> } else { <dl class="resource-details"><dt>Declared profile</dt><dd>@resolution.Profile.DisplayName <code>@resolution.Profile.Name</code></dd><dt>Resolved provider</dt><dd>@(resolution.Provider?.DisplayName ?? resolution.Provider?.Name ?? "Not resolved")</dd><dt>Provider connection</dt><dd>@ModelManagementUi.Label(resolution.Provider?.Status ?? "unknown")</dd><dt>Resolved model</dt><dd>@resolution.Model.Name</dd><dt>Model status</dt><dd>@ModelManagementUi.Label(resolution.Model.Status ?? "unknown")</dd><dt>Profile status</dt><dd>@ModelManagementUi.Label(resolution.Status)</dd></dl>@foreach (var item in resolution.Warnings) { <p class="inline-warning">@item</p> } }
             </article>
             <article class="panel" id="agents"><div class="panel-header"><div><p class="eyebrow">Usages</p><h2>Agents</h2></div><span>@usages.Count</span></div>
                 @if (usages.Count == 0) { <p>No agent references this profile.</p> } else { <ul class="resource-links">@foreach (var usage in usages) { <li><a href="@AgentUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul> }
             </article>
+        </section>
+        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">Compatibility</p><h2>Effective capabilities</h2></div><span>Provider · model · adapter</span></div>
+            @if (resolution?.Capabilities is not { Count: > 0 })
+            {
+                <EmptyState Title="Capabilities unavailable" Message="Refresh the diagnosis after the provider and model become available." />
+            }
+            else
+            {
+                <DataGrid TItem="ModelCapabilityResponse" Items="resolution.Capabilities"><Header><tr><th>Capability</th><th>Provider</th><th>Model</th><th>Adapter</th><th>Effective</th><th>Values</th></tr></Header><Row Context="capability"><tr><td><strong>@capability.Name</strong></td><td>@SupportLabel(capability.ProviderSupport)</td><td>@SupportLabel(capability.ModelSupport)</td><td>@SupportLabel(capability.AdapterSupport)</td><td><strong>@SupportLabel(capability.EffectiveSupport)</strong></td><td>@(capability.SupportedValues.Count == 0 ? "—" : string.Join(", ", capability.SupportedValues))</td></tr></Row></DataGrid>
+            }
+            @if (resolution?.Incompatibilities is { Count: > 0 })
+            {
+                <div class="form-alert form-alert-danger" role="alert"><strong>Profile configuration is incompatible</strong>@foreach (var issue in resolution.Incompatibilities) { <span><code>@issue.Capability</code> — @issue.Message</span> }</div>
+            }
+            else if (resolution?.Capabilities is { Count: > 0 })
+            {
+                <p class="inline-info">The profile options are compatible with the provider, model and AEP adapter. Runtime capabilities and agent tools are evaluated when an agent is resolved.</p>
+            }
         </section>
         <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Declarative resource</h2></div><span>Read only</span></div><pre class="runner-json">@Definition</pre></section>
     }
@@ -90,17 +142,21 @@ else
 
 @code {
     [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     private readonly CancellationTokenSource cancellation = new();
-    private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = [];
+    private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
-    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool confirmDelete;
+    private ExtensionOptionsEditorModel? optionEditor; private bool rawOptions;
+    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
+    private string SelectedProvider => model is null || string.IsNullOrWhiteSpace(model.ProviderName) ? string.Empty : $"{model.ProviderNamespace}:{model.ProviderName}";
     private string Definition
     {
         get
         {
             if (model is null) return string.Empty;
-            try { return JsonSerializer.Serialize(new { apiVersion = ManagementApiVersions.CoreV1, kind = ResourceKinds.ModelProfile, metadata = new { name = model.Name }, definition = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
+            try { return JsonSerializer.Serialize(new { apiVersion = ManagementApiVersions.CoreV1, kind = ResourceKinds.ModelProfile, metadata = new { name = model.Name, @namespace = model.Namespace }, definition = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
             catch (ArgumentException) { return "The declarative definition is unavailable until the configuration is structurally valid."; }
         }
     }
@@ -111,29 +167,37 @@ else
         try
         {
             providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
-            if (IsNew) model = new ModelProfileEditorModel();
+            extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
+            if (IsNew) model = new ModelProfileEditorModel { Namespace = SelectedNamespace.Value };
             else
             {
-                var snapshot = await Client.GetModelProfileAsync(Name!, cancellation.Token);
+                var snapshot = await Client.GetModelProfileAsync(SelectedNamespace, Name!, cancellation.Token);
                 model = ModelProfileEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag;
-                usages = (await Client.GetModelProfileUsagesAsync(Name!, cancellation.Token)).Value;
-                resolution = await Client.GetModelProfileResolutionAsync(Name!, cancellation.Token);
+                usages = (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value;
+                resolution = await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
             }
             if (!string.IsNullOrWhiteSpace(model.ProviderName)) await LoadModelsAsync(clearSelection: false);
+            ConfigureOptionEditor();
         }
         catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProfileEditorModel(); }
         finally { loading = false; }
     }
     private async Task ProviderChangedAsync(ChangeEventArgs args)
     {
-        if (model is null) return; model.ProviderName = args.Value?.ToString() ?? string.Empty; await LoadModelsAsync(clearSelection: true);
+        if (model is null) return;
+        var value = args.Value?.ToString() ?? string.Empty;
+        var separator = value.IndexOf(':');
+        model.ProviderNamespace = separator > 0 ? value[..separator] : ResourceNamespace.DefaultValue;
+        model.ProviderName = separator > 0 ? value[(separator + 1)..] : value;
+        await LoadModelsAsync(clearSelection: true);
+        ConfigureOptionEditor();
     }
     private async Task LoadModelsAsync(bool clearSelection)
     {
         if (model is null) return; if (clearSelection) model.ModelName = string.Empty; models = []; warning = null;
         if (string.IsNullOrWhiteSpace(model.ProviderName)) return;
         loadingModels = true;
-        try { models = await ProvidersClient.GetProviderModelsAsync(model.ProviderName, cancellation.Token); }
+        try { models = await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, cancellation.Token); }
         catch (AgentstrationApiException exception) { warning = $"Models cannot currently be discovered: {exception.Message}"; }
         finally { loadingModels = false; }
     }
@@ -142,24 +206,72 @@ else
         if (model is null || saving) return; saving = true; error = null;
         try
         {
+            if (!rawOptions && optionEditor?.CanGuide == true) model.ProviderOptionsJson = optionEditor.ToProviderOptionsJson();
             ResourceSnapshot<ModelProfileResource> snapshot = IsNew
                 ? await Client.CreateModelProfileAsync(model.ToCreateRequest(), cancellation.Token)
-                : await Client.UpdateModelProfileAsync(model.Name, model.ToPutRequest(), etag!, cancellation.Token);
+                : await Client.UpdateModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, model.ToPutRequest(), etag!, cancellation.Token);
             etag = snapshot.ETag; Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? "Model profile created" : "Model profile updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
-            Navigation.NavigateTo($"/modelprofiles/{Uri.EscapeDataString(snapshot.Value.Name)}");
+            Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name));
         }
         catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { saving = false; }
     }
+    private async Task RefreshResolutionAsync()
+    {
+        if (IsNew || diagnosing) return; diagnosing = true; error = null;
+        try { resolution = await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { diagnosing = false; }
+    }
     private void RequestDelete() { if (usages.Count > 0) { warning = $"This model profile cannot be deleted because it is used by {usages.Count} agent(s): {string.Join(", ", usages.Select(item => item.DisplayName))}."; return; } confirmDelete = true; }
     private async Task DeleteAsync()
     {
         if (model is null || etag is null) return; confirmDelete = false;
-        try { await Client.DeleteModelProfileAsync(model.Name, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
+        try { await Client.DeleteModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
         catch (AgentstrationApiException exception) { error = exception; }
     }
     private static bool IsUnavailable(AvailableModelResponse model) => string.Equals(model.Status, "unavailable", StringComparison.OrdinalIgnoreCase);
+    private void ConfigureOptionEditor()
+    {
+        optionEditor = null;
+        rawOptions = false;
+        if (model is null) return;
+        var provider = providers.SingleOrDefault(value => string.Equals(value.Name, model.ProviderName, StringComparison.Ordinal)
+            && string.Equals(value.Namespace, model.ProviderNamespace, StringComparison.Ordinal));
+        if (provider is null) return;
+        var extension = extensions.SingleOrDefault(value => value.Providers.Any(binding =>
+            string.Equals(binding.Name, provider.Name, StringComparison.Ordinal)
+            && string.Equals(binding.Namespace, provider.Namespace, StringComparison.Ordinal)));
+        var contract = extension?.OptionSets.SingleOrDefault(value =>
+            string.Equals(value.ContributionKind, "model-provider", StringComparison.Ordinal)
+            && string.Equals(value.ContributionId, provider.Properties.ContributionId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(value.Scope, "model-profile", StringComparison.Ordinal));
+        if (contract is not null) optionEditor = ExtensionOptionsEditorModel.Create(provider.Properties.ContributionId, contract, model.ProviderOptionsJson);
+    }
+    private void UseGuidedOptions()
+    {
+        ConfigureOptionEditor();
+        rawOptions = false;
+    }
+    private void SetProviderOptionsEnabled(ChangeEventArgs args)
+    {
+        if (optionEditor is not null) optionEditor.Enabled = args.Value is true;
+    }
+    private static void SetOption(ExtensionOptionFieldEditor field, string? value) => field.Value = value;
+    private static void SetBooleanOption(ExtensionOptionFieldEditor field, ChangeEventArgs args) => field.Value = args.Value is true ? "true" : "false";
+    private static bool BooleanValue(ExtensionOptionFieldEditor field) => bool.TryParse(field.Value, out var value) && value;
+    private static string FieldLabel(ExtensionOptionFieldEditor field) => field.Required ? $"{field.Name} *" : field.Name;
+    private static Microsoft.AspNetCore.Components.RenderFragment FieldHelp(ExtensionOptionFieldEditor field) => builder =>
+    {
+        var text = field.Description;
+        if (string.IsNullOrWhiteSpace(text) && (field.Minimum is not null || field.Maximum is not null)) text = $"Range: {field.Minimum ?? "−∞"} to {field.Maximum ?? "+∞"}.";
+        if (string.IsNullOrWhiteSpace(text)) return;
+        builder.OpenElement(0, "small"); builder.AddContent(1, text); builder.CloseElement();
+    };
+    private static string SupportLabel(string support) => support switch { "native" => "Native", "emulated" => "Emulated", "partial" => "Partial", _ => "Unsupported" };
     private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
+    private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";
+    private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/modelprofiles/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }
