@@ -289,6 +289,8 @@ public sealed class ModelManagementApiTests
                 services.AddSingleton<IExtensionInspector, MigrationExtensionAdapter>();
                 services.AddSingleton<IExtensionOptionsMigrator, MigrationExtensionAdapter>();
             }));
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
         var sourceVersion = MigrationExtensionAdapter.OptionSet.Versions.Single(value => value.Version == "1.0.0");
         var stored = await profiles.CreateAsync(new ModelProfileResource
@@ -361,6 +363,8 @@ public sealed class ModelManagementApiTests
     public async Task ProfileCrudUsesETagAndAllowsTemporarilyUnavailableModel()
     {
         await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         using var client = factory.CreateClient();
         var create = Request("api-test-profile", "model-not-downloaded");
 
@@ -670,6 +674,8 @@ public sealed class ModelManagementApiTests
     public async Task CanonicalProfileCategoriesFlowIntoRuntimeResolution()
     {
         await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         var service = factory.Services.GetRequiredService<ModelProfileManagementService>();
         var profile = new ModelProfileResource
         {
@@ -753,6 +759,8 @@ public sealed class ModelManagementApiTests
     public async Task RuntimeProfileIsPersistedAsAnIndependentManagementResource()
     {
         await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         var service = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
         var id = RuntimeProfileManagementService.ProfileId("maf-persistent-test");
         var stored = await service.CreateAsync(new RuntimeProfileResource
@@ -797,6 +805,8 @@ public sealed class ModelManagementApiTests
     public async Task DeletingAgentRemovesItsDeploymentAndReleasesRuntimeProfile()
     {
         await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
         var runtimes = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
         var store = factory.Services.GetRequiredService<IControlPlaneStore>();
@@ -851,6 +861,8 @@ public sealed class ModelManagementApiTests
     public async Task DeletingRuntimeProfileCleansUpDeploymentOrphanedByEarlierAgentDeletion()
     {
         await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
         var runtimes = factory.Services.GetRequiredService<RuntimeProfileManagementService>();
         var store = factory.Services.GetRequiredService<IControlPlaneStore>();
@@ -1041,6 +1053,11 @@ public sealed class ModelManagementApiTests
             services.AddSingleton<IModelProviderDiscovery, DiagnosticModelProvider>();
             services.AddSingleton<IModelProviderCapabilitiesResolver, DiagnosticModelProvider>();
         }));
+
+    private static Task<RequestContext> GetBootstrapContextAsync(WebApplicationFactory<Program> factory) =>
+        factory.Services
+            .GetRequiredService<ILocalEnvironmentBootstrapper>()
+            .EnsureInitializedAsync(default);
 
     private sealed class DiagnosticModelProvider : IModelProviderDiscovery, IModelProviderCapabilitiesResolver
     {

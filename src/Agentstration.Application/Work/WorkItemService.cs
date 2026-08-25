@@ -64,8 +64,8 @@ public sealed class WorkItemService(
         activity?.SetTag("work.item.id", item.Id.ToString());
         activity?.SetTag("work.correlation.id", item.CorrelationId.ToString());
         var executionScope = executionScopeAccessors.Select(accessor => accessor.Current).FirstOrDefault(scope => scope is not null);
-        if (item.Flow is not null && executionScope is null)
-            throw new WorkValidationException("work_execution_scope_required", "Flow-backed work requires an authenticated execution scope.");
+        if (executionScope is null)
+            throw new WorkValidationException("work_execution_scope_required", "Work execution requires an authenticated Workspace scope.");
         await repository.CreateAsync(item, cancellationToken);
 
         var accepted = await executionGateway.RequestExecutionAsync(new WorkExecutionRequest(

@@ -81,6 +81,12 @@ public sealed class WorkplaceApiTests
             }
             using (var dependencyScope = factory.Services.CreateScope())
             {
+                var requestContext = await dependencyScope.ServiceProvider
+                    .GetRequiredService<ILocalEnvironmentBootstrapper>()
+                    .EnsureInitializedAsync(default);
+                using var requestContextScope = dependencyScope.ServiceProvider
+                    .GetRequiredService<IRequestContextScopeFactory>()
+                    .Push(requestContext);
                 var management = dependencyScope.ServiceProvider.GetRequiredService<AgentManagementService>();
                 var identityStore = dependencyScope.ServiceProvider.GetRequiredService<IIdentityStore>();
                 var tenant = await identityStore.FindTenantByNameAsync("local", default);

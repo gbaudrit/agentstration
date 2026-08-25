@@ -47,7 +47,6 @@ public static class DependencyInjection
         services.TryAddSingleton<LocalBootstrapOptions>();
         services.TryAddSingleton<CurrentRequestContext>();
         services.TryAddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
-        services.TryAddSingleton<IRequestContextInitializer>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton(new GenAiObservabilityOptions());
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();

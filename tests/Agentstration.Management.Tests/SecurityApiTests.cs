@@ -391,7 +391,7 @@ public sealed class SecurityApiTests
         await using var factory = Factory("Development");
         using var client = factory.CreateClient();
         var store = factory.Services.GetRequiredService<IIdentityStore>();
-        var context = factory.Services.GetRequiredService<CurrentRequestContext>().Current;
+        var context = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
 
         using var allowed = await client.GetAsync("/api/agents");
         using var allowedRuns = await client.GetAsync("/api/flowRuns");
@@ -411,7 +411,7 @@ public sealed class SecurityApiTests
     {
         await using var factory = Factory("Development");
         using var client = factory.CreateClient();
-        var context = factory.Services.GetRequiredService<CurrentRequestContext>().Current;
+        var context = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         var store = factory.Services.GetRequiredService<IIdentityStore>();
 
         using var createdResponse = await client.PostAsJsonAsync("/api/identity/workspaces", new { name = "workspace-b", displayName = "Workspace B" });
