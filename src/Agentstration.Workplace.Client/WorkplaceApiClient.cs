@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
+using Microsoft.AspNetCore.Http.Connections.Client;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -73,6 +74,11 @@ public sealed class WorkplaceApiClient(HttpClient httpClient) : IWorkplaceApiCli
     private static string E(string value) => Uri.EscapeDataString(value);
 }
 
+public interface IWorkplaceRealtimeConnectionOptionsConfigurator
+{
+    void Configure(Uri endpoint, HttpConnectionOptions options);
+}
+
 public sealed class WorkplaceRealtimeClient : IAsyncDisposable
 {
     private readonly HubConnection connection;
@@ -80,9 +86,12 @@ public sealed class WorkplaceRealtimeClient : IAsyncDisposable
     private string? workspaceId;
     private long lastSequence;
 
-    public WorkplaceRealtimeClient(Uri hubUrl)
+    public WorkplaceRealtimeClient(Uri hubUrl, IWorkplaceRealtimeConnectionOptionsConfigurator? optionsConfigurator)
     {
-        connection = new HubConnectionBuilder().WithUrl(hubUrl).WithAutomaticReconnect().Build();
+        connection = new HubConnectionBuilder()
+            .WithUrl(hubUrl, options => optionsConfigurator?.Configure(hubUrl, options))
+            .WithAutomaticReconnect()
+            .Build();
         connection.Reconnecting += _ => { StateChanged?.Invoke(HubConnectionState.Reconnecting); return Task.CompletedTask; };
         connection.Reconnected += async _ =>
         {
@@ -175,7 +184,9 @@ public static class WorkplaceClientServiceCollectionExtensions
     public static IHttpClientBuilder AddAgentstrationWorkplaceClient(this IServiceCollection services, Uri apiBaseUrl, Uri hubUrl)
     {
         var builder = services.AddHttpClient<IWorkplaceApiClient, WorkplaceApiClient>(client => client.BaseAddress = apiBaseUrl);
-        services.AddScoped(_ => new WorkplaceRealtimeClient(hubUrl));
+        services.AddScoped(provider => new WorkplaceRealtimeClient(
+            hubUrl,
+            provider.GetService<IWorkplaceRealtimeConnectionOptionsConfigurator>()));
         return builder;
     }
 }

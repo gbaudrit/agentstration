@@ -152,12 +152,12 @@ if (genAiObservability.HttpPayloadCapture.Enabled)
 }
 app.UseExceptionHandler();
 app.UseStatusCodePages();
-if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapAgentstrationOpenApi();
 app.UseAuthentication();
 app.UseMiddleware<PrincipalResolutionMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
 app.UseMiddleware<StandardManagementDataMiddleware>();
 app.UseAuthorization();
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapAgentstrationOpenApi();
 app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 app.MapAgentstrationAuthentication();

@@ -42,6 +42,18 @@ public sealed class OpenApiTests
 
         Assert.IsEmpty(missing, $"Routes without an effective authorization policy:{Environment.NewLine}{string.Join(Environment.NewLine, missing)}");
 
+        var missingContextualPolicy = endpoints
+            .Where(endpoint => endpoint.Metadata.OfType<IAllowAnonymous>().Any() is false)
+            .Where(endpoint => IsContextualAuthorizationBoundary(endpoint.RoutePattern.RawText))
+            .Where(endpoint => endpoint.Metadata.OfType<IAuthorizeData>().All(data =>
+                string.IsNullOrWhiteSpace(data.Policy)
+                || string.Equals(data.Policy, AgentstrationPolicies.Authenticated, StringComparison.Ordinal)))
+            .Select(endpoint => endpoint.RoutePattern.RawText ?? endpoint.DisplayName ?? "<unknown>")
+            .ToArray();
+        Assert.IsEmpty(
+            missingContextualPolicy,
+            $"Routes without an explicit contextual authorization policy:{Environment.NewLine}{string.Join(Environment.NewLine, missingContextualPolicy)}");
+
         var anonymous = endpoints
             .Where(endpoint => endpoint.Metadata.OfType<IAllowAnonymous>().Any())
             .Select(endpoint => NormalizeRoute(endpoint.RoutePattern.RawText))
@@ -184,6 +196,18 @@ public sealed class OpenApiTests
     }
 
     [TestMethod]
+    public async Task SwaggerUiRequiresAuthenticationWhenDevelopmentAutoAuthenticationIsDisabled()
+    {
+        await using var factory = CreateFactory("Local");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        using var response = await client.GetAsync($"{OpenApiConfiguration.SwaggerPath}/index.html");
+
+        Assert.AreEqual(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.AreEqual("/login", response.Headers.Location?.AbsolutePath);
+    }
+
+    [TestMethod]
     public async Task FlowOperationsExposeTheirActualSuccessContracts()
     {
         await using var factory = CreateFactory();
@@ -235,8 +259,13 @@ public sealed class OpenApiTests
         Assert.IsEmpty(gaps, $"Operations without a typed success response ({gaps.Length}):{Environment.NewLine}{string.Join(Environment.NewLine, gaps)}");
     }
 
-    private static WebApplicationFactory<global::Program> CreateFactory() =>
-        new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+    private static WebApplicationFactory<global::Program> CreateFactory(string? authenticationMode = null) =>
+        new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            if (authenticationMode is not null)
+                builder.UseSetting("Agentstration:Authentication:Mode", authenticationMode);
+        });
 
     private static bool IsApiRoute(string? route) => route is not null
         && (route.Equals("health", StringComparison.OrdinalIgnoreCase)
@@ -247,6 +276,14 @@ public sealed class OpenApiTests
         var normalized = NormalizeRoute(route);
         return normalized is "health" or "login" or "bootstrap" or "access-denied"
             || normalized.StartsWith("api/", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("mcp", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsContextualAuthorizationBoundary(string? route)
+    {
+        var normalized = NormalizeRoute(route);
+        return normalized.StartsWith("api/", StringComparison.OrdinalIgnoreCase)
             || normalized.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase)
             || normalized.StartsWith("mcp", StringComparison.OrdinalIgnoreCase);
     }
