@@ -24,7 +24,8 @@ public static class IdentityEndpoints
             Results.Ok(await service.GetCurrentAsync(token))).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
         group.MapGet("/workspaces", async (IdentityAdministrationService service, CancellationToken token) =>
             Results.Ok((await service.GetCurrentAsync(token)).Workspaces)).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
-        group.MapGet("/workspaces/{workspaceId:guid}", GetWorkspaceAsync);
+        group.MapGet("/workspaces/{workspaceId:guid}", GetWorkspaceAsync)
+            .RequireAuthorization(AgentstrationPolicies.WorkspaceReader);
         group.MapPost("/workspaces", CreateWorkspaceAsync).RequireAuthorization(AgentstrationPolicies.WorkspaceAdmin);
         group.MapGet("/workspaces/{workspaceId:guid}/memberships", ListWorkspaceMembershipsAsync)
             .RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
