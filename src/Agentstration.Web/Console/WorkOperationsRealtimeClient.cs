@@ -1,5 +1,5 @@
-using Agentstration.Work.Contracts;
 using Agentstration.Web.Security;
+using Agentstration.Work.Contracts;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace Agentstration.Web.Console;
