@@ -44,6 +44,11 @@ public static class PackProvenanceAnnotations
     public const string Version = "agentstration.io/pack.version";
 }
 
+public static class ResourceProvenanceAnnotations
+{
+    public const string BuiltIn = "agentstration.io/builtin";
+}
+
 public sealed record PackManifest
 {
     public required string ApiVersion { get; init; }
@@ -453,7 +458,7 @@ public record AgentProperties
     public string Handler { get; init; } = "prompt-agent";
     public required string Instructions { get; init; }
     public required ResourceReference ModelProfile { get; init; }
-    public ResourceReference RuntimeProfile { get; init; } = new("maf-default", @namespace: ResourceNamespace.Default);
+    public ResourceReference RuntimeProfile { get; init; } = new("maf-builtin", @namespace: ResourceNamespace.Default);
     public IReadOnlyList<ResourceReference> Tools { get; init; } = [];
     public IReadOnlyList<string> Behaviors { get; init; } = [];
     public IReadOnlyList<string> Middleware { get; init; } = [];

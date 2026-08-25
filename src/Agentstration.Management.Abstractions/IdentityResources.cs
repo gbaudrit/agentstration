@@ -110,7 +110,11 @@ public static class AuthorizationScopes
     public static string Workspace(Guid workspaceId) => $"/workspaces/{workspaceId:D}";
 }
 
-public sealed record RequestContext(Guid PrincipalId, Guid TenantId, Guid WorkspaceId)
+public sealed record RequestContext(
+    Guid PrincipalId,
+    Guid TenantId,
+    Guid WorkspaceId,
+    AuthorizationRestriction? Restriction = null)
 {
     public Guid UserId => PrincipalId;
 }
@@ -135,11 +139,6 @@ public sealed class SystemOperationRequestContext : ICurrentRequestContext
     public bool IsInitialized => false;
     public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.System;
     public RequestContext Current => throw new InvalidOperationException("System operations do not have a workspace request context.");
-}
-
-public interface IRequestContextInitializer
-{
-    void Initialize(RequestContext context);
 }
 
 public interface IRequestContextScopeFactory
@@ -195,7 +194,7 @@ public interface IPlatformAdministratorPolicy
 
 public interface ILocalEnvironmentBootstrapper
 {
-    Task EnsureInitializedAsync(CancellationToken cancellationToken);
+    Task<RequestContext> EnsureInitializedAsync(CancellationToken cancellationToken);
 }
 
 public interface IAuthorizationService

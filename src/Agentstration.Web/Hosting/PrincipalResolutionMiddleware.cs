@@ -20,9 +20,13 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
             return;
         }
 
+        var personalAccessTokenClaim = httpContext.User.FindFirst(PersonalAccessTokenClaimTypes.TokenId)?.Value;
         var accountClaim = httpContext.User.FindFirst(LocalIdentityClaimTypes.AccountId)?.Value;
         Principal? principal;
-        if (Guid.TryParse(accountClaim, out var accountId))
+        if (Guid.TryParse(personalAccessTokenClaim, out _)
+            && Guid.TryParse(httpContext.User.FindFirst(PersonalAccessTokenClaimTypes.PrincipalId)?.Value, out var personalAccessTokenPrincipalId))
+            principal = await identityStore.GetPrincipalAsync(personalAccessTokenPrincipalId, httpContext.RequestAborted);
+        else if (Guid.TryParse(accountClaim, out var accountId))
             principal = await resolver.ResolveLocalAsync(accountId, httpContext.RequestAborted);
         else
         {
@@ -42,9 +46,20 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
         var memberships = await identityStore.ListWorkspaceMembershipsAsync(principal.Id, httpContext.RequestAborted);
         var activeMemberships = memberships.Where(value => value.Status == MembershipStatus.Active).ToArray();
         var requestedWorkspaceId = RequestedWorkspace(httpContext);
-        var selected = requestedWorkspaceId is null
-            ? activeMemberships.FirstOrDefault()
-            : activeMemberships.SingleOrDefault(value => value.WorkspaceId == requestedWorkspaceId.Value);
+        var isPersonalAccessToken = Guid.TryParse(personalAccessTokenClaim, out var personalAccessTokenId);
+        var personalAccessTokenWorkspaceId = Guid.TryParse(
+            httpContext.User.FindFirst(PersonalAccessTokenClaimTypes.WorkspaceId)?.Value,
+            out var parsedPersonalAccessTokenWorkspaceId)
+            ? parsedPersonalAccessTokenWorkspaceId
+            : (Guid?)null;
+        var selected = isPersonalAccessToken
+            ? personalAccessTokenWorkspaceId is { } restrictedWorkspaceId
+                && (requestedWorkspaceId is null || requestedWorkspaceId == restrictedWorkspaceId)
+                ? activeMemberships.SingleOrDefault(value => value.WorkspaceId == restrictedWorkspaceId)
+                : null
+            : requestedWorkspaceId is null
+                ? activeMemberships.FirstOrDefault()
+                : activeMemberships.SingleOrDefault(value => value.WorkspaceId == requestedWorkspaceId.Value);
         if (selected is null)
         {
             await next(httpContext);
@@ -58,7 +73,15 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
             return;
         }
 
-        using (scopeFactory.Push(new RequestContext(principal.Id, workspace.TenantId, workspace.Id)))
+        var restriction = isPersonalAccessToken
+            ? new AuthorizationRestriction(
+                personalAccessTokenId,
+                workspace.Id,
+                httpContext.User.FindAll(PersonalAccessTokenClaimTypes.Permission)
+                    .Select(claim => claim.Value)
+                    .ToHashSet(StringComparer.Ordinal))
+            : null;
+        using (scopeFactory.Push(new RequestContext(principal.Id, workspace.TenantId, workspace.Id, restriction)))
             await next(httpContext);
     }
 

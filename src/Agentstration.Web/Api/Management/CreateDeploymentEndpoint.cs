@@ -2,12 +2,14 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
 
 internal sealed class CreateDeploymentEndpoint : IManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapPost("/deployments/{name}", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/deployments/{name}", HandleAsync)
+        .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
 
     private static Task<IResult> HandleAsync(
         string name,

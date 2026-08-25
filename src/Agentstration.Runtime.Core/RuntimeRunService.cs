@@ -301,6 +301,16 @@ public sealed class RuntimeRunService(
         }
     }
 
+    public async Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(
+        WorkspaceId workspaceId,
+        string runId,
+        long afterSequence,
+        CancellationToken cancellationToken)
+    {
+        _ = await GetRequiredAsync(workspaceId, runId, cancellationToken);
+        return await runs.ListEventsAsync(workspaceId, runId, Math.Max(0, afterSequence), cancellationToken);
+    }
+
     private async Task<StoredRuntimeRun> GetRequiredAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) =>
         await runs.GetAsync(workspaceId, runId, cancellationToken) ?? throw new RuntimeRunNotFoundException(runId);
 

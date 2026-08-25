@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Core;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -34,17 +35,8 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 
         var configured = configuration.GetSection(AgentstrationWebOptions.SectionName).Get<AgentstrationWebOptions>() ?? new();
-        if (configured.UseSimulatedData)
-        {
-            services.AddScoped<MockApiClient>();
-            services.AddScoped<IRuntimeApiClient>(provider => provider.GetRequiredService<MockApiClient>());
-            services.AddScoped<IAgentstrationEventStream>(provider => provider.GetRequiredService<MockApiClient>());
-        }
-        else
-        {
-            AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi);
-            services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
-        }
+        AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi);
+        services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
 
         // Tasks are always real Work API resources, even when unrelated Console
         // projections still use deterministic demonstration data.
@@ -53,14 +45,15 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi);
         AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi);
         services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
-            new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"), provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
+            new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
+            provider.GetRequiredService<ConsoleRealtimeSession>(),
+            provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
 
         AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi);
         AddClient<ToolGovernanceAuditApiClient, IToolGovernanceAuditClient>(services, configured.RuntimeApi);
 
-        // Agent and model management always use the canonical HTTP APIs so that
-        // edits and Runtime activation observe the same persisted generations and
-        // profiles, even when unrelated dashboard widgets use simulated data.
+        // Agent and model management use the canonical HTTP APIs so edits,
+        // deployments, and Runtime activation observe the same persisted state.
         AddClient<ManagementApiClient, IManagementApiClient>(services, configured.ManagementApi);
         AddClient<HttpUserPreferencesClient, IUserPreferencesClient>(services, configured.ManagementApi);
         AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
@@ -101,9 +94,12 @@ public static class WebConsoleServiceCollectionExtensions
                     {
                         var bearer = context.Request.Headers.Authorization.ToString()
                             .StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
+                        var personalAccessToken = context.Request.Headers.Authorization.ToString()
+                            .StartsWith($"Bearer {PersonalAccessTokenService.TokenPrefix}", StringComparison.Ordinal);
                         var apiWithoutWebSession = oidc
                             && (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/mcp"))
                             && !context.Request.Cookies.ContainsKey(AgentstrationAuthenticationDefaults.ApplicationCookie);
+                        if (personalAccessToken) return PersonalAccessTokenAuthenticationDefaults.Scheme;
                         return (oidc || hybrid) && (bearer || apiWithoutWebSession)
                             ? JwtBearerDefaults.AuthenticationScheme
                             : IdentityConstants.ApplicationScheme;
@@ -122,7 +118,10 @@ public static class WebConsoleServiceCollectionExtensions
                 })
                 .AddCookie(IdentityConstants.ExternalScheme)
                 .AddCookie(IdentityConstants.TwoFactorRememberMeScheme)
-                .AddCookie(IdentityConstants.TwoFactorUserIdScheme);
+                .AddCookie(IdentityConstants.TwoFactorUserIdScheme)
+                .AddScheme<AuthenticationSchemeOptions, PersonalAccessTokenAuthenticationHandler>(
+                    PersonalAccessTokenAuthenticationDefaults.Scheme,
+                    _ => { });
 
             if (oidc || hybrid)
             {
@@ -164,23 +163,33 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddSingleton<IAuthorizationHandler, WorkspacePermissionHandler>();
         services.AddSingleton<IAuthorizationHandler, WorkspaceResourcePermissionHandler>();
         services.AddSingleton<IAuthorizationHandler, PlatformAdministratorHandler>();
+        services.AddSingleton<IAuthorizationHandler, InteractiveUserHandler>();
         services.AddSingleton<ConsoleRealtimeSession>();
         services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build())
             .AddPolicy(AgentstrationPolicies.Authenticated, policy => policy.RequireAuthenticatedUser())
             .AddPolicy(AgentstrationPolicies.PlatformAdmin, policy =>
             {
                 policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new InteractiveUserRequirement());
                 policy.AddRequirements(new PlatformAdministratorRequirement());
+            })
+            .AddPolicy(AgentstrationPolicies.InteractiveUser, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new InteractiveUserRequirement());
             })
             .AddPolicy(AgentstrationPolicies.WorkspaceReader, policy => WorkspacePolicy(policy, AuthorizationPermissions.WorkspacesRead))
             .AddPolicy(AgentstrationPolicies.WorkspaceAdmin, policy => WorkspacePolicy(policy, AuthorizationPermissions.WorkspacesWrite))
             .AddPolicy(AgentstrationPolicies.AuthorizationReader, policy => WorkspacePolicy(policy, AuthorizationPermissions.AuthorizationRead))
             .AddPolicy(AgentstrationPolicies.AuthorizationAdmin, policy => WorkspacePolicy(policy, AuthorizationPermissions.AuthorizationWrite))
-            .AddPolicy(AgentstrationPolicies.CanReadAgents, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesRead))
-            .AddPolicy(AgentstrationPolicies.CanManageAgents, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesWrite))
-            .AddPolicy(AgentstrationPolicies.CanRunAgents, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute))
+            .AddPolicy(AgentstrationPolicies.CanReadResources, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesRead))
+            .AddPolicy(AgentstrationPolicies.CanWriteResources, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesWrite))
+            .AddPolicy(AgentstrationPolicies.CanDeleteResources, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesDelete))
             .AddPolicy(AgentstrationPolicies.CanReadRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsRead))
-            .AddPolicy(AgentstrationPolicies.CanRunFlows, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute));
+            .AddPolicy(AgentstrationPolicies.CanExecuteRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute));
     }
 
     private static void WorkspacePolicy(AuthorizationPolicyBuilder policy, string permission)
@@ -244,8 +253,8 @@ public static class WebConsoleServiceCollectionExtensions
         return builder;
     }
 
-    private static bool Validate(AgentstrationWebOptions options) => ValidateEndpoint(options.WorkApi) && (options.UseSimulatedData ||
-        ValidateEndpoint(options.ManagementApi) && ValidateEndpoint(options.RuntimeApi) && ValidateEndpoint(options.FlowApi)) &&
+    private static bool Validate(AgentstrationWebOptions options) => ValidateEndpoint(options.WorkApi) &&
+        ValidateEndpoint(options.ManagementApi) && ValidateEndpoint(options.RuntimeApi) && ValidateEndpoint(options.FlowApi) &&
         (string.IsNullOrWhiteSpace(options.WorkplaceBaseUrl) || Uri.TryCreate(options.WorkplaceBaseUrl, UriKind.Absolute, out var workplace) && workplace.Scheme is "http" or "https");
 
     private static bool ValidateEndpoint(ApiEndpointOptions options) =>

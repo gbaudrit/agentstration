@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Runtime.Abstractions;
@@ -389,12 +390,13 @@ public sealed class RuntimeRunTests
         };
 
         var readiness = await client.GetFromJsonAsync<AgentRuntimeReadinessResponse>($"/api/runtime/agents/sql-expert/readiness?generation={agent.Generation}");
+        var deployments = await client.GetFromJsonAsync<PagedResponse<AgentDeployment>>("/api/deployments?top=100");
 
         using var createdResponse = await client.PostAsJsonAsync("/api/runtime/runs", request);
         Assert.AreEqual(HttpStatusCode.Accepted, createdResponse.StatusCode);
         var created = await createdResponse.Content.ReadFromJsonAsync<RuntimeRun>();
         Assert.IsNotNull(created);
-        var current = factory.Services.GetRequiredService<ICurrentRequestContext>().Current;
+        var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         Assert.AreEqual(new RuntimeRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId), created.Properties.Scope);
         Assert.AreEqual(current.PrincipalId.ToString("D"), created.Properties.Initiator);
         Assert.IsNull(typeof(CreateRuntimeRunRequest).GetProperty("Initiator"));
@@ -407,12 +409,18 @@ public sealed class RuntimeRunTests
             await Task.Delay(100);
         }
         var eventStream = await client.GetStringAsync($"/api/runtime/runs/{created.Id}/events");
+        var eventHistory = await client.GetFromJsonAsync<RuntimeRunEvent[]>($"/api/runtime/runs/{created.Id}/eventHistory?afterSequence=0");
         var workAfter = await client.GetFromJsonAsync<WorkItemPageResponse>("/api/work/workitems?top=100");
 
         Assert.AreEqual(RuntimeRunState.Succeeded, completed!.Status.State);
         Assert.IsTrue(readiness?.Ready);
+        Assert.IsNotNull(deployments);
+        Assert.IsTrue(deployments.Value.Any(deployment => deployment.AgentName == "sql-expert" && deployment.OperationalState == OperationalState.Ready));
         StringAssert.Contains(eventStream, "event: ResponseDelta");
         StringAssert.Contains(eventStream, "event: RunCompleted");
+        Assert.IsNotNull(eventHistory);
+        Assert.IsTrue(eventHistory.Any(item => item.Kind == RuntimeRunEventKind.ResponseDelta));
+        Assert.AreEqual(RuntimeRunEventKind.RunCompleted, eventHistory[^1].Kind);
         Assert.AreEqual(workBefore!.Value.Count, workAfter!.Value.Count);
     }
 
@@ -555,7 +563,7 @@ public sealed class RuntimeRunTests
                 AgentVersion = 3,
                 EffectiveInstructions = "Test",
                 ModelProfileName = "reasoning-default",
-                RuntimeProfileName = "maf-default",
+                RuntimeProfileName = "maf-builtin",
                 EffectiveToolNames = [],
                 MiddlewareIds = [],
                 ContextProviderIds = [],
@@ -573,7 +581,7 @@ public sealed class RuntimeRunTests
             RevisionName = revisionId,
             AgentName = "sql-expert",
             Environment = "local",
-            RuntimeProfileName = "maf-default",
+            RuntimeProfileName = "maf-builtin",
             HostingMode = AgentHostingMode.InProcess,
             DesiredState = DesiredAgentState.Running,
             ProvisioningState = ProvisioningState.Succeeded,

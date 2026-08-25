@@ -1,13 +1,26 @@
-<article class="metric-card">
-    <div><span class="metric-label">@Label</span><strong>@Value</strong></div>
-    @if (!string.IsNullOrWhiteSpace(Detail)) { <small>@Detail</small> }
-    <span class="metric-accent metric-@Status.ToString().ToLowerInvariant()" aria-hidden="true"></span>
-</article>
+@if (!string.IsNullOrWhiteSpace(Url))
+{
+    <a class="metric-card metric-card-link" href="@Url">
+        <div><span class="metric-label">@Label</span><strong>@Value</strong></div>
+        @if (!string.IsNullOrWhiteSpace(Detail)) { <small>@Detail</small> }
+        <span class="metric-card-arrow" aria-hidden="true">→</span>
+        <span class="metric-accent metric-@Status.ToString().ToLowerInvariant()" aria-hidden="true"></span>
+    </a>
+}
+else
+{
+    <article class="metric-card">
+        <div><span class="metric-label">@Label</span><strong>@Value</strong></div>
+        @if (!string.IsNullOrWhiteSpace(Detail)) { <small>@Detail</small> }
+        <span class="metric-accent metric-@Status.ToString().ToLowerInvariant()" aria-hidden="true"></span>
+    </article>
+}
 
 @code {
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
     [Parameter] public string? Detail { get; set; }
     [Parameter] public UiStatus Status { get; set; }
+    [Parameter] public string? Url { get; set; }
 }
 

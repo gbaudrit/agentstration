@@ -1,5 +1,7 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
@@ -16,6 +18,143 @@ public sealed class SecurityApiTests
 {
     private const string LocalPassword = "A-strong-local-password-42!";
     private const string ChangedLocalPassword = "A-changed-local-password-84!";
+
+    [TestMethod]
+    public async Task HttpMcpAndSignalRBoundariesEnforceTheRoleAndPatMatrix()
+    {
+        await using var factory = Factory("Local");
+        using var administrator = UnredirectedClient(factory);
+        await BootstrapAsync(administrator, "boundary-owner");
+        var context = await administrator.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.IsNotNull(context);
+
+        var viewer = await CreateAccountAsync(administrator, context.Context.WorkspaceId, "boundary-viewer", BuiltInIdentityRoles.Viewer);
+        _ = await CreateAccountAsync(administrator, context.Context.WorkspaceId, "boundary-member", BuiltInIdentityRoles.Member);
+        _ = await CreateAccountAsync(administrator, context.Context.WorkspaceId, "boundary-admin", BuiltInIdentityRoles.Admin);
+        using var platformGrant = await administrator.PutAsync($"/api/identity/platform-administrators/{viewer.PrincipalId:D}", null);
+        Assert.AreEqual(HttpStatusCode.OK, platformGrant.StatusCode);
+
+        using var patResponse = await administrator.PostAsJsonAsync("/api/identity/pat", new
+        {
+            name = "Boundary read-only token",
+            workspaceId = context.Context.WorkspaceId,
+            permissions = new[] { AuthorizationPermissions.ResourcesRead },
+            expiresAt = DateTimeOffset.UtcNow.AddDays(1)
+        });
+        Assert.AreEqual(HttpStatusCode.Created, patResponse.StatusCode);
+        using var patDocument = JsonDocument.Parse(await patResponse.Content.ReadAsStringAsync());
+        var pat = patDocument.RootElement.GetProperty("token").GetString();
+        Assert.IsNotNull(pat);
+
+        using var anonymous = UnredirectedClient(factory);
+        using var viewerClient = UnredirectedClient(factory);
+        using var memberClient = UnredirectedClient(factory);
+        using var adminClient = UnredirectedClient(factory);
+        using var patClient = UnredirectedClient(factory);
+        await LoginAsync(viewerClient, "boundary-viewer", LocalPassword);
+        await LoginAsync(memberClient, "boundary-member", LocalPassword);
+        await LoginAsync(adminClient, "boundary-admin", LocalPassword);
+        patClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", pat);
+        patClient.DefaultRequestHeaders.Add("X-Agentstration-Workspace", context.Context.WorkspaceId.ToString("D"));
+
+        var resourceRead = new AccessProbe("resources/read", () => new(HttpMethod.Get, "/api/modelproviders"));
+        var resourceWrite = new AccessProbe("resources/write", () => Json(HttpMethod.Post, "/api/modelproviders", "{}"));
+        var resourceDelete = new AccessProbe("resources/delete", () => new(HttpMethod.Delete, "/api/modelproviders/missing"));
+        var runsExecute = new AccessProbe("runs/execute", () => new(HttpMethod.Post, "/api/triggers/missing/run"));
+        var hubRead = new AccessProbe("SignalR runs/read", () => new(HttpMethod.Post, "/hubs/workplace/negotiate?negotiateVersion=1") { Content = new ByteArrayContent([]) });
+        var probes = new[] { resourceRead, resourceWrite, resourceDelete, runsExecute, hubRead };
+
+        await AssertAccessMatrixAsync(anonymous, probes, [false, false, false, false, false]);
+        await AssertAccessMatrixAsync(viewerClient, probes, [true, false, false, false, true]);
+        await AssertAccessMatrixAsync(memberClient, probes, [true, false, false, true, true]);
+        await AssertAccessMatrixAsync(adminClient, probes, [true, true, true, true, true]);
+        await AssertAccessMatrixAsync(patClient, probes, [true, false, false, false, false]);
+        foreach (var deniedClient in new[] { anonymous, viewerClient, patClient })
+        {
+            using var deniedMcp = await deniedClient.SendAsync(Json(HttpMethod.Post, "/mcp", "{}"));
+            Assert.IsTrue(deniedMcp.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden);
+        }
+
+        using var platformAccess = await viewerClient.GetAsync("/api/identity/platform");
+        Assert.AreEqual(HttpStatusCode.OK, platformAccess.StatusCode);
+        using var workspaceWriteStillDenied = await viewerClient.SendAsync(resourceWrite.Request());
+        Assert.AreEqual(HttpStatusCode.Forbidden, workspaceWriteStillDenied.StatusCode,
+            "PlatformAdmin must not imply Workspace resource permissions.");
+        using var vaultInitialization = await viewerClient.PostAsync("/api/vaults/missing/initialize", null);
+        Assert.AreNotEqual(HttpStatusCode.Unauthorized, vaultInitialization.StatusCode);
+        Assert.AreNotEqual(HttpStatusCode.Forbidden, vaultInitialization.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenIsWorkspaceScopedPermissionLimitedAndRevocable()
+    {
+        await using var factory = Factory("Local");
+        using var browser = UnredirectedClient(factory);
+        await BootstrapAsync(browser, "pat-user");
+        var context = await browser.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.IsNotNull(context);
+
+        using var createdResponse = await browser.PostAsJsonAsync("/api/identity/pat", new
+        {
+            name = "Read-only automation",
+            workspaceId = context.Context.WorkspaceId,
+            permissions = new[] { AuthorizationPermissions.ResourcesRead },
+            expiresAt = DateTimeOffset.UtcNow.AddDays(30)
+        });
+        Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
+        using var created = JsonDocument.Parse(await createdResponse.Content.ReadAsStringAsync());
+        var token = created.RootElement.GetProperty("token").GetString();
+        var tokenId = created.RootElement.GetProperty("metadata").GetProperty("id").GetGuid();
+        Assert.IsNotNull(token);
+        Assert.StartsWith(PersonalAccessTokenService.TokenPrefix, token, StringComparison.Ordinal);
+
+        using var listResponse = await browser.GetAsync("/api/identity/pat");
+        Assert.AreEqual(HttpStatusCode.OK, listResponse.StatusCode);
+        var listedJson = await listResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(token, listedJson, StringComparison.Ordinal);
+        StringAssert.Contains(listedJson, "Read-only automation");
+
+        using var tokenClient = UnredirectedClient(factory);
+        tokenClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        tokenClient.DefaultRequestHeaders.Add("X-Agentstration-Workspace", context.Context.WorkspaceId.ToString("D"));
+        using var allowed = await tokenClient.GetAsync("/api/agents");
+        using var deniedByScope = await tokenClient.GetAsync("/api/flowRuns");
+        using var deniedAdministration = await tokenClient.GetAsync("/api/identity/pat");
+        Assert.AreEqual(HttpStatusCode.OK, allowed.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Forbidden, deniedByScope.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Forbidden, deniedAdministration.StatusCode);
+
+        using var crossWorkspace = UnredirectedClient(factory);
+        crossWorkspace.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        crossWorkspace.DefaultRequestHeaders.Add("X-Agentstration-Workspace", Guid.NewGuid().ToString("D"));
+        using var deniedWorkspace = await crossWorkspace.GetAsync("/api/agents");
+        Assert.AreEqual(HttpStatusCode.Forbidden, deniedWorkspace.StatusCode);
+
+        using var revoked = await browser.DeleteAsync($"/api/identity/pat/{tokenId:D}");
+        Assert.AreEqual(HttpStatusCode.NoContent, revoked.StatusCode);
+        using var deniedAfterRevocation = await tokenClient.GetAsync("/api/agents");
+        Assert.AreEqual(HttpStatusCode.Unauthorized, deniedAfterRevocation.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task PersonalAccessTokenPageUsesAntiforgeryAndNeverDisplaysExistingSecrets()
+    {
+        await using var factory = Factory("Local");
+        using var browser = UnredirectedClient(factory);
+        await BootstrapAsync(browser, "pat-page-user");
+
+        using var page = await browser.GetAsync("/account/pat");
+        Assert.AreEqual(HttpStatusCode.OK, page.StatusCode);
+        var html = await page.Content.ReadAsStringAsync();
+        StringAssert.Contains(html, "Personal access tokens");
+        StringAssert.Contains(html, "Create a token");
+        _ = AntiforgeryToken(html);
+
+        using var missingAntiforgery = await browser.PostAsync(
+            "/account/pat?handler=RevokeAll",
+            new FormUrlEncodedContent([]));
+        Assert.AreEqual(HttpStatusCode.BadRequest, missingAntiforgery.StatusCode);
+    }
 
     [TestMethod]
     public async Task AuthenticatedPrincipalCanPersistOwnThemePreference()
@@ -252,7 +391,7 @@ public sealed class SecurityApiTests
         await using var factory = Factory("Development");
         using var client = factory.CreateClient();
         var store = factory.Services.GetRequiredService<IIdentityStore>();
-        var context = factory.Services.GetRequiredService<CurrentRequestContext>().Current;
+        var context = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
 
         using var allowed = await client.GetAsync("/api/agents");
         using var allowedRuns = await client.GetAsync("/api/flowRuns");
@@ -272,7 +411,7 @@ public sealed class SecurityApiTests
     {
         await using var factory = Factory("Development");
         using var client = factory.CreateClient();
-        var context = factory.Services.GetRequiredService<CurrentRequestContext>().Current;
+        var context = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         var store = factory.Services.GetRequiredService<IIdentityStore>();
 
         using var createdResponse = await client.PostAsJsonAsync("/api/identity/workspaces", new { name = "workspace-b", displayName = "Workspace B" });
@@ -324,8 +463,15 @@ public sealed class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.Conflict, repeated.StatusCode);
 
         using var agents = await client.GetAsync("/api/agents");
+        var standardRuntime = await client.GetFromJsonAsync<RuntimeProfileResource>("/api/runtimeprofiles/maf-builtin");
         using var platform = await client.GetAsync("/api/identity/platform");
         Assert.AreEqual(HttpStatusCode.OK, agents.StatusCode);
+        Assert.IsNotNull(standardRuntime);
+        Assert.AreEqual("microsoft-agent-framework", standardRuntime.Definition.RuntimeType);
+        Assert.AreEqual(RuntimeSessionMode.Transient, standardRuntime.Definition.Execution.SessionMode);
+        Assert.AreEqual(RuntimeToolInvocationMode.Automatic, standardRuntime.Definition.Execution.ToolInvocation);
+        Assert.AreEqual(StreamingMode.Automatic, standardRuntime.Definition.Execution.Streaming);
+        Assert.AreEqual("true", standardRuntime.Metadata.Annotations[ResourceProvenanceAnnotations.BuiltIn]);
         Assert.AreEqual(HttpStatusCode.OK, platform.StatusCode);
 
         await using var scope = factory.Services.CreateAsyncScope();
@@ -830,6 +976,46 @@ public sealed class SecurityApiTests
         using var response = await client.PostAsJsonAsync("/api/auth/local/login", new { userName, password });
         Assert.AreEqual(HttpStatusCode.NoContent, response.StatusCode);
     }
+
+    private static async Task<LocalAccountView> CreateAccountAsync(HttpClient administrator, Guid workspaceId, string userName, string role)
+    {
+        using var response = await administrator.PostAsJsonAsync("/api/identity/accounts/", new
+        {
+            userName,
+            password = LocalPassword,
+            displayName = userName,
+            workspaceId,
+            role
+        });
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
+        return await response.Content.ReadFromJsonAsync<LocalAccountView>()
+            ?? throw new InvalidOperationException("The created local account response was empty.");
+    }
+
+    private static HttpRequestMessage Json(HttpMethod method, string uri, string json) => new(method, uri)
+    {
+        Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+    };
+
+    private static async Task AssertAccessMatrixAsync(HttpClient client, IReadOnlyList<AccessProbe> probes, IReadOnlyList<bool> expected)
+    {
+        for (var index = 0; index < probes.Count; index++)
+        {
+            using var response = await client.SendAsync(probes[index].Request());
+            if (expected[index])
+            {
+                Assert.AreNotEqual(HttpStatusCode.Unauthorized, response.StatusCode, $"{probes[index].Name} unexpectedly required authentication.");
+                Assert.AreNotEqual(HttpStatusCode.Forbidden, response.StatusCode, $"{probes[index].Name} unexpectedly denied authorization.");
+            }
+            else
+            {
+                Assert.IsTrue(response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden,
+                    $"{probes[index].Name} unexpectedly crossed the authorization boundary with status {(int)response.StatusCode}.");
+            }
+        }
+    }
+
+    private sealed record AccessProbe(string Name, Func<HttpRequestMessage> Request);
 
     private static FormUrlEncodedContent ChangePasswordForm(
         string? antiforgeryToken,

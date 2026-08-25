@@ -2,13 +2,14 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
 
 internal sealed class GetAgentModelEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/{agentName}/model", HandleAsync);
-    public static void MapNamespaced(IEndpointRouteBuilder endpoints) => endpoints.MapGet("/api/namespaces/{namespace}/agents/{agentName}/model", HandleNamespacedAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{agentName}/model", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+    public static void MapNamespaced(IEndpointRouteBuilder endpoints) => endpoints.MapGet("/api/namespaces/{namespace}/agents/{agentName}/model", HandleNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
 
     private static Task<IResult> HandleAsync(
         string agentName,

@@ -9,7 +9,8 @@ public sealed record EventListItem(
     string Type,
     string Summary,
     string? CorrelationId = null,
-    string? Details = null);
+    string? Details = null,
+    string? Url = null);
 
 public sealed record TimelineItem(string Title, DateTimeOffset Timestamp, UiStatus Status, string? Detail = null);
 

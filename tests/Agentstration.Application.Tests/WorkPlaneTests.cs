@@ -562,12 +562,12 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
-    public async Task FlowBackedWorkIsRejectedBeforeQueueingWithoutAnExecutionScope()
+    public async Task WorkIsRejectedBeforeQueueingWithoutAnExecutionScope()
     {
         await using var fixture = await WorkFixture.CreateAsync(withExecutionScope: false);
 
         var exception = await Assert.ThrowsExactlyAsync<WorkValidationException>(() => fixture.Service.SubmitAsync(
-            new SubmitWorkItemCommand(WorkplaceId, "flow", "Run", Flow: new FlowReference(new FlowId("main"))), default));
+            new SubmitWorkItemCommand(WorkplaceId, "analysis", "Run"), default));
 
         Assert.AreEqual("work_execution_scope_required", exception.Code);
         Assert.IsNull(fixture.Gateway.Request);

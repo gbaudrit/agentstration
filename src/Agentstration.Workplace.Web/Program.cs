@@ -21,6 +21,11 @@ builder.Services.AddTransient(provider => new WorkplaceApiSessionHandler(
     apiUrl,
     ".Agentstration.Identity.Application",
     "agentstration.workspace"));
+builder.Services.AddScoped<IWorkplaceRealtimeConnectionOptionsConfigurator>(provider => new WorkplaceRealtimeSession(
+    provider.GetRequiredService<IHttpContextAccessor>(),
+    hubUrl,
+    ".Agentstration.Identity.Application",
+    "agentstration.workspace"));
 builder.Services.AddAgentstrationWorkplaceClient(apiUrl, hubUrl)
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
     .AddHttpMessageHandler<WorkplaceApiSessionHandler>();

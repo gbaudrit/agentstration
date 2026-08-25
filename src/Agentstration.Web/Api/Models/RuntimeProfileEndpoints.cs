@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
 
@@ -8,12 +9,12 @@ internal static class RuntimeProfileEndpoints
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/", ListAsync);
-        group.MapGet("/{profileName}/usages", UsagesAsync);
-        group.MapGet("/{profileName}", GetAsync);
-        group.MapPost("/", CreateAsync);
-        group.MapPut("/{profileName}", PutAsync);
-        group.MapDelete("/{profileName}", DeleteAsync);
+        group.MapGet("/", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/{profileName}/usages", UsagesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/{profileName}", GetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPost("/", CreateAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapPut("/{profileName}", PutAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapDelete("/{profileName}", DeleteAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
     }
 
     private static Task<IResult> ListAsync(RuntimeProfileManagementService service, CancellationToken cancellationToken) =>

@@ -1,0 +1,47 @@
+@implements IDisposable
+
+@if (metric is null)
+{
+    <article class="metric-card metric-card-loading" aria-label="@($"{Label} loading")" aria-busy="true">
+        <span class="metric-label">@Label</span>
+        <span class="metric-loading-value" aria-hidden="true"></span>
+        <span class="metric-loading-detail" aria-hidden="true"></span>
+    </article>
+}
+else
+{
+    <MetricCard Label="@Label" Value="@metric.Value" Detail="@metric.Detail" Status="@metric.Status" Url="@Url" />
+}
+
+@code {
+    private DashboardMetric? metric;
+    private bool disposed;
+
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public Task<DashboardMetric> Load { get; set; } = Task.FromResult(new DashboardMetric("—", null, UiStatus.Neutral));
+    [Parameter] public string? Url { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            metric = await Load;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception)
+        {
+            metric = new("—", "Unavailable", UiStatus.Danger);
+        }
+
+        if (!disposed)
+            await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => disposed = true;
+}
