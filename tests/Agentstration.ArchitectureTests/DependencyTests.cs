@@ -2,9 +2,7 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
-using Agentstration.Application;
-using Agentstration.Domain;
-using Agentstration.Evaluation;
+using Agentstration.Application.Work;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
 using Agentstration.Extensions.Ollama;
@@ -69,30 +67,16 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void DomainHasNoInfrastructureOrFrameworkDependencies()
-    {
-        var references = typeof(Agentstration.Domain.Workspace).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
-        Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal) || name.Contains("Agents.AI", StringComparison.Ordinal) || name.Contains("Infrastructure", StringComparison.Ordinal)));
-    }
-
-    [TestMethod]
     public void ApplicationDoesNotReferenceInfrastructureOrWeb()
     {
-        var references = typeof(IPlatformStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
-        Assert.IsFalse(references.Any(name => name!.Contains("Infrastructure", StringComparison.Ordinal) || name.Contains("Agentstration.Web", StringComparison.Ordinal)));
-    }
-
-    [TestMethod]
-    public void EvaluationDoesNotReferenceInfrastructureOrWeb()
-    {
-        var references = typeof(ContentWorkflowEvaluator).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var references = typeof(WorkplaceService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Infrastructure", StringComparison.Ordinal) || name.Contains("Agentstration.Web", StringComparison.Ordinal)));
     }
 
     [TestMethod]
     public void ApplicationDoesNotReferenceConcreteStorageOrRuntimeAdapters()
     {
-        var references = typeof(IPlatformStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        var references = typeof(WorkplaceService).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Storage.Sqlite", StringComparison.Ordinal)
             || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
@@ -252,8 +236,8 @@ public sealed class DependencyTests
     {
         var assemblies = new[]
         {
-            typeof(Agentstration.Domain.Workspace).Assembly,
-            typeof(IPlatformStore).Assembly,
+            typeof(Agentstration.Resources.ResourceAddress).Assembly,
+            typeof(WorkplaceService).Assembly,
             typeof(IControlPlaneStore).Assembly,
             typeof(AgentManagementService).Assembly
         };
