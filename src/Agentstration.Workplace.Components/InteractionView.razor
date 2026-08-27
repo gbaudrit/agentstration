@@ -24,6 +24,20 @@
                 case WorkTaskResult result:
                     <TaskResultView Result="result" />
                     break;
+                case ResultDiagnosticsItem:
+                    <div class="result-diagnostics">
+                        <button class="result-diagnostics-toggle" type="button" aria-expanded="@diagnosticsExpanded.ToString().ToLowerInvariant()" @onclick="ToggleDiagnostics"><UiIcon Name="document" /> Execution details <small>Development</small></button>
+                        @if (diagnosticsExpanded)
+                        {
+                            <div class="result-diagnostics-content">
+                                @foreach (var result in Results.OrderBy(value => value.Sequence))
+                                {
+                                    <TaskResultView Result="result" />
+                                }
+                            </div>
+                        }
+                    </div>
+                    break;
                 case WorkTaskArtifact artifact:
                     <ArtifactCard Artifact="artifact" ContentUrl="@ArtifactContentUrl(artifact)" />
                     break;
@@ -54,6 +68,7 @@
     [Parameter] public IReadOnlyList<WorkTaskResult> Results { get; set; } = [];
     [Parameter] public IReadOnlyList<WorkTaskArtifact> Artifacts { get; set; } = [];
     [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool DiagnosticsEnabled { get; set; }
     [Parameter] public bool RealtimeConnected { get; set; }
     [Parameter] public string? Error { get; set; }
     [Parameter] public InteractionStatus Status { get; set; } = InteractionStatus.Active;
@@ -81,6 +96,8 @@
             items.AddRange(progress.Select(value => new TimelineItem(value.CreatedAt, 1, value.Id.ToString(), value)));
             if (Task is not null && ShowTask(Task)) items.Add(new(Task.CreatedAt, 3, Task.Id.ToString(), Task));
             items.AddRange(Results.Where(ShowResult).Select(value => new TimelineItem(value.CreatedAt, 4, value.Id.ToString(), value)));
+            if (DiagnosticsEnabled && Presentation.Results.Display == EntryResultDisplay.Auto && Results.Count > 0)
+                items.Add(new(Results.Max(value => value.CreatedAt), 4, "result-diagnostics", ResultDiagnosticsItem.Instance));
             items.AddRange(Artifacts.Select(value => new TimelineItem(value.CreatedAt, 5, value.Id.ToString(), value)));
             if (Presentation.Progress.Visibility != EntryProgressVisibility.Hidden
                 && Task is not null && Task.Status is WorkTaskStatus.Running or WorkTaskStatus.Pending && progress.Count == 0)
@@ -133,30 +150,17 @@
         var deliverables = Results.Count + Artifacts.Count;
         return lastObservedAt - task.CreatedAt >= AutoTaskDuration || completedMilestones >= 2 || deliverables >= 2;
     }
-    private bool ShowResult(WorkTaskResult result) => Presentation.Results.Display switch
+    private bool ShowResult(WorkTaskResult _) => Presentation.Results.Display == EntryResultDisplay.Visible;
+    private void ToggleDiagnostics() => diagnosticsExpanded = !diagnosticsExpanded;
+    private bool diagnosticsExpanded;
+    private Guid? diagnosticsTaskId;
+    protected override void OnParametersSet()
     {
-        EntryResultDisplay.Visible => true,
-        EntryResultDisplay.Hidden => false,
-        _ => result.Kind is not WorkTaskResultKind.Text && !ConversationAlreadyCarries(result)
-    };
-    private bool ConversationAlreadyCarries(WorkTaskResult result)
-    {
-        var summary = ConversationSummary(result.Content);
-        if (string.IsNullOrWhiteSpace(summary)
-            || !Messages.Any(message => message.Role == ConversationRole.Agentstration && string.Equals(message.Content.Trim(), summary.Trim(), StringComparison.Ordinal)))
-            return false;
-
-        if (result.Content.ValueKind == System.Text.Json.JsonValueKind.String) return true;
-        return result.Content.ValueKind == System.Text.Json.JsonValueKind.Object
-            && result.Content.EnumerateObject().All(property => string.Equals(property.Name, "finalOutput", StringComparison.Ordinal));
+        var taskId = Task?.Id ?? Results.FirstOrDefault()?.WorkTaskId.Value;
+        if (taskId == diagnosticsTaskId) return;
+        diagnosticsTaskId = taskId;
+        diagnosticsExpanded = false;
     }
-    private static string? ConversationSummary(System.Text.Json.JsonElement content) => content.ValueKind switch
-    {
-        System.Text.Json.JsonValueKind.String => content.GetString(),
-        System.Text.Json.JsonValueKind.Object when content.TryGetProperty("finalOutput", out var output)
-            && output.ValueKind == System.Text.Json.JsonValueKind.String => output.GetString(),
-        _ => null
-    };
     private string? ComposerDisabledReason => Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction || Status == InteractionStatus.WaitingForUser
         ? "Answer the question above to continue."
         : Status == InteractionStatus.Closed ? "This conversation is closed."
@@ -165,4 +169,5 @@
     private sealed record TimelineItem(DateTimeOffset Timestamp, int Order, string Key, object Value);
     private sealed record AssistantResponseItem(string Content);
     private sealed class ProcessingItem { public static readonly ProcessingItem Instance = new(); }
+    private sealed class ResultDiagnosticsItem { public static readonly ResultDiagnosticsItem Instance = new(); }
 }

@@ -121,7 +121,7 @@ public sealed class WorkplaceUxTests
     }
 
     [TestMethod]
-    public void CompactDefaultsHideParticipantMechanicsAndDuplicateTextResults()
+    public void CompactDefaultsHideParticipantMechanicsAndTechnicalResults()
     {
         using var context = new BunitContext();
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
@@ -141,10 +141,34 @@ public sealed class WorkplaceUxTests
 
         Assert.IsFalse(rendered.Markup.Contains("Participant detail", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Final answer", StringComparison.Ordinal));
-        Assert.AreEqual(2, rendered.FindAll(".task-result").Count);
+        Assert.AreEqual(0, rendered.FindAll(".task-result").Count);
+        Assert.AreEqual(0, rendered.FindAll(".result-diagnostics-toggle").Count);
         Assert.IsFalse(rendered.Markup.Contains("Duplicate envelope", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Markup.Contains("Comparison", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Markup.Contains("Enriched answer", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Markup.Contains("Comparison", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Markup.Contains("Enriched answer", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void DevelopmentDiagnosticsRevealAutomaticResultsOnlyOnDemand()
+    {
+        using var context = new BunitContext();
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        var taskId = new WorkTaskId(Guid.NewGuid());
+        var result = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Structured, "Execution result", JsonSerializer.SerializeToElement(new { finalOutput = "Answer", participants = new[] { "alice", "bob" } }), DateTimeOffset.UtcNow);
+        var rendered = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.DiagnosticsEnabled, true)
+            .Add(value => value.Results, [result])
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+
+        var toggle = rendered.Find(".result-diagnostics-toggle");
+        Assert.AreEqual("false", toggle.GetAttribute("aria-expanded"));
+        Assert.AreEqual(0, rendered.FindAll(".task-result").Count);
+        Assert.IsFalse(rendered.Markup.Contains("participants", StringComparison.Ordinal));
+
+        toggle.Click();
+        Assert.AreEqual("true", rendered.Find(".result-diagnostics-toggle").GetAttribute("aria-expanded"));
+        Assert.AreEqual(1, rendered.FindAll(".task-result").Count);
+        Assert.IsTrue(rendered.Markup.Contains("participants", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -323,7 +347,7 @@ public sealed class WorkplaceUxTests
         var result = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Table, "Comparison table", JsonSerializer.SerializeToElement(new { rows = 3 }), now.AddSeconds(2));
         var artifact = new WorkTaskArtifact(WorkTaskArtifactId.New(), workspaceId, taskId, "run-1", "comparison.csv", "text/csv", 32, "private-key", now.AddSeconds(3));
         var rendered = context.Render<InteractionView>(parameters => parameters
-            .Add(value => value.Presentation, new EntryPresentation { Progress = new(EntryProgressVisibility.Detailed) })
+            .Add(value => value.Presentation, new EntryPresentation { Progress = new(EntryProgressVisibility.Detailed), Results = new(EntryResultDisplay.Visible) })
             .Add(value => value.Messages, [message])
             .Add(value => value.Activities, [activity])
             .Add(value => value.Results, [result])

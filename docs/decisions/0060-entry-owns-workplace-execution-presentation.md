@@ -21,7 +21,7 @@ Participant turn boundaries are projected durably as generic `ProgressStarted` a
 
 `task.display: auto` is resolved entirely by Workplace from durable Work evidence. Interrupted or actionable Tasks are always materialized; otherwise an inline Task card appears only after a meaningful observed duration, multiple completed progress milestones, or multiple deliverables. Explicit `visible` and `hidden` settings remain authoritative. The detailed Task timeline collapses completed start/end pairs and distinguishes completed, current, and terminal activities.
 
-The user-facing synthesis is carried by a ConversationMessage. Workplace renders a WorkTaskResult automatically only when it adds structured information beyond that synthesis, and it projects only artifacts explicitly declared by WorkResult. A textual result is not converted into a synthetic downloadable artifact.
+The user-facing synthesis is carried by a ConversationMessage. Automatic presentation does not render WorkTaskResult payloads inside the end-user conversation, even when they contain additional execution metadata. An Entry may explicitly request visible Results; a Development host may instead expose the same payloads behind a collapsed diagnostic control that is not part of Entry configuration. Workplace projects only artifacts explicitly declared by WorkResult, and a textual result is not converted into a synthetic downloadable artifact.
 
 ## Consequences
 
