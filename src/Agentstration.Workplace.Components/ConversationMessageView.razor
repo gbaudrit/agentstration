@@ -1,7 +1,9 @@
-<article class="conversation-message @RoleClass">
-    <div class="message-avatar" aria-hidden="true">@if (Message.Role == ConversationRole.User) { <span>You</span> } else if (ParticipantLabel is not null) { <span>@Initials</span> } else { <img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /> }</div>
+<article class="conversation-message @RoleClass" aria-label="@RoleLabel">
     <div class="message-body">
-        <header><strong>@RoleLabel</strong><time datetime="@Message.CreatedAt.ToString("O")">@Message.CreatedAt.ToLocalTime().ToString("HH:mm")</time></header>
+        <header>
+            @if (ShowRoleLabel) { <strong>@RoleLabel</strong> }
+            <time datetime="@Message.CreatedAt.ToString("O")">@Message.CreatedAt.ToLocalTime().ToString("HH:mm")</time>
+        </header>
         <p>@Message.Content</p>
     </div>
 </article>
@@ -10,7 +12,7 @@
     [Parameter, EditorRequired] public required ConversationMessage Message { get; set; }
     private string RoleClass => Message.Role == ConversationRole.User ? "message-user" : Message.Role == ConversationRole.System ? "message-system" : "message-assistant";
     private string RoleLabel => Message.Role == ConversationRole.User ? "You" : Message.Role == ConversationRole.System ? "Update" : ParticipantLabel ?? "Agentstration";
+    private bool ShowRoleLabel => Message.Role == ConversationRole.System || ParticipantLabel is not null;
     private string? ParticipantLabel => Message.Metadata?.GetValueOrDefault("participantId") is { Length: > 0 } participant ? Humanize(participant) : null;
-    private string Initials => string.Concat((ParticipantLabel ?? "A").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(value => char.ToUpperInvariant(value[0])));
     private static string Humanize(string value) => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('-', ' ').Replace('_', ' '));
 }

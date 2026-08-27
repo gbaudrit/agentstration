@@ -218,6 +218,28 @@ public sealed class WorkplaceUxTests
     }
 
     [TestMethod]
+    public void DefaultConversationUsesAlignmentInsteadOfRedundantSpeakerChrome()
+    {
+        using var context = new BunitContext();
+        var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        var interactionId = InteractionId.New();
+        var now = DateTimeOffset.UtcNow;
+        var messages = new[]
+        {
+            new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, null, ConversationRole.User, "Can you help?", now),
+            new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, null, ConversationRole.Agentstration, "Here is the answer.", now.AddSeconds(1))
+        };
+        var rendered = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.Messages, messages)
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+
+        Assert.AreEqual(0, rendered.FindAll(".message-avatar").Count);
+        Assert.AreEqual(0, rendered.FindAll(".conversation-message header strong").Count);
+        Assert.AreEqual("You", rendered.Find(".message-user").GetAttribute("aria-label"));
+        Assert.AreEqual("Agentstration", rendered.Find(".message-assistant").GetAttribute("aria-label"));
+    }
+
+    [TestMethod]
     public void ParticipantProgressUsesEntryVisibilityWithoutExposingFlowTopology()
     {
         using var context = new BunitContext();
