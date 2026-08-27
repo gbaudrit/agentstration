@@ -17,11 +17,15 @@ builder.Services.AddHttpClient("ollama", client =>
 });
 builder.Services.AddSingleton<OllamaApiClient>(services => new OllamaApiClient(services.GetRequiredService<IHttpClientFactory>().CreateClient("ollama")));
 builder.Services.AddSingleton<IChatClient>(services => services.GetRequiredService<OllamaApiClient>());
-builder.Services.AddAgentstrationAep(options => options.Extension = new(
-    "Agentstration.Extensions.Ollama",
-    "Ollama",
-    "1.0.0",
-    "Agentstration AEP model-provider extension for Ollama."))
+builder.Services.AddAgentstrationAep(options =>
+{
+    options.Extension = new(
+        "Agentstration.Extensions.Ollama",
+        "Ollama",
+        "1.0.0",
+        "Agentstration AEP model-provider extension for Ollama.");
+    options.OptionSets.Add(OllamaOptionContracts.ModelProfile);
+})
     .AddModelProvider<OllamaAepModelProvider>();
 
 var app = builder.Build();

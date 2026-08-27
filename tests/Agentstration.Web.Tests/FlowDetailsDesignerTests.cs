@@ -8,7 +8,9 @@ using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
+using Agentstration.Web.Security;
 using Bunit;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
@@ -54,6 +56,21 @@ public sealed class FlowDetailsDesignerTests
         Assert.IsTrue(rendered.Find("fieldset.orchestration-configuration").HasAttribute("disabled"));
     }
 
+    [TestMethod]
+    public void MissingFlowRunRendersNotFoundStateInsteadOfThrowing()
+    {
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
+        context.Services.AddSingleton(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
+
+        var rendered = context.Render<FlowRunDetails>(parameters => parameters
+            .Add(component => component.RunId, "flowrun-missing"));
+
+        StringAssert.Contains(rendered.Markup, "Flow Run not found");
+        StringAssert.Contains(rendered.Markup, "does not exist in the current workspace");
+        Assert.AreEqual("/flow-runs", rendered.Find("a.button-secondary").GetAttribute("href"));
+    }
+
     private sealed class FlowClientStub : IFlowApiClient
     {
         private static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-08-15T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
@@ -80,7 +97,8 @@ public sealed class FlowDetailsDesignerTests
         public Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) =>
+            throw new AgentstrationApiException("The Flow Run was not found.", "missing-flow-run", System.Net.HttpStatusCode.NotFound, "flow_run_not_found");
         public Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -101,9 +119,17 @@ public sealed class FlowDetailsDesignerTests
     private sealed class ManagementClientStub : IManagementApiClient
     {
         public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<AgentSummary>>([]);
+        public Task<IReadOnlyList<DeploymentSummary>> GetDeploymentsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<DeploymentSummary>>([]);
+        public Task<IReadOnlyList<TriggerResource>> GetTriggersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TriggerResource>>([]);
         public Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<AgentResource>> PutAgentAsync(AgentResourceRequest request, string? etag, bool createOnly, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteAgentAsync(string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ManagementSummary> GetSummaryAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class UninitializedRequestContext : ICurrentRequestContext
+    {
+        public bool IsInitialized => false;
+        public RequestContext Current => throw new InvalidOperationException("The request context is not initialized.");
     }
 }

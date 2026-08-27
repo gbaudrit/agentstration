@@ -100,16 +100,24 @@ public sealed class AgentRunnerState
 
     public void Apply(RuntimeRunEvent runEvent)
     {
-        if (events.Any(item => item.EventId == runEvent.EventId)) return;
-        events.Add(runEvent);
+        if (!AddEvent(runEvent)) return;
         if (runEvent.Kind == RuntimeRunEventKind.ResponseDelta && runEvent.Content is not null) Response += runEvent.Content;
         if (runEvent.State is { } state) State = state;
     }
+
+    public void Restore(RuntimeRunEvent runEvent) => AddEvent(runEvent);
 
     public void Refresh(RuntimeRun run)
     {
         Run = run;
         State = run.Status.State;
         if (string.IsNullOrEmpty(Response)) Response = run.Status.Response ?? string.Empty;
+    }
+
+    private bool AddEvent(RuntimeRunEvent runEvent)
+    {
+        if (events.Any(item => item.EventId == runEvent.EventId)) return false;
+        events.Add(runEvent);
+        return true;
     }
 }

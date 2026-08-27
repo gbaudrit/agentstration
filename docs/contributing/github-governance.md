@@ -9,6 +9,7 @@ The repository keeps reviewable governance files in Git:
 - `.github/workflows/ci.yml` restores, builds, tests, verifies formatting on changed .NET files, and builds the container on Linux;
 - `.github/workflows/codeql.yml` scans C# on pull requests, `main`, and a weekly schedule;
 - `.github/workflows/dependency-review.yml` blocks pull requests that introduce known vulnerabilities of moderate severity or higher;
+- `.github/workflows/release.yml` validates version tags, rebuilds and retests the product, packages the server and Workplace, and creates GitHub prereleases;
 - `.github/dependabot.yml` checks the root and autonomous AEP NuGet manifests plus GitHub Actions each week;
 - `.github/CODEOWNERS`, the pull request template, and issue forms provide lightweight contribution ownership and prompts;
 - `.github/rulesets/main.json` is the reproducible source definition for `main` protection.
@@ -80,4 +81,22 @@ The following settings are remote and must be checked in the repository UI:
 
 After CodeQL and Dependency Review have completed successfully and their repository features are available, maintainers may add them as required checks. Keep that decision separate from the initial bootstrap so a plan limitation or first-run setup cannot deadlock `main`.
 
-Release automation is intentionally deferred. The repository documents the intended Semantic Versioning direction but has no stabilized central product version or release tags yet.
+## Product releases
+
+The root `Directory.Build.props` is the product-version source of truth. A release requires a matching notes file under `docs/releases/` and a tag named `v<version>` on a commit already contained in `main`. The release workflow rejects mismatched versions and non-main commits before building artifacts.
+
+Docker Hub publication requires an existing `agentstration/agentstration` repository and these GitHub Actions repository secrets:
+
+- `DOCKERHUB_USERNAME`: the Docker Hub account allowed to push the repository;
+- `DOCKERHUB_TOKEN`: a scoped Docker Hub access token with write permission. Do not store an account password.
+
+For example, after the release change has merged and all required checks have passed:
+
+```powershell
+git switch main
+git pull --ff-only
+git tag -a v0.1.0-alpha.1 -m "Agentstration 0.1.0-alpha.1"
+git push origin v0.1.0-alpha.1
+```
+
+GitHub Actions then repeats restore, Release build, and tests; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. Alpha releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag. Correct a failed release through a reviewed commit and a new prerelease identifier.

@@ -21,6 +21,7 @@ public static class ResourceKinds
     public const string InstalledPack = "InstalledPack";
     public const string PackConfiguration = "PackConfiguration";
     public const string ModelProvider = "ModelProvider";
+    public const string ExtensionRegistration = "ExtensionRegistration";
     public const string ModelProfile = "ModelProfile";
     public const string RuntimeProfile = "RuntimeProfile";
     public const string Secret = "Secret";
@@ -28,11 +29,24 @@ public static class ResourceKinds
     public const string Tool = "Tool";
     public const string ToolProvider = "ToolProvider";
     public const string ToolExecutionHook = "ToolExecutionHook";
+    public const string Trigger = "Trigger";
 }
 
 public static class PackKinds
 {
     public const string Pack = "Pack";
+}
+
+public static class PackProvenanceAnnotations
+{
+    public const string Publisher = "agentstration.io/pack.publisher";
+    public const string Name = "agentstration.io/pack.name";
+    public const string Version = "agentstration.io/pack.version";
+}
+
+public static class ResourceProvenanceAnnotations
+{
+    public const string BuiltIn = "agentstration.io/builtin";
 }
 
 public sealed record PackManifest
@@ -84,6 +98,8 @@ public enum PackBindingTargetKind
 {
     [JsonStringEnumMemberName("modelProfile")] ModelProfile,
     [JsonStringEnumMemberName("modelProvider")] ModelProvider,
+    [JsonStringEnumMemberName("runtimeProfile")] RuntimeProfile,
+    [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
     [JsonStringEnumMemberName("secret")] Secret
 }
 
@@ -442,6 +458,7 @@ public record AgentProperties
     public string Handler { get; init; } = "prompt-agent";
     public required string Instructions { get; init; }
     public required ResourceReference ModelProfile { get; init; }
+    public ResourceReference RuntimeProfile { get; init; } = new("maf-builtin", @namespace: ResourceNamespace.Default);
     public IReadOnlyList<ResourceReference> Tools { get; init; } = [];
     public IReadOnlyList<string> Behaviors { get; init; } = [];
     public IReadOnlyList<string> Middleware { get; init; } = [];
@@ -458,6 +475,7 @@ public sealed record AgentDeploymentSpec
 {
     public required string Environment { get; init; }
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required AgentHostingMode HostingMode { get; init; }
 }
 
@@ -501,7 +519,9 @@ public sealed record ResolvedAgentDefinition
     public required long AgentVersion { get; init; }
     public required string EffectiveInstructions { get; init; }
     public required string ModelProfileName { get; init; }
+    public ResourceNamespace? ModelProfileNamespace { get; init; }
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required IReadOnlyCollection<string> EffectiveToolNames { get; init; }
     public required IReadOnlyCollection<string> MiddlewareIds { get; init; }
     public required IReadOnlyCollection<string> ContextProviderIds { get; init; }
@@ -516,8 +536,10 @@ public sealed record AgentDeployment : Resource
     public required string RevisionName { get; init; }
     public string? AgentName { get; init; }
     public string? ModelProfileName { get; init; }
+    public ResourceNamespace? ModelProfileNamespace { get; init; }
     public required string Environment { get; init; }
     public required string RuntimeProfileName { get; init; }
+    public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public required AgentHostingMode HostingMode { get; init; }
     public required DesiredAgentState DesiredState { get; init; }
     public required ProvisioningState ProvisioningState { get; init; }
@@ -543,21 +565,39 @@ public sealed record ModelSelection
     public required string Name { get; init; }
 }
 
-public enum ModelProviderManagementMode { External, Aspire }
+[JsonConverter(typeof(JsonStringEnumConverter<ExtensionRegistrationSource>))]
+public enum ExtensionRegistrationSource
+{
+    [JsonStringEnumMemberName("manual")] Manual,
+    [JsonStringEnumMemberName("configuration")] Configuration,
+    [JsonStringEnumMemberName("aspire")] Aspire
+}
 
 public sealed record ModelProviderProperties
 {
     public required string DisplayName { get; init; }
-    public required string ProviderType { get; init; }
-    public required Uri Endpoint { get; init; }
-    public ModelProviderManagementMode ManagementMode { get; init; } = ModelProviderManagementMode.External;
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
-    public ResourceReference? Credential { get; init; }
+    public required ResourceReference Extension { get; init; }
+    public required string ContributionId { get; init; }
 }
 
 public sealed record ModelProviderResource : Resource
 {
     public ModelProviderProperties Definition { get; init; } = null!;
+}
+
+public sealed record ExtensionRegistrationProperties
+{
+    public required string DisplayName { get; init; }
+    public required Uri Endpoint { get; init; }
+    public bool Enabled { get; init; } = true;
+    public string? ExpectedExtensionId { get; init; }
+    public ExtensionRegistrationSource Source { get; init; } = ExtensionRegistrationSource.Manual;
+    public ResourceReference? Credential { get; init; }
+}
+
+public sealed record ExtensionRegistrationResource : Resource
+{
+    public ExtensionRegistrationProperties Definition { get; init; } = null!;
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<SecretType>))]
@@ -617,6 +657,16 @@ public sealed record ModelOutputOptions
     public bool Strict { get; init; }
 }
 
+public sealed record VersionedExtensionOptions
+{
+    public string OptionSet { get; init; } = string.Empty;
+    public string Version { get; init; } = string.Empty;
+    public string SchemaDigest { get; init; } = string.Empty;
+    public JsonElement Values { get; init; }
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public IDictionary<string, JsonElement>? LegacyValues { get; init; }
+}
+
 public sealed record ModelProfileProperties
 {
     public required string DisplayName { get; init; }
@@ -626,7 +676,7 @@ public sealed record ModelProfileProperties
     public ModelGenerationOptions Generation { get; init; } = new();
     public ModelReasoningOptions Reasoning { get; init; } = new();
     public ModelOutputOptions Output { get; init; } = new();
-    public IReadOnlyDictionary<string, JsonElement> ProviderOptions { get; init; } = new Dictionary<string, JsonElement>();
+    public IReadOnlyDictionary<string, VersionedExtensionOptions> ProviderOptions { get; init; } = new Dictionary<string, VersionedExtensionOptions>();
 }
 
 public sealed record ModelProfileResource : Resource

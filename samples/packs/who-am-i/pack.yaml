@@ -22,6 +22,11 @@ definition:
       displayName: Conversational model
       description: Model profile used by the three game agents.
       required: true
+    - name: local-runtime
+      targetKind: runtimeProfile
+      displayName: Local runtime
+      description: Runtime profile used to execute the game agents locally.
+      required: true
   resources:
     - agents/who-am-i-secret.yaml
     - agents/who-am-i-ai-player.yaml

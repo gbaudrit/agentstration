@@ -6,6 +6,7 @@ public enum PrincipalStatus { Active, Disabled }
 public enum PrincipalKind { Human, Workload }
 public enum MembershipStatus { Active, Suspended }
 public enum PrincipalType { User, Group, ServicePrincipal }
+public enum ThemePreference { System, Light, Dark }
 
 public sealed record Tenant(
     Guid Id,
@@ -29,6 +30,11 @@ public sealed record Principal(
     string? Email,
     PrincipalStatus Status,
     DateTimeOffset CreatedAt);
+
+public sealed record PrincipalPreferences(
+    Guid PrincipalId,
+    ThemePreference Theme,
+    DateTimeOffset UpdatedAt);
 
 public sealed record ExternalIdentity(
     Guid Id,
@@ -104,7 +110,11 @@ public static class AuthorizationScopes
     public static string Workspace(Guid workspaceId) => $"/workspaces/{workspaceId:D}";
 }
 
-public sealed record RequestContext(Guid PrincipalId, Guid TenantId, Guid WorkspaceId)
+public sealed record RequestContext(
+    Guid PrincipalId,
+    Guid TenantId,
+    Guid WorkspaceId,
+    AuthorizationRestriction? Restriction = null)
 {
     public Guid UserId => PrincipalId;
 }
@@ -129,11 +139,6 @@ public sealed class SystemOperationRequestContext : ICurrentRequestContext
     public bool IsInitialized => false;
     public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.System;
     public RequestContext Current => throw new InvalidOperationException("System operations do not have a workspace request context.");
-}
-
-public interface IRequestContextInitializer
-{
-    void Initialize(RequestContext context);
 }
 
 public interface IRequestContextScopeFactory
@@ -189,7 +194,7 @@ public interface IPlatformAdministratorPolicy
 
 public interface ILocalEnvironmentBootstrapper
 {
-    Task EnsureInitializedAsync(CancellationToken cancellationToken);
+    Task<RequestContext> EnsureInitializedAsync(CancellationToken cancellationToken);
 }
 
 public interface IAuthorizationService
@@ -213,6 +218,8 @@ public interface IIdentityStore
     Task<Principal?> GetPrincipalAsync(Guid principalId, CancellationToken cancellationToken);
     Task AddPrincipalAsync(Principal principal, CancellationToken cancellationToken);
     Task UpdatePrincipalAsync(Principal principal, CancellationToken cancellationToken);
+    Task<PrincipalPreferences?> GetPrincipalPreferencesAsync(Guid principalId, CancellationToken cancellationToken);
+    Task UpsertPrincipalPreferencesAsync(PrincipalPreferences preferences, CancellationToken cancellationToken);
     Task<ExternalIdentity?> FindExternalIdentityAsync(string issuer, string subject, CancellationToken cancellationToken);
     Task<IReadOnlyList<ExternalIdentity>> ListExternalIdentitiesAsync(Guid principalId, CancellationToken cancellationToken);
     Task AddExternalIdentityAsync(ExternalIdentity externalIdentity, CancellationToken cancellationToken);

@@ -1,11 +1,13 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
 
 internal sealed class GetDeploymentEndpoint : IManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/deployments/{name}", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/deployments/{name}", HandleAsync)
+        .RequireAuthorization(AgentstrationPolicies.CanReadResources);
 
     private static Task<IResult> HandleAsync(
         string name,

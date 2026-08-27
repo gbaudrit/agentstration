@@ -1,53 +1,150 @@
 # Agentstration
 
-Agentstration is an open-source, self-hosted platform for governing, executing, and tracking work delegated to agents. It is built on the Microsoft .NET AI stack while remaining provider-neutral and cloud-optional.
+**The open-source, self-hosted control plane for AI agents.**
 
-Agentstration currently provides:
+Agentstration lets you define governed agents, model profiles and tools, compose them into versioned Flows, distribute reusable Packs, and execute and track delegated work from an operations Console or the end-user Workplace.
 
-- declarative agents, model/tool providers, governed tool catalogs, profiles, and deployments;
-- durable Work Items, Workplace interactions, tasks, results, and artifacts;
-- editable Flows, immutable published Flow versions, and observable Flow Runs;
-- persisted tenants, workspaces, Principals, local accounts, memberships, and scoped RBAC;
-- offline Pack installation, exact-source forks, deterministic local builds, and modification-safe uninstall;
-- REST, Razor/Blazor, MCP, and local runtime surfaces backed by shared application services;
-- SQLite and deterministic local defaults that require no Azure subscription or remote API key.
+It is built on the Microsoft .NET AI stack and currently executes agents through Microsoft Agent Framework (MAF), while keeping application contracts provider-neutral and cloud-optional. Real agents can run fully locally through Ollama, llama.cpp or LocalAI; no Azure subscription is required.
 
-The product is a modular monolith organized around a Management Plane, Runtime Plane, and Work Plane. See the [architecture overview](docs/architecture/overview.md) for the boundaries and dependency rules.
+- **Website:** [www.agentstration.io/en](https://www.agentstration.io/en/)
+- **Documentation:** [docs.agentstration.io](https://docs.agentstration.io/)
+- **Project status:** public alpha, under active `0.x` development
 
-The autonomous Agentstration Extension Protocol SDK, conformance validator, CLI, samples, and standalone Inspector are staged in [`aep/`](aep/README.md). That directory has its own solution and build configuration so it can be moved into a dedicated repository without carrying Agentstration application projects.
+## What is implemented
+
+### Governed agent platform
+
+- declarative, workspace-scoped Agents, model providers, Model Profiles, deployments, Extension registrations and tool catalogs;
+- Ollama, llama.cpp and LocalAI integrations through autonomous, versioned AEP contributions;
+- governed Tool execution with enablement checks, ordered hooks, workspace guards, human approval and durable audit records;
+- local Secrets and Vault management;
+- local accounts, external identity links, stable Principals, workspace memberships, scoped RBAC and security auditing.
+
+### Flows and durable execution
+
+- editable Flow drafts, immutable published versions and observable Flow Runs;
+- structured Direct, Routing and Workflow Flows with typed steps and transitions;
+- Microsoft Agent Framework orchestration modes, including Sequential, Concurrent, Handoff, Group Chat and Magentic;
+- durable interactive execution for text, choice, confirmation and tool-approval requests;
+- persisted checkpoints, selected revisions and run traces so supported executions can be reconstructed after a restart.
+
+### Work Plane and Workplace
+
+- durable Work Items, interactions, Tasks, Pending Actions, results, artifacts and notifications;
+- Entries as governed user-facing access points to immutable Flow versions;
+- workspace Dashboards that organize published Entries without exposing runtime details;
+- a responsive, conversation-first Workplace that projects agent turns, progress, human input and outcomes;
+- an operations Console for configuration, supervision, run inspection and governance.
+
+### Packs and automation
+
+- offline ZIP Pack installation with deterministic `publisher.name` namespaces and retained provenance;
+- Pack inventory, resource bindings, exact-source forks, local authoring and builds, replacement and modification-safe uninstall;
+- Pack Studio and workspace composition for ordinary Agentstration resources—Packs distribute resources but are never executed;
+- workspace-scoped schedule Triggers supporting one-time, interval and Quartz cron schedules, IANA time zones, occurrence history, misfire/concurrency policies and `Run now`;
+- Triggers submit autonomous Work to a Flow, including namespaced Flows installed by Packs. They do not introduce a second runtime.
+
+## Architecture
+
+Agentstration is a modular monolith with explicit **Management**, **Runtime**, **Work** and **Flow** boundaries:
+
+- the **Management Plane** owns governed definitions and desired state;
+- the **Runtime Plane** materializes and executes agents through provider-neutral contracts;
+- the **Work Plane** receives, represents and tracks delegated work and its outcomes;
+- the **Flow module** owns composition, publication, orchestration and durable Flow Runs.
+
+Packs form a distribution layer above these boundaries. The repository produces multiple local hosts from one codebase: the operations Console and authoritative server, the standalone Workplace, the Work API and an Aspire AppHost. SQLite-backed stores keep the main module boundaries explicit.
+
+The Agentstration Extension Protocol SDK, conformance validator, CLI, samples and standalone Inspector are staged autonomously in [`aep/`](aep/README.md). AEP gives extensions versioned discovery, capability and option contracts without leaking provider-specific concerns into portable Agentstration resources.
+
+Read the [architecture overview](https://docs.agentstration.io/architecture/overview) and [current capabilities reference](https://docs.agentstration.io/reference/current-capabilities) for the detailed boundaries and guarantees.
 
 ## Quick start
 
-Requirements: the .NET SDK version selected by [`global.json`](global.json) (currently .NET 10.0.300 or a compatible feature band).
+### Requirements
+
+- the .NET SDK selected by [`global.json`](global.json), currently .NET SDK 10.0.300 with compatible feature-band roll-forward;
+- Ollama, llama.cpp or LocalAI to execute real agents locally;
+- optionally Docker for container-based local model or Compose workflows.
+
+### Run locally
+
+```powershell
+git clone https://github.com/gbaudrit/agentstration.git
+cd agentstration
+
+dotnet run --project src/Agentstration.Web
+```
+
+Open the operations Console at [http://localhost:5100](http://localhost:5100). On a fresh installation, `/bootstrap` creates the first local administrator, organization and workspace; no default credentials exist.
+
+In the Development environment, the complete interactive HTTP API reference is available at [http://localhost:5100/swagger](http://localhost:5100/swagger), backed by the OpenAPI document at [http://localhost:5100/openapi/v1.json](http://localhost:5100/openapi/v1.json). Swagger supports the current Console session cookie and JWT bearer tokens; SignalR and MCP remain separate transports.
+
+`Managed` is the normal execution mode. Configure an Ollama, llama.cpp or LocalAI provider and bind a Model Profile to run real agents entirely on your machine. The provider endpoint and selected model are resolved from Agentstration's persisted resources.
+
+For a first UI exploration, automated test or diagnostic session without any model, use the deterministic fallback:
 
 ```powershell
 $env:AI__Provider = "Deterministic"
 dotnet run --project src/Agentstration.Web
 ```
 
-Open the operations Console at `http://localhost:5100`. A fresh installation redirects to `/bootstrap`, where you create the first local administrator; no default username or password exists. The bootstrap also creates the initial organization and workspace and then becomes inaccessible.
+Deterministic mode produces reproducible simulated responses. It is not a substitute for a local model and is not the normal production path.
 
-> Schema note: workspace scope is part of the durable identity of Management, Runtime, Flow, and Work resources. Databases created before this schema must be deleted and reseeded; no in-place migration is provided.
+To run the end-user Workplace, keep the authoritative server running and start a second terminal:
 
-For the standalone end-user Workplace and its Work API, follow the [local installation guide](docs/getting-started/local-installation.md).
+```powershell
+dotnet run --project src/Agentstration.Workplace.Web
+```
+
+Open [http://localhost:5180](http://localhost:5180). The Workplace API defaults to the server at `http://localhost:5100`.
+
+For Aspire orchestration and its local dashboard:
+
+```powershell
+dotnet run --project src/Agentstration.AppHost
+```
+
+Or use Compose:
+
+```powershell
+docker compose up --build
+```
+
+Aspire starts Agentstration and its AEP extensions, but does not install inference servers or download models. Follow the [local installation guide](https://docs.agentstration.io/getting-started/local-installation) and [model provider guide](https://docs.agentstration.io/concepts/model-providers) for provider-specific setup.
+
+## Build and test
+
+```powershell
+dotnet build Agentstration.slnx --configuration Release
+dotnet test Agentstration.slnx --configuration Release
+```
+
+Warnings are treated as errors, .NET analyzers are enabled and NuGet audit findings fail restore. The default tests are designed to remain offline and cost-free; real-provider smoke tests are opt-in.
 
 ## Documentation
 
-- [Documentation portal source](docs/index.md)
-- [Getting started](docs/getting-started/overview.md)
-- [Concepts](docs/concepts/overview.md)
-- [Architecture](docs/architecture/overview.md)
-- [Reference](docs/reference/overview.md)
-- [Architecture decisions](docs/decisions/index.md)
-- [Detailed current capabilities](docs/reference/current-capabilities.md)
-- [Identity and authorization reference](docs/reference/identity-and-authorization.md)
+The published documentation at [docs.agentstration.io](https://docs.agentstration.io/) tracks the current development branch and covers:
 
-Run the documentation site locally with `npm install` and `npm start` from `docs/site`. The complete workflow is documented in [Working on the documentation](docs/contributing/documentation.md).
+- [getting started](https://docs.agentstration.io/getting-started/overview);
+- [concepts](https://docs.agentstration.io/concepts/overview);
+- [architecture](https://docs.agentstration.io/architecture/overview);
+- [reference](https://docs.agentstration.io/reference/overview);
+- [Architecture Decision Records](https://docs.agentstration.io/decisions);
+- [contributor guidance](https://docs.agentstration.io/contributing/overview).
+
+The Markdown and MDX files under `docs/` are the source of truth; `docs/site/` contains the Docusaurus renderer. To work on the site locally, follow [Working on the documentation](docs/contributing/documentation.md).
 
 ## Project status
 
-Agentstration is under active `0.x` development. Public contracts can still evolve, and planned capabilities are identified explicitly in the documentation. Semantic Versioning is the intended product-versioning policy; the repository does not yet publish a product version or release tags.
+Agentstration is a **public alpha** under active `0.x` development. Public APIs, resource contracts and package formats may still change. It is a product foundation, not yet a production multi-tenant release; planned capabilities and current limits are identified explicitly in the documentation.
+
+Semantic Versioning is the intended product-versioning policy, but the repository does not yet publish a product version or release tags.
+
+## License
+
+Agentstration is licensed under the [Apache License 2.0](LICENSE). The license includes an explicit patent grant; trademarks and product names are not licensed except as required for customary attribution. See [NOTICE](NOTICE) for attribution information.
 
 ## Contributing
 
-Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md), and the [Security policy](SECURITY.md) before opening a substantial change.
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and the [Security policy](SECURITY.md) before opening a substantial change.

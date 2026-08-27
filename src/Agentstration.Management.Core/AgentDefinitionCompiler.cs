@@ -34,6 +34,7 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
         var middleware = agent.Middleware.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         var contextProviders = agent.ContextProviders.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         var capabilities = agent.Behaviors.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        var modelProfile = agent.ModelProfile.Resolve(resource.Namespace, ResourceKinds.ModelProfile);
         var canonical = new
         {
             resource.Uid,
@@ -43,8 +44,9 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             AgentVersion = resource.Generation,
             agent.Handler,
             Instructions = instructions,
-            ModelProfile = agent.ModelProfile,
+            ModelProfile = modelProfile,
             deployment.RuntimeProfileName,
+            deployment.RuntimeProfileNamespace,
             deployment.HostingMode,
             Tools = tools,
             Middleware = middleware,
@@ -62,8 +64,10 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             Description = agent.Description ?? string.Empty,
             AgentVersion = resource.Generation,
             EffectiveInstructions = instructions,
-            ModelProfileName = agent.ModelProfile.Name,
+            ModelProfileName = modelProfile.Name,
+            ModelProfileNamespace = modelProfile.Namespace,
             RuntimeProfileName = deployment.RuntimeProfileName,
+            RuntimeProfileNamespace = deployment.RuntimeProfileNamespace,
             EffectiveToolNames = tools,
             MiddlewareIds = middleware,
             ContextProviderIds = contextProviders,

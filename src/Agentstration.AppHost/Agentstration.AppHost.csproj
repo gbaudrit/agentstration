@@ -7,6 +7,8 @@
     <ProjectReference Include="../Agentstration.Web/Agentstration.Web.csproj" />
     <ProjectReference Include="../Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
   </ItemGroup>
 </Project>

@@ -9,12 +9,14 @@ internal sealed class PurgeAgentRevisionEndpoint : IManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/agents/{agentName}/revisions/{revisionName}/purge-impact", GetImpactAsync);
-        group.MapGet("/namespaces/{namespace}/agents/{agentName}/revisions/{revisionName}/purge-impact", GetNamespacedImpactAsync);
+        group.MapGet("/agents/{agentName}/revisions/{revisionName}/purge-impact", GetImpactAsync)
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/namespaces/{namespace}/agents/{agentName}/revisions/{revisionName}/purge-impact", GetNamespacedImpactAsync)
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapDelete("/agents/{agentName}/revisions/{revisionName}", PurgeAsync)
-            .RequireAuthorization(AgentstrationPolicies.CanManageAgents);
+            .RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
         group.MapDelete("/namespaces/{namespace}/agents/{agentName}/revisions/{revisionName}", PurgeNamespacedAsync)
-            .RequireAuthorization(AgentstrationPolicies.CanManageAgents);
+            .RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
     }
 
     private static Task<IResult> GetImpactAsync(

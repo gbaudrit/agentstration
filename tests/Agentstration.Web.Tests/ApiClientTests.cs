@@ -18,6 +18,7 @@ using Agentstration.Web.Security;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -77,12 +78,39 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
-    public void AgentManagementAndRunnerUseCanonicalHttpClientsWhenDashboardSimulationIsEnabled()
+    public async Task CookieAuthenticationReturnsStatusCodeInsteadOfHtmlRedirectForHubs()
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Agentstration:UseSimulatedData"] = "true",
+            ["Agentstration:Authentication:Mode"] = Agentstration.Web.Configuration.AuthenticationOptions.Local
+        }).Build();
+        services.AddLogging();
+        services.AddAgentstrationWebConsole(configuration, new TestHostEnvironment());
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(IdentityConstants.ApplicationScheme);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Path = "/hubs/flow-runs/negotiate";
+        var redirect = new RedirectContext<CookieAuthenticationOptions>(
+            httpContext,
+            new AuthenticationScheme(IdentityConstants.ApplicationScheme, null, typeof(CookieAuthenticationHandler)),
+            options,
+            new AuthenticationProperties(),
+            "/login");
+
+        await options.Events.OnRedirectToLogin(redirect);
+
+        Assert.AreEqual(StatusCodes.Status401Unauthorized, httpContext.Response.StatusCode);
+        Assert.IsFalse(httpContext.Response.Headers.ContainsKey("Location"));
+    }
+
+    [TestMethod]
+    public void ConsoleUsesCanonicalHttpClients()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
             ["Agentstration:ManagementApi:BaseAddress"] = "http://localhost:5080/",
             ["Agentstration:RuntimeApi:BaseAddress"] = "http://localhost:5080/"
         }).Build();
@@ -97,6 +125,7 @@ public sealed class ApiClientTests
         Assert.IsInstanceOfType<WorkApiClient>(scope.ServiceProvider.GetRequiredService<IWorkApiClient>());
         Assert.IsInstanceOfType<EntryAdministrationApiClient>(scope.ServiceProvider.GetRequiredService<IEntryAdministrationApiClient>());
         Assert.IsInstanceOfType<PacksApiClient>(scope.ServiceProvider.GetRequiredService<IPacksClient>());
+        Assert.IsInstanceOfType<HttpAgentstrationEventStream>(scope.ServiceProvider.GetRequiredService<IAgentstrationEventStream>());
         Assert.IsInstanceOfType<ConsoleResourceSearchProvider>(scope.ServiceProvider.GetRequiredService<IResourceSearchProvider>());
     }
 
@@ -119,6 +148,34 @@ public sealed class ApiClientTests
         Assert.AreEqual("Review API", items[0].Title);
         Assert.AreEqual("Running", items[0].Status);
         Assert.AreEqual("personal", items[0].Owner);
+    }
+
+    [TestMethod]
+    public async Task WorkClientRespondsToTaskScopedPendingActionWithoutInteractionToken()
+    {
+        var taskId = Guid.NewGuid();
+        var actionId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        HttpMethod? method = null;
+        string? path = null;
+        string? body = null;
+        var contract = new PendingActionContract(actionId, workspaceId, null, taskId, "run-1", PendingActionKind.ConfirmationRequired, PendingActionStatus.Completed, "Approve", null, [], DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow, 2);
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            method = request.Method;
+            path = request.RequestUri!.AbsolutePath;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(contract) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        var actual = await new WorkApiClient(httpClient).RespondTaskPendingActionAsync(taskId, actionId, new Dictionary<string, JsonElement> { ["confirmed"] = JsonSerializer.SerializeToElement(true) }, default);
+
+        Assert.AreEqual(HttpMethod.Post, method);
+        Assert.AreEqual($"/api/tasks/{taskId}/pending-actions/{actionId}/respond", path);
+        StringAssert.Contains(body, "confirmed");
+        Assert.AreEqual(actionId, actual.Id);
+        Assert.IsNull(actual.InteractionId);
     }
 
     [TestMethod]
@@ -386,7 +443,11 @@ public sealed class ApiClientTests
         var @namespace = new ResourceNamespace("agentstration.who-am-i");
         var resource = CreateAgentResource("web-agent") with
         {
-            Metadata = CreateAgentResource("web-agent").Metadata with { Namespace = @namespace }
+            Metadata = CreateAgentResource("web-agent").Metadata with { Namespace = @namespace },
+            Definition = CreateAgentResource("web-agent").Definition with
+            {
+                ModelProfile = new ResourceReference("reasoning-shared", @namespace: new ResourceNamespace("shared.models"))
+            }
         };
         string? requestPathAndQuery = null;
         using var httpClient = new HttpClient(new StubHandler(request =>
@@ -405,6 +466,8 @@ public sealed class ApiClientTests
         Assert.AreEqual("/api/agents?allNamespaces=true&top=1000", requestPathAndQuery);
         Assert.HasCount(1, agents);
         Assert.AreEqual(@namespace, agents[0].Namespace);
+        Assert.AreEqual(new ResourceNamespace("shared.models"), agents[0].ModelProfileNamespace);
+        Assert.AreEqual("/modelprofiles/reasoning-shared?namespace=shared.models", ConsoleResourceUrls.ModelProfile(agents[0].ModelProfileAddress));
         Assert.AreEqual("/namespaces/agentstration.who-am-i/agents/web-agent", agents[0].DetailsUrl);
     }
 
@@ -495,7 +558,7 @@ public sealed class ApiClientTests
     [TestMethod]
     public async Task ModelProvidersClientMapsProviderAndDynamicModels()
     {
-        var provider = new ModelProviderResponse("provider-id", "ollama-local", new ModelProviderPropertiesResponse("Ollama local", "ollama", "aspire", "available", "ollama", 1));
+        var provider = new ModelProviderResponse("provider-id", "ollama-local", new ModelProviderPropertiesResponse("Ollama local", "aep", "ollama", "ollama-extension", "default", "aspire", "available", "Ollama extension", 1));
         var model = new AvailableModelResponse("qwen3:4b", "Qwen 3 4B", "available", ["chat"], new Dictionary<string, string> { ["parameterSize"] = "4B" });
         using var httpClient = new HttpClient(new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/models", StringComparison.Ordinal)
             ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ValueResponse<AvailableModelResponse>([model])) }
@@ -506,7 +569,7 @@ public sealed class ApiClientTests
         var providers = await client.GetModelProvidersAsync(default);
         var models = await client.GetProviderModelsAsync("ollama-local", default);
 
-        Assert.AreEqual("aspire", providers[0].Properties.ManagementMode);
+        Assert.AreEqual("aspire", providers[0].Properties.RegistrationSource);
         Assert.AreEqual("qwen3:4b", models[0].Name);
         Assert.AreEqual("4B", models[0].Metadata["parameterSize"]);
     }
@@ -631,22 +694,21 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
-    public void ModelProviderEditorPersistsOnlySecretReference()
+    public void ModelProviderEditorPersistsExtensionAndContributionReferences()
     {
         var editor = new ModelProviderEditorModel
         {
             Name = "openai",
             DisplayName = "OpenAI",
-            ProviderType = "openai",
-            Endpoint = "https://extension.example.test",
-            CredentialId = "default:openai-api-key"
+            ExtensionId = "default:openai-extension",
+            ContributionId = "openai"
         };
 
         var properties = editor.ToProperties();
 
-        Assert.IsNotNull(properties.Credential);
-        Assert.AreEqual("openai-api-key", properties.Credential.Name);
-        Assert.IsNull(properties.Credential.Namespace);
+        Assert.AreEqual("openai-extension", properties.Extension.Name);
+        Assert.IsNull(properties.Extension.Namespace);
+        Assert.AreEqual("openai", properties.ContributionId);
     }
 
     [TestMethod]
@@ -694,6 +756,27 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public async Task AgentsModelClientKeepsTheAgentNamespace()
+    {
+        Uri? requested = null;
+        var response = new AgentModelResponse(
+            new DeclaredAgentModelResponse(new ModelProfileIdentityResponse("reasoning", "reasoning", Namespace: "shared.models")),
+            new ResolvedAgentModelResponse(null, new ModelReferenceResponse("qwen3:4b"), new EffectiveModelOptionsResponse(new(), new(), new())),
+            "ready", []);
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        var actual = await new AgentsModelApiClient(httpClient).GetAgentModelResolutionAsync(new ResourceNamespace("agentstration.daily-life-assistant"), "concierge", default);
+
+        Assert.AreEqual("shared.models", actual.Declared.ModelProfile.Namespace);
+        Assert.AreEqual("/api/namespaces/agentstration.daily-life-assistant/agents/concierge/model", requested!.AbsolutePath);
+    }
+
+    [TestMethod]
     public void AgentEditorMapsCanonicalReferencesTagsAndTools()
     {
         var model = new AgentEditorModel
@@ -702,6 +785,9 @@ public sealed class ApiClientTests
             DisplayName = "Web Agent",
             Instructions = "Help with web development.",
             ModelProfileName = "reasoning-default",
+            ModelProfileNamespace = "shared.models",
+            RuntimeProfileName = "maf-shared",
+            RuntimeProfileNamespace = "shared.platform",
             ToolNames = "search",
             Tags = "domain=web\nowner=platform"
         };
@@ -709,8 +795,27 @@ public sealed class ApiClientTests
         var request = model.ToRequest();
 
         Assert.AreEqual("reasoning-default", request.Definition.ModelProfile.Name);
+        Assert.AreEqual(new ResourceNamespace("shared.models"), request.Definition.ModelProfile.Namespace);
+        Assert.AreEqual("maf-shared", request.Definition.RuntimeProfile.Name);
+        Assert.AreEqual(new ResourceNamespace("shared.platform"), request.Definition.RuntimeProfile.Namespace);
         Assert.HasCount(1, request.Definition.Tools);
         Assert.AreEqual("web", request.Metadata.Tags["domain"]);
+    }
+
+    [TestMethod]
+    public void AgentEditorMarksOnlyAnEffectiveModelProfileChange()
+    {
+        var model = new AgentEditorModel
+        {
+            ModelProfileName = "default-reasoning",
+            ModelProfileNamespace = "default"
+        };
+        var current = Summary("default-reasoning", "ollama-local", "qwen3:1.7b", "available");
+        var namespaced = current with { Namespace = "shared.models" };
+
+        Assert.IsFalse(model.SelectModelProfile(current));
+        Assert.IsTrue(model.SelectModelProfile(namespaced));
+        Assert.AreEqual("shared.models", model.ModelProfileNamespace);
     }
 
     [TestMethod]
@@ -774,6 +879,63 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public async Task ManagementClientMapsPersistedAgentDeploymentsWithoutInventedMetrics()
+    {
+        var updatedAt = new DateTimeOffset(2026, 8, 21, 9, 30, 0, TimeSpan.Zero);
+        var deployment = new AgentDeployment
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.AgentDeployment,
+            Metadata = new ResourceMetadata { Name = "sql-expert--g000007", Namespace = new ResourceNamespace("engineering") },
+            RevisionName = "sql-expert--000007",
+            AgentName = "sql-expert",
+            Environment = "local",
+            RuntimeProfileName = "maf-default",
+            HostingMode = AgentHostingMode.InProcess,
+            DesiredState = DesiredAgentState.Running,
+            ProvisioningState = ProvisioningState.Succeeded,
+            OperationalState = OperationalState.Ready,
+            ObservedRevisionName = "sql-expert--000007",
+            UpdatedAt = updatedAt
+        };
+        using var httpClient = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new PagedResponse<AgentDeployment>([deployment], null))
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new ManagementApiClient(httpClient);
+
+        var actual = await client.GetDeploymentsAsync(default);
+
+        Assert.HasCount(1, actual);
+        Assert.AreEqual("sql-expert--g000007", actual[0].Id);
+        Assert.AreEqual("engineering", actual[0].Namespace);
+        Assert.AreEqual("Ready", actual[0].Status);
+        Assert.AreEqual("maf-default", actual[0].RuntimeProfile);
+        Assert.AreEqual(updatedAt, actual[0].UpdatedAt);
+    }
+
+    [TestMethod]
+    public async Task RuntimeClientReadsPersistedEventHistoryAfterTheRequestedSequence()
+    {
+        Uri? requested = null;
+        var expected = new[] { RunEvent(8, RuntimeRunEventKind.RunCompleted, state: RuntimeRunState.Succeeded) };
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(expected) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var client = new RuntimeApiClient(httpClient);
+
+        var actual = await client.GetRunEventsAsync("run-test", 7, default);
+
+        Assert.HasCount(1, actual);
+        Assert.AreEqual(RuntimeRunEventKind.RunCompleted, actual[0].Kind);
+        Assert.AreEqual("/api/runtime/runs/run-test/eventHistory?afterSequence=7", requested!.PathAndQuery);
+    }
+
+    [TestMethod]
     public void AgentRunnerRestoresToolCallsFromTheDurableRunProjection()
     {
         var persistedToolCall = new RuntimeToolCall
@@ -800,6 +962,31 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public void AgentRunnerRestoresPersistedTraceWithoutDuplicatingProjectedResponse()
+    {
+        var originalRun = CreateRun("completed-run");
+        var run = originalRun with
+        {
+            Status = originalRun.Status with
+            {
+                State = RuntimeRunState.Succeeded,
+                Response = "final response"
+            }
+        };
+        var state = new AgentRunnerState();
+        state.Reset(run);
+
+        state.Restore(RunEvent(1, RuntimeRunEventKind.StatusChanged, state: RuntimeRunState.Running));
+        state.Restore(RunEvent(2, RuntimeRunEventKind.ResponseDelta, content: "final response"));
+        state.Restore(RunEvent(3, RuntimeRunEventKind.RunCompleted, state: RuntimeRunState.Succeeded));
+
+        Assert.AreEqual("final response", state.Response);
+        Assert.AreEqual(RuntimeRunState.Succeeded, state.State);
+        Assert.HasCount(3, state.Events);
+        Assert.AreEqual(3L, state.LastSequence);
+    }
+
+    [TestMethod]
     public async Task AgentRunnerRuntimeClientReadsCanonicalReadinessEndpoint()
     {
         var requested = new List<Uri>();
@@ -815,11 +1002,18 @@ public sealed class ApiClientTests
 
         var actual = await client.GetAgentReadinessAsync("sql-expert", 4, default);
         var prepared = await client.PrepareAgentAsync("sql-expert", 4, default);
+        var agentNamespace = new ResourceNamespace("agentstration.daily-life-assistant");
+        var namespaced = await client.GetAgentReadinessAsync(agentNamespace, "concierge", 5, default);
+        var namespacedPreparation = await client.PrepareAgentAsync(agentNamespace, "concierge", 5, default);
 
         Assert.IsTrue(actual.Ready);
         Assert.AreEqual("Ready", prepared.State);
+        Assert.IsTrue(namespaced.Ready);
+        Assert.AreEqual("Ready", namespacedPreparation.State);
         StringAssert.Contains(requested[0].PathAndQuery, "/api/runtime/agents/sql-expert/readiness?generation=4");
         StringAssert.Contains(requested[1].PathAndQuery, "/api/runtime/agents/sql-expert/prepare?generation=4");
+        StringAssert.Contains(requested[2].PathAndQuery, "/api/runtime/namespaces/agentstration.daily-life-assistant/agents/concierge/readiness?generation=5");
+        StringAssert.Contains(requested[3].PathAndQuery, "/api/runtime/namespaces/agentstration.daily-life-assistant/agents/concierge/prepare?generation=5");
     }
 
     [TestMethod]

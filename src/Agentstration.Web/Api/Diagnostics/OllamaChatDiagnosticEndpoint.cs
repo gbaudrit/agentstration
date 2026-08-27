@@ -1,4 +1,5 @@
 using Agentstration.ModelProviders;
+using Agentstration.Web.Security;
 using Microsoft.Extensions.AI;
 
 namespace Agentstration.Web.Api.Diagnostics;
@@ -8,7 +9,8 @@ internal sealed class OllamaChatDiagnosticEndpoint
     private const string ProfileResourceId = "reasoning-default";
 
     public static void Map(IEndpointRouteBuilder endpoints) =>
-        endpoints.MapPost("/api/diagnostics/models/ollama/chat", HandleAsync);
+        endpoints.MapPost("/api/diagnostics/models/ollama/chat", HandleAsync)
+            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
 
     private static async Task<IResult> HandleAsync(
         OllamaChatDiagnosticRequest request,
@@ -36,7 +38,7 @@ internal sealed class OllamaChatDiagnosticEndpoint
                 "Running local model diagnostic with profile {ModelProfile}, deployment {Deployment}, provider {ProviderType}/{ProviderName}, and model {Model}",
                 profile.Name,
                 deployment.Name,
-                provider.ProviderType,
+                provider.ContributionId,
                 provider.Name,
                 deployment.ModelName);
         }
@@ -46,11 +48,11 @@ internal sealed class OllamaChatDiagnosticEndpoint
             var client = await resolver.ResolveAsync(ProfileResourceId, cancellationToken);
             var messages = new[] { new ChatMessage(ChatRole.User, request.Prompt) };
             var response = await client.GetResponseAsync(messages, cancellationToken: cancellationToken);
-            return Results.Ok(new OllamaChatDiagnosticResponse(provider.ProviderType, deployment.ModelName, response.Text));
+            return Results.Ok(new OllamaChatDiagnosticResponse(provider.ContributionId, deployment.ModelName, response.Text));
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "Local model diagnostic failed for provider {ProviderType} and model {Model}", provider.ProviderType, deployment.ModelName);
+            logger.LogWarning(exception, "Local model diagnostic failed for contribution {ContributionId} and model {Model}", provider.ContributionId, deployment.ModelName);
             return Results.Problem("The local Ollama model is unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
         }
     }

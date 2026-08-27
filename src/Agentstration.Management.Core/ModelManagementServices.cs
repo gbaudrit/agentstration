@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
+using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Core;
@@ -8,7 +9,16 @@ namespace Agentstration.Management.Core;
 public sealed record ModelProviderView(ModelProviderConfiguration Configuration, ModelProviderHealth Health, IReadOnlyList<DiscoveredModel> Models, DateTimeOffset CheckedAt);
 public sealed record ModelProfileUsage(string Kind, string Name, string DisplayName);
 public sealed record ModelProviderUsage(string Kind, string Name, string DisplayName);
-public sealed record ModelProfileResolution(ModelProfileResource Profile, ModelProviderConfiguration? Provider, ModelProviderHealth ProviderHealth, DiscoveredModel? Model, string Status, IReadOnlyList<string> Warnings);
+public sealed record ModelProfileResolution(
+    ModelProfileResource Profile,
+    ModelProviderConfiguration? Provider,
+    ModelProviderHealth ProviderHealth,
+    DiscoveredModel? Model,
+    string Status,
+    IReadOnlyList<string> Warnings,
+    ResolvedModelProviderCapabilities? CapabilityLevels = null,
+    EffectiveCapabilities? EffectiveCapabilities = null,
+    IReadOnlyList<ExecutionCapabilityIssue>? Incompatibilities = null);
 
 public sealed class ModelProfileValidationException(string code, string message, IReadOnlyDictionary<string, string[]>? errors = null) : Exception(message)
 {
@@ -31,19 +41,18 @@ public sealed class ModelProviderInUseException(string providerName, IReadOnlyLi
 public sealed class ModelProviderManagementService(
     IControlPlaneStore store,
     IEnumerable<IModelProviderDiscovery> discoveries,
-    IEnumerable<IModelProviderOptionsValidator> optionsValidators,
     TimeProvider timeProvider) : IModelProviderConfigurationStore
 {
     public static string ModelProviderId(string name) => name;
     public async Task<StoredResource<ModelProviderResource>> CreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        await ValidateCredentialAsync(resource.Namespace, resource.Definition.Credential, cancellationToken);
         if (await GetAsync(resource.Namespace, resource.Metadata.Name, cancellationToken) is not null) throw new ControlPlaneConcurrencyException($"Model provider '{resource.Address}' already exists.");
+        var definition = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, cancellationToken);
         return await store.PutAsync(resource with
         {
             Generation = 1,
-            Definition = ValidateAndNormalize(resource.Definition),
+            Definition = definition,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
         }, null, true, cancellationToken);
     }
@@ -54,11 +63,11 @@ public sealed class ModelProviderManagementService(
     public async Task<StoredResource<ModelProviderResource>> PutAsync(ResourceNamespace @namespace, string name, ModelProviderProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {
         var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
-        await ValidateCredentialAsync(existing.Value.Namespace, definition.Credential, cancellationToken);
+        var validated = await ValidateAndNormalizeAsync(existing.Value.Namespace, definition, cancellationToken);
         return await store.PutAsync(existing.Value with
         {
             Generation = checked(existing.Value.Generation + 1),
-            Definition = ValidateAndNormalize(definition),
+            Definition = validated,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
         }, ifMatch, false, cancellationToken);
     }
@@ -69,7 +78,8 @@ public sealed class ModelProviderManagementService(
     public async Task<IReadOnlyList<ModelProviderView>> ListAsync(CancellationToken cancellationToken)
     {
         var resources = await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken);
-        return await Task.WhenAll(resources.Select(resource => InspectAsync(ToConfiguration(resource.Value), true, cancellationToken)));
+        return await Task.WhenAll(resources.Select(async resource =>
+            await InspectAsync(await ToConfigurationAsync(resource.Value, cancellationToken), true, cancellationToken)));
     }
 
     public async Task<ModelProviderView> GetViewRequiredAsync(string name, CancellationToken cancellationToken)
@@ -78,7 +88,7 @@ public sealed class ModelProviderManagementService(
     public async Task<ModelProviderView> GetViewRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
         var stored = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
-        return await InspectAsync(ToConfiguration(stored.Value), false, cancellationToken);
+        return await InspectAsync(await ToConfigurationAsync(stored.Value, cancellationToken), false, cancellationToken);
     }
 
     public async Task<IReadOnlyList<DiscoveredModel>> ListModelsAsync(string name, CancellationToken cancellationToken)
@@ -87,7 +97,7 @@ public sealed class ModelProviderManagementService(
     public async Task<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
         var provider = await GetConfigurationRequiredAsync(@namespace, name, cancellationToken);
-        var discovery = FindDiscovery(provider.ProviderType) ?? throw new ModelProviderUnavailableException(name, "No discovery adapter is registered in this host.");
+        var discovery = FindDiscovery(provider.AdapterType) ?? throw new ModelProviderUnavailableException(name, "No discovery adapter is registered in this host.");
         var health = await discovery.GetHealthAsync(provider, cancellationToken);
         if (!string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase)) throw new ModelProviderUnavailableException(name, health.Details);
         try { return await discovery.ListModelsAsync(provider, cancellationToken); }
@@ -125,7 +135,7 @@ public sealed class ModelProviderManagementService(
 
     private async Task<ModelProviderView> InspectAsync(ModelProviderConfiguration provider, bool includeModels, CancellationToken cancellationToken)
     {
-        var discovery = FindDiscovery(provider.ProviderType);
+        var discovery = FindDiscovery(provider.AdapterType);
         if (discovery is null) return new(provider, new("unknown", "No discovery adapter is registered in this host."), [], timeProvider.GetUtcNow());
         var health = await discovery.GetHealthAsync(provider, cancellationToken);
         IReadOnlyList<DiscoveredModel> models = [];
@@ -143,56 +153,60 @@ public sealed class ModelProviderManagementService(
     public async Task<ModelProviderConfiguration> GetConfigurationRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
         var resource = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderConfigurationNotFoundException(name);
-        return ToConfiguration(resource.Value);
+        return await ToConfigurationAsync(resource.Value, cancellationToken);
     }
 
     ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredAsync(string name, CancellationToken cancellationToken) => new(GetConfigurationRequiredAsync(name, cancellationToken));
+    ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => new(GetConfigurationRequiredAsync(@namespace, name, cancellationToken));
 
     async ValueTask<IReadOnlyList<ModelProviderConfiguration>> IModelProviderConfigurationStore.ListAsync(CancellationToken cancellationToken) =>
-        (await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken)).Select(resource => ToConfiguration(resource.Value)).ToArray();
+        await Task.WhenAll((await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken))
+            .Select(resource => ToConfigurationAsync(resource.Value, cancellationToken)));
 
-    private ModelProviderProperties ValidateAndNormalize(ModelProviderProperties definition)
+    private async Task<ModelProviderProperties> ValidateAndNormalizeAsync(
+        ResourceNamespace ownerNamespace,
+        ModelProviderProperties definition,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.DisplayName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(definition.ProviderType);
-        if (FindDiscovery(definition.ProviderType) is null) throw new ModelProviderValidationException($"Provider type '{definition.ProviderType}' is not registered in this host.");
-        if (!definition.Endpoint.IsAbsoluteUri || definition.Endpoint.Scheme is not ("http" or "https")) throw new ModelProviderValidationException("Provider endpoint must be an absolute HTTP(S) URL.");
-        if (!string.IsNullOrEmpty(definition.Endpoint.UserInfo) || !string.IsNullOrEmpty(definition.Endpoint.Query) || !string.IsNullOrEmpty(definition.Endpoint.Fragment))
-            throw new ModelProviderValidationException("Provider endpoint cannot contain credentials, a query string, or a fragment.");
-        foreach (var key in definition.ProviderOptions.Keys)
-            if (!string.Equals(key, definition.ProviderType, StringComparison.OrdinalIgnoreCase)) throw new ModelProviderValidationException($"Provider options for '{key}' cannot be used with provider '{definition.ProviderType}'.");
-        try { optionsValidators.SingleOrDefault(validator => validator.CanHandle(definition.ProviderType))?.Validate(definition.ProviderOptions); }
-        catch (ModelProviderConfigurationException exception) { throw new ModelProviderValidationException(exception.Message); }
+        ArgumentException.ThrowIfNullOrWhiteSpace(definition.ContributionId);
+        if (definition.Extension.WorkspaceRef is not null)
+            throw new ModelProviderValidationException("Cross-workspace extension references are not supported.");
+        var extensionAddress = definition.Extension.Resolve(ownerNamespace, ResourceKinds.ExtensionRegistration);
+        if (await store.GetAsync<ExtensionRegistrationResource>(new(extensionAddress.Kind, extensionAddress.Name, extensionAddress.Namespace), cancellationToken) is null)
+            throw new ModelProviderValidationException($"Referenced extension registration '{extensionAddress}' does not exist.");
+        if (FindDiscovery(AepModelProvider.AdapterType) is null)
+            throw new ModelProviderValidationException("The AEP model-provider adapter is not registered in this host.");
         return definition with
         {
             DisplayName = definition.DisplayName.Trim(),
-            ProviderType = definition.ProviderType.Trim().ToLowerInvariant(),
-            Endpoint = new Uri(definition.Endpoint.AbsoluteUri.TrimEnd('/') + "/", UriKind.Absolute)
+            ContributionId = definition.ContributionId.Trim()
         };
     }
 
-    private static ModelProviderConfiguration ToConfiguration(ModelProviderResource resource) => new()
+    private async Task<ModelProviderConfiguration> ToConfigurationAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
-        Uid = resource.Uid,
-        Namespace = resource.Namespace,
-        Name = resource.Metadata.Name,
-        ProviderType = resource.Definition.ProviderType,
-        Endpoint = resource.Definition.Endpoint,
-        DisplayName = resource.Definition.DisplayName,
-        ManagementMode = resource.Definition.ManagementMode,
-        EndpointDisplayName = resource.Definition.Endpoint.Authority,
-        Capabilities = ["chat"],
-        Credential = resource.Definition.Credential
-    };
-
-    private async Task ValidateCredentialAsync(ResourceNamespace ownerNamespace, ResourceReference? credential, CancellationToken cancellationToken)
-    {
-        if (credential is null) return;
-        if (credential.WorkspaceRef is not null) throw new ModelProviderValidationException("Cross-workspace secret references are not supported.");
-        var address = credential.Resolve(ownerNamespace, ResourceKinds.Secret);
-        if (await store.GetAsync<SecretResource>(new(address.Kind, address.Name, address.Namespace), cancellationToken) is null)
-            throw new ModelProviderValidationException($"Referenced secret '{address}' does not exist.");
+        var extensionAddress = resource.Definition.Extension.Resolve(resource.Namespace, ResourceKinds.ExtensionRegistration);
+        var extension = await store.GetAsync<ExtensionRegistrationResource>(
+            new(extensionAddress.Kind, extensionAddress.Name, extensionAddress.Namespace), cancellationToken)
+            ?? throw new ModelProviderConfigurationException($"Extension registration '{extensionAddress}' was not found.");
+        return new()
+        {
+            Uid = resource.Uid,
+            Namespace = resource.Namespace,
+            Name = resource.Metadata.Name,
+            AdapterType = AepModelProvider.AdapterType,
+            ContributionId = resource.Definition.ContributionId,
+            Extension = resource.Definition.Extension,
+            Endpoint = extension.Value.Definition.Endpoint,
+            ExtensionEnabled = extension.Value.Definition.Enabled,
+            ExpectedExtensionId = extension.Value.Definition.ExpectedExtensionId,
+            DisplayName = resource.Definition.DisplayName,
+            RegistrationSource = extension.Value.Definition.Source,
+            EndpointDisplayName = extension.Value.Definition.DisplayName,
+            Credential = extension.Value.Definition.Credential
+        };
     }
 
     private static void ValidateIdentity(ModelProviderResource resource)
@@ -209,7 +223,7 @@ public sealed class ModelProfileManagementService(
     IControlPlaneStore store,
     ModelProviderManagementService providerConfigurations,
     IEnumerable<IModelProviderDiscovery> discoveries,
-    IEnumerable<IModelProviderOptionsValidator> optionsValidators) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
+    IEnumerable<IModelProviderCapabilitiesResolver> capabilityResolvers) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
 {
     public static string ProfileId(string name) => name;
     public async Task<StoredResource<ModelProfileResource>> CreateAsync(ModelProfileResource resource, CancellationToken cancellationToken)
@@ -265,24 +279,82 @@ public sealed class ModelProfileManagementService(
             .Select(agent => new ModelProfileUsage(agent.Value.Kind, agent.Value.Metadata.Name, agent.Value.Definition.DisplayName))
             .ToArray();
 
-    public async Task<ModelProfileResolution> ResolveAsync(ModelProfileResource profile, CancellationToken cancellationToken)
+    public async Task<ModelProfileResolution> ResolveAsync(
+        ModelProfileResource profile,
+        CancellationToken cancellationToken,
+        bool includeCapabilityDiagnostics = false)
     {
         ModelProviderConfiguration provider;
         var providerAddress = profile.Definition.Provider.Resolve(profile.Namespace, ResourceKinds.ModelProvider);
         try { provider = await providerConfigurations.GetConfigurationRequiredAsync(providerAddress.Namespace, providerAddress.Name, cancellationToken); }
         catch (ModelProviderResolutionException) { return new(profile, null, new("unavailable", "Provider not found."), null, "unavailable", ["The referenced provider does not exist."]); }
-        var discovery = discoveries.SingleOrDefault(candidate => candidate.CanHandle(provider.ProviderType));
+        var discovery = discoveries.SingleOrDefault(candidate => candidate.CanHandle(provider.AdapterType));
         if (discovery is null) return new(profile, provider, new("unknown", "No discovery adapter."), null, "unknown", ["No provider discovery adapter is registered."]);
         var health = await discovery.GetHealthAsync(provider, cancellationToken);
         if (!string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase)) return new(profile, provider, health, null, "unavailable", [health.Details ?? "Provider unavailable."]);
         var models = await discovery.ListModelsAsync(provider, cancellationToken);
         var model = models.FirstOrDefault(value => value.Name == profile.Definition.Model.Name);
-        return new(profile, provider, health, model, model is null ? "unavailable" : "available", model is null ? ["The configured model is not installed."] : []);
+        if (model is null) return new(profile, provider, health, null, "unavailable", ["The configured model is not installed."]);
+        if (!includeCapabilityDiagnostics) return new(profile, provider, health, model, "available", []);
+        var capabilityResolver = capabilityResolvers.SingleOrDefault(candidate => candidate.CanHandle(provider.AdapterType));
+        if (capabilityResolver is null)
+        {
+            return new(profile, provider, health, model, "unknown", ["Effective capabilities cannot be determined because no capability resolver is registered."]);
+        }
+        try
+        {
+            var deployment = new ModelDeploymentConfiguration
+            {
+                Name = profile.Metadata.Name,
+                ProviderName = provider.Name,
+                ModelName = profile.Definition.Model.Name,
+                ProviderOptions = profile.Definition.ProviderOptions
+            };
+            var levels = await capabilityResolver.ResolveCapabilitiesAsync(provider, deployment, cancellationToken);
+            var effective = EffectiveCapabilityResolver.Intersect(levels.Provider, levels.Model, levels.Adapter);
+            IReadOnlyList<ExecutionCapabilityIssue> incompatibilities = [];
+            try
+            {
+                ExecutionCompatibilityValidator.Validate(
+                    profile.Definition.Reasoning,
+                    profile.Definition.Output,
+                    new ModelExecutionOptions(Streaming: RuntimeStreamingMode.Disabled),
+                    effective,
+                    provider.ContributionId,
+                    model.Name,
+                    "runtime not evaluated");
+            }
+            catch (ExecutionCompatibilityException exception)
+            {
+                incompatibilities = exception.Issues;
+            }
+            return new(
+                profile,
+                provider,
+                health,
+                model,
+                incompatibilities.Count == 0 ? "available" : "incompatible",
+                incompatibilities.Select(issue => issue.Message).ToArray(),
+                levels,
+                effective,
+                incompatibilities);
+        }
+        catch (ModelProviderConfigurationException exception)
+        {
+            return new(profile, provider, health, model, "incompatible", [exception.Message]);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            return new(profile, provider, health, model, "unknown", [$"Effective capabilities could not be resolved: {exception.Message}"]);
+        }
     }
 
     public async ValueTask<ModelProfileConfiguration> GetRequiredAsync(string name, CancellationToken cancellationToken = default)
+        => await GetRequiredAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    public async ValueTask<ModelProfileConfiguration> GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
     {
-        var profile = await GetAsync(name, cancellationToken) ?? throw new ModelProfileNotFoundException(name);
+        var profile = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProfileNotFoundException($"{@namespace}/{name}");
         return new()
         {
             Name = profile.Value.Metadata.Name,
@@ -295,9 +367,13 @@ public sealed class ModelProfileManagementService(
     }
 
     async ValueTask<ModelDeploymentConfiguration> IModelDeploymentStore.GetRequiredAsync(string name, CancellationToken cancellationToken)
+        => await ((IModelDeploymentStore)this).GetRequiredAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    async ValueTask<ModelDeploymentConfiguration> IModelDeploymentStore.GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        var profile = await GetAsync(name, cancellationToken) ?? throw new ModelDeploymentNotFoundException(name);
-        return new() { Name = profile.Value.Metadata.Name, ProviderName = profile.Value.Definition.Provider.Name, ModelName = profile.Value.Definition.Model.Name, ProviderOptions = profile.Value.Definition.ProviderOptions };
+        var profile = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelDeploymentNotFoundException($"{@namespace}/{name}");
+        var provider = profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ResourceKinds.ModelProvider);
+        return new() { Name = profile.Value.Metadata.Name, ProviderName = provider.Name, ProviderNamespace = provider.Namespace, ModelName = profile.Value.Definition.Model.Name, ProviderOptions = profile.Value.Definition.ProviderOptions };
     }
 
     public async Task ValidateReferenceAsync(ResourceReference profileReference, CancellationToken cancellationToken)
@@ -319,13 +395,25 @@ public sealed class ModelProfileManagementService(
         var providerAddress = definition.Provider.Resolve(ownerNamespace, ResourceKinds.ModelProvider);
         try { provider = await providerConfigurations.GetConfigurationRequiredAsync(providerAddress.Namespace, providerAddress.Name, cancellationToken); }
         catch (ModelProviderResolutionException) { throw Invalid("definition.provider.name", "The referenced model provider does not exist."); }
-        if (!provider.Capabilities.Contains("chat", StringComparer.OrdinalIgnoreCase)) throw Invalid("definition.provider.name", "The referenced model provider does not support chat.");
         if (string.IsNullOrWhiteSpace(definition.Model.Name)) throw Invalid("definition.model.name", "A model name is required.");
         if (definition.Generation.Temperature is < 0 or > 2) throw Invalid("definition.generation.temperature", "Temperature must be between 0 and 2.");
         foreach (var option in definition.ProviderOptions.Keys)
-            if (!string.Equals(option, provider.ProviderType, StringComparison.OrdinalIgnoreCase)) throw Invalid($"definition.providerOptions.{option}", $"Provider options for '{option}' cannot be used with provider '{provider.ProviderType}'.");
-        try { optionsValidators.SingleOrDefault(candidate => candidate.CanHandle(provider.ProviderType))?.Validate(definition.ProviderOptions); }
-        catch (ModelProviderConfigurationException exception) { throw Invalid($"definition.providerOptions.{provider.ProviderType}", exception.Message); }
+            if (!string.Equals(option, provider.ContributionId, StringComparison.OrdinalIgnoreCase)) throw Invalid($"definition.providerOptions.{option}", $"Provider options for '{option}' cannot be used with contribution '{provider.ContributionId}'.");
+        if (definition.ProviderOptions.TryGetValue(provider.ContributionId, out var options))
+            ValidateVersionedOptions(provider.ContributionId, options);
+    }
+
+    private static void ValidateVersionedOptions(string providerType, VersionedExtensionOptions options)
+    {
+        var path = $"definition.providerOptions.{providerType}";
+        if (string.IsNullOrWhiteSpace(options.OptionSet)) throw Invalid($"{path}.optionSet", "An option set identifier is required.");
+        if (string.IsNullOrWhiteSpace(options.Version)) throw Invalid($"{path}.version", "An option set version is required.");
+        if (string.IsNullOrWhiteSpace(options.SchemaDigest)
+            || !options.SchemaDigest.StartsWith("sha256:", StringComparison.Ordinal)
+            || options.SchemaDigest.Length != 71)
+            throw Invalid($"{path}.schemaDigest", "A sha256 schema digest is required.");
+        if (options.Values.ValueKind != System.Text.Json.JsonValueKind.Object)
+            throw Invalid($"{path}.values", "Extension option values must be a JSON object.");
     }
 
     private static ModelProfileValidationException Invalid(string field, string message) => new("model_profile_invalid", message, new Dictionary<string, string[]> { [field] = [message] });
@@ -345,9 +433,12 @@ public static class ModelManagementServiceCollectionExtensions
         services.AddSingleton<ModelProviderManagementService>();
         services.AddSingleton<IModelProviderConfigurationStore>(provider => provider.GetRequiredService<ModelProviderManagementService>());
         services.AddSingleton<ModelProfileManagementService>();
+        services.AddSingleton<ModelProfileOptionMigrationService>();
         services.AddSingleton<IModelProfileStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
         services.AddSingleton<IModelDeploymentStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
         services.AddSingleton<IModelProfileReferenceValidator>(provider => provider.GetRequiredService<ModelProfileManagementService>());
+        services.AddSingleton<ExtensionRegistrationManagementService>();
+        services.AddSingleton<ExtensionManagementService>();
         return services;
     }
 }

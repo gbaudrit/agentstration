@@ -5,10 +5,10 @@
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Domain/Agentstration.Domain.csproj" />
     <ProjectReference Include="../../src/Agentstration.Application/Agentstration.Application.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Evaluation/Agentstration.Evaluation.csproj" />
     <ProjectReference Include="../../src/Agentstration.Flow/Agentstration.Flow.csproj" />
     <ProjectReference Include="../../src/Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
     <ProjectReference Include="../../src/Agentstration.Flow.Storage.Abstractions/Agentstration.Flow.Storage.Abstractions.csproj" />

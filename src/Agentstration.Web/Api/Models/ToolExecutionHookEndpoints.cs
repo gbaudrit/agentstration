@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
 
@@ -8,11 +9,11 @@ internal static class ToolExecutionHookEndpoints
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/", ListAsync);
-        group.MapGet("/{hookName}", GetAsync);
-        group.MapPost("/", CreateAsync);
-        group.MapPut("/{hookName}", PutAsync);
-        group.MapDelete("/{hookName}", DeleteAsync);
+        group.MapGet("/", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/{hookName}", GetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPost("/", CreateAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapPut("/{hookName}", PutAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapDelete("/{hookName}", DeleteAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
     }
 
     private static Task<IResult> ListAsync(

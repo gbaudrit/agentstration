@@ -1,3 +1,4 @@
+using Agentstration.Resources;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -10,21 +11,29 @@ public sealed class ChatClientResolver(
     IModelProviderResolver providers,
     GenAiObservabilityOptions observability,
     ILoggerFactory loggerFactory,
-    ILogger<ChatClientResolver> logger) : IChatClientResolver
+    ILogger<ChatClientResolver> logger,
+    IEnumerable<IModelProviderCapabilitiesResolver>? capabilityResolvers = null) : IChatClientResolver
 {
-    public async ValueTask<IChatClient> ResolveAsync(string modelProfileResourceId, CancellationToken cancellationToken = default)
+    public ValueTask<IChatClient> ResolveAsync(string modelProfileResourceId, CancellationToken cancellationToken = default) =>
+        ResolveAsync(ResourceNamespace.Default, modelProfileResourceId, cancellationToken);
+
+    public async ValueTask<IChatClient> ResolveAsync(ResourceNamespace @namespace, string modelProfileResourceId, CancellationToken cancellationToken = default)
     {
-        var profile = await profiles.GetRequiredAsync(modelProfileResourceId, cancellationToken);
-        var deployment = await deployments.GetRequiredAsync(profile.DeploymentName, cancellationToken);
-        var providerConfiguration = await providerConfigurations.GetRequiredAsync(deployment.ProviderName, cancellationToken);
-        var provider = providers.GetRequiredProvider(providerConfiguration.ProviderType);
+        var profile = await profiles.GetRequiredAsync(@namespace, modelProfileResourceId, cancellationToken);
+        var deployment = await deployments.GetRequiredAsync(@namespace, profile.DeploymentName, cancellationToken);
+        var providerConfiguration = await providerConfigurations.GetRequiredAsync(deployment.ProviderNamespace, deployment.ProviderName, cancellationToken);
+        var provider = providers.GetRequiredProvider(providerConfiguration.AdapterType);
+        var capabilityResolver = capabilityResolvers?.SingleOrDefault(value => value.CanHandle(providerConfiguration.AdapterType));
+        var capabilities = capabilityResolver is null
+            ? null
+            : await capabilityResolver.ResolveCapabilitiesAsync(providerConfiguration, deployment, cancellationToken);
         if (logger.IsEnabled(LogLevel.Information))
         {
             logger.LogInformation(
                 "Resolved model profile {ModelProfile} to deployment {Deployment}, provider {ProviderType}/{ProviderName}, and model {ModelName}",
                 profile.Name,
                 deployment.Name,
-                providerConfiguration.ProviderType,
+                providerConfiguration.AdapterType,
                 providerConfiguration.Name,
                 deployment.ModelName);
         }
@@ -43,12 +52,15 @@ public sealed class ChatClientResolver(
             new ModelChatClientMetadata(
                 profile.Name,
                 deployment.Name,
-                providerConfiguration.ProviderType,
+                providerConfiguration.ContributionId,
                 providerConfiguration.Name,
                 deployment.ModelName,
                 profile.Generation,
                 profile.Reasoning,
                 profile.Output,
-                profile.ProviderOptions));
+                profile.ProviderOptions,
+                capabilities?.Provider,
+                capabilities?.Model,
+                capabilities?.Adapter));
     }
 }

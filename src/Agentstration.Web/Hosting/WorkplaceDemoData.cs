@@ -11,12 +11,7 @@ public static class WorkplaceDemoData
 {
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
-        var identityStore = services.GetRequiredService<IIdentityStore>();
-        var tenant = (await identityStore.ListTenantsAsync(cancellationToken)).FirstOrDefault();
-        if (tenant is null) return;
-        var canonicalWorkspace = (await identityStore.ListWorkspacesAsync(tenant.Id, cancellationToken)).FirstOrDefault();
-        if (canonicalWorkspace is null) return;
-        var workspaceId = new WorkspaceId(canonicalWorkspace.Id);
+        var workspaceId = services.GetRequiredService<IWorkplaceContext>().WorkspaceId;
         var flows = services.GetRequiredService<FlowService>();
         var flowId = new FlowId("universal-router");
         var flow = await flows.GetAsync(workspaceId, flowId, cancellationToken);

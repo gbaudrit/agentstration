@@ -44,7 +44,7 @@ The Inspector provides:
 - a bounded HTTP exchange viewer with redacted headers and JSON secrets;
 - conformance validation and formatted raw payloads.
 
-Configuration editing remains unavailable until an extension publishes the versioned `aep.configuration` schema and secret annotations. The Inspector does not invent provider-specific fields.
+Extensions can publish immutable option-set versions and explicit directed migrations through `aep.configuration`. Consumers pin the option-set id, version, and schema digest; a newer preferred version does not silently reinterpret existing values. Migration requests validate every step before returning a new envelope. Secret annotations and schema-driven editing in the standalone Inspector remain future work.
 
 ## CLI
 
@@ -58,3 +58,7 @@ dotnet run --project cli/Agentstration.Aep.Cli -- validate http://localhost:5200
 The `aep/` directory is deliberately self-contained and is ready to become its own Git repository. During the transition, Agentstration uses local project references into this directory. After package publication, those references should be replaced by versioned `PackageReference` entries. Official provider extensions remain outside this repository and consume the AEP SDK.
 
 See [the protocol specification](docs/specification/protocol.md) and [compatibility policy](docs/compatibility/versioning.md).
+
+## License
+
+AEP, its .NET SDK, CLI, Inspector and samples are licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution information.

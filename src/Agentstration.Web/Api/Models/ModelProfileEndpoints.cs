@@ -1,12 +1,13 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
 
 internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
     private static Task<IResult> HandleAsync(
         string? provider,
         string? model,
@@ -45,7 +46,7 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
 
 internal sealed class GetModelProfileEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
     private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -58,7 +59,7 @@ internal sealed class GetModelProfileEndpoint : IModelManagementEndpoint
 
 internal sealed class CreateModelProfileEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapPost("/", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     private static Task<IResult> HandleAsync(CreateModelProfileRequest body, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -76,7 +77,7 @@ internal sealed class CreateModelProfileEndpoint : IModelManagementEndpoint
 
 internal sealed class PutModelProfileEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapPut("/{profileName}", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapPut("/{profileName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, PutModelProfileRequest body, HttpRequest request, HttpResponse response, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () => ModelManagementHttp.ResourceResult(
             await service.PutAsync(ModelManagementHttp.Namespace(resourceNamespace), profileName, body.Properties, ModelManagementHttp.IfMatch(request), cancellationToken),
@@ -86,7 +87,7 @@ internal sealed class PutModelProfileEndpoint : IModelManagementEndpoint
 
 internal sealed class DeleteModelProfileEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapDelete("/{profileName}", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapDelete("/{profileName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
     private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, HttpRequest request, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -97,7 +98,7 @@ internal sealed class DeleteModelProfileEndpoint : IModelManagementEndpoint
 
 internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}/usages", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}/usages", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
     private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
@@ -112,13 +113,62 @@ internal sealed class GetModelProfileUsagesEndpoint : IModelManagementEndpoint
 
 internal sealed class ResolveModelProfileEndpoint : IModelManagementEndpoint
 {
-    public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}/resolution", HandleAsync);
+    public static void Map(RouteGroupBuilder group) => group.MapGet("/{profileName}/resolution", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
     private static Task<IResult> HandleAsync(string profileName, string? resourceNamespace, ModelProfileManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
             var @namespace = ModelManagementHttp.Namespace(resourceNamespace);
             var profile = await service.GetAsync(@namespace, profileName, cancellationToken)
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ModelProfile, profileName, @namespace));
-            return Results.Ok(ModelManagementHttp.Resolution(await service.ResolveAsync(profile.Value, cancellationToken)));
+            return Results.Ok(ModelManagementHttp.Resolution(await service.ResolveAsync(profile.Value, cancellationToken, includeCapabilityDiagnostics: true)));
         });
+}
+
+internal sealed class PreviewModelProfileOptionMigrationEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/{profileName}/option-migrations/preview", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+    private static Task<IResult> HandleAsync(
+        string profileName,
+        string? resourceNamespace,
+        PreviewModelProfileOptionMigrationRequest body,
+        HttpResponse response,
+        ModelProfileOptionMigrationService service,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () =>
+        {
+            var preview = await service.PreviewAsync(
+                ModelManagementHttp.Namespace(resourceNamespace),
+                profileName,
+                body.TargetVersion,
+                cancellationToken);
+            response.Headers.ETag = preview.ProfileETag;
+            return Results.Ok(new ModelProfileOptionMigrationPreviewResponse(
+                preview.ProfileName,
+                preview.ProfileNamespace,
+                preview.ProviderType,
+                preview.Source,
+                preview.Target));
+        });
+}
+
+internal sealed class ApplyModelProfileOptionMigrationEndpoint : IModelManagementEndpoint
+{
+    public static void Map(RouteGroupBuilder group) => group.MapPost("/{profileName}/option-migrations/apply", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+    private static Task<IResult> HandleAsync(
+        string profileName,
+        string? resourceNamespace,
+        PreviewModelProfileOptionMigrationRequest body,
+        HttpRequest request,
+        HttpResponse response,
+        ModelProfileOptionMigrationService service,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () => ModelManagementHttp.ResourceResult(
+            await service.ApplyAsync(
+                ModelManagementHttp.Namespace(resourceNamespace),
+                profileName,
+                body.TargetVersion,
+                ModelManagementHttp.IfMatch(request),
+                cancellationToken),
+            response,
+            StatusCodes.Status200OK));
 }

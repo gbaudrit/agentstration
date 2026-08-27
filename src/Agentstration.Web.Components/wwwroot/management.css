@@ -19,7 +19,9 @@
 .form-grid small,.resource-hint{margin:0;color:var(--muted);font-size:.72rem;font-weight:400}
 .form-grid .validation-message,.validation-errors{color:#c83b48;font-size:.74rem}
 .form-span-2{grid-column:1/-1}
-.form-actions{position:sticky;bottom:12px;display:flex;justify-content:flex-end;gap:10px;padding:14px;border:1px solid var(--border);border-radius:10px;background:color-mix(in srgb,var(--surface) 94%,transparent);box-shadow:var(--shadow);backdrop-filter:blur(12px)}
+.form-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:18px}
+.resource-form>.form-actions{position:sticky;bottom:12px;margin-top:0;padding:14px;border:1px solid var(--border);border-radius:10px;background:color-mix(in srgb,var(--surface) 94%,transparent);box-shadow:var(--shadow);backdrop-filter:blur(12px)}
+.panel-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
 .form-alert{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:8px;border:1px solid var(--border);font-size:.82rem}
 .form-alert-danger{background:rgba(221,67,80,.1);border-color:rgba(221,67,80,.35);color:#c83b48}
 .form-alert-success{background:rgba(31,168,104,.1);border-color:rgba(31,168,104,.3);color:#1b9560}

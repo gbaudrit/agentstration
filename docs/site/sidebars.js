@@ -80,9 +80,17 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Releases',
+      items: [
+        'releases/0.1.0-alpha.1',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Contributing',
       items: [
         'contributing/overview',
+        'contributing/development-slots',
         'contributing/documentation',
         'contributing/github-governance',
       ],

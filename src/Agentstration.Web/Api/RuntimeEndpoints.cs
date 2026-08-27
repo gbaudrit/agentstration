@@ -11,6 +11,7 @@ public static class RuntimeEndpoints
         CreateRuntimeRunEndpoint.Map(group);
         ListRuntimeRunsEndpoint.Map(group);
         GetRuntimeRunEndpoint.Map(group);
+        ListRuntimeRunEventsEndpoint.Map(group);
         StreamRuntimeRunEventsEndpoint.Map(group);
         CancelRuntimeRunEndpoint.Map(group);
         RetryRuntimeRunEndpoint.Map(group);
@@ -18,6 +19,10 @@ public static class RuntimeEndpoints
             .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
         GetAgentRuntimeReadinessEndpoint.Map(agents);
         PrepareAgentRuntimeEndpoint.Map(agents);
+        var namespacedAgents = endpoints.MapGroup("/api/runtime/namespaces/{namespace}/agents")
+            .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
+        GetAgentRuntimeReadinessEndpoint.MapNamespaced(namespacedAgents);
+        PrepareAgentRuntimeEndpoint.MapNamespaced(namespacedAgents);
         return endpoints;
     }
 }

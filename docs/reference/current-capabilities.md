@@ -38,6 +38,39 @@ flowchart LR
 
 The management plane is the source of truth for agent definitions and desired state; runtime `AIAgent` instances are reconstructible. The Work Plane owns the functional lifecycle, interactions, history, and result of each `WorkItem`. Its architectural principle is **Microsoft-first, provider-neutral, cloud-optional**.
 
+## Schedule Triggers
+
+Agentstration can submit autonomous Work from a declarative Workspace-scoped `Trigger`. Trigger owns **when**, Work owns **what**, Flow owns **how**, and Runtime owns execution. Automation is not a second runtime.
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: Trigger
+metadata:
+  name: morning-summary
+definition:
+  displayName: Morning summary
+  enabled: false
+  source:
+    kind: schedule
+    schedule:
+      type: cron
+      expression: "0 0 8 ? * MON-FRI"
+      timeZone: Europe/Paris
+  target:
+    kind: flow
+    flow:
+      name: daily-report
+  input: {}
+  misfirePolicy: fireOnce
+  concurrencyPolicy: skip
+```
+
+V1 supports once, interval and Quartz cron schedules, strict IANA time zones, ETag CRUD, enable/disable, `Run now`, next/last observed status and durable occurrence history. A Trigger can explicitly target a Flow in any namespace of its Workspace, including an installed Pack namespace; cross-Workspace resolution remains forbidden. Quartz registrations live in a separate local SQLite JobStore and are reconciled from Trigger resources after restart. A deterministic occurrence/Work identity prevents duplicate local submission for the same scheduled instant. Current owner authorization is re-evaluated at every firing and fails closed after revocation.
+
+The Console exposes a searchable `/triggers` list, a guided schedule editor with Flow selection, IANA time zones and occurrence preview, plus a detail view for desired state, observed status, occurrence history, enable/disable and `Run now`. The Management API exposes `/api/triggers` and namespaced equivalents. A scheduled Work becomes an autonomous Task without a fabricated Entry or Interaction. Human input uses the existing task-scoped PendingAction panel and notification path directly from Task details.
+
+See [ADR-0068](../decisions/0068-triggers-submit-work-through-quartz-projection.md) for policies, guarantees and V1 limits.
+
 Packs are a Management/distribution concept above these planes: they install ordinary resources into deterministic `publisher.name` namespaces and retain provenance, but they are never run. Local ZIP installation, source/fork coexistence, installed-Pack inventory, compensating failure handling, modification-safe uninstall, and six resource handlers are implemented through the Management API. See [Pack format and lifecycle](packs.md).
 
 ## Declarative agent resources
@@ -109,12 +142,13 @@ Agents
 
 The Flow module manages editable graph drafts, immutable published versions, and durable Flow Runs. Its local sequential executor supports typed `Input`, `Agent`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps through provider-neutral contracts. The earlier `Direct`, `Routing`, `Workflow`, `Orchestration`, and `Composite` specifications remain compatible with the same Flow resource and storage boundary. Orchestration Runs can suspend durably for text, choice, or confirmation input, survive process reconstruction through opaque SQLite-backed MAF checkpoints, and resume with the exact Flow snapshot and Agent revisions selected at first execution.
 
-The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework. The existing ingestion, memory, mission, REST, Razor, and MCP verticals remain available as product capabilities.
+The standalone vertical uses SQLite for management resources and runs without Azure, Foundry, a remote model, or an API key. It seeds `dotnet-expert` and `sql-expert`, compiles immutable revisions, deploys them in-process, reconciles their runtime state, routes each request to one agent, and executes that agent through Microsoft Agent Framework.
 
 ## Prerequisites
 
 - .NET SDK 10.0.300 or later feature band
-- Optional: a local Ollama installation for the managed Ollama profile, including Aspire launches
+- Optional: a local Ollama installation for the managed Ollama profile
+- Optional: a local `llama-server` and GGUF model for the `llamacpp` provider
 
 No Azure subscription or remote API key is required.
 
@@ -126,7 +160,7 @@ The most direct route is:
 dotnet run --project src/Agentstration.Web
 ```
 
-Open the Console at `http://localhost:5100`. The same process hosts all Management, Runtime, Flow, Work, Workplace, content, MCP, and SignalR surfaces. Data is persisted to `src/Agentstration.Web/.agentstration/data.json` and is intentionally ignored by Git.
+Open the Console at `http://localhost:5100`. The same process hosts the Management, Runtime, Flow, Work, Workplace, generic MCP, and SignalR surfaces. Module-owned SQLite databases and file artifacts live under `src/Agentstration.Web/.agentstration` by default.
 
 The end-user Workplace remains an autonomous UI host. Start the authoritative server and UI in separate terminals:
 
@@ -150,7 +184,7 @@ For the Aspire dashboard and orchestration experience:
 dotnet run --project src/Agentstration.AppHost
 ```
 
-The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to the existing local Ollama installation configured by `Ollama:Endpoint` (default `http://localhost:11434`); it does not provision an Ollama server or model. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
+The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to `Ollama:Endpoint` (default `http://localhost:11434`), the llama.cpp extension to `LlamaCpp:Endpoint` (default `http://localhost:8080`), and the LocalAI extension to `LocalAI:Endpoint` (default `http://localhost:8081`). It provisions no inference server or model. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
 
 Or with containers:
 
@@ -160,7 +194,7 @@ docker compose up --build
 
 ## AI modes
 
-The normal `Managed` mode resolves the provider, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; no `AI__Provider=Ollama` environment variable is required. The seeded `ollama-local` Model Provider URL, editable from `/modelproviders/default/ollama-local`, is the AEP extension URL and never the native Ollama URL.
+The normal `Managed` mode resolves the provider, extension registration, endpoint, and model from the persisted Model Profile and Model Provider selected on each agent. It is the default for direct Web and Aspire launches; concrete provider names are never host execution modes. The seeded `ollama-local`, `llama-cpp-local`, and `localai-local` providers reference extension registrations whose URLs are AEP endpoints, never native inference-server URLs.
 
 Use the deterministic offline mode explicitly for tests or fallback diagnostics:
 
@@ -178,6 +212,24 @@ dotnet run --project src/Agentstration.AppHost
 ```
 
 The seeded `reasoning-default` profile resolves to the persisted `ollama-local` AEP contribution and its `qwen3:1.7b` model. Aspire injects the autonomous Ollama extension endpoint and passes `Ollama:Endpoint` to that extension. To target a non-default local address, set `Ollama__Endpoint` before starting the AppHost. Direct startup of the extension defaults to `http://localhost:11434`, while Agentstration’s persisted AEP endpoint defaults to `http://localhost:5260`. The persisted AEP endpoint can be edited without restarting the host and is authoritative for subsequent runtime resolution.
+
+For llama.cpp, start `llama-server` with a stable alias and point Aspire at it before creating a Model Profile that references `llama-cpp-local`:
+
+```powershell
+llama-server -m C:\models\model.gguf --alias local-gguf --port 8080 --jinja
+$env:LlamaCpp__Endpoint = "http://localhost:8080"
+dotnet run --project src/Agentstration.AppHost
+```
+
+For LocalAI, expose an existing server on host port 8081 and create a Model Profile that references one of the chat models returned by its capability endpoint:
+
+```powershell
+$env:LocalAI__Endpoint = "http://localhost:8081"
+# Optional: $env:LocalAI__ApiKey = "..."
+dotnet run --project src/Agentstration.AppHost
+```
+
+See [Model providers](../concepts/model-providers.md) for declarations, capabilities, native options, and limitations.
 
 The Agent Runner uses this resolver through Microsoft Agent Framework, so no Ollama-specific execution path exists in the Runtime Plane. Create a normal durable Runtime Run to exercise the entire declared-agent path:
 
@@ -199,13 +251,13 @@ $body = @{ prompt = "Reply with one short sentence." } | ConvertTo-Json
 Invoke-RestMethod -Method Post -ContentType application/json -Body $body http://localhost:5100/api/diagnostics/models/ollama/chat
 ```
 
-`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. The autonomous `Agentstration.Extensions.Ollama` service alone owns OllamaSharp, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no AEP or Ollama dependency.
+`Agentstration.Management.Core` owns persisted profile definitions and projects them into the provider-neutral resolver. `Agentstration.ModelProviders` reaches provider contributions only through AEP. Autonomous Ollama, llama.cpp, and LocalAI extensions own their native transports, while `Agentstration.AppHost` owns orchestration. `Runtime.AgentFramework` consumes `IChatClient`; it has no dependency on a concrete provider.
 
-Current limitations are deliberate: Ollama is the only mutable provider type, credentials are not stored on provider resources, separate Flow Runs are not dispatched in parallel, and there is no conversation persistence or provider-native streaming yet. The Concurrent Flow orchestration strategy does execute its participants concurrently inside one bounded Run. Other OpenAI-compatible endpoints still use the legacy host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
+Current limitations are deliberate: credentials are not stored on provider resources, llama.cpp reasoning output is not represented as a distinct AEP content kind, and image input is not yet effective through the AEP-to-`IChatClient` adapter. Separate Flow Runs are not dispatched in parallel and there is no conversation persistence. Other legacy OpenAI-compatible endpoints still use host-level `AI__Endpoint`, `AI__Model`, and optional `AI__ApiKey` settings.
 
 ### Model provider and profile APIs
 
-Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Aspire starts the AEP extension and supplies its initial seed URL, but relies on the configured local Ollama installation and remains outside the provider source of truth:
+Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and dynamic model discovery. Model Profile resolution exposes provider/model/adapter capability levels, their effective intersection, and profile-option incompatibilities before execution. Runtime and agent-tool compatibility remains an execution-resolution concern. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
 
 ```powershell
 Invoke-RestMethod http://localhost:5100/api/modelproviders
@@ -213,9 +265,13 @@ Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/status
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/models
 Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/test
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/usages
+Invoke-RestMethod http://localhost:5100/api/modelproviders/llama-cpp-local/status
+Invoke-RestMethod http://localhost:5100/api/modelproviders/llama-cpp-local/models
+Invoke-RestMethod http://localhost:5100/api/modelproviders/localai-local/status
+Invoke-RestMethod http://localhost:5100/api/modelproviders/localai-local/models
 ```
 
-Create or edit a local Ollama declaration from the Blazor console at `/modelproviders`. Provider URLs must be absolute HTTP(S) URLs without embedded credentials, query strings, or fragments. Saving a provider does not require Ollama to be online; health and installed models remain observed state. Deleting a provider is rejected while a model profile references its exact resource ID.
+Create or edit Ollama, llama.cpp, and LocalAI extension registrations from the Blazor console at `/extensions`, then bind their model-provider contributions at `/modelproviders`. Extension URLs must be absolute HTTP(S) AEP endpoints without embedded credentials, query strings, or fragments. Saving a provider does not require its native inference server to be online; health and installed models remain observed state. LocalAI discovery requires `/v1/models/capabilities` and filters non-chat models. Deleting a provider is rejected while a model profile references its exact resource ID.
 
 Model profiles are durable Management Plane resources with ETag concurrency and usage protection:
 
@@ -230,7 +286,7 @@ Model profiles separate portable `generation`, `reasoning`, and `output` intent 
 
 The seeded `reasoning-default` profile references the stable `ollama-local` provider resource and `qwen3:1.7b`. Profiles remain valid when Ollama or a selected model is temporarily unavailable; only structurally invalid profiles are rejected. An in-use profile cannot be deleted. Agent definitions continue to persist only the model-profile resource ID.
 
-The Blazor console exposes this vertical through `/modelproviders`, `/modelprofiles`, `/runtimeprofiles`, the agent editor, and the Agent Runner. Provider pages create and edit declarations, test connectivity, show dynamic models and usages, and enforce ETag/deletion protection. Model profile pages edit all canonical inference categories; runtime profile pages manage session, tool invocation, streaming, and runtime-specific options with ETag conflict and usage protection. The runner shows the resolved runtime profile and lets an advanced run choose its streaming mode. The reusable agent picker saves only `modelProfile.resourceId`; agent details render the declared profile separately from the resolved provider and model.
+The Blazor console exposes this vertical through `/modelproviders`, `/modelprofiles`, `/runtimeprofiles`, the agent editor, and the Agent Runner. Provider pages create and edit declarations, test connectivity, show dynamic models and usages, and enforce ETag/deletion protection. Model profile pages edit all canonical inference categories; runtime profile pages manage session, tool invocation, streaming, and runtime-specific options with ETag conflict and usage protection. Each active Workspace receives the `maf-builtin` Microsoft Agent Framework Runtime Profile automatically. Resources shipped with Agentstration use the `-builtin` suffix and the `agentstration.io/builtin: "true"` provenance annotation; this identifies their origin without making them implicit defaults. The runner shows the resolved runtime profile and lets an advanced run choose its streaming mode. The reusable agent picker saves only `modelProfile.resourceId`; agent details render the declared profile separately from the resolved provider and model.
 
 ## REST quickstart
 
@@ -270,39 +326,6 @@ Invoke-RestMethod "http://localhost:5100/api/runtime/runs/$($run.id)"
 Run history and ordered events are stored independently in `.agentstration/runtime-plane.db`. The console exposes Quick Run, advanced context/parameters, SSE progress, cancellation, retry, trace and raw inspection from each agent page.
 
 Agent management and Agent Runner always call the canonical Management and Runtime APIs, even when the remaining console dashboard uses simulated projections. Saving an agent activates its current generation; **Reconcile runtime** retries that idempotent activation manually. A successful replacement is made ready before superseded instances are deprovisioned. A Run resolves the current persisted Model Profile, invokes the deployment model through Microsoft Agent Framework and the selected provider, and records the provider, model, temperature, and maximum output tokens actually used. Advanced overrides accept only `temperature` and `maxOutputTokens`; provider, endpoint, and model overrides are rejected.
-
-### Content and missions
-
-List the seeded workspace and inbox:
-
-```powershell
-$workspace = Invoke-RestMethod http://localhost:5100/api/workspaces | Select-Object -First 1
-$inbox = Invoke-RestMethod "http://localhost:5100/api/workspaces/$($workspace.id.value)/inboxes" | Select-Object -First 1
-```
-
-Ingest text and inspect the asynchronous result:
-
-```powershell
-$body = @{ text = "Microsoft Agent Framework enables provider-neutral agent workflows." } | ConvertTo-Json
-$accepted = Invoke-RestMethod -Method Post -ContentType application/json -Body $body "http://localhost:5100/api/workspaces/$($workspace.id.value)/inboxes/$($inbox.id.value)/items"
-Start-Sleep -Seconds 1
-Invoke-RestMethod "http://localhost:5100/api/workspaces/$($workspace.id.value)/items/$($accepted.itemId.value)"
-```
-
-Search memory:
-
-```powershell
-$search = @{ query = "agent"; limit = 20 } | ConvertTo-Json
-Invoke-RestMethod -Method Post -ContentType application/json -Body $search "http://localhost:5100/api/workspaces/$($workspace.id.value)/memory/search"
-```
-
-Create and run a deterministic monitoring mission:
-
-```powershell
-$missionBody = @{ name="Price watch"; objective="Notify below 300"; sourceUrl="demo://product/coffee-machine"; frequencyMinutes=360; threshold=300 } | ConvertTo-Json
-$mission = Invoke-RestMethod -Method Post -ContentType application/json -Body $missionBody "http://localhost:5100/api/workspaces/$($workspace.id.value)/missions"
-Invoke-RestMethod -Method Post "http://localhost:5100/api/workspaces/$($workspace.id.value)/missions/$($mission.id.value)/run"
-```
 
 ### Work plane
 
@@ -353,7 +376,7 @@ The official C# MCP SDK exposes Streamable HTTP at `http://localhost:5100/mcp`. 
 }
 ```
 
-Tools: `list_workspaces`, `list_inboxes`, `ingest_text`, `ingest_url`, `search_memory`, `create_mission`, `get_mission`, `list_mission_runs`, and `run_mission_now`.
+The server endpoint remains available as generic MCP infrastructure, but it currently publishes no built-in platform tools. Governed external MCP and AEP tool providers continue to be discovered and executed through the Tool catalog.
 
 ## Runtime and MAF observability
 
@@ -404,24 +427,7 @@ dotnet build Agentstration.slnx --configuration Release
 dotnet test Agentstration.slnx --configuration Release
 ```
 
-Warnings are errors, .NET analyzers are enabled, and NuGet audit findings fail restore. The test suite covers the two verticals, workspace isolation, idempotency, raw preservation, routing, agent failure, MCP surface, REST startup, and dependency rules.
-
-## AI evaluation
-
-`Agentstration.Evaluation` contains an offline evaluator built on `Microsoft.Extensions.AI.Evaluation`. The evaluation suite runs the real ingestion and content-processing workflow with the deterministic chat client, then measures:
-
-- valid structured output;
-- lexical summary groundedness against the preserved source;
-- required-fact coverage;
-- expected-category coverage.
-
-Cases are versioned in `tests/Agentstration.Evaluation.Tests/Data/content-workflow-cases.json`. Run the deterministic suite with:
-
-```powershell
-dotnet test tests/Agentstration.Evaluation.Tests --configuration Release
-```
-
-This baseline is intentionally offline and cost-free. LLM-as-judge quality evaluators and report generation remain opt-in future extensions; they must not make the default test suite depend on a remote model.
+Warnings are errors, .NET analyzers are enabled, and NuGet audit findings fail restore. The test suite covers Management, Work, Workplace, Flow, Runtime, Triggers, Packs, Agents, workspace isolation, MCP infrastructure, REST startup, and dependency rules.
 
 ## Current boundaries
 

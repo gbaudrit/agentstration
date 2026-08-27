@@ -21,6 +21,7 @@
 @if (Model.Account is null)
 {
     <p class="account-unavailable">This session is not backed by a local account. Password security is managed by your external identity provider.</p>
+    <a href="/account/pat" class="secondary-action">Manage personal access tokens</a>
     <a href="/" class="secondary-action">Return to the console</a>
 }
 else
@@ -50,6 +51,12 @@ else
         <form method="post" asp-page-handler="SignOutOtherSessions">
             <button type="submit" class="secondary-action">Sign out other sessions</button>
         </form>
+    </section>
+
+    <section class="security-section security-section-separated">
+        <h2>Personal access tokens</h2>
+        <p>Create revocable, Workspace-scoped credentials for scripts and command-line clients.</p>
+        <a href="/account/pat" class="secondary-action">Manage personal access tokens</a>
     </section>
 
     <a href="/" class="auth-back-link">← Return to the console</a>

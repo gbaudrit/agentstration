@@ -9,7 +9,7 @@ namespace Agentstration.Aep.MicrosoftExtensionsAI;
 public sealed class AepChatClient(
     AepModelProviderClient provider,
     string model,
-    IReadOnlyDictionary<string, JsonElement>? providerOptions = null) : IChatClient
+    AepVersionedOptions? nativeOptions = null) : IChatClient
 {
     public async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -62,8 +62,6 @@ public sealed class AepChatClient(
             MapContents(message),
             message.AuthorName)).ToArray();
         var additional = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-        if (providerOptions is not null)
-            foreach (var value in providerOptions) additional[value.Key] = value.Value;
         if (options?.AdditionalProperties is not null)
             foreach (var value in options.AdditionalProperties)
                 additional[value.Key] = JsonSerializer.SerializeToElement(value.Value, AepProtocol.JsonOptions);
@@ -81,9 +79,29 @@ public sealed class AepChatClient(
                 TopK = options?.TopK,
                 Seed = options?.Seed,
                 StopSequences = options?.StopSequences?.ToArray(),
+                ResponseFormat = MapResponseFormat(options?.ResponseFormat),
+                NativeOptions = nativeOptions,
                 AdditionalOptions = additional
             },
             tools);
+    }
+
+    private static JsonElement? MapResponseFormat(ChatResponseFormat? format)
+    {
+        if (format is null) return null;
+        if (format == ChatResponseFormat.Text)
+            return JsonSerializer.SerializeToElement(new { type = "text" }, AepProtocol.JsonOptions);
+        if (format == ChatResponseFormat.Json)
+            return JsonSerializer.SerializeToElement(new { type = "json_object" }, AepProtocol.JsonOptions);
+        if (format is ChatResponseFormatJson { Schema: { } schema } json)
+        {
+            return JsonSerializer.SerializeToElement(new
+            {
+                type = "json_schema",
+                json_schema = new { name = json.SchemaName ?? "agentstration_output", schema }
+            }, AepProtocol.JsonOptions);
+        }
+        return null;
     }
 
     private static List<AepContent> MapContents(ChatMessage message)

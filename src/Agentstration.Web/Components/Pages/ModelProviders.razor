@@ -26,7 +26,7 @@ else
         <Row Context="provider"><tr>
             <td><strong>@provider.Properties.DisplayName</strong><br /><code>@provider.Name</code></td>
             <td><code>@provider.Namespace</code></td>
-            <td>@provider.Properties.ProviderType</td><td>@provider.Properties.ManagementMode</td>
+            <td>@provider.Properties.ContributionId</td><td>@provider.Properties.RegistrationSource</td>
             <td><StatusBadge Text="@ModelManagementUi.Label(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></td>
             <td>@provider.Properties.ModelCount</td>
             <td><a class="text-button" href="@DetailsUrl(provider)">View details →</a></td>

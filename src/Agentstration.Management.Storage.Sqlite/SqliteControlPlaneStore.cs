@@ -13,6 +13,7 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     internal DbSet<TenantRow> Tenants => Set<TenantRow>();
     internal DbSet<WorkspaceRow> Workspaces => Set<WorkspaceRow>();
     internal DbSet<PrincipalRow> Principals => Set<PrincipalRow>();
+    internal DbSet<PrincipalPreferencesRow> PrincipalPreferences => Set<PrincipalPreferencesRow>();
     internal DbSet<ExternalIdentityRow> ExternalIdentities => Set<ExternalIdentityRow>();
     internal DbSet<LocalIdentityRow> LocalIdentities => Set<LocalIdentityRow>();
     internal DbSet<PlatformAdministratorRow> PlatformAdministrators => Set<PlatformAdministratorRow>();
@@ -21,6 +22,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     internal DbSet<RoleDefinitionRow> RoleDefinitions => Set<RoleDefinitionRow>();
     internal DbSet<RoleAssignmentRow> RoleAssignments => Set<RoleAssignmentRow>();
     internal DbSet<SecurityAuditRow> SecurityAuditEvents => Set<SecurityAuditRow>();
+    internal DbSet<PersonalAccessTokenRow> PersonalAccessTokens => Set<PersonalAccessTokenRow>();
+    internal DbSet<TriggerOccurrenceRow> TriggerOccurrences => Set<TriggerOccurrenceRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,6 +39,16 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
         document.Property(value => value.WorkspaceId);
         document.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
         document.HasIndex(value => new { value.WorkspaceId, value.Namespace, value.Kind, value.Name }).IsUnique();
+        var occurrence = modelBuilder.Entity<TriggerOccurrenceRow>();
+        occurrence.ToTable("TriggerOccurrences");
+        occurrence.HasKey(value => value.Id);
+        occurrence.Property(value => value.TriggerName).HasMaxLength(256);
+        occurrence.Property(value => value.TriggerNamespace).HasMaxLength(128);
+        occurrence.Property(value => value.Kind).HasMaxLength(32);
+        occurrence.Property(value => value.Outcome).HasMaxLength(32);
+        occurrence.Property(value => value.WorkItemId).HasMaxLength(128);
+        occurrence.Property(value => value.ErrorCode).HasMaxLength(128);
+        occurrence.HasIndex(value => new { value.WorkspaceId, value.TriggerUid, value.ScheduledAt });
         modelBuilder.ConfigureIdentityModel();
     }
 }
@@ -67,13 +80,75 @@ public sealed class SqliteControlPlaneStore(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS PrincipalPreferences (
+                PrincipalId TEXT NOT NULL CONSTRAINT PK_PrincipalPreferences PRIMARY KEY,
+                PreferencesJson TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL,
+                CONSTRAINT FK_PrincipalPreferences_Users_PrincipalId FOREIGN KEY (PrincipalId) REFERENCES Users (Id) ON DELETE CASCADE
+            )
+            """,
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_AgentRevisionLookup ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.agentUid'), json_extract(Payload, '$.agentVersion'))",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS PersonalAccessTokens (
+                Id TEXT NOT NULL CONSTRAINT PK_PersonalAccessTokens PRIMARY KEY,
+                PrincipalId TEXT NOT NULL,
+                WorkspaceId TEXT NOT NULL,
+                Name TEXT NOT NULL,
+                TokenPrefix TEXT NOT NULL,
+                SecretHash BLOB NOT NULL,
+                PermissionsJson TEXT NOT NULL,
+                CreatedAt TEXT NOT NULL,
+                ExpiresAt TEXT NOT NULL,
+                LastUsedAt TEXT NULL,
+                RevokedAt TEXT NULL,
+                CONSTRAINT FK_PersonalAccessTokens_Users_PrincipalId FOREIGN KEY (PrincipalId) REFERENCES Users (Id) ON DELETE CASCADE,
+                CONSTRAINT FK_PersonalAccessTokens_Workspaces_WorkspaceId FOREIGN KEY (WorkspaceId) REFERENCES Workspaces (Id) ON DELETE CASCADE
+            )
+            """,
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_PersonalAccessTokens_TokenPrefix ON PersonalAccessTokens (TokenPrefix)",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_PersonalAccessTokens_PrincipalId ON PersonalAccessTokens (PrincipalId)",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_PersonalAccessTokens_WorkspaceId ON PersonalAccessTokens (WorkspaceId)",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_PersonalAccessTokens_ExpiresAt ON PersonalAccessTokens (ExpiresAt)",
             cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_DeploymentRevision ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.revisionName'))",
             cancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_ControlPlaneResources_DeploymentAgent ON ControlPlaneResources (TenantId, WorkspaceId, Kind, json_extract(Payload, '$.agentName'))",
+            cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS TriggerOccurrences (
+                Id TEXT NOT NULL CONSTRAINT PK_TriggerOccurrences PRIMARY KEY,
+                TenantId TEXT NOT NULL,
+                WorkspaceId TEXT NOT NULL,
+                TriggerUid TEXT NOT NULL,
+                TriggerName TEXT NOT NULL,
+                TriggerNamespace TEXT NOT NULL,
+                TriggerGeneration INTEGER NOT NULL,
+                Kind TEXT NOT NULL,
+                ScheduledAt TEXT NOT NULL,
+                FiredAt TEXT NULL,
+                Outcome TEXT NOT NULL,
+                WorkItemId TEXT NULL,
+                ErrorCode TEXT NULL,
+                ErrorMessage TEXT NULL
+            )
+            """, cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_TriggerOccurrences_WorkspaceId_TriggerUid_ScheduledAt ON TriggerOccurrences (WorkspaceId, TriggerUid, ScheduledAt)",
             cancellationToken);
     }
 
@@ -351,9 +426,11 @@ public static class SqliteControlPlaneServiceCollectionExtensions
         services.AddDbContextFactory<ControlPlaneDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IControlPlaneStore, SqliteControlPlaneStore>();
         services.AddSingleton<IAgentResourceQueries>(provider => (SqliteControlPlaneStore)provider.GetRequiredService<IControlPlaneStore>());
+        services.AddSingleton<ITriggerOccurrenceStore, SqliteTriggerOccurrenceStore>();
         services.AddSingleton<SqliteIdentityStore>();
         services.AddSingleton<IIdentityStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());
         services.AddSingleton<ISecurityAuditStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());
+        services.AddSingleton<IPersonalAccessTokenStore>(provider => provider.GetRequiredService<SqliteIdentityStore>());
         return services;
     }
 }

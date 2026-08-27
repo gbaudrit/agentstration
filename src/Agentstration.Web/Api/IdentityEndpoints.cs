@@ -13,12 +13,19 @@ public static class IdentityEndpoints
         var group = endpoints.MapGroup("/api/identity").RequireAuthorization(AgentstrationPolicies.Authenticated);
         group.MapGet("/context", async (IdentityExperienceService service, CancellationToken token) => Results.Ok(await service.GetContextAsync(token)))
             .RequireAuthorization(AgentstrationPolicies.WorkspaceReader);
-        group.MapPost("/context/workspace", SelectWorkspaceAsync);
+        group.MapGet("/preferences", GetPreferencesAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
+        group.MapPut("/preferences", UpdatePreferencesAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
+        group.MapPost("/context/workspace", SelectWorkspaceAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
+        group.MapGet("/pat", ListPersonalAccessTokensAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
+        group.MapPost("/pat", CreatePersonalAccessTokenAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
+        group.MapDelete("/pat", RevokeAllPersonalAccessTokensAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
+        group.MapDelete("/pat/{tokenId:guid}", RevokePersonalAccessTokenAsync).RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         group.MapGet("/organization", async (IdentityAdministrationService service, CancellationToken token) =>
             Results.Ok(await service.GetCurrentAsync(token))).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
         group.MapGet("/workspaces", async (IdentityAdministrationService service, CancellationToken token) =>
             Results.Ok((await service.GetCurrentAsync(token)).Workspaces)).RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
-        group.MapGet("/workspaces/{workspaceId:guid}", GetWorkspaceAsync);
+        group.MapGet("/workspaces/{workspaceId:guid}", GetWorkspaceAsync)
+            .RequireAuthorization(AgentstrationPolicies.WorkspaceReader);
         group.MapPost("/workspaces", CreateWorkspaceAsync).RequireAuthorization(AgentstrationPolicies.WorkspaceAdmin);
         group.MapGet("/workspaces/{workspaceId:guid}/memberships", ListWorkspaceMembershipsAsync)
             .RequireAuthorization(AgentstrationPolicies.AuthorizationReader);
@@ -43,13 +50,139 @@ public static class IdentityEndpoints
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapDelete("/principals/{principalId:guid}/external-identities/{externalIdentityId:guid}", UnlinkExternalIdentityAsync)
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapGet("/principals/{principalId:guid}/pat", ListPrincipalPersonalAccessTokensAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapDelete("/principals/{principalId:guid}/pat", RevokeAllPrincipalPersonalAccessTokensAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapDelete("/principals/{principalId:guid}/pat/{tokenId:guid}", RevokePrincipalPersonalAccessTokenAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapGet("/audit-events", async (int? limit, SecurityAuditService service, CancellationToken token) =>
             Results.Ok(await service.ListLatestAsync(limit ?? 100, token)))
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         endpoints.MapPost("/bff/identity/context/workspace", SelectWorkspaceAsync)
-            .RequireAuthorization(AgentstrationPolicies.Authenticated);
+            .RequireAuthorization(AgentstrationPolicies.InteractiveUser);
         return endpoints;
     }
+
+    private static async Task<IResult> ListPersonalAccessTokensAsync(
+        PersonalAccessTokenService service,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken) =>
+        Results.Ok((await service.ListCurrentAsync(cancellationToken)).Select(token => ToResponse(token, timeProvider.GetUtcNow())));
+
+    private static async Task<IResult> CreatePersonalAccessTokenAsync(
+        CreatePersonalAccessTokenRequest request,
+        PersonalAccessTokenService service,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var created = await service.CreateAsync(
+                new(request.Name, request.WorkspaceId, request.Permissions, request.ExpiresAt),
+                cancellationToken);
+            return Results.Created(
+                $"/api/identity/pat/{created.Metadata.Id:D}",
+                new CreatedPersonalAccessTokenResponse(ToResponse(created.Metadata, timeProvider.GetUtcNow()), created.Token));
+        }
+        catch (AuthorizationDeniedException exception)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "permission_denied", detail: exception.Message);
+        }
+        catch (ArgumentException exception)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["pat"] = [exception.Message] });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Results.Conflict(new { error = exception.Message });
+        }
+    }
+
+    private static async Task<IResult> RevokePersonalAccessTokenAsync(
+        Guid tokenId,
+        PersonalAccessTokenService service,
+        CancellationToken cancellationToken) =>
+        await service.RevokeCurrentAsync(tokenId, cancellationToken) ? Results.NoContent() : Results.NotFound();
+
+    private static async Task<IResult> RevokeAllPersonalAccessTokensAsync(
+        PersonalAccessTokenService service,
+        CancellationToken cancellationToken) =>
+        Results.Ok(new { revoked = await service.RevokeAllCurrentAsync(cancellationToken) });
+
+    private static async Task<IResult> ListPrincipalPersonalAccessTokensAsync(
+        Guid principalId,
+        PersonalAccessTokenService service,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var now = timeProvider.GetUtcNow();
+            return Results.Ok((await service.ListAsPlatformAdministratorAsync(principalId, cancellationToken))
+                .Select(token => ToResponse(token, now)));
+        }
+        catch (ArgumentException exception) { return Results.NotFound(new { error = exception.Message }); }
+    }
+
+    private static async Task<IResult> RevokePrincipalPersonalAccessTokenAsync(
+        Guid principalId,
+        Guid tokenId,
+        PersonalAccessTokenService service,
+        CancellationToken cancellationToken) =>
+        await service.RevokeAsPlatformAdministratorAsync(principalId, tokenId, cancellationToken)
+            ? Results.NoContent()
+            : Results.NotFound();
+
+    private static async Task<IResult> RevokeAllPrincipalPersonalAccessTokensAsync(
+        Guid principalId,
+        PersonalAccessTokenService service,
+        CancellationToken cancellationToken) =>
+        Results.Ok(new { revoked = await service.RevokeAllAsPlatformAdministratorAsync(principalId, cancellationToken) });
+
+    private static PersonalAccessTokenResponse ToResponse(PersonalAccessToken token, DateTimeOffset now) =>
+        new(
+            token.Id,
+            token.WorkspaceId,
+            token.Name,
+            token.TokenPrefix,
+            token.Permissions,
+            token.CreatedAt,
+            token.ExpiresAt,
+            token.LastUsedAt,
+            token.RevokedAt,
+            token.RevokedAt is not null ? "Revoked" : token.ExpiresAt <= now ? "Expired" : "Active");
+
+    private static async Task<IResult> GetPreferencesAsync(
+        HttpContext context,
+        PrincipalPreferencesService service,
+        CancellationToken cancellationToken)
+    {
+        var principal = context.Features.Get<ResolvedPrincipalFeature>()?.Principal;
+        if (principal is null) return Results.Forbid();
+        return Results.Ok(ToResponse(await service.GetAsync(principal.Id, cancellationToken)));
+    }
+
+    private static async Task<IResult> UpdatePreferencesAsync(
+        UpdatePrincipalPreferencesRequest request,
+        HttpContext context,
+        PrincipalPreferencesService service,
+        CancellationToken cancellationToken)
+    {
+        var principal = context.Features.Get<ResolvedPrincipalFeature>()?.Principal;
+        if (principal is null) return Results.Forbid();
+        try
+        {
+            return Results.Ok(ToResponse(await service.UpdateAsync(principal.Id, request.Theme, cancellationToken)));
+        }
+        catch (ArgumentException exception)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["theme"] = [exception.Message] });
+        }
+    }
+
+    private static PrincipalPreferencesResponse ToResponse(PrincipalPreferences preferences) =>
+        new(preferences.Theme.ToString(), preferences.UpdatedAt);
 
     private static async Task<IResult> GetWorkspaceAsync(
         Guid workspaceId,
@@ -228,3 +361,22 @@ public static class IdentityEndpoints
 public sealed record SelectWorkspaceRequest(Guid WorkspaceId);
 public sealed record CreateWorkspaceRequest(string Name, string DisplayName);
 public sealed record SetWorkspaceMembershipRequest(string Role);
+public sealed record UpdatePrincipalPreferencesRequest(string Theme);
+public sealed record PrincipalPreferencesResponse(string Theme, DateTimeOffset UpdatedAt);
+public sealed record CreatePersonalAccessTokenRequest(
+    string Name,
+    Guid WorkspaceId,
+    IReadOnlyCollection<string> Permissions,
+    DateTimeOffset ExpiresAt);
+public sealed record PersonalAccessTokenResponse(
+    Guid Id,
+    Guid WorkspaceId,
+    string Name,
+    string TokenPrefix,
+    IReadOnlyCollection<string> Permissions,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset ExpiresAt,
+    DateTimeOffset? LastUsedAt,
+    DateTimeOffset? RevokedAt,
+    string Status);
+public sealed record CreatedPersonalAccessTokenResponse(PersonalAccessTokenResponse Metadata, string Token);

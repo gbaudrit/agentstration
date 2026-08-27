@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
@@ -73,11 +74,12 @@ public sealed class ControlPlaneStoreHardeningTests
     public async Task RuntimeResolverReturnsOnlyExecutableRuntimeViewForExactGeneration()
     {
         await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
+        var packNamespace = new ResourceNamespace("agentstration.sample-pack");
         var agent = await fixture.Store.PutAsync(new AgentResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.Agent,
-            Metadata = new ResourceMetadata { Name = "sql-expert" },
+            Metadata = new ResourceMetadata { Name = "sql-expert", Namespace = packNamespace },
             Generation = 3,
             Definition = new AgentProperties
             {
@@ -90,7 +92,7 @@ public sealed class ControlPlaneStoreHardeningTests
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.AgentRevision,
-            Metadata = new ResourceMetadata { Name = "sql-expert--000003" },
+            Metadata = new ResourceMetadata { Name = "sql-expert--000003", Namespace = packNamespace },
             AgentUid = agent.Value.Uid,
             AgentName = "sql-expert",
             AgentVersion = 3,
@@ -103,11 +105,11 @@ public sealed class ControlPlaneStoreHardeningTests
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.AgentDeployment,
-            Metadata = new ResourceMetadata { Name = "sql-expert--g000003" },
+            Metadata = new ResourceMetadata { Name = "sql-expert--g000003", Namespace = packNamespace },
             RevisionName = revision.Value.Metadata.Name,
             AgentName = "sql-expert",
             ModelProfileName = "reasoning-default",
-            RuntimeProfileName = "maf-default",
+            RuntimeProfileName = "maf-builtin",
             Environment = "local",
             HostingMode = AgentHostingMode.InProcess,
             DesiredState = DesiredAgentState.Running,
@@ -117,24 +119,25 @@ public sealed class ControlPlaneStoreHardeningTests
         }, null, true, default);
 
         var resolver = new ControlPlaneRuntimeAgentResolver(fixture.Store, fixture.Queries);
-        var resolved = await resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 3), default);
+        var resolved = await resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 3) { Namespace = packNamespace }, default);
 
         Assert.AreEqual(agent.Value.Uid, resolved.AgentId);
         Assert.AreEqual(deployment.Value.Uid.ToString("N"), resolved.DeploymentId);
         Assert.AreEqual("reasoning-default", resolved.ModelProfileName);
+        Assert.AreEqual(packNamespace, resolved.ModelProfileNamespace);
         Assert.IsTrue(resolved.Ready);
         var missingAgent = await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(() =>
-            resolver.ResolveAsync(new RuntimeAgentReference("missing-agent", 1), default));
+            resolver.ResolveAsync(new RuntimeAgentReference("missing-agent", 1) { Namespace = packNamespace }, default));
         Assert.AreEqual("agent_not_found", missingAgent.Code);
         var exception = await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(() =>
-            resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 2), default));
+            resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 2) { Namespace = packNamespace }, default));
         Assert.AreEqual("agent_version_not_found", exception.Code);
 
         await fixture.Store.CreateImmutableAsync(new AgentRevision
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.AgentRevision,
-            Metadata = new ResourceMetadata { Name = "sql-expert--000004" },
+            Metadata = new ResourceMetadata { Name = "sql-expert--000004", Namespace = packNamespace },
             AgentUid = agent.Value.Uid,
             AgentName = "sql-expert",
             AgentVersion = 4,
@@ -144,7 +147,7 @@ public sealed class ControlPlaneStoreHardeningTests
             Definition = Definition(agent.Value.Uid) with { AgentVersion = 4 }
         }, default);
         var missingDeployment = await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(() =>
-            resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 4), default));
+            resolver.ResolveAsync(new RuntimeAgentReference("sql-expert", 4) { Namespace = packNamespace }, default));
         Assert.AreEqual("deployment_not_found", missingDeployment.Code);
     }
 
@@ -195,7 +198,7 @@ public sealed class ControlPlaneStoreHardeningTests
         AgentVersion = 3,
         EffectiveInstructions = "Help with SQL.",
         ModelProfileName = "reasoning-default",
-        RuntimeProfileName = "maf-default",
+        RuntimeProfileName = "maf-builtin",
         EffectiveToolNames = [],
         MiddlewareIds = [],
         ContextProviderIds = [],

@@ -97,9 +97,10 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 };
                 var factory = new AgentFrameworkRuntimeFactory(
                     new RecordingResolver(requestingClient), NullLoggerFactory.Instance, new GenAiObservabilityOptions());
+                var executionStateStore = firstProvider.GetRequiredService<IRuntimeExecutionStateStore>();
                 var firstEngine = new AgentFrameworkFlowOrchestrationEngine(
                     agentResolver, new EmptyToolCatalog(), factory,
-                    firstProvider.GetRequiredService<IRuntimeExecutionStateStore>());
+                    new DelayedRuntimeExecutionStateStore(executionStateStore, TimeSpan.FromMilliseconds(1250)));
 
                 await foreach (var item in firstEngine.ExecuteAsync(new FlowOrchestrationExecutionRequest(
                     TestWorkspaceId, "run-maf-resume", definition, JsonSerializer.SerializeToElement(new { prompt = "Delete it" }), "correlation-1")))
@@ -107,7 +108,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 suspended = initialEvents.OfType<FlowExternalInputRequested>().Single();
                 bindings = initialEvents.OfType<FlowRuntimeBindingsResolved>().Single().Bindings;
                 Assert.AreEqual(InputRequestType.Confirmation, suspended.Type);
-                Assert.IsNotNull(await firstProvider.GetRequiredService<IRuntimeExecutionStateStore>().GetAsync(
+                Assert.IsNotNull(await executionStateStore.GetAsync(
                     TestWorkspaceId, "run-maf-resume", suspended.RuntimeState.RuntimeType, suspended.RuntimeState.StateId, default));
             }
 
@@ -607,12 +608,13 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         };
         var resolver = new RecordingResolver(chatClient);
         var factory = new AgentFrameworkRuntimeFactory(resolver, NullLoggerFactory.Instance, new GenAiObservabilityOptions { Enabled = false });
-        var definition = Definition();
+        var definition = Definition() with { ModelProfileNamespace = new ResourceNamespace("agentstration.sample-pack") };
 
         var runtime = await factory.CreateAsync(definition, "revision-1", new AgentRuntimeContext(new EmptyToolCatalog()), default);
         var result = await runtime.ExecuteAsync(new AgentExecutionRequest("What is HAVING?", "run-1", new ModelExecutionOptions(0.7f, 1500)), default);
 
         Assert.AreEqual(definition.ModelProfileName, resolver.RequestedProfile);
+        Assert.AreEqual(definition.ModelProfileNamespace, resolver.RequestedNamespace);
         Assert.AreEqual("sql-expert", runtime.AgentId);
         Assert.AreEqual("OK", result.Output);
         Assert.IsTrue(chatClient.Options?.Instructions?.Contains(definition.EffectiveInstructions, StringComparison.Ordinal) == true);
@@ -727,7 +729,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         AgentVersion = 1,
         EffectiveInstructions = "Focus on SQL Server.",
         ModelProfileName = "reasoning-default",
-        RuntimeProfileName = "maf-default",
+        RuntimeProfileName = "maf-builtin",
         EffectiveToolNames = [],
         MiddlewareIds = [],
         ContextProviderIds = [],
@@ -844,6 +846,40 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         }
     }
 
+    private sealed class DelayedRuntimeExecutionStateStore(
+        IRuntimeExecutionStateStore inner,
+        TimeSpan storeDelay) : IRuntimeExecutionStateStore
+    {
+        public async Task StoreAsync(RuntimeExecutionState state, CancellationToken cancellationToken)
+        {
+            await Task.Delay(storeDelay, cancellationToken);
+            await inner.StoreAsync(state, cancellationToken);
+        }
+
+        public Task<RuntimeExecutionState?> GetAsync(
+            WorkspaceId workspaceId,
+            string runId,
+            string runtimeType,
+            string stateId,
+            CancellationToken cancellationToken) =>
+            inner.GetAsync(workspaceId, runId, runtimeType, stateId, cancellationToken);
+
+        public Task<IReadOnlyList<RuntimeExecutionState>> ListAsync(
+            WorkspaceId workspaceId,
+            string runId,
+            string runtimeType,
+            string? parentStateId,
+            CancellationToken cancellationToken) =>
+            inner.ListAsync(workspaceId, runId, runtimeType, parentStateId, cancellationToken);
+
+        public Task DeleteAsync(
+            WorkspaceId workspaceId,
+            string runId,
+            string? runtimeType,
+            CancellationToken cancellationToken) =>
+            inner.DeleteAsync(workspaceId, runId, runtimeType, cancellationToken);
+    }
+
     private sealed record TestApprovalResponse(IList<ChatMessage> Messages);
 
     private sealed record TestApprovalEnvelope(ToolApprovalRequestContent Approval) : IExternalRequestEnvelope
@@ -855,6 +891,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     private sealed class RecordingResolver(IChatClient client) : IChatClientResolver
     {
         public string? RequestedProfile { get; private set; }
+        public ResourceNamespace? RequestedNamespace { get; private set; }
         public IChatClient Client { get; set; } = client;
         public int ResolutionCount { get; private set; }
 
@@ -863,6 +900,15 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             RequestedProfile = modelProfileResourceId;
             ResolutionCount++;
             return ValueTask.FromResult(Client);
+        }
+
+        public ValueTask<IChatClient> ResolveAsync(
+            ResourceNamespace @namespace,
+            string modelProfileResourceId,
+            CancellationToken cancellationToken = default)
+        {
+            RequestedNamespace = @namespace;
+            return ResolveAsync(modelProfileResourceId, cancellationToken);
         }
     }
 
