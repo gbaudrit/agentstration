@@ -508,6 +508,9 @@ public sealed class WorkPlaneTests
         var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
         Assert.IsNotNull(submitted?.Task);
         Assert.IsInstanceOfType<CreateTaskAction>(submitted.Action);
+        var initialMessages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/{workspaceRoute}/interactions/{submitted.Interaction.Id}/messages") ?? [];
+        Assert.IsFalse(initialMessages.Any(value => value.Content == "I’ve started the work and will keep this conversation updated."));
+        Assert.IsFalse(initialMessages.Any(value => value.Content == "I’ll prepare a standard report and highlight the main changes."));
 
         WorkTaskResponse? task = null;
         for (var attempt = 0; attempt < 100; attempt++)

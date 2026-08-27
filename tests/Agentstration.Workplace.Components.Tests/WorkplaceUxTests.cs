@@ -302,8 +302,30 @@ public sealed class WorkplaceUxTests
         var explicitlyVisible = context.Render<InteractionView>(parameters => parameters
             .Add(value => value.Presentation, new EntryPresentation { Task = new(EntryTaskDisplay.Visible) })
             .Add(value => value.Task, TaskResponse(taskId, now, now.AddSeconds(1)))
+            .Add(value => value.TaskDetailsUrl, task => $"/w/personal/tasks/{task.Id}")
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
         Assert.AreEqual(1, explicitlyVisible.FindAll(".inline-task-card").Count);
+        var taskLink = explicitlyVisible.Find("a.inline-task-card");
+        Assert.AreEqual($"/w/personal/tasks/{taskId}", taskLink.GetAttribute("href"));
+        Assert.IsTrue(taskLink.TextContent.Contains("Prepare report", StringComparison.Ordinal));
+        Assert.IsFalse(taskLink.TextContent.Contains("View details", StringComparison.Ordinal));
+        Assert.IsFalse(taskLink.TextContent.Contains("result", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(taskLink.TextContent.Contains("file", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void RunningTaskWithoutActivityUsesTransientWaitingFeedback()
+    {
+        using var context = new BunitContext();
+        var now = new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero);
+        var taskId = new WorkTaskId(Guid.NewGuid());
+        var rendered = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.Task, TaskResponse(taskId, now, now.AddSeconds(1)))
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+
+        Assert.AreEqual(1, rendered.FindAll(".processing-feedback").Count);
+        Assert.IsTrue(rendered.Markup.Contains("Agentstration is working on your request", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Markup.Contains("I’ve started the work", StringComparison.Ordinal));
     }
 
     [TestMethod]

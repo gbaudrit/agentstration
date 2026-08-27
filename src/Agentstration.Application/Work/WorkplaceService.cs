@@ -377,11 +377,7 @@ public sealed class WorkplaceService(
                 task = ToTask(queued.Value);
                 action = new CreateTaskAction(task.Id, task.Title, task.Description, $"/tasks/{task.Id}");
                 var now = timeProvider.GetUtcNow();
-                var response = string.Equals(entry.Name, "prepare-report", StringComparison.Ordinal)
-                    ? "I’ll prepare a standard report and highlight the main changes."
-                    : "I’ve started the work and will keep this conversation updated.";
-                var agentMessage = await AddAgentMessageAsync(interaction with { TaskId = task.Id }, response, now, cancellationToken);
-                updated = interaction with { Status = InteractionStatus.Processing, TaskId = task.Id, PendingActionId = null, ImmediateResult = action, LastActivityAt = now, Messages = [.. interaction.Messages, agentMessage], Version = expectedInteractionVersion + 1 };
+                updated = interaction with { Status = InteractionStatus.Processing, TaskId = task.Id, PendingActionId = null, ImmediateResult = action, LastActivityAt = now, Version = expectedInteractionVersion + 1 };
                 await repository.SaveInteractionAsync(updated, expectedInteractionVersion, cancellationToken);
             },
             token);

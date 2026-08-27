@@ -19,7 +19,7 @@
                     <div class="inline-pending"><PendingActionPanel Action="action" Busy="Busy" OnSubmit="OnPendingAction" ConversationMode="true" /></div>
                     break;
                 case WorkTaskResponse task:
-                    <InlineTaskCard Task="task" LatestActivity="@Activities.OrderByDescending(value => value.CreatedAt).FirstOrDefault()" ResultsCount="Results.Count" ArtifactsCount="Artifacts.Count" />
+                    <InlineTaskCard Task="task" DetailsUrl="@TaskDetailsUrl(task)" />
                     break;
                 case WorkTaskResult result:
                     <TaskResultView Result="result" />
@@ -76,6 +76,7 @@
     [Parameter] public EventCallback<string> OnMessage { get; set; }
     [Parameter] public EventCallback OnNewRequest { get; set; }
     [Parameter, EditorRequired] public required Func<WorkTaskArtifact, string> ArtifactContentUrl { get; set; }
+    [Parameter] public Func<WorkTaskResponse, string> TaskDetailsUrl { get; set; } = task => $"/tasks/{task.Id}";
 
     private IReadOnlyList<TimelineItem> Timeline
     {
