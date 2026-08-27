@@ -523,9 +523,9 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                         Usage = new UsageDetails { InputTokenCount = 12, OutputTokenCount = 3 }
                     }
                     : new ChatResponse(new ChatMessage(ChatRole.Assistant, "[[HANDOFF_COMPLETE]]"))
-                {
-                    Usage = new UsageDetails { InputTokenCount = 12, OutputTokenCount = 3 }
-                };
+                    {
+                        Usage = new UsageDetails { InputTokenCount = 12, OutputTokenCount = 3 }
+                    };
             }
         };
         var events = await ExecuteOrchestrationAsync(
