@@ -1,3 +1,35 @@
+.namespaced-agent-metrics {
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
+}
+
+.namespaced-agent-metrics ::deep .metric-card {
+    min-width: 0;
+}
+
+.namespaced-agent-metrics ::deep .metric-card small {
+    overflow-wrap: anywhere;
+}
+
+.namespaced-agent-provenance {
+    margin: -6px 0 18px;
+}
+
+.namespaced-binding-panel,
+.namespaced-instructions {
+    display: grid;
+    gap: 14px;
+}
+
+.namespaced-binding-panel .panel-header,
+.namespaced-instructions .panel-header {
+    margin-bottom: 2px;
+}
+
+.namespaced-binding-panel .eyebrow,
+.namespaced-instructions .eyebrow {
+    margin: 0 0 4px;
+}
+
 .namespaced-agent-actions {
     display: flex;
     flex-wrap: wrap;
@@ -22,12 +54,37 @@
     background: var(--surface-2);
 }
 
+.namespaced-instructions-copy {
+    max-width: 92ch;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: 9px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: inherit;
+    font-size: .92rem;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
 @media (max-width: 720px) {
+    .namespaced-agent-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .namespaced-agent-actions {
         justify-content: stretch;
     }
 
     .namespaced-agent-actions > * {
         flex: 1 1 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .namespaced-agent-metrics {
+        grid-template-columns: 1fr;
     }
 }
