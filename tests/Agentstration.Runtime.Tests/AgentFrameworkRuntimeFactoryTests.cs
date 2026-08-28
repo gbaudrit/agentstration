@@ -494,7 +494,17 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     }
 
     [TestMethod]
-    public async Task HandoffInvokesTheDeclaredTransferAndRunsTheDestination()
+    public void HandoffTerminationPhraseFilterRemovesMarkerAcrossStreamingUpdates()
+    {
+        var filter = new AgentFrameworkFlowOrchestrationEngine.TerminationPhraseFilter("[[HANDOFF_COMPLETE]]");
+
+        Assert.AreEqual("Final answer. ", filter.Append("Final answer. [[HAND"));
+        Assert.AreEqual(string.Empty, filter.Append("OFF_COMPLETE]]"));
+        Assert.AreEqual(string.Empty, filter.Flush());
+    }
+
+    [TestMethod]
+    public async Task HandoffUsesTheContinuationPromptToStopAfterAnUnmarkedAnswer()
     {
         using var chatClient = new RecordingChatClient
         {
@@ -505,19 +515,49 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                     var handoff = options?.Tools?.SingleOrDefault(tool => tool.Name.StartsWith("handoff_to_", StringComparison.Ordinal))
                         ?? throw new InvalidOperationException($"The Handoff workflow did not expose the destination transfer tool: {string.Join(", ", options?.Tools?.Select(tool => tool.Name) ?? [])}.");
                     return new ChatResponse(new ChatMessage(ChatRole.Assistant,
-                        [new TextContent("Transferring."), new FunctionCallContent("handoff-1", handoff.Name, new Dictionary<string, object?>())]));
+                        [new FunctionCallContent("handoff-1", handoff.Name, new Dictionary<string, object?>())]));
                 }
-                return new ChatResponse(new ChatMessage(ChatRole.Assistant, "HANDOFF_OK"));
+                return call == 2
+                    ? new ChatResponse(new ChatMessage(ChatRole.Assistant, "HANDOFF_OK"))
+                    {
+                        Usage = new UsageDetails { InputTokenCount = 12, OutputTokenCount = 3 }
+                    }
+                    : new ChatResponse(new ChatMessage(ChatRole.Assistant, "[[HANDOFF_COMPLETE]]"))
+                    {
+                        Usage = new UsageDetails { InputTokenCount = 12, OutputTokenCount = 3 }
+                    };
             }
         };
         var events = await ExecuteOrchestrationAsync(
-            new HandoffOrchestrationPattern("agent-1", [new FlowHandoff("agent-1", "agent-2")], Autonomous: true),
+            new HandoffOrchestrationPattern(
+                "agent-1",
+                [new FlowHandoff("agent-1", "agent-2")],
+                Autonomous: true,
+                TerminationPhrase: "[[HANDOFF_COMPLETE]]"),
             chatClient);
 
-        Assert.IsTrue(chatClient.Calls.Count >= 2);
+        Assert.HasCount(3, chatClient.Calls);
+        Assert.IsTrue(chatClient.Calls[2].Any(message =>
+            message.Text.Contains("reply only with [[HANDOFF_COMPLETE]]", StringComparison.Ordinal)));
+        CollectionAssert.AreEqual(
+            new[] { "agent-1", "agent-2" },
+            events.OfType<FlowParticipantTurnStarted>().Select(value => value.ParticipantId).ToArray(),
+            string.Join(", ", events.Select(value => value.GetType().Name)));
+        CollectionAssert.AreEqual(
+            new[] { string.Empty, "HANDOFF_OK" },
+            events.OfType<FlowParticipantCompleted>()
+                .SelectMany(value => value.Result.Turns)
+                .Select(value => value.Content)
+                .ToArray());
         CollectionAssert.AreEqual(
             new[] { "agent-1", "agent-2" },
             events.OfType<FlowParticipantCompleted>().Select(value => value.Result.ParticipantId).ToArray());
+        var destination = events.OfType<FlowParticipantCompleted>().Single(value => value.Result.ParticipantId == "agent-2");
+        Assert.AreEqual(12, destination.Result.Usage?.InputTokens);
+        Assert.AreEqual(3, destination.Result.Usage?.OutputTokens);
+        Assert.AreEqual("HANDOFF_OK", events.OfType<FlowExecutionCompleted>().Single().Result.FinalOutput.GetString());
+        Assert.IsFalse(events.OfType<FlowParticipantDelta>()
+            .Any(value => value.Content.Contains("HANDOFF_COMPLETE", StringComparison.Ordinal)));
         Assert.IsFalse(events.OfType<FlowParticipantCompleted>()
             .SelectMany(value => value.Result.Tools)
             .Any(tool => tool.StartsWith("handoff_to_", StringComparison.Ordinal)));
