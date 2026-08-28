@@ -457,8 +457,13 @@ public sealed class WorkPlaneTests
         }, default);
         var interaction = new WorkplaceInteraction
         {
-            Id = InteractionId.New(), WorkspaceId = WorkplaceId, EntryId = draft.Id, EntrySnapshot = published,
-            Status = InteractionStatus.Processing, StartedAt = Now, LastActivityAt = Now
+            Id = InteractionId.New(),
+            WorkspaceId = WorkplaceId,
+            EntryId = draft.Id,
+            EntrySnapshot = published,
+            Status = InteractionStatus.Processing,
+            StartedAt = Now,
+            LastActivityAt = Now
         };
         await fixture.Workplace.CreateInteractionAsync(interaction, default);
         var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), TimeProvider.System, new WorkplaceContextStub());
