@@ -16,6 +16,7 @@
     <ProjectReference Include="../Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Agentstration.Web.Tests" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />

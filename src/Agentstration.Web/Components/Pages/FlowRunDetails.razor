@@ -65,7 +65,7 @@ else
             @if (!string.IsNullOrWhiteSpace(inputError)) { <p class="validation-error">@inputError</p> }
         </article>
     }
-    <FlowRunTimeline Events="events" IsLive="@(!run.Status.IsTerminal())" />
+    <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" />
     @if (realtimeError is not null)
     {
         <div class="panel realtime-warning" role="status"><span>@realtimeError</span><button class="button-secondary" @onclick="ConnectAsync">Retry live updates</button></div>
@@ -94,8 +94,7 @@ else
 @code {
     [Parameter] public string RunId { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
-    private readonly List<FlowRunEvent> events = [];
-    private readonly HashSet<long> eventSequences = [];
+    private readonly FlowRunEventBuffer eventBuffer = new();
     private FlowRun? run;
     private InputRequest? pendingInput;
     private FlowStepRun? selected;
@@ -103,13 +102,12 @@ else
     private AgentstrationApiException? loadError;
     private bool notFound;
     private string? realtimeError;
-    private long lastSequence;
     private int streamingRenderScheduled;
     private string responseText = string.Empty;
     private string selectedChoice = string.Empty;
     private string? inputError;
     private bool submittingInput;
-    private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", "Flow topology") : FlowTopologyProjector.Project(run, events);
+    private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", "Flow topology") : FlowTopologyProjector.Project(run, eventBuffer.Snapshot());
 
     protected override async Task OnParametersSetAsync()
     {
@@ -134,9 +132,7 @@ else
         }
         await RefreshInputAsync();
         selected = run.Steps.FirstOrDefault();
-        events.Clear();
-        eventSequences.Clear();
-        lastSequence = 0;
+        eventBuffer.Clear();
         await ReplayAsync();
         if (!run.Status.IsTerminal()) await ConnectAsync();
     }
@@ -176,7 +172,7 @@ else
 
     private async Task ReplayAsync()
     {
-        var replay = await Client.GetFlowRunEventsAsync(RunId, lastSequence, cancellation.Token);
+        var replay = await Client.GetFlowRunEventsAsync(RunId, eventBuffer.LastSequence, cancellation.Token);
         foreach (var runEvent in replay) AddEvent(runEvent);
         if (replay.Count > 0) await RefreshRunAsync();
         await InvokeAsync(StateHasChanged);
@@ -196,10 +192,7 @@ else
 
     private bool AddEvent(FlowRunEvent runEvent)
     {
-        if (!eventSequences.Add(runEvent.Sequence)) return false;
-        lastSequence = Math.Max(lastSequence, runEvent.Sequence);
-        events.Add(runEvent);
-        return true;
+        return eventBuffer.TryAdd(runEvent);
     }
 
     private async Task RefreshRunAsync()
@@ -243,18 +236,18 @@ else
 
     private async Task FlushStreamingRenderAsync()
     {
-        var renderedSequence = lastSequence;
+        var renderedSequence = eventBuffer.LastSequence;
         try
         {
             await Task.Delay(TimeSpan.FromMilliseconds(150), cancellation.Token);
-            renderedSequence = lastSequence;
+            renderedSequence = eventBuffer.LastSequence;
             await InvokeAsync(StateHasChanged);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         finally
         {
             Volatile.Write(ref streamingRenderScheduled, 0);
-            if (!cancellation.IsCancellationRequested && lastSequence > renderedSequence) ScheduleStreamingRender();
+            if (!cancellation.IsCancellationRequested && eventBuffer.LastSequence > renderedSequence) ScheduleStreamingRender();
         }
     }
 
