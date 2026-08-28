@@ -3,6 +3,7 @@
     <ProjectReference Include="../../src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="bunit" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
 </Project>

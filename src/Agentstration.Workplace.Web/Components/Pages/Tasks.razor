@@ -4,7 +4,7 @@
 <PageHeader Title="Tasks" Description="Follow work that continues beyond the conversation." Eyebrow="Workplace" />
 <FilterBar><label class="sr-only" for="task-status">Filter by status</label><select id="task-status" @bind="filter"><option value="">All statuses</option>@foreach(var value in Enum.GetValues<WorkTaskStatus>()){<option value="@value">@Label(value)</option>}</select></FilterBar>
 @if (loading) { <LoadingState /> }
-else if (error is not null) { <ServiceUnavailableState Message="@error" OnRetry="LoadAsync" /> }
+else if (error is not null) { <ServiceUnavailableState Message="@error" /> }
 else if (!Filtered.Any()) { <EmptyState Title="No matching tasks" Message="Start a request from Home or change the status filter." /> }
 else { <div class="task-cards">@foreach(var task in Filtered){<a class="task-list-card" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")"><div><TaskStatusBadge Value="task.Status" /><h2>@task.Title</h2></div><small>Updated @task.UpdatedAt.LocalDateTime.ToString("g")</small></a>}</div> }
 @code {
