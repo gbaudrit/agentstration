@@ -8,12 +8,12 @@
 .form-section .eyebrow{margin:0 0 4px}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .form-grid label{display:grid;align-content:start;gap:7px;color:var(--text);font-size:.82rem;font-weight:650}
-.form-grid input,.form-grid select,.form-grid textarea{width:100%;padding:10px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);font-weight:400}
-.form-grid input:focus,.form-grid select:focus,.form-grid textarea:focus{outline:2px solid color-mix(in srgb,var(--primary) 28%,transparent);border-color:var(--primary)}
-.form-grid input:disabled{opacity:.72;cursor:not-allowed}
+.form-grid input,.form-grid select,.form-grid textarea{width:100%;min-height:var(--field-height);padding:9px 12px;border:1px solid var(--field-border);border-radius:var(--field-radius);background:var(--field-background);color:var(--text);box-shadow:var(--field-shadow);font-weight:400}
+.form-grid input:focus-visible,.form-grid select:focus-visible,.form-grid textarea:focus-visible{outline:0;border-color:var(--primary);background:var(--surface);box-shadow:var(--field-focus-ring),var(--field-shadow)}
+.form-grid input:disabled,.form-grid select:disabled,.form-grid textarea:disabled,.form-grid input[readonly],.form-grid textarea[readonly]{border-color:var(--border);background:color-mix(in srgb,var(--surface-2) 72%,var(--bg));color:var(--muted);box-shadow:none;opacity:1;cursor:not-allowed}
 .form-grid textarea{resize:vertical}
 .form-grid .checkbox-field{display:flex;align-items:center;align-self:end;gap:10px;min-height:42px;margin:0 0 1px;cursor:pointer}
-.form-grid .checkbox-field input[type="checkbox"]{flex:0 0 auto;width:17px;height:17px;margin:0;padding:0;border-radius:4px;accent-color:var(--primary)}
+.form-grid .checkbox-field input[type="checkbox"]{flex:0 0 auto;width:17px;height:17px;min-height:17px;margin:0;padding:0;border-radius:4px;accent-color:var(--primary)}
 .form-grid .checkbox-field span{line-height:1.25}
 .form-grid .form-code-editor{width:100%;min-height:170px;max-height:none;line-height:1.5}
 .form-grid small,.resource-hint{margin:0;color:var(--muted);font-size:.72rem;font-weight:400}

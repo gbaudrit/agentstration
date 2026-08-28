@@ -38,9 +38,10 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         yield return new FlowRuntimeBindingsResolved(bindings);
         var built = await BuildWorkflowAsync(request.Definition, participants, cancellationToken);
         var actorsByExecutorId = MapExecutors(built.Workflow, participants, built.Manager);
+        var terminationPhrase = (request.Definition.Pattern as HandoffOrchestrationPattern)?.TerminationPhrase;
         var states = request.Definition.Participants.ToDictionary(
             participant => participant.Id,
-            participant => new ParticipantState(participants[participant.Id]),
+            participant => new ParticipantState(participants[participant.Id], terminationPhrase),
             StringComparer.Ordinal);
         var nextTurn = 0;
         var serializedTurns = request.Definition.Pattern is not ConcurrentOrchestrationPattern;
@@ -123,7 +124,10 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                         foreach (var previousState in states.Values.Where(value => value.Active is not null && value.Participant.Id != actor.Id).OrderBy(value => value.Active!.Turn))
                         {
                             var previousTurn = previousState.CompleteActive();
-                            yield return new FlowParticipantTurnCompleted(previousState.Participant.Id, previousTurn.Turn);
+                            if (!string.IsNullOrEmpty(previousTurn.Delta))
+                                yield return new FlowParticipantDelta(previousState.Participant.Id, previousTurn.Delta);
+                            if (previousTurn.Include)
+                                yield return new FlowParticipantTurnCompleted(previousState.Participant.Id, previousTurn.Turn.Turn);
                         }
                     }
                     var state = states[actor.Id];
@@ -133,26 +137,29 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                         state.Capture(update.Update.Contents);
                         break;
                     }
-                    if (state.Active is not null && !string.Equals(state.Active.ResponseId, responseId, StringComparison.Ordinal))
-                    {
-                        var previous = state.CompleteActive();
-                        yield return new FlowParticipantTurnCompleted(actor.Id, previous.Turn);
-                    }
                     if (state.Active is null)
                     {
                         state.Start(++nextTurn, responseId);
                         yield return new FlowParticipantTurnStarted(actor.Id, nextTurn);
                     }
+                    else
+                    {
+                        state.Correlate(responseId);
+                    }
                     state.Capture(update.Update.Contents);
                     if (!string.IsNullOrEmpty(update.Update.Text))
                     {
-                        state.Append(update.Update.Text);
-                        yield return new FlowParticipantDelta(actor.Id, update.Update.Text);
+                        var delta = state.Append(update.Update.Text);
+                        if (!string.IsNullOrEmpty(delta))
+                            yield return new FlowParticipantDelta(actor.Id, delta);
                     }
                     if (update.Update.FinishReason is not null)
                     {
                         var completed = state.CompleteActive();
-                        yield return new FlowParticipantTurnCompleted(actor.Id, completed.Turn);
+                        if (!string.IsNullOrEmpty(completed.Delta))
+                            yield return new FlowParticipantDelta(actor.Id, completed.Delta);
+                        if (completed.Include)
+                            yield return new FlowParticipantTurnCompleted(actor.Id, completed.Turn.Turn);
                     }
                     break;
 
@@ -164,35 +171,41 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                         foreach (var previousState in states.Values.Where(value => value.Active is not null && value.Participant.Id != actor.Id).OrderBy(value => value.Active!.Turn))
                         {
                             var previousTurn = previousState.CompleteActive();
-                            yield return new FlowParticipantTurnCompleted(previousState.Participant.Id, previousTurn.Turn);
+                            if (!string.IsNullOrEmpty(previousTurn.Delta))
+                                yield return new FlowParticipantDelta(previousState.Participant.Id, previousTurn.Delta);
+                            if (previousTurn.Include)
+                                yield return new FlowParticipantTurnCompleted(previousState.Participant.Id, previousTurn.Turn.Turn);
                         }
                     }
                     state = states[actor.Id];
                     responseId = ResponseKey(response.Response.ResponseId, null, state.Active?.ResponseId);
-                    state.Capture(response.Response.Messages.SelectMany(message => message.Contents));
                     if (state.IsCompleted(responseId))
                     {
                         state.MergeUsage(response.Response.Usage);
                         break;
-                    }
-                    if (state.Active is not null && !string.Equals(state.Active.ResponseId, responseId, StringComparison.Ordinal))
-                    {
-                        var previous = state.CompleteActive();
-                        yield return new FlowParticipantTurnCompleted(actor.Id, previous.Turn);
                     }
                     if (state.Active is null)
                     {
                         state.Start(++nextTurn, responseId);
                         yield return new FlowParticipantTurnStarted(actor.Id, nextTurn);
                     }
+                    else
+                    {
+                        state.Correlate(responseId);
+                    }
+                    state.Capture(response.Response.Messages.SelectMany(message => message.Contents));
                     if (state.Active!.Content.Length == 0 && !string.IsNullOrEmpty(response.Response.Text))
                     {
-                        state.Append(response.Response.Text);
-                        yield return new FlowParticipantDelta(actor.Id, response.Response.Text);
+                        var delta = state.Append(response.Response.Text);
+                        if (!string.IsNullOrEmpty(delta))
+                            yield return new FlowParticipantDelta(actor.Id, delta);
                     }
                     state.MergeUsage(response.Response.Usage);
                     var responseTurn = state.CompleteActive();
-                    yield return new FlowParticipantTurnCompleted(actor.Id, responseTurn.Turn);
+                    if (!string.IsNullOrEmpty(responseTurn.Delta))
+                        yield return new FlowParticipantDelta(actor.Id, responseTurn.Delta);
+                    if (responseTurn.Include)
+                        yield return new FlowParticipantTurnCompleted(actor.Id, responseTurn.Turn.Turn);
                     break;
 
                 case WorkflowOutputEvent completed when !completed.IsIntermediate() && completed.Is<List<ChatMessage>>():
@@ -207,7 +220,10 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         foreach (var state in states.Values.Where(value => value.Active is not null).OrderBy(value => value.Active!.Turn))
         {
             var completed = state.CompleteActive();
-            yield return new FlowParticipantTurnCompleted(state.Participant.Id, completed.Turn);
+            if (!string.IsNullOrEmpty(completed.Delta))
+                yield return new FlowParticipantDelta(state.Participant.Id, completed.Delta);
+            if (completed.Include)
+                yield return new FlowParticipantTurnCompleted(state.Participant.Id, completed.Turn.Turn);
         }
 
         var participantResults = request.Definition.Participants
@@ -225,7 +241,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                     ? "The orchestration returned no supported terminal output."
                     : $"The orchestration returned unsupported terminal output: {string.Join(", ", unsupportedOutputTypes)}.");
 
-        var finalOutput = SelectFinalOutput(request.Definition.Strategy, finalMessages ?? [], participantResults);
+        var finalOutput = SelectFinalOutput(request.Definition.Strategy, finalMessages ?? [], participantResults, terminationPhrase);
         yield return new FlowExecutionCompleted(new FlowOrchestrationResult(
             request.Definition.Strategy,
             finalOutput,
@@ -312,13 +328,34 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                 return new(AgentWorkflowBuilder.BuildConcurrent(Ordered(definition, participants)), null);
             case HandoffOrchestrationPattern handoff:
                 var handoffBuilder = AgentWorkflowBuilder.CreateHandoffBuilderWith(participants[handoff.InitialParticipant].Agent);
-                handoffBuilder.EmitAgentResponseUpdateEvents(true).EmitAgentResponseEvents(true);
+                // Streaming updates already carry text, function calls, finish reasons, and usage. Emitting the
+                // aggregated response as well would report the same agent invocation twice.
+                handoffBuilder.EmitAgentResponseUpdateEvents(true).EmitAgentResponseEvents(false);
                 foreach (var routes in handoff.Handoffs.GroupBy(route => route.From, StringComparer.Ordinal))
                     handoffBuilder.WithHandoffs(participants[routes.Key].Agent, routes.Select(route => participants[route.To].Agent));
-                if (handoff.Autonomous) handoffBuilder.WithAutonomousMode(handoff.MaximumTurnsPerParticipant);
                 if (!string.IsNullOrWhiteSpace(handoff.TerminationPhrase))
+                {
+                    handoffBuilder.WithHandoffInstructions($"""
+                        Use a handoff tool when another participant should take over the conversation.
+                        When the user's request is fully resolved and no handoff is needed, end the final answer with exactly {handoff.TerminationPhrase}.
+                        Never emit {handoff.TerminationPhrase} when performing a handoff.
+                        """);
                     handoffBuilder.WithTerminationCondition(history => history.Any(message =>
                         message.Text?.Contains(handoff.TerminationPhrase, StringComparison.OrdinalIgnoreCase) == true));
+                }
+                if (handoff.Autonomous)
+                {
+                    if (string.IsNullOrWhiteSpace(handoff.TerminationPhrase))
+                    {
+                        handoffBuilder.WithAutonomousMode(handoff.MaximumTurnsPerParticipant);
+                    }
+                    else
+                    {
+                        handoffBuilder.WithAutonomousMode(
+                            handoff.MaximumTurnsPerParticipant,
+                            $"If your previous response fully resolved the user's request, reply only with {handoff.TerminationPhrase}. Otherwise, continue assisting or use a handoff tool when another participant should take over.");
+                    }
+                }
                 return new(handoffBuilder.Build(), null);
             case GroupChatOrchestrationPattern groupChat:
                 return new(AgentWorkflowBuilder.CreateGroupChatBuilderWith(agents => new RoundRobinGroupChatManager(agents)
@@ -457,7 +494,8 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
     private static JsonElement SelectFinalOutput(
         FlowOrchestrationStrategy strategy,
         IReadOnlyList<ChatMessage> finalMessages,
-        IReadOnlyList<FlowParticipantResult> participants)
+        IReadOnlyList<FlowParticipantResult> participants,
+        string? terminationPhrase)
     {
         if (strategy == FlowOrchestrationStrategy.Concurrent)
             return JsonSerializer.SerializeToElement(participants.Select(result => new
@@ -465,11 +503,28 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
                 result.ParticipantId,
                 Output = result.Output
             }).ToArray(), JsonOptions);
-        var text = finalMessages.LastOrDefault(message => !string.IsNullOrWhiteSpace(message.Text))?.Text
-            ?? participants.LastOrDefault()?.Turns.LastOrDefault()?.Content
+        var text = finalMessages
+            .Where(message => message.Role == ChatRole.Assistant)
+            .Select(message => VisibleHandoffText(message.Text, terminationPhrase))
+            .LastOrDefault(value => !string.IsNullOrWhiteSpace(value))
+            ?? participants
+                .SelectMany(participant => participant.Turns)
+                .Select(turn => VisibleHandoffText(turn.Content, terminationPhrase))
+                .LastOrDefault(value => !string.IsNullOrWhiteSpace(value))
             ?? string.Empty;
         return JsonSerializer.SerializeToElement(text);
     }
+
+    private static string VisibleHandoffText(string? text, string? terminationPhrase)
+    {
+        text ??= string.Empty;
+        return string.IsNullOrWhiteSpace(terminationPhrase)
+            ? text
+            : text.Replace(terminationPhrase, string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
+    }
+
+    private static bool IsInternalOrchestrationTool(string name) =>
+        name.StartsWith("handoff_to_", StringComparison.Ordinal);
 
     private static string ResponseKey(string? responseId, string? messageId, string? activeResponseId) =>
         !string.IsNullOrWhiteSpace(responseId) ? responseId
@@ -493,7 +548,7 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         RuntimeExecutionBinding Binding);
     private sealed record WorkflowActor(string Id, bool IsManager);
 
-    private sealed class ParticipantState(ResolvedParticipant participant)
+    private sealed class ParticipantState(ResolvedParticipant participant, string? terminationPhrase)
     {
         private readonly HashSet<string> completedResponseIds = new(StringComparer.Ordinal);
         private readonly HashSet<string> tools = new(StringComparer.Ordinal);
@@ -504,22 +559,24 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
 
         public bool IsCompleted(string responseId) => completedResponseIds.Contains(responseId);
 
-        public void Start(int turn, string responseId) => Active = new MutableTurn(turn, responseId);
+        public void Start(int turn, string responseId) => Active = new MutableTurn(turn, responseId, terminationPhrase);
 
-        public void Append(string content) => Active!.Content.Append(content);
+        public void Correlate(string responseId) => Active!.ResponseIds.Add(responseId);
+
+        public string Append(string content) => Active!.Append(content);
 
         public void Capture(IEnumerable<AIContent> contents)
         {
             foreach (var content in contents)
             {
-                if (content is FunctionCallContent functionCall && !IsInternalOrchestrationTool(functionCall.Name))
-                    tools.Add(functionCall.Name);
+                if (content is FunctionCallContent functionCall)
+                {
+                    if (!IsInternalOrchestrationTool(functionCall.Name))
+                        tools.Add(functionCall.Name);
+                }
                 if (content is UsageContent usage) MergeUsage(usage.Details);
             }
         }
-
-        private static bool IsInternalOrchestrationTool(string name) =>
-            name.StartsWith("handoff_to_", StringComparison.Ordinal);
 
         public void MergeUsage(UsageDetails? usage)
         {
@@ -528,13 +585,17 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
             Active.OutputTokens = Math.Max(Active.OutputTokens ?? 0, usage.OutputTokenCount ?? 0);
         }
 
-        public MutableTurn CompleteActive()
+        public CompletedTurn CompleteActive()
         {
             var completed = Active ?? throw new InvalidOperationException("No participant turn is active.");
             Active = null;
-            completedResponseIds.Add(completed.ResponseId);
-            Turns.Add(completed);
-            return completed;
+            var delta = completed.Flush();
+            completedResponseIds.UnionWith(completed.ResponseIds);
+            var duplicateEmptyTurn = completed.Content.Length == 0
+                && Turns.LastOrDefault()?.Content.Length == 0;
+            var include = !duplicateEmptyTurn && !completed.IsTerminationMarkerOnly;
+            if (include) Turns.Add(completed);
+            return new(completed, delta, include);
         }
 
         public FlowParticipantResult ToResult()
@@ -560,13 +621,81 @@ public sealed class AgentFrameworkFlowOrchestrationEngine(
         private static int ToInt32(long value) => value > int.MaxValue ? int.MaxValue : checked((int)value);
     }
 
-    private sealed class MutableTurn(int turn, string responseId)
+    private sealed record CompletedTurn(MutableTurn Turn, string Delta, bool Include);
+
+    private sealed class MutableTurn(int turn, string responseId, string? terminationPhrase)
     {
+        private readonly TerminationPhraseFilter? terminationFilter = string.IsNullOrWhiteSpace(terminationPhrase)
+            ? null
+            : new(terminationPhrase);
+
         public int Turn { get; } = turn;
         public string ResponseId { get; } = responseId;
+        public HashSet<string> ResponseIds { get; } = new(StringComparer.Ordinal) { responseId };
         public StringBuilder Content { get; } = new();
         public long? InputTokens { get; set; }
         public long? OutputTokens { get; set; }
+        public bool IsTerminationMarkerOnly => terminationFilter?.Matched == true && Content.Length == 0;
+
+        public string Append(string content)
+        {
+            var visible = terminationFilter?.Append(content) ?? content;
+            Content.Append(visible);
+            return visible;
+        }
+
+        public string Flush()
+        {
+            var visible = terminationFilter?.Flush() ?? string.Empty;
+            Content.Append(visible);
+            return visible;
+        }
+    }
+
+    internal sealed class TerminationPhraseFilter(string phrase)
+    {
+        private readonly StringBuilder pending = new();
+        public bool Matched { get; private set; }
+
+        public string Append(string content)
+        {
+            pending.Append(content);
+            var visible = new StringBuilder();
+            while (pending.Length > 0)
+            {
+                var value = pending.ToString();
+                var marker = value.IndexOf(phrase, StringComparison.OrdinalIgnoreCase);
+                if (marker >= 0)
+                {
+                    Matched = true;
+                    visible.Append(value.AsSpan(0, marker));
+                    pending.Clear().Append(value.AsSpan(marker + phrase.Length));
+                    continue;
+                }
+
+                var retained = RetainedSuffixLength(value);
+                visible.Append(value.AsSpan(0, value.Length - retained));
+                pending.Clear().Append(value.AsSpan(value.Length - retained));
+                break;
+            }
+            return visible.ToString();
+        }
+
+        public string Flush()
+        {
+            var visible = pending.ToString();
+            pending.Clear();
+            return visible;
+        }
+
+        private int RetainedSuffixLength(string value)
+        {
+            var maximum = Math.Min(value.Length, phrase.Length - 1);
+            for (var length = maximum; length > 0; length--)
+                if (value.AsSpan(value.Length - length).Equals(phrase.AsSpan(0, length), StringComparison.OrdinalIgnoreCase))
+                    return length;
+            return 0;
+        }
     }
 }
 #pragma warning restore MAAIW001
