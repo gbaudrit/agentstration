@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 
 namespace Agentstration.Workplace.Web.Tests;
 
@@ -26,6 +28,7 @@ public sealed class WorkplaceHostTests
         context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
         context.Services.AddSingleton(new WorkplaceRealtimeClient(new Uri("http://localhost/hubs/workplace"), null));
         context.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        context.Services.AddSingleton<IHostEnvironment>(new TestHostEnvironment());
 
         var rendered = context.Render<Home>();
 
@@ -96,5 +99,13 @@ public sealed class WorkplaceHostTests
                 Content = JsonContent.Create(new[] { new WorkplaceWorkspaceResponse(Guid.NewGuid(), "personal", "Personal") })
             });
         }
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Development;
+        public string ApplicationName { get; set; } = "Agentstration.Workplace.Web";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

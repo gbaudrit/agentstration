@@ -7,6 +7,7 @@
 @inject WorkplaceRealtimeClient Realtime
 @inject NavigationManager Navigation
 @inject IConfiguration Configuration
+@inject IHostEnvironment HostEnvironment
 
 <PageTitle>Workplace · Agentstration</PageTitle>
 
@@ -40,7 +41,7 @@ else
             }
             else
             {
-                <InteractionView Messages="messages" Action="currentAction" PendingAction="pendingAction" ActionTimestamp="interaction.LastActivityAt" Presentation="@(activeEntry?.Presentation ?? new EntryPresentation())" Status="interaction.Status" Task="activeTask" Activities="activities" Results="results" Artifacts="artifacts" Busy="busy" RealtimeConnected="RealtimeConnected" Error="@interactionError" OnPendingAction="RespondAsync" OnMessage="ContinueAsync" OnNewRequest="NewRequest" ArtifactContentUrl="ArtifactUrl" />
+                <InteractionView Messages="messages" Action="currentAction" PendingAction="pendingAction" ActionTimestamp="interaction.LastActivityAt" Presentation="@(activeEntry?.Presentation ?? new EntryPresentation())" Status="interaction.Status" Task="activeTask" Activities="activities" Results="results" Artifacts="artifacts" Busy="busy" DiagnosticsEnabled="HostEnvironment.IsDevelopment()" RealtimeConnected="RealtimeConnected" Error="@interactionError" OnPendingAction="RespondAsync" OnMessage="ContinueAsync" OnNewRequest="NewRequest" ArtifactContentUrl="ArtifactUrl" TaskDetailsUrl="TaskUrl" />
             }
             @if (interaction is null && primary is null && featuredEntries.Count == 0 && standardEntries.Count == 0) { <EmptyState Title="Empty dashboard" Message="This Dashboard has no Entries configured yet." /> }
             <section class="home-section recent-work @(tasks.Count == 0 ? "is-empty" : null)">
