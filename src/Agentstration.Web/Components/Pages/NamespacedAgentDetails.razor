@@ -4,12 +4,13 @@
 @inject IManagementApiClient Client
 @inject IPacksClient PacksClient
 @inject IAgentRunnerRuntimeClient RuntimeClient
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NamespacedAgentDetailsStrings> Localizer
 
 <PageTitle>@(agent?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 
 @if (loading)
 {
-    <LoadingState Message="Loading Agent resource…" />
+    <LoadingState Message="@T("Loading")" />
 }
 else if (error is not null)
 {
@@ -17,11 +18,11 @@ else if (error is not null)
 }
 else if (agent is not null)
 {
-    <ResourceHeader ResourceType="Agent" Domain="agent" Icon="◎" Name="@agent.Definition.DisplayName" Description="@agent.Definition.Description" StatusText="@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())" Status="@StatusPresentation.Tone(agent.Status.ProvisioningState.ToString())">
-        <Metadata><span><code>@AgentResourceNamespace.Value/@agent.Metadata.Name</code></span><span>Generation @agent.Generation</span></Metadata>
-        <Actions><button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="/agents">Back to agents</a></Actions>
+    <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@agent.Definition.DisplayName" Description="@agent.Definition.Description" StatusText="@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())" Status="@StatusPresentation.Tone(agent.Status.ProvisioningState.ToString())">
+        <Metadata><span><code>@AgentResourceNamespace.Value/@agent.Metadata.Name</code></span><span>@T("Generation", agent.Generation)</span></Metadata>
+        <Actions><button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="/agents">@T("BackToAgents")</a></Actions>
     </ResourceHeader>
-    <nav class="section-tabs namespaced-agent-tabs" role="tablist" aria-label="Agent details">
+    <nav class="section-tabs namespaced-agent-tabs" role="tablist" aria-label="@T("AgentDetails")">
         @foreach (var tab in Enum.GetValues<PageTab>())
         {
             <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="agent-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@TabLabel(tab)</button>
@@ -30,92 +31,92 @@ else if (agent is not null)
     <main id="agent-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
         @if (activeTab == PageTab.Overview)
         {
-            <section class="metric-grid namespaced-agent-metrics" aria-label="Agent status overview">
-                <MetricCard Label="Generation" Value="@agent.Generation.ToString()" Detail="@AgentStatus" HelpText="The desired Agent definition generation and its Management provisioning status." Status="@AgentStatusTone" />
-                <MetricCard Label="Model profile" Value="@ModelBindingStatus" Detail="@ModelBindingDetail" HelpText="@ModelBindingHelp" Status="@ModelBindingTone" />
-                <MetricCard Label="Runtime profile" Value="@RuntimeBindingStatus" Detail="@RuntimeBindingDetail" HelpText="@RuntimeBindingHelp" Status="@RuntimeBindingTone" />
-                <MetricCard Label="Deployment" Value="@DeploymentOverviewStatus" Detail="@DeploymentOverviewDetail" HelpText="The local Runtime deployment prepared for this exact Agent generation. Not ready means it still needs reconciliation or preparation failed." Status="@DeploymentTone" />
+            <section class="metric-grid namespaced-agent-metrics" aria-label="@T("AgentStatusOverview")">
+                <MetricCard Label="@T("GenerationLabel")" Value="@agent.Generation.ToString()" Detail="@AgentStatus" HelpText="@T("GenerationHelp")" Status="@AgentStatusTone" />
+                <MetricCard Label="@T("ModelProfile")" Value="@ModelBindingStatus" Detail="@ModelBindingDetail" HelpText="@ModelBindingHelp" Status="@ModelBindingTone" />
+                <MetricCard Label="@T("RuntimeProfile")" Value="@RuntimeBindingStatus" Detail="@RuntimeBindingDetail" HelpText="@RuntimeBindingHelp" Status="@RuntimeBindingTone" />
+                <MetricCard Label="@T("Deployment")" Value="@DeploymentOverviewStatus" Detail="@DeploymentOverviewDetail" HelpText="@T("DeploymentHelp")" Status="@DeploymentTone" />
             </section>
-            <p class="muted namespaced-agent-provenance">This Agent is managed by its namespaced source. Fork or repack its Pack to change the definition.</p>
+            <p class="muted namespaced-agent-provenance">@T("NamespacedProvenance")</p>
             <article class="panel definition-grid">
-                <div><span class="field-label">Namespace</span><code>@AgentResourceNamespace.Value</code></div>
-                <div><span class="field-label">Resource name</span><code>@agent.Metadata.Name</code></div>
-                <div><span class="field-label">Handler</span><strong>@agent.Definition.Handler</strong></div>
-                <div><span class="field-label">Model profile</span><a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a></div>
-                <div><span class="field-label">Runtime profile</span><a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a></div>
-                <div><span class="field-label">Capabilities</span><strong>@Capabilities</strong></div>
-                <div><span class="field-label">Status</span><strong>@AgentStatus</strong></div>
+                <div><span class="field-label">@T("Namespace")</span><code>@AgentResourceNamespace.Value</code></div>
+                <div><span class="field-label">@T("ResourceName")</span><code>@agent.Metadata.Name</code></div>
+                <div><span class="field-label">@T("Handler")</span><strong>@agent.Definition.Handler</strong></div>
+                <div><span class="field-label">@T("ModelProfile")</span><a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a></div>
+                <div><span class="field-label">@T("RuntimeProfile")</span><a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a></div>
+                <div><span class="field-label">@T("Capabilities")</span><strong>@Capabilities</strong></div>
+                <div><span class="field-label">@T("Status")</span><strong>@AgentStatus</strong></div>
             </article>
         }
         else if (activeTab == PageTab.Model)
         {
             <section class="panel form-section namespaced-binding-panel">
-                <div class="panel-header"><div><p class="eyebrow">Installation configuration</p><h2>Model binding</h2></div>@if (modelBindings.Count > 0) { <StatusBadge Text="Bound by Pack" Status="UiStatus.Info" /> }</div>
+                <div class="panel-header"><div><p class="eyebrow">@T("InstallationConfiguration")</p><h2>@T("ModelBinding")</h2></div>@if (modelBindings.Count > 0) { <StatusBadge Text="@T("BoundByPack")" Status="UiStatus.Info" /> }</div>
                 @if (ownerPack is null)
                 {
-                    <p class="muted">The Agent references <a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a>. No installed Pack provenance could be loaded.</p>
+                    <p class="muted">@T("ModelNoPackPrefix") <a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a>. @T("NoPackProvenance")</p>
                 }
                 else if (modelBindings.Count == 0)
                 {
-                    <p>This Model Profile is a contained or explicitly qualified Pack resource reference, not an external installation binding.</p>
-                    <dl class="resource-details"><dt>Effective profile</dt><dd><a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a></dd><dt>Managed by</dt><dd><code>@PackIdentity</code></dd></dl>
-                    <div class="namespaced-agent-actions"><a class="button-secondary" href="@PackUrl">Open Pack installation</a></div>
+                    <p>@T("ContainedModelReference")</p>
+                    <dl class="resource-details"><dt>@T("EffectiveProfile")</dt><dd><a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a></dd><dt>@T("ManagedBy")</dt><dd><code>@PackIdentity</code></dd></dl>
+                    <div class="namespaced-agent-actions"><a class="button-secondary" href="@PackUrl">@T("OpenPackInstallation")</a></div>
                 }
                 else
                 {
-                    <p>The archive declared a logical Model Profile requirement. Installation resolved it to the effective resource below.</p>
+                    <p>@T("LogicalModelRequirement")</p>
                     <dl class="resource-details">
                         @foreach (var binding in modelBindings)
                         {
-                            <dt>Binding</dt><dd><code>@binding.Name</code></dd>
-                            <dt>Effective profile</dt><dd><a class="text-button" href="@ModelProfileUrl"><code>@BindingTarget(binding.Target)</code></a></dd>
+                            <dt>@T("Binding")</dt><dd><code>@binding.Name</code></dd>
+                            <dt>@T("EffectiveProfile")</dt><dd><a class="text-button" href="@ModelProfileUrl"><code>@BindingTarget(binding.Target)</code></a></dd>
                         }
-                        <dt>Managed by</dt><dd><code>@PackIdentity</code></dd>
+                        <dt>@T("ManagedBy")</dt><dd><code>@PackIdentity</code></dd>
                     </dl>
-                    <p class="resource-hint">The binding belongs to the Pack installation. The Agent definition remains read-only so changing it cannot detach the resource from its source.</p>
-                    <div class="namespaced-agent-actions"><a class="button-primary" href="@ModelProfileUrl">Open effective model profile</a><a class="button-secondary" href="@PackUrl">Open Pack installation</a></div>
+                    <p class="resource-hint">@T("BindingReadOnlyHelp")</p>
+                    <div class="namespaced-agent-actions"><a class="button-primary" href="@ModelProfileUrl">@T("OpenEffectiveModelProfile")</a><a class="button-secondary" href="@PackUrl">@T("OpenPackInstallation")</a></div>
                 }
             </section>
         }
         else if (activeTab == PageTab.Runtime)
         {
             <section class="panel form-section namespaced-binding-panel">
-                <div class="panel-header"><div><p class="eyebrow">Local deployment</p><h2>Runtime binding</h2></div><div class="namespaced-agent-status">@if (runtimeBindings.Count > 0) { <StatusBadge Text="Bound by Pack" Status="UiStatus.Info" /> }<StatusBadge Text="@DeploymentStatus" Status="@DeploymentTone" /></div></div>
+                <div class="panel-header"><div><p class="eyebrow">@T("LocalDeployment")</p><h2>@T("RuntimeBinding")</h2></div><div class="namespaced-agent-status">@if (runtimeBindings.Count > 0) { <StatusBadge Text="@T("BoundByPack")" Status="UiStatus.Info" /> }<StatusBadge Text="@DeploymentStatus" Status="@DeploymentTone" /></div></div>
                 @if (ownerPack is null)
                 {
-                    <p class="muted">Local execution uses <a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a>. No installed Pack provenance could be loaded.</p>
+                    <p class="muted">@T("RuntimeNoPackPrefix") <a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a>. @T("NoPackProvenance")</p>
                 }
                 else if (runtimeBindings.Count == 0)
                 {
-                    <p>The Agent uses a contained or explicitly qualified Runtime Profile rather than an external installation binding.</p>
-                    <dl class="resource-details"><dt>Effective runtime</dt><dd><a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a></dd><dt>Managed by</dt><dd><code>@PackIdentity</code></dd></dl>
+                    <p>@T("ContainedRuntimeReference")</p>
+                    <dl class="resource-details"><dt>@T("EffectiveRuntime")</dt><dd><a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a></dd><dt>@T("ManagedBy")</dt><dd><code>@PackIdentity</code></dd></dl>
                 }
                 else
                 {
-                    <p>Installation selected the Runtime Profile used when this Pack Agent is prepared for local execution.</p>
+                    <p>@T("LogicalRuntimeRequirement")</p>
                     <dl class="resource-details">
                         @foreach (var binding in runtimeBindings)
                         {
-                            <dt>Binding</dt><dd><code>@binding.Name</code></dd>
-                            <dt>Effective runtime</dt><dd><a class="text-button" href="@RuntimeProfileUrl"><code>@BindingTarget(binding.Target)</code></a></dd>
+                            <dt>@T("Binding")</dt><dd><code>@binding.Name</code></dd>
+                            <dt>@T("EffectiveRuntime")</dt><dd><a class="text-button" href="@RuntimeProfileUrl"><code>@BindingTarget(binding.Target)</code></a></dd>
                         }
-                        <dt>Managed by</dt><dd><code>@PackIdentity</code></dd>
+                        <dt>@T("ManagedBy")</dt><dd><code>@PackIdentity</code></dd>
                     </dl>
                 }
                 <dl class="resource-details namespaced-deployment-details">
-                    <dt>Desired generation</dt><dd>@agent.Generation</dd>
-                    <dt>Deployment</dt><dd>@(readiness?.DeploymentId ?? "Not prepared")</dd>
-                    @if (!string.IsNullOrWhiteSpace(readiness?.RevisionId)) { <dt>Revision</dt><dd><code>@readiness.RevisionId</code></dd> }
+                    <dt>@T("DesiredGeneration")</dt><dd>@agent.Generation</dd>
+                    <dt>@T("Deployment")</dt><dd>@(readiness?.DeploymentId ?? T("NotPrepared"))</dd>
+                    @if (!string.IsNullOrWhiteSpace(readiness?.RevisionId)) { <dt>@T("Revision")</dt><dd><code>@readiness.RevisionId</code></dd> }
                 </dl>
-                @if (!string.IsNullOrWhiteSpace(deploymentError)) { <div class="form-alert form-alert-danger" role="alert"><strong>Deployment failed</strong><span>@deploymentError</span></div> }
-                @if (!string.IsNullOrWhiteSpace(deploymentMessage)) { <div class="form-alert form-alert-success" role="status"><strong>Deployment ready</strong><span>@deploymentMessage</span></div> }
-                <div class="namespaced-agent-actions"><button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="@RuntimeProfileUrl">Open effective runtime profile</a>@if (ownerPack is not null) { <a class="button-secondary" href="@PackUrl">Open Pack installation</a> }</div>
+                @if (!string.IsNullOrWhiteSpace(deploymentError)) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("DeploymentFailed")</strong><span>@deploymentError</span></div> }
+                @if (!string.IsNullOrWhiteSpace(deploymentMessage)) { <div class="form-alert form-alert-success" role="status"><strong>@T("DeploymentReady")</strong><span>@deploymentMessage</span></div> }
+                <div class="namespaced-agent-actions"><button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="@RuntimeProfileUrl">@T("OpenEffectiveRuntimeProfile")</a>@if (ownerPack is not null) { <a class="button-secondary" href="@PackUrl">@T("OpenPackInstallation")</a> }</div>
             </section>
         }
         else
         {
             <section class="panel namespaced-instructions">
-                <div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Instructions</h2></div></div>
+                <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("Instructions")</h2></div></div>
                 <div class="namespaced-instructions-copy">@agent.Definition.Instructions</div>
             </section>
         }
@@ -125,6 +126,7 @@ else if (agent is not null)
 @code {
     [Parameter] public string AgentNamespace { get; set; } = string.Empty;
     [Parameter] public string Name { get; set; } = string.Empty;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private readonly CancellationTokenSource cancellation = new();
     private AgentResource? agent;
     private InstalledPackResource? ownerPack;
@@ -144,33 +146,33 @@ else if (agent is not null)
     private ResourceAddress RuntimeProfileAddress => agent?.Definition.RuntimeProfile.Resolve(AgentResourceNamespace, ResourceKinds.RuntimeProfile)
         ?? ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.RuntimeProfile, "unavailable");
     private string RuntimeProfileUrl => ConsoleResourceUrls.RuntimeProfile(RuntimeProfileAddress);
-    private string PackIdentity => ownerPack is null ? "Unknown Pack" : $"{ownerPack.Definition.Publisher}/{ownerPack.Definition.PackName}";
+    private string PackIdentity => ownerPack is null ? T("UnknownPack") : $"{ownerPack.Definition.Publisher}/{ownerPack.Definition.PackName}";
     private string PackUrl => ownerPack is null ? "/packs" : $"/packs?publisher={Uri.EscapeDataString(ownerPack.Definition.Publisher)}&name={Uri.EscapeDataString(ownerPack.Definition.PackName)}";
     private string Capabilities => agent is null || agent.Definition.Behaviors.Count == 0 ? "—" : string.Join(", ", agent.Definition.Behaviors);
-    private string DeploymentStatus => readiness?.Ready == true ? "Ready" : readiness?.State ?? "Not deployed";
+    private string DeploymentStatus => readiness?.Ready == true ? T("Ready") : readiness?.State ?? T("NotDeployed");
     private UiStatus DeploymentTone => readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning;
-    private string DeploymentOverviewStatus => readiness?.Ready == true ? "Ready" : "Not ready";
-    private string DeploymentOverviewDetail => readiness?.Ready == true ? readiness.DeploymentId ?? "Active deployment" : DeploymentStatus;
-    private string DeploymentActionLabel => deploying ? "Deploying…" : readiness?.Ready == true ? "Reconcile deployment" : $"Deploy generation {agent?.Generation}";
-    private string AgentStatus => agent is null ? "Unknown" : StatusPresentation.Label(agent.Status.ProvisioningState.ToString());
+    private string DeploymentOverviewStatus => readiness?.Ready == true ? T("Ready") : T("NotReady");
+    private string DeploymentOverviewDetail => readiness?.Ready == true ? readiness.DeploymentId ?? T("ActiveDeployment") : DeploymentStatus;
+    private string DeploymentActionLabel => deploying ? T("Deploying") : readiness?.Ready == true ? T("ReconcileDeployment") : T("DeployGeneration", agent?.Generation ?? 0);
+    private string AgentStatus => agent is null ? T("Unknown") : StatusPresentation.Label(agent.Status.ProvisioningState.ToString());
     private UiStatus AgentStatusTone => agent is null ? UiStatus.Neutral : StatusPresentation.Tone(agent.Status.ProvisioningState.ToString());
     private bool ModelIsPackResource => ownerPack is not null && ModelProfileAddress.Namespace == AgentResourceNamespace;
-    private string ModelBindingStatus => modelBindings.Count > 0 ? "Installation binding" : ModelIsPackResource ? "Pack resource" : "Direct reference";
+    private string ModelBindingStatus => modelBindings.Count > 0 ? T("InstallationBinding") : ModelIsPackResource ? T("PackResource") : T("DirectReference");
     private string ModelBindingDetail => modelBindings.Count > 0 ? string.Join(", ", modelBindings.Select(binding => $"{binding.Name} → {BindingTarget(binding.Target)}")) : ModelProfileAddress.ToString();
     private string ModelBindingHelp => modelBindings.Count > 0
-        ? "Selected when the Pack was installed. A logical requirement resolves to this workspace Model Profile."
+        ? T("ModelBindingHelp")
         : ModelIsPackResource
-            ? "Included in the same Pack namespace and managed together with the Agent."
-            : "Referenced explicitly by the Agent definition outside its Pack namespace.";
+            ? T("PackResourceHelp")
+            : T("DirectModelReferenceHelp");
     private UiStatus ModelBindingTone => modelBindings.Count > 0 ? UiStatus.Info : ownerPack is null ? UiStatus.Warning : UiStatus.Neutral;
     private bool RuntimeIsPackResource => ownerPack is not null && RuntimeProfileAddress.Namespace == AgentResourceNamespace;
-    private string RuntimeBindingStatus => runtimeBindings.Count > 0 ? "Installation binding" : RuntimeIsPackResource ? "Pack resource" : "Direct reference";
+    private string RuntimeBindingStatus => runtimeBindings.Count > 0 ? T("InstallationBinding") : RuntimeIsPackResource ? T("PackResource") : T("DirectReference");
     private string RuntimeBindingDetail => runtimeBindings.Count > 0 ? string.Join(", ", runtimeBindings.Select(binding => $"{binding.Name} → {BindingTarget(binding.Target)}")) : RuntimeProfileAddress.ToString();
     private string RuntimeBindingHelp => runtimeBindings.Count > 0
-        ? "Selected when the Pack was installed. A logical requirement resolves to this workspace Runtime Profile."
+        ? T("RuntimeBindingHelp")
         : RuntimeIsPackResource
-            ? "Included in the same Pack namespace and managed together with the Agent."
-            : "Referenced explicitly by the Agent definition outside its Pack namespace.";
+            ? T("PackResourceHelp")
+            : T("DirectRuntimeReferenceHelp");
     private UiStatus RuntimeBindingTone => runtimeBindings.Count > 0 ? UiStatus.Info : ownerPack is null ? UiStatus.Warning : UiStatus.Neutral;
 
     protected override async Task OnParametersSetAsync()
@@ -205,9 +207,9 @@ else if (agent is not null)
             var prepared = await RuntimeClient.PrepareAgentAsync(AgentResourceNamespace, agent.Metadata.Name, agent.Generation, cancellation.Token);
             await LoadReadinessAsync();
             if (string.Equals(prepared.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
-                deploymentMessage = $"Generation {prepared.Generation} is active through deployment '{prepared.DeploymentId}'.";
+                deploymentMessage = T("GenerationActiveThroughDeployment", prepared.Generation, prepared.DeploymentId);
             else
-                deploymentError = $"Runtime preparation completed with state '{prepared.State}'.";
+                deploymentError = T("RuntimePreparationCompleted", prepared.State);
         }
         catch (AgentstrationApiException exception) { deploymentError = exception.Message; }
         finally { deploying = false; }
@@ -239,7 +241,7 @@ else if (agent is not null)
 
     private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";
     private static string TabId(PageTab tab) => $"agent-{tab.ToString().ToLowerInvariant()}-tab";
-    private static string TabLabel(PageTab tab) => tab switch { PageTab.Model => "Model", PageTab.Runtime => "Runtime", _ => tab.ToString() };
+    private string TabLabel(PageTab tab) => Localizer[$"Tab.{tab}"];
 
     private enum PageTab { Overview, Model, Runtime, Instructions }
 

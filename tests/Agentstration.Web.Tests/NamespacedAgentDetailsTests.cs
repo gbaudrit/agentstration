@@ -7,21 +7,25 @@ using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using System.Globalization;
 
 namespace Agentstration.Web.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class NamespacedAgentDetailsTests
 {
     [TestMethod]
     public async Task PageShowsPackBindingsAndDeploysTheExactNamespacedAgent()
     {
+        using var culture = new CultureScope("en-US");
         using var context = new BunitContext();
         var agents = new FakeManagementClient();
         var runtime = new FakeRuntimeClient();
         context.Services.AddSingleton<IManagementApiClient>(agents);
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         context.Services.AddSingleton<IAgentRunnerRuntimeClient>(runtime);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<NamespacedAgentDetails>(parameters => parameters
             .Add(component => component.AgentNamespace, FakeManagementClient.PackNamespace.Value)
@@ -80,6 +84,19 @@ public sealed class NamespacedAgentDetailsTests
         Assert.IsTrue(rendered.FindAll(".namespaced-instructions-copy").Any());
         Assert.IsFalse(rendered.FindAll(".namespaced-instructions pre").Any());
         Assert.IsTrue(rendered.Find(".namespaced-instructions-copy").TextContent.Contains("Help the user.", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void FrenchCatalogLocalizesNamespacedAgentOperations()
+    {
+        using var culture = new CultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var localizer = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<NamespacedAgentDetailsStrings>>();
+
+        Assert.AreEqual("Vue d’ensemble", localizer["Tab.Overview"].Value);
+        Assert.AreEqual("Liaison d’installation", localizer["InstallationBinding"].Value);
+        Assert.AreEqual("Déployer la génération 4", localizer["DeployGeneration", 4].Value);
     }
 
     private sealed class FakeRuntimeClient : IAgentRunnerRuntimeClient
@@ -207,5 +224,23 @@ public sealed class NamespacedAgentDetailsTests
         public Task<IReadOnlyList<PackProjectBuildResource>> GetBuildsAsync(Guid projectId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<PackInstallationPreview> PreviewBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class CultureScope : IDisposable
+    {
+        private readonly CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        private readonly CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+
+        public CultureScope(string name)
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(name);
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(name);
+        }
+
+        public void Dispose()
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 }
