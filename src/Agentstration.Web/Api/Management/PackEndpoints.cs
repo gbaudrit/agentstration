@@ -45,6 +45,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
 
     private static Task<IResult> InstallAsync(
         bool? replaceExisting,
+        bool? removeDashboardReferences,
         HttpRequest request,
         HttpResponse response,
         IPackArchiveReader archiveReader,
@@ -54,7 +55,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
         {
             ManagementHttp.RequireApiVersion(request);
             var (archive, bindings) = await ReadInstallationAsync(request, archiveReader, cancellationToken);
-            var installed = await service.InstallAsync(archive, replaceExisting ?? false, bindings, cancellationToken);
+            var installed = await service.InstallAsync(archive, replaceExisting ?? false, bindings, new PackRemovalOptions(removeDashboardReferences ?? false), cancellationToken);
             response.Headers.ETag = installed.ETag;
             response.Headers.Location = $"/api/packs/{Uri.EscapeDataString(installed.Value.Definition.Publisher)}/{Uri.EscapeDataString(installed.Value.Definition.PackName)}";
             return Results.Created(response.Headers.Location, installed.Value);
@@ -122,6 +123,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
     private static Task<IResult> UninstallAsync(
         string publisher,
         string name,
+        bool? removeDashboardReferences,
         HttpRequest request,
         PackManagementService service,
         CancellationToken cancellationToken) =>
@@ -132,7 +134,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
             var ifMatch = ManagementHttp.IfMatch(request);
             if (ifMatch is not null && !string.Equals(ifMatch, installed.ETag, StringComparison.Ordinal))
                 throw new ControlPlaneConcurrencyException("The supplied ETag does not match the installed Pack.");
-            await service.UninstallAsync(identity, cancellationToken);
+            await service.UninstallAsync(identity, new PackRemovalOptions(removeDashboardReferences ?? false), cancellationToken);
             return Results.NoContent();
         });
 

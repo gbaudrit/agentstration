@@ -609,11 +609,11 @@ public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> c
         }
     }
 
-    public async Task<bool> HasEntryInteractionsAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkplaceInteraction>> ListEntryInteractionsAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var payloads = await context.Interactions.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.ToString()).Select(value => value.Payload).ToArrayAsync(cancellationToken);
-        return payloads.Select(Deserialize<WorkplaceInteraction>).Any(value => value.EntryId == entryId);
+        return payloads.Select(Deserialize<WorkplaceInteraction>).Where(value => value.EntryId == entryId).ToArray();
     }
 
     public async Task CreateInteractionAsync(WorkplaceInteraction interaction, CancellationToken cancellationToken)

@@ -419,6 +419,60 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public async Task EntryRemovalCanExplicitlyDetachDashboardsAndCloseButRetainInteractions()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var draft = Entry(new EntryId("retired", new ResourceNamespace("sample.pack")));
+        var published = new EntryResource
+        {
+            WorkspaceId = draft.WorkspaceId,
+            Id = draft.Id,
+            Name = draft.Name,
+            DisplayName = draft.DisplayName,
+            Presentation = draft.Presentation,
+            ResolvedTarget = new("router", "1.0.0"),
+            PublishedAt = Now
+        };
+        await fixture.Workplace.UpsertEntryDraftAsync(draft, default);
+        await fixture.Workplace.UpsertEntryAsync(published, default);
+        await fixture.Workplace.UpsertDashboardDraftAsync(new WorkplaceDashboardDraft
+        {
+            Id = new("home"), WorkspaceId = WorkplaceId, Name = "home", DisplayName = "Home", IsDefault = true,
+            Entries = [new() { EntryResourceId = draft.Id }], UpdatedAt = Now
+        }, default);
+        await fixture.Workplace.UpsertDashboardAsync(new WorkplaceDashboard
+        {
+            Id = new("home"), WorkspaceId = WorkplaceId, Name = "home", DisplayName = "Home", IsDefault = true,
+            Entries = [new() { EntryResourceId = draft.Id }], PublishedAt = Now
+        }, default);
+        var interaction = new WorkplaceInteraction
+        {
+            Id = InteractionId.New(), WorkspaceId = WorkplaceId, EntryId = draft.Id, EntrySnapshot = published,
+            Status = InteractionStatus.Processing, StartedAt = Now, LastActivityAt = Now
+        };
+        await fixture.Workplace.CreateInteractionAsync(interaction, default);
+        var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), TimeProvider.System, new WorkplaceContextStub());
+
+        var conflict = await Assert.ThrowsExactlyAsync<WorkValidationException>(() =>
+            service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default));
+        Assert.AreEqual("entry_interactions_active", conflict.Code);
+        await fixture.Workplace.SaveInteractionAsync(interaction with { Status = InteractionStatus.Idle, Version = 2 }, 1, default);
+
+        await service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default);
+
+        Assert.IsNull(await fixture.Workplace.GetEntryAsync(WorkplaceId, draft.Id, default));
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, draft.Id, default));
+        Assert.HasCount(0, (await fixture.Workplace.GetDashboardAsync(WorkplaceId, new("home"), default))!.Entries);
+        var retained = await fixture.Workplace.GetInteractionAsync(WorkplaceId, interaction.Id, default);
+        Assert.AreEqual(InteractionStatus.Closed, retained!.Status);
+        Assert.AreEqual("entry_uninstalled", retained.ClosedReason);
+        Assert.IsNotNull(retained.EntrySnapshot);
+        Assert.AreEqual(published.Id, retained.EntrySnapshot.Id);
+        Assert.AreEqual(published.Version, retained.EntrySnapshot.Version);
+        Assert.AreEqual(published.ResolvedTarget, retained.EntrySnapshot.ResolvedTarget);
+    }
+
+    [TestMethod]
     public async Task WorkApiValidatesCreatesGetsAndReportsUnavailableResult()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -581,6 +635,17 @@ public sealed class WorkPlaneTests
             Guid.Parse("33333333-3333-3333-3333-333333333333"));
 
         public FlowRunScope Current => Scope;
+    }
+
+    private sealed class WorkplaceContextStub : IWorkplaceContext
+    {
+        public WorkspaceId WorkspaceId => WorkplaceId;
+    }
+
+    private sealed class EntryTargetResolverStub : IEntryTargetResolver
+    {
+        public Task<EntryResolvedTarget> ResolveAsync(EntryDraft draft, CancellationToken cancellationToken) => Task.FromResult(new EntryResolvedTarget("router", "1.0.0"));
+        public Task<IReadOnlyList<EntryDependency>> GetDependenciesAsync(WorkspaceId workspaceId, EntryId entryId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<EntryDependency>>([]);
     }
 
     private static EntryDraft Entry(EntryId id) => new()

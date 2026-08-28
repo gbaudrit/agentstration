@@ -1,6 +1,6 @@
 # Pack format and lifecycle
 
-> **Status:** implemented local V1 contract. Advanced dependencies, updates, signatures, Gallery, and Marketplace behavior remain planned.
+> **Status:** implemented local V1 contract with modification-safe differential updates. Advanced dependencies, merge policies, signatures, Gallery, and Marketplace behavior remain planned.
 
 ## Definition
 
@@ -174,7 +174,7 @@ The executable local increment covers:
 6. safe uninstall;
 7. independent Pack versions.
 
-Advanced dependencies, update/merge policy, signatures, verified publishers, Gallery clients, ratings, licensing, payment, and Marketplace policy are outside V1.
+Advanced dependencies, three-way merge policy, signatures, verified publishers, Gallery clients, ratings, licensing, payment, and Marketplace policy are outside V1. Updating an installed Pack reconciles stable resources in place, preserves Dashboard references for retained Entries, and reports additions, updates, removals, and conflicts during preview. Entry removal closes eligible durable Interactions without deleting their history; Dashboard references are removed only with explicit operator authorization.
 
 ## HTTP API
 

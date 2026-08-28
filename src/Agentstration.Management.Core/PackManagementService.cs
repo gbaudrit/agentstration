@@ -59,6 +59,14 @@ public sealed partial class PackManagementService
         PackArchive archive,
         bool replaceExisting,
         IReadOnlyList<PackBindingSelection> bindings,
+        CancellationToken cancellationToken) =>
+        await InstallAsync(archive, replaceExisting, bindings, new PackRemovalOptions(), cancellationToken);
+
+    public async Task<StoredResource<InstalledPackResource>> InstallAsync(
+        PackArchive archive,
+        bool replaceExisting,
+        IReadOnlyList<PackBindingSelection> bindings,
+        PackRemovalOptions removalOptions,
         CancellationToken cancellationToken)
     {
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
@@ -69,8 +77,7 @@ public sealed partial class PackManagementService
         if (prepared.Preview.AlreadyInstalled)
         {
             if (!replaceExisting) throw new PackAlreadyInstalledException(identity);
-            await UninstallAsync(identity, cancellationToken);
-            prepared = await PrepareAsync(archive, bindings, cancellationToken);
+            return await UpdateInstallationAsync(archive, prepared, removalOptions, cancellationToken);
         }
 
         var @namespace = identity.Namespace;
@@ -134,7 +141,7 @@ public sealed partial class PackManagementService
             var remaining = new List<ManagedPackResource>();
             foreach (var item in applied.AsEnumerable().Reverse())
             {
-                try { await item.Handler.DeleteAsync(item.Resource, CancellationToken.None); }
+                try { await item.Handler.DeleteAsync(item.Resource, new PackRemovalOptions(), CancellationToken.None); }
                 catch { remaining.Add(item.Resource); }
             }
 
@@ -207,6 +214,9 @@ public sealed partial class PackManagementService
         var resolvedResources = archive.Resources
             .Select(resource => ResolveBindings(resource, validationTargets))
             .ToArray();
+        var existingInstallation = await GetAsync(identity, cancellationToken);
+        var managedKeys = existingInstallation?.Value.Definition.ManagedResources
+            .Select(value => (value.Kind, value.Name)).ToHashSet() ?? [];
         var selectedHandlers = new Dictionary<PackResourceDocument, IPackResourceHandler>();
         var resources = new List<PackResourcePreview>();
         foreach (var resource in resolvedResources)
@@ -216,14 +226,23 @@ public sealed partial class PackManagementService
             if (!handlers.TryGetValue(resource.Kind, out var handler))
                 throw new PackValidationException("pack_resource_kind_unsupported", $"Resource kind '{resource.Kind}' is not supported by this installation.");
             await handler.ValidateAsync(resource, archive.Resources, cancellationToken);
-            resources.Add(new(resource.Path, resource.Kind, resource.Name, await handler.ExistsAsync(@namespace, resource.Name, cancellationToken)));
+            var exists = await handler.ExistsAsync(@namespace, resource.Name, cancellationToken);
+            var managed = managedKeys.Contains((resource.Kind, resource.Name));
+            resources.Add(new(resource.Path, resource.Kind, resource.Name, exists, managed ? PackResourceChange.Update : exists ? PackResourceChange.Conflict : PackResourceChange.Add));
             selectedHandlers.Add(resource, handler);
+        }
+        if (existingInstallation is not null)
+        {
+            var incoming = resolvedResources.Select(value => (value.Kind, value.Name)).ToHashSet();
+            resources.AddRange(existingInstallation.Value.Definition.ManagedResources
+                .Where(value => !incoming.Contains((value.Kind, value.Name)))
+                .Select(value => new PackResourcePreview(value.Path, value.Kind, value.Name, true, PackResourceChange.Remove)));
         }
 
         var preview = new PackInstallationPreview(
             archive.Manifest.Metadata,
             resources,
-            await GetAsync(identity, cancellationToken) is not null)
+            existingInstallation is not null)
         {
             Namespace = @namespace,
             Bindings = bindingPreviews
@@ -391,7 +410,90 @@ public sealed partial class PackManagementService
         }
     }
 
-    public async Task UninstallAsync(PackIdentity identity, CancellationToken cancellationToken)
+    private async Task<StoredResource<InstalledPackResource>> UpdateInstallationAsync(
+        PackArchive archive,
+        (PackInstallationPreview Preview, IReadOnlyDictionary<PackResourceDocument, IPackResourceHandler> Handlers) prepared,
+        PackRemovalOptions removalOptions,
+        CancellationToken cancellationToken)
+    {
+        var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
+        var installed = await GetAsync(identity, cancellationToken) ?? throw new PackNotFoundException(identity);
+        var previous = installed.Value.Definition.ManagedResources.ToDictionary(value => (value.Kind, value.Name));
+        var existingTokens = new Dictionary<(string Kind, string Name), string?>();
+        foreach (var resource in previous.Values)
+        {
+            if (!handlers.TryGetValue(resource.Kind, out var handler))
+                throw new PackValidationException("pack_resource_kind_unsupported", $"Resource kind '{resource.Kind}' has no installed handler.");
+            var currentToken = await handler.GetVersionTokenAsync(resource.Namespace, resource.Name, cancellationToken);
+            existingTokens[(resource.Kind, resource.Name)] = currentToken;
+            if (currentToken is not null && !string.Equals(currentToken, resource.VersionToken, StringComparison.Ordinal))
+                throw new PackResourceModifiedException(resource.Kind, resource.Name);
+        }
+
+        var incomingKeys = prepared.Handlers.Keys.Select(value => (value.Kind, value.Name)).ToHashSet();
+        var unmanagedConflict = prepared.Preview.Resources.FirstOrDefault(value => value.AlreadyExists && !previous.ContainsKey((value.Kind, value.Name)));
+        if (unmanagedConflict is not null) throw new PackResourceConflictException(unmanagedConflict.Kind, unmanagedConflict.Name);
+
+        installed = await UpdateAsync(installed, installed.Value.Definition with { State = InstalledPackState.Updating, ErrorCode = null, ErrorMessage = null }, ProvisioningState.Updating, cancellationToken);
+        var managed = installed.Value.Definition.ManagedResources.ToList();
+        try
+        {
+            foreach (var pair in prepared.Handlers.OrderBy(value => value.Value.InstallOrder).ThenBy(value => value.Key.Path, StringComparer.Ordinal))
+            {
+                var key = (pair.Key.Kind, pair.Key.Name);
+                ManagedPackResource applied;
+                if (previous.TryGetValue(key, out var current) && existingTokens[key] is not null)
+                    applied = await pair.Value.UpdateAsync(pair.Key, current, identity, archive.Manifest.Metadata.Version, cancellationToken);
+                else
+                    applied = await pair.Value.InstallAsync(pair.Key, identity, identity.Namespace, archive.Manifest.Metadata.Version, cancellationToken);
+                managed.RemoveAll(value => value.Kind == key.Kind && value.Name == key.Name);
+                managed.Add(applied);
+                installed = await UpdateAsync(installed, installed.Value.Definition with { ManagedResources = managed.ToArray() }, ProvisioningState.Updating, cancellationToken);
+            }
+
+            foreach (var removed in previous.Values.Where(value => !incomingKeys.Contains((value.Kind, value.Name))).OrderByDescending(value => handlers[value.Kind].InstallOrder))
+            {
+                if (existingTokens[(removed.Kind, removed.Name)] is not null)
+                    await handlers[removed.Kind].DeleteAsync(removed, removalOptions, cancellationToken);
+                managed.RemoveAll(value => value.Kind == removed.Kind && value.Name == removed.Name);
+                installed = await UpdateAsync(installed, installed.Value.Definition with { ManagedResources = managed.ToArray() }, ProvisioningState.Updating, cancellationToken);
+            }
+
+            var sourceArtifact = artifacts is not null && !archive.Content.IsEmpty
+                ? await artifacts.SaveAsync(archive.Content, archive.Source, cancellationToken)
+                : installed.Value.Definition.SourceArtifact;
+            var resolutions = prepared.Preview.Bindings.Where(value => value.Target is not null && value.TargetAvailable)
+                .Select(value => new PackBindingResolution(value.Name, value.TargetKind, value.Target!)).ToArray();
+            installed = await UpdateAsync(installed, installed.Value.Definition with
+            {
+                Version = archive.Manifest.Metadata.Version,
+                Audience = archive.Manifest.Metadata.Audience,
+                Purpose = archive.Manifest.Metadata.Purpose,
+                DisplayName = archive.Manifest.Metadata.DisplayName,
+                Description = archive.Manifest.Metadata.Description,
+                Source = archive.Source,
+                SourceArtifact = sourceArtifact,
+                InstalledAt = timeProvider.GetUtcNow(),
+                State = InstalledPackState.Installed,
+                Bindings = resolutions,
+                ManagedResources = managed.ToArray(),
+                ErrorCode = null,
+                ErrorMessage = null
+            }, ProvisioningState.Succeeded, cancellationToken);
+            await SaveConfigurationAsync(identity, resolutions, cancellationToken);
+            return installed;
+        }
+        catch (Exception exception)
+        {
+            _ = await UpdateAsync(installed, installed.Value.Definition with { State = InstalledPackState.Degraded, ManagedResources = managed.ToArray(), ErrorCode = "pack_update_failed", ErrorMessage = exception.Message }, ProvisioningState.Failed, CancellationToken.None);
+            throw;
+        }
+    }
+
+    public Task UninstallAsync(PackIdentity identity, CancellationToken cancellationToken) =>
+        UninstallAsync(identity, new PackRemovalOptions(), cancellationToken);
+
+    public async Task UninstallAsync(PackIdentity identity, PackRemovalOptions removalOptions, CancellationToken cancellationToken)
     {
         var installed = await GetAsync(identity, cancellationToken) ?? throw new PackNotFoundException(identity);
         installed = await UpdateAsync(installed, installed.Value.Definition with { State = InstalledPackState.Uninstalling }, ProvisioningState.Deleting, cancellationToken);
@@ -407,7 +509,7 @@ public sealed partial class PackManagementService
                 {
                     if (!string.Equals(currentToken, resource.VersionToken, StringComparison.Ordinal))
                         throw new PackResourceModifiedException(resource.Kind, resource.Name);
-                    await handler.DeleteAsync(resource, cancellationToken);
+                    await handler.DeleteAsync(resource, removalOptions, cancellationToken);
                 }
                 remaining.Remove(resource);
                 installed = await UpdateAsync(installed, installed.Value.Definition with { ManagedResources = remaining.ToArray() }, ProvisioningState.Deleting, cancellationToken);

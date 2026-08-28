@@ -11,8 +11,8 @@ public interface IPacksClient
     Task<IReadOnlyList<InstalledPackResource>> GetPacksAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<InstalledPackResource>> GetPackAsync(string publisher, string name, CancellationToken cancellationToken);
     Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken);
-    Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, bool replaceExisting, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken);
-    Task UninstallAsync(string publisher, string name, string etag, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, bool replaceExisting, bool removeDashboardReferences, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken);
+    Task UninstallAsync(string publisher, string name, string etag, bool removeDashboardReferences, CancellationToken cancellationToken);
     Task<ResourceSnapshot<InstalledPackResource>> AttachSourceAsync(string publisher, string name, byte[] archive, string fileName, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken);
     Task<IReadOnlyList<PackCompositionCatalogItem>> GetCompositionResourcesAsync(CancellationToken cancellationToken) =>
@@ -51,15 +51,15 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
             ?? throw new AgentstrationApiException("Agentstration API returned an empty Pack preview.", Guid.NewGuid().ToString("N"));
     }
 
-    public async Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, bool replaceExisting, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken)
+    public async Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, bool replaceExisting, bool removeDashboardReferences, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken)
     {
-        using var response = await SendInstallationAsync(archive, fileName, replaceExisting, bindings, cancellationToken);
+        using var response = await SendInstallationAsync(archive, fileName, replaceExisting, removeDashboardReferences, bindings, cancellationToken);
         return await ReadInstalledAsync(response, cancellationToken);
     }
 
-    public async Task UninstallAsync(string publisher, string name, string etag, CancellationToken cancellationToken)
+    public async Task UninstallAsync(string publisher, string name, string etag, bool removeDashboardReferences, CancellationToken cancellationToken)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Delete, Path(publisher, name));
+        using var message = new HttpRequestMessage(HttpMethod.Delete, $"{Path(publisher, name)}?removeDashboardReferences={removeDashboardReferences.ToString().ToLowerInvariant()}");
         message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         using var response = await httpClient.SendAsync(message, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
@@ -158,6 +158,7 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
         byte[] archive,
         string fileName,
         bool replaceExisting,
+        bool removeDashboardReferences,
         IReadOnlyList<PackBindingSelection> bindings,
         CancellationToken cancellationToken)
     {
@@ -166,7 +167,7 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
         archiveContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
         content.Add(archiveContent, "archive", fileName);
         content.Add(new StringContent(JsonSerializer.Serialize(bindings, JsonOptions), Encoding.UTF8, "application/json"), "bindings");
-        return await httpClient.PostAsync($"api/packs?replaceExisting={replaceExisting.ToString().ToLowerInvariant()}", content, cancellationToken);
+        return await httpClient.PostAsync($"api/packs?replaceExisting={replaceExisting.ToString().ToLowerInvariant()}&removeDashboardReferences={removeDashboardReferences.ToString().ToLowerInvariant()}", content, cancellationToken);
     }
 
     private static async Task<ResourceSnapshot<InstalledPackResource>> ReadInstalledAsync(HttpResponseMessage response, CancellationToken cancellationToken)

@@ -268,6 +268,14 @@ public sealed class FlowTests
         Assert.AreEqual(12, agent.Usage!.InputTokens);
         Assert.AreEqual("done", completed.Output!.Value.GetString());
         Assert.AreEqual(1, (await runs.ListAsync(created.Value.Id, FlowRunStatus.Succeeded, 0, 20, TestScope, default)).Items.Count);
+
+        var current = await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default);
+        await fixture.Service.DeleteAsync(TestScope.WorkspaceId, created.Value.Id, current!.ETag, default);
+
+        Assert.IsNull(await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default));
+        Assert.IsNull(await fixture.Repository.GetVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", default));
+        Assert.IsNotNull(await fixture.Repository.GetRunAsync(TestScope.WorkspaceId, completed.Id, default));
+        Assert.IsNotEmpty(await fixture.Repository.ListRunEventsAsync(TestScope.WorkspaceId, completed.Id, 0, default));
     }
 
     [TestMethod]

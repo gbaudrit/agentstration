@@ -135,7 +135,7 @@ else
                     <div class="pack-resource-list compact">
                         @foreach (var resource in preview.Resources)
                         {
-                            <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div>@if (resource.AlreadyExists) { <StatusBadge Text="Exists" Status="UiStatus.Warning" /> }</article>
+                            <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div><StatusBadge Text="@resource.Change.ToString()" Status="@ChangeTone(resource.Change)" /></article>
                         }
                     </div>
                     @if (preview.Bindings.Count > 0)
@@ -205,7 +205,8 @@ else
                     {
                         <section class="pack-reinstall-option" aria-label="Pack replacement">
                             <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> Replace the installed Pack</label>
-                            <p class="pack-muted">The existing Pack resources are removed safely, then this archive is installed with the selected bindings. Resources modified since installation remain protected and can block replacement.</p>
+                            <p class="pack-muted">The installed resources are reconciled in place. Stable Entries keep their Dashboard references and durable interactions.</p>
+                            <label class="studio-checkbox"><input type="checkbox" @bind="removeDashboardReferences" /> Remove Dashboard references for Entries removed by this version</label>
                         </section>
                     }
                 </section>
@@ -254,7 +255,18 @@ else
     </div>
 }
 
-<ConfirmationDialog IsOpen="@confirmUninstall" Title="Uninstall Pack?" Message="Managed resources are removed only if they have not changed since installation. Modified resources are preserved and the Pack is marked degraded." ConfirmLabel="Uninstall" OnCancel="() => confirmUninstall = false" OnConfirm="UninstallAsync" />
+@if (confirmUninstall)
+{
+    <div class="dialog-backdrop" role="presentation">
+        <section class="dialog pack-dialog" role="dialog" aria-modal="true" aria-labelledby="pack-uninstall-title">
+            <h2 id="pack-uninstall-title">Uninstall Pack?</h2>
+            <p>Idle interactions are closed but retained. Active interactions and locally modified resources still block uninstall.</p>
+            <label class="studio-checkbox"><input type="checkbox" @bind="removeDashboardReferences" /> Remove Pack Entries from Dashboard drafts and publications</label>
+            <p class="pack-muted">Dashboard composition is user-owned, so this cascade is never enabled automatically.</p>
+            <div class="dialog-actions"><button class="button-secondary" @onclick="() => confirmUninstall = false">Cancel</button><button class="button-danger" @onclick="UninstallAsync">Uninstall</button></div>
+        </section>
+    </div>
+}
 
 @code {
     [SupplyParameterFromQuery(Name = "publisher")] public string? RequestedPublisher { get; set; }
@@ -282,6 +294,7 @@ else
     private bool installing;
     private bool replaceExisting;
     private bool confirmUninstall;
+    private bool removeDashboardReferences;
     private bool forkOpen;
     private bool forking;
     private bool sourceAttaching;
@@ -403,7 +416,7 @@ else
                 .Where(binding => !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)))
                 .Select(binding => new PackBindingSelection(binding.Name, ParseBindingTarget(SelectedBinding(binding.Name)!)))
                 .ToArray();
-            selected = await Client.InstallAsync(archive, archiveName, replaceExisting, bindings, cancellation.Token);
+            selected = await Client.InstallAsync(archive, archiveName, replaceExisting, removeDashboardReferences, bindings, cancellation.Token);
             installOpen = false;
             await LoadAsync();
         }
@@ -476,7 +489,7 @@ else
         confirmUninstall = false;
         try
         {
-            await Client.UninstallAsync(selected.Value.Definition.Publisher, selected.Value.Definition.PackName, selected.ETag, cancellation.Token);
+            await Client.UninstallAsync(selected.Value.Definition.Publisher, selected.Value.Definition.PackName, selected.ETag, removeDashboardReferences, cancellation.Token);
             selected = null;
             await LoadAsync();
         }
@@ -508,6 +521,7 @@ else
     private static string AudienceLabel(PackAudience audience) => audience switch { PackAudience.Personal => "Personal", PackAudience.Professional => "Professional", _ => "Universal" };
     private static string StateLabel(InstalledPackState state) => state switch { InstalledPackState.Installing => "Installing", InstalledPackState.Installed => "Installed", InstalledPackState.Uninstalling => "Uninstalling", InstalledPackState.Failed => "Failed", _ => "Degraded" };
     private static UiStatus StateTone(InstalledPackState state) => state switch { InstalledPackState.Installed => UiStatus.Success, InstalledPackState.Failed => UiStatus.Danger, InstalledPackState.Degraded => UiStatus.Warning, _ => UiStatus.Info };
+    private static UiStatus ChangeTone(PackResourceChange change) => change switch { PackResourceChange.Add => UiStatus.Success, PackResourceChange.Conflict => UiStatus.Danger, PackResourceChange.Remove => UiStatus.Warning, _ => UiStatus.Info };
 
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }
