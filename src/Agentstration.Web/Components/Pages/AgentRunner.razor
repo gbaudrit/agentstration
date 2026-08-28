@@ -120,30 +120,31 @@ else
                 else if (activeTab == "Tools")
                 {
                     var tools = state.ToolCalls;
-                    @if (tools.Count == 0) { <EmptyState Title="No tool calls" Message="This run has not reported a tool invocation." /> }
-                    else { @foreach (var tool in tools) { <details><summary>@tool.Name · @tool.State</summary><p><a class="text-button" href="@GovernanceUrl(state.Run.Id, tool)">Inspect governance decision</a></p><pre>@tool.Arguments</pre><pre>@(tool.Error ?? tool.Result)</pre></details> } }
+                    @if (tools.Count == 0) { <EmptyState Title="@I("NoToolCalls")" Message="@I("NoToolCallsMessage")" /> }
+                    else { @foreach (var tool in tools) { <details><summary>@tool.Name · @tool.State</summary><p><a class="text-button" href="@GovernanceUrl(state.Run.Id, tool)">@I("InspectGovernanceDecision")</a></p><pre>@tool.Arguments</pre><pre>@(tool.Error ?? tool.Result)</pre></details> } }
                 }
                 else if (activeTab == "Trace")
                 {
-                    <ol class="runner-trace">@foreach (var item in state.Events) { <li><time>@item.Timestamp.LocalDateTime.ToString("T")</time><strong>@(item.Step ?? item.Kind.ToString())</strong><span>@item.Message</span></li> }</ol>
+                    @if (state.Events.Count == 0) { <EmptyState Title="@I("NoTraceEvents")" Message="@I("NoTraceEventsMessage")" /> }
+                    else { <ol class="runner-trace">@foreach (var item in state.Events) { <li><time>@item.Timestamp.LocalDateTime.ToString("T")</time><strong>@(item.Step ?? item.Kind.ToString())</strong><span>@item.Message</span></li> }</ol> }
                 }
                 else if (activeTab == "Raw")
                 {
-                    <div class="runner-raw-actions"><button class="button-secondary" @onclick="() => CopyAsync(rawRequest)">Copy request JSON</button><button class="button-secondary" @onclick="() => CopyAsync(RawResponse)">Copy response JSON</button></div>
-                    <h3>Request</h3><pre class="runner-json">@rawRequest</pre>
-                    <h3>Run and events</h3><pre class="runner-json">@RawResponse</pre>
+                    <div class="runner-raw-actions"><button class="button-secondary" @onclick="() => CopyAsync(rawRequest)">@I("CopyRequestJson")</button><button class="button-secondary" @onclick="() => CopyAsync(RawResponse)">@I("CopyResponseJson")</button></div>
+                    <h3>@I("Request")</h3><pre class="runner-json">@rawRequest</pre>
+                    <h3>@I("RunAndEvents")</h3><pre class="runner-json">@RawResponse</pre>
                 }
             </div>
         </section>
     }
 
     <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">History</p><h2>Recent agent runs</h2></div></div>
-        @if (history.Count == 0) { <EmptyState Title="No runs yet" Message="Start a Quick Run to create this agent's first Runtime resource." /> }
+        <div class="panel-header"><div><p class="eyebrow">@I("History")</p><h2>@I("RecentAgentRuns")</h2></div></div>
+        @if (history.Count == 0) { <EmptyState Title="@I("NoRunsYet")" Message="@I("NoRunsYetMessage")" /> }
         else
         {
             <DataGrid TItem="RuntimeRun" Items="history">
-                <Header><tr><th>Run</th><th>Date</th><th>Status</th><th>Duration</th><th>Initiator</th><th>Version</th><th>Prompt</th><th>Origin</th></tr></Header>
+                <Header><tr><th>@I("Run")</th><th>@I("Date")</th><th>@I("Status")</th><th>@I("Duration")</th><th>@I("Initiator")</th><th>@I("Version")</th><th>@I("Prompt")</th><th>@I("Origin")</th></tr></Header>
                 <Row Context="run"><tr><td><a href="/runs/@run.Id"><code>@ShortId(run.Id)</code></a></td><td>@run.Status.CreatedAt.LocalDateTime.ToString("g")</td><td><StatusBadge Text="@run.Status.State.ToString()" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></td><td>@Duration(run)</td><td>@run.Properties.Initiator</td><td>@run.Properties.Agent.Version</td><td>@PromptPreview(run)</td><td>@run.Properties.Origin</td></tr></Row>
             </DataGrid>
         }
@@ -334,7 +335,7 @@ else
     private static string ResourceName(string id) => id;
     private static string ShortId(string id) => id.Length > 13 ? id[..13] : id;
     private static string PromptPreview(RuntimeRun run) { var value = run.Properties.Input.Messages.LastOrDefault(message => message.Role == RuntimeMessageRole.User)?.Content ?? "—"; return value.Length > 60 ? $"{value[..60]}…" : value; }
-    private static string Duration(RuntimeRun run) { var start = run.Status.StartedAt ?? run.Status.CreatedAt; var end = run.Status.CompletedAt; return end is null ? "Live" : (end.Value - start).ToString("g"); }
+    private string Duration(RuntimeRun run) { var start = run.Status.StartedAt ?? run.Status.CreatedAt; var end = run.Status.CompletedAt; return end is null ? I("Live") : (end.Value - start).ToString("g"); }
     private static string ToolArgumentRetentionLabel(bool? value) => value switch { true => "Retain for this Run", false => "Do not retain for this Run", null => "Inherit host default" };
     private static string GovernanceUrl(string runId, RuntimeToolCall tool) => $"/tool-governance/runtime/{Uri.EscapeDataString(runId)}?toolCallId={Uri.EscapeDataString(tool.Id)}&invocationId={Uri.EscapeDataString(tool.InvocationId)}";
     private static CreateRuntimeRunRequest ToRequest(RuntimeRun run) => new() { Agent = run.Properties.Agent, Input = run.Properties.Input, Execution = run.Properties.Execution, Origin = run.Properties.Origin };

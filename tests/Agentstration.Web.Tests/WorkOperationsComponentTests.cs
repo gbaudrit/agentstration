@@ -89,12 +89,16 @@ public sealed class WorkOperationsComponentTests
         using var context = CreateContext();
         var agents = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentsStrings>>();
         var agentRuns = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentRunsStrings>>();
+        var agentRunnerInspector = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentRunnerInspectorStrings>>();
         var flows = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowsStrings>>();
 
         Assert.AreEqual("Créer un agent", agents["CreateAgent"].Value);
         Assert.AreEqual("Définissez, publiez et exploitez des ressources d’agents spécialisés.", agents["Description"].Value);
         Assert.AreEqual("Exécutions d’agents", agentRuns["Title"].Value);
         Assert.AreEqual("Aucune exécution d’agent", agentRuns["EmptyTitle"].Value);
+        Assert.AreEqual("Données brutes", agentRunnerInspector["Tab.Raw"].Value);
+        Assert.AreEqual("Exécutions récentes de l’agent", agentRunnerInspector["RecentAgentRuns"].Value);
+        Assert.AreEqual("Copier la requête JSON", agentRunnerInspector["CopyRequestJson"].Value);
         Assert.AreEqual("Nouveau Flow", flows["NewFlow"].Value);
         Assert.AreEqual("Voir toutes les exécutions", flows["ViewAllRuns"].Value);
     }
