@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="PageTitle" xml:space="preserve"><value>Profile settings · Agentstration</value></data>
+  <data name="PersonalSettings" xml:space="preserve"><value>Personal settings</value></data>
+  <data name="ProfileSettings" xml:space="preserve"><value>Profile settings</value></data>
+  <data name="PageDescription" xml:space="preserve"><value>Review and personalize the preferences attached to your Agentstration Principal.</value></data>
+  <data name="CurrentProfile" xml:space="preserve"><value>Current profile</value></data>
+  <data name="ProfileDescription" xml:space="preserve"><value>These settings follow your Agentstration profile, independently of the authentication method you use.</value></data>
+  <data name="Appearance" xml:space="preserve"><value>Appearance</value></data>
+  <data name="AppearanceDescription" xml:space="preserve"><value>Choose how the Console is displayed for this profile.</value></data>
+  <data name="Saving" xml:space="preserve"><value>Saving…</value></data>
+  <data name="ColorTheme" xml:space="preserve"><value>Color theme</value></data>
+  <data name="ThemeSystem" xml:space="preserve"><value>System</value></data>
+  <data name="ThemeSystemDescription" xml:space="preserve"><value>Follow the preference of this device.</value></data>
+  <data name="ThemeLight" xml:space="preserve"><value>Light</value></data>
+  <data name="ThemeLightDescription" xml:space="preserve"><value>Always use the light appearance.</value></data>
+  <data name="ThemeDark" xml:space="preserve"><value>Dark</value></data>
+  <data name="ThemeDarkDescription" xml:space="preserve"><value>Always use the dark appearance.</value></data>
+  <data name="Language" xml:space="preserve"><value>Language</value></data>
+  <data name="LanguageDescription" xml:space="preserve"><value>Choose the language used by the Console and Workplace.</value></data>
+  <data name="LanguageAutomatic" xml:space="preserve"><value>Automatic — browser preference</value></data>
+  <data name="Account" xml:space="preserve"><value>Account</value></data>
+  <data name="Security" xml:space="preserve"><value>Security</value></data>
+  <data name="SecurityDescription" xml:space="preserve"><value>Credentials, password and authentication methods are managed separately from profile preferences.</value></data>
+  <data name="ManageAccountSecurity" xml:space="preserve"><value>Manage account security</value></data>
+  <data name="ManageTokens" xml:space="preserve"><value>Manage personal access tokens</value></data>
+  <data name="CurrentUser" xml:space="preserve"><value>Current user</value></data>
+</root>

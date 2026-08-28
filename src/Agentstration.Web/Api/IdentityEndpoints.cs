@@ -1,8 +1,10 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Options;
 
 namespace Agentstration.Web;
 
@@ -167,22 +169,30 @@ public static class IdentityEndpoints
         UpdatePrincipalPreferencesRequest request,
         HttpContext context,
         PrincipalPreferencesService service,
+        IOptions<AgentstrationLocalizationOptions> localizationOptions,
         CancellationToken cancellationToken)
     {
         var principal = context.Features.Get<ResolvedPrincipalFeature>()?.Principal;
         if (principal is null) return Results.Forbid();
+        if (!string.IsNullOrWhiteSpace(request.Language)
+            && !localizationOptions.Value.SupportedCultures.Contains(request.Language, StringComparer.OrdinalIgnoreCase))
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["language"] = ["Language must be one of the supported cultures."]
+            });
         try
         {
-            return Results.Ok(ToResponse(await service.UpdateAsync(principal.Id, request.Theme, cancellationToken)));
+            return Results.Ok(ToResponse(await service.UpdateAsync(principal.Id, request.Theme, request.Language, cancellationToken)));
         }
         catch (ArgumentException exception)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["theme"] = [exception.Message] });
+            var field = string.Equals(exception.ParamName, "language", StringComparison.Ordinal) ? "language" : "theme";
+            return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [exception.Message] });
         }
     }
 
     private static PrincipalPreferencesResponse ToResponse(PrincipalPreferences preferences) =>
-        new(preferences.Theme.ToString(), preferences.UpdatedAt);
+        new(preferences.Theme.ToString(), preferences.Language, preferences.UpdatedAt);
 
     private static async Task<IResult> GetWorkspaceAsync(
         Guid workspaceId,
@@ -361,8 +371,8 @@ public static class IdentityEndpoints
 public sealed record SelectWorkspaceRequest(Guid WorkspaceId);
 public sealed record CreateWorkspaceRequest(string Name, string DisplayName);
 public sealed record SetWorkspaceMembershipRequest(string Role);
-public sealed record UpdatePrincipalPreferencesRequest(string Theme);
-public sealed record PrincipalPreferencesResponse(string Theme, DateTimeOffset UpdatedAt);
+public sealed record UpdatePrincipalPreferencesRequest(string Theme, string? Language = null);
+public sealed record PrincipalPreferencesResponse(string Theme, string? Language, DateTimeOffset UpdatedAt);
 public sealed record CreatePersonalAccessTokenRequest(
     string Name,
     Guid WorkspaceId,

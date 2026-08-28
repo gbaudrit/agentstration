@@ -44,28 +44,32 @@ public sealed class StateTests
     [TestMethod]
     public async Task UserPreferencesStateLoadsAndPersistsSelectedTheme()
     {
-        var client = new StubUserPreferencesClient(UserTheme.Light);
+        var client = new StubUserPreferencesClient(UserTheme.Light, "en-US");
         var state = new UserPreferencesState(client);
 
         await state.LoadAsync(default);
         await state.SetThemeAsync(UserTheme.Dark, default);
+        await state.SetLanguageAsync("fr-FR", default);
 
         Assert.IsTrue(state.IsDarkTheme);
         Assert.IsTrue(state.IsLoaded);
         Assert.AreEqual(UserTheme.Dark, client.SavedTheme);
+        Assert.AreEqual("fr-FR", client.SavedLanguage);
     }
 
-    private sealed class StubUserPreferencesClient(UserTheme initialTheme) : IUserPreferencesClient
+    private sealed class StubUserPreferencesClient(UserTheme initialTheme, string? initialLanguage) : IUserPreferencesClient
     {
         public UserTheme? SavedTheme { get; private set; }
+        public string? SavedLanguage { get; private set; }
 
         public Task<UserPreferences> GetAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(new UserPreferences(initialTheme, DateTimeOffset.UtcNow));
+            Task.FromResult(new UserPreferences(initialTheme, initialLanguage, DateTimeOffset.UtcNow));
 
-        public Task<UserPreferences> UpdateAsync(UserTheme theme, CancellationToken cancellationToken)
+        public Task<UserPreferences> UpdateAsync(UserTheme theme, string? language, CancellationToken cancellationToken)
         {
             SavedTheme = theme;
-            return Task.FromResult(new UserPreferences(theme, DateTimeOffset.UtcNow));
+            SavedLanguage = language;
+            return Task.FromResult(new UserPreferences(theme, language, DateTimeOffset.UtcNow));
         }
     }
 }

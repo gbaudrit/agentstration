@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @implements IAsyncDisposable
+@using Agentstration.Web.Components.Localization
 @inject NavigationManager Navigation
 @inject UserPreferencesState Preferences
 @inject IJSRuntime JS
@@ -45,6 +46,7 @@
         if (!firstRender) return;
         themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/theme-preferences.js");
         Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
+        CultureNavigation.NavigateToPreferredCulture(Navigation, Preferences.Language);
     }
 
     private Task ToggleThemeAsync() => Preferences.ToggleThemeAsync(lifetimeCancellation.Token);

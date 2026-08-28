@@ -102,3 +102,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 70. [ADR-0070 — Personal access tokens are revocable Workspace delegations](0070-personal-access-tokens-are-revocable-workspace-delegations.md)
 71. [ADR-0071 — Remove the legacy content and mission vertical](0071-remove-legacy-content-vertical.md)
 72. [ADR-0072 — Pack updates reconcile stable resources and preserve Work history](0072-pack-updates-reconcile-stable-resources.md)
+73. [ADR-0073 — UI localization uses RESX and Principal culture preferences](0073-ui-localization-uses-resx-and-principal-culture-preferences.md)

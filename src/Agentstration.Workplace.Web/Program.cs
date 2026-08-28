@@ -1,4 +1,5 @@
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Components.State;
 using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Web;
@@ -15,6 +16,7 @@ hubValue = string.IsNullOrWhiteSpace(hubValue) ? new Uri(apiUrl, "hubs/workplace
 if (!Uri.TryCreate(hubValue, UriKind.Absolute, out var hubUrl) || hubUrl.Scheme is not ("http" or "https")) throw new InvalidOperationException("Agentstration:WorkplaceHubUrl must be an absolute HTTP(S) URL.");
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddAgentstrationWebComponents();
+builder.Services.AddAgentstrationLocalization(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient(provider => new WorkplaceApiSessionHandler(
     provider.GetRequiredService<IHttpContextAccessor>(),
@@ -35,5 +37,5 @@ builder.Services.AddHttpClient<IUserPreferencesClient, HttpUserPreferencesClient
 builder.Services.AddProblemDetails(); builder.Services.AddHealthChecks();
 var otlp = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 builder.Services.AddOpenTelemetry().ConfigureResource(value => value.AddService("Agentstration.Workplace.Web")).WithTracing(value => { value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation(); if (otlp) value.AddOtlpExporter(); }).WithMetrics(value => { value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation(); if (otlp) value.AddOtlpExporter(); });
-var app = builder.Build(); app.UseExceptionHandler(); app.UseStatusCodePages(); app.UseAntiforgery(); app.MapHealthChecks("/health"); app.MapStaticAssets(); app.MapRazorComponents<App>().AddInteractiveServerRenderMode(); await app.RunAsync();
+var app = builder.Build(); app.UseExceptionHandler(); app.UseStatusCodePages(); app.UseRequestLocalization(); app.UseAntiforgery(); app.MapHealthChecks("/health"); app.MapAgentstrationCultureEndpoint(); app.MapStaticAssets(); app.MapRazorComponents<App>().AddInteractiveServerRenderMode(); await app.RunAsync();
 public partial class Program;

@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @implements IAsyncDisposable
+@using Agentstration.Web.Components.Localization
 @inject NavigationState Navigation
 @inject UserPreferencesState Preferences
 @inject NotificationState Notifications
@@ -230,6 +231,7 @@
             Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
             selfReference = DotNetObjectReference.Create(this);
             commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", selfReference);
+            if (CultureNavigation.NavigateToPreferredCulture(NavigationManager, Preferences.Language)) return;
         }
 
         if (focusCommandInput && commandRegistration is not null)

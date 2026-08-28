@@ -157,7 +157,7 @@ public sealed class SecurityApiTests
     }
 
     [TestMethod]
-    public async Task AuthenticatedPrincipalCanPersistOwnThemePreference()
+    public async Task AuthenticatedPrincipalCanPersistOwnPreferences()
     {
         await using var factory = Factory("Local");
         using var browser = UnredirectedClient(factory);
@@ -165,22 +165,55 @@ public sealed class SecurityApiTests
 
         var defaults = await browser.GetFromJsonAsync<PreferencesResponse>("/api/identity/preferences");
         Assert.AreEqual("System", defaults?.Theme);
+        Assert.IsNull(defaults?.Language);
 
         using var updated = await browser.PutAsJsonAsync(
             "/api/identity/preferences",
-            new { theme = "Dark" });
+            new { theme = "Dark", language = "fr-FR" });
         Assert.AreEqual(HttpStatusCode.OK, updated.StatusCode);
-        Assert.AreEqual("Dark", (await updated.Content.ReadFromJsonAsync<PreferencesResponse>())?.Theme);
-        Assert.AreEqual("Dark", (await browser.GetFromJsonAsync<PreferencesResponse>("/api/identity/preferences"))?.Theme);
+        var updatedPreferences = await updated.Content.ReadFromJsonAsync<PreferencesResponse>();
+        Assert.AreEqual("Dark", updatedPreferences?.Theme);
+        Assert.AreEqual("fr-FR", updatedPreferences?.Language);
+        var persisted = await browser.GetFromJsonAsync<PreferencesResponse>("/api/identity/preferences");
+        Assert.AreEqual("Dark", persisted?.Theme);
+        Assert.AreEqual("fr-FR", persisted?.Language);
 
         using var invalid = await browser.PutAsJsonAsync(
             "/api/identity/preferences",
             new { theme = "Sepia" });
         Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
 
+        using var unsupportedLanguage = await browser.PutAsJsonAsync(
+            "/api/identity/preferences",
+            new { theme = "Dark", language = "de-DE" });
+        Assert.AreEqual(HttpStatusCode.BadRequest, unsupportedLanguage.StatusCode);
+
         using var anonymous = UnredirectedClient(factory);
         using var unauthorized = await anonymous.GetAsync("/api/identity/preferences");
         Assert.AreEqual(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task CultureCookieLocalizesTheAuthenticatedProfilePage()
+    {
+        await using var factory = Factory("Local");
+        using var browser = UnredirectedClient(factory);
+        await BootstrapAsync(browser, "localized-profile-user");
+
+        using var selected = await browser.GetAsync(
+            "/_culture?culture=fr-FR&returnUrl=%2Fsettings%2Fprofile");
+        Assert.AreEqual(HttpStatusCode.Redirect, selected.StatusCode);
+        Assert.AreEqual("/settings/profile", selected.Headers.Location?.OriginalString);
+
+        using var profile = await browser.GetAsync("/settings/profile");
+        Assert.AreEqual(HttpStatusCode.OK, profile.StatusCode);
+        var html = await profile.Content.ReadAsStringAsync();
+        StringAssert.Contains(html, "<html lang=\"fr-FR\">");
+        StringAssert.Contains(WebUtility.HtmlDecode(html), "Paramètres du profil");
+
+        using var unsupported = await browser.GetAsync(
+            "/_culture?culture=de-DE&returnUrl=%2Fsettings%2Fprofile");
+        Assert.AreEqual(HttpStatusCode.BadRequest, unsupported.StatusCode);
     }
 
     [TestMethod]
@@ -958,7 +991,7 @@ public sealed class SecurityApiTests
             HandleCookies = true
         });
 
-    private sealed record PreferencesResponse(string Theme, DateTimeOffset UpdatedAt);
+    private sealed record PreferencesResponse(string Theme, string? Language, DateTimeOffset UpdatedAt);
 
     private static async Task BootstrapAsync(HttpClient client, string userName)
     {

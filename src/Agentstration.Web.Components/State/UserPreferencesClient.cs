@@ -4,12 +4,12 @@ namespace Agentstration.Web.Components.State;
 
 public enum UserTheme { System, Light, Dark }
 
-public sealed record UserPreferences(UserTheme Theme, DateTimeOffset UpdatedAt);
+public sealed record UserPreferences(UserTheme Theme, string? Language, DateTimeOffset UpdatedAt);
 
 public interface IUserPreferencesClient
 {
     Task<UserPreferences> GetAsync(CancellationToken cancellationToken);
-    Task<UserPreferences> UpdateAsync(UserTheme theme, CancellationToken cancellationToken);
+    Task<UserPreferences> UpdateAsync(UserTheme theme, string? language, CancellationToken cancellationToken);
 }
 
 public sealed class HttpUserPreferencesClient(HttpClient httpClient) : IUserPreferencesClient
@@ -22,11 +22,11 @@ public sealed class HttpUserPreferencesClient(HttpClient httpClient) : IUserPref
         return Map(response);
     }
 
-    public async Task<UserPreferences> UpdateAsync(UserTheme theme, CancellationToken cancellationToken)
+    public async Task<UserPreferences> UpdateAsync(UserTheme theme, string? language, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PutAsJsonAsync(
             "api/identity/preferences",
-            new UpdateUserPreferencesRequest(theme.ToString()),
+            new UpdateUserPreferencesRequest(theme.ToString(), language),
             cancellationToken);
         response.EnsureSuccessStatusCode();
         var value = await response.Content.ReadFromJsonAsync<UserPreferencesResponse>(cancellationToken)
@@ -38,18 +38,18 @@ public sealed class HttpUserPreferencesClient(HttpClient httpClient) : IUserPref
     {
         if (!Enum.TryParse<UserTheme>(response.Theme, true, out var theme) || !Enum.IsDefined(theme))
             throw new InvalidOperationException($"The preferences API returned unsupported theme '{response.Theme}'.");
-        return new UserPreferences(theme, response.UpdatedAt);
+        return new UserPreferences(theme, response.Language, response.UpdatedAt);
     }
 
-    private sealed record UpdateUserPreferencesRequest(string Theme);
-    private sealed record UserPreferencesResponse(string Theme, DateTimeOffset UpdatedAt);
+    private sealed record UpdateUserPreferencesRequest(string Theme, string? Language);
+    private sealed record UserPreferencesResponse(string Theme, string? Language, DateTimeOffset UpdatedAt);
 }
 
 internal sealed class EmptyUserPreferencesClient(TimeProvider timeProvider) : IUserPreferencesClient
 {
     public Task<UserPreferences> GetAsync(CancellationToken cancellationToken) =>
-        Task.FromResult(new UserPreferences(UserTheme.System, timeProvider.GetUtcNow()));
+        Task.FromResult(new UserPreferences(UserTheme.System, null, timeProvider.GetUtcNow()));
 
-    public Task<UserPreferences> UpdateAsync(UserTheme theme, CancellationToken cancellationToken) =>
-        Task.FromResult(new UserPreferences(theme, timeProvider.GetUtcNow()));
+    public Task<UserPreferences> UpdateAsync(UserTheme theme, string? language, CancellationToken cancellationToken) =>
+        Task.FromResult(new UserPreferences(theme, language, timeProvider.GetUtcNow()));
 }

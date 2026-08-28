@@ -2,33 +2,35 @@
 @implements IDisposable
 @inject ConsoleContextState ContextState
 @inject UserPreferencesState Preferences
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ProfileSettingsStrings> Localizer
 
-<PageTitle>Profile settings · Agentstration</PageTitle>
-<PageHeader Eyebrow="Personal settings" Title="Profile settings" Description="Review and personalize the preferences attached to your Agentstration Principal." />
+<PageTitle>@Localizer["PageTitle"]</PageTitle>
+<PageHeader Eyebrow="@Localizer["PersonalSettings"]" Title="@Localizer["ProfileSettings"]" Description="@Localizer["PageDescription"]" />
 
 <section class="profile-settings-layout">
     <article class="panel profile-settings-panel">
         <div class="profile-heading">
             <span class="profile-avatar" aria-hidden="true">@ProfileInitial</span>
             <div>
-                <p class="eyebrow">Current profile</p>
+                <p class="eyebrow">@Localizer["CurrentProfile"]</p>
                 <h2>@ProfileName</h2>
-                <p>These settings follow your Agentstration profile, independently of the authentication method you use.</p>
+                <p>@Localizer["ProfileDescription"]</p>
             </div>
         </div>
 
         <div class="profile-section-heading">
             <div>
-                <h2>Appearance</h2>
-                <p>Choose how the Console is displayed for this profile.</p>
+                <h2>@Localizer["Appearance"]</h2>
+                <p>@Localizer["AppearanceDescription"]</p>
             </div>
             @if (Preferences.IsSaving)
             {
-                <span class="profile-save-state" role="status">Saving…</span>
+                <span class="profile-save-state" role="status">@Localizer["Saving"]</span>
             }
         </div>
 
-        <div class="theme-options" role="radiogroup" aria-label="Color theme">
+        <div class="theme-options" role="radiogroup" aria-label="@Localizer["ColorTheme"]">
             @foreach (var option in ThemeOptions)
             {
                 <button type="button"
@@ -49,6 +51,16 @@
             }
         </div>
 
+        <div class="profile-language">
+            <label for="profile-language"><strong>@Localizer["Language"]</strong></label>
+            <p>@Localizer["LanguageDescription"]</p>
+            <select id="profile-language" value="@(Preferences.Language ?? "auto")" @onchange="SelectLanguageAsync" disabled="@Preferences.IsSaving">
+                <option value="auto">@Localizer["LanguageAutomatic"]</option>
+                <option value="en-US">English</option>
+                <option value="fr-FR">Français</option>
+            </select>
+        </div>
+
         @if (!string.IsNullOrWhiteSpace(Preferences.Error))
         {
             <p class="profile-error" role="alert">@Preferences.Error</p>
@@ -56,25 +68,25 @@
     </article>
 
     <aside class="panel account-security-panel">
-        <p class="eyebrow">Account</p>
-        <h2>Security</h2>
-        <p>Credentials, password and authentication methods are managed separately from profile preferences.</p>
-        <a class="button-secondary" href="/account/security">Manage account security</a>
-        <a class="button-secondary" href="/account/pat">Manage personal access tokens</a>
+        <p class="eyebrow">@Localizer["Account"]</p>
+        <h2>@Localizer["Security"]</h2>
+        <p>@Localizer["SecurityDescription"]</p>
+        <a class="button-secondary" href="/account/security">@Localizer["ManageAccountSecurity"]</a>
+        <a class="button-secondary" href="/account/pat">@Localizer["ManageTokens"]</a>
     </aside>
 </section>
 
 @code {
     private readonly CancellationTokenSource cancellation = new();
 
-    private static readonly ThemeOption[] ThemeOptions =
+    private ThemeOption[] ThemeOptions =>
     [
-        new(UserTheme.System, "System", "Follow the preference of this device.", "system"),
-        new(UserTheme.Light, "Light", "Always use the light appearance.", "light"),
-        new(UserTheme.Dark, "Dark", "Always use the dark appearance.", "dark")
+        new(UserTheme.System, Localizer["ThemeSystem"], Localizer["ThemeSystemDescription"], "system"),
+        new(UserTheme.Light, Localizer["ThemeLight"], Localizer["ThemeLightDescription"], "light"),
+        new(UserTheme.Dark, Localizer["ThemeDark"], Localizer["ThemeDarkDescription"], "dark")
     ];
 
-    private string ProfileName => ContextState.Current?.UserDisplayName ?? "Current user";
+    private string ProfileName => ContextState.Current?.UserDisplayName ?? Localizer["CurrentUser"];
     private string ProfileInitial => ProfileName.Trim() is { Length: > 0 } value
         ? value[..1].ToUpperInvariant()
         : "?";
@@ -88,6 +100,21 @@
     }
 
     private Task SelectThemeAsync(UserTheme theme) => Preferences.SetThemeAsync(theme, cancellation.Token);
+
+    private async Task SelectLanguageAsync(ChangeEventArgs args)
+    {
+        var selected = args.Value?.ToString();
+        var language = string.Equals(selected, "auto", StringComparison.OrdinalIgnoreCase) ? null : selected;
+        await Preferences.SetLanguageAsync(language, cancellation.Token);
+        if (Preferences.Error is not null) return;
+
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var returnUrl = "/" + relative;
+        var culture = Preferences.Language ?? "auto";
+        Navigation.NavigateTo(
+            $"/_culture?culture={Uri.EscapeDataString(culture)}&returnUrl={Uri.EscapeDataString(returnUrl)}",
+            forceLoad: true);
+    }
 
     public void Dispose()
     {

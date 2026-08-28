@@ -34,7 +34,8 @@ public sealed record Principal(
 public sealed record PrincipalPreferences(
     Guid PrincipalId,
     ThemePreference Theme,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? Language = null);
 
 public sealed record ExternalIdentity(
     Guid Id,
