@@ -4,10 +4,11 @@
 @inject IWorkApiClient Client
 @inject IWorkOperationsRealtimeClient Realtime
 @inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<TasksStrings> Localizer
 
-<PageTitle>Tasks · Agentstration</PageTitle>
-<PageHeader Title="Tasks" Description="Operational supervision of WorkTasks owned by Work API.">
-    <Actions><RealtimeStatus State="Realtime.State" /><button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@loading">Refresh</button></Actions>
+<PageTitle>@T("PageTitle")</PageTitle>
+<PageHeader Title="@T("Tasks")" Description="@T("Description")">
+    <Actions><RealtimeStatus State="Realtime.State" /><button class="button-secondary" type="button" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button></Actions>
 </PageHeader>
 
 @if (unavailable)
@@ -21,17 +22,17 @@ else if (page is null || counters is null)
 else
 {
     <TaskOperationsSummary Summary="counters" />
-    <section class="panel task-filters" aria-label="Task filters">
-        <label>Search<input @bind="searchValue" placeholder="Title, description, Task or Interaction ID" /></label>
-        <label>Workspace<select @bind="workspaceValue"><option value="">All workspaces</option>@foreach(var workspace in workspaces){<option value="@workspace.Id">@workspace.Name</option>}</select></label>
-        <label>Status<select @bind="statusValue"><option value="">All statuses</option>@foreach(var value in Enum.GetValues<WorkTaskStatus>()){<option value="@value">@(value == WorkTaskStatus.ActionRequired ? "Needs attention" : value)</option>}</select></label>
-        <label>Attention<select @bind="attentionValue"><option value="">Any</option><option value="true">Needs attention</option><option value="false">No pending action</option></select></label>
-        <div class="form-actions"><button class="button-primary" type="button" @onclick="ApplyFilters">Apply</button><button class="text-button" type="button" @onclick="ClearFilters">Clear filters</button></div>
+    <section class="panel task-filters" aria-label="@T("TaskFilters")">
+        <label>@T("Search")<input @bind="searchValue" placeholder="@T("SearchPlaceholder")" /></label>
+        <label>@T("Workspace")<select @bind="workspaceValue"><option value="">@T("AllWorkspaces")</option>@foreach(var workspace in workspaces){<option value="@workspace.Id">@workspace.Name</option>}</select></label>
+        <label>@T("Status")<select @bind="statusValue"><option value="">@T("AllStatuses")</option>@foreach(var value in Enum.GetValues<WorkTaskStatus>()){<option value="@value">@StatusLabel(value)</option>}</select></label>
+        <label>@T("Attention")<select @bind="attentionValue"><option value="">@T("Any")</option><option value="true">@T("NeedsAttention")</option><option value="false">@T("NoPendingAction")</option></select></label>
+        <div class="form-actions"><button class="button-primary" type="button" @onclick="ApplyFilters">@T("Apply")</button><button class="text-button" type="button" @onclick="ClearFilters">@T("ClearFilters")</button></div>
     </section>
     <TaskOperationsTable Items="page.Items" Filtered="Filtered" />
     @if (page.TotalCount > 0)
     {
-        <nav class="task-pagination" aria-label="Task pages"><span>Page @(page.Page) · @(page.TotalCount) task(s)</span><span><button class="button-secondary" disabled="@(page.Page <= 1)" @onclick="PreviousPage">Previous</button><button class="button-secondary" disabled="@(page.Page * page.PageSize >= page.TotalCount)" @onclick="NextPage">Next</button></span></nav>
+        <nav class="task-pagination" aria-label="@T("TaskPages")"><span>@F("PageSummary", page.Page, page.TotalCount)</span><span><button class="button-secondary" disabled="@(page.Page <= 1)" @onclick="PreviousPage">@T("Previous")</button><button class="button-secondary" disabled="@(page.Page * page.PageSize >= page.TotalCount)" @onclick="NextPage">@T("Next")</button></span></nav>
     }
 }
 
@@ -73,6 +74,9 @@ else
     private void ClearFilters()=>Navigate(1,null,null,null,null);
     private void PreviousPage()=>Navigate(Math.Max(1,CurrentPage-1),WorkspaceId,ParsedStatus,Search,HasPendingAction);
     private void NextPage()=>Navigate(CurrentPage+1,WorkspaceId,ParsedStatus,Search,HasPendingAction);
+    private string StatusLabel(WorkTaskStatus value) => Localizer[$"Status.{value}"];
+    private string T(string key) => Localizer[key];
+    private string F(string key, params object[] arguments) => Localizer[key, arguments];
     private void Navigate(int targetPage,string? workspace,WorkTaskStatus? status,string? search,bool? attention)
     {
         var query=new List<string>();if(!string.IsNullOrWhiteSpace(workspace))query.Add($"workspaceId={Uri.EscapeDataString(workspace)}");if(status is not null)query.Add($"status={status}");if(!string.IsNullOrWhiteSpace(search))query.Add($"search={Uri.EscapeDataString(search.Trim())}");if(attention is not null)query.Add($"hasPendingAction={attention.Value.ToString().ToLowerInvariant()}");if(targetPage>1)query.Add($"page={targetPage}");Navigation.NavigateTo(query.Count==0?"/tasks":$"/tasks?{string.Join('&',query)}");

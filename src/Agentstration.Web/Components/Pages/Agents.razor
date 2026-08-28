@@ -2,19 +2,20 @@
 @implements IDisposable
 @inject IManagementApiClient Client
 @inject NotificationState Notifications
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentsStrings> Localizer
 
-<PageTitle>Agents · Agentstration</PageTitle>
-<PageHeader Eyebrow="Build · Agent resources" Title="Agents" Description="Define, publish and operate specialized agent resources.">
-    <Metadata><span>@Filtered.Count agents</span><span>@PublishedCount published</span><span>@FailedCount requiring attention</span></Metadata>
-    <Actions><a class="button-primary" href="/agents/new">Create agent</a></Actions>
+<PageTitle>@T("PageTitle")</PageTitle>
+<PageHeader Eyebrow="@T("Eyebrow")" Title="@T("Agents")" Description="@T("Description")">
+    <Metadata><span>@F("AgentCount", Filtered.Count)</span><span>@F("PublishedCount", PublishedCount)</span><span>@F("AttentionCount", FailedCount)</span></Metadata>
+    <Actions><a class="button-primary" href="/agents/new">@T("CreateAgent")</a></Actions>
 </PageHeader>
 
-<ResourceToolbar Label="Agent filters">
+<ResourceToolbar Label="@T("AgentFilters")">
     <ChildContent>
-        <SearchBox Value="search" ValueChanged="value => search = value" Placeholder="Search agents…" Label="Search agents" />
-        <select @bind="status" aria-label="Filter agent status"><option value="">Status: All</option><option value="Accepted">Valid</option><option value="Succeeded">Published</option><option value="Failed">Failed</option></select>
+        <SearchBox Value="search" ValueChanged="value => search = value" Placeholder="@T("SearchAgentsPlaceholder")" Label="@T("SearchAgents")" />
+        <select @bind="status" aria-label="@T("FilterAgentStatus")"><option value="">@T("StatusAll")</option><option value="Accepted">@T("StatusValid")</option><option value="Succeeded">@T("StatusPublished")</option><option value="Failed">@T("StatusFailed")</option></select>
     </ChildContent>
-    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@(loading ? "Refreshing…" : "Refresh")</button></Actions>
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@(loading ? T("Refreshing") : T("Refresh"))</button></Actions>
 </ResourceToolbar>
 
 @if (loading && items is null)
@@ -23,39 +24,39 @@
 }
 else if (error is not null)
 {
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
 }
 else if (Filtered.Count == 0)
 {
-    <EmptyState Title="No agents found" Message="Create an agent resource or change the current filters."><a class="button-primary" href="/agents/new">Create agent</a></EmptyState>
+    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/agents/new">@T("CreateAgent")</a></EmptyState>
 }
 else
 {
     <DataGrid TItem="AgentSummary" Items="Filtered">
-        <Header><tr><th>Agent</th><th>Namespace</th><th>Definition</th><th>Model profile</th><th>Deployment</th><th>Last activity</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></Header>
+        <Header><tr><th>Agent</th><th>@T("Namespace")</th><th>@T("Definition")</th><th>@T("ModelProfile")</th><th>@T("Deployment")</th><th>@T("LastActivity")</th><th>@T("Status")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
         <Row Context="item"><tr>
             <td><a class="resource-name-link" href="@EditUrl(item)">@item.Name</a><span class="resource-secondary"><code>@TechnicalName(item)</code></span></td>
             <td><code>@item.Namespace.Value</code></td>
-            <td><strong>@ResourceName(item.Type)</strong><span class="resource-secondary">generation @item.Version</span></td>
+            <td><strong>@ResourceName(item.Type)</strong><span class="resource-secondary">@F("Generation", item.Version)</span></td>
             <td><a class="text-button" href="@ModelProfileUrl(item)">@ResourceName(item.ModelProfile)</a></td>
-            <td><span>@item.Runtime</span><span class="resource-secondary">Desired generation @item.Version</span></td>
+            <td><span>@item.Runtime</span><span class="resource-secondary">@F("DesiredGeneration", item.Version)</span></td>
             <td>@LastActivity(item.LastActivity)</td>
-            <td><StatusIndicator Text="@StatusPresentation.Label(item.Status)" Status="@StatusPresentation.Tone(item.Status)" /></td>
-            <td><div class="table-actions">@if(item.Namespace.IsDefault){<a class="text-button" href="@RunUrl(item)">Run</a>}<details class="row-actions-menu"><summary aria-label="More actions for @item.Name">•••</summary><div><a href="@EditUrl(item)">Open</a>@if(item.Namespace.IsDefault){<a href="@RunUrl(item)">Run</a><a href="@EditUrl(item)#definition">Edit definition</a><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">Delete</button>}<button type="button" @onclick="() => selected = item">Quick inspect</button></div></details></div></td>
+            <td><StatusIndicator Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" /></td>
+            <td><div class="table-actions">@if(item.Namespace.IsDefault){<a class="text-button" href="@RunUrl(item)">@T("Run")</a>}<details class="row-actions-menu"><summary aria-label="@F("MoreActions", item.Name)">•••</summary><div><a href="@EditUrl(item)">@T("Open")</a>@if(item.Namespace.IsDefault){<a href="@RunUrl(item)">@T("Run")</a><a href="@EditUrl(item)#definition">@T("EditDefinition")</a><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">@T("Delete")</button>}<button type="button" @onclick="() => selected = item">@T("QuickInspect")</button></div></details></div></td>
         </tr></Row>
     </DataGrid>
 }
 
 @if (selected is not null)
 {
-    <aside class="quick-inspector" aria-label="Agent quick inspector">
-        <header><div><p class="eyebrow">Agent</p><h2>@selected.Name</h2><StatusIndicator Text="@StatusPresentation.Label(selected.Status)" Status="@StatusPresentation.Tone(selected.Status)" /></div><button class="icon-button" @onclick="() => selected = null" aria-label="Close inspector">×</button></header>
-        <dl class="resource-details resource-section"><dt>Namespace</dt><dd><code>@selected.Namespace.Value</code></dd><dt>Definition</dt><dd>@ResourceName(selected.Type) · generation @selected.Version</dd><dt>Model profile</dt><dd>@ResourceName(selected.ModelProfile)</dd><dt>Deployment</dt><dd>@selected.Runtime</dd><dt>Resource ID</dt><dd><code>@selected.Id</code></dd></dl>
-        <div class="quick-inspector-actions">@if(selected.Namespace.IsDefault){<a class="button-primary" href="@RunUrl(selected)">Run agent</a>}<a class="button-secondary" href="@EditUrl(selected)">Open details</a></div>
+    <aside class="quick-inspector" aria-label="@T("QuickInspector")">
+        <header><div><p class="eyebrow">Agent</p><h2>@selected.Name</h2><StatusIndicator Text="@StatusLabel(selected.Status)" Status="@StatusPresentation.Tone(selected.Status)" /></div><button class="icon-button" @onclick="() => selected = null" aria-label="@T("CloseInspector")">×</button></header>
+        <dl class="resource-details resource-section"><dt>@T("Namespace")</dt><dd><code>@selected.Namespace.Value</code></dd><dt>@T("Definition")</dt><dd>@ResourceName(selected.Type) · @F("Generation", selected.Version)</dd><dt>@T("ModelProfile")</dt><dd>@ResourceName(selected.ModelProfile)</dd><dt>@T("Deployment")</dt><dd>@selected.Runtime</dd><dt>@T("ResourceId")</dt><dd><code>@selected.Id</code></dd></dl>
+        <div class="quick-inspector-actions">@if(selected.Namespace.IsDefault){<a class="button-primary" href="@RunUrl(selected)">@T("RunAgent")</a>}<a class="button-secondary" href="@EditUrl(selected)">@T("OpenDetails")</a></div>
     </aside>
 }
 
-<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="Delete agent" Message="@DeleteMessage" ConfirmLabel="Delete agent" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
+<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="@T("DeleteAgent")" Message="@DeleteMessage" ConfirmLabel="@T("DeleteAgent")" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
 
 @code {
     private readonly CancellationTokenSource cancellation = new();
@@ -77,7 +78,7 @@ else
         && (string.IsNullOrWhiteSpace(status) || string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase))).ToArray() ?? [];
     private int PublishedCount => items?.Count(item => string.Equals(item.Status, "Succeeded", StringComparison.OrdinalIgnoreCase)) ?? 0;
     private int FailedCount => items?.Count(item => string.Equals(item.Status, "Failed", StringComparison.OrdinalIgnoreCase)) ?? 0;
-    private string DeleteMessage => pendingDelete is null ? string.Empty : $"Delete '{pendingDelete.Name}'? Existing revisions and deployments are not deleted automatically.";
+    private string DeleteMessage => pendingDelete is null ? string.Empty : F("DeleteMessage", pendingDelete.Name);
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -102,13 +103,13 @@ else
         {
             var snapshot = await Client.GetAgentAsync(deleted.Id, cancellation.Token);
             await Client.DeleteAgentAsync(deleted.Id, snapshot.ETag, cancellation.Token);
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), "Agent deleted", deleted.Name, DateTimeOffset.Now, UiStatus.Success));
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("AgentDeleted"), deleted.Name, DateTimeOffset.Now, UiStatus.Success));
             await LoadAsync();
         }
         catch (AgentstrationApiException exception)
         {
             error = exception;
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), "Delete failed", exception.Message, DateTimeOffset.Now, UiStatus.Danger));
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeleteFailed"), exception.Message, DateTimeOffset.Now, UiStatus.Danger));
         }
     }
 
@@ -117,6 +118,9 @@ else
     private static string ModelProfileUrl(AgentSummary item) => ConsoleResourceUrls.ModelProfile(item.ModelProfileAddress);
     private static string TechnicalName(AgentSummary item) => item.Id;
     private static string ResourceName(string resourceId) => resourceId;
-    private static string LastActivity(DateTimeOffset value) => value == DateTimeOffset.MinValue ? "No activity reported" : value.LocalDateTime.ToString("g");
+    private string LastActivity(DateTimeOffset value) => value == DateTimeOffset.MinValue ? T("NoActivityReported") : value.LocalDateTime.ToString("g");
+    private string StatusLabel(string value) => value switch { "Accepted" => T("StatusValid"), "Succeeded" => T("StatusPublished"), "Failed" => T("StatusFailed"), _ => value };
+    private string T(string key) => Localizer[key];
+    private string F(string key, params object[] arguments) => Localizer[key, arguments];
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

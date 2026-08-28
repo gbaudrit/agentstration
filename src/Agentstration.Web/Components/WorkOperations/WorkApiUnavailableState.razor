@@ -1,4 +1,5 @@
-<EmptyState Title="Work API unavailable" Message="The Console cannot load operational Tasks right now. Other Console sections remain available.">
-    <button class="button-primary" type="button" @onclick="OnRetry">Retry</button>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.TasksStrings> Localizer
+<EmptyState Title="@Localizer["UnavailableTitle"]" Message="@Localizer["UnavailableMessage"]">
+    <button class="button-primary" type="button" @onclick="OnRetry">@Localizer["Retry"]</button>
 </EmptyState>
 @code { [Parameter] public EventCallback OnRetry { get; set; } }
