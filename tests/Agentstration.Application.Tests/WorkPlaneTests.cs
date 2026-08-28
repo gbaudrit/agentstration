@@ -437,13 +437,23 @@ public sealed class WorkPlaneTests
         await fixture.Workplace.UpsertEntryAsync(published, default);
         await fixture.Workplace.UpsertDashboardDraftAsync(new WorkplaceDashboardDraft
         {
-            Id = new("home"), WorkspaceId = WorkplaceId, Name = "home", DisplayName = "Home", IsDefault = true,
-            Entries = [new() { EntryResourceId = draft.Id }], UpdatedAt = Now
+            Id = new("home"),
+            WorkspaceId = WorkplaceId,
+            Name = "home",
+            DisplayName = "Home",
+            IsDefault = true,
+            Entries = [new() { EntryResourceId = draft.Id }],
+            UpdatedAt = Now
         }, default);
         await fixture.Workplace.UpsertDashboardAsync(new WorkplaceDashboard
         {
-            Id = new("home"), WorkspaceId = WorkplaceId, Name = "home", DisplayName = "Home", IsDefault = true,
-            Entries = [new() { EntryResourceId = draft.Id }], PublishedAt = Now
+            Id = new("home"),
+            WorkspaceId = WorkplaceId,
+            Name = "home",
+            DisplayName = "Home",
+            IsDefault = true,
+            Entries = [new() { EntryResourceId = draft.Id }],
+            PublishedAt = Now
         }, default);
         var interaction = new WorkplaceInteraction
         {
