@@ -45,8 +45,13 @@ public sealed class ModelProviderPackResourceHandler(ModelProviderManagementServ
         var value = Parse(resource); var stored = await service.CreateAsync(value with { Metadata = PackProvenance.Add(value.Metadata, pack, @namespace, packVersion) }, cancellationToken);
         return Managed(resource, @namespace, stored.ETag);
     }
+    public async Task<ManagedPackResource> UpdateAsync(PackResourceDocument resource, ManagedPackResource current, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
+    {
+        var stored = await service.PutAsync(current.Namespace, current.Name, Parse(resource).Definition, current.VersionToken, cancellationToken);
+        return Managed(resource, current.Namespace, stored.ETag);
+    }
     public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAsync(@namespace, name, cancellationToken))?.ETag;
-    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
+    public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) => service.DeleteAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
     private static ModelProviderResource Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<ModelProviderResource>(resource.Manifest.GetRawText());
     private static ManagedPackResource Managed(PackResourceDocument resource, ResourceNamespace @namespace, string token) => new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = token };
 }
@@ -62,8 +67,13 @@ public sealed class RuntimeProfilePackResourceHandler(RuntimeProfileManagementSe
         var value = Parse(resource); var stored = await service.CreateAsync(value with { Metadata = PackProvenance.Add(value.Metadata, pack, @namespace, packVersion) }, cancellationToken);
         return Managed(resource, @namespace, stored.ETag);
     }
+    public async Task<ManagedPackResource> UpdateAsync(PackResourceDocument resource, ManagedPackResource current, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
+    {
+        var stored = await service.PutAsync(current.Namespace, current.Name, Parse(resource).Definition, current.VersionToken, cancellationToken);
+        return Managed(resource, current.Namespace, stored.ETag);
+    }
     public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAsync(@namespace, name, cancellationToken))?.ETag;
-    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
+    public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) => service.DeleteAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
     private static RuntimeProfileResource Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<RuntimeProfileResource>(resource.Manifest.GetRawText());
     private static ManagedPackResource Managed(PackResourceDocument resource, ResourceNamespace @namespace, string token) => new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = token };
 }
@@ -79,8 +89,13 @@ public sealed class ModelProfilePackResourceHandler(ModelProfileManagementServic
         var value = Parse(resource); var stored = await service.CreateAsync(value with { Metadata = PackProvenance.Add(value.Metadata, pack, @namespace, packVersion) }, cancellationToken);
         return Managed(resource, @namespace, stored.ETag);
     }
+    public async Task<ManagedPackResource> UpdateAsync(PackResourceDocument resource, ManagedPackResource current, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
+    {
+        var stored = await service.PutAsync(current.Namespace, current.Name, Parse(resource).Definition, current.VersionToken, cancellationToken);
+        return Managed(resource, current.Namespace, stored.ETag);
+    }
     public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAsync(@namespace, name, cancellationToken))?.ETag;
-    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
+    public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) => service.DeleteAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
     private static ModelProfileResource Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<ModelProfileResource>(resource.Manifest.GetRawText());
     private static ManagedPackResource Managed(PackResourceDocument resource, ResourceNamespace @namespace, string token) => new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = token };
 }
@@ -96,8 +111,14 @@ public sealed class AgentPackResourceHandler(AgentManagementService service) : I
         var value = Parse(resource); var stored = await service.PutAgentAsync(value with { Metadata = PackProvenance.Add(value.Metadata, pack, @namespace, packVersion) }, null, true, cancellationToken);
         return Managed(resource, @namespace, stored.ETag);
     }
+    public async Task<ManagedPackResource> UpdateAsync(PackResourceDocument resource, ManagedPackResource current, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
+    {
+        var value = Parse(resource);
+        var stored = await service.PutAgentAsync(value with { Metadata = PackProvenance.Add(value.Metadata, pack, current.Namespace, packVersion) }, current.VersionToken, false, cancellationToken);
+        return Managed(resource, current.Namespace, stored.ETag);
+    }
     public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAgentAsync(@namespace, name, cancellationToken))?.ETag;
-    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAgentAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
+    public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) => service.DeleteAgentAsync(resource.Namespace, resource.Name, resource.VersionToken, cancellationToken);
     private static AgentResource Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<AgentResource>(resource.Manifest.GetRawText());
     private static ManagedPackResource Managed(PackResourceDocument resource, ResourceNamespace @namespace, string token) => new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = token };
 }
@@ -148,8 +169,19 @@ public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinition
         if (definition.Publish) { _ = await service.PublishVersionAsync(workspaceId, flowId, definition.Version, definition.Activate, cancellationToken); stored = (await service.GetAsync(workspaceId, flowId, cancellationToken))!; }
         return new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = stored.ETag };
     }
+    public async Task<ManagedPackResource> UpdateAsync(PackResourceDocument resource, ManagedPackResource current, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
+    {
+        var value = Parse(resource); var definition = value.Definition; var workspaceId = CurrentWorkspaceId(); var flowId = new FlowId(current.Name, current.Namespace);
+        var stored = await service.UpdateAsync(workspaceId, flowId, new(definition.Description, definition.Version, definition.Enabled, definition.Spec, PackProvenance.Add(definition.Metadata, pack, packVersion), definition.Graph, definition.DisplayName), current.VersionToken, cancellationToken);
+        if (definition.Publish && await service.GetVersionAsync(workspaceId, flowId, definition.Version, cancellationToken) is null)
+        {
+            _ = await service.PublishVersionAsync(workspaceId, flowId, definition.Version, definition.Activate, cancellationToken);
+            stored = (await service.GetAsync(workspaceId, flowId, cancellationToken))!;
+        }
+        return new() { Namespace = current.Namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = stored.ETag };
+    }
     public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAsync(CurrentWorkspaceId(), new(name, @namespace), cancellationToken))?.ETag;
-    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(CurrentWorkspaceId(), new(resource.Name, resource.Namespace), resource.VersionToken, cancellationToken);
+    public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) => service.DeleteAsync(CurrentWorkspaceId(), new(resource.Name, resource.Namespace), resource.VersionToken, cancellationToken);
     private WorkspaceId CurrentWorkspaceId() => new(requestContext.Current.WorkspaceId);
     private static PackResourceEnvelope<PackFlowDefinition> Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<PackResourceEnvelope<PackFlowDefinition>>(resource.Manifest.GetRawText());
 }
@@ -179,12 +211,18 @@ public sealed class EntryPackResourceHandler(EntryAdministrationService service,
         var published = definition.Publish ? await service.PublishAsync(workspaceId, saved.Id, cancellationToken) : null;
         return new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = $"{saved.Revision}:{published?.Version ?? 0}" };
     }
+    public async Task<ManagedPackResource> UpdateAsync(PackResourceDocument resource, ManagedPackResource current, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
+    {
+        var workspaceId = CurrentWorkspaceId(); var definition = Parse(resource).Definition; var saved = await service.SaveAsync(ToDraft(workspaceId, current.Name, current.Namespace, definition, timeProvider.GetUtcNow()), cancellationToken);
+        var published = definition.Publish ? await service.PublishAsync(workspaceId, saved.Id, cancellationToken) : null;
+        return new() { Namespace = current.Namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = $"{saved.Revision}:{published?.Version ?? 0}" };
+    }
     public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
         var workspaceId = CurrentWorkspaceId(); var id = new EntryId(name, @namespace); var draft = await repository.GetEntryDraftAsync(workspaceId, id, cancellationToken); if (draft is null) return null;
         var published = await repository.GetEntryAsync(workspaceId, id, cancellationToken); return $"{draft.Revision}:{published?.Version ?? 0}";
     }
-    public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken) => service.DeleteAsync(CurrentWorkspaceId(), new(resource.Name, resource.Namespace), cancellationToken);
+    public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) => service.DeleteAsync(CurrentWorkspaceId(), new(resource.Name, resource.Namespace), options.RemoveDashboardReferences, options.CloseInteractions, cancellationToken);
     private static PackResourceEnvelope<PackEntryDefinition> Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<PackResourceEnvelope<PackEntryDefinition>>(resource.Manifest.GetRawText());
     private WorkspaceId CurrentWorkspaceId() => new(requestContext.Current.WorkspaceId);
     private static EntryDraft ToDraft(WorkspaceId workspaceId, string name, ResourceNamespace @namespace, PackEntryDefinition definition, DateTimeOffset now) => new() { WorkspaceId = workspaceId, Id = new(name, @namespace), Name = name, DisplayName = definition.DisplayName ?? name, Description = definition.Description, Presentation = definition.Presentation, Binding = definition.Binding, Behavior = definition.Behavior, UpdatedAt = now };

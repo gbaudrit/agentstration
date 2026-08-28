@@ -198,6 +198,30 @@ public sealed class PackTests
     }
 
     [TestMethod]
+    public async Task ReplacementUpdatesManagedResourcesInPlace()
+    {
+        await using var fixture = await PackFixture.CreateAsync();
+        var events = new List<string>();
+        var handler = new FakeHandler("First", 10, events);
+        var service = new PackManagementService(fixture.Store, [handler], TimeProvider.System);
+        await service.InstallAsync(Archive(Document("First", "one")), default);
+        var replacement = Archive(Document("First", "one")) with
+        {
+            Manifest = Archive(Document("First", "one")).Manifest with
+            {
+                Metadata = Archive(Document("First", "one")).Manifest.Metadata with { Version = "2.0.0" }
+            }
+        };
+
+        var updated = await service.InstallAsync(replacement, true, [], default);
+
+        CollectionAssert.AreEqual(new[] { "install:First/one", "update:First/one" }, events);
+        Assert.AreEqual("2.0.0", updated.Value.Definition.Version);
+        Assert.AreEqual(InstalledPackState.Installed, updated.Value.Definition.State);
+        Assert.AreEqual(handler.CurrentToken, updated.Value.Definition.ManagedResources.Single().VersionToken);
+    }
+
+    [TestMethod]
     public async Task ResourceBindingsResolveReferencesAndSurviveReinstallation()
     {
         await using var fixture = await PackFixture.CreateAsync();
@@ -800,8 +824,15 @@ public sealed class PackTests
             Exists = true;
             return Task.FromResult(new ManagedPackResource { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = CurrentToken });
         }
+        public Task<ManagedPackResource> UpdateAsync(PackResourceDocument resource, ManagedPackResource current, PackIdentity pack, string packVersion, CancellationToken cancellationToken)
+        {
+            events.Add($"update:{resource.Kind}/{resource.Name}");
+            LastInstalledManifest = resource.Manifest.Clone();
+            CurrentToken = $"{CurrentToken}-updated";
+            return Task.FromResult(current with { Path = resource.Path, VersionToken = CurrentToken });
+        }
         public Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => Task.FromResult(Exists ? CurrentToken : null);
-        public Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken)
+        public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken)
         {
             events.Add($"delete:{resource.Kind}/{resource.Name}"); Exists = false; return Task.CompletedTask;
         }
