@@ -93,4 +93,22 @@ public sealed class PendingActionPanelTests
         Assert.AreEqual(1, rendered.FindAll(".brand-mark-compact").Count);
         Assert.IsTrue(rendered.Markup.Contains("Workplace content", StringComparison.Ordinal));
     }
+
+    [TestMethod]
+    public void WorkplaceLayoutDisablesWorkspaceNavigationBeforeInitialization()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddAgentstrationWebComponents();
+
+        var rendered = context.Render<WorkplaceLayout>(parameters => parameters
+            .Add(value => value.Body, builder => builder.AddContent(0, "Workplace content")));
+
+        Assert.AreEqual(1, rendered.FindAll(".side-nav a.active").Count);
+        var disabled = rendered.FindAll(".side-nav a.side-nav-disabled");
+        Assert.AreEqual(2, disabled.Count);
+        Assert.IsTrue(disabled.All(value => value.GetAttribute("aria-disabled") == "true"));
+        Assert.IsTrue(disabled.All(value => value.GetAttribute("tabindex") == "-1"));
+        Assert.IsTrue(disabled.All(value => !value.HasAttribute("href")));
+    }
 }

@@ -74,6 +74,7 @@ public partial class Home
 
     private async Task LoadAsync()
     {
+        var navigationPending = false;
         loading = true; loadError = null;
         try
         {
@@ -83,6 +84,7 @@ public partial class Home
                 var available = await Api.ListWorkspacesAsync(lifetime.Token);
                 workspaceName = available.FirstOrDefault()?.Name
                     ?? throw new InvalidOperationException("No canonical Workspace is available.");
+                navigationPending = true;
                 Navigation.NavigateTo($"/w/{Uri.EscapeDataString(workspaceName)}", replace: true);
                 return;
             }
@@ -91,6 +93,7 @@ public partial class Home
             if (string.IsNullOrWhiteSpace(DashboardName))
             {
                 var defaultDashboard = await Api.GetDefaultDashboardAsync(workspaceName, lifetime.Token);
+                navigationPending = true;
                 Navigation.NavigateTo(DashboardUrl(defaultDashboard.Name), replace: true);
                 return;
             }
@@ -109,8 +112,8 @@ public partial class Home
             realtimeSubscription ??= Realtime.OnWorkspaceChanged(HandleRealtimeEvent);
             try { await Realtime.StartAsync(workspace.Id.ToString("D"), 0, lifetime.Token); } catch when (!lifetime.IsCancellationRequested) { }
         }
-        catch when (!lifetime.IsCancellationRequested) { loadError = "The local Work API could not be reached. Check that it is running, then retry."; }
-        finally { loading = false; }
+        catch when (!lifetime.IsCancellationRequested) { loadError = "Workplace connects to Agentstration Console for its data. Start the Console and complete first-time setup if prompted, then try again."; }
+        finally { if (!navigationPending) loading = false; }
     }
 
     private async Task SubmitAsync(EntryResponse entry, IReadOnlyDictionary<string, System.Text.Json.JsonElement> values)

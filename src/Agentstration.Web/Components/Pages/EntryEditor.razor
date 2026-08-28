@@ -20,9 +20,12 @@
 else
 {
     <div class="entry-summary-bar" aria-label="Entry status">
-        <StatusBadge Text="Draft" Status="UiStatus.Info" />
-        <span>Revision @draftRevision</span>
-        @if (published is not null)
+        @if (published is null)
+        {
+            <StatusBadge Text="Draft" Status="UiStatus.Info" />
+            <span>Revision @draftRevision</span>
+        }
+        else
         {
             <StatusBadge Text="Published" Status="UiStatus.Success" />
             <span>Version @published.Version</span>
@@ -56,7 +59,7 @@ else
                     <p class="eyebrow">Definition</p>
                     <h2>Entry summary</h2>
                     <dl class="entry-facts">
-                        <dt>Status</dt><dd>@(published is null ? "Draft only" : "Draft and published")</dd>
+                        <dt>Status</dt><dd>@(published is null ? "Draft" : "Published")</dd>
                         <dt>Draft revision</dt><dd>@draftRevision</dd>
                         <dt>Published version</dt><dd>@(published?.Version.ToString() ?? "Not published")</dd>
                         <dt>Presentation</dt><dd>@presentationKind</dd>
@@ -214,7 +217,9 @@ else
         else
         {
             <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">Versions</p><h2>Published Entry</h2><p>The current MVP retains the current published version, not a fabricated version history.</p></div></div>
+                <div class="panel-header">
+                    <div><p class="eyebrow">Versions</p><h2>Published Entry</h2></div>
+                </div>
                 @if (published is null) { <p class="entry-empty-copy">No published version yet. Validate and publish the draft from Definition.</p> }
                 else
                 {

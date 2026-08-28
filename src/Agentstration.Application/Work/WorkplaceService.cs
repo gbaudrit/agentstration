@@ -85,7 +85,7 @@ public sealed class WorkplaceService(
         if (!dashboards.Any(dashboard => dashboard.Entries.Any(reference => reference.EntryResourceId == command.EntryId)))
             throw new WorkValidationException("entry_not_in_workspace", "The Entry is not exposed by a published Dashboard in the selected Workspace.");
         var entry = await GetEntryAsync(command.WorkspaceId, command.EntryId, cancellationToken); WorkplaceValidation.ValidateSubmission(entry, command.Values);
-        var now = timeProvider.GetUtcNow(); var interaction = new WorkplaceInteraction { Id = InteractionId.New(), WorkspaceId = command.WorkspaceId, EntryId = command.EntryId, StartedAt = now, LastActivityAt = now, InputValues = command.Values.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal), Attachments = command.Attachments ?? [] };
+        var now = timeProvider.GetUtcNow(); var interaction = new WorkplaceInteraction { Id = InteractionId.New(), WorkspaceId = command.WorkspaceId, EntryId = command.EntryId, EntrySnapshot = entry, StartedAt = now, LastActivityAt = now, InputValues = command.Values.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal), Attachments = command.Attachments ?? [] };
         await repository.CreateInteractionAsync(interaction, cancellationToken);
         var initialMessage = new ConversationMessage(Guid.NewGuid(), command.WorkspaceId, interaction.Id, null, ConversationRole.User, Instruction(entry, command.Values), now, Attachments: command.Attachments);
         await repository.AddMessageAsync(initialMessage, cancellationToken);
@@ -190,7 +190,7 @@ public sealed class WorkplaceService(
 
         if (action.ResumeStep == 10)
         {
-            var guidedEntry = await GetEntryAsync(interaction.WorkspaceId, interaction.EntryId, cancellationToken);
+            var guidedEntry = await ResolveInteractionEntryAsync(interaction, cancellationToken);
             var guidedValues = interaction.InputValues.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal);
             foreach (var value in values) guidedValues[value.Key] = value.Value.Clone();
             var guidedSubmission = await CreateTaskAsync(interaction with { Messages = [.. interaction.Messages, message] }, guidedEntry, guidedValues, interaction.Attachments, interaction.Version, cancellationToken);
@@ -205,7 +205,7 @@ public sealed class WorkplaceService(
             await repository.SaveInteractionAsync(interaction, interaction.Version - 1, cancellationToken); await PublishAsync(new PendingActionResolvedEvent(EventId(), workspaceId.Value, Sequence(), now, action.Id.Value), cancellationToken); return new PendingActionResolution(resolved, cancelled, interaction, null);
         }
 
-        var entry = await GetEntryAsync(interaction.WorkspaceId, interaction.EntryId, cancellationToken); var merged = interaction.InputValues.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal);
+        var entry = await ResolveInteractionEntryAsync(interaction, cancellationToken); var merged = interaction.InputValues.ToDictionary(value => value.Key, value => value.Value.Clone(), StringComparer.Ordinal);
         foreach (var pending in await repository.ListPendingActionsAsync(workspaceId, interactionId, cancellationToken)) if (pending.Response is not null) foreach (var value in pending.Response.Values) merged[value.Key] = value.Value.Clone();
         var submission = await CreateTaskAsync(interaction with { Messages = [.. interaction.Messages, message] }, entry, merged, interaction.Attachments, interaction.Version, cancellationToken);
         resolved = await LinkPendingActionAsync(resolved, submission.Task, cancellationToken);
@@ -244,7 +244,7 @@ public sealed class WorkplaceService(
         var message = new ConversationMessage(Guid.NewGuid(), workspaceId, interactionId, interaction.TaskId, ConversationRole.User, content.Trim(), now);
         await repository.AddMessageAsync(message, cancellationToken);
         await PublishAsync(new MessageAddedEvent(EventId(), workspaceId.Value, Sequence(), now, message), cancellationToken);
-        var entry = await GetEntryAsync(interaction.WorkspaceId, interaction.EntryId, cancellationToken);
+        var entry = await ResolveInteractionEntryAsync(interaction, cancellationToken);
         if (!entry.Behavior.AllowConversation || entry.Behavior.Conversation?.Enabled == false) throw new WorkTransitionException("conversation_disabled", "This Entry does not allow conversational continuation.");
 
         if (entry.Behavior.TaskCreationMode == TaskCreationMode.Never)
@@ -407,6 +407,11 @@ public sealed class WorkplaceService(
         var lastFlowRunId = results.OrderByDescending(value => value.Sequence).Select(value => value.FlowRunId).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? interaction.LastFlowRunId;
         return new InteractionContinuationContext(interaction.WorkspaceId, interaction.Id, interaction.TaskId, lastFlowRunId, trigger.Id, recent, results, taskArtifacts, interaction.EntryId);
     }
+
+    private Task<EntryResource> ResolveInteractionEntryAsync(WorkplaceInteraction interaction, CancellationToken cancellationToken) =>
+        interaction.EntrySnapshot is not null
+            ? Task.FromResult(interaction.EntrySnapshot)
+            : GetEntryAsync(interaction.WorkspaceId, interaction.EntryId, cancellationToken);
 
     private async Task<ConversationMessage> AddAgentMessageAsync(WorkplaceInteraction interaction, string content, DateTimeOffset now, CancellationToken token)
     {

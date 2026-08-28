@@ -5,11 +5,23 @@
 @inject IJSRuntime JS
 <div class="app-shell @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light") workplace-shell">
     <aside class="sidebar" aria-label="Workplace navigation">
-        <a class="brand-lockup workplace-brand-lockup" href="@HomeUrl" aria-label="Agentstration Workplace home">
-            <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
-            <img class="brand-lockup-logo" src="_content/Agentstration.Web.Components/images/agentstration-lockup.png" alt="" width="204" height="38" />
-        </a>
-        <nav class="side-nav"><NavLink href="@HomeUrl"><UiIcon Name="home" /><span class="nav-label">Home</span></NavLink><NavLink href="@TasksUrl"><UiIcon Name="tasks" /><span class="nav-label">Tasks</span></NavLink><NavLink href="@NotificationsUrl"><UiIcon Name="notifications" /><span class="nav-label">Notifications</span></NavLink></nav>
+<a class="brand-lockup workplace-brand-lockup" href="@HomeUrl" aria-label="Agentstration Workplace home">
+    <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
+    <img class="brand-lockup-logo" src="_content/Agentstration.Web.Components/images/agentstration-lockup.png" alt="" width="204" height="38" />
+</a>
+<nav class="side-nav">
+    <NavLink href="@HomeUrl" Match="NavLinkMatch.All"><UiIcon Name="home" /><span class="nav-label">Home</span></NavLink>
+            @if (CurrentWorkspace is null)
+            {
+                <a class="side-nav-disabled" aria-disabled="true" tabindex="-1"><UiIcon Name="tasks" /><span class="nav-label">Tasks</span></a>
+                <a class="side-nav-disabled" aria-disabled="true" tabindex="-1"><UiIcon Name="notifications" /><span class="nav-label">Notifications</span></a>
+            }
+            else
+            {
+                <NavLink href="@TasksUrl"><UiIcon Name="tasks" /><span class="nav-label">Tasks</span></NavLink>
+        <NavLink href="@NotificationsUrl"><UiIcon Name="notifications" /><span class="nav-label">Notifications</span></NavLink>
+    }
+</nav>
         <div class="sidebar-footer"><strong>@(CurrentWorkspace ?? "Workplace")</strong><small>Local mode</small></div>
     </aside>
     <div class="workspace">

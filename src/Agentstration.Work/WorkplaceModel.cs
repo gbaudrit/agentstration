@@ -250,6 +250,7 @@ public sealed record WorkplaceInteraction
     public required InteractionId Id { get; init; }
     public required WorkspaceId WorkspaceId { get; init; }
     public required EntryId EntryId { get; init; }
+    public EntryResource? EntrySnapshot { get; init; }
     public InteractionStatus Status { get; init; } = InteractionStatus.Active;
     public required DateTimeOffset StartedAt { get; init; }
     public required DateTimeOffset LastActivityAt { get; init; }
@@ -261,6 +262,7 @@ public sealed record WorkplaceInteraction
     public string? LastFlowRunId { get; init; }
     public Guid? LastTriggerMessageId { get; init; }
     public WorkplaceAction? ImmediateResult { get; init; }
+    public string? ClosedReason { get; init; }
     public long Version { get; init; } = 1;
 }
 
