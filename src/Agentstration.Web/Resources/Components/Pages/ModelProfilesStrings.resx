@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Model profiles</value></data>
+  <data name="Description"><value>Manage reusable logical model selections referenced by agents.</value></data>
+  <data name="CreateModelProfile"><value>Create model profile</value></data>
+  <data name="SearchPlaceholder"><value>Search name or display name</value></data>
+  <data name="FilterByProvider"><value>Filter by provider</value></data>
+  <data name="AllProviders"><value>All providers</value></data>
+  <data name="FilterByStatus"><value>Filter by status</value></data>
+  <data name="AllStatuses"><value>All statuses</value></data>
+  <data name="Status.Ready"><value>Ready</value></data>
+  <data name="Status.ProviderUnavailable"><value>Provider unavailable</value></data>
+  <data name="Status.ModelUnavailable"><value>Model unavailable</value></data>
+  <data name="Status.InvalidConfiguration"><value>Invalid configuration</value></data>
+  <data name="Status.Unknown"><value>Unknown</value></data>
+  <data name="ApplyFilters"><value>Apply filters</value></data>
+  <data name="Retry"><value>Retry</value></data>
+  <data name="Loading"><value>Loading model profiles…</value></data>
+  <data name="EmptyTitle"><value>No model profiles</value></data>
+  <data name="EmptyMessage"><value>Create a logical profile or change the current filters.</value></data>
+  <data name="Profile"><value>Profile</value></data>
+  <data name="Namespace"><value>Namespace</value></data>
+  <data name="Provider"><value>Provider</value></data>
+  <data name="Model"><value>Model</value></data>
+  <data name="Usage"><value>Usage</value></data>
+  <data name="Status"><value>Status</value></data>
+  <data name="Actions"><value>Actions</value></data>
+  <data name="AgentCount.One"><value>{0} agent</value></data>
+  <data name="AgentCount.Many"><value>{0} agents</value></data>
+  <data name="Open"><value>Open</value></data>
+  <data name="Delete"><value>Delete</value></data>
+  <data name="DeleteConflictTitle"><value>Profile cannot be deleted</value></data>
+  <data name="DeleteConflictMessage"><value>This model profile is still referenced by {0}.</value></data>
+  <data name="DeleteDialogTitle"><value>Delete model profile</value></data>
+  <data name="DeleteDialogConfirm"><value>Delete model profile</value></data>
+  <data name="DeleteMessage"><value>Delete model profile '{0}'? This action cannot be undone.</value></data>
+  <data name="DeletedNotification"><value>Model profile deleted</value></data>
+</root>

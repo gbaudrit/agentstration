@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Profils de modèles</value></data>
+  <data name="Description"><value>Gérez les sélections logiques et réutilisables de modèles référencées par les agents.</value></data>
+  <data name="CreateModelProfile"><value>Créer un profil de modèle</value></data>
+  <data name="SearchPlaceholder"><value>Rechercher par nom ou nom d’affichage</value></data>
+  <data name="FilterByProvider"><value>Filtrer par fournisseur</value></data>
+  <data name="AllProviders"><value>Tous les fournisseurs</value></data>
+  <data name="FilterByStatus"><value>Filtrer par état</value></data>
+  <data name="AllStatuses"><value>Tous les états</value></data>
+  <data name="Status.Ready"><value>Prêt</value></data>
+  <data name="Status.ProviderUnavailable"><value>Fournisseur indisponible</value></data>
+  <data name="Status.ModelUnavailable"><value>Modèle indisponible</value></data>
+  <data name="Status.InvalidConfiguration"><value>Configuration non valide</value></data>
+  <data name="Status.Unknown"><value>Inconnu</value></data>
+  <data name="ApplyFilters"><value>Appliquer les filtres</value></data>
+  <data name="Retry"><value>Réessayer</value></data>
+  <data name="Loading"><value>Chargement des profils de modèles…</value></data>
+  <data name="EmptyTitle"><value>Aucun profil de modèle</value></data>
+  <data name="EmptyMessage"><value>Créez un profil logique ou modifiez les filtres actuels.</value></data>
+  <data name="Profile"><value>Profil</value></data>
+  <data name="Namespace"><value>Espace de noms</value></data>
+  <data name="Provider"><value>Fournisseur</value></data>
+  <data name="Model"><value>Modèle</value></data>
+  <data name="Usage"><value>Utilisation</value></data>
+  <data name="Status"><value>État</value></data>
+  <data name="Actions"><value>Actions</value></data>
+  <data name="AgentCount.One"><value>{0} agent</value></data>
+  <data name="AgentCount.Many"><value>{0} agents</value></data>
+  <data name="Open"><value>Ouvrir</value></data>
+  <data name="Delete"><value>Supprimer</value></data>
+  <data name="DeleteConflictTitle"><value>Impossible de supprimer le profil</value></data>
+  <data name="DeleteConflictMessage"><value>Ce profil de modèle est encore référencé par {0}.</value></data>
+  <data name="DeleteDialogTitle"><value>Supprimer le profil de modèle</value></data>
+  <data name="DeleteDialogConfirm"><value>Supprimer le profil de modèle</value></data>
+  <data name="DeleteMessage"><value>Supprimer le profil de modèle « {0} » ? Cette action est irréversible.</value></data>
+  <data name="DeletedNotification"><value>Profil de modèle supprimé</value></data>
+</root>

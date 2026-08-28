@@ -3,51 +3,52 @@
 @inject IModelProfilesClient Client
 @inject IModelProvidersClient ProvidersClient
 @inject NotificationState Notifications
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfilesStrings> Localizer
 
-<PageTitle>Model profiles · Agentstration</PageTitle>
-<PageHeader Title="Model profiles" Description="Manage reusable logical model selections referenced by agents.">
-    <Actions><a class="button-primary" href="/modelprofiles/new">Create model profile</a></Actions>
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")">
+    <Actions><a class="button-primary" href="/modelprofiles/new">@T("CreateModelProfile")</a></Actions>
 </PageHeader>
 
 <FilterBar>
-    <SearchBox Value="search" ValueChanged="SearchChanged" Placeholder="Search name or display name" />
-    <select @bind="providerFilter" aria-label="Filter by provider"><option value="">All providers</option>@foreach (var provider in providers) { <option value="@provider.Name">@provider.Properties.DisplayName</option> }</select>
-    <select @bind="statusFilter" aria-label="Filter by status"><option value="">All statuses</option><option value="ready">Ready</option><option value="providerUnavailable">Provider unavailable</option><option value="modelUnavailable">Model unavailable</option><option value="invalidConfiguration">Invalid configuration</option><option value="unknown">Unknown</option></select>
-    <button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Apply filters</button>
+    <SearchBox Value="search" ValueChanged="SearchChanged" Placeholder="@T("SearchPlaceholder")" />
+    <select @bind="providerFilter" aria-label="@T("FilterByProvider")"><option value="">@T("AllProviders")</option>@foreach (var provider in providers) { <option value="@provider.Name">@provider.Properties.DisplayName</option> }</select>
+    <select @bind="statusFilter" aria-label="@T("FilterByStatus")"><option value="">@T("AllStatuses")</option><option value="ready">@T("Status.Ready")</option><option value="providerUnavailable">@T("Status.ProviderUnavailable")</option><option value="modelUnavailable">@T("Status.ModelUnavailable")</option><option value="invalidConfiguration">@T("Status.InvalidConfiguration")</option><option value="unknown">@T("Status.Unknown")</option></select>
+    <button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("ApplyFilters")</button>
 </FilterBar>
 
 @if (error is not null)
 {
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
 }
 else if (loading && profiles is null)
 {
-    <LoadingState Message="Loading model profiles…" />
+    <LoadingState Message="@T("Loading")" />
 }
 else if (profiles?.Count == 0)
 {
-    <EmptyState Title="No model profiles" Message="Create a logical profile or change the current filters."><a class="button-primary" href="/modelprofiles/new">Create model profile</a></EmptyState>
+    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/modelprofiles/new">@T("CreateModelProfile")</a></EmptyState>
 }
 else
 {
     <DataGrid TItem="ModelProfileSummaryResponse" Items="profiles ?? []">
-        <Header><tr><th>Profile</th><th>Namespace</th><th>Provider</th><th>Model</th><th>Usage</th><th>Status</th><th>Actions</th></tr></Header>
+        <Header><tr><th>@T("Profile")</th><th>@T("Namespace")</th><th>@T("Provider")</th><th>@T("Model")</th><th>@T("Usage")</th><th>@T("Status")</th><th>@T("Actions")</th></tr></Header>
         <Row Context="profile"><tr>
             <td><strong>@profile.Properties.DisplayName</strong><br /><code>@profile.Name</code></td>
             <td><code>@profile.Namespace</code></td>
             <td>@(profile.Properties.Provider.DisplayName ?? profile.Properties.Provider.Name)</td><td><code>@profile.Properties.Model.Name</code></td>
-            <td>@profile.Properties.UsageCount agent(s)</td><td><StatusBadge Text="@ModelManagementUi.Label(profile.Properties.Status)" Status="@ModelManagementUi.Status(profile.Properties.Status)" /></td>
-            <td><div class="table-actions"><a class="text-button" href="@DetailsUrl(profile)">Open</a><button class="text-button danger-text" @onclick="() => RequestDeleteAsync(profile)">Delete</button></div></td>
+            <td>@AgentCount(profile.Properties.UsageCount)</td><td><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@ModelManagementUi.Status(profile.Properties.Status)" /></td>
+            <td><div class="table-actions"><a class="text-button" href="@DetailsUrl(profile)">@T("Open")</a><button class="text-button danger-text" @onclick="() => RequestDeleteAsync(profile)">@T("Delete")</button></div></td>
         </tr></Row>
     </DataGrid>
 }
 
 @if (deleteConflictUsages.Count > 0)
 {
-    <section class="panel resource-section"><div class="panel-header"><h2>Profile cannot be deleted</h2></div><p>This model profile is still referenced by @deleteConflictUsages.Count agent(s).</p><ul>@foreach (var usage in deleteConflictUsages) { <li><a href="@AgentUrl(usage)">@usage.DisplayName <code>@usage.Name</code></a></li> }</ul></section>
+    <section class="panel resource-section"><div class="panel-header"><h2>@T("DeleteConflictTitle")</h2></div><p>@T("DeleteConflictMessage", AgentCount(deleteConflictUsages.Count))</p><ul>@foreach (var usage in deleteConflictUsages) { <li><a href="@AgentUrl(usage)">@usage.DisplayName <code>@usage.Name</code></a></li> }</ul></section>
 }
 
-<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="Delete model profile" Message="@DeleteMessage" ConfirmLabel="Delete model profile" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
+<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="@T("DeleteDialogTitle")" Message="@DeleteMessage" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
 
 @code {
     private readonly CancellationTokenSource cancellation = new();
@@ -55,7 +56,10 @@ else
     private IReadOnlyList<ModelProfileUsageResponse> deleteConflictUsages = [];
     private ModelProfileSummaryResponse? pendingDelete; private AgentstrationApiException? error;
     private string search = string.Empty; private string providerFilter = string.Empty; private string statusFilter = string.Empty; private bool loading;
-    private string DeleteMessage => pendingDelete is null ? string.Empty : $"Delete model profile '{pendingDelete.Name}'? This action cannot be undone.";
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string DeleteMessage => pendingDelete is null ? string.Empty : T("DeleteMessage", pendingDelete.Name);
+    private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
+    private string StatusLabel(string status) => Localizer[$"Status.{status switch { "ready" => "Ready", "providerUnavailable" => "ProviderUnavailable", "modelUnavailable" => "ModelUnavailable", "invalidConfiguration" => "InvalidConfiguration", _ => "Unknown" }}"];
     protected override async Task OnInitializedAsync() { try { providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token); } catch (AgentstrationApiException) { } await LoadAsync(); }
     private async Task SearchChanged(string value) { search = value; await LoadAsync(); }
     private async Task LoadAsync()
@@ -86,7 +90,7 @@ else
             var @namespace = ResourceNamespace.Parse(selected.Namespace);
             var snapshot = await Client.GetModelProfileAsync(@namespace, selected.Name, cancellation.Token);
             await Client.DeleteModelProfileAsync(@namespace, selected.Name, snapshot.ETag, cancellation.Token);
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", selected.Name, DateTimeOffset.Now, UiStatus.Success));
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeletedNotification"), selected.Name, DateTimeOffset.Now, UiStatus.Success));
             await LoadAsync();
         }
         catch (AgentstrationApiException exception)
