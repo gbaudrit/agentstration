@@ -92,6 +92,7 @@ public sealed class WorkOperationsComponentTests
         var agentRuns = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentRunsStrings>>();
         var agentRunnerInspector = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentRunnerInspectorStrings>>();
         var flows = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowsStrings>>();
+        var modelProfileEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProfileEditorStrings>>();
         var modelProfiles = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProfilesStrings>>();
 
         Assert.AreEqual("Créer un agent", agents["CreateAgent"].Value);
@@ -106,6 +107,9 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Copier la requête JSON", agentRunnerInspector["CopyRequestJson"].Value);
         Assert.AreEqual("Nouveau Flow", flows["NewFlow"].Value);
         Assert.AreEqual("Voir toutes les exécutions", flows["ViewAllRuns"].Value);
+        Assert.AreEqual("Créer un profil de modèle", modelProfileEditor["CreateModelProfile"].Value);
+        Assert.AreEqual("Fournisseur et modèle", modelProfileEditor["ProviderAndModel"].Value);
+        Assert.AreEqual("La modification de ce profil affectera 1 agent.", modelProfileEditor["ChangingProfileAffects", modelProfileEditor["AgentCount.One", 1].Value].Value);
         Assert.AreEqual("Profils de modèles", modelProfiles["Title"].Value);
         Assert.AreEqual("Fournisseur indisponible", modelProfiles["Status.ProviderUnavailable"].Value);
         Assert.AreEqual("Ce profil de modèle est encore référencé par 2 agents.", modelProfiles["DeleteConflictMessage", modelProfiles["AgentCount.Many", 2].Value].Value);
