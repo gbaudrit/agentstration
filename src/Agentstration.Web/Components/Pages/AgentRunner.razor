@@ -6,6 +6,7 @@
 @inject IAgentsModelClient ModelsClient
 @inject IJSRuntime JavaScript
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerInspectorStrings> InspectorLocalizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
 <PageHeader Title="@T("Title")" Description="@T("Description")">
@@ -82,38 +83,38 @@ else
             <div class="runner-tabs" role="tablist">
                 @foreach (var tab in Tabs)
                 {
-                    <button class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@tab</button>
+                    <button class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@TabLabel(tab)</button>
                 }
             </div>
             <div class="runner-tab-content">
                 @if (activeTab == "Response")
                 {
-                    <div class="runner-response"><pre>@(string.IsNullOrWhiteSpace(state.Response) ? "Waiting for the agent response…" : state.Response)</pre></div>
+                    <div class="runner-response"><pre>@(string.IsNullOrWhiteSpace(state.Response) ? I("WaitingResponse") : state.Response)</pre></div>
                 }
                 else if (activeTab == "Execution")
                 {
                     <dl class="runner-details">
-                        <dt>Run ID</dt><dd><code>@state.Run.Id</code></dd>
-                        <dt>Status</dt><dd><StatusBadge Text="@state.State.ToString()" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
-                        <dt>Duration</dt><dd>@Duration(state.Run)</dd>
-                        <dt>Agent version</dt><dd>@state.Run.Properties.Agent.Version</dd>
-                        <dt>Model profile</dt><dd>@(state.Run.Status.ModelProfile ?? "Not resolved")</dd>
-                        <dt>Resolved model</dt><dd>@(state.Run.Status.ResolvedModel ?? "Provider did not report it")</dd>
-                        <dt>Temperature</dt><dd>@(state.Run.Status.EffectiveTemperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Profile default")</dd>
-                        <dt>Maximum output tokens</dt><dd>@(state.Run.Status.EffectiveMaxOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Provider default")</dd>
-                        <dt>Tool arguments</dt><dd>@ToolArgumentRetentionLabel(state.Run.Properties.Execution.PersistToolArguments)</dd>
-                        <dt>Tokens</dt><dd>@(state.Run.Status.InputTokens?.ToString() ?? "—") input · @(state.Run.Status.OutputTokens?.ToString() ?? "—") output</dd>
-                        <dt>Started</dt><dd>@(state.Run.Status.StartedAt?.LocalDateTime.ToString("G") ?? "Pending")</dd>
-                        <dt>Completed</dt><dd>@(state.Run.Status.CompletedAt?.LocalDateTime.ToString("G") ?? "—")</dd>
-                        <dt>Initiator</dt><dd>@state.Run.Properties.Initiator</dd>
-                        <dt>Origin</dt><dd>@state.Run.Properties.Origin</dd>
+                        <dt>@I("RunId")</dt><dd><code>@state.Run.Id</code></dd>
+                        <dt>@I("Status")</dt><dd><StatusBadge Text="@state.State.ToString()" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
+                        <dt>@I("Duration")</dt><dd>@Duration(state.Run)</dd>
+                        <dt>@I("AgentVersion")</dt><dd>@state.Run.Properties.Agent.Version</dd>
+                        <dt>@I("ModelProfile")</dt><dd>@(state.Run.Status.ModelProfile ?? I("NotResolved"))</dd>
+                        <dt>@I("ResolvedModel")</dt><dd>@(state.Run.Status.ResolvedModel ?? I("ModelNotReported"))</dd>
+                        <dt>Temperature</dt><dd>@(state.Run.Status.EffectiveTemperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? I("ProfileDefault"))</dd>
+                        <dt>@I("MaximumOutputTokens")</dt><dd>@(state.Run.Status.EffectiveMaxOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? I("ProviderDefault"))</dd>
+                        <dt>@I("ToolArguments")</dt><dd>@ToolArgumentRetentionLabel(state.Run.Properties.Execution.PersistToolArguments)</dd>
+                        <dt>Tokens</dt><dd>@(state.Run.Status.InputTokens?.ToString() ?? "—") @I("Input") · @(state.Run.Status.OutputTokens?.ToString() ?? "—") @I("Output")</dd>
+                        <dt>@I("Started")</dt><dd>@(state.Run.Status.StartedAt?.LocalDateTime.ToString("G") ?? I("Pending"))</dd>
+                        <dt>@I("Completed")</dt><dd>@(state.Run.Status.CompletedAt?.LocalDateTime.ToString("G") ?? "—")</dd>
+                        <dt>@I("Initiator")</dt><dd>@state.Run.Properties.Initiator</dd>
+                        <dt>@I("Origin")</dt><dd>@state.Run.Properties.Origin</dd>
                     </dl>
                 }
                 else if (activeTab == "Messages")
                 {
                     <div class="runner-messages">
                         @foreach (var message in state.Run.Properties.Input.Messages) { <article><strong>@message.Role</strong><pre>@message.Content</pre></article> }
-                        @if (!string.IsNullOrWhiteSpace(state.Response)) { <article><strong>Assistant</strong><pre>@state.Response</pre></article> }
+                        @if (!string.IsNullOrWhiteSpace(state.Response)) { <article><strong>@I("Assistant")</strong><pre>@state.Response</pre></article> }
                     </div>
                 }
                 else if (activeTab == "Tools")
@@ -155,6 +156,8 @@ else
 
     private static readonly string[] Tabs = ["Response", "Execution", "Messages", "Tools", "Trace", "Raw"];
     private string T(string key) => Localizer[key];
+    private string I(string key) => InspectorLocalizer[key];
+    private string TabLabel(string tab) => InspectorLocalizer[$"Tab.{tab}"];
     private readonly CancellationTokenSource cancellation = new();
     private readonly AgentRunnerState state = new();
     private CancellationTokenSource? observation;
