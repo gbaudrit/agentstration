@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="PageTitle" xml:space="preserve"><value>Paramètres · Agentstration</value></data><data name="ConsoleSettings" xml:space="preserve"><value>Paramètres de la Console</value></data><data name="PageDescription" xml:space="preserve"><value>Préférences Web, connexions aux API et configuration de l’authentification. Les secrets restent côté serveur.</value></data>
+  <data name="DataSource" xml:space="preserve"><value>Source des données</value></data><data name="CanonicalHttpApis" xml:space="preserve"><value>API HTTP canoniques</value></data><data name="DataSourceDescription" xml:space="preserve"><value>Les pages de la Console lisent les ressources persistées de Management, Runtime, Work et Flow par l’intermédiaire de leurs API publiques.</value></data>
+  <data name="Authentication" xml:space="preserve"><value>Authentification</value></data><data name="CurrentMode" xml:space="preserve"><value>Mode actuel</value></data><data name="AuthenticationDescription" xml:space="preserve"><value>Les comptes locaux utilisent ASP.NET Core Identity et les identités externes utilisent OIDC. Tous correspondent au même modèle d’autorisation Principal et Workspace d’Agentstration.</value></data>
+  <data name="ApiEndpoints" xml:space="preserve"><value>Points de terminaison des API</value></data><data name="Plane" xml:space="preserve"><value>Plan</value></data><data name="BaseAddress" xml:space="preserve"><value>Adresse de base</value></data>
+</root>

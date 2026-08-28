@@ -212,6 +212,18 @@ public sealed class SecurityApiTests
         StringAssert.Contains(WebUtility.HtmlDecode(html), "Paramètres du profil");
         StringAssert.Contains(WebUtility.HtmlDecode(html), "Vue d’ensemble");
 
+        using var overview = await browser.GetAsync("/");
+        Assert.AreEqual(HttpStatusCode.OK, overview.StatusCode);
+        var overviewHtml = WebUtility.HtmlDecode(await overview.Content.ReadAsStringAsync());
+        StringAssert.Contains(overviewHtml, "Vue d’ensemble de la plateforme");
+        StringAssert.Contains(overviewHtml, "Agents définis");
+
+        using var settings = await browser.GetAsync("/settings");
+        Assert.AreEqual(HttpStatusCode.OK, settings.StatusCode);
+        var settingsHtml = WebUtility.HtmlDecode(await settings.Content.ReadAsStringAsync());
+        StringAssert.Contains(settingsHtml, "Paramètres de la Console");
+        StringAssert.Contains(settingsHtml, "API HTTP canoniques");
+
         using var unsupported = await browser.GetAsync(
             "/_culture?culture=de-DE&returnUrl=%2Fsettings%2Fprofile");
         Assert.AreEqual(HttpStatusCode.BadRequest, unsupported.StatusCode);

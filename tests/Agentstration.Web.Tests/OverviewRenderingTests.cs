@@ -31,6 +31,7 @@ public sealed class OverviewRenderingTests
             NullLogger<PlatformDashboardService>.Instance));
         context.Services.AddSingleton<IAgentstrationEventStream>(eventStream);
         context.Services.AddSingleton(new PlatformStatusState());
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Home>();
 
@@ -83,14 +84,15 @@ public sealed class OverviewRenderingTests
             NullLogger<PlatformDashboardService>.Instance));
         context.Services.AddSingleton<IAgentstrationEventStream>(new ControlledEventStream());
         context.Services.AddSingleton(new PlatformStatusState());
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Home>();
 
         rendered.WaitForAssertion(() =>
         {
             var cards = rendered.FindAll(".overview-metric-grid > *");
-            var agents = cards.Single(card => card.TextContent.Contains("Defined agents", StringComparison.Ordinal));
-            var tasks = cards.Single(card => card.TextContent.Contains("Tasks running", StringComparison.Ordinal));
+            var agents = cards[0];
+            var tasks = cards[4];
             Assert.IsFalse(agents.ClassList.Contains("metric-card-loading"));
             Assert.IsTrue(tasks.ClassList.Contains("metric-card-loading"));
             Assert.IsTrue(work.IsSummaryPending);

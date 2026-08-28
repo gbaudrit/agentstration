@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="PageTitle" xml:space="preserve"><value>Settings · Agentstration</value></data><data name="ConsoleSettings" xml:space="preserve"><value>Console settings</value></data><data name="PageDescription" xml:space="preserve"><value>Web preferences, API connections and authentication posture. Secrets remain server-side.</value></data>
+  <data name="DataSource" xml:space="preserve"><value>Data source</value></data><data name="CanonicalHttpApis" xml:space="preserve"><value>Canonical HTTP APIs</value></data><data name="DataSourceDescription" xml:space="preserve"><value>Console pages read persisted Management, Runtime, Work and Flow resources through their public APIs.</value></data>
+  <data name="Authentication" xml:space="preserve"><value>Authentication</value></data><data name="CurrentMode" xml:space="preserve"><value>Current mode</value></data><data name="AuthenticationDescription" xml:space="preserve"><value>Local accounts use ASP.NET Core Identity; external identities use OIDC. Both resolve to the same Agentstration Principal and Workspace authorization model.</value></data>
+  <data name="ApiEndpoints" xml:space="preserve"><value>API endpoints</value></data><data name="Plane" xml:space="preserve"><value>Plane</value></data><data name="BaseAddress" xml:space="preserve"><value>Base address</value></data>
+</root>

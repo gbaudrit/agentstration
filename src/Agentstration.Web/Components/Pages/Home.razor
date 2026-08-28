@@ -2,8 +2,9 @@
 @implements IDisposable
 @inject PlatformDashboardService Dashboard
 @inject PlatformStatusState PlatformState
-<PageTitle>Overview · Agentstration</PageTitle>
-<PageHeader Title="Platform overview" Eyebrow="Operations center">
+@inject Microsoft.Extensions.Localization.IStringLocalizer<HomeStrings> Localizer
+<PageTitle>@T("PageTitle")</PageTitle>
+<PageHeader Title="@T("PlatformOverview")" Eyebrow="@T("OperationsCenter")">
     <Status>
         @if (snapshot is not null)
         {
@@ -14,23 +15,23 @@
 @if (error is not null) { <ErrorState Message="@error" ErrorId="@errorId" /> }
 else if (load is not null)
 {
-    <section class="overview-metric-grid" aria-label="Platform metrics">
-        <DashboardMetricCard Label="Defined agents" Load="@load.DefinedAgents" Url="/agents" />
-        <DashboardMetricCard Label="Ready deployments" Load="@load.ReadyDeployments" Url="/deployments" />
-        <DashboardMetricCard Label="Agents Run" Load="@load.RuntimeRuns" Url="/agent-runs" />
-        <DashboardMetricCard Label="Flow Run" Load="@load.FlowRuns" Url="/flow-runs" />
-        <DashboardMetricCard Label="Tasks running" Load="@load.RunningTasks" Url="/tasks" />
-        <DashboardMetricCard Label="Needs attention" Load="@load.NeedsAttention" Url="#needs-attention" />
-        <DashboardMetricCard Label="Enabled triggers" Load="@load.EnabledTriggers" Url="/triggers" />
-        <DashboardMetricCard Label="Model providers" Load="@load.ModelProviders" Url="/modelproviders" />
+    <section class="overview-metric-grid" aria-label="@T("PlatformMetrics")">
+        <DashboardMetricCard Label="@T("DefinedAgents")" Load="@load.DefinedAgents" Url="/agents" />
+        <DashboardMetricCard Label="@T("ReadyDeployments")" Load="@load.ReadyDeployments" Url="/deployments" />
+        <DashboardMetricCard Label="@T("AgentRuns")" Load="@load.RuntimeRuns" Url="/agent-runs" />
+        <DashboardMetricCard Label="@T("FlowRuns")" Load="@load.FlowRuns" Url="/flow-runs" />
+        <DashboardMetricCard Label="@T("TasksRunning")" Load="@load.RunningTasks" Url="/tasks" />
+        <DashboardMetricCard Label="@T("NeedsAttention")" Load="@load.NeedsAttention" Url="#needs-attention" />
+        <DashboardMetricCard Label="@T("EnabledTriggers")" Load="@load.EnabledTriggers" Url="/triggers" />
+        <DashboardMetricCard Label="@T("ModelProviders")" Load="@load.ModelProviders" Url="/modelproviders" />
     </section>
     <section class="dashboard-grid">
         <LatestRunEvents />
-        <article class="panel" id="needs-attention"><div class="panel-header"><h2>Needs attention</h2><a href="/deployments">Deployments →</a></div>@if (snapshot is null) { <LoadingState Message="Loading attention…" /> } else if (snapshot.AttentionItems.Count == 0) { <EmptyState Title="No issues" Message="" /> } else { <div class="health-list">@foreach (var component in snapshot.AttentionItems) { if (component.Url is not null) { <a class="attention-item" href="@component.Url"><HealthIndicator Label="@component.Name" StatusText="@component.Detail" Status="@component.Severity" /></a> } else { <HealthIndicator Label="@component.Name" StatusText="@component.Detail" Status="@component.Severity" /> } }</div> }</article>
+        <article class="panel" id="needs-attention"><div class="panel-header"><h2>@T("NeedsAttention")</h2><a href="/deployments">@T("Deployments") →</a></div>@if (snapshot is null) { <LoadingState Message="@T("LoadingAttention")" /> } else if (snapshot.AttentionItems.Count == 0) { <EmptyState Title="@T("NoIssues")" Message="" /> } else { <div class="health-list">@foreach (var component in snapshot.AttentionItems) { if (component.Url is not null) { <a class="attention-item" href="@component.Url"><HealthIndicator Label="@component.Name" StatusText="@component.Detail" Status="@component.Severity" /></a> } else { <HealthIndicator Label="@component.Name" StatusText="@component.Detail" Status="@component.Severity" /> } }</div> }</article>
     </section>
     <section class="panel dashboard-sources">
-        <div class="panel-header"><h2>Dashboard data sources</h2></div>
-        @if (snapshot is null) { <LoadingState Message="Loading data sources…" /> }
+        <div class="panel-header"><h2>@T("DashboardDataSources")</h2></div>
+        @if (snapshot is null) { <LoadingState Message="@T("LoadingDataSources")" /> }
         else { <div class="dashboard-source-grid">@foreach (var source in snapshot.Sources) { <a class="dashboard-source-item" href="@source.Url"><HealthIndicator Label="@source.Name" StatusText="@source.Detail" Status="@source.Severity" /><span class="dashboard-source-arrow" aria-hidden="true">→</span></a> }</div> }
     </section>
 }
@@ -66,7 +67,7 @@ else if (load is not null)
         {
             error = exception.Message;
             errorId = exception.ErrorId;
-            PlatformState.Set(UiStatus.Danger, "Unavailable");
+            PlatformState.Set(UiStatus.Danger, T("Unavailable"));
             if (!disposed)
                 await InvokeAsync(StateHasChanged);
         }
@@ -74,6 +75,8 @@ else if (load is not null)
 
     private void SetPlatformStatus(PlatformSnapshot value) =>
         PlatformState.Set(PlatformDashboardService.ToStatus(value.Status), value.Status);
+
+    private string T(string key) => Localizer[key];
 
     public void Dispose()
     {
