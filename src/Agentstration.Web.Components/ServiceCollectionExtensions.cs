@@ -8,6 +8,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddAgentstrationWebComponents(this IServiceCollection services)
     {
+        services.AddLocalization(options => options.ResourcesPath = "Resources");
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<NavigationState>();
         services.AddScoped<UserPreferencesState>();

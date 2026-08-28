@@ -210,6 +210,7 @@ public sealed class SecurityApiTests
         var html = await profile.Content.ReadAsStringAsync();
         StringAssert.Contains(html, "<html lang=\"fr-FR\">");
         StringAssert.Contains(WebUtility.HtmlDecode(html), "Paramètres du profil");
+        StringAssert.Contains(WebUtility.HtmlDecode(html), "Vue d’ensemble");
 
         using var unsupported = await browser.GetAsync(
             "/_culture?culture=de-DE&returnUrl=%2Fsettings%2Fprofile");

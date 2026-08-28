@@ -4,30 +4,31 @@
 @inject NavigationManager Navigation
 @inject UserPreferencesState Preferences
 @inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceLayoutStrings> Localizer
 <div class="app-shell @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light") workplace-shell">
-    <aside class="sidebar" aria-label="Workplace navigation">
-        <a class="brand-lockup" href="@HomeUrl" aria-label="Agentstration Workplace home"><span class="brand-mark"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></span><span><strong>Agentstration</strong><small>Workplace</small></span></a>
+    <aside class="sidebar" aria-label="@T("WorkplaceNavigation")">
+        <a class="brand-lockup" href="@HomeUrl" aria-label="@T("WorkplaceHome")"><span class="brand-mark"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></span><span><strong>Agentstration</strong><small>Workplace</small></span></a>
         <nav class="side-nav">
-            <NavLink href="@HomeUrl" Match="NavLinkMatch.All"><UiIcon Name="home" /><span class="nav-label">Home</span></NavLink>
+            <NavLink href="@HomeUrl" Match="NavLinkMatch.All"><UiIcon Name="home" /><span class="nav-label">@T("Home")</span></NavLink>
             @if (CurrentWorkspace is null)
             {
-                <a class="side-nav-disabled" aria-disabled="true" tabindex="-1"><UiIcon Name="tasks" /><span class="nav-label">Tasks</span></a>
-                <a class="side-nav-disabled" aria-disabled="true" tabindex="-1"><UiIcon Name="notifications" /><span class="nav-label">Notifications</span></a>
+                <a class="side-nav-disabled" aria-disabled="true" tabindex="-1"><UiIcon Name="tasks" /><span class="nav-label">@T("Tasks")</span></a>
+                <a class="side-nav-disabled" aria-disabled="true" tabindex="-1"><UiIcon Name="notifications" /><span class="nav-label">@T("Notifications")</span></a>
             }
             else
             {
-                <NavLink href="@TasksUrl"><UiIcon Name="tasks" /><span class="nav-label">Tasks</span></NavLink>
-                <NavLink href="@NotificationsUrl"><UiIcon Name="notifications" /><span class="nav-label">Notifications</span></NavLink>
+                <NavLink href="@TasksUrl"><UiIcon Name="tasks" /><span class="nav-label">@T("Tasks")</span></NavLink>
+                <NavLink href="@NotificationsUrl"><UiIcon Name="notifications" /><span class="nav-label">@T("Notifications")</span></NavLink>
             }
         </nav>
-        <div class="sidebar-footer"><strong>@(CurrentWorkspace ?? "Workplace")</strong><small>Local mode</small></div>
+        <div class="sidebar-footer"><strong>@(CurrentWorkspace ?? "Workplace")</strong><small>@T("LocalMode")</small></div>
     </aside>
     <div class="workspace">
         <header class="mobile-appbar">
-            <a class="mobile-brand" href="@HomeUrl" aria-label="Agentstration Workplace home"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /><span><small>Agentstration</small><strong>Workplace</strong></span></a>
-            <a class="mobile-notifications" href="@NotificationsUrl" aria-label="Open notifications"><UiIcon Name="notifications" /></a>
+            <a class="mobile-brand" href="@HomeUrl" aria-label="@T("WorkplaceHome")"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /><span><small>Agentstration</small><strong>Workplace</strong></span></a>
+            <a class="mobile-notifications" href="@NotificationsUrl" aria-label="@T("OpenNotifications")"><UiIcon Name="notifications" /></a>
         </header>
-        <header class="topbar"><div class="topbar-start"><nav class="breadcrumb"><a href="@HomeUrl">@((CurrentWorkspace ?? "My") + " Workplace")</a></nav></div><div class="topbar-actions"><span class="environment-chip">LOCAL</span><button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="Toggle color theme" title="@(Preferences.Error ?? $"Theme: {Preferences.Theme}")"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button><a class="icon-button" href="@NotificationsUrl" aria-label="Open notifications"><UiIcon Name="notifications" /></a></div></header><main class="content">@Body</main>
+        <header class="topbar"><div class="topbar-start"><nav class="breadcrumb"><a href="@HomeUrl">@(CurrentWorkspace is null ? T("MyWorkplace") : F("NamedWorkplace", CurrentWorkspace))</a></nav></div><div class="topbar-actions"><span class="environment-chip">LOCAL</span><button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="@T("ToggleColorTheme")" title="@(Preferences.Error ?? F("ThemeValue", Preferences.Theme))"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button><a class="icon-button" href="@NotificationsUrl" aria-label="@T("OpenNotifications")"><UiIcon Name="notifications" /></a></div></header><main class="content">@Body</main>
     </div>
 </div>
 
@@ -65,6 +66,8 @@
     private string HomeUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}";
     private string TasksUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}/tasks";
     private string NotificationsUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}/notifications";
+    private string T(string key) => Localizer[key];
+    private string F(string key, params object[] arguments) => Localizer[key, arguments];
 
     public async ValueTask DisposeAsync()
     {

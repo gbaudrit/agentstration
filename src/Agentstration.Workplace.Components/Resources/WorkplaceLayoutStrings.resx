@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="WorkplaceNavigation" xml:space="preserve"><value>Workplace navigation</value></data><data name="WorkplaceHome" xml:space="preserve"><value>Agentstration Workplace home</value></data>
+  <data name="Home" xml:space="preserve"><value>Home</value></data><data name="Tasks" xml:space="preserve"><value>Tasks</value></data><data name="Notifications" xml:space="preserve"><value>Notifications</value></data><data name="LocalMode" xml:space="preserve"><value>Local mode</value></data>
+  <data name="OpenNotifications" xml:space="preserve"><value>Open notifications</value></data><data name="MyWorkplace" xml:space="preserve"><value>My Workplace</value></data><data name="NamedWorkplace" xml:space="preserve"><value>{0} Workplace</value></data>
+  <data name="ToggleColorTheme" xml:space="preserve"><value>Toggle color theme</value></data><data name="ThemeValue" xml:space="preserve"><value>Theme: {0}</value></data>
+</root>

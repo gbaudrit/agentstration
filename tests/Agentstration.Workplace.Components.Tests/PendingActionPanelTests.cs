@@ -4,6 +4,7 @@ using Agentstration.Workplace.Components;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using System.Globalization;
 
 namespace Agentstration.Workplace.Components.Tests;
 
@@ -108,5 +109,33 @@ public sealed class PendingActionPanelTests
         Assert.IsTrue(disabled.All(value => value.GetAttribute("aria-disabled") == "true"));
         Assert.IsTrue(disabled.All(value => value.GetAttribute("tabindex") == "-1"));
         Assert.IsTrue(disabled.All(value => !value.HasAttribute("href")));
+    }
+
+    [TestMethod]
+    [DoNotParallelize]
+    public void WorkplaceLayoutUsesTheSelectedCulture()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
+            using var context = new BunitContext();
+            context.JSInterop.Mode = JSRuntimeMode.Loose;
+            context.Services.AddAgentstrationWebComponents();
+
+            var rendered = context.Render<WorkplaceLayout>(parameters => parameters
+                .Add(value => value.Body, builder => builder.AddContent(0, "Contenu")));
+
+            StringAssert.Contains(rendered.Markup, "Accueil");
+            StringAssert.Contains(rendered.Markup, "Tâches");
+            StringAssert.Contains(rendered.Markup, "Mode local");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 }
