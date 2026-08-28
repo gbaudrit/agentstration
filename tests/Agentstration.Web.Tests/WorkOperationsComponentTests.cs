@@ -88,10 +88,13 @@ public sealed class WorkOperationsComponentTests
         using var culture = new CultureScope("fr-FR");
         using var context = CreateContext();
         var agents = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentsStrings>>();
+        var agentRuns = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentRunsStrings>>();
         var flows = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowsStrings>>();
 
         Assert.AreEqual("Créer un agent", agents["CreateAgent"].Value);
         Assert.AreEqual("Définissez, publiez et exploitez des ressources d’agents spécialisés.", agents["Description"].Value);
+        Assert.AreEqual("Exécutions d’agents", agentRuns["Title"].Value);
+        Assert.AreEqual("Aucune exécution d’agent", agentRuns["EmptyTitle"].Value);
         Assert.AreEqual("Nouveau Flow", flows["NewFlow"].Value);
         Assert.AreEqual("Voir toutes les exécutions", flows["ViewAllRuns"].Value);
     }
