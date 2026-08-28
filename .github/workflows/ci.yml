@@ -15,6 +15,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  windows-host-lifecycle:
+    name: windows-host-lifecycle
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Restore web tests
+        run: dotnet restore tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Build web tests
+        run: dotnet build tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --no-restore
+      - name: Verify Windows host lifecycle
+        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "FullyQualifiedName~QuartzHostLifecycleTests|FullyQualifiedName~StartupDoesNotCreateLegacyDataJson" --progress off
+
   build-and-test:
     name: build-and-test
     runs-on: ubuntu-latest
