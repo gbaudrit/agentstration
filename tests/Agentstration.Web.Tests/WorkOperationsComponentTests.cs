@@ -88,12 +88,16 @@ public sealed class WorkOperationsComponentTests
         using var culture = new CultureScope("fr-FR");
         using var context = CreateContext();
         var agents = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentsStrings>>();
+        var agentEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentEditorStrings>>();
         var agentRuns = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentRunsStrings>>();
         var agentRunnerInspector = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentRunnerInspectorStrings>>();
         var flows = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowsStrings>>();
 
         Assert.AreEqual("Créer un agent", agents["CreateAgent"].Value);
         Assert.AreEqual("Définissez, publiez et exploitez des ressources d’agents spécialisés.", agents["Description"].Value);
+        Assert.AreEqual("Créer et déployer", agentEditor["CreateAndDeploy"].Value);
+        Assert.AreEqual("Configuration déclarée et résolue", agentEditor["DeclaredAndResolved"].Value);
+        Assert.AreEqual("La génération 7 est prête.", agentEditor["GenerationReady", 7].Value);
         Assert.AreEqual("Exécutions d’agents", agentRuns["Title"].Value);
         Assert.AreEqual("Aucune exécution d’agent", agentRuns["EmptyTitle"].Value);
         Assert.AreEqual("Données brutes", agentRunnerInspector["Tab.Raw"].Value);
