@@ -22,16 +22,18 @@ public sealed class FlowDetailsDesignerTests
     public void NamespacedFlowKeepsDesignerTabAndUsesNamespacedLink()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters
             .Add(component => component.FlowId, "sample")
             .Add(component => component.FlowNamespace, "pack.sample"));
 
-        var overviewLink = rendered.FindAll("a").Single(link => link.TextContent.Trim() == "read-only Flow Designer");
+        var overviewLink = rendered.FindAll("a").Single(link => link.TextContent.Trim() == strings["ReadOnlyDesigner"].Value);
         Assert.AreEqual("/namespaces/pack.sample/flows/sample/designer", overviewLink.GetAttribute("href"));
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == "Designer").Click();
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Designer"].Value).Click();
 
         var link = rendered.Find("a.button-primary");
         Assert.AreEqual("/namespaces/pack.sample/flows/sample/designer", link.GetAttribute("href"));
@@ -42,17 +44,19 @@ public sealed class FlowDetailsDesignerTests
     public void NamespacedOrchestrationPageShowsPublishedDefinitionWithoutSaveOrPublish()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub(orchestration: true);
         context.Services.AddSingleton<IFlowApiClient>(client);
         context.Services.AddSingleton<IManagementApiClient>(new ManagementClientStub());
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowOrchestrationEditorStrings>>();
 
         var rendered = context.Render<FlowOrchestrationEditor>(parameters => parameters
             .Add(component => component.FlowId, "review")
             .Add(component => component.FlowNamespace, "pack.sample"));
 
-        StringAssert.Contains(rendered.Markup, "Read only");
-        StringAssert.Contains(rendered.Markup, "Published version");
-        Assert.IsFalse(rendered.FindAll("button").Any(button => button.TextContent.Contains("Save", StringComparison.Ordinal) || button.TextContent.Contains("Publish", StringComparison.Ordinal)));
+        StringAssert.Contains(rendered.Markup, strings["ReadOnly"].Value);
+        StringAssert.Contains(rendered.Markup, strings["PublishedVersion"].Value);
+        Assert.IsFalse(rendered.FindAll("button").Any(button => button.TextContent.Contains(strings["Save"].Value, StringComparison.Ordinal) || button.TextContent.Contains(strings["PublishAndActivate"].Value, StringComparison.Ordinal)));
         Assert.IsTrue(rendered.Find("fieldset.orchestration-configuration").HasAttribute("disabled"));
     }
 

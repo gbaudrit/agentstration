@@ -5,30 +5,31 @@
 @inject IFlowApiClient Client
 @inject IManagementApiClient Management
 @inject NavigationManager Navigation
-<PageTitle>@(model?.Name ?? "Orchestration") · Agentstration</PageTitle>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FlowOrchestrationEditorStrings> Localizer
+<PageTitle>@(model?.Name ?? T("Orchestration")) · Agentstration</PageTitle>
 
 @if (loading)
 {
-    <LoadingState />
+    <LoadingState Message="@T("Loading")" />
 }
 else if (model is null)
 {
-    <ErrorState Title="Orchestration unavailable" Message="@(error ?? "The Flow could not be loaded.")" />
+    <ErrorState Title="@T("Unavailable")" Message="@(error ?? T("CouldNotLoad"))" />
 }
 else
 {
-    <PageHeader Title="@model.Name" Description="@(IsReadOnly ? "Inspect the published participants and execution strategy." : "Edit participants and execution strategy without exposing runtime implementation details.")">
-        <Actions><a class="button-secondary" href="@DetailsUrl">Flow details</a></Actions>
+    <PageHeader Title="@model.Name" Description="@(IsReadOnly ? T("ReadOnlyDescription") : T("EditDescription"))">
+        <Actions><a class="button-secondary" href="@DetailsUrl">@T("FlowDetails")</a></Actions>
     </PageHeader>
     @if (IsReadOnly)
     {
-        <p class="muted"><span class="read-only-badge">Read only</span> Namespace <code>@FlowResourceNamespace.Value</code> · Published version <strong>@publishedVersion</strong></p>
+        <p class="muted"><span class="read-only-badge">@T("ReadOnly")</span> @T("Namespace") <code>@FlowResourceNamespace.Value</code> · @T("PublishedVersion") <strong>@publishedVersion</strong></p>
     }
     <EditForm Model="model" OnValidSubmit="SaveAsync">
         <fieldset class="panel orchestration-metadata" disabled="@IsReadOnly">
-            <div class="form-columns"><label>Technical name<input value="@model.Name" readonly /></label><label>Current definition version<InputText @bind-Value="model.Version" /></label></div>
-            <label>Description<InputTextArea @bind-Value="model.Description" /></label>
-            <label class="check-option"><InputCheckbox @bind-Value="model.Enabled" /> Enabled</label>
+            <div class="form-columns"><label>@T("TechnicalName")<input value="@model.Name" readonly /></label><label>@T("CurrentDefinitionVersion")<InputText @bind-Value="model.Version" /></label></div>
+            <label>@T("Description")<InputTextArea @bind-Value="model.Description" /></label>
+            <label class="check-option"><InputCheckbox @bind-Value="model.Enabled" /> @T("Enabled")</label>
         </fieldset>
         <OrchestrationDefinitionEditor Model="model" Agents="agents" IsReadOnly="@IsReadOnly" />
         @if (error is not null) { <p class="error-panel orchestration-message">@error</p> }
@@ -36,10 +37,10 @@ else
         @if (!IsReadOnly)
         {
             <div class="orchestration-actions">
-                <span class="save-state">ETag protected · @(saving ? "Saving…" : "Ready")</span>
-                <button type="submit" class="button-secondary" disabled="@saving">Save</button>
-                <label>Publish version<input @bind="publishVersion" /></label>
-                <button type="button" class="button-primary" disabled="@saving" @onclick="PublishAsync">Publish and activate</button>
+                <span class="save-state">@T("EtagProtected") · @(saving ? T("Saving") : T("Ready"))</span>
+                <button type="submit" class="button-secondary" disabled="@saving">@T("Save")</button>
+                <label>@T("PublishVersion")<input @bind="publishVersion" /></label>
+                <button type="button" class="button-primary" disabled="@saving" @onclick="PublishAsync">@T("PublishAndActivate")</button>
             </div>
         }
     </EditForm>
@@ -48,6 +49,7 @@ else
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private readonly CancellationTokenSource cancellation = new();
     private OrchestrationEditorModel? model;
     private IReadOnlyList<AgentSummary> agents = [];
@@ -74,10 +76,10 @@ else
             {
                 var flow = await Client.GetFlowAsync(FlowResourceNamespace, FlowId, cancellation.Token);
                 if (string.IsNullOrWhiteSpace(flow.ActiveVersion))
-                    throw new InvalidOperationException($"Namespaced Flow '{FlowResourceNamespace.Value}/{FlowId}' has no active published version.");
+                    throw new InvalidOperationException(T("NoActivePublishedVersion", $"{FlowResourceNamespace.Value}/{FlowId}"));
                 var version = await Client.GetFlowVersionAsync(FlowResourceNamespace, FlowId, flow.ActiveVersion, cancellation.Token);
                 if (version.Definition is not OrchestrationFlowDefinition)
-                    throw new InvalidOperationException($"Published version {version.Version} is not an orchestration Flow.");
+                    throw new InvalidOperationException(T("NotOrchestration", version.Version));
                 model = OrchestrationEditorModel.From(flow with { Version = version.Version, Definition = version.Definition, Description = version.Description });
                 publishedVersion = version.Version;
                 etag = null;
@@ -111,7 +113,7 @@ else
                 model.CreateDefinition()), etag, cancellation.Token);
             model = OrchestrationEditorModel.From(saved.Value);
             etag = saved.ETag;
-            message = "Orchestration saved.";
+            message = T("Saved");
         }
         catch (Exception exception) { error = exception.Message; }
         finally { saving = false; }
@@ -126,7 +128,7 @@ else
         {
             saving = true; message = null;
             var published = await Client.CreateFlowVersionAsync(FlowId, new CreateFlowVersionRequest(publishVersion, true), cancellation.Token);
-            message = $"Version {published.Version} published and activated.";
+            message = T("VersionPublished", published.Version);
             publishVersion = NextVersion(published.Version);
         }
         catch (Exception exception) { error = exception.Message; }

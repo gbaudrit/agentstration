@@ -3,6 +3,8 @@ using Agentstration.Web.Components.Flows;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using FlowDesignerPage = Agentstration.Web.Components.Pages.FlowDesigner;
 using FlowOrchestrationEditorPage = Agentstration.Web.Components.Pages.FlowOrchestrationEditor;
 
@@ -14,7 +16,7 @@ public sealed class OrchestrationConsoleComponentTests
     [TestMethod]
     public void PreviewShowsMagenticManagerAndParticipantsWithoutRuntimeVocabulary()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var model = new OrchestrationEditorModel
         {
             Strategy = FlowOrchestrationStrategy.Magentic,
@@ -33,7 +35,7 @@ public sealed class OrchestrationConsoleComponentTests
     [TestMethod]
     public void PreviewShowsDeclaredHandoffRoutes()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var model = new OrchestrationEditorModel
         {
             Strategy = FlowOrchestrationStrategy.Handoff,
@@ -53,7 +55,8 @@ public sealed class OrchestrationConsoleComponentTests
     [TestMethod]
     public void PreviewOpensNodeDetailsWhenParticipantIsSelected()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
+        var strings = context.Services.GetRequiredService<IStringLocalizer<Agentstration.Web.Components.Pages.FlowOrchestrationEditorStrings>>();
         var model = new OrchestrationEditorModel
         {
             Strategy = FlowOrchestrationStrategy.Handoff,
@@ -74,7 +77,7 @@ public sealed class OrchestrationConsoleComponentTests
         rendered.FindAll(".topology-node").Single(node => node.GetAttribute("aria-label")!.StartsWith("agent-a", StringComparison.Ordinal)).Click();
 
         var details = rendered.Find(".orchestration-node-details");
-        StringAssert.Contains(details.TextContent, "Initial participant");
+        StringAssert.Contains(details.TextContent, strings["InitialParticipant"].Value);
         StringAssert.Contains(details.TextContent, "default");
         StringAssert.Contains(details.TextContent, "calendar");
     }
@@ -92,7 +95,8 @@ public sealed class OrchestrationConsoleComponentTests
     [TestMethod]
     public void ReadOnlyOrchestrationEditorDisablesAllConfigurationControls()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
+        var strings = context.Services.GetRequiredService<IStringLocalizer<Agentstration.Web.Components.Pages.FlowOrchestrationEditorStrings>>();
         var model = new OrchestrationEditorModel { Strategy = FlowOrchestrationStrategy.Sequential };
         model.ParticipantIds.AddRange(["agent-a", "agent-b"]);
 
@@ -103,6 +107,13 @@ public sealed class OrchestrationConsoleComponentTests
         var configuration = rendered.Find("fieldset.orchestration-configuration");
         Assert.IsTrue(configuration.HasAttribute("disabled"));
         Assert.IsTrue(configuration.QuerySelectorAll("input, select, button").All(element => element.HasAttribute("disabled") || element.Closest("fieldset[disabled]") is not null));
-        StringAssert.Contains(rendered.Markup, "Execution preview");
+        StringAssert.Contains(rendered.Markup, strings["ExecutionPreview"].Value);
+    }
+
+    private static BunitContext CreateContext()
+    {
+        var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        return context;
     }
 }

@@ -4,27 +4,28 @@
 @implements IDisposable
 @inject IFlowApiClient Client
 @inject NavigationManager Navigation
-<PageTitle>@(flow?.Name ?? "Flow") · Agentstration</PageTitle>
-@if (flow is null) { <LoadingState /> }
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings> Localizer
+<PageTitle>@(flow?.Name ?? T("Flow")) · Agentstration</PageTitle>
+@if (flow is null) { <LoadingState Message="@T("Loading")" /> }
 else
 {
-    <PageHeader Title="@flow.Name" Description="@(flow.Description ?? "Flow definition and execution history")">
-        <Actions><StatusBadge Text="@Status" Status="@PlatformDashboardService.ToStatus(Status)" /></Actions>
+    <PageHeader Title="@flow.Name" Description="@(flow.Description ?? T("DefaultDescription"))">
+        <Actions><StatusBadge Text="@StatusLabel" Status="@PlatformDashboardService.ToStatus(Status)" /></Actions>
     </PageHeader>
-    <nav class="section-tabs" aria-label="Flow details">
-        @foreach (var tab in AvailableTabs) { <button class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@tab</button> }
+    <nav class="section-tabs" aria-label="@T("DetailsAriaLabel")">
+        @foreach (var tab in AvailableTabs) { <button class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@TabLabel(tab)</button> }
     </nav>
     @if (activeTab == "Overview")
     {
-        <section class="metric-grid flow-metrics"><MetricCard Label="Current version" Value="@flow.Version" Detail="@(flow.ActiveVersion is null ? "Not published" : $"Active {flow.ActiveVersion}")" Status="UiStatus.Info" /><MetricCard Label="Status" Value="@Status" Detail="Immutable versions" Status="@(flow.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="@(IsOrchestration ? "Participants" : "Steps")" Value="@TopologyNodeCount.ToString()" Detail="@(IsOrchestration ? Orchestration!.Strategy.ToString() : Topology.Layout)" Status="UiStatus.Neutral" /><MetricCard Label="Recent runs" Value="@runs.Count.ToString()" Detail="@($"{runs.Count(x => x.Status == FlowRunStatus.Succeeded)} succeeded")" Status="UiStatus.Success" /></section>
-        <article class="panel definition-grid"><div><span class="field-label">Display name</span><strong>@flow.Name</strong></div><div><span class="field-label">Resource name</span><code>@flow.Id</code></div><div><span class="field-label">Namespace</span><code>@FlowResourceNamespace.Value</code></div><div><span class="field-label">Kind</span><strong>@flow.Definition.Kind</strong></div>@if(IsOrchestration){<div><span class="field-label">Strategy</span><strong>@Orchestration!.Strategy</strong></div><div><span class="field-label">Participants</span><strong>@string.Join(", ", Orchestration.Participants.Select(x => x.Id))</strong></div>}<div><span class="field-label">Execution profile</span><strong>local</strong></div><div><span class="field-label">Last publication</span><strong>@(versions.FirstOrDefault()?.PublishedAt.LocalDateTime.ToString("g") ?? "—")</strong></div></article>
+        <section class="metric-grid flow-metrics"><MetricCard Label="@T("CurrentVersion")" Value="@flow.Version" Detail="@(flow.ActiveVersion is null ? T("NotPublished") : T("ActiveVersion", flow.ActiveVersion))" Status="UiStatus.Info" /><MetricCard Label="@T("Status")" Value="@StatusLabel" Detail="@T("ImmutableVersions")" Status="@(flow.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="@(IsOrchestration ? T("Participants") : T("Steps"))" Value="@TopologyNodeCount.ToString()" Detail="@(IsOrchestration ? StrategyLabel(Orchestration!.Strategy) : Topology.Layout)" Status="UiStatus.Neutral" /><MetricCard Label="@T("RecentRuns")" Value="@runs.Count.ToString()" Detail="@SucceededRunCount(runs.Count(x => x.Status == FlowRunStatus.Succeeded))" Status="UiStatus.Success" /></section>
+        <article class="panel definition-grid"><div><span class="field-label">@T("DisplayName")</span><strong>@flow.Name</strong></div><div><span class="field-label">@T("ResourceName")</span><code>@flow.Id</code></div><div><span class="field-label">@T("Namespace")</span><code>@FlowResourceNamespace.Value</code></div><div><span class="field-label">@T("Kind")</span><strong>@flow.Definition.Kind</strong></div>@if(IsOrchestration){<div><span class="field-label">@T("Strategy")</span><strong>@StrategyLabel(Orchestration!.Strategy)</strong></div><div><span class="field-label">@T("Participants")</span><strong>@string.Join(", ", Orchestration.Participants.Select(x => x.Id))</strong></div>}<div><span class="field-label">@T("ExecutionProfile")</span><strong>local</strong></div><div><span class="field-label">@T("LastPublication")</span><strong>@(versions.FirstOrDefault()?.PublishedAt.LocalDateTime.ToString("g") ?? "—")</strong></div></article>
         @if (!FlowResourceNamespace.IsDefault)
         {
             <p class="muted">
-                This Flow is managed by namespace <code>@FlowResourceNamespace.Value</code>.
-                Its active published version can be inspected in the
-                <a href="@EditorUrl" data-enhance-nav="false">@(IsOrchestration ? "read-only orchestration view" : "read-only Flow Designer")</a>
-                and run here. Editing remains available only for workspace Flows.
+                @T("ManagedByNamespace") <code>@FlowResourceNamespace.Value</code>.
+                @T("PublishedVersionPrefix")
+                <a href="@EditorUrl" data-enhance-nav="false">@(IsOrchestration ? T("ReadOnlyOrchestrationView") : T("ReadOnlyDesigner"))</a>
+                @T("PublishedVersionSuffix")
             </p>
         }
     }
@@ -34,41 +35,46 @@ else
         <section class="designer-layout">
             <FlowTopologyViewer Graph="Topology" SelectedKey="selectedNode" SelectedKeyChanged="SelectNode" />
             <article class="panel inspector">
-                <div class="panel-header"><h2>@(IsOrchestration ? "Orchestration topology" : "Step properties")</h2></div>
+                <div class="panel-header"><h2>@(IsOrchestration ? T("OrchestrationTopology") : T("StepProperties"))</h2></div>
                 @if (SelectedTopologyNode is null)
                 {
-                    <p class="muted">Select a node in the graph.</p>
+                    <p class="muted">@T("SelectNode")</p>
                 }
                 else
                 {
-                    <dl class="details-list"><dt>Name</dt><dd>@SelectedTopologyNode.Label</dd><dt>Type</dt><dd>@SelectedTopologyNode.Type</dd>@if(SelectedTopologyNode.Subtitle is not null){<dt>Role / target</dt><dd>@SelectedTopologyNode.Subtitle</dd>}@if(SelectedTopologyNode.IsInitial){<dt>Entry</dt><dd>Initial participant</dd>}</dl>
-                    <p class="muted">Open the full editor to change the definition and its execution parameters.</p>
+                    <dl class="details-list"><dt>@T("Name")</dt><dd>@SelectedTopologyNode.Label</dd><dt>@T("Type")</dt><dd>@SelectedTopologyNode.Type</dd>@if(SelectedTopologyNode.Subtitle is not null){<dt>@T("RoleOrTarget")</dt><dd>@SelectedTopologyNode.Subtitle</dd>}@if(SelectedTopologyNode.IsInitial){<dt>@T("Entry")</dt><dd>@T("InitialParticipant")</dd>}</dl>
+                    <p class="muted">@T("OpenEditorHelp")</p>
                 }
             </article>
         </section>
     }
     else if (activeTab == "Runs")
     {
-        <div class="toolbar"><button class="button-primary" @onclick="OpenRun">Run flow</button><a class="button-secondary" href="/flow-runs">All Flow Runs</a></div>
-        @if(runs.Count == 0){<EmptyState Title="No runs yet" Message="Run the active published version to create the first trace." />}else{<RunGrid Runs="runs" />}
+        <div class="toolbar"><button class="button-primary" @onclick="OpenRun">@T("RunFlow")</button><a class="button-secondary" href="/flow-runs">@T("AllFlowRuns")</a></div>
+        @if(runs.Count == 0){<EmptyState Title="@T("NoRunsTitle")" Message="@T("NoRunsMessage")" />}else{<RunGrid Runs="runs" />}
     }
     else
     {
-        <DataGrid TItem="FlowVersionResponse" Items="versions"><Header><tr><th>Deployment</th><th>Version</th><th>Status</th><th>Published</th></tr></Header><Row Context="version"><tr><td><code>local</code></td><td>@version.Version</td><td><StatusBadge Text="@(version.Version == flow.ActiveVersion ? "Active" : "Published")" Status="@(version.Version == flow.ActiveVersion ? UiStatus.Success : UiStatus.Info)" /></td><td>@version.PublishedAt.LocalDateTime.ToString("g")</td></tr></Row></DataGrid>
+        <DataGrid TItem="FlowVersionResponse" Items="versions"><Header><tr><th>@T("Deployment")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Published")</th></tr></Header><Row Context="version"><tr><td><code>local</code></td><td>@version.Version</td><td><StatusBadge Text="@(version.Version == flow.ActiveVersion ? T("Active") : T("Published"))" Status="@(version.Version == flow.ActiveVersion ? UiStatus.Success : UiStatus.Info)" /></td><td>@version.PublishedAt.LocalDateTime.ToString("g")</td></tr></Row></DataGrid>
     }
     @if (showRun)
     {
-        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true"><h2>Run flow</h2><label>Published version<select @bind="runVersion">@foreach(var version in versions){<option value="@version.Version">@version.Version</option>}</select></label><label>Deployment<select @bind="deployment"><option value="local">local</option></select></label><label>Input JSON<textarea rows="11" @bind="inputJson"></textarea></label>@if(error is not null){<p class="error-panel">@error</p>}<div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun=false">Cancel</button><button class="button-primary" disabled="@submitting" @onclick="SubmitRunAsync">@(submitting ? "Starting…" : "Run flow")</button></div></section></div>
+        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true"><h2>@T("RunFlow")</h2><label>@T("PublishedVersion")<select @bind="runVersion">@foreach(var version in versions){<option value="@version.Version">@version.Version</option>}</select></label><label>@T("Deployment")<select @bind="deployment"><option value="local">local</option></select></label><label>@T("InputJson")<textarea rows="11" @bind="inputJson"></textarea></label>@if(error is not null){<p class="error-panel">@error</p>}<div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun=false">@T("Cancel")</button><button class="button-primary" disabled="@submitting" @onclick="SubmitRunAsync">@(submitting ? T("Starting") : T("RunFlow"))</button></div></section></div>
     }
 }
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string TabLabel(string tab) => Localizer[$"Tab.{tab}"];
+    private string StrategyLabel(FlowOrchestrationStrategy strategy) => Localizer[$"Strategy.{strategy}"];
+    private string SucceededRunCount(int count) => T(count == 1 ? "SucceededRunCount.One" : "SucceededRunCount.Many", count);
     private static readonly string[] Tabs = ["Overview", "Designer", "Runs", "Deployments"];
     private readonly CancellationTokenSource cancellation = new();
     private FlowResponse? flow; private IReadOnlyList<FlowVersionResponse> versions=[]; private IReadOnlyList<FlowRun> runs=[];
     private string activeTab="Overview", inputJson="{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}", deployment="local", runVersion=""; private string? selectedNode,error; private bool showRun,submitting;
     private string Status => flow?.ActiveVersion is not null ? "Published" : "Draft";
+    private string StatusLabel => T($"Status.{Status}");
     private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
     private IReadOnlyList<string> AvailableTabs => Tabs;
     private OrchestrationFlowDefinition? Orchestration => flow?.Definition as OrchestrationFlowDefinition;
@@ -84,9 +90,9 @@ else
         }
     }
     private string EditorLabel => IsOrchestration
-        ? FlowResourceNamespace.IsDefault ? "Open orchestration editor" : "View orchestration"
-        : FlowResourceNamespace.IsDefault ? "Open Flow Designer" : "View in Flow Designer";
-    private FlowTopologyGraph Topology => flow is null ? new([], [], "horizontal", "Flow topology") : FlowTopologyProjector.Project(flow.Definition, flow.Graph);
+        ? FlowResourceNamespace.IsDefault ? T("OpenOrchestrationEditor") : T("ViewOrchestration")
+        : FlowResourceNamespace.IsDefault ? T("OpenFlowDesigner") : T("ViewInFlowDesigner");
+    private FlowTopologyGraph Topology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(flow.Definition, flow.Graph);
     private FlowTopologyNode? SelectedTopologyNode => Topology.FindBySelection(selectedNode);
     private int TopologyNodeCount => Topology.Nodes.Count(node => node.Type is not "input" and not "output" and not "conversation" and not "manager");
     protected override async Task OnParametersSetAsync(){flow=await Client.GetFlowAsync(FlowResourceNamespace,FlowId,cancellation.Token);versions=await Client.GetFlowVersionsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runs=await Client.GetFlowRunsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runVersion=flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";}
