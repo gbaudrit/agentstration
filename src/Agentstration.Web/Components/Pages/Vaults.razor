@@ -1,12 +1,31 @@
 @page "/vaults"
 @implements IDisposable
 @inject ISecretsClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SecretStrings> Localizer
 
-<PageTitle>Vaults · Agentstration</PageTitle>
-<PageHeader Title="Vaults" Description="Configure providers that store secret values outside declarative resources."><Actions><a class="button-primary" href="/vaults/new">Create vault</a></Actions></PageHeader>
-<ResourceTabs Label="Secret management"><a href="/secrets">Secrets</a><a class="active" href="/vaults">Vaults</a></ResourceTabs>
-@if (loading) { <LoadingState Message="Loading Vaults…" /> }
+<PageTitle>@T("Vaults") · Agentstration</PageTitle>
+<PageHeader Title="@T("Vaults")" Description="@T("Vaults.Description")"><Actions><a class="button-primary" href="/vaults/new">@T("CreateVault")</a></Actions></PageHeader>
+<ResourceTabs Label="@T("SecretManagement")"><a href="/secrets">@T("Secrets")</a><a class="active" href="/vaults">@T("Vaults")</a></ResourceTabs>
+@if (loading) { <LoadingState Message="@T("LoadingVaults")" /> }
 else if (error is not null) { <div class="form-alert form-alert-danger">@error.Message</div> }
-else if (items.Count == 0) { <EmptyState Title="No Vaults" Message="Create a Local Vault before declaring Secrets." /> }
-else { <DataGrid TItem="VaultResponse" Items="items"><Header><tr><th>Name</th><th>Provider</th><th>Status</th><th>Location</th><th></th></tr></Header><Row Context="item"><tr><td><strong>@item.Resource.Definition.DisplayName</strong><br/><code>@item.Resource.Name</code></td><td>@item.Resource.Definition.ProviderType</td><td><StatusBadge Text="@item.Status" Status="@Tone(item.Status)" /></td><td>Local</td><td><a class="text-button" href="@($"/vaults/{Uri.EscapeDataString(item.Resource.Name)}")">Manage →</a></td></tr></Row></DataGrid> }
-@code { private readonly CancellationTokenSource cancellation = new(); private IReadOnlyList<VaultResponse> items=[]; private bool loading=true; private Exception? error; protected override async Task OnInitializedAsync(){try{items=await Client.GetVaultsAsync(cancellation.Token);}catch(Exception ex){error=ex;}finally{loading=false;}} private static UiStatus Tone(string value)=>value.Equals("available",StringComparison.OrdinalIgnoreCase)?UiStatus.Success:UiStatus.Danger; public void Dispose(){cancellation.Cancel();cancellation.Dispose();} }
+else if (items.Count == 0) { <EmptyState Title="@T("NoVaults")" Message="@T("NoVaultsMessage")" /> }
+else
+{
+    <DataGrid TItem="VaultResponse" Items="items">
+        <Header><tr><th>@T("Name")</th><th>@T("Provider")</th><th>@T("Status")</th><th>@T("Location")</th><th></th></tr></Header>
+        <Row Context="item"><tr><td><strong>@item.Resource.Definition.DisplayName</strong><br /><code>@item.Resource.Name</code></td><td>@ProviderText(item.Resource.Definition.ProviderType)</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" /></td><td>@T("Local")</td><td><a class="text-button" href="@($"/vaults/{Uri.EscapeDataString(item.Resource.Name)}")">@T("ManageArrow")</a></td></tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<VaultResponse> items = [];
+    private bool loading = true;
+    private Exception? error;
+    private string T(string key) => Localizer[key].Value;
+    private string StatusText(string status) => status.ToLowerInvariant() switch { "available" => T("Status.Available"), "unavailable" => T("Status.Unavailable"), "uninitialized" => T("Status.Uninitialized"), _ => T($"Status.{status}") };
+    private string ProviderText(string provider) => T($"Provider.{provider}");
+    protected override async Task OnInitializedAsync() { try { items = await Client.GetVaultsAsync(cancellation.Token); } catch (Exception ex) { error = ex; } finally { loading = false; } }
+    private static UiStatus Tone(string value) => value.Equals("available", StringComparison.OrdinalIgnoreCase) ? UiStatus.Success : UiStatus.Danger;
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

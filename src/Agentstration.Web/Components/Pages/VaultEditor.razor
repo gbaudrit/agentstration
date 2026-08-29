@@ -3,16 +3,40 @@
 @implements IDisposable
 @inject ISecretsClient Client
 @inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SecretStrings> Localizer
 
-<PageTitle>@(IsNew ? "Create Vault" : $"{Name} · Vault") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? "Create Vault" : model.DisplayName)" Description="Declare where encrypted Secret values are stored."><Actions>@if(!IsNew){<button class="button-danger" @onclick="()=>confirmDelete=true">Delete</button>}<a class="button-secondary" href="/vaults">Back</a></Actions></PageHeader>
-<ResourceTabs Label="Secret management"><a href="/secrets">Secrets</a><a class="active" href="/vaults">Vaults</a></ResourceTabs>
-@if(error is not null){<div class="form-alert form-alert-danger">@error.Message</div>}
-<EditForm Model="model" OnValidSubmit="SaveAsync" FormName="vault-editor" class="resource-form"><DataAnnotationsValidator/><ValidationSummary/>
-<section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Vault resource</h2></div>@if(status is not null){<StatusBadge Text="@status" Status="@(status=="available"?UiStatus.Success:UiStatus.Danger)"/>}</div><div class="form-grid">
-<label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)"/></label><label><span>Display name</span><InputText @bind-Value="model.DisplayName"/></label><label><span>Provider</span><InputSelect @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="local">Local</option></InputSelect></label></div></section>
-<section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Bootstrap</p><h2>Master key</h2></div>@if(!IsNew&&model.ProviderType=="local"&&status!="available"){<button type="button" class="button-primary" @onclick="()=>confirmInitialize=true" disabled="@busy">Initialize Local Vault</button>}</div><p>Generate the key on the server or configure a Base64-encoded 32-byte key through <code>AGENTSTRATION_MASTER_KEY_FILE</code>. The key is never sent to or displayed by the browser.</p>@if(keyFilePath is not null){<div class="form-alert form-alert-warning"><strong>Back up the master key file now.</strong><span><code>@keyFilePath</code></span></div>}</section>
-<div class="form-actions"><a class="button-secondary" href="/vaults">Cancel</a><button class="button-primary" disabled="@busy">@(busy?"Saving…":"Save vault")</button></div></EditForm>
-<ConfirmationDialog IsOpen="@confirmDelete" Title="Delete Vault" Message="@($"Delete Vault '{Name}'?")" ConfirmLabel="Delete Vault" OnConfirm="DeleteAsync" OnCancel="()=>confirmDelete=false"/>
-<ConfirmationDialog IsOpen="@confirmInitialize" Title="Initialize Local Vault" Message="Generate a new master key on the server? This action is available only once and the generated file must be backed up." ConfirmLabel="Generate master key" OnConfirm="InitializeAsync" OnCancel="()=>confirmInitialize=false"/>
-@code { [Parameter]public string? Name{get;set;} private readonly CancellationTokenSource cancellation=new(); private VaultEditorModel model=new(); private string? etag,status,keyFilePath; private Exception? error; private bool busy,confirmDelete,confirmInitialize; private bool IsNew=>string.IsNullOrWhiteSpace(Name); protected override async Task OnParametersSetAsync(){if(IsNew)return;try{var snapshot=await Client.GetVaultAsync(Name!,cancellation.Token);model=VaultEditorModel.From(snapshot.Value.Resource);status=snapshot.Value.Status;etag=snapshot.ETag;}catch(Exception ex){error=ex;}} private async Task SaveAsync(){busy=true;error=null;try{var snapshot=IsNew?await Client.CreateVaultAsync(new(model.Name,model.Properties()),cancellation.Token):await Client.UpdateVaultAsync(model.Name,new(model.Properties()),etag!,cancellation.Token);if(IsNew)Navigation.NavigateTo($"/vaults/{Uri.EscapeDataString(snapshot.Value.Name)}");else etag=snapshot.ETag;}catch(Exception ex){error=ex;}finally{busy=false;}} private async Task InitializeAsync(){confirmInitialize=false;busy=true;error=null;try{var result=await Client.InitializeVaultAsync(model.Name,cancellation.Token);keyFilePath=result.KeyFilePath;status="available";}catch(Exception ex){error=ex;}finally{busy=false;}} private async Task DeleteAsync(){confirmDelete=false;try{await Client.DeleteVaultAsync(model.Name,etag!,cancellation.Token);Navigation.NavigateTo("/vaults");}catch(Exception ex){error=ex;}} public void Dispose(){cancellation.Cancel();cancellation.Dispose();} }
+<PageTitle>@(IsNew ? T("CreateVault") : $"{Name} · {T("Vault")}") · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? T("CreateVault") : model.DisplayName)" Description="@T("VaultEditor.Description")"><Actions>@if (!IsNew) { <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/vaults">@T("Back")</a></Actions></PageHeader>
+<ResourceTabs Label="@T("SecretManagement")"><a href="/secrets">@T("Secrets")</a><a class="active" href="/vaults">@T("Vaults")</a></ResourceTabs>
+@if (error is not null) { <div class="form-alert form-alert-danger">@error.Message</div> }
+<EditForm Model="model" OnValidSubmit="SaveAsync" FormName="vault-editor" class="resource-form"><DataAnnotationsValidator /><ValidationSummary />
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("VaultResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusText(status)" Status="@(status == "available" ? UiStatus.Success : UiStatus.Danger)" /> }</div>
+        <div class="form-grid"><label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /></label><label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /></label><label><span>@T("Provider")</span><InputSelect @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="local">@T("Provider.local")</option></InputSelect></label></div>
+    </section>
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">@T("Bootstrap")</p><h2>@T("MasterKey")</h2></div>@if (!IsNew && model.ProviderType == "local" && status != "available") { <button type="button" class="button-primary" @onclick="() => confirmInitialize = true" disabled="@busy">@T("InitializeLocalVault")</button> }</div>
+        <p>@T("MasterKeyHelp")</p>
+        @if (keyFilePath is not null) { <div class="form-alert form-alert-warning"><strong>@T("BackUpMasterKey")</strong><span><code>@keyFilePath</code></span></div> }
+    </section>
+    <div class="form-actions"><a class="button-secondary" href="/vaults">@T("Cancel")</a><button class="button-primary" disabled="@busy">@(busy ? T("Saving") : T("SaveVault"))</button></div>
+</EditForm>
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteVault")" Message="@T("DeleteVaultMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteVault")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+<ConfirmationDialog IsOpen="@confirmInitialize" Title="@T("InitializeLocalVault")" Message="@T("InitializeLocalVaultMessage")" ConfirmLabel="@T("GenerateMasterKey")" OnConfirm="InitializeAsync" OnCancel="() => confirmInitialize = false" />
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private VaultEditorModel model = new();
+    private string? etag, status, keyFilePath;
+    private Exception? error;
+    private bool busy, confirmDelete, confirmInitialize;
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private string StatusText(string value) => value.ToLowerInvariant() switch { "available" => T("Status.Available"), "unavailable" => T("Status.Unavailable"), "uninitialized" => T("Status.Uninitialized"), _ => T($"Status.{value}") };
+    protected override async Task OnParametersSetAsync() { if (IsNew) return; try { var snapshot = await Client.GetVaultAsync(Name!, cancellation.Token); model = VaultEditorModel.From(snapshot.Value.Resource); status = snapshot.Value.Status; etag = snapshot.ETag; } catch (Exception ex) { error = ex; } }
+    private async Task SaveAsync() { busy = true; error = null; try { var snapshot = IsNew ? await Client.CreateVaultAsync(new(model.Name, model.Properties()), cancellation.Token) : await Client.UpdateVaultAsync(model.Name, new(model.Properties()), etag!, cancellation.Token); if (IsNew) Navigation.NavigateTo($"/vaults/{Uri.EscapeDataString(snapshot.Value.Name)}"); else etag = snapshot.ETag; } catch (Exception ex) { error = ex; } finally { busy = false; } }
+    private async Task InitializeAsync() { confirmInitialize = false; busy = true; error = null; try { var result = await Client.InitializeVaultAsync(model.Name, cancellation.Token); keyFilePath = result.KeyFilePath; status = "available"; } catch (Exception ex) { error = ex; } finally { busy = false; } }
+    private async Task DeleteAsync() { confirmDelete = false; try { await Client.DeleteVaultAsync(model.Name, etag!, cancellation.Token); Navigation.NavigateTo("/vaults"); } catch (Exception ex) { error = ex; } }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}
