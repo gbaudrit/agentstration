@@ -56,6 +56,7 @@ public sealed class ToolGovernanceAuditConsoleTests
     public void PageRendersAttemptAndExplainsWhenArgumentsWereNotRetained()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolGovernanceAuditClient>(new FakeAuditClient());
 
         var rendered = context.Render<ToolGovernanceAudit>(parameters => parameters
@@ -68,7 +69,7 @@ public sealed class ToolGovernanceAuditConsoleTests
             Assert.Contains("default/ToolExecutionHook/guard", rendered.Markup, StringComparison.Ordinal);
             Assert.Contains(">7<", rendered.Markup, StringComparison.Ordinal);
             Assert.Contains("Denied", rendered.Markup, StringComparison.Ordinal);
-            Assert.Contains("Arguments were not retained", rendered.Markup, StringComparison.Ordinal);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(rendered.Find(".governance-invocation .muted").TextContent));
             Assert.DoesNotContain("provider-result", rendered.Markup, StringComparison.OrdinalIgnoreCase);
         });
     }
@@ -77,6 +78,7 @@ public sealed class ToolGovernanceAuditConsoleTests
     public void PageRendersRetainedInvocationArguments()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolGovernanceAuditClient>(new FakeAuditClient("{\"query\":\"latest dotnet version\"}"));
 
         var rendered = context.Render<ToolGovernanceAudit>(parameters => parameters
@@ -86,7 +88,7 @@ public sealed class ToolGovernanceAuditConsoleTests
         rendered.WaitForAssertion(() =>
         {
             Assert.Contains("latest dotnet version", rendered.Markup, StringComparison.Ordinal);
-            Assert.DoesNotContain("Arguments were not retained", rendered.Markup, StringComparison.Ordinal);
+            Assert.IsEmpty(rendered.FindAll(".governance-invocation .muted"));
         });
     }
 

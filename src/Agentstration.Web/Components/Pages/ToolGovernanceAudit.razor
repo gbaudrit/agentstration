@@ -1,63 +1,64 @@
 @page "/tool-governance/{Owner}/{RunId}"
 @implements IDisposable
 @inject IToolGovernanceAuditClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolGovernanceAuditStrings> Localizer
 
-<PageTitle>Tool Governance · Agentstration</PageTitle>
-<PageHeader Title="Tool Governance" Description="Durable pre-invocation decisions for one Run.">
-    <Actions><a class="button-secondary" href="@BackUrl">Back to Run</a></Actions>
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")">
+    <Actions><a class="button-secondary" href="@BackUrl">@T("BackToRun")</a></Actions>
 </PageHeader>
 
 <section class="panel governance-context">
-    <div><span>Owner</span><strong>@OwnerLabel</strong></div>
-    <div><span>Run</span><code>@RunId</code></div>
-    <div><span>Arguments</span><strong>Opt-in retention</strong></div>
+    <div><span>@T("Owner")</span><strong>@OwnerLabel</strong></div>
+    <div><span>@T("Run")</span><code>@RunId</code></div>
+    <div><span>@T("Arguments")</span><strong>@T("OptInRetention")</strong></div>
 </section>
 
 <section class="panel governance-filters">
-    <div class="panel-header"><div><p class="eyebrow">Audit filters</p><h2>Physical attempts</h2></div></div>
+    <div class="panel-header"><div><p class="eyebrow">@T("AuditFilters")</p><h2>@T("PhysicalAttempts")</h2></div></div>
     <div class="filter-grid">
-        <label><span>Logical Tool call</span><input @bind="toolCallId" placeholder="ToolCallId" /></label>
-        <label><span>Physical invocation</span><input @bind="invocationId" placeholder="InvocationId" /></label>
-        <label><span>Tool</span><input @bind="toolId" placeholder="Tool resource ID" /></label>
-        <label><span>Hook</span><input @bind="hookId" placeholder="Hook or resource ID" /></label>
-        <label><span>Resource generation</span><input @bind="resourceGeneration" inputmode="numeric" placeholder="Any generation" /></label>
-        <label><span>Decision</span><select @bind="decision"><option value="">All decisions</option><option value="Allowed">Allowed</option><option value="Denied">Denied</option><option value="Failed">Failed</option></select></label>
+        <label><span>@T("LogicalToolCall")</span><input @bind="toolCallId" placeholder="ToolCallId" /></label>
+        <label><span>@T("PhysicalInvocation")</span><input @bind="invocationId" placeholder="InvocationId" /></label>
+        <label><span>@T("Tool")</span><input @bind="toolId" placeholder="@T("ToolResourceId")" /></label>
+        <label><span>@T("Hook")</span><input @bind="hookId" placeholder="@T("HookOrResourceId")" /></label>
+        <label><span>@T("ResourceGeneration")</span><input @bind="resourceGeneration" inputmode="numeric" placeholder="@T("AnyGeneration")" /></label>
+        <label><span>@T("Decision")</span><select @bind="decision"><option value="">@T("AllDecisions")</option>@foreach (var value in Enum.GetValues<ToolExecutionHookEvaluationKind>()) { <option value="@value">@DecisionLabel(value)</option> }</select></label>
     </div>
-    <div class="button-row"><button class="button-primary" @onclick="ApplyAsync" disabled="@loading">Apply filters</button><button class="button-secondary" @onclick="ClearAsync" disabled="@loading">Clear</button></div>
+    <div class="button-row"><button class="button-primary" @onclick="ApplyAsync" disabled="@loading">@T("ApplyFilters")</button><button class="button-secondary" @onclick="ClearAsync" disabled="@loading">@T("Clear")</button></div>
     @if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
 </section>
 
 @if (loading && records.Count == 0)
 {
-    <LoadingState Message="Loading Tool governance audit…" />
+    <LoadingState Message="@T("LoadingAudit")" />
 }
 else if (records.Count == 0)
 {
-    <EmptyState Title="No governance decisions" Message="No physical Tool attempt matches these filters." />
+    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" />
 }
 else
 {
-    <section class="governance-records" aria-label="Tool governance decisions">
+    <section class="governance-records" aria-label="@T("DecisionsAriaLabel")">
         @foreach (var record in records)
         {
             <article class="panel governance-record" id="invocation-@record.InvocationId">
                 <header>
-                    <div><p class="eyebrow">Sequence @record.Sequence · @record.Timestamp.LocalDateTime.ToString("G")</p><h2>@record.ToolName</h2></div>
-                    <StatusBadge Text="@OverallDecision(record).ToString()" Status="@DecisionTone(OverallDecision(record))" />
+                    <div><p class="eyebrow">@T("Sequence", record.Sequence) · @record.Timestamp.LocalDateTime.ToString("G")</p><h2>@record.ToolName</h2></div>
+                    <StatusBadge Text="@DecisionLabel(OverallDecision(record))" Status="@DecisionTone(OverallDecision(record))" />
                 </header>
                 <dl class="governance-identities">
-                    <dt>Logical call</dt><dd><code>@record.ToolCallId</code></dd>
-                    <dt>Physical invocation</dt><dd><code>@record.InvocationId</code></dd>
-                    <dt>Tool resource</dt><dd><code>@record.ToolId</code></dd>
-                    <dt>Provider</dt><dd><code>@(record.ProviderId ?? "—")</code></dd>
-                    <dt>Agent</dt><dd><code>@(record.AgentId ?? "—")</code></dd>
-                    <dt>Correlation</dt><dd><code>@(record.CorrelationId ?? "—")</code></dd>
+                    <dt>@T("LogicalCall")</dt><dd><code>@record.ToolCallId</code></dd>
+                    <dt>@T("PhysicalInvocation")</dt><dd><code>@record.InvocationId</code></dd>
+                    <dt>@T("ToolResource")</dt><dd><code>@record.ToolId</code></dd>
+                    <dt>@T("Provider")</dt><dd><code>@(record.ProviderId ?? "—")</code></dd>
+                    <dt>@T("Agent")</dt><dd><code>@(record.AgentId ?? "—")</code></dd>
+                    <dt>@T("Correlation")</dt><dd><code>@(record.CorrelationId ?? "—")</code></dd>
                 </dl>
-                <section class="governance-invocation" aria-label="Tool invocation arguments">
-                    <h3>Invocation arguments</h3>
+                <section class="governance-invocation" aria-label="@T("InvocationArgumentsAriaLabel")">
+                    <h3>@T("InvocationArguments")</h3>
                     @if (record.Arguments is null)
                     {
-                        <p class="muted">Arguments were not retained for this invocation.</p>
+                        <p class="muted">@T("ArgumentsNotRetained")</p>
                     }
                     else
                     {
@@ -66,13 +67,13 @@ else
                 </section>
                 @if (record.Evaluations.Count == 0)
                 {
-                    <p class="muted">No hook matched this physical attempt. The empty governance decision was persisted before provider invocation.</p>
+                    <p class="muted">@T("NoHookMatched")</p>
                 }
                 else
                 {
                     <DataGrid TItem="ToolExecutionHookEvaluation" Items="record.Evaluations">
-                        <Header><tr><th>Order</th><th>Hook</th><th>Source</th><th>Resource generation</th><th>Decision</th><th>Code</th></tr></Header>
-                        <Row Context="evaluation"><tr><td>@evaluation.Hook.Order</td><td><code>@evaluation.Hook.Id</code>@if (evaluation.Hook.ResourceId is not null) { <small>@evaluation.Hook.ResourceId</small> }</td><td>@evaluation.Hook.Source</td><td>@(evaluation.Hook.ResourceGeneration?.ToString() ?? "—")</td><td><StatusBadge Text="@evaluation.Decision.ToString()" Status="@DecisionTone(evaluation.Decision)" /></td><td><code>@(evaluation.Code ?? "—")</code></td></tr></Row>
+                        <Header><tr><th>@T("Order")</th><th>@T("Hook")</th><th>@T("Source")</th><th>@T("ResourceGeneration")</th><th>@T("Decision")</th><th>@T("Code")</th></tr></Header>
+                        <Row Context="evaluation"><tr><td>@evaluation.Hook.Order</td><td><code>@evaluation.Hook.Id</code>@if (evaluation.Hook.ResourceId is not null) { <small>@evaluation.Hook.ResourceId</small> }</td><td>@SourceLabel(evaluation.Hook.Source)</td><td>@(evaluation.Hook.ResourceGeneration?.ToString() ?? "—")</td><td><StatusBadge Text="@DecisionLabel(evaluation.Decision)" Status="@DecisionTone(evaluation.Decision)" /></td><td><code>@(evaluation.Code ?? "—")</code></td></tr></Row>
                     </DataGrid>
                 }
             </article>
@@ -80,7 +81,7 @@ else
     </section>
     @if (nextSequence is not null)
     {
-        <div class="load-more"><button class="button-secondary" @onclick="LoadMoreAsync" disabled="@loading">@(loading ? "Loading…" : "Load more")</button></div>
+        <div class="load-more"><button class="button-secondary" @onclick="LoadMoreAsync" disabled="@loading">@(loading ? T("LoadingMore") : T("LoadMore"))</button></div>
     }
 }
 
@@ -106,7 +107,10 @@ else
     private string decision = string.Empty;
     private string? error;
     private bool loading;
-    private string OwnerLabel => ownerKind == ToolExecutionOwnerKind.FlowRun ? "Flow Run" : "Runtime Run";
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string DecisionLabel(ToolExecutionHookEvaluationKind value) => Localizer[$"Decision.{value}"];
+    private string SourceLabel(ToolExecutionHookSource value) => Localizer[$"Source.{value}"];
+    private string OwnerLabel => ownerKind == ToolExecutionOwnerKind.FlowRun ? T("FlowRun") : T("RuntimeRun");
     private string BackUrl => ownerKind == ToolExecutionOwnerKind.FlowRun
         ? $"/flow-runs/{Uri.EscapeDataString(RunId)}"
         : $"/runs/{Uri.EscapeDataString(RunId)}";
@@ -147,14 +151,14 @@ else
         if (ownerKind == ToolExecutionOwnerKind.Unspecified)
         {
             records.Clear();
-            error = "Unknown audit owner. Use runtime or flow.";
+            error = T("UnknownOwner");
             return;
         }
         long? generation = null;
         if (!string.IsNullOrWhiteSpace(resourceGeneration)
             && (!long.TryParse(resourceGeneration, out var parsed) || parsed <= 0))
         {
-            error = "Resource generation must be a positive integer.";
+            error = T("InvalidGeneration");
             return;
         }
         else if (!string.IsNullOrWhiteSpace(resourceGeneration)) generation = long.Parse(resourceGeneration, System.Globalization.CultureInfo.InvariantCulture);

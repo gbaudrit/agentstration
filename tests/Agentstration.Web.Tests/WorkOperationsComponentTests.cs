@@ -99,6 +99,7 @@ public sealed class WorkOperationsComponentTests
         var runtimeProfileEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.RuntimeProfileEditorStrings>>();
         var runtimeProfiles = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.RuntimeProfilesStrings>>();
         var toolDetails = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolDetailsStrings>>();
+        var toolGovernanceAudit = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolGovernanceAuditStrings>>();
         var toolProviderEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolProviderEditorStrings>>();
         var toolProviders = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolProvidersStrings>>();
         var tools = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolsStrings>>();
@@ -139,6 +140,10 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Non découvert", toolProviders["Status.notDiscovered"].Value);
         Assert.AreEqual("Gouvernance et source", toolDetails["GovernanceAndSource"].Value);
         Assert.AreEqual("Approbation requise", toolDetails["RequiresApproval"].Value);
+        Assert.AreEqual("Gouvernance des outils", toolGovernanceAudit["Title"].Value);
+        Assert.AreEqual("Refusée", toolGovernanceAudit["Decision.Denied"].Value);
+        Assert.AreEqual("Les arguments n’ont pas été conservés pour cette invocation.", toolGovernanceAudit["ArgumentsNotRetained"].Value);
+        Assert.AreEqual("Séquence 4", toolGovernanceAudit["Sequence", 4].Value);
         Assert.AreEqual("Ajouter un fournisseur d’outils", toolProviderEditor["AddProvider"].Value);
         Assert.AreEqual("Connexion établie. La négociation du protocole a réussi. Outils découverts : 2 outils.", toolProviderEditor["ConnectionSucceeded", toolProviderEditor["ToolCount.Many", 2].Value].Value);
     }
