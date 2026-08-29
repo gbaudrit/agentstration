@@ -64,11 +64,7 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.LlamaCpp__Endpoint", llamaCppExtension.GetEndpoint("http"))
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.LocalAI__Endpoint", localAiExtension.GetEndpoint("http"))
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint", utilitiesExtension.GetEndpoint("http"))
-    .WithHttpHealthCheck("/health")
-    .WaitFor(ollamaExtension);
-console.WaitFor(llamaCppExtension);
-console.WaitFor(localAiExtension);
-console.WaitFor(utilitiesExtension);
+    .WithHttpHealthCheck("/health");
 console
     .WithEnvironment("Agentstration__ManagementApi__BaseAddress", console.GetEndpoint("http"))
     .WithEnvironment("Agentstration__ManagementApi__ForwardSessionCookie", "true")
