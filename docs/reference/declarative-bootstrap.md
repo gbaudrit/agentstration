@@ -42,7 +42,7 @@ environment:
   Agentstration__Bootstrap__Secrets__AdminPassword: ${ADMIN_PASSWORD}
 ```
 
-The password must satisfy the existing ASP.NET Core Identity policy. Identity validates and hashes it; Agentstration never adds it to the canonical resource or logs it. If the declared account already exists and its Principal is already a Platform administrator, bootstrap skips it without resolving or checking the password. Password changes therefore survive restarts. An existing account without the declared grant is treated as an inconsistent collision and fails startup rather than being silently changed.
+The password must satisfy the existing ASP.NET Core Identity policy. Identity validates and hashes it; Agentstration never adds it to the canonical resource or logs it. If the declared account already exists and its Principal is already a Platform administrator, bootstrap skips it without resolving or checking the password. Password changes therefore survive restarts. An existing account without the declared grant is reported as a non-fatal conflict: startup continues, the account and password remain unchanged, and bootstrap does not silently grant Platform administrator access.
 
 ## Visual Studio and local Development
 

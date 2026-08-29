@@ -18,7 +18,8 @@ public sealed record BootstrapResourceDocument
 public enum BootstrapResourceApplyResult
 {
     Created,
-    Skipped
+    Skipped,
+    Conflict
 }
 
 public interface IBootstrapResourceHandler

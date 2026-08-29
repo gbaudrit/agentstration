@@ -125,6 +125,31 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task ExistingNonAdministratorAccountIsANonFatalConflictWithoutResolvingTheSecret()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var factory = Factory(directory.Path, InitialPassword);
+        using var client = factory.CreateClient();
+        using var health = await client.GetAsync("/health");
+        health.EnsureSuccessStatusCode();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>();
+        var account = new LocalIdentityUser { UserName = "bootstrap-admin" };
+        var created = await users.CreateAsync(account, ChangedPassword);
+        Assert.IsTrue(created.Succeeded, string.Join("; ", created.Errors.Select(error => error.Description)));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "00-platform-admin.yaml"), PlatformAdministrator());
+        factory.Services.GetRequiredService<IConfiguration>()["Agentstration:Bootstrap:Secrets:AdminPassword"] = null;
+
+        var result = await scope.ServiceProvider.GetRequiredService<DeclarativeBootstrapService>().ApplyAsync(default);
+
+        Assert.AreEqual(1, result);
+        Assert.IsTrue(await users.CheckPasswordAsync(account, ChangedPassword));
+        var principal = await scope.ServiceProvider.GetRequiredService<IPrincipalResolver>().ResolveLocalAsync(account.Id, default);
+        Assert.IsNull(principal);
+    }
+
+    [TestMethod]
     public async Task MissingReferencedConfigurationFailsStartup()
     {
         using var directory = new TemporaryDirectory();

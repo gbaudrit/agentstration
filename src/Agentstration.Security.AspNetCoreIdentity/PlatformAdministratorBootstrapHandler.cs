@@ -49,8 +49,7 @@ public sealed class PlatformAdministratorBootstrapHandler(
             var principal = await principalResolver.ResolveLocalAsync(existing.Id, cancellationToken);
             if (principal is not null && await authorization.IsPlatformAdministratorAsync(principal.Id, cancellationToken))
                 return BootstrapResourceApplyResult.Skipped;
-            throw new InvalidOperationException(
-                $"Local account '{userName}' already exists but is not the declared Platform administrator.");
+            return BootstrapResourceApplyResult.Conflict;
         }
 
         var password = configuration[definition.PasswordFrom.Configuration];

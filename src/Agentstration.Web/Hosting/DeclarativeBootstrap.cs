@@ -60,18 +60,30 @@ public sealed class DeclarativeBootstrapService(
                     applied++;
                     if (logger.IsEnabled(LogLevel.Information))
                     {
-                        if (result == BootstrapResourceApplyResult.Created)
-                            logger.LogInformation(
-                                "Created bootstrap resource {BootstrapKind}/{BootstrapName} from {BootstrapFile}",
-                                resource.Kind,
-                                resource.Metadata.Name,
-                                fileName);
-                        else
-                            logger.LogInformation(
-                                "Skipped existing bootstrap resource {BootstrapKind}/{BootstrapName} from {BootstrapFile}",
-                                resource.Kind,
-                                resource.Metadata.Name,
-                                fileName);
+                        switch (result)
+                        {
+                            case BootstrapResourceApplyResult.Created:
+                                logger.LogInformation(
+                                    "Created bootstrap resource {BootstrapKind}/{BootstrapName} from {BootstrapFile}",
+                                    resource.Kind,
+                                    resource.Metadata.Name,
+                                    fileName);
+                                break;
+                            case BootstrapResourceApplyResult.Skipped:
+                                logger.LogInformation(
+                                    "Skipped existing bootstrap resource {BootstrapKind}/{BootstrapName} from {BootstrapFile}",
+                                    resource.Kind,
+                                    resource.Metadata.Name,
+                                    fileName);
+                                break;
+                            case BootstrapResourceApplyResult.Conflict:
+                                logger.LogWarning(
+                                    "Skipped conflicting bootstrap resource {BootstrapKind}/{BootstrapName} from {BootstrapFile}; existing state was preserved",
+                                    resource.Kind,
+                                    resource.Metadata.Name,
+                                    fileName);
+                                break;
+                        }
                     }
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException and not DeclarativeBootstrapException)
