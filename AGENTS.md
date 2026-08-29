@@ -95,6 +95,36 @@ Web -> Management / Flow / Runtime public boundaries
 - Provider-specific behavior belongs behind the existing Model Provider, Runtime, AEP, MCP and `IChatClient` boundaries.
 - Centralize NuGet versions in `Directory.Packages.props`; do not put package versions in individual project files.
 
+## Local Launch Profiles
+
+The standard Development profiles bootstrap a fresh local instance from `deploy/bootstrap/profiles/development` with the public fixture account `admin / admin`. This credential is disposable local test data, not a secret, and must never be reused outside local Development.
+
+For direct Web startup:
+
+```powershell
+# Bootstrap enabled; `http` is the default profile.
+dotnet run --project src/Agentstration.Web
+dotnet run --project src/Agentstration.Web --launch-profile https
+
+# Bootstrap disabled.
+dotnet run --project src/Agentstration.Web --launch-profile http-NoBootstrap
+dotnet run --project src/Agentstration.Web --launch-profile https-NoBootstrap
+```
+
+For Aspire startup:
+
+```powershell
+# Bootstrap enabled; `https` is the default AppHost profile.
+dotnet run --project src/Agentstration.AppHost
+
+# Bootstrap disabled for the orchestrated Console.
+dotnet run --project src/Agentstration.AppHost --launch-profile https-NoBootstrap
+```
+
+In Visual Studio, select the profile on the configured startup project. When `Agentstration.AppHost` is the startup project, its profile resolves and forwards the bootstrap path to the Console; profiles from `Agentstration.Web` do not appear in that selector.
+
+Build configuration and host environment are independent. `--configuration Release` still uses the selected Development launch profile and does not disable bootstrap. Use a `NoBootstrap` profile or `--no-launch-profile` when bootstrap must be omitted intentionally.
+
 ## C# Conventions
 
 - Target .NET 10 and follow `.editorconfig` and `Directory.Build.props`.
@@ -109,6 +139,7 @@ Web -> Management / Flow / Runtime public boundaries
 ## Security and Observability
 
 - Never commit secrets, API keys, personal data, generated data stores, or real document contents used for testing.
+- A credential may be committed only when it is explicitly documented as a public, disposable Development fixture, such as the local `admin / admin` bootstrap account. Never promote or reuse fixture credentials in an exposed or non-Development environment.
 - Never log full documents, prompts, credentials, or sensitive agent output by default.
 - Add structured correlation identifiers for relevant Workspace, WorkItem, FlowRun, Runtime Run and agent IDs.
 - Enforce workspace access in every new REST, UI, MCP, persistence, and background-processing path.
@@ -143,14 +174,14 @@ dotnet test Agentstration.slnx --configuration Release --no-build
 
 For a focused iteration, run the affected test project first, then run the full build and test suite before handoff. Do not suppress warnings or disable analyzers to make a change pass.
 
-To smoke-test the executable default when startup behavior changes:
+To smoke-test the executable default with the Development bootstrap when startup behavior changes:
 
 ```powershell
 $env:AI__Provider = "Deterministic"
 dotnet run --project src/Agentstration.Web
 ```
 
-Verify `/health` and the affected REST, Razor, or MCP path. Do not assume Docker, PostgreSQL, Ollama, or Aspire is available unless the task specifically targets that profile.
+Use `--launch-profile http-NoBootstrap` instead when the test must preserve or exercise a non-bootstrapped local state. Verify `/health` and the affected REST, Razor, or MCP path. Do not assume Docker, PostgreSQL, Ollama, or Aspire is available unless the task specifically targets that profile.
 
 ## Change Workflow
 

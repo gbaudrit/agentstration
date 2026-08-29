@@ -89,7 +89,11 @@ builder.Services.AddAgentstrationOpenApi();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSignalR();
-builder.Services.AddAgentstrationLocalIdentity(identityConnectionString, dataProtectionKeysPath);
+builder.Services.AddAgentstrationLocalIdentity(
+    identityConnectionString,
+    dataProtectionKeysPath,
+    useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
+builder.Services.AddScoped<DeclarativeBootstrapService>();
 builder.Services.AddSingleton<SignalRFlowRunEventSink>();
 builder.Services.AddSingleton<WorkplaceFlowConversationProjectionSink>();
 builder.Services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRunEventSink(
@@ -193,6 +197,7 @@ using (startupScopes.PushSystem())
     await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
     await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
     await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+    await app.Services.ApplyDeclarativeBootstrapAsync(app.Lifetime.ApplicationStopping);
 }
 if (bootstrapContext is not null)
     await WorkspaceStartupData.InitializeAsync(

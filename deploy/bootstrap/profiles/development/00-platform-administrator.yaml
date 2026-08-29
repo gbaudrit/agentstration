@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: PlatformAdministrator
+metadata:
+  name: admin
+definition:
+  displayName: Development administrator
+  passwordFrom:
+    configuration: Agentstration:Bootstrap:Secrets:AdminPassword
