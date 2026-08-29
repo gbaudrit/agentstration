@@ -1,1 +1,60 @@
-<?xml version="1.0" encoding="utf-8"?><root><resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader><data name="Tab.Response"><value>Réponse</value></data><data name="Tab.Execution"><value>Exécution</value></data><data name="Tab.Messages"><value>Messages</value></data><data name="Tab.Tools"><value>Outils</value></data><data name="Tab.Trace"><value>Trace</value></data><data name="Tab.Raw"><value>Données brutes</value></data><data name="WaitingResponse"><value>En attente de la réponse de l’agent…</value></data><data name="RunId"><value>Identifiant d’exécution</value></data><data name="Status"><value>État</value></data><data name="Duration"><value>Durée</value></data><data name="AgentVersion"><value>Version de l’agent</value></data><data name="ModelProfile"><value>Profil de modèle</value></data><data name="ResolvedModel"><value>Modèle résolu</value></data><data name="NotResolved"><value>Non résolu</value></data><data name="ModelNotReported"><value>Non communiqué par le fournisseur</value></data><data name="ProfileDefault"><value>Valeur du profil</value></data><data name="MaximumOutputTokens"><value>Nombre maximal de tokens en sortie</value></data><data name="ProviderDefault"><value>Valeur du fournisseur</value></data><data name="ToolArguments"><value>Arguments des outils</value></data><data name="Input"><value>en entrée</value></data><data name="Output"><value>en sortie</value></data><data name="Started"><value>Démarrée</value></data><data name="Pending"><value>En attente</value></data><data name="Completed"><value>Terminée</value></data><data name="Initiator"><value>Initiateur</value></data><data name="Origin"><value>Origine</value></data><data name="Assistant"><value>Assistant</value></data><data name="NoToolCalls"><value>Aucun appel d’outil</value></data><data name="NoToolCallsMessage"><value>Cette exécution n’a signalé aucune invocation d’outil.</value></data><data name="InspectGovernanceDecision"><value>Examiner la décision de gouvernance</value></data><data name="NoTraceEvents"><value>Aucun événement de trace</value></data><data name="NoTraceEventsMessage"><value>Cette exécution n’a encore signalé aucun événement de trace.</value></data><data name="CopyRequestJson"><value>Copier la requête JSON</value></data><data name="CopyResponseJson"><value>Copier la réponse JSON</value></data><data name="Request"><value>Requête</value></data><data name="RunAndEvents"><value>Exécution et événements</value></data><data name="History"><value>Historique</value></data><data name="RecentAgentRuns"><value>Exécutions récentes de l’agent</value></data><data name="NoRunsYet"><value>Aucune exécution</value></data><data name="NoRunsYetMessage"><value>Lancez une exécution rapide pour créer la première ressource d’exécution de cet agent.</value></data><data name="Run"><value>Exécution</value></data><data name="Date"><value>Date</value></data><data name="Version"><value>Version</value></data><data name="Prompt"><value>Invite</value></data><data name="Live"><value>En cours</value></data></root>
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Tab.Response" xml:space="preserve"><value>Réponse</value></data>
+  <data name="Tab.Execution" xml:space="preserve"><value>Exécution</value></data>
+  <data name="Tab.Messages" xml:space="preserve"><value>Messages</value></data>
+  <data name="Tab.Tools" xml:space="preserve"><value>Outils</value></data>
+  <data name="Tab.Trace" xml:space="preserve"><value>Trace</value></data>
+  <data name="Tab.Raw" xml:space="preserve"><value>Données brutes</value></data>
+  <data name="WaitingResponse" xml:space="preserve"><value>En attente de la réponse de l’agent…</value></data>
+  <data name="RunId" xml:space="preserve"><value>Identifiant d’exécution</value></data>
+  <data name="Status" xml:space="preserve"><value>État</value></data>
+  <data name="Duration" xml:space="preserve"><value>Durée</value></data>
+  <data name="AgentVersion" xml:space="preserve"><value>Version de l’agent</value></data>
+  <data name="ModelProfile" xml:space="preserve"><value>Profil de modèle</value></data>
+  <data name="ResolvedModel" xml:space="preserve"><value>Modèle résolu</value></data>
+  <data name="NotResolved" xml:space="preserve"><value>Non résolu</value></data>
+  <data name="ModelNotReported" xml:space="preserve"><value>Non communiqué par le fournisseur</value></data>
+  <data name="ProfileDefault" xml:space="preserve"><value>Valeur du profil</value></data>
+  <data name="MaximumOutputTokens" xml:space="preserve"><value>Nombre maximal de jetons en sortie</value></data>
+  <data name="ProviderDefault" xml:space="preserve"><value>Valeur du fournisseur</value></data>
+  <data name="ToolArguments" xml:space="preserve"><value>Arguments des outils</value></data>
+  <data name="Input" xml:space="preserve"><value>en entrée</value></data>
+  <data name="Output" xml:space="preserve"><value>en sortie</value></data>
+  <data name="Started" xml:space="preserve"><value>Démarrée</value></data>
+  <data name="Pending" xml:space="preserve"><value>En attente</value></data>
+  <data name="Completed" xml:space="preserve"><value>Terminée</value></data>
+  <data name="Initiator" xml:space="preserve"><value>Initiateur</value></data>
+  <data name="Origin" xml:space="preserve"><value>Origine</value></data>
+  <data name="Assistant" xml:space="preserve"><value>Assistant</value></data>
+  <data name="NoToolCalls" xml:space="preserve"><value>Aucun appel d’outil</value></data>
+  <data name="NoToolCallsMessage" xml:space="preserve"><value>Cette exécution n’a signalé aucune invocation d’outil.</value></data>
+  <data name="InspectGovernanceDecision" xml:space="preserve"><value>Examiner la décision de gouvernance</value></data>
+  <data name="NoTraceEvents" xml:space="preserve"><value>Aucun événement de trace</value></data>
+  <data name="NoTraceEventsMessage" xml:space="preserve"><value>Cette exécution n’a encore signalé aucun événement de trace.</value></data>
+  <data name="CopyRequestJson" xml:space="preserve"><value>Copier la requête JSON</value></data>
+  <data name="CopyResponseJson" xml:space="preserve"><value>Copier la réponse JSON</value></data>
+  <data name="Request" xml:space="preserve"><value>Requête</value></data>
+  <data name="RunAndEvents" xml:space="preserve"><value>Exécution et événements</value></data>
+  <data name="History" xml:space="preserve"><value>Historique</value></data>
+  <data name="RecentAgentRuns" xml:space="preserve"><value>Exécutions récentes de l’agent</value></data>
+  <data name="NoRunsYet" xml:space="preserve"><value>Aucune exécution</value></data>
+  <data name="NoRunsYetMessage" xml:space="preserve"><value>Lancez une exécution rapide pour créer la première ressource d’exécution de cet agent.</value></data>
+  <data name="Run" xml:space="preserve"><value>Exécution</value></data>
+  <data name="Date" xml:space="preserve"><value>Date</value></data>
+  <data name="Version" xml:space="preserve"><value>Version</value></data>
+  <data name="Prompt" xml:space="preserve"><value>Invite</value></data>
+  <data name="Live" xml:space="preserve"><value>En cours</value></data>
+  <data name="Temperature" xml:space="preserve"><value>Température</value></data>
+  <data name="Tokens" xml:space="preserve"><value>Jetons</value></data>
+  <data name="RunState.Pending" xml:space="preserve"><value>En attente</value></data>
+  <data name="RunState.Running" xml:space="preserve"><value>En cours</value></data>
+  <data name="RunState.Succeeded" xml:space="preserve"><value>Réussie</value></data>
+  <data name="RunState.Failed" xml:space="preserve"><value>Échec</value></data>
+  <data name="RunState.Cancelled" xml:space="preserve"><value>Annulée</value></data>
+  <data name="RunState.TimedOut" xml:space="preserve"><value>Délai dépassé</value></data>
+</root>

@@ -33,9 +33,9 @@ else
     }
 
     <section class="runner-config panel">
-        <div><span>Agent</span><strong>@agent.Definition.DisplayName</strong></div>
+        <div><span>@T("Agent")</span><strong>@agent.Definition.DisplayName</strong></div>
         <div><span>@T("Version")</span><strong>@agent.Generation</strong></div>
-        <div><span>Runtime</span><strong>@(state.Run?.Status.Runtime ?? "Local")</strong></div>
+        <div><span>@T("Runtime")</span><strong>@(state.Run?.Status.Runtime ?? T("Local"))</strong></div>
         <div><span>@T("ModelProfile")</span><strong>@ResourceName(agent.Definition.ModelProfile.ResourceId)</strong></div>
         <div><span>@T("Provider")</span><strong>@(modelResolution?.Resolved.Provider?.Name ?? T("NotResolved"))</strong></div>
         <div><span>@T("Model")</span><strong>@(modelResolution?.Resolved.Model.Name ?? T("NotResolved"))</strong></div>
@@ -59,14 +59,14 @@ else
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("QuickRun")</p><h2>@T("UserInput")</h2></div><button class="text-button" type="button" @onclick="() => advanced = !advanced">@(advanced ? T("HideAdvanced") : T("AdvancedRun"))</button></div>
             <div class="form-grid">
-                <label class="form-span-2"><span>Prompt</span><InputTextArea @bind-Value="model.Prompt" rows="7" placeholder="@T("PromptPlaceholder")" /><ValidationMessage For="() => model.Prompt" /></label>
+                <label class="form-span-2"><span>@T("Prompt")</span><InputTextArea @bind-Value="model.Prompt" rows="7" placeholder="@T("PromptPlaceholder")" /><ValidationMessage For="() => model.Prompt" /></label>
                 @if (advanced)
                 {
                     <label><span>@T("Context")</span><InputTextArea @bind-Value="model.Context" rows="7" /></label>
-                    <label><span>Runtime parameter overrides · JSON</span><InputTextArea @bind-Value="model.RuntimeParameters" rows="7" placeholder="{ &quot;temperature&quot;: 0.2 }" /><small>Overrides remain subject to Model Profile policy resolution.</small></label>
-                    <label><span>Timeout · seconds</span><InputNumber @bind-Value="model.TimeoutSeconds" /><ValidationMessage For="() => model.TimeoutSeconds" /></label>
-                    <label><span>Streaming</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@value</option> }</InputSelect><small>Automatic inherits the runtime profile default.</small></label>
-                    <label><span>Tool arguments</span><InputSelect @bind-Value="model.ToolArgumentRetention"><option value="@ToolArgumentRetentionMode.Inherit">Inherit host default</option><option value="@ToolArgumentRetentionMode.Retain">Retain for this Run</option><option value="@ToolArgumentRetentionMode.DoNotRetain">Do not retain for this Run</option></InputSelect><small>The host maximum capture length still applies.</small></label>
+                    <label><span>@T("RuntimeParameterOverrides")</span><InputTextArea @bind-Value="model.RuntimeParameters" rows="7" placeholder="{ &quot;temperature&quot;: 0.2 }" /><small>@T("RuntimeParameterOverridesHelp")</small></label>
+                    <label><span>@T("TimeoutSeconds")</span><InputNumber @bind-Value="model.TimeoutSeconds" /><ValidationMessage For="() => model.TimeoutSeconds" /></label>
+                    <label><span>@T("Streaming")</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@T($"Streaming.{value}")</option> }</InputSelect><small>@T("StreamingHelp")</small></label>
+                    <label><span>@T("ToolArguments")</span><InputSelect @bind-Value="model.ToolArgumentRetention"><option value="@ToolArgumentRetentionMode.Inherit">@T("ToolArguments.Inherit")</option><option value="@ToolArgumentRetentionMode.Retain">@T("ToolArguments.Retain")</option><option value="@ToolArgumentRetentionMode.DoNotRetain">@T("ToolArguments.DoNotRetain")</option></InputSelect><small>@T("ToolArgumentsHelp")</small></label>
                 }
             </div>
             <div class="runner-actions">
@@ -95,15 +95,15 @@ else
                 {
                     <dl class="runner-details">
                         <dt>@I("RunId")</dt><dd><code>@state.Run.Id</code></dd>
-                        <dt>@I("Status")</dt><dd><StatusBadge Text="@state.State.ToString()" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
+                        <dt>@I("Status")</dt><dd><StatusBadge Text="@I($"RunState.{state.State}")" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
                         <dt>@I("Duration")</dt><dd>@Duration(state.Run)</dd>
                         <dt>@I("AgentVersion")</dt><dd>@state.Run.Properties.Agent.Version</dd>
                         <dt>@I("ModelProfile")</dt><dd>@(state.Run.Status.ModelProfile ?? I("NotResolved"))</dd>
                         <dt>@I("ResolvedModel")</dt><dd>@(state.Run.Status.ResolvedModel ?? I("ModelNotReported"))</dd>
-                        <dt>Temperature</dt><dd>@(state.Run.Status.EffectiveTemperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? I("ProfileDefault"))</dd>
+                        <dt>@I("Temperature")</dt><dd>@(state.Run.Status.EffectiveTemperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? I("ProfileDefault"))</dd>
                         <dt>@I("MaximumOutputTokens")</dt><dd>@(state.Run.Status.EffectiveMaxOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? I("ProviderDefault"))</dd>
                         <dt>@I("ToolArguments")</dt><dd>@ToolArgumentRetentionLabel(state.Run.Properties.Execution.PersistToolArguments)</dd>
-                        <dt>Tokens</dt><dd>@(state.Run.Status.InputTokens?.ToString() ?? "—") @I("Input") · @(state.Run.Status.OutputTokens?.ToString() ?? "—") @I("Output")</dd>
+                        <dt>@I("Tokens")</dt><dd>@(state.Run.Status.InputTokens?.ToString() ?? "—") @I("Input") · @(state.Run.Status.OutputTokens?.ToString() ?? "—") @I("Output")</dd>
                         <dt>@I("Started")</dt><dd>@(state.Run.Status.StartedAt?.LocalDateTime.ToString("G") ?? I("Pending"))</dd>
                         <dt>@I("Completed")</dt><dd>@(state.Run.Status.CompletedAt?.LocalDateTime.ToString("G") ?? "—")</dd>
                         <dt>@I("Initiator")</dt><dd>@state.Run.Properties.Initiator</dd>
@@ -336,7 +336,7 @@ else
     private static string ShortId(string id) => id.Length > 13 ? id[..13] : id;
     private static string PromptPreview(RuntimeRun run) { var value = run.Properties.Input.Messages.LastOrDefault(message => message.Role == RuntimeMessageRole.User)?.Content ?? "—"; return value.Length > 60 ? $"{value[..60]}…" : value; }
     private string Duration(RuntimeRun run) { var start = run.Status.StartedAt ?? run.Status.CreatedAt; var end = run.Status.CompletedAt; return end is null ? I("Live") : (end.Value - start).ToString("g"); }
-    private static string ToolArgumentRetentionLabel(bool? value) => value switch { true => "Retain for this Run", false => "Do not retain for this Run", null => "Inherit host default" };
+    private string ToolArgumentRetentionLabel(bool? value) => value switch { true => T("ToolArguments.Retain"), false => T("ToolArguments.DoNotRetain"), null => T("ToolArguments.Inherit") };
     private static string GovernanceUrl(string runId, RuntimeToolCall tool) => $"/tool-governance/runtime/{Uri.EscapeDataString(runId)}?toolCallId={Uri.EscapeDataString(tool.Id)}&invocationId={Uri.EscapeDataString(tool.InvocationId)}";
     private static CreateRuntimeRunRequest ToRequest(RuntimeRun run) => new() { Agent = run.Properties.Agent, Input = run.Properties.Input, Execution = run.Properties.Execution, Origin = run.Properties.Origin };
 
