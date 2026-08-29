@@ -92,6 +92,8 @@ public sealed class WorkOperationsComponentTests
         var agentRuns = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentRunsStrings>>();
         var agentRunnerInspector = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.AgentRunnerInspectorStrings>>();
         var flows = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowsStrings>>();
+        var flowRunDetails = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowRunDetailsStrings>>();
+        var flowRuns = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowRunsStrings>>();
         var modelProfileEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProfileEditorStrings>>();
         var modelProfiles = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProfilesStrings>>();
         var modelProviderDetails = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProviderDetailsStrings>>();
@@ -116,6 +118,11 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Copier la requête JSON", agentRunnerInspector["CopyRequestJson"].Value);
         Assert.AreEqual("Nouveau Flow", flows["NewFlow"].Value);
         Assert.AreEqual("Voir toutes les exécutions", flows["ViewAllRuns"].Value);
+        Assert.AreEqual("Exécutions de Flow", flowRuns["Title"].Value);
+        Assert.AreEqual("En attente d’une saisie", flowRuns["Status.WaitingForInput"].Value);
+        Assert.AreEqual("Chronologie d’exécution", flowRunDetails["ExecutionTimeline"].Value);
+        Assert.AreEqual("3 événements", flowRunDetails["EventCount.Many", 3].Value);
+        Assert.AreEqual("Réponse demandée", flowRunDetails["Event.InputRequested", "agent-1"].Value);
         Assert.AreEqual("Créer un profil de modèle", modelProfileEditor["CreateModelProfile"].Value);
         Assert.AreEqual("Fournisseur et modèle", modelProfileEditor["ProviderAndModel"].Value);
         Assert.AreEqual("La modification de ce profil affectera 1 agent.", modelProfileEditor["ChangingProfileAffects", modelProfileEditor["AgentCount.One", 1].Value].Value);

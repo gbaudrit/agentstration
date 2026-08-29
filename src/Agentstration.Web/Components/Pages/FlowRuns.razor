@@ -1,13 +1,17 @@
 @page "/flow-runs"
 @implements IDisposable
 @inject IFlowApiClient Client
-<PageTitle>Flow Runs · Agentstration</PageTitle>
-<PageHeader Title="Flow Runs" Description="Search and diagnose executions across every published Flow version."><Actions><a class="button-secondary" href="/flows">Definitions</a></Actions></PageHeader>
-<nav class="section-tabs"><a href="/flows">Definitions</a><a class="active" href="/flow-runs">Runs</a><a href="/flows#deployments">Deployments</a></nav>
-<div class="filter-bar"><SearchBox @bind-Value="search" Placeholder="Search run or Flow" /><select @bind="status"><option value="">All statuses</option>@foreach(var value in Enum.GetNames<FlowRunStatus>()){<option>@value</option>}</select><select @bind="trigger"><option value="">All triggers</option>@foreach(var value in Enum.GetNames<FlowRunTrigger>()){<option>@value</option>}</select><input @bind="version" placeholder="Version" /><input @bind="deployment" placeholder="Deployment" /></div>
-@if(runs is null){<LoadingState/>}else if(Filtered.Count==0){<EmptyState Title="No matching Flow Runs" Message="Adjust filters or start a Flow from its Runs tab."/>}else{<RunGrid Runs="Filtered" />}
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunsStrings> Localizer
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")"><Actions><a class="button-secondary" href="/flows">@T("Definitions")</a></Actions></PageHeader>
+<nav class="section-tabs"><a href="/flows">@T("Definitions")</a><a class="active" href="/flow-runs">@T("Runs")</a><a href="/flows#deployments">@T("Deployments")</a></nav>
+<div class="filter-bar"><SearchBox @bind-Value="search" Placeholder="@T("SearchPlaceholder")" /><select @bind="status"><option value="">@T("AllStatuses")</option>@foreach(var value in Enum.GetValues<FlowRunStatus>()){<option value="@value">@StatusLabel(value)</option>}</select><select @bind="trigger"><option value="">@T("AllTriggers")</option>@foreach(var value in Enum.GetValues<FlowRunTrigger>()){<option value="@value">@TriggerLabel(value)</option>}</select><input @bind="version" placeholder="@T("Version")" /><input @bind="deployment" placeholder="@T("Deployment")" /></div>
+@if(runs is null){<LoadingState Message="@T("Loading")"/>}else if(Filtered.Count==0){<EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"/>}else{<RunGrid Runs="Filtered" />}
 @code {
     private readonly CancellationTokenSource cancellation=new(); private IReadOnlyList<FlowRun>? runs; private string search="",status="",trigger="",version="",deployment="";
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string StatusLabel(FlowRunStatus value) => Localizer[$"Status.{value}"];
+    private string TriggerLabel(FlowRunTrigger value) => Localizer[$"Trigger.{value}"];
     private IReadOnlyList<FlowRun> Filtered => runs?.Where(run => (string.IsNullOrWhiteSpace(search)||run.Id.Contains(search,StringComparison.OrdinalIgnoreCase)||run.FlowId.Value.Contains(search,StringComparison.OrdinalIgnoreCase))&&(string.IsNullOrWhiteSpace(status)||run.Status.ToString()==status)&&(string.IsNullOrWhiteSpace(trigger)||run.Trigger.ToString()==trigger)&&(string.IsNullOrWhiteSpace(version)||run.FlowVersion.Contains(version,StringComparison.OrdinalIgnoreCase))&&(string.IsNullOrWhiteSpace(deployment)||(run.DeploymentResourceId?.Contains(deployment,StringComparison.OrdinalIgnoreCase)??false))).ToArray() ?? [];
     protected override async Task OnInitializedAsync()=>runs=await Client.GetFlowRunsAsync(null,cancellation.Token);
     public void Dispose(){cancellation.Cancel();cancellation.Dispose();}

@@ -60,14 +60,16 @@ public sealed class FlowDetailsDesignerTests
     public void MissingFlowRunRendersNotFoundStateInsteadOfThrowing()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
         context.Services.AddSingleton(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
 
         var rendered = context.Render<FlowRunDetails>(parameters => parameters
             .Add(component => component.RunId, "flowrun-missing"));
 
-        StringAssert.Contains(rendered.Markup, "Flow Run not found");
-        StringAssert.Contains(rendered.Markup, "does not exist in the current workspace");
+        StringAssert.Contains(rendered.Markup, strings["NotFoundTitle"].Value);
+        StringAssert.Contains(rendered.Markup, strings["NotFoundMessage"].Value);
         Assert.AreEqual("/flow-runs", rendered.Find("a.button-secondary").GetAttribute("href"));
     }
 

@@ -2,7 +2,10 @@ using System.Globalization;
 using System.Text.Json;
 using Agentstration.Flow;
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.Pages;
 using Bunit;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Web.Tests;
 
@@ -12,7 +15,8 @@ public sealed class FlowRunTimelineTests
     [TestMethod]
     public void ConsecutiveStreamingDeltasRenderAsOneSemanticTimelineEntry()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
+        var strings = context.Services.GetRequiredService<IStringLocalizer<FlowRunDetailsStrings>>();
         var now = DateTimeOffset.UtcNow;
         FlowRunEvent[] events =
         [
@@ -29,14 +33,15 @@ public sealed class FlowRunTimelineTests
 
         Assert.AreEqual(3, rendered.FindAll(".flow-timeline-item").Count);
         Assert.AreEqual("out est simple", rendered.Find(".flow-stream-output").TextContent);
-        Assert.Contains("3 delta(s)", rendered.Markup, StringComparison.Ordinal);
-        Assert.Contains("Live", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains(strings["DeltaCount.Many", 3].Value, rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains(strings["Live"].Value, rendered.Markup, StringComparison.Ordinal);
     }
 
     [TestMethod]
     public void RawViewKeepsIndividualEventsAndBoundsTheRenderedWindow()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
+        var strings = context.Services.GetRequiredService<IStringLocalizer<FlowRunDetailsStrings>>();
         var now = DateTimeOffset.UtcNow;
         var events = Enumerable.Range(1, 205)
             .Select(sequence => Event(sequence, FlowRunEventType.StepOutputDelta, "agent_1", new { delta = sequence.ToString(CultureInfo.InvariantCulture) }, now))
@@ -46,7 +51,7 @@ public sealed class FlowRunTimelineTests
         rendered.FindAll("[role=tab]")[1].Click();
 
         Assert.AreEqual(200, rendered.FindAll(".flow-raw-events li").Count);
-        Assert.Contains("Showing 200 of 205", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains(strings["ShowingEvents", 200, 205].Value, rendered.Markup, StringComparison.Ordinal);
         rendered.Find(".flow-load-events").Click();
         Assert.AreEqual(205, rendered.FindAll(".flow-raw-events li").Count);
     }
@@ -54,7 +59,8 @@ public sealed class FlowRunTimelineTests
     [TestMethod]
     public void ParticipantTurnsAndTimeoutRenderAsSemanticActivity()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
+        var strings = context.Services.GetRequiredService<IStringLocalizer<FlowRunDetailsStrings>>();
         var now = DateTimeOffset.UtcNow;
         FlowRunEvent[] events =
         [
@@ -66,16 +72,17 @@ public sealed class FlowRunTimelineTests
 
         var rendered = context.Render<FlowRunTimeline>(parameters => parameters.Add(value => value.Events, events));
 
-        Assert.Contains("researcher started a turn", rendered.Markup, StringComparison.Ordinal);
-        Assert.Contains("researcher completed a turn", rendered.Markup, StringComparison.Ordinal);
-        Assert.Contains("reviewer started a turn", rendered.Markup, StringComparison.Ordinal);
-        Assert.Contains("Flow run timed out", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains(strings["Event.ParticipantTurnStarted", "researcher"].Value, rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains(strings["Event.ParticipantTurnCompleted", "researcher"].Value, rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains(strings["Event.ParticipantTurnStarted", "reviewer"].Value, rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains(strings["Event.FlowRunTimedOut", strings["Step"].Value].Value, rendered.Markup, StringComparison.Ordinal);
     }
 
     [TestMethod]
     public void InteractiveLifecycleRendersAsSemanticActivity()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
+        var strings = context.Services.GetRequiredService<IStringLocalizer<FlowRunDetailsStrings>>();
         var now = DateTimeOffset.UtcNow;
         var rendered = context.Render<FlowRunTimeline>(parameters => parameters.Add(value => value.Events, new[]
         {
@@ -84,9 +91,16 @@ public sealed class FlowRunTimelineTests
             Event(3, FlowRunEventType.FlowRunResumed, null, null, now)
         }));
 
-        Assert.Contains("Response requested", rendered.Markup, StringComparison.Ordinal);
-        Assert.Contains("Response received", rendered.Markup, StringComparison.Ordinal);
-        Assert.Contains("Flow run resumed", rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains(strings["Event.InputRequested", "agent-1"].Value, rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains(strings["Event.InputReceived", "agent-1"].Value, rendered.Markup, StringComparison.Ordinal);
+        Assert.Contains(strings["Event.FlowRunResumed", strings["Step"].Value].Value, rendered.Markup, StringComparison.Ordinal);
+    }
+
+    private static BunitContext CreateContext()
+    {
+        var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        return context;
     }
 
     private static FlowRunEvent Event(long sequence, FlowRunEventType type, string? stepId, object? payload, DateTimeOffset timestamp) =>

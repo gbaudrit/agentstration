@@ -1,21 +1,22 @@
 @using System.Globalization
 @using System.Text
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.FlowRunDetailsStrings> Localizer
 
 <article class="panel flow-run-timeline">
     <div class="flow-timeline-header">
-        <div><p class="eyebrow">Execution trace</p><h2>Execution timeline</h2></div>
+        <div><p class="eyebrow">@T("ExecutionTrace")</p><h2>@T("ExecutionTimeline")</h2></div>
         <div class="flow-timeline-summary">
-            @if (IsLive) { <span class="flow-live-indicator"><span></span>Live</span> }
-            <span>@Events.Count event(s)</span>
+            @if (IsLive) { <span class="flow-live-indicator"><span></span>@T("Live")</span> }
+            <span>@EventCount(Events.Count)</span>
         </div>
     </div>
-    <div class="flow-timeline-tabs" role="tablist" aria-label="Execution timeline views">
-        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Activity)" class="@(activeView == TimelineView.Activity ? "active" : null)" @onclick="() => activeView = TimelineView.Activity">Activity</button>
-        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Raw)" class="@(activeView == TimelineView.Raw ? "active" : null)" @onclick="() => activeView = TimelineView.Raw">Raw events</button>
+    <div class="flow-timeline-tabs" role="tablist" aria-label="@T("TimelineViewsAriaLabel")">
+        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Activity)" class="@(activeView == TimelineView.Activity ? "active" : null)" @onclick="() => activeView = TimelineView.Activity">@T("Activity")</button>
+        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Raw)" class="@(activeView == TimelineView.Raw ? "active" : null)" @onclick="() => activeView = TimelineView.Raw">@T("RawEvents")</button>
     </div>
     @if (Events.Count == 0)
     {
-        <div class="flow-timeline-empty">Waiting for execution events…</div>
+        <div class="flow-timeline-empty">@T("WaitingForEvents")</div>
     }
     else if (activeView == TimelineView.Activity)
     {
@@ -29,13 +30,13 @@
                         <strong>@Title(item)</strong>
                         @if (item.IsStream)
                         {
-                            <pre class="flow-stream-output">@(string.IsNullOrEmpty(item.Text) ? "Waiting for output…" : item.Text)</pre>
-                            <small>@item.Count delta(s) · #@item.FirstSequence–@item.LastSequence</small>
+                            <pre class="flow-stream-output">@(string.IsNullOrEmpty(item.Text) ? T("WaitingForOutput") : item.Text)</pre>
+                            <small>@DeltaCount(item.Count) · #@item.FirstSequence–@item.LastSequence</small>
                         }
                         else
                         {
                             @if (!string.IsNullOrWhiteSpace(item.Detail)) { <p>@item.Detail</p> }
-                            <small>#@item.FirstSequence · @item.Type</small>
+                            <small>#@item.FirstSequence · @EventTypeLabel(item.Type)</small>
                         }
                     </div>
                 </li>
@@ -45,24 +46,28 @@
     else
     {
         <div class="flow-raw-toolbar">
-            <label><span class="sr-only">Filter event type</span><select @bind="rawType"><option value="">All event types</option>@foreach (var type in Enum.GetNames<FlowRunEventType>()) { <option value="@type">@type</option> }</select></label>
-            <span>Showing @VisibleRawEvents.Count of @FilteredRawEvents.Count</span>
+            <label><span class="sr-only">@T("FilterEventType")</span><select @bind="rawType"><option value="">@T("AllEventTypes")</option>@foreach (var type in Enum.GetValues<FlowRunEventType>()) { <option value="@type">@EventTypeLabel(type)</option> }</select></label>
+            <span>@T("ShowingEvents", VisibleRawEvents.Count, FilteredRawEvents.Count)</span>
         </div>
         <ol class="flow-raw-events">
             @foreach (var runEvent in VisibleRawEvents)
             {
-                <li><time>@runEvent.Timestamp.ToLocalTime().ToString("T", CultureInfo.CurrentCulture)</time><strong>@(runEvent.StepId is null ? runEvent.Type : $"{runEvent.StepId} · {runEvent.Type}")</strong><code>#@runEvent.Sequence</code><span>@Payload(runEvent.Payload)</span></li>
+                <li><time>@runEvent.Timestamp.ToLocalTime().ToString("T", CultureInfo.CurrentCulture)</time><strong>@(runEvent.StepId is null ? EventTypeLabel(runEvent.Type) : $"{runEvent.StepId} · {EventTypeLabel(runEvent.Type)}")</strong><code>#@runEvent.Sequence</code><span>@Payload(runEvent.Payload)</span></li>
             }
         </ol>
         @if (VisibleRawEvents.Count < FilteredRawEvents.Count)
         {
-            <button type="button" class="button-secondary flow-load-events" @onclick="LoadMoreRawEvents">Load 200 older events</button>
+            <button type="button" class="button-secondary flow-load-events" @onclick="LoadMoreRawEvents">@T("LoadOlderEvents", RawPageSize)</button>
         }
     }
 </article>
 
 @code {
     private const int RawPageSize = 200;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string EventCount(int count) => T(count == 1 ? "EventCount.One" : "EventCount.Many", count);
+    private string DeltaCount(int count) => T(count == 1 ? "DeltaCount.One" : "DeltaCount.Many", count);
+    private string EventTypeLabel(FlowRunEventType value) => Localizer[$"EventType.{value}"];
     private TimelineView activeView;
     private string rawType = string.Empty;
     private int rawLimit = RawPageSize;
@@ -93,25 +98,14 @@
         return activity;
     }
 
-    private static string Title(TimelineItem item) => item.IsStream ? $"{item.StepId ?? "Step"} · Streaming output" : item.Type switch
+    private string Title(TimelineItem item)
     {
-        FlowRunEventType.FlowRunCreated => "Flow run created",
-        FlowRunEventType.FlowRunStarted => "Flow run started",
-        FlowRunEventType.FlowRunResumed => "Flow run resumed",
-        FlowRunEventType.InputRequested => "Response requested",
-        FlowRunEventType.InputReceived => "Response received",
-        FlowRunEventType.InputExpired => "Response request expired",
-        FlowRunEventType.StepRunStarted => $"{item.StepId ?? "Step"} started",
-        FlowRunEventType.ParticipantTurnStarted => $"{item.StepId ?? "Participant"} started a turn",
-        FlowRunEventType.ParticipantTurnCompleted => $"{item.StepId ?? "Participant"} completed a turn",
-        FlowRunEventType.StepRunCompleted => $"{item.StepId ?? "Step"} completed",
-        FlowRunEventType.StepRunFailed => $"{item.StepId ?? "Step"} failed",
-        FlowRunEventType.FlowRunCompleted => "Flow run completed",
-        FlowRunEventType.FlowRunFailed => "Flow run failed",
-        FlowRunEventType.FlowRunCancelled => "Flow run cancelled",
-        FlowRunEventType.FlowRunTimedOut => "Flow run timed out",
-        _ => item.Type.ToString()
-    };
+        if (item.IsStream) return T("StreamingOutput", item.StepId ?? T("Step"));
+        var subject = item.Type is FlowRunEventType.ParticipantTurnStarted or FlowRunEventType.ParticipantTurnCompleted
+            ? item.StepId ?? T("Participant")
+            : item.StepId ?? T("Step");
+        return T($"Event.{item.Type}", subject);
+    }
 
     private static string Tone(FlowRunEventType type) => type switch
     {

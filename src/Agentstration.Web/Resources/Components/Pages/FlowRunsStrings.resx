@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Flow Runs</value></data>
+  <data name="Description"><value>Search and diagnose executions across every published Flow version.</value></data>
+  <data name="Definitions"><value>Definitions</value></data>
+  <data name="Runs"><value>Runs</value></data>
+  <data name="Deployments"><value>Deployments</value></data>
+  <data name="SearchPlaceholder"><value>Search run or Flow</value></data>
+  <data name="AllStatuses"><value>All statuses</value></data>
+  <data name="AllTriggers"><value>All triggers</value></data>
+  <data name="Version"><value>Version</value></data>
+  <data name="Deployment"><value>Deployment</value></data>
+  <data name="Loading"><value>Loading Flow Runs…</value></data>
+  <data name="EmptyTitle"><value>No matching Flow Runs</value></data>
+  <data name="EmptyMessage"><value>Adjust filters or start a Flow from its Runs tab.</value></data>
+  <data name="Status"><value>Status</value></data>
+  <data name="Flow"><value>Flow</value></data>
+  <data name="Started"><value>Started</value></data>
+  <data name="Duration"><value>Duration</value></data>
+  <data name="Trigger"><value>Trigger</value></data>
+  <data name="StartedBy"><value>Started by</value></data>
+  <data name="Pending"><value>Pending</value></data>
+  <data name="Inspect"><value>Inspect</value></data>
+  <data name="Status.Pending"><value>Pending</value></data>
+  <data name="Status.Running"><value>Running</value></data>
+  <data name="Status.WaitingForInput"><value>Waiting for input</value></data>
+  <data name="Status.Succeeded"><value>Succeeded</value></data>
+  <data name="Status.Failed"><value>Failed</value></data>
+  <data name="Status.Cancelled"><value>Cancelled</value></data>
+  <data name="Status.TimedOut"><value>Timed out</value></data>
+  <data name="Trigger.Manual"><value>Manual</value></data>
+  <data name="Trigger.Api"><value>API</value></data>
+  <data name="Trigger.WorkItem"><value>Work item</value></data>
+  <data name="Trigger.Flow"><value>Flow</value></data>
+  <data name="Trigger.Schedule"><value>Schedule</value></data>
+  <data name="Trigger.Event"><value>Event</value></data>
+</root>
