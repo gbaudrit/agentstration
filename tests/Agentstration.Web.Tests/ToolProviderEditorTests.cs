@@ -15,6 +15,7 @@ public sealed class ToolProviderEditorTests
     public void SectionLinksRetainTheProviderRouteBeforeApplyingTheFragment()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolsClient>(new ProviderClient());
 
         var rendered = context.Render<ToolProviderEditor>(parameters => parameters

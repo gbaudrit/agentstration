@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="AddProvider"><value>Ajouter un fournisseur d’outils</value></data>
+  <data name="Description"><value>La découverte des outils relève d’une gouvernance explicite : les outils découverts restent désactivés jusqu’à leur approbation.</value></data>
+  <data name="Back"><value>Retour</value></data>
+  <data name="TestConnection"><value>Tester la connexion</value></data>
+  <data name="RefreshDiscovery"><value>Actualiser la découverte</value></data>
+  <data name="Loading"><value>Chargement du fournisseur…</value></data>
+  <data name="SectionsLabel"><value>Sections du fournisseur</value></data>
+  <data name="Overview"><value>Vue d’ensemble</value></data>
+  <data name="Tools"><value>Outils</value></data>
+  <data name="Connection"><value>Connexion</value></data>
+  <data name="Name"><value>Nom</value></data>
+  <data name="DisplayName"><value>Nom d’affichage</value></data>
+  <data name="ProviderType"><value>Type de fournisseur</value></data>
+  <data name="Enabled"><value>Activé</value></data>
+  <data name="Status"><value>État</value></data>
+  <data name="LastDiscovery"><value>Dernière découverte</value></data>
+  <data name="Never"><value>Jamais</value></data>
+  <data name="AepExtensionId"><value>Identifiant de l’extension AEP</value></data>
+  <data name="Transport"><value>Transport</value></data>
+  <data name="Command"><value>Commande</value></data>
+  <data name="Arguments"><value>Arguments (un par ligne)</value></data>
+  <data name="WorkingDirectory"><value>Répertoire de travail</value></data>
+  <data name="EnvironmentReferences"><value>Références d’environnement</value></data>
+  <data name="EnvironmentReferencesHelp"><value>Les valeurs sont des références de configuration ; les secrets ne sont jamais stockés dans cette ressource.</value></data>
+  <data name="Endpoint"><value>Point de terminaison</value></data>
+  <data name="Saving"><value>Enregistrement…</value></data>
+  <data name="SaveProvider"><value>Enregistrer le fournisseur</value></data>
+  <data name="ToolsDiscovered"><value>Outils découverts : {0}. Les nouveaux outils sont désactivés par défaut.</value></data>
+  <data name="NoToolsTitle"><value>Aucun outil découvert</value></data>
+  <data name="NoToolsMessage"><value>Actualisez la découverte après avoir validé la connexion.</value></data>
+  <data name="Inspect"><value>Inspecter →</value></data>
+  <data name="ToolCount.One"><value>{0} outil</value></data>
+  <data name="ToolCount.Many"><value>{0} outils</value></data>
+  <data name="Available"><value>Disponible</value></data>
+  <data name="Unavailable"><value>Indisponible</value></data>
+  <data name="Status.connected"><value>Connecté</value></data>
+  <data name="Status.error"><value>Erreur</value></data>
+  <data name="Status.notDiscovered"><value>Non découvert</value></data>
+  <data name="SavedAndRefreshed"><value>Fournisseur enregistré et découverte actualisée.</value></data>
+  <data name="SavedWithStatus"><value>Fournisseur enregistré ; état de la découverte : {0}.</value></data>
+  <data name="ConnectionSucceeded"><value>Connexion établie. La négociation du protocole a réussi. Outils découverts : {0}.</value></data>
+  <data name="DiscoverySummary"><value>Découverte : {0} inchangés, {1} nouveaux, {2} modifiés, {3} indisponibles.</value></data>
+</root>

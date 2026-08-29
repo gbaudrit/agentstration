@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Loading"><value>Loading tool…</value></data>
+  <data name="Tool"><value>Tool</value></data>
+  <data name="Available"><value>Available</value></data>
+  <data name="Unavailable"><value>Unavailable</value></data>
+  <data name="Disable"><value>Disable</value></data>
+  <data name="Enable"><value>Enable</value></data>
+  <data name="GovernanceAndSource"><value>Governance and source</value></data>
+  <data name="Provider"><value>Provider</value></data>
+  <data name="ExternalName"><value>External name</value></data>
+  <data name="Enabled"><value>Enabled</value></data>
+  <data name="RequiresApproval"><value>Requires approval</value></data>
+  <data name="AvailableLabel"><value>Available</value></data>
+  <data name="FirstSeen"><value>First seen</value></data>
+  <data name="LastSeen"><value>Last seen</value></data>
+  <data name="InputSchema"><value>Input schema</value></data>
+  <data name="Yes"><value>Yes</value></data>
+  <data name="No"><value>No</value></data>
+</root>

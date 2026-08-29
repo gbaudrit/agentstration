@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Outils</value></data>
+  <data name="Description"><value>Gouvernez les capacités fournies par des fournisseurs avant de les attribuer aux agents.</value></data>
+  <data name="Providers"><value>Fournisseurs</value></data>
+  <data name="Refresh"><value>Actualiser</value></data>
+  <data name="SectionsLabel"><value>Sections des outils</value></data>
+  <data name="Catalog"><value>Catalogue</value></data>
+  <data name="Loading"><value>Chargement du catalogue d’outils…</value></data>
+  <data name="EmptyTitle"><value>Aucun outil découvert</value></data>
+  <data name="EmptyMessage"><value>Créez un fournisseur d’outils et actualisez la découverte. Les nouveaux outils restent désactivés par défaut.</value></data>
+  <data name="Tool"><value>Outil</value></data>
+  <data name="Provider"><value>Fournisseur</value></data>
+  <data name="Availability"><value>Disponibilité</value></data>
+  <data name="Enabled"><value>Activé</value></data>
+  <data name="Available"><value>Disponible</value></data>
+  <data name="Unavailable"><value>Indisponible</value></data>
+  <data name="Yes"><value>Oui</value></data>
+  <data name="No"><value>Non</value></data>
+  <data name="Details"><value>Détails →</value></data>
+</root>

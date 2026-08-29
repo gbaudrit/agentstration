@@ -98,6 +98,10 @@ public sealed class WorkOperationsComponentTests
         var modelProviders = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProvidersStrings>>();
         var runtimeProfileEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.RuntimeProfileEditorStrings>>();
         var runtimeProfiles = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.RuntimeProfilesStrings>>();
+        var toolDetails = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolDetailsStrings>>();
+        var toolProviderEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolProviderEditorStrings>>();
+        var toolProviders = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolProvidersStrings>>();
+        var tools = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolsStrings>>();
 
         Assert.AreEqual("Créer un agent", agents["CreateAgent"].Value);
         Assert.AreEqual("Définissez, publiez et exploitez des ressources d’agents spécialisés.", agents["Description"].Value);
@@ -129,6 +133,14 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Politique d’exécution", runtimeProfileEditor["ExecutionPolicy"].Value);
         Assert.AreEqual("Requise", runtimeProfileEditor["ToolInvocation.Required"].Value);
         Assert.AreEqual("Ce profil est utilisé par 1 déploiement. Les modifications prendront effet à la prochaine réconciliation.", runtimeProfileEditor["ProfileUsedWarning", runtimeProfileEditor["DeploymentCount.One", 1].Value].Value);
+        Assert.AreEqual("Outils", tools["Title"].Value);
+        Assert.AreEqual("Aucun outil découvert", tools["EmptyTitle"].Value);
+        Assert.AreEqual("Fournisseurs d’outils", toolProviders["Title"].Value);
+        Assert.AreEqual("Non découvert", toolProviders["Status.notDiscovered"].Value);
+        Assert.AreEqual("Gouvernance et source", toolDetails["GovernanceAndSource"].Value);
+        Assert.AreEqual("Approbation requise", toolDetails["RequiresApproval"].Value);
+        Assert.AreEqual("Ajouter un fournisseur d’outils", toolProviderEditor["AddProvider"].Value);
+        Assert.AreEqual("Connexion établie. La négociation du protocole a réussi. Outils découverts : 2 outils.", toolProviderEditor["ConnectionSucceeded", toolProviderEditor["ToolCount.Many", 2].Value].Value);
     }
 
     private static BunitContext CreateContext()
