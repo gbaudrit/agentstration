@@ -4,42 +4,43 @@
 @inject Agentstration.Management.Abstractions.ICurrentRequestContext RequestContext
 @inject Agentstration.Management.Abstractions.IPlatformAuthorizationService PlatformAuthorization
 @inject Microsoft.Extensions.Options.IOptions<Agentstration.Web.Configuration.AgentstrationWebOptions> Options
+@inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
-<PageTitle>Members · Organization · Agentstration</PageTitle>
-<PageHeader Title="Members" Description="Tenant memberships and their tenant or workspace role assignments." />
+<PageTitle>@T("Members") · @T("Organization") · Agentstration</PageTitle>
+<PageHeader Title="@T("Members")" Description="@T("Members.Description")" />
 <OrganizationSettingsNav />
 
 @if (canManageLocalAccounts)
 {
     <section class="panel" style="margin-bottom:18px">
-        <div class="panel-header"><div><h2>Local accounts</h2><p class="muted">Create an ASP.NET Core Identity account and assign its initial Workspace role.</p></div></div>
+        <div class="panel-header"><div><h2>@T("LocalAccounts")</h2><p class="muted">@T("LocalAccounts.Description")</p></div></div>
         @if (!string.IsNullOrWhiteSpace(accountMessage)) { <p class="form-alert @(accountError ? "form-alert-danger" : "form-alert-success")">@accountMessage</p> }
         <div class="form-grid">
-            <label><span>Username</span><input @bind="newUserName" autocomplete="off" /></label>
-            <label><span>Display name</span><input @bind="newDisplayName" /></label>
-            <label><span>Email (optional)</span><input @bind="newEmail" type="email" autocomplete="off" /></label>
-            <label><span>Initial password</span><input @bind="newPassword" type="password" autocomplete="new-password" /></label>
-            <label><span>Workspace</span><select @bind="newWorkspaceId">@foreach(var workspace in view?.Workspaces ?? []){<option value="@workspace.Id">@workspace.DisplayName</option>}</select></label>
-            <label><span>Role</span><select @bind="newRole">@foreach(var role in Agentstration.Management.Core.BuiltInIdentityRoles.Names){<option value="@role">@role</option>}</select></label>
+            <label><span>@T("Username")</span><input @bind="newUserName" autocomplete="off" /></label>
+            <label><span>@T("DisplayName")</span><input @bind="newDisplayName" /></label>
+            <label><span>@T("EmailOptional")</span><input @bind="newEmail" type="email" autocomplete="off" /></label>
+            <label><span>@T("InitialPassword")</span><input @bind="newPassword" type="password" autocomplete="new-password" /></label>
+            <label><span>@T("Workspace")</span><select @bind="newWorkspaceId">@foreach(var workspace in view?.Workspaces ?? []){<option value="@workspace.Id">@workspace.DisplayName</option>}</select></label>
+            <label><span>@T("Role")</span><select @bind="newRole">@foreach(var role in Agentstration.Management.Core.BuiltInIdentityRoles.Names){<option value="@role">@role</option>}</select></label>
         </div>
-        <div class="form-actions"><button class="button-primary" @onclick="CreateAccountAsync" disabled="@savingAccount">@(savingAccount ? "Creating…" : "Create local account")</button></div>
+        <div class="form-actions"><button class="button-primary" @onclick="CreateAccountAsync" disabled="@savingAccount">@(savingAccount ? T("Creating") : T("CreateLocalAccount"))</button></div>
         @if (localAccounts.Count > 0)
         {
             <DataGrid TItem="Agentstration.Security.AspNetCoreIdentity.LocalAccountView" Items="localAccounts">
-                <Header><tr><th>Account</th><th>Principal</th><th>Status</th><th>Instance role</th><th></th></tr></Header>
-                <Row Context="account"><tr><td><strong>@account.UserName</strong><br /><small>@(account.Email ?? "No email")</small></td><td>@account.DisplayName<br /><code>@account.PrincipalId</code></td><td><StatusBadge Text="@account.PrincipalStatus.ToString()" Status="@(account.PrincipalStatus == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Warning)" /></td><td>@(account.PlatformAdministrator ? "PlatformAdmin" : "—")</td><td><button class="text-button" @onclick="() => SetEnabledAsync(account, account.PrincipalStatus != PrincipalStatus.Active)">@(account.PrincipalStatus == PrincipalStatus.Active ? "Disable" : "Enable")</button></td></tr></Row>
+                <Header><tr><th>@T("Account")</th><th>@T("Principal")</th><th>@T("Status")</th><th>@T("InstanceRole")</th><th></th></tr></Header>
+                <Row Context="account"><tr><td><strong>@account.UserName</strong><br /><small>@(account.Email ?? T("NoEmail"))</small></td><td>@account.DisplayName<br /><code>@account.PrincipalId</code></td><td><StatusBadge Text="@T($"Status.{account.PrincipalStatus}")" Status="@(account.PrincipalStatus == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Warning)" /></td><td>@(account.PlatformAdministrator ? "PlatformAdmin" : "—")</td><td><button class="text-button" @onclick="() => SetEnabledAsync(account, account.PrincipalStatus != PrincipalStatus.Active)">@(account.PrincipalStatus == PrincipalStatus.Active ? T("Disable") : T("Enable"))</button></td></tr></Row>
             </DataGrid>
         }
     </section>
 }
 
-@if (view is null) { <LoadingState Message="Loading members…" /> }
-else if (view.Members.Count == 0) { <EmptyState Title="No members" Message="No active or suspended membership exists in this organization." /> }
+@if (view is null) { <LoadingState Message="@T("LoadingMembers")" /> }
+else if (view.Members.Count == 0) { <EmptyState Title="@T("NoMembers")" Message="@T("NoMembersMessage")" /> }
 else
 {
     <DataGrid TItem="Agentstration.Management.Core.MemberAdministrationView" Items="view.Members">
-        <Header><tr><th>Member</th><th>Identity</th><th>Membership</th><th>Assigned access</th></tr></Header>
-        <Row Context="member"><tr><td><a href="@($"/settings/organization/members/{member.Principal.Id:D}")"><strong>@member.Principal.DisplayName</strong></a><br /><small>@(member.Principal.Email ?? "No email")</small></td><td>@(member.ExternalIdentities.Count == 0 ? "Unlinked" : $"{member.ExternalIdentities.Count} external identity")</td><td><StatusBadge Text="@member.Membership.Status.ToString()" Status="UiStatus.Success" /></td><td>@if(member.Roles.Count == 0){<span>None</span>}else{@foreach(var assigned in member.Roles){<div><strong>@assigned.Role.DisplayName</strong> <small>@ScopeLabel(assigned.Scope)</small></div>}}</td></tr></Row>
+        <Header><tr><th>@T("Member")</th><th>@T("Identity")</th><th>@T("Membership")</th><th>@T("AssignedAccess")</th></tr></Header>
+        <Row Context="member"><tr><td><a href="@($"/settings/organization/members/{member.Principal.Id:D}")"><strong>@member.Principal.DisplayName</strong></a><br /><small>@(member.Principal.Email ?? T("NoEmail"))</small></td><td>@(member.ExternalIdentities.Count == 0 ? T("Unlinked") : T("ExternalIdentityCount", member.ExternalIdentities.Count))</td><td><StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" /></td><td>@if(member.Roles.Count == 0){<span>@T("None")</span>}else{@foreach(var assigned in member.Roles){<div><strong>@assigned.Role.DisplayName</strong> <small>@ScopeLabel(assigned.Scope)</small></div>}}</td></tr></Row>
     </DataGrid>
 }
 
@@ -49,6 +50,7 @@ else
     private bool canManageLocalAccounts; private bool savingAccount; private bool accountError;
     private string newUserName = ""; private string newDisplayName = ""; private string? newEmail; private string newPassword = "";
     private Guid newWorkspaceId; private string newRole = Agentstration.Management.Core.BuiltInIdentityRoles.Member; private string? accountMessage;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     protected override async Task OnInitializedAsync()
     {
         view = await Service.GetCurrentAsync(default);
@@ -64,7 +66,7 @@ else
         try
         {
             var result = await Accounts.CreateAsync(new(newUserName, newPassword, newDisplayName, newEmail, newWorkspaceId, newRole), default);
-            accountError = result.Account is null; accountMessage = result.Account is null ? string.Join(" ", result.Errors) : $"Account '{result.Account.UserName}' created.";
+            accountError = result.Account is null; accountMessage = result.Account is null ? string.Join(" ", result.Errors) : T("AccountCreated", result.Account.UserName);
             if (result.Account is not null) { newUserName = newDisplayName = newPassword = ""; newEmail = null; localAccounts = await Accounts.ListAsync(default); view = await Service.GetCurrentAsync(default); }
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { accountError = true; accountMessage = exception.Message; }
@@ -72,8 +74,8 @@ else
     }
     private async Task SetEnabledAsync(Agentstration.Security.AspNetCoreIdentity.LocalAccountView account, bool enabled)
     {
-        try { await Accounts.SetEnabledAsync(account.AccountId, enabled, default); localAccounts = await Accounts.ListAsync(default); accountError = false; accountMessage = $"Account '{account.UserName}' {(enabled ? "enabled" : "disabled")}."; }
+        try { await Accounts.SetEnabledAsync(account.AccountId, enabled, default); localAccounts = await Accounts.ListAsync(default); accountError = false; accountMessage = T(enabled ? "AccountEnabled" : "AccountDisabled", account.UserName); }
         catch (InvalidOperationException exception) { accountError = true; accountMessage = exception.Message; }
     }
-    private string ScopeLabel(string scope) => scope.StartsWith("/tenants/", StringComparison.Ordinal) ? "Tenant · inherited by all workspaces" : view?.Workspaces.FirstOrDefault(workspace => scope == AuthorizationScopes.Workspace(workspace.Id)) is { } workspace ? $"Workspace · {workspace.DisplayName}" : scope;
+    private string ScopeLabel(string scope) => scope.StartsWith("/tenants/", StringComparison.Ordinal) ? T("TenantInherited") : view?.Workspaces.FirstOrDefault(workspace => scope == AuthorizationScopes.Workspace(workspace.Id)) is { } workspace ? T("WorkspaceScope", workspace.DisplayName) : scope;
 }

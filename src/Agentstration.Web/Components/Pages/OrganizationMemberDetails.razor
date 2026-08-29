@@ -5,53 +5,54 @@
 @inject Agentstration.Management.Core.ExternalIdentityAdministrationService ExternalIdentities
 @inject Agentstration.Management.Abstractions.ICurrentRequestContext RequestContext
 @inject Agentstration.Management.Abstractions.IPlatformAuthorizationService PlatformAuthorization
+@inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
-<PageTitle>Member access · Agentstration</PageTitle>
-@if (member is null) { <LoadingState Message="Loading member access…" /> }
+<PageTitle>@T("MemberAccess") · Agentstration</PageTitle>
+@if (member is null) { <LoadingState Message="@T("LoadingMemberAccess")" /> }
 else
 {
-    <PageHeader Title="@member.Principal.DisplayName" Description="Effective tenant and workspace access for this principal." />
+    <PageHeader Title="@member.Principal.DisplayName" Description="@T("MemberAccess.Description")" />
     <OrganizationSettingsNav />
     <section class="dashboard-grid">
-        <article class="panel"><div class="panel-header"><h2>Principal</h2><StatusBadge Text="@member.Principal.Status.ToString()" Status="UiStatus.Success" /></div><p><strong>Kind:</strong> @member.Principal.Kind</p><p><strong>Email:</strong> @(member.Principal.Email ?? "—")</p><p><strong>Principal ID:</strong> <code>@member.Principal.Id</code></p><p><strong>Instance role:</strong> @(targetIsPlatformAdministrator ? "PlatformAdmin" : "—")</p>@foreach(var identity in member.ExternalIdentities){<p><strong>External identity:</strong> <code>@identity.Issuer</code> · <code>@identity.Subject</code></p>}</article>
-        <article class="panel"><div class="panel-header"><h2>Membership</h2><StatusBadge Text="@member.Membership.Status.ToString()" Status="UiStatus.Success" /></div><p>Joined @member.Membership.JoinedAt.ToLocalTime().ToString("g")</p></article>
+        <article class="panel"><div class="panel-header"><h2>@T("Principal")</h2><StatusBadge Text="@T($"Status.{member.Principal.Status}")" Status="UiStatus.Success" /></div><p><strong>@T("Kind"):</strong> @member.Principal.Kind</p><p><strong>@T("Email"):</strong> @(member.Principal.Email ?? "—")</p><p><strong>@T("PrincipalId"):</strong> <code>@member.Principal.Id</code></p><p><strong>@T("InstanceRole"):</strong> @(targetIsPlatformAdministrator ? "PlatformAdmin" : "—")</p>@foreach(var identity in member.ExternalIdentities){<p><strong>@T("ExternalIdentity"):</strong> <code>@identity.Issuer</code> · <code>@identity.Subject</code></p>}</article>
+        <article class="panel"><div class="panel-header"><h2>@T("Membership")</h2><StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" /></div><p>@T("JoinedAt", member.Membership.JoinedAt.ToLocalTime().ToString("g"))</p></article>
     </section>
-    <section class="panel" style="margin-top:18px"><div class="panel-header"><h2>Role assignments</h2></div>@if(member.Roles.Count == 0){<EmptyState Title="No access assigned" Message="Membership alone does not grant workspace access." />}else{@foreach(var assigned in member.Roles){<article><p><strong>@assigned.Role.DisplayName</strong> @if(assigned.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="Inherited" Status="UiStatus.Info" />}</p><code>@assigned.Scope</code></article>}}</section>
+    <section class="panel" style="margin-top:18px"><div class="panel-header"><h2>@T("RoleAssignments")</h2></div>@if(member.Roles.Count == 0){<EmptyState Title="@T("NoAccessAssigned")" Message="@T("MembershipNoAccess")" />}else{@foreach(var assigned in member.Roles){<article><p><strong>@assigned.Role.DisplayName</strong> @if(assigned.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="@T("Inherited")" Status="UiStatus.Info" />}</p><code>@assigned.Scope</code></article>}}</section>
     <section class="panel" style="margin-top:18px">
-        <div class="panel-header"><div><h2>Current Workspace membership</h2><p class="muted">Assign the minimum role required in the selected Workspace.</p></div></div>
+        <div class="panel-header"><div><h2>@T("CurrentWorkspaceMembership")</h2><p class="muted">@T("WorkspaceMembershipHelp")</p></div></div>
         @if (!string.IsNullOrWhiteSpace(message)) { <p class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")">@message</p> }
-        <div class="form-grid"><label><span>Role</span><select @bind="selectedRole">@foreach(var role in Agentstration.Management.Core.BuiltInIdentityRoles.Names){<option value="@role">@role</option>}</select></label></div>
-        <div class="form-actions"><button class="button-primary" @onclick="SaveMembershipAsync">Save role</button>@if(workspaceMembership is not null){<button class="button-secondary" @onclick="RemoveMembershipAsync">Remove from Workspace</button>}</div>
+        <div class="form-grid"><label><span>@T("Role")</span><select @bind="selectedRole">@foreach(var role in Agentstration.Management.Core.BuiltInIdentityRoles.Names){<option value="@role">@role</option>}</select></label></div>
+        <div class="form-actions"><button class="button-primary" @onclick="SaveMembershipAsync">@T("SaveRole")</button>@if(workspaceMembership is not null){<button class="button-secondary" @onclick="RemoveMembershipAsync">@T("RemoveFromWorkspace")</button>}</div>
     </section>
     @if (canManagePlatformAdministrators)
     {
         <section class="panel" style="margin-top:18px">
-            <div class="panel-header"><div><h2>External authentication</h2><p class="muted">Link the exact issuer and subject emitted by a validated OIDC provider. Email is never used as an identity key.</p></div></div>
+            <div class="panel-header"><div><h2>@T("ExternalAuthentication")</h2><p class="muted">@T("ExternalAuthenticationHelp")</p></div></div>
             @if (!string.IsNullOrWhiteSpace(identityMessage)) { <p class="form-alert @(identityError ? "form-alert-danger" : "form-alert-success")">@identityMessage</p> }
             <div class="form-grid">
-                <label><span>Issuer</span><input @bind="newIssuer" placeholder="https://identity.example/realms/company" autocomplete="off" /></label>
-                <label><span>Subject</span><input @bind="newSubject" autocomplete="off" /></label>
+                <label><span>@T("Issuer")</span><input @bind="newIssuer" placeholder="https://identity.example/realms/company" autocomplete="off" /></label>
+                <label><span>@T("Subject")</span><input @bind="newSubject" autocomplete="off" /></label>
             </div>
-            <div class="form-actions"><button class="button-primary" @onclick="LinkExternalIdentityAsync">Link external identity</button></div>
+            <div class="form-actions"><button class="button-primary" @onclick="LinkExternalIdentityAsync">@T("LinkExternalIdentity")</button></div>
             @if (member.ExternalIdentities.Count > 0)
             {
                 <DataGrid TItem="ExternalIdentity" Items="member.ExternalIdentities">
-                    <Header><tr><th>Issuer</th><th>Subject</th><th>Linked</th><th></th></tr></Header>
-                    <Row Context="identity"><tr><td><code>@identity.Issuer</code></td><td><code>@identity.Subject</code></td><td>@identity.LinkedAt.ToLocalTime().ToString("g")</td><td><button class="text-button" @onclick="() => UnlinkExternalIdentityAsync(identity.Id)">Unlink</button></td></tr></Row>
+                    <Header><tr><th>@T("Issuer")</th><th>@T("Subject")</th><th>@T("Linked")</th><th></th></tr></Header>
+                    <Row Context="identity"><tr><td><code>@identity.Issuer</code></td><td><code>@identity.Subject</code></td><td>@identity.LinkedAt.ToLocalTime().ToString("g")</td><td><button class="text-button" @onclick="() => UnlinkExternalIdentityAsync(identity.Id)">@T("Unlink")</button></td></tr></Row>
                 </DataGrid>
             }
         </section>
         <section class="panel" style="margin-top:18px">
-            <div class="panel-header"><div><h2>Instance administration</h2><p class="muted">PlatformAdmin grants apply to the Agentstration instance, independently of Workspace roles.</p></div></div>
+            <div class="panel-header"><div><h2>@T("InstanceAdministration")</h2><p class="muted">@T("InstanceAdministrationHelp")</p></div></div>
             @if (!string.IsNullOrWhiteSpace(platformMessage)) { <p class="form-alert @(platformError ? "form-alert-danger" : "form-alert-success")">@platformMessage</p> }
             <div class="form-actions">
                 @if (targetIsPlatformAdministrator)
                 {
-                    <button class="button-secondary" @onclick="RevokePlatformAdministratorAsync" disabled="@(UserId == RequestContext.Current.PrincipalId)">Revoke PlatformAdmin</button>
+                    <button class="button-secondary" @onclick="RevokePlatformAdministratorAsync" disabled="@(UserId == RequestContext.Current.PrincipalId)">@T("RevokePlatformAdmin")</button>
                 }
                 else
                 {
-                    <button class="button-primary" @onclick="GrantPlatformAdministratorAsync" disabled="@(member.Principal.Status != PrincipalStatus.Active)">Grant PlatformAdmin</button>
+                    <button class="button-primary" @onclick="GrantPlatformAdministratorAsync" disabled="@(member.Principal.Status != PrincipalStatus.Active)">@T("GrantPlatformAdmin")</button>
                 }
             </div>
         </section>
@@ -64,6 +65,7 @@ else
     private Agentstration.Management.Core.WorkspaceMemberView? workspaceMembership; private string selectedRole = Agentstration.Management.Core.BuiltInIdentityRoles.Viewer; private string? message; private bool hasError;
     private bool canManagePlatformAdministrators; private bool targetIsPlatformAdministrator; private string? platformMessage; private bool platformError;
     private string newIssuer = ""; private string newSubject = ""; private string? identityMessage; private bool identityError;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     protected override async Task OnParametersSetAsync()
     {
         member = (await Service.GetCurrentAsync(default)).Members.SingleOrDefault(value => value.Principal.Id == UserId);
@@ -75,22 +77,22 @@ else
     }
     private async Task SaveMembershipAsync()
     {
-        try { workspaceMembership = await Memberships.SetAsync(RequestContext.Current.WorkspaceId, UserId, selectedRole, default); hasError = false; message = "Workspace role updated."; }
+        try { workspaceMembership = await Memberships.SetAsync(RequestContext.Current.WorkspaceId, UserId, selectedRole, default); hasError = false; message = T("WorkspaceRoleUpdated"); }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { hasError = true; message = exception.Message; }
     }
     private async Task RemoveMembershipAsync()
     {
-        try { await Memberships.RemoveAsync(RequestContext.Current.WorkspaceId, UserId, default); workspaceMembership = null; hasError = false; message = "Principal removed from the Workspace."; }
+        try { await Memberships.RemoveAsync(RequestContext.Current.WorkspaceId, UserId, default); workspaceMembership = null; hasError = false; message = T("PrincipalRemoved"); }
         catch (InvalidOperationException exception) { hasError = true; message = exception.Message; }
     }
     private async Task GrantPlatformAdministratorAsync()
     {
-        try { await PlatformAdministrators.GrantAsync(UserId, default); targetIsPlatformAdministrator = true; platformError = false; platformMessage = "PlatformAdmin granted."; }
+        try { await PlatformAdministrators.GrantAsync(UserId, default); targetIsPlatformAdministrator = true; platformError = false; platformMessage = T("PlatformAdminGranted"); }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { platformError = true; platformMessage = exception.Message; }
     }
     private async Task RevokePlatformAdministratorAsync()
     {
-        try { await PlatformAdministrators.RevokeAsync(UserId, default); targetIsPlatformAdministrator = false; platformError = false; platformMessage = "PlatformAdmin revoked."; }
+        try { await PlatformAdministrators.RevokeAsync(UserId, default); targetIsPlatformAdministrator = false; platformError = false; platformMessage = T("PlatformAdminRevoked"); }
         catch (InvalidOperationException exception) { platformError = true; platformMessage = exception.Message; }
     }
     private async Task LinkExternalIdentityAsync()
@@ -99,7 +101,7 @@ else
         {
             await ExternalIdentities.LinkAsync(UserId, newIssuer, newSubject, default);
             member = (await Service.GetCurrentAsync(default)).Members.Single(value => value.Principal.Id == UserId);
-            newIssuer = newSubject = ""; identityError = false; identityMessage = "External identity linked.";
+            newIssuer = newSubject = ""; identityError = false; identityMessage = T("ExternalIdentityLinked");
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or ControlPlaneConcurrencyException)
         { identityError = true; identityMessage = exception.Message; }
@@ -110,7 +112,7 @@ else
         {
             await ExternalIdentities.UnlinkAsync(UserId, externalIdentityId, default);
             member = (await Service.GetCurrentAsync(default)).Members.Single(value => value.Principal.Id == UserId);
-            identityError = false; identityMessage = "External identity unlinked.";
+            identityError = false; identityMessage = T("ExternalIdentityUnlinked");
         }
         catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException)
         { identityError = true; identityMessage = exception.Message; }

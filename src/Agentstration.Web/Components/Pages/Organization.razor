@@ -1,25 +1,26 @@
 @page "/settings/organization"
 @inject Agentstration.Management.Core.IdentityAdministrationService Service
+@inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
-<PageTitle>Organization · Agentstration</PageTitle>
-<PageHeader Title="Organization" Description="Current tenant, workspaces, members and inherited role assignments." />
+<PageTitle>@T("Organization") · Agentstration</PageTitle>
+<PageHeader Title="@T("Organization")" Description="@T("Organization.Description")" />
 <OrganizationSettingsNav />
 
 @if (view is null)
 {
-    <LoadingState Message="Loading organization…" />
+    <LoadingState Message="@T("LoadingOrganization")" />
 }
 else
 {
     <section class="dashboard-grid">
         <article class="panel">
             <div class="panel-header"><h2>@view.Tenant.DisplayName</h2><StatusBadge Text="@view.Tenant.Status.ToString()" Status="UiStatus.Success" /></div>
-            <p><strong>Technical name:</strong> @view.Tenant.Name</p>
-            <p><strong>Tenant ID:</strong> <code>@view.Tenant.Id</code></p>
-            <p><strong>Created:</strong> <time datetime="@view.Tenant.CreatedAt.ToString("O")">@view.Tenant.CreatedAt.ToLocalTime().ToString("g")</time></p>
+            <p><strong>@T("TechnicalName"):</strong> @view.Tenant.Name</p>
+            <p><strong>@T("TenantId"):</strong> <code>@view.Tenant.Id</code></p>
+            <p><strong>@T("Created"):</strong> <time datetime="@view.Tenant.CreatedAt.ToString("O")">@view.Tenant.CreatedAt.ToLocalTime().ToString("g")</time></p>
         </article>
         <article class="panel">
-            <div class="panel-header"><h2>Workspaces</h2></div>
+            <div class="panel-header"><h2>@T("Workspaces")</h2></div>
             @foreach (var workspace in view.Workspaces)
             {
                 <p><strong>@workspace.DisplayName</strong><br /><small>@workspace.Name · @workspace.Id</small></p>
@@ -27,7 +28,7 @@ else
         </article>
     </section>
     <section class="panel">
-        <div class="panel-header"><h2>Members and roles</h2></div>
+        <div class="panel-header"><h2>@T("MembersAndRoles")</h2></div>
         @foreach (var member in view.Members)
         {
             <article>
@@ -43,5 +44,6 @@ else
 
 @code {
     private Agentstration.Management.Core.TenantAdministrationView? view;
+    private string T(string key) => Localizer[key].Value;
     protected override async Task OnInitializedAsync() => view = await Service.GetCurrentAsync(CancellationToken.None);
 }
