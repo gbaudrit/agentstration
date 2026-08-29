@@ -12,7 +12,7 @@ The primary input is declared explicitly with `EntryFieldRole.PrimaryInput`; it 
 
 Workspace is the functional boundary for Interactions, Tasks, Conversations, Notifications, and Dashboards. Dashboard is the UX composition of namespaced Entry references, roles, and order. Entry remains independent from every Dashboard that displays it, and its published `ResolvedTarget` remains an immutable Flow reference.
 
-`home` is only the default seeded Dashboard (`IsDefault = true`), and `personal` is only a Workspace name. Neither name activates engine behavior. Workplace routes make both selections explicit with `/w/{workspace}/d/{dashboard}`; `/` resolves the configured default Workspace and then its default Dashboard. Switching Dashboard does not move or filter Workspace work state.
+`home` is only the default seeded Dashboard (`IsDefault = true`) and does not activate engine behavior. Workplace routes make both selections explicit with `/w/{workspace}/d/{dashboard}`; `/` resolves the selected Workspace and then its default Dashboard. Switching Dashboard does not move or filter Workspace work state.
 
 Pack installation only makes namespaced published Entries available for explicit Dashboard selection. It does not add them to Home.
 

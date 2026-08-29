@@ -12,6 +12,7 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
         HttpContext httpContext,
         IPrincipalResolver resolver,
         IIdentityStore identityStore,
+        IPlatformAuthorizationService platformAuthorization,
         IRequestContextScopeFactory scopeFactory)
     {
         if (httpContext.User.Identity?.IsAuthenticated != true)
@@ -43,8 +44,6 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
         }
 
         httpContext.Features.Set(new ResolvedPrincipalFeature(principal));
-        var memberships = await identityStore.ListWorkspaceMembershipsAsync(principal.Id, httpContext.RequestAborted);
-        var activeMemberships = memberships.Where(value => value.Status == MembershipStatus.Active).ToArray();
         var requestedWorkspaceId = RequestedWorkspace(httpContext);
         var isPersonalAccessToken = Guid.TryParse(personalAccessTokenClaim, out var personalAccessTokenId);
         var personalAccessTokenWorkspaceId = Guid.TryParse(
@@ -52,22 +51,48 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
             out var parsedPersonalAccessTokenWorkspaceId)
             ? parsedPersonalAccessTokenWorkspaceId
             : (Guid?)null;
-        var selected = isPersonalAccessToken
-            ? personalAccessTokenWorkspaceId is { } restrictedWorkspaceId
-                && (requestedWorkspaceId is null || requestedWorkspaceId == restrictedWorkspaceId)
-                ? activeMemberships.SingleOrDefault(value => value.WorkspaceId == restrictedWorkspaceId)
-                : null
-            : requestedWorkspaceId is null
-                ? activeMemberships.FirstOrDefault()
-                : activeMemberships.SingleOrDefault(value => value.WorkspaceId == requestedWorkspaceId.Value);
-        if (selected is null)
+        var isPlatformAdministrator = await platformAuthorization.IsPlatformAdministratorAsync(
+            principal.Id,
+            httpContext.RequestAborted);
+        Workspace? workspace;
+        if (isPersonalAccessToken)
+        {
+            if (personalAccessTokenWorkspaceId is not { } restrictedWorkspaceId
+                || requestedWorkspaceId is not null && requestedWorkspaceId != restrictedWorkspaceId)
+            {
+                await next(httpContext);
+                return;
+            }
+            workspace = isPlatformAdministrator
+                ? await identityStore.GetWorkspaceAsync(restrictedWorkspaceId, httpContext.RequestAborted)
+                : await ResolveMembershipWorkspaceAsync(
+                    identityStore,
+                    principal.Id,
+                    restrictedWorkspaceId,
+                    httpContext.RequestAborted);
+        }
+        else if (isPlatformAdministrator)
+        {
+            workspace = requestedWorkspaceId is { } requested
+                ? await identityStore.GetWorkspaceAsync(requested, httpContext.RequestAborted)
+                : await ResolvePlatformDefaultWorkspaceAsync(identityStore, principal.Id, httpContext.RequestAborted);
+        }
+        else
+        {
+            workspace = await ResolveMembershipWorkspaceAsync(
+                identityStore,
+                principal.Id,
+                requestedWorkspaceId,
+                httpContext.RequestAborted);
+        }
+        if (workspace?.Status != WorkspaceStatus.Active)
         {
             await next(httpContext);
             return;
         }
 
-        var workspace = await identityStore.GetWorkspaceAsync(selected.WorkspaceId, httpContext.RequestAborted);
-        if (workspace?.Status != WorkspaceStatus.Active)
+        var tenant = await identityStore.GetTenantAsync(workspace.TenantId, httpContext.RequestAborted);
+        if (tenant?.Status != TenantStatus.Active)
         {
             await next(httpContext);
             return;
@@ -83,6 +108,43 @@ public sealed class PrincipalResolutionMiddleware(RequestDelegate next)
             : null;
         using (scopeFactory.Push(new RequestContext(principal.Id, workspace.TenantId, workspace.Id, restriction)))
             await next(httpContext);
+    }
+
+    private static async Task<Workspace?> ResolveMembershipWorkspaceAsync(
+        IIdentityStore store,
+        Guid principalId,
+        Guid? requestedWorkspaceId,
+        CancellationToken cancellationToken)
+    {
+        var memberships = (await store.ListWorkspaceMembershipsAsync(principalId, cancellationToken))
+            .Where(value => value.Status == MembershipStatus.Active);
+        var selected = requestedWorkspaceId is null
+            ? memberships.FirstOrDefault()
+            : memberships.SingleOrDefault(value => value.WorkspaceId == requestedWorkspaceId.Value);
+        return selected is null ? null : await store.GetWorkspaceAsync(selected.WorkspaceId, cancellationToken);
+    }
+
+    private static async Task<Workspace?> ResolvePlatformDefaultWorkspaceAsync(
+        IIdentityStore store,
+        Guid principalId,
+        CancellationToken cancellationToken)
+    {
+        var preferences = await store.GetPrincipalPreferencesAsync(principalId, cancellationToken);
+        if (preferences?.DefaultWorkspaceId is { } defaultWorkspaceId)
+        {
+            var preferred = await store.GetWorkspaceAsync(defaultWorkspaceId, cancellationToken);
+            if (preferred is not null
+                && (preferences.DefaultTenantId is null || preferred.TenantId == preferences.DefaultTenantId))
+                return preferred;
+        }
+
+        foreach (var tenant in (await store.ListTenantsAsync(cancellationToken)).Where(value => value.Status == TenantStatus.Active))
+        {
+            var workspace = (await store.ListWorkspacesAsync(tenant.Id, cancellationToken))
+                .FirstOrDefault(value => value.Status == WorkspaceStatus.Active);
+            if (workspace is not null) return workspace;
+        }
+        return null;
     }
 
     private static Guid? RequestedWorkspace(HttpContext context)

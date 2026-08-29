@@ -5,6 +5,9 @@ namespace Agentstration.Management.Abstractions;
 public static class BootstrapResourceKinds
 {
     public const string PlatformAdministrator = "PlatformAdministrator";
+    public const string Tenant = "Tenant";
+    public const string Workspace = "Workspace";
+    public const string PrincipalDefaultContext = "PrincipalDefaultContext";
 }
 
 public sealed record BootstrapResourceDocument

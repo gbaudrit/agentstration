@@ -41,7 +41,16 @@ public sealed class BootstrapModel(
         if (!ModelState.IsValid) return Page();
 
         var result = await bootstrap.BootstrapAsync(
-            new LocalBootstrapRequest(Input.UserName, Input.Password, Input.DisplayName, Input.Email),
+            new LocalBootstrapRequest(
+                Input.UserName,
+                Input.Password,
+                Input.DisplayName,
+                Input.Email,
+                new LocalBootstrapTopology(
+                    Input.TenantName,
+                    Input.TenantDisplayName,
+                    Input.WorkspaceName,
+                    Input.WorkspaceDisplayName)),
             cancellationToken);
         if (!result.Succeeded)
         {
@@ -57,6 +66,18 @@ public sealed class BootstrapModel(
 
     public sealed class BootstrapInput
     {
+        [Required, StringLength(64, MinimumLength = 2), RegularExpression("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"), Display(Name = "Tenant name")]
+        public string TenantName { get; set; } = string.Empty;
+
+        [Required, StringLength(120, MinimumLength = 2), Display(Name = "Tenant display name")]
+        public string TenantDisplayName { get; set; } = string.Empty;
+
+        [Required, StringLength(64, MinimumLength = 2), RegularExpression("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"), Display(Name = "Workspace name")]
+        public string WorkspaceName { get; set; } = string.Empty;
+
+        [Required, StringLength(120, MinimumLength = 2), Display(Name = "Workspace display name")]
+        public string WorkspaceDisplayName { get; set; } = string.Empty;
+
         [Required, StringLength(120, MinimumLength = 2), Display(Name = "Display name")]
         public string DisplayName { get; set; } = string.Empty;
 

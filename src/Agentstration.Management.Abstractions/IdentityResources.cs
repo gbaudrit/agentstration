@@ -34,7 +34,9 @@ public sealed record Principal(
 public sealed record PrincipalPreferences(
     Guid PrincipalId,
     ThemePreference Theme,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid? DefaultTenantId = null,
+    Guid? DefaultWorkspaceId = null);
 
 public sealed record ExternalIdentity(
     Guid Id,
@@ -160,13 +162,30 @@ public sealed record InitialPrincipalProvisioning(
     string? Email);
 
 public sealed record InitialPrincipalProvisioningResult(
-    Principal Principal,
-    Tenant Tenant,
-    Workspace Workspace);
+    Principal Principal);
 
 public interface IInitialPrincipalProvisioner
 {
     Task<InitialPrincipalProvisioningResult> ProvisionAsync(InitialPrincipalProvisioning request, CancellationToken cancellationToken);
+}
+
+public sealed record InitialTopologyProvisioning(
+    Guid PrincipalId,
+    string TenantName,
+    string TenantDisplayName,
+    string WorkspaceName,
+    string WorkspaceDisplayName);
+
+public sealed record InitialTopologyProvisioningResult(Tenant Tenant, Workspace Workspace);
+
+public interface IInitialTopologyProvisioner
+{
+    Task<InitialTopologyProvisioningResult> ProvisionAsync(InitialTopologyProvisioning request, CancellationToken cancellationToken);
+}
+
+public interface ILocalAccountPrincipalResolver
+{
+    Task<Principal?> ResolveByUserNameAsync(string userName, CancellationToken cancellationToken);
 }
 
 public sealed record LocalPrincipalProvisioning(
