@@ -9,7 +9,9 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DOTNET_ENVIRONMENT": "Development",
-        "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles/development",
+        "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles",
+        "Agentstration__Bootstrap__InitialBootstrapEnabled": "true",
+        "Agentstration__Bootstrap__InitialProfiles__0": "development",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21030",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057",
         "DOCKER_HOST": "tcp://localhost:2375"
@@ -23,7 +25,9 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DOTNET_ENVIRONMENT": "Development",
-        "Agentstration__Bootstrap__Path": "",
+        "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles",
+        "Agentstration__Bootstrap__InitialBootstrapEnabled": "false",
+        "Agentstration__Bootstrap__InitialProfiles__0": "development",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21030",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057",
         "DOCKER_HOST": "tcp://localhost:2375"

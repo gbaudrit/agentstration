@@ -21,15 +21,49 @@ public sealed class DeclarativeBootstrapTests
     private const string ChangedPassword = "Changed123!Password";
 
     [TestMethod]
-    public async Task MissingUnconfiguredOrEmptyDirectoriesHaveNoEffect()
+    public async Task DisabledUnconfiguredOrEmptyBootstrapHasNoEffect()
     {
         using var directory = new TemporaryDirectory();
         var handler = new RecordingHandler();
 
         Assert.AreEqual(0, await Service(directory.Path, handler).ApplyAsync(default));
-        Assert.AreEqual(0, await Service(directory.Path, handler, Path.Combine(directory.Path, "missing")).ApplyAsync(default));
+        Assert.AreEqual(
+            0,
+            await Service(directory.Path, handler, Path.Combine(directory.Path, "missing"), enabled: false).ApplyAsync(default));
+        Assert.AreEqual(0, await ServiceForProfiles(directory.Path, handler, []).ApplyAsync(default));
         Assert.AreEqual(0, await Service(directory.Path, handler, directory.Path).ApplyAsync(default));
         Assert.AreEqual(0, handler.Names.Count);
+    }
+
+    [TestMethod]
+    public async Task MissingInvalidOrDuplicateSelectedProfilesFailClearly()
+    {
+        using var directory = new TemporaryDirectory();
+        var handler = new RecordingHandler();
+
+        var missingRoot = await Assert.ThrowsAsync<DeclarativeBootstrapException>(
+            () => ServiceForConfiguration(
+                directory.Path,
+                handler,
+                new Dictionary<string, string?>
+                {
+                    ["Agentstration:Bootstrap:InitialBootstrapEnabled"] = "true",
+                    ["Agentstration:Bootstrap:InitialProfiles:0"] = "development"
+                }).ApplyAsync(default));
+        StringAssert.Contains(missingRoot.Message, "Agentstration:Bootstrap:Path is required");
+
+        var missing = await Assert.ThrowsAsync<DeclarativeBootstrapException>(
+            () => ServiceForProfiles(directory.Path, handler, ["missing"]).ApplyAsync(default));
+        StringAssert.Contains(missing.Message, "profile 'missing' does not exist");
+
+        var invalid = await Assert.ThrowsAsync<DeclarativeBootstrapException>(
+            () => ServiceForProfiles(directory.Path, handler, ["../outside"]).ApplyAsync(default));
+        StringAssert.Contains(invalid.Message, "single valid directory name");
+
+        Directory.CreateDirectory(Path.Combine(directory.Path, "development"));
+        var duplicate = await Assert.ThrowsAsync<DeclarativeBootstrapException>(
+            () => ServiceForProfiles(directory.Path, handler, ["development", "development"]).ApplyAsync(default));
+        StringAssert.Contains(duplicate.Message, "configured more than once");
     }
 
     [TestMethod]
@@ -69,6 +103,26 @@ public sealed class DeclarativeBootstrapTests
 
         Assert.AreEqual(3, await Service(directory.Path, handler, directory.Path).ApplyAsync(default));
         CollectionAssert.AreEqual(new[] { "first", "second", "last" }, handler.Names);
+    }
+
+    [TestMethod]
+    public async Task ProfilesAreAppliedInConfiguredOrderAndCanBeAppliedWhenInitialBootstrapIsDisabled()
+    {
+        using var directory = new TemporaryDirectory();
+        var baseProfile = Directory.CreateDirectory(Path.Combine(directory.Path, "base"));
+        var developmentProfile = Directory.CreateDirectory(Path.Combine(directory.Path, "development"));
+        await File.WriteAllTextAsync(Path.Combine(baseProfile.FullName, "20-second.yaml"), Resource("Recording", "base"));
+        await File.WriteAllTextAsync(Path.Combine(developmentProfile.FullName, "10-first.yaml"), Resource("Recording", "development"));
+        var handler = new RecordingHandler();
+        var service = ServiceForProfiles(
+            directory.Path,
+            handler,
+            ["development", "base"],
+            enabled: false);
+
+        Assert.AreEqual(0, await service.ApplyAsync(default));
+        Assert.AreEqual(2, await service.ApplyProfilesAsync(["development", "base"], default));
+        CollectionAssert.AreEqual(new[] { "development", "base" }, handler.Names);
     }
 
     [TestMethod]
@@ -243,9 +297,43 @@ public sealed class DeclarativeBootstrapTests
         Assert.IsTrue(defaultPolicy.RequireNonAlphanumeric);
     }
 
-    private static DeclarativeBootstrapService Service(string contentRoot, IBootstrapResourceHandler handler, string? path = null)
+    private static DeclarativeBootstrapService Service(
+        string contentRoot,
+        IBootstrapResourceHandler handler,
+        string? path = null,
+        bool enabled = true)
     {
-        var values = path is null ? null : new Dictionary<string, string?> { ["Agentstration:Bootstrap:Path"] = path };
+        if (path is null)
+            return ServiceForConfiguration(contentRoot, handler, null);
+
+        var root = Directory.GetParent(path)?.FullName
+            ?? throw new InvalidOperationException($"Bootstrap test path '{path}' has no parent directory.");
+        var profile = Path.GetFileName(path);
+        return ServiceForProfiles(root, handler, [profile], enabled);
+    }
+
+    private static DeclarativeBootstrapService ServiceForProfiles(
+        string root,
+        IBootstrapResourceHandler handler,
+        IReadOnlyList<string> profiles,
+        bool enabled = true)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Agentstration:Bootstrap:Path"] = root,
+            ["Agentstration:Bootstrap:InitialBootstrapEnabled"] = enabled.ToString()
+        };
+        for (var index = 0; index < profiles.Count; index++)
+            values[$"Agentstration:Bootstrap:InitialProfiles:{index}"] = profiles[index];
+
+        return ServiceForConfiguration(root, handler, values);
+    }
+
+    private static DeclarativeBootstrapService ServiceForConfiguration(
+        string contentRoot,
+        IBootstrapResourceHandler handler,
+        IEnumerable<KeyValuePair<string, string?>>? values)
+    {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         return new(configuration, new TestHostEnvironment(contentRoot), [handler], NullLogger<DeclarativeBootstrapService>.Instance);
     }
@@ -255,7 +343,9 @@ public sealed class DeclarativeBootstrapTests
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", "Local");
-            builder.UseSetting("Agentstration:Bootstrap:Path", path);
+            builder.UseSetting("Agentstration:Bootstrap:Path", Directory.GetParent(path)!.FullName);
+            builder.UseSetting("Agentstration:Bootstrap:InitialBootstrapEnabled", "true");
+            builder.UseSetting("Agentstration:Bootstrap:InitialProfiles:0", Path.GetFileName(path));
             if (password is not null) builder.UseSetting("Agentstration:Bootstrap:Secrets:AdminPassword", password);
         });
 

@@ -1,8 +1,23 @@
 # Declarative bootstrap
 
-Agentstration can create initial resources from YAML when the optional `Agentstration:Bootstrap:Path` setting points to a directory. There is no default path and no `Enabled` setting. An unconfigured path, a missing directory, or a directory containing no `.yaml` or `.yml` files has no effect.
+Agentstration treats `Agentstration:Bootstrap:Path` as the root of a profile catalog. Each immediate child directory is one independently selectable profile. Startup applies the ordered `Agentstration:Bootstrap:InitialProfiles` list only when `Agentstration:Bootstrap:InitialBootstrapEnabled` is `true`. Initial bootstrap is disabled by default.
 
-Relative paths resolve from the Web host content root. Files use ordinal lexical filename order; use numeric prefixes when references introduce dependencies. A file may contain one YAML resource or several YAML documents separated by `---`. Bootstrap runs during every process startup after persistence initialization, but handlers only create absent resources and never reconcile existing ones.
+Profiles use configuration order; files inside each profile use ordinal lexical filename order. Use profile order for dependencies across profiles and numeric filename prefixes for dependencies inside one profile. A file may contain one YAML resource or several YAML documents separated by `---`. Bootstrap runs during every enabled process startup after persistence initialization, but handlers only create absent resources and never reconcile existing ones.
+
+For example:
+
+```text
+deploy/bootstrap/profiles/
+  base/
+    10-tenant.yaml
+  development/
+    00-platform-administrator.yaml
+    20-workspace.yaml
+  demo/
+    10-demo-resources.yaml
+```
+
+Profile names identify one immediate child directory. Absolute paths, separators, `.` and `..` are rejected. A selected profile must exist and may appear only once. The root and selected profiles fail clearly when an enabled startup is misconfigured; an existing selected profile without YAML files is a valid no-op.
 
 ## Initial topology
 
@@ -74,7 +89,12 @@ Configure the path without putting a production password in YAML:
 {
   "Agentstration": {
     "Bootstrap": {
-      "Path": "./bootstrap"
+      "Path": "./bootstrap/profiles",
+      "InitialBootstrapEnabled": true,
+      "InitialProfiles": [
+        "base",
+        "production"
+      ]
     }
   }
 }
@@ -86,7 +106,10 @@ Supply the referenced value through any normal .NET configuration provider. For 
 volumes:
   - ./bootstrap:/app/bootstrap:ro
 environment:
-  Agentstration__Bootstrap__Path: /app/bootstrap
+  Agentstration__Bootstrap__Path: /app/bootstrap/profiles
+  Agentstration__Bootstrap__InitialBootstrapEnabled: "true"
+  Agentstration__Bootstrap__InitialProfiles__0: base
+  Agentstration__Bootstrap__InitialProfiles__1: production
   Agentstration__Bootstrap__Secrets__AdminPassword: ${ADMIN_PASSWORD}
 ```
 
@@ -96,7 +119,7 @@ Outside Development, Agentstration does not choose or activate an unattended top
 
 ## Visual Studio and local Development
 
-The default `http` and `https` launch profiles activate the versioned bundle under `deploy/bootstrap/profiles/development`. They are available from Visual Studio or the command line:
+The default `http` and `https` launch profiles use `deploy/bootstrap/profiles` as their catalog, enable initial bootstrap, and select `development`. They are available from Visual Studio or the command line:
 
 ```powershell
 dotnet run --project src/Agentstration.Web
@@ -105,23 +128,25 @@ dotnet run --project src/Agentstration.Web --launch-profile https
 
 Both Development profiles create `admin / admin`, Tenant `dev`, Workspace `default`, and the administrator's default context on a fresh instance. The known credential is a development fixture, not a secret: never use these profiles for an exposed or production instance. Development relaxes the local Identity password policy to accept it; every other environment retains the strong password policy.
 
-Use the corresponding explicit profile when Development must start without declarative bootstrap:
+Use the corresponding explicit profile when Development must start without applying initial profiles:
 
 ```powershell
 dotnet run --project src/Agentstration.Web --launch-profile http-NoBootstrap
 dotnet run --project src/Agentstration.Web --launch-profile https-NoBootstrap
 ```
 
-Build configuration and host environment are independent. `dotnet run --configuration Release` still uses the default `http` launch profile and its Development bootstrap settings. Use a `NoBootstrap` profile or `--no-launch-profile` when bootstrap must be disabled.
+Build configuration and host environment are independent. `dotnet run --configuration Release` still uses the default `http` launch profile and its Development bootstrap settings. Use a `NoBootstrap` profile or `--no-launch-profile` when initial bootstrap must be disabled. A `NoBootstrap` profile changes only `InitialBootstrapEnabled`; the catalog path and selected profiles remain configured for later manual application.
 
-When Visual Studio starts `Agentstration.AppHost`, select the profile on that startup project. Its `https` profile passes the Development bundle to the orchestrated Console; `https-NoBootstrap` passes an empty override:
+When Visual Studio starts `Agentstration.AppHost`, select the profile on that startup project. Its `https` profile passes the resolved catalog path, activation flag, and ordered initial profiles to the orchestrated Console; `https-NoBootstrap` forwards the same catalog selection with initial bootstrap disabled:
 
 ```powershell
 dotnet run --project src/Agentstration.AppHost
 dotnet run --project src/Agentstration.AppHost --launch-profile https-NoBootstrap
 ```
 
-Malformed YAML, an unsupported `apiVersion`, an unknown `kind`, a missing required field, a missing referenced resource, or an absent referenced configuration value fails startup explicitly.
+An invalid or duplicate profile name, a missing selected profile, malformed YAML, an unsupported `apiVersion`, an unknown `kind`, a missing required field, a missing referenced resource, or an absent referenced configuration value fails enabled startup explicitly.
+
+`InitialBootstrapEnabled` controls startup application only. It does not disable profile loading itself: the same application service can apply an explicit ordered profile list independently of the startup flag. This is the boundary intended for a future PlatformAdmin-only validation and application UI; no such HTTP or UI surface is exposed yet.
 
 ## Extension boundary
 

@@ -4,6 +4,8 @@ Status: Accepted — 2026-08-28
 
 The Platform administrator/topology coupling originally described here is superseded by [ADR-0074](0074-initial-topology-is-declarative-and-platform-administration-is-global.md). The loader and initial-state decisions remain accepted.
 
+The single-directory configuration and absence of an activation flag described here are superseded by [ADR-0075](0075-bootstrap-files-are-an-ordered-profile-catalog.md).
+
 ## Context
 
 A fresh local or containerized instance may need a known initial administrator before an operator can use the interactive bootstrap. Future deployments may need the same startup source for ordinary Agentstration resources or Pack installations. This must not introduce a second resource model, a reconciliation loop, or persisted bootstrap bookkeeping.
