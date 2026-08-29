@@ -57,7 +57,7 @@ else
                 <label><span>@T("Handler")</span><InputText @bind-Value="model.Handler" /><ValidationMessage For="() => model.Handler" /></label>
                 <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
             </div>
-            @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">UID: <code>@resourceId</code></p> }
+            @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">@T("Uid"): <code>@resourceId</code></p> }
         </section>
 
         <section class="panel form-section">
@@ -73,10 +73,10 @@ else
         @if (!IsNew)
         {
             <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("ModelConfiguration")</p><h2>@T("DeclaredAndResolved")</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelManagementUi.Label(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
+                <div class="panel-header"><div><p class="eyebrow">@T("ModelConfiguration")</p><h2>@T("DeclaredAndResolved")</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelStatusLabel(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
                 <div class="declaration-resolution-grid">
                     <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? model.ModelProfileName)</dd><dt>@T("Name")</dt><dd><code>@model.ModelProfileName</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">@T("OpenModelProfile") →</a> }</article>
-                    <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelManagementUi.Label(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">@T("OpenProvider") →</a> }}</article>
+                    <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">@T("OpenProvider") →</a> }}</article>
                 </div>
             </section>
         }
@@ -113,6 +113,7 @@ else
     [Parameter] public string? Name { get; set; }
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string ModelStatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "ready" => "Ready", "succeeded" => "Succeeded", "starting" => "Starting", "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "unavailable" => "Unavailable", "invalidconfiguration" => "InvalidConfiguration", "incompatible" => "Incompatible", "failed" => "Failed", _ => "Unknown" }}"];
 
     private readonly CancellationTokenSource cancellation = new();
     private AgentEditorModel? model;

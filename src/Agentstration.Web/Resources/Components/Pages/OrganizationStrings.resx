@@ -128,4 +128,5 @@
 <data name="PlatformAdminRevoked"><value>Platform administrator role revoked.</value></data>
 <data name="ExternalIdentityLinked"><value>External identity linked.</value></data>
 <data name="ExternalIdentityUnlinked"><value>External identity unlinked.</value></data>
+<data name="PlatformAdministrator"><value>Platform administrator</value></data>
 </root>

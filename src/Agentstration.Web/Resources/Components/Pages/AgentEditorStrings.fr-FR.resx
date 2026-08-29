@@ -74,4 +74,5 @@
   <data name="ConcurrencyConflict"><value>Cet agent a été modifié sur le serveur. Rechargez la page avant de l’enregistrer à nouveau.</value></data>
   <data name="GenerationActive"><value>La génération {0} est active.</value></data>
   <data name="ReconciliationCompleted"><value>Réconciliation terminée avec l’état {0}.</value></data>
+  <data name="Uid"><value>UID</value></data><data name="Status.Available"><value>Disponible</value></data><data name="Status.Ready"><value>Prêt</value></data><data name="Status.Succeeded"><value>Réussi</value></data><data name="Status.Starting"><value>Démarrage</value></data><data name="Status.ProviderUnavailable"><value>Fournisseur indisponible</value></data><data name="Status.ModelUnavailable"><value>Modèle indisponible</value></data><data name="Status.Unavailable"><value>Indisponible</value></data><data name="Status.InvalidConfiguration"><value>Configuration non valide</value></data><data name="Status.Incompatible"><value>Incompatible</value></data><data name="Status.Failed"><value>Échec</value></data><data name="Status.Unknown"><value>Inconnu</value></data>
 </root>

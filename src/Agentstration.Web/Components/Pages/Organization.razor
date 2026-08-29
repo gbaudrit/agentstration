@@ -14,7 +14,7 @@ else
 {
     <section class="dashboard-grid">
         <article class="panel">
-            <div class="panel-header"><h2>@view.Tenant.DisplayName</h2><StatusBadge Text="@view.Tenant.Status.ToString()" Status="UiStatus.Success" /></div>
+            <div class="panel-header"><h2>@view.Tenant.DisplayName</h2><StatusBadge Text="@T($"Status.{view.Tenant.Status}")" Status="UiStatus.Success" /></div>
             <p><strong>@T("TechnicalName"):</strong> @view.Tenant.Name</p>
             <p><strong>@T("TenantId"):</strong> <code>@view.Tenant.Id</code></p>
             <p><strong>@T("Created"):</strong> <time datetime="@view.Tenant.CreatedAt.ToString("O")">@view.Tenant.CreatedAt.ToLocalTime().ToString("g")</time></p>
@@ -32,7 +32,7 @@ else
         @foreach (var member in view.Members)
         {
             <article>
-                <p><strong>@member.Principal.DisplayName</strong> <StatusBadge Text="@member.Membership.Status.ToString()" Status="UiStatus.Success" /></p>
+                <p><strong>@member.Principal.DisplayName</strong> <StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" /></p>
                 @foreach (var role in member.Roles)
                 {
                     <p><span>@role.Role.DisplayName</span><br /><small>@role.Scope</small></p>

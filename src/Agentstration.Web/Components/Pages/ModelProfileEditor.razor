@@ -25,7 +25,7 @@ else
 
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-profile-editor" class="resource-form">
         <DataAnnotationsValidator /><ValidationSummary />
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProfileResource")</h2></div>@if (resolution is not null) { <StatusBadge Text="@ModelManagementUi.Label(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProfileResource")</h2></div>@if (resolution is not null) { <StatusBadge Text="@StatusLabel(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
             <div class="form-grid">
                 <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
                 <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
@@ -37,7 +37,7 @@ else
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("ModelSelection")</p><h2>@T("ProviderAndModel")</h2></div></div>
             <div class="form-grid">
                 <label><span>@T("Provider")</span><select value="@SelectedProvider" @onchange="ProviderChangedAsync"><option value="">@T("SelectProvider")</option>@foreach (var provider in providers) { <option value="@ProviderKey(provider)">@provider.Properties.DisplayName — @provider.Namespace/@provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
-                <label><span>@T("Model")</span><select @bind="model.ModelName" disabled="@loadingModels"><option value="">@(loadingModels ? T("LoadingModels") : T("SelectModel"))</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — @T("NotCurrentlyDiscovered")</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @ModelManagementUi.Label(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
+                <label><span>@T("Model")</span><select @bind="model.ModelName" disabled="@loadingModels"><option value="">@(loadingModels ? T("LoadingModels") : T("SelectModel"))</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — @T("NotCurrentlyDiscovered")</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @StatusLabel(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
             </div>
             @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderName)) { <p class="inline-warning">@T("NoModelsReported")</p> }
         </section>

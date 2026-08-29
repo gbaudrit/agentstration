@@ -50,7 +50,7 @@ else
             </section>
             <section class="panel">
                 <div class="panel-header"><div><p class="eyebrow">@T("What")</p><h2>@T("WorkSubmission")</h2></div></div>
-                <dl class="resource-details"><dt>@T("TargetKind")</dt><dd>Flow</dd><dt>Flow</dt><dd><a href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd><dt>@T("Resolution")</dt><dd>@(trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version))</dd><dt>@T("Input")</dt><dd><pre class="trigger-input">@PrettyInput(trigger.Definition.Input)</pre></dd></dl>
+                <dl class="resource-details"><dt>@T("TargetKind")</dt><dd>@T("Flow")</dd><dt>@T("Flow")</dt><dd><a href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd><dt>@T("Resolution")</dt><dd>@(trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version))</dd><dt>@T("Input")</dt><dd><pre class="trigger-input">@PrettyInput(trigger.Definition.Input)</pre></dd></dl>
             </section>
         </div>
         <aside class="trigger-detail-stack">
@@ -64,7 +64,7 @@ else
             </section>
             <section class="panel">
                 <div class="panel-header"><div><p class="eyebrow">@T("Observed")</p><h2>@T("CurrentStatus")</h2></div><StatusBadge Text="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" /></div>
-                <dl class="resource-details"><dt>@T("Enabled")</dt><dd>@T(trigger.Definition.Enabled ? "Yes" : "No")</dd><dt>@T("LastOutcome")</dt><dd>@T($"Outcome.{trigger.Observed.LastOutcome}")</dd><dt>@T("ErrorCode")</dt><dd><code>@(trigger.Observed.LastErrorCode ?? "—")</code></dd><dt>UID</dt><dd><code>@Short(trigger.Uid)</code></dd></dl>
+                <dl class="resource-details"><dt>@T("Enabled")</dt><dd>@T(trigger.Definition.Enabled ? "Yes" : "No")</dd><dt>@T("LastOutcome")</dt><dd>@T($"Outcome.{trigger.Observed.LastOutcome}")</dd><dt>@T("ErrorCode")</dt><dd><code>@(trigger.Observed.LastErrorCode ?? "—")</code></dd><dt>@T("Uid")</dt><dd><code>@Short(trigger.Uid)</code></dd></dl>
             </section>
         </aside>
     </div>

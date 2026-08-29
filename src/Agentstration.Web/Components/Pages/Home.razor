@@ -8,7 +8,7 @@
     <Status>
         @if (snapshot is not null)
         {
-            <StatusBadge Text="@snapshot.Status" Status="@PlatformDashboardService.ToStatus(snapshot.Status)" />
+            <StatusBadge Text="@T($"Status.{snapshot.Status}")" Status="@PlatformDashboardService.ToStatus(snapshot.Status)" />
         }
     </Status>
 </PageHeader>
@@ -74,7 +74,7 @@ else if (load is not null)
     }
 
     private void SetPlatformStatus(PlatformSnapshot value) =>
-        PlatformState.Set(PlatformDashboardService.ToStatus(value.Status), value.Status);
+        PlatformState.Set(PlatformDashboardService.ToStatus(value.Status), T($"Status.{value.Status}"));
 
     private string T(string key) => Localizer[key];
 

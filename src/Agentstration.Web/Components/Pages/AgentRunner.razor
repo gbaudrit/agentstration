@@ -145,7 +145,7 @@ else
         {
             <DataGrid TItem="RuntimeRun" Items="history">
                 <Header><tr><th>@I("Run")</th><th>@I("Date")</th><th>@I("Status")</th><th>@I("Duration")</th><th>@I("Initiator")</th><th>@I("Version")</th><th>@I("Prompt")</th><th>@I("Origin")</th></tr></Header>
-                <Row Context="run"><tr><td><a href="/runs/@run.Id"><code>@ShortId(run.Id)</code></a></td><td>@run.Status.CreatedAt.LocalDateTime.ToString("g")</td><td><StatusBadge Text="@run.Status.State.ToString()" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></td><td>@Duration(run)</td><td>@run.Properties.Initiator</td><td>@run.Properties.Agent.Version</td><td>@PromptPreview(run)</td><td>@run.Properties.Origin</td></tr></Row>
+                <Row Context="run"><tr><td><a href="/runs/@run.Id"><code>@ShortId(run.Id)</code></a></td><td>@run.Status.CreatedAt.LocalDateTime.ToString("g")</td><td><StatusBadge Text="@I($"RunState.{run.Status.State}")" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></td><td>@Duration(run)</td><td>@run.Properties.Initiator</td><td>@run.Properties.Agent.Version</td><td>@PromptPreview(run)</td><td>@run.Properties.Origin</td></tr></Row>
             </DataGrid>
         }
     </section>

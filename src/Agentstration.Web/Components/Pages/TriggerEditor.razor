@@ -47,7 +47,7 @@ else
         <section class="panel form-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Target")</p><h2>@T("PublishedFlow")</h2></div></div>
             <div class="form-grid">
-                <label class="form-span-2"><span>Flow</span><InputSelect @bind-Value="model.FlowKey"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</InputSelect><ValidationMessage For="() => model.FlowKey" /><small>@T("FlowResolutionHelp")</small></label>
+                <label class="form-span-2"><span>@T("Flow")</span><InputSelect @bind-Value="model.FlowKey"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</InputSelect><ValidationMessage For="() => model.FlowKey" /><small>@T("FlowResolutionHelp")</small></label>
             </div>
         </section>
 

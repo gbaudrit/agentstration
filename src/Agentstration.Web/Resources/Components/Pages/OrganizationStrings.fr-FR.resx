@@ -128,4 +128,5 @@
 <data name="PlatformAdminRevoked"><value>Rôle d’administrateur de la plateforme révoqué.</value></data>
 <data name="ExternalIdentityLinked"><value>Identité externe liée.</value></data>
 <data name="ExternalIdentityUnlinked"><value>Identité externe déliée.</value></data>
+<data name="PlatformAdministrator"><value>Administrateur de la plateforme</value></data>
 </root>

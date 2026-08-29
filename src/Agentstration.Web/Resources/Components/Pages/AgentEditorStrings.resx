@@ -74,4 +74,5 @@
   <data name="ConcurrencyConflict"><value>This agent changed on the server. Reload the page before saving again.</value></data>
   <data name="GenerationActive"><value>Generation {0} is active.</value></data>
   <data name="ReconciliationCompleted"><value>Reconciliation completed with state {0}.</value></data>
+  <data name="Uid"><value>UID</value></data><data name="Status.Available"><value>Available</value></data><data name="Status.Ready"><value>Ready</value></data><data name="Status.Succeeded"><value>Succeeded</value></data><data name="Status.Starting"><value>Starting</value></data><data name="Status.ProviderUnavailable"><value>Provider unavailable</value></data><data name="Status.ModelUnavailable"><value>Model unavailable</value></data><data name="Status.Unavailable"><value>Unavailable</value></data><data name="Status.InvalidConfiguration"><value>Invalid configuration</value></data><data name="Status.Incompatible"><value>Incompatible</value></data><data name="Status.Failed"><value>Failed</value></data><data name="Status.Unknown"><value>Unknown</value></data>
 </root>
