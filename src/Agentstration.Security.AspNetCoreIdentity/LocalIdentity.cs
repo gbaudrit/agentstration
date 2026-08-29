@@ -473,6 +473,7 @@ public static class LocalIdentityServiceCollectionExtensions
             .AddDefaultTokenProviders();
         services.AddScoped<IUserClaimsPrincipalFactory<LocalIdentityUser>, LocalIdentityClaimsPrincipalFactory>();
         services.AddScoped<LocalBootstrapCoordinator>();
+        services.AddScoped<IBootstrapResourceHandler, PlatformAdministratorBootstrapHandler>();
         services.AddScoped<LocalAccountAdministrationService>();
         services.AddScoped<LocalAccountSecurityService>();
         services.AddScoped<LocalAuthenticationService>();
