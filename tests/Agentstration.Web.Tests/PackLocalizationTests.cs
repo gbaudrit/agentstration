@@ -25,6 +25,7 @@ public sealed class PackLocalizationTests
             Assert.AreEqual("Fournisseur de modèles", strings["Binding.ModelProvider"].Value);
             Assert.AreEqual("Retirer agent du Pack", strings["RemoveFromPackLabel", "agent"].Value);
             Assert.AreEqual("Le build 1.0.0 est prêt pour cet espace de travail.", strings["BuildReadyForWorkspace", "1.0.0"].Value);
+            Assert.AreEqual("Désinstaller le Pack ?", strings["UninstallPackQuestion"].Value);
         }
         finally
         {

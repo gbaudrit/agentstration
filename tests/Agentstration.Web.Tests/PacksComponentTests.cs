@@ -4,16 +4,37 @@ using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using System.Globalization;
 
 namespace Agentstration.Web.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class PacksComponentTests
 {
+    private CultureInfo? originalCulture;
+    private CultureInfo? originalUiCulture;
+
+    [TestInitialize]
+    public void SetEnglishCulture()
+    {
+        originalCulture = CultureInfo.CurrentCulture;
+        originalUiCulture = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+    }
+
+    [TestCleanup]
+    public void RestoreCulture()
+    {
+        CultureInfo.CurrentCulture = originalCulture!;
+        CultureInfo.CurrentUICulture = originalUiCulture!;
+    }
+
     [TestMethod]
     public async Task PageSummarizesAndInspectsInstalledPacks()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
 
         var rendered = context.Render<Packs>();
@@ -29,7 +50,7 @@ public sealed class PacksComponentTests
     [TestMethod]
     public void PageSelectsThePackRequestedByResourceNavigation()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
             .NavigateTo("/packs?publisher=agentstration&name=starter");
@@ -46,7 +67,7 @@ public sealed class PacksComponentTests
     [TestMethod]
     public async Task InstallActionOpensSideEffectFreeArchivePreviewStep()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         var rendered = context.Render<Packs>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
@@ -60,7 +81,7 @@ public sealed class PacksComponentTests
     [TestMethod]
     public async Task ArchiveInstallOffersExplicitReplacementForAnInstalledPackIdentity()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var client = new FakePacksClient
         {
             PreviewResult = new PackInstallationPreview(
@@ -97,7 +118,7 @@ public sealed class PacksComponentTests
     [TestMethod]
     public async Task LegacyPackForkPromptsForItsOriginalSourceArchive()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         var rendered = context.Render<Packs>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
@@ -113,7 +134,7 @@ public sealed class PacksComponentTests
     [TestMethod]
     public async Task ComposerMovesResourcesAndReviewsDependenciesAutomatically()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         var rendered = context.Render<PackComposer>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Daily Assistant", StringComparison.Ordinal)));
@@ -135,7 +156,7 @@ public sealed class PacksComponentTests
     [TestMethod]
     public async Task ComposerExplainsWhenRemovingASelectionLeavesARequiredDependency()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         var rendered = context.Render<PackComposer>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Daily Assistant", StringComparison.Ordinal)));
@@ -153,6 +174,13 @@ public sealed class PacksComponentTests
 
         await rendered.FindAll("button").Single(button => button.GetAttribute("aria-label") == "Keep Concierge explicitly in Pack").ClickAsync(new());
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Find(".composer-content-group:not(.automatic)").TextContent.Contains("Concierge", StringComparison.Ordinal)));
+    }
+
+    private static BunitContext CreateContext()
+    {
+        var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        return context;
     }
 
     private sealed class FakePacksClient : IPacksClient
