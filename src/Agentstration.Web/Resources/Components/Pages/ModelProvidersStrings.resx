@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Model providers</value></data>
+  <data name="Description"><value>Inspect configured technical providers and their dynamically discovered models.</value></data>
+  <data name="Refresh"><value>Refresh</value></data>
+  <data name="CreateProvider"><value>Create model provider</value></data>
+  <data name="Loading"><value>Loading model providers…</value></data>
+  <data name="Retry"><value>Retry</value></data>
+  <data name="EmptyTitle"><value>No model providers</value></data>
+  <data name="EmptyMessage"><value>No technical provider is configured for this environment.</value></data>
+  <data name="Provider"><value>Provider</value></data>
+  <data name="Namespace"><value>Namespace</value></data>
+  <data name="Type"><value>Type</value></data>
+  <data name="Management"><value>Management</value></data>
+  <data name="Status"><value>Status</value></data>
+  <data name="Models"><value>Models</value></data>
+  <data name="ModelCount.One"><value>{0} model</value></data>
+  <data name="ModelCount.Many"><value>{0} models</value></data>
+  <data name="ViewDetails"><value>View details</value></data>
+  <data name="Status.Available"><value>Available</value></data>
+  <data name="Status.Starting"><value>Starting</value></data>
+  <data name="Status.Unavailable"><value>Unavailable</value></data>
+  <data name="Status.Failed"><value>Failed</value></data>
+  <data name="Status.Unknown"><value>Unknown</value></data>
+</root>

@@ -1,35 +1,36 @@
 @page "/modelproviders"
 @implements IDisposable
 @inject IModelProvidersClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProvidersStrings> Localizer
 
-<PageTitle>Model providers · Agentstration</PageTitle>
-<PageHeader Title="Model providers" Description="Inspect configured technical providers and their dynamically discovered models.">
-    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">Refresh</button><a class="button-primary" href="/modelproviders/new">Create model provider</a></Actions>
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")">
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button><a class="button-primary" href="/modelproviders/new">@T("CreateProvider")</a></Actions>
 </PageHeader>
 
 @if (loading && providers is null)
 {
-    <LoadingState Message="Loading model providers…" />
+    <LoadingState Message="@T("Loading")" />
 }
 else if (error is not null)
 {
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
 }
 else if (providers?.Count == 0)
 {
-    <EmptyState Title="No model providers" Message="No technical provider is configured for this environment." />
+    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" />
 }
 else
 {
     <DataGrid TItem="ModelProviderResponse" Items="providers ?? []">
-        <Header><tr><th>Provider</th><th>Namespace</th><th>Type</th><th>Management</th><th>Status</th><th>Models</th><th></th></tr></Header>
+        <Header><tr><th>@T("Provider")</th><th>@T("Namespace")</th><th>@T("Type")</th><th>@T("Management")</th><th>@T("Status")</th><th>@T("Models")</th><th></th></tr></Header>
         <Row Context="provider"><tr>
             <td><strong>@provider.Properties.DisplayName</strong><br /><code>@provider.Name</code></td>
             <td><code>@provider.Namespace</code></td>
             <td>@provider.Properties.ContributionId</td><td>@provider.Properties.RegistrationSource</td>
-            <td><StatusBadge Text="@ModelManagementUi.Label(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></td>
-            <td>@provider.Properties.ModelCount</td>
-            <td><a class="text-button" href="@DetailsUrl(provider)">View details →</a></td>
+            <td><StatusBadge Text="@StatusLabel(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></td>
+            <td>@ModelCount(provider.Properties.ModelCount)</td>
+            <td><a class="text-button" href="@DetailsUrl(provider)">@T("ViewDetails") →</a></td>
         </tr></Row>
     </DataGrid>
 }
@@ -39,6 +40,9 @@ else
     private IReadOnlyList<ModelProviderResponse>? providers;
     private AgentstrationApiException? error;
     private bool loading;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string ModelCount(int count) => T(count == 1 ? "ModelCount.One" : "ModelCount.Many", count);
+    private string StatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "starting" => "Starting", "unavailable" => "Unavailable", "failed" => "Failed", _ => "Unknown" }}"];
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync()
     {

@@ -94,6 +94,8 @@ public sealed class WorkOperationsComponentTests
         var flows = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowsStrings>>();
         var modelProfileEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProfileEditorStrings>>();
         var modelProfiles = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProfilesStrings>>();
+        var modelProviderDetails = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProviderDetailsStrings>>();
+        var modelProviders = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProvidersStrings>>();
 
         Assert.AreEqual("Créer un agent", agents["CreateAgent"].Value);
         Assert.AreEqual("Définissez, publiez et exploitez des ressources d’agents spécialisés.", agents["Description"].Value);
@@ -116,6 +118,10 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Profils de modèles", modelProfiles["Title"].Value);
         Assert.AreEqual("Fournisseur indisponible", modelProfiles["Status.ProviderUnavailable"].Value);
         Assert.AreEqual("Ce profil de modèle est encore référencé par 2 agents.", modelProfiles["DeleteConflictMessage", modelProfiles["AgentCount.Many", 2].Value].Value);
+        Assert.AreEqual("Fournisseurs de modèles", modelProviders["Title"].Value);
+        Assert.AreEqual("2 modèles", modelProviders["ModelCount.Many", 2].Value);
+        Assert.AreEqual("Point de terminaison détenu par l’extension", modelProviderDetails["ExtensionOwnedEndpoint"].Value);
+        Assert.AreEqual("Ce fournisseur est référencé par 1 profil de modèle.", modelProviderDetails["ProviderReferencedBy", modelProviderDetails["ProfileCount.One", 1].Value].Value);
     }
 
     private static BunitContext CreateContext()

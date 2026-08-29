@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Fournisseurs de modèles</value></data>
+  <data name="Description"><value>Examinez les fournisseurs techniques configurés et leurs modèles découverts dynamiquement.</value></data>
+  <data name="Refresh"><value>Actualiser</value></data>
+  <data name="CreateProvider"><value>Créer un fournisseur de modèles</value></data>
+  <data name="Loading"><value>Chargement des fournisseurs de modèles…</value></data>
+  <data name="Retry"><value>Réessayer</value></data>
+  <data name="EmptyTitle"><value>Aucun fournisseur de modèles</value></data>
+  <data name="EmptyMessage"><value>Aucun fournisseur technique n’est configuré pour cet environnement.</value></data>
+  <data name="Provider"><value>Fournisseur</value></data>
+  <data name="Namespace"><value>Espace de noms</value></data>
+  <data name="Type"><value>Type</value></data>
+  <data name="Management"><value>Gestion</value></data>
+  <data name="Status"><value>État</value></data>
+  <data name="Models"><value>Modèles</value></data>
+  <data name="ModelCount.One"><value>{0} modèle</value></data>
+  <data name="ModelCount.Many"><value>{0} modèles</value></data>
+  <data name="ViewDetails"><value>Voir les détails</value></data>
+  <data name="Status.Available"><value>Disponible</value></data>
+  <data name="Status.Starting"><value>Démarrage</value></data>
+  <data name="Status.Unavailable"><value>Indisponible</value></data>
+  <data name="Status.Failed"><value>Échec</value></data>
+  <data name="Status.Unknown"><value>Inconnu</value></data>
+</root>
