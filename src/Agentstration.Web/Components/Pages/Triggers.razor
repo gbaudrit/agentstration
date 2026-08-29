@@ -5,53 +5,54 @@
 @using Agentstration.Resources
 @inject TriggerManagementService Management
 @inject ConsoleContextState ContextState
+@inject Microsoft.Extensions.Localization.IStringLocalizer<TriggerStrings> Localizer
 
-<PageTitle>Triggers · Agentstration</PageTitle>
-<PageHeader Title="Triggers" Description="Schedule autonomous Work through the existing Flow runtime.">
-    <Metadata><span>@Filtered.Count Trigger(s)</span><span>@EnabledCount enabled</span><span>@AttentionCount requiring attention</span></Metadata>
-    <Actions>@if (CanManage) { <a class="button-primary" href="/triggers/new">New Trigger</a> }</Actions>
+<PageTitle>@T("Triggers") · Agentstration</PageTitle>
+<PageHeader Title="@T("Triggers")" Description="@T("List.Description")">
+    <Metadata><span>@T(Filtered.Count == 1 ? "TriggerCount.One" : "TriggerCount.Many", Filtered.Count)</span><span>@T("EnabledCount", EnabledCount)</span><span>@T("AttentionCount", AttentionCount)</span></Metadata>
+    <Actions>@if (CanManage) { <a class="button-primary" href="/triggers/new">@T("NewTrigger")</a> }</Actions>
 </PageHeader>
 
 @if (loading)
 {
-    <LoadingState Message="Loading Triggers…" />
+    <LoadingState Message="@T("LoadingTriggers")" />
 }
 else if (!string.IsNullOrWhiteSpace(error))
 {
-    <ErrorState Title="Triggers unavailable" Message="@error" OnRetry="LoadAsync" />
+    <ErrorState Title="@T("TriggersUnavailable")" Message="@error" OnRetry="LoadAsync" />
 }
 else
 {
     <div class="filter-bar">
-        <SearchBox @bind-Value="search" Placeholder="Search Trigger or Flow" />
-        <select @bind="state" aria-label="Filter Trigger state">
-            <option value="">State: All</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option><option value="attention">Requires attention</option>
+        <SearchBox @bind-Value="search" Placeholder="@T("SearchPlaceholder")" />
+        <select @bind="state" aria-label="@T("FilterStateAriaLabel")">
+            <option value="">@T("State.All")</option><option value="enabled">@T("Enabled")</option><option value="disabled">@T("Disabled")</option><option value="attention">@T("RequiresAttention")</option>
         </select>
-        <select @bind="scheduleType" aria-label="Filter schedule type">
-            <option value="">Schedule: All</option><option value="once">Once</option><option value="interval">Interval</option><option value="cron">Cron</option>
+        <select @bind="scheduleType" aria-label="@T("FilterScheduleAriaLabel")">
+            <option value="">@T("Schedule.All")</option><option value="once">@T("ScheduleType.Once")</option><option value="interval">@T("ScheduleType.Interval")</option><option value="cron">@T("ScheduleType.Cron")</option>
         </select>
     </div>
 
     @if (items.Count == 0)
     {
-        <EmptyState Title="No Triggers" Message="Create a disabled schedule, review it, then enable it explicitly.">@if (CanManage) { <a class="button-primary" href="/triggers/new">Create Trigger</a> }</EmptyState>
+        <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")">@if (CanManage) { <a class="button-primary" href="/triggers/new">@T("CreateTrigger")</a> }</EmptyState>
     }
     else if (Filtered.Count == 0)
     {
-        <EmptyState Title="No matching Triggers" Message="Adjust the search or filters." />
+        <EmptyState Title="@T("NoMatchesTitle")" Message="@T("NoMatchesMessage")" />
     }
     else
     {
         <DataGrid TItem="StoredResource<TriggerResource>" Items="Filtered">
-            <Header><tr><th>Trigger</th><th>State</th><th>Schedule</th><th>Target</th><th>Next occurrence</th><th>Last outcome</th><th></th></tr></Header>
+            <Header><tr><th>@T("Trigger")</th><th>@T("State")</th><th>@T("Schedule")</th><th>@T("Target")</th><th>@T("NextOccurrence")</th><th>@T("LastOutcome")</th><th></th></tr></Header>
             <Row Context="stored"><tr>
                 <td><strong><a href="@DetailsUrl(stored.Value)">@stored.Value.Definition.DisplayName</a></strong><small class="table-secondary">@stored.Value.Namespace.Value/@stored.Value.Name</small></td>
-                <td><StatusBadge Text="@(stored.Value.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(stored.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /></td>
-                <td>@TriggerUi.ScheduleLabel(stored.Value.Definition.Source.Schedule)</td>
+                <td><StatusBadge Text="@(stored.Value.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(stored.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /></td>
+                <td>@TriggerUi.ScheduleLabel(stored.Value.Definition.Source.Schedule, Localizer)</td>
                 <td><a class="text-button" href="@FlowUrl(stored.Value)">@stored.Value.Definition.Target.Flow?.Name</a></td>
                 <td>@TriggerUi.FormatDate(stored.Value.Observed.NextOccurrenceAt)</td>
-                <td><StatusBadge Text="@stored.Value.Observed.LastOutcome.ToString()" Status="@OutcomeStatus(stored.Value.Observed.LastOutcome)" />@if (stored.Value.Observed.LastErrorCode is { } errorCode) { <small class="table-secondary">@errorCode</small> }</td>
-                <td><a class="text-button" href="@DetailsUrl(stored.Value)">Open</a>@if (CanManage) { <a class="text-button" href="@EditUrl(stored.Value)">Edit</a> }</td>
+                <td><StatusBadge Text="@T($"Outcome.{stored.Value.Observed.LastOutcome}")" Status="@OutcomeStatus(stored.Value.Observed.LastOutcome)" />@if (stored.Value.Observed.LastErrorCode is { } errorCode) { <small class="table-secondary">@errorCode</small> }</td>
+                <td><a class="text-button" href="@DetailsUrl(stored.Value)">@T("Open")</a>@if (CanManage) { <a class="text-button" href="@EditUrl(stored.Value)">@T("Edit")</a> }</td>
             </tr></Row>
         </DataGrid>
     }
@@ -62,6 +63,7 @@ else
     private bool loading = true;
     private string? error;
     private string search = "", state = "", scheduleType = "";
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private bool CanManage => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
     private int EnabledCount => items.Count(value => value.Value.Definition.Enabled);
     private int AttentionCount => items.Count(value => value.Value.Observed.LastOutcome == TriggerLastOutcome.Failed);

@@ -11,23 +11,24 @@
 @inject NotificationState Notifications
 @inject ConsoleContextState ContextState
 @inject TimeProvider TimeProvider
+@inject Microsoft.Extensions.Localization.IStringLocalizer<TriggerStrings> Localizer
 
-<PageTitle>@(IsNew ? "New Trigger" : "Edit Trigger") · Agentstration</PageTitle>
+<PageTitle>@(IsNew ? T("NewTrigger") : T("EditTrigger")) · Agentstration</PageTitle>
 @if (loading || model is null)
 {
-    <LoadingState Message="@(IsNew ? "Preparing Trigger editor…" : "Loading Trigger…")" />
+    <LoadingState Message="@(IsNew ? T("PreparingEditor") : T("LoadingTrigger"))" />
 }
 else if (notFound)
 {
-    <EmptyState Title="Trigger not found" Message="The requested Trigger no longer exists."><a class="button-secondary" href="/triggers">Back to Triggers</a></EmptyState>
+    <EmptyState Title="@T("NotFoundTitle")" Message="@T("NotFoundMessage")"><a class="button-secondary" href="/triggers">@T("BackToTriggers")</a></EmptyState>
 }
 else
 {
-    <PageHeader Title="@(IsNew ? "New Trigger" : model.DisplayName)" Description="@(IsNew ? "Create a disabled schedule and review it before activation." : $"Edit desired configuration · {model.Name}")">
-        <Actions><a class="button-secondary" href="@(IsNew ? "/triggers" : $"/triggers/{Uri.EscapeDataString(model.Name)}")">Cancel</a></Actions>
+    <PageHeader Title="@(IsNew ? T("NewTrigger") : model.DisplayName)" Description="@(IsNew ? T("Editor.NewDescription") : T("Editor.EditDescription", model.Name))">
+        <Actions><a class="button-secondary" href="@(IsNew ? "/triggers" : $"/triggers/{Uri.EscapeDataString(model.Name)}")">@T("Cancel")</a></Actions>
     </PageHeader>
 
-    @if (!CanManage) { <div class="form-alert form-alert-danger" role="alert">You do not have permission to manage Trigger resources.</div> }
+    @if (!CanManage) { <div class="form-alert form-alert-danger" role="alert">@T("ManagePermissionDenied")</div> }
     @if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
 
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="trigger-editor" class="resource-form" @onchange="MarkDirty">
@@ -35,67 +36,67 @@ else
         <ValidationSummary />
 
         <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Trigger resource</h2></div>@if (!IsNew) { <StatusBadge Text="@(existing!.Value.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(existing.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /> }</div>
+            <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("TriggerResource")</h2></div>@if (!IsNew) { <StatusBadge Text="@(existing!.Value.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(existing.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /> }</div>
             <div class="form-grid">
-                <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /><small>Immutable resource name.</small></label>
-                <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
-                <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
+                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /><small>@T("ImmutableNameHelp")</small></label>
+                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>
         </section>
 
         <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">Target</p><h2>Published Flow</h2></div></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("Target")</p><h2>@T("PublishedFlow")</h2></div></div>
             <div class="form-grid">
-                <label class="form-span-2"><span>Flow</span><InputSelect @bind-Value="model.FlowKey"><option value="">Select a Flow</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</InputSelect><ValidationMessage For="() => model.FlowKey" /><small>The Flow version is resolved immutably when the Trigger fires.</small></label>
+                <label class="form-span-2"><span>Flow</span><InputSelect @bind-Value="model.FlowKey"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.Namespace.Value/@flow.Id · @flow.Status · @flow.Version</option> }</InputSelect><ValidationMessage For="() => model.FlowKey" /><small>@T("FlowResolutionHelp")</small></label>
             </div>
         </section>
 
         <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">When</p><h2>Schedule</h2></div><button class="button-secondary" type="button" @onclick="PreviewAsync">Preview</button></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("When")</p><h2>@T("Schedule")</h2></div><button class="button-secondary" type="button" @onclick="PreviewAsync">@T("Preview")</button></div>
             <div class="form-grid">
-                <label><span>Schedule type</span><InputSelect @bind-Value="model.ScheduleType"><option value="@TriggerScheduleType.Once">Once</option><option value="@TriggerScheduleType.Interval">Interval</option><option value="@TriggerScheduleType.Cron">Cron</option></InputSelect></label>
-                <label><span>Time zone</span><InputSelect @bind-Value="model.TimeZone">@foreach (var zone in timeZones) { <option value="@zone">@zone</option> }</InputSelect><small>IANA identifier; local times are rejected when ambiguous.</small></label>
+                <label><span>@T("ScheduleType")</span><InputSelect @bind-Value="model.ScheduleType"><option value="@TriggerScheduleType.Once">@T("ScheduleType.Once")</option><option value="@TriggerScheduleType.Interval">@T("ScheduleType.Interval")</option><option value="@TriggerScheduleType.Cron">@T("ScheduleType.Cron")</option></InputSelect></label>
+                <label><span>@T("TimeZone")</span><InputSelect @bind-Value="model.TimeZone">@foreach (var zone in timeZones) { <option value="@zone">@zone</option> }</InputSelect><small>@T("TimeZoneHelp")</small></label>
                 @if (model.ScheduleType == TriggerScheduleType.Once)
                 {
-                    <label class="form-span-2"><span>Run at</span><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" /><ValidationMessage For="() => model.LocalAt" /></label>
+                    <label class="form-span-2"><span>@T("RunAt")</span><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" /><ValidationMessage For="() => model.LocalAt" /></label>
                 }
                 else if (model.ScheduleType == TriggerScheduleType.Interval)
                 {
-                    <label><span>Repeat every</span><InputNumber @bind-Value="model.IntervalValue" min="1" /><ValidationMessage For="() => model.IntervalValue" /></label>
-                    <label><span>Unit</span><InputSelect @bind-Value="model.IntervalUnit"><option value="minutes">Minutes</option><option value="hours">Hours</option><option value="days">Days</option></InputSelect></label>
-                    <label class="form-span-2"><span>Start at</span><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" /><ValidationMessage For="() => model.LocalAt" /></label>
+                    <label><span>@T("RepeatEvery")</span><InputNumber @bind-Value="model.IntervalValue" min="1" /><ValidationMessage For="() => model.IntervalValue" /></label>
+                    <label><span>@T("Unit")</span><InputSelect @bind-Value="model.IntervalUnit"><option value="minutes">@T("Unit.Minutes")</option><option value="hours">@T("Unit.Hours")</option><option value="days">@T("Unit.Days")</option></InputSelect></label>
+                    <label class="form-span-2"><span>@T("StartAt")</span><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" /><ValidationMessage For="() => model.LocalAt" /></label>
                 }
                 else
                 {
-                    <label><span>Preset</span><select value="@cronPreset" @onchange="ApplyCronPreset"><option value="advanced">Advanced</option><option value="weekdayMorning">Weekdays at 08:00</option><option value="dailyMorning">Every day at 08:00</option><option value="weeklyMonday">Mondays at 09:00</option></select></label>
-                    <label><span>Quartz cron expression</span><InputText @bind-Value="model.CronExpression" /><ValidationMessage For="() => model.CronExpression" /><small>Quartz syntax; use Advanced for a custom expression.</small></label>
+                    <label><span>@T("Preset")</span><select value="@cronPreset" @onchange="ApplyCronPreset"><option value="advanced">@T("Preset.Advanced")</option><option value="weekdayMorning">@T("Preset.WeekdaysMorning")</option><option value="dailyMorning">@T("Preset.DailyMorning")</option><option value="weeklyMonday">@T("Preset.MondayMorning")</option></select></label>
+                    <label><span>@T("CronExpression")</span><InputText @bind-Value="model.CronExpression" /><ValidationMessage For="() => model.CronExpression" /><small>@T("CronHelp")</small></label>
                 }
-                <label><span>Missed occurrence</span><InputSelect @bind-Value="model.MisfirePolicy"><option value="@TriggerMisfirePolicy.FireOnce">Fire once after restart</option><option value="@TriggerMisfirePolicy.Skip">Skip missed occurrence</option></InputSelect><small>No unbounded backlog is created.</small></label>
-                <label><span>While previous Work is active</span><InputSelect @bind-Value="model.ConcurrencyPolicy"><option value="@TriggerConcurrencyPolicy.Skip">Skip new occurrence</option><option value="@TriggerConcurrencyPolicy.Allow">Allow overlap</option></InputSelect><small>This does not change Flow-internal parallelism.</small></label>
+                <label><span>@T("MissedOccurrence")</span><InputSelect @bind-Value="model.MisfirePolicy"><option value="@TriggerMisfirePolicy.FireOnce">@T("Misfire.FireOnce")</option><option value="@TriggerMisfirePolicy.Skip">@T("Misfire.Skip")</option></InputSelect><small>@T("MisfireHelp")</small></label>
+                <label><span>@T("PreviousWorkActive")</span><InputSelect @bind-Value="model.ConcurrencyPolicy"><option value="@TriggerConcurrencyPolicy.Skip">@T("Concurrency.Skip")</option><option value="@TriggerConcurrencyPolicy.Allow">@T("Concurrency.Allow")</option></InputSelect><small>@T("ConcurrencyHelp")</small></label>
             </div>
             @if (!string.IsNullOrWhiteSpace(scheduleError)) { <p class="form-alert form-alert-danger" role="alert">@scheduleError</p> }
             @if (preview.Count > 0)
             {
-                <div class="trigger-preview" aria-live="polite"><strong>Next occurrences</strong><ol>@foreach (var value in preview) { <li>@TriggerUi.OccurrenceLabel(value, model.TimeZone, TimeProvider.GetUtcNow())</li> }</ol></div>
+                <div class="trigger-preview" aria-live="polite"><strong>@T("NextOccurrences")</strong><ol>@foreach (var value in preview) { <li>@TriggerUi.OccurrenceLabel(value, model.TimeZone, TimeProvider.GetUtcNow(), Localizer)</li> }</ol></div>
             }
         </section>
 
         <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">What</p><h2>Static input</h2></div><button class="text-button" type="button" @onclick="FormatInput">Format JSON</button></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("What")</p><h2>@T("StaticInput")</h2></div><button class="text-button" type="button" @onclick="FormatInput">@T("FormatJson")</button></div>
             <div class="form-grid">
-                <label class="form-span-2"><span>JSON object</span><InputTextArea @bind-Value="model.InputJson" rows="10" class="trigger-json form-code-editor" /><ValidationMessage For="() => model.InputJson" /><small>Event payload and expression bindings remain outside V1. Raw credential fields are rejected.</small></label>
+                <label class="form-span-2"><span>@T("JsonObject")</span><InputTextArea @bind-Value="model.InputJson" rows="10" class="trigger-json form-code-editor" /><ValidationMessage For="() => model.InputJson" /><small>@T("StaticInputHelp")</small></label>
             </div>
             @if (!string.IsNullOrWhiteSpace(inputError)) { <p class="form-alert form-alert-danger" role="alert">@inputError</p> }
         </section>
 
         @if (IsNew)
         {
-            <div class="form-actions"><a class="button-secondary" href="/triggers">Cancel</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)">@(saving ? "Creating…" : "Create disabled Trigger")</button></div>
+            <div class="form-actions"><a class="button-secondary" href="/triggers">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)">@(saving ? T("Creating") : T("CreateDisabledTrigger"))</button></div>
         }
         else
         {
-            <UnsavedChangesBar IsVisible="@dirty" Message="Save the desired schedule. Existing Work and occurrences are not changed.">
-                <Actions><a class="button-secondary" href="@($"/triggers/{Uri.EscapeDataString(model.Name)}")">Discard</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)">@(saving ? "Saving…" : "Save changes")</button></Actions>
+            <UnsavedChangesBar IsVisible="@dirty" Message="@T("UnsavedMessage")">
+                <Actions><a class="button-secondary" href="@($"/triggers/{Uri.EscapeDataString(model.Name)}")">@T("Discard")</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)">@(saving ? T("Saving") : T("SaveChanges"))</button></Actions>
             </UnsavedChangesBar>
         }
     </EditForm>
@@ -113,6 +114,7 @@ else
     private string cronPreset = "weekdayMorning";
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private bool CanManage => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -171,7 +173,7 @@ else
     private JsonElement ParseInput()
     {
         inputError = null;
-        try { using var document = JsonDocument.Parse(model!.InputJson); if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException("Static input must be a JSON object."); return document.RootElement.Clone(); }
+        try { using var document = JsonDocument.Parse(model!.InputJson); if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException(T("StaticInputMustBeObject")); return document.RootElement.Clone(); }
         catch (Exception exception) when (exception is JsonException or FormatException) { inputError = exception.Message; throw; }
     }
 
@@ -189,13 +191,13 @@ else
         {
             await PreviewAsync(); if (scheduleError is not null) return;
             var input = ParseInput();
-            var separator = model.FlowKey.IndexOf('/'); if (separator <= 0) throw new InvalidOperationException("Select a Flow target.");
+            var separator = model.FlowKey.IndexOf('/'); if (separator <= 0) throw new InvalidOperationException(T("SelectFlowTarget"));
             var flowNamespace = ResourceNamespace.Parse(model.FlowKey[..separator]); var flowName = model.FlowKey[(separator + 1)..];
             var definition = new TriggerProperties { DisplayName = model.DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), Enabled = existing?.Value.Definition.Enabled ?? false, Source = new() { Schedule = BuildSchedule() }, Target = new() { Flow = new() { Name = flowName, Namespace = flowNamespace } }, Input = input, MisfirePolicy = model.MisfirePolicy, ConcurrencyPolicy = model.ConcurrencyPolicy, ExecutionScope = existing?.Value.Definition.ExecutionScope };
             StoredResource<TriggerResource> saved;
             if (IsNew) saved = await Management.CreateAsync(new() { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Trigger, Metadata = new() { Name = model.Name.Trim() }, Definition = definition }, CancellationToken.None);
             else saved = await Management.UpdateAsync(ResourceNamespace.Default, model.Name, definition, existing!.ETag, CancellationToken.None);
-            Notifications.Add(new(Guid.NewGuid(), IsNew ? "Trigger created" : "Trigger updated", saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));
+            Notifications.Add(new(Guid.NewGuid(), IsNew ? T("Notification.Created") : T("Notification.Updated"), saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));
             Navigation.NavigateTo($"/triggers/{Uri.EscapeDataString(saved.Value.Name)}");
         }
         catch (Exception exception) { error = exception.Message; }
@@ -204,10 +206,10 @@ else
 
     private sealed class TriggerEditorModel
     {
-        [Required, RegularExpression("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", ErrorMessage = "Use lowercase letters, digits, and hyphens.")] public string Name { get; set; } = "";
+        [Required, RegularExpression("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")] public string Name { get; set; } = "";
         [Required, StringLength(120)] public string DisplayName { get; set; } = "";
         [StringLength(500)] public string? Description { get; set; }
-        [Required(ErrorMessage = "Select a published Flow.")] public string FlowKey { get; set; } = "";
+        [Required, Display(Name = "Flow")] public string FlowKey { get; set; } = "";
         public TriggerScheduleType ScheduleType { get; set; } = TriggerScheduleType.Once;
         [Required] public string TimeZone { get; set; } = "Europe/Paris";
         public DateTime LocalAt { get; set; }

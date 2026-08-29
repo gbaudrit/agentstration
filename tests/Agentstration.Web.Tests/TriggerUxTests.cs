@@ -1,11 +1,16 @@
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.WorkOperations;
+using Agentstration.Management.Abstractions;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
+using System.Globalization;
 
 namespace Agentstration.Web.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class TriggerUxTests
 {
     [TestMethod]
@@ -33,6 +38,32 @@ public sealed class TriggerUxTests
         var label = TriggerUi.OccurrenceLabel(occurrence, "America/New_York", occurrence.AddHours(-1));
 
         StringAssert.Contains(label, "UTC-04:00");
+    }
+
+    [TestMethod]
+    public void ScheduleAndOccurrenceLabelsUseTheSelectedFrenchCulture()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
+            var collection = new ServiceCollection();
+            collection.AddLogging();
+            collection.AddLocalization(options => options.ResourcesPath = "Resources");
+            var services = collection.BuildServiceProvider();
+            var strings = services.GetRequiredService<IStringLocalizer<TriggerStrings>>();
+            var schedule = new TriggerSchedule { Type = TriggerScheduleType.Interval, Every = "PT2H", StartAt = DateTimeOffset.Parse("2026-08-21T10:00:00Z", CultureInfo.InvariantCulture) };
+
+            StringAssert.StartsWith(TriggerUi.ScheduleLabel(schedule, strings), "Toutes les PT2H");
+            StringAssert.Contains(TriggerUi.OccurrenceLabel(schedule.StartAt!.Value.AddHours(3), "Europe/Paris", schedule.StartAt.Value, strings), "dans 3 heures");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 
     [TestMethod]

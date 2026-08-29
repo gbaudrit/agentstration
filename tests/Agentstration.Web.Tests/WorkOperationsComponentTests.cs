@@ -108,6 +108,7 @@ public sealed class WorkOperationsComponentTests
         var toolProviderEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolProviderEditorStrings>>();
         var toolProviders = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolProvidersStrings>>();
         var tools = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ToolsStrings>>();
+        var triggers = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.TriggerStrings>>();
 
         Assert.AreEqual("Créer un agent", agents["CreateAgent"].Value);
         Assert.AreEqual("Définissez, publiez et exploitez des ressources d’agents spécialisés.", agents["Description"].Value);
@@ -162,6 +163,9 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Séquence 4", toolGovernanceAudit["Sequence", 4].Value);
         Assert.AreEqual("Ajouter un fournisseur d’outils", toolProviderEditor["AddProvider"].Value);
         Assert.AreEqual("Connexion établie. La négociation du protocole a réussi. Outils découverts : 2 outils.", toolProviderEditor["ConnectionSucceeded", toolProviderEditor["ToolCount.Many", 2].Value].Value);
+        Assert.AreEqual("Nouveau déclencheur", triggers["NewTrigger"].Value);
+        Assert.AreEqual("2 déclencheurs", triggers["TriggerCount.Many", 2].Value);
+        Assert.AreEqual("Ignorer pendant que le Work précédent est actif", triggers["Concurrency.SkipActive"].Value);
     }
 
     private static BunitContext CreateContext()
