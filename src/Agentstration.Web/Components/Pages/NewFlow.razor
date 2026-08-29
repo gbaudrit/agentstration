@@ -3,28 +3,29 @@
 @inject IFlowApiClient Client
 @inject IManagementApiClient Management
 @inject NavigationManager Navigation
-<PageTitle>New Flow · Agentstration</PageTitle>
-<PageHeader Title="New Flow" Description="Choose the execution model, then configure a provider-neutral Flow definition." />
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewFlowStrings> Localizer
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")" />
 
 <EditForm Model="model" OnValidSubmit="CreateAsync">
     <DataAnnotationsValidator />
     <article class="panel flow-create-form">
         <div class="form-columns">
-            <label>Technical name<InputText @bind-Value="model.Name" /></label>
-            <label>Flow kind<InputSelect @bind-Value="model.Kind"><option value="Workflow">Workflow</option><option value="Orchestration">Orchestration</option></InputSelect></label>
+            <label>@T("TechnicalName")<InputText @bind-Value="model.Name" /></label>
+            <label>@T("FlowKind")<InputSelect @bind-Value="model.Kind"><option value="Workflow">@T("Kind.Workflow")</option><option value="Orchestration">@T("Kind.Orchestration")</option></InputSelect></label>
         </div>
         @if (model.Kind == "Workflow")
         {
-            <label>Display name<InputText @bind-Value="model.DisplayName" /></label>
+            <label>@T("DisplayName")<InputText @bind-Value="model.DisplayName" /></label>
         }
-        <label>Description<InputTextArea @bind-Value="model.Description" /></label>
+        <label>@T("Field.Description")<InputTextArea @bind-Value="model.Description" /></label>
         @if (model.Kind == "Workflow")
         {
-            <label>Starting template<InputSelect @bind-Value="model.Template"><option value="EmptyFlow">Empty flow</option><option value="AgentRouting">Agent routing</option><option value="SequentialProcessing">Sequential processing</option><option value="ConditionalFlow">Conditional flow</option></InputSelect></label>
+            <label>@T("StartingTemplate")<InputSelect @bind-Value="model.Template"><option value="EmptyFlow">@T("Template.EmptyFlow")</option><option value="AgentRouting">@T("Template.AgentRouting")</option><option value="SequentialProcessing">@T("Template.SequentialProcessing")</option><option value="ConditionalFlow">@T("Template.ConditionalFlow")</option></InputSelect></label>
         }
         else
         {
-            <div class="form-columns"><label>Initial version<InputText @bind-Value="orchestration.Version" /></label><label class="check-option"><InputCheckbox @bind-Value="orchestration.Enabled" /> Enabled</label></div>
+            <div class="form-columns"><label>@T("InitialVersion")<InputText @bind-Value="orchestration.Version" /></label><label class="check-option"><InputCheckbox @bind-Value="orchestration.Enabled" /> @T("Enabled")</label></div>
         }
     </article>
 
@@ -34,7 +35,7 @@
     }
 
     @if (error is not null) { <p class="error-panel">@error</p> }
-    <div class="dialog-actions flow-create-actions"><a class="button-secondary" href="/flows">Cancel</a><button class="button-primary" disabled="@submitting">@(submitting ? "Creating…" : model.Kind == "Workflow" ? "Create Draft" : "Create Orchestration")</button></div>
+    <div class="dialog-actions flow-create-actions"><a class="button-secondary" href="/flows">@T("Cancel")</a><button class="button-primary" disabled="@submitting">@(submitting ? T("Creating") : model.Kind == "Workflow" ? T("CreateDraft") : T("CreateOrchestration"))</button></div>
 </EditForm>
 
 @code {
@@ -44,6 +45,7 @@
     private IReadOnlyList<AgentSummary> agents = [];
     private bool submitting;
     private string? error;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
 
     protected override async Task OnInitializedAsync()
     {

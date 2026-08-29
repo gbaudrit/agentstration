@@ -9,21 +9,26 @@ using Blazor.Diagrams.Core.Geometry;
 using Bunit;
 using Bunit.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
+using System.Globalization;
 using FlowDesignerComponent = Agentstration.Web.FlowDesigner.Components.FlowDesigner;
 
 namespace Agentstration.Web.FlowDesigner.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class FlowDesignerReadOnlyTests
 {
     [TestMethod]
     public void ReadOnlyModeDisablesMutatingActions()
     {
+        using var culture = new CultureScope("en-US");
         using var context = new BunitContext();
         var backend = new BackendStub();
         context.Services.AddSingleton<IFlowDesignerBackend>(backend);
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
         context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
             .SetResult(new Rectangle(0, 0, 1024, 768));
@@ -43,6 +48,32 @@ public sealed class FlowDesignerReadOnlyTests
         rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Definition").Click();
         var applyYaml = rendered.FindAll("button").Single(button => button.TextContent.Trim() == "Apply valid YAML");
         Assert.IsTrue(applyYaml.HasAttribute("disabled"));
+    }
+
+    [TestMethod]
+    public void ReadOnlyModeUsesTheSelectedFrenchCulture()
+    {
+        using var culture = new CultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub());
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "sample")
+            .Add(component => component.Namespace, new ResourceNamespace("pack.sample")));
+
+        StringAssert.Contains(rendered.Markup, "Lecture seule");
+        StringAssert.Contains(rendered.Markup, "Version publiée 2.1.0");
+        StringAssert.Contains(rendered.Markup, "Ajuster");
+
+        var strings = context.Services.GetRequiredService<IStringLocalizer<FlowDesignerStrings>>();
+        Assert.AreEqual("Appliquer le YAML valide", strings["ApplyValidYaml"].Value);
+        Assert.AreEqual("2 agents disponibles. Les routes sont explicites et restent des références immuables après publication.", strings["AvailableAgents.Many", 2].Value);
     }
 
     private sealed class ResourceProviderStub : IFlowDesignerResourceProvider
@@ -76,6 +107,24 @@ public sealed class FlowDesignerReadOnlyTests
             return new(new FlowDraft { WorkspaceId = WorkspaceId, Id = "draft", FlowId = new("sample"), DisplayName = "Sample", Definition = definition, CreatedAt = now, UpdatedAt = now }, "\"etag\"");
         }
 
-        private static readonly Agentstration.Resources.WorkspaceId WorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+    private static readonly Agentstration.Resources.WorkspaceId WorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+    }
+
+    private sealed class CultureScope : IDisposable
+    {
+        private readonly CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        private readonly CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+
+        public CultureScope(string name)
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(name);
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(name);
+        }
+
+        public void Dispose()
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 }

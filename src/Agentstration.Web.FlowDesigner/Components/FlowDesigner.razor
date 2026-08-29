@@ -3,10 +3,11 @@
 @inject IFlowDesignerResourceProvider Resources
 @inject FlowEditorStore Editor
 @inject NavigationManager Navigation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
 
 @if (Editor.State.Resource is null && error is not null)
 {
-    <section class="error-panel designer-error"><strong>Flow Designer unavailable</strong><p>@error</p></section>
+    <section class="error-panel designer-error"><strong>@T("Unavailable")</strong><p>@error</p></section>
 }
 else if (Editor.State.Resource is null)
 {
@@ -16,35 +17,35 @@ else
 {
     <header class="designer-toolbar">
         <div>
-            <p class="eyebrow"><a href="/flows">Flows</a> / <code>@Editor.State.Namespace.Value</code> / @ResourceId / @(ReadOnly ? $"Published {Editor.State.PublishedVersion}" : "Draft")</p>
+            <p class="eyebrow"><a href="/flows">@T("Flows")</a> / <code>@Editor.State.Namespace.Value</code> / @ResourceId / @(ReadOnly ? T("Published", Editor.State.PublishedVersion ?? string.Empty) : T("Draft"))</p>
             <h1>@Editor.State.Resource.DisplayName</h1>
             @if (!ReadOnly)
             {
                 <span class="save-state @Editor.State.SaveState.ToString().ToLowerInvariant()">@SaveText</span>
-                <span class="draft-revision">Revision @Editor.State.Resource.DraftRevision</span>
+                <span class="draft-revision">@T("Revision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</span>
             }
             else
             {
-                <span class="draft-revision">Published version @Editor.State.PublishedVersion</span>
-                <span class="read-only-badge">Read only</span>
+                <span class="draft-revision">@T("PublishedVersion", Editor.State.PublishedVersion ?? string.Empty)</span>
+                <span class="read-only-badge">@T("ReadOnly")</span>
             }
         </div>
         <div class="designer-modes">
             @foreach (var mode in Enum.GetValues<FlowEditorMode>())
             {
-                <button class="@(Editor.State.Mode == mode ? "active" : null)" @onclick="() => Editor.SetMode(mode)">@mode</button>
+                <button class="@(Editor.State.Mode == mode ? "active" : null)" @onclick="() => Editor.SetMode(mode)">@T($"Mode.{mode}")</button>
             }
         </div>
         <div class="designer-actions">
             @if (!ReadOnly)
             {
-                <button class="button-secondary" disabled="@(!Editor.CanUndo)" @onclick="Undo">Undo</button>
-                <button class="button-secondary" disabled="@(!Editor.CanRedo)" @onclick="Redo">Redo</button>
-                <button class="button-secondary" @onclick="ValidateAsync">Validate</button>
-                <button class="button-secondary" @onclick="OpenRun">Run draft</button>
-                <button class="button-primary" disabled="@saving" @onclick="SaveAsync">Save</button>
-                <label class="publish-version">Version<input aria-label="Publish version" @bind="publishVersion" /></label>
-                <button class="button-primary" @onclick="PublishAsync">Publish</button>
+                <button class="button-secondary" disabled="@(!Editor.CanUndo)" @onclick="Undo">@T("Undo")</button>
+                <button class="button-secondary" disabled="@(!Editor.CanRedo)" @onclick="Redo">@T("Redo")</button>
+                <button class="button-secondary" @onclick="ValidateAsync">@T("Validate")</button>
+                <button class="button-secondary" @onclick="OpenRun">@T("RunDraft")</button>
+                <button class="button-primary" disabled="@saving" @onclick="SaveAsync">@T("Save")</button>
+                <label class="publish-version">@T("Version")<input aria-label="@T("PublishVersion")" @bind="publishVersion" /></label>
+                <button class="button-primary" @onclick="PublishAsync">@T("Publish")</button>
             }
         </div>
     </header>
@@ -55,15 +56,15 @@ else
         @if (Editor.State.Mode is FlowEditorMode.Designer or FlowEditorMode.Split)
         {
             <aside class="step-palette">
-                <h2>Steps</h2>
+                <h2>@T("Steps")</h2>
                 @foreach (var entry in Palette)
                 {
-                    <button disabled="@ReadOnly" @onclick="() => AddStepAsync(entry.Type)"><span>@entry.Icon</span> @entry.Label</button>
+                    <button disabled="@ReadOnly" @onclick="() => AddStepAsync(entry.Type)"><span>@entry.Icon</span> @T($"Step.{entry.Type}")</button>
                 }
                 <hr />
-                <button disabled="@ReadOnly" @onclick="() => LayoutAsync(false)">Horizontal layout</button>
-                <button disabled="@ReadOnly" @onclick="() => LayoutAsync(true)">Vertical layout</button>
-                <button @onclick="Center">Center</button>
+                <button disabled="@ReadOnly" @onclick="() => LayoutAsync(false)">@T("HorizontalLayout")</button>
+                <button disabled="@ReadOnly" @onclick="() => LayoutAsync(true)">@T("VerticalLayout")</button>
+                <button @onclick="Center">@T("Center")</button>
             </aside>
 
             <div class="flow-canvas-wrap">
@@ -74,20 +75,20 @@ else
             </div>
 
             <aside class="flow-inspector">
-                <h2>Inspector</h2>
+                <h2>@T("Inspector")</h2>
                 @if (SelectedStep is null)
                 {
-                    <p class="muted">Select a step to edit it.</p>
+                    <p class="muted">@T("SelectStep")</p>
                 }
                 else
                 {
-                    <label>Display name<input disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
-                    <label>Technical name<input value="@SelectedStep.Name" readonly /></label>
-                    <label>Type<input value="@SelectedStep.Type()" readonly /></label>
+                    <label>@T("DisplayName")<input disabled="@ReadOnly" value="@(SelectedStep.DisplayName ?? SelectedStep.Name)" @onchange="UpdateDisplayNameAsync" /></label>
+                    <label>@T("TechnicalName")<input value="@SelectedStep.Name" readonly /></label>
+                    <label>@T("Type")<input value="@SelectedStep.Type()" readonly /></label>
                     @if (SelectedStep is AgentFlowStepDefinition agent)
                     {
-                        <label>Agent<select disabled="@ReadOnly" value="@agent.Agent.ResourceId" @onchange="UpdateAgentAsync">
-                            <option value="${steps.route-request.output.selectedAgent}">Router output</option>
+                        <label>@T("Agent")<select disabled="@ReadOnly" value="@agent.Agent.ResourceId" @onchange="UpdateAgentAsync">
+                            <option value="${steps.route-request.output.selectedAgent}">@T("RouterOutput")</option>
                             @foreach (var item in agents) { <option value="@item.Name">@item.DisplayName</option> }
                         </select></label>
                     }
@@ -95,10 +96,10 @@ else
                     {
                         <section class="router-editor">
                             <div class="router-group-picker">
-                                <button class="button-secondary" @onclick="LoadAgentsAsync">Load agents</button>
-                                <button class="button-secondary" disabled="@(ReadOnly || loadingAgents)" @onclick="AddAllRouterAgentsAsync">Add all</button>
+                                <button class="button-secondary" @onclick="LoadAgentsAsync">@T("LoadAgents")</button>
+                                <button class="button-secondary" disabled="@(ReadOnly || loadingAgents)" @onclick="AddAllRouterAgentsAsync">@T("AddAll")</button>
                             </div>
-                            <p class="muted">@routerAgents.Count agent(s) available. Routes are explicit and remain immutable references when published.</p>
+                            <p class="muted">@T(routerAgents.Count == 1 ? "AvailableAgents.One" : "AvailableAgents.Many", routerAgents.Count)</p>
                             <div class="route-cards">
                                 @for (var index = 0; index < router.Candidates.Count; index++)
                                 {
@@ -106,38 +107,38 @@ else
                                     var candidate = router.Candidates[index];
                                     <article class="route-card">
                                         <header><span class="route-key-badge">@candidate.Route</span><button disabled="@ReadOnly" @onclick="() => RemoveRouterCandidateAsync(routeIndex)">×</button></header>
-                                        <label>Route key<input disabled="@ReadOnly" value="@candidate.Route" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Route = Text(e) })" /></label>
-                                        <label>Agent<select disabled="@ReadOnly" value="@candidate.Agent.ResourceId" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Agent = new(Text(e)) })">
+                                        <label>@T("RouteKey")<input disabled="@ReadOnly" value="@candidate.Route" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Route = Text(e) })" /></label>
+                                        <label>@T("Agent")<select disabled="@ReadOnly" value="@candidate.Agent.ResourceId" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Agent = new(Text(e)) })">
                                             <option value="@candidate.Agent.ResourceId">@AgentLabel(candidate.Agent.ResourceId)</option>
                                             @foreach (var item in routerAgents.Where(item => item.Name != candidate.Agent.ResourceId)) { <option value="@item.Name">@item.DisplayName</option> }
                                         </select></label>
-                                        <label>Description<input disabled="@ReadOnly" value="@candidate.Description" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Description = EmptyToNull(Text(e)) })" /></label>
-                                        <label>Examples<input disabled="@ReadOnly" value="@string.Join(", ", candidate.Examples ?? [])" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Examples = Text(e).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) })" /></label>
+                                        <label>@T("Description")<input disabled="@ReadOnly" value="@candidate.Description" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Description = EmptyToNull(Text(e)) })" /></label>
+                                        <label>@T("Examples")<input disabled="@ReadOnly" value="@string.Join(", ", candidate.Examples ?? [])" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Examples = Text(e).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) })" /></label>
                                     </article>
                                 }
                             </div>
-                            <button class="button-secondary" disabled="@ReadOnly" @onclick="AddRouterCandidateAsync">＋ Add route</button>
+                            <button class="button-secondary" disabled="@ReadOnly" @onclick="AddRouterCandidateAsync">＋ @T("AddRoute")</button>
                         </section>
                     }
                     else if (SelectedStep is ConditionFlowStepDefinition condition)
                     {
-                        <label>Left value<input disabled="@ReadOnly" value="@condition.Left" @onchange="e => UpdateSelectedAsync(condition with { Left = Text(e) })" /></label>
-                        <label>Operator<input disabled="@ReadOnly" value="@condition.Operator" @onchange="e => UpdateSelectedAsync(condition with { Operator = Text(e) })" /></label>
-                        <label>Right value<input disabled="@ReadOnly" value="@condition.Right" @onchange="e => UpdateSelectedAsync(condition with { Right = Text(e) })" /></label>
+                        <label>@T("LeftValue")<input disabled="@ReadOnly" value="@condition.Left" @onchange="e => UpdateSelectedAsync(condition with { Left = Text(e) })" /></label>
+                        <label>@T("Operator")<input disabled="@ReadOnly" value="@condition.Operator" @onchange="e => UpdateSelectedAsync(condition with { Operator = Text(e) })" /></label>
+                        <label>@T("RightValue")<input disabled="@ReadOnly" value="@condition.Right" @onchange="e => UpdateSelectedAsync(condition with { Right = Text(e) })" /></label>
                     }
                     else if (SelectedStep is FailureFlowStepDefinition failure)
                     {
-                        <label>Error code<input disabled="@ReadOnly" value="@failure.Code" @onchange="e => UpdateSelectedAsync(failure with { Code = Text(e) })" /></label>
-                        <label>Message<textarea disabled="@ReadOnly" value="@failure.Message" @onchange="e => UpdateSelectedAsync(failure with { Message = Text(e) })"></textarea></label>
+                        <label>@T("ErrorCode")<input disabled="@ReadOnly" value="@failure.Code" @onchange="e => UpdateSelectedAsync(failure with { Code = Text(e) })" /></label>
+                        <label>@T("Message")<textarea disabled="@ReadOnly" value="@failure.Message" @onchange="e => UpdateSelectedAsync(failure with { Message = Text(e) })"></textarea></label>
                     }
-                    <button class="button-danger" disabled="@(ReadOnly || SelectedStep.Name == Editor.State.Resource.Definition.EntryStep)" @onclick="RemoveSelectedAsync">Delete step</button>
+                    <button class="button-danger" disabled="@(ReadOnly || SelectedStep.Name == Editor.State.Resource.Definition.EntryStep)" @onclick="RemoveSelectedAsync">@T("DeleteStep")</button>
                 }
 
-                <hr /><h3>Transitions</h3>
-                <label>From<select disabled="@ReadOnly" @bind="transitionFrom">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
-                <label>Event<input disabled="@ReadOnly" @bind="transitionEvent" /></label>
-                <label>To<select disabled="@ReadOnly" @bind="transitionTo">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
-                <button class="button-secondary" disabled="@ReadOnly" @onclick="AddTransitionAsync">Add transition</button>
+                <hr /><h3>@T("Transitions")</h3>
+                <label>@T("From")<select disabled="@ReadOnly" @bind="transitionFrom">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
+                <label>@T("Event")<input disabled="@ReadOnly" @bind="transitionEvent" /></label>
+                <label>@T("To")<select disabled="@ReadOnly" @bind="transitionTo">@foreach (var node in Editor.State.Diagram.Nodes) { <option value="@node.Name">@node.Name</option> }</select></label>
+                <button class="button-secondary" disabled="@ReadOnly" @onclick="AddTransitionAsync">@T("AddTransition")</button>
                 <ul class="transition-list">@foreach (var transition in Editor.State.Resource.Definition.Transitions) { <li><button @onclick="() => Editor.SelectTransition(transition.Id)">@transition.FromStep —@transition.Event→ @transition.ToStep</button><button disabled="@ReadOnly" @onclick="() => RemoveTransitionAsync(transition.Id)">×</button></li> }</ul>
             </aside>
         }
@@ -150,19 +151,19 @@ else
     </section>
 
     <section class="validation-dock">
-        <header><strong>Validation</strong><span>@Editor.State.Issues.Count issue(s)</span></header>
-        @if (Editor.State.Issues.Count == 0) { <p class="muted">@(ReadOnly ? "This published definition is displayed without creating a Draft." : "Validate the Draft to check structure, reachability, expressions and resources.")</p> }
+        <header><strong>@T("Validation")</strong><span>@T(Editor.State.Issues.Count == 1 ? "IssueCount.One" : "IssueCount.Many", Editor.State.Issues.Count)</span></header>
+        @if (Editor.State.Issues.Count == 0) { <p class="muted">@(ReadOnly ? T("PublishedDefinitionHelp") : T("ValidationHelp"))</p> }
         else { <ul>@foreach (var issue in Editor.State.Issues) { <li class="@issue.Severity.ToString().ToLowerInvariant()"><button @onclick="() => SelectIssue(issue)"><strong>@issue.Severity</strong> @issue.Message <code>@issue.Code</code></button></li> }</ul> }
     </section>
 
     @if (showRun)
     {
-        <div class="dialog-backdrop"><section class="dialog run-dialog"><h2>Run Draft revision @Editor.State.Resource.DraftRevision</h2><label>Input JSON<textarea rows="10" @bind="runInput"></textarea></label><div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun = false">Cancel</button><button class="button-primary" @onclick="RunDraftAsync">Run draft</button></div></section></div>
+        <div class="dialog-backdrop"><section class="dialog run-dialog"><h2>@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><label>@T("InputJson")<textarea rows="10" @bind="runInput"></textarea></label><div class="dialog-actions"><button class="button-secondary" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" @onclick="RunDraftAsync">@T("RunDraft")</button></div></section></div>
     }
 }
 
 @code {
-    private static readonly (string Type, string Label, string Icon)[] Palette = [("input", "Input", "●"), ("agent", "Agent", "◎"), ("router", "Router", "◇"), ("condition", "Condition", "?"), ("transform", "Transform", "ƒ"), ("output", "Output", "□"), ("failure", "Failure", "!")];
+    private static readonly (string Type, string Icon)[] Palette = [("input", "●"), ("agent", "◎"), ("router", "◇"), ("condition", "?"), ("transform", "ƒ"), ("output", "□"), ("failure", "!")];
     private readonly CancellationTokenSource cancellation = new();
     private CancellationTokenSource? autosave;
     private FlowCanvas? canvas;
@@ -186,7 +187,8 @@ else
     [Parameter] public ResourceNamespace Namespace { get; set; } = ResourceNamespace.Default;
 
     private FlowStepDefinition? SelectedStep => Editor.State.Resource?.Definition.Steps.FirstOrDefault(step => step.Name == Editor.State.Selection.StepName);
-    private string SaveText => Editor.State.SaveState switch { FlowSaveState.Saving => "Saving…", FlowSaveState.UnsavedChanges => "Unsaved changes", FlowSaveState.SaveFailed => "Save failed", _ => "Saved" };
+    private string SaveText => T($"SaveState.{Editor.State.SaveState}");
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private FlowDesignerTarget Target => new(Namespace, ResourceId);
     private bool ReadOnly => IsReadOnly || Target.IsReadOnly || Editor.State.IsReadOnly;
 

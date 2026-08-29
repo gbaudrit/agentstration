@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>New Flow</value></data>
+  <data name="Description"><value>Choose the execution model, then configure a provider-neutral Flow definition.</value></data>
+  <data name="TechnicalName"><value>Technical name</value></data>
+  <data name="FlowKind"><value>Flow kind</value></data>
+  <data name="Kind.Workflow"><value>Workflow</value></data>
+  <data name="Kind.Orchestration"><value>Orchestration</value></data>
+  <data name="DisplayName"><value>Display name</value></data>
+  <data name="Field.Description"><value>Description</value></data>
+  <data name="StartingTemplate"><value>Starting template</value></data>
+  <data name="Template.EmptyFlow"><value>Empty flow</value></data>
+  <data name="Template.AgentRouting"><value>Agent routing</value></data>
+  <data name="Template.SequentialProcessing"><value>Sequential processing</value></data>
+  <data name="Template.ConditionalFlow"><value>Conditional flow</value></data>
+  <data name="InitialVersion"><value>Initial version</value></data>
+  <data name="Enabled"><value>Enabled</value></data>
+  <data name="Cancel"><value>Cancel</value></data>
+  <data name="Creating"><value>Creating…</value></data>
+  <data name="CreateDraft"><value>Create Draft</value></data>
+  <data name="CreateOrchestration"><value>Create Orchestration</value></data>
+</root>

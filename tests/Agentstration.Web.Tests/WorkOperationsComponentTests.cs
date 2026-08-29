@@ -96,6 +96,7 @@ public sealed class WorkOperationsComponentTests
         var flowRuns = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowRunsStrings>>();
         var flowDetails = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowDetailsStrings>>();
         var flowOrchestrationEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.FlowOrchestrationEditorStrings>>();
+        var newFlow = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.NewFlowStrings>>();
         var modelProfileEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProfileEditorStrings>>();
         var modelProfiles = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProfilesStrings>>();
         var modelProviderDetails = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProviderDetailsStrings>>();
@@ -129,6 +130,8 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("2 réussies", flowDetails["SucceededRunCount.Many", 2].Value);
         Assert.AreEqual("Discussion de groupe", flowOrchestrationEditor["Strategy.GroupChat"].Value);
         Assert.AreEqual("2 sélectionnés", flowOrchestrationEditor["SelectedCount.Many", 2].Value);
+        Assert.AreEqual("Nouveau Flow", newFlow["Title"].Value);
+        Assert.AreEqual("Routage d’agents", newFlow["Template.AgentRouting"].Value);
         Assert.AreEqual("Créer un profil de modèle", modelProfileEditor["CreateModelProfile"].Value);
         Assert.AreEqual("Fournisseur et modèle", modelProfileEditor["ProviderAndModel"].Value);
         Assert.AreEqual("La modification de ce profil affectera 1 agent.", modelProfileEditor["ChangingProfileAffects", modelProfileEditor["AgentCount.One", 1].Value].Value);

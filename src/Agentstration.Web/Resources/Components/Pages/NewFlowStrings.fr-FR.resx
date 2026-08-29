@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Nouveau Flow</value></data>
+  <data name="Description"><value>Choisissez le modèle d’exécution, puis configurez une définition de Flow indépendante du fournisseur.</value></data>
+  <data name="TechnicalName"><value>Nom technique</value></data>
+  <data name="FlowKind"><value>Type de Flow</value></data>
+  <data name="Kind.Workflow"><value>Workflow</value></data>
+  <data name="Kind.Orchestration"><value>Orchestration</value></data>
+  <data name="DisplayName"><value>Nom d’affichage</value></data>
+  <data name="Field.Description"><value>Description</value></data>
+  <data name="StartingTemplate"><value>Modèle de départ</value></data>
+  <data name="Template.EmptyFlow"><value>Flow vide</value></data>
+  <data name="Template.AgentRouting"><value>Routage d’agents</value></data>
+  <data name="Template.SequentialProcessing"><value>Traitement séquentiel</value></data>
+  <data name="Template.ConditionalFlow"><value>Flow conditionnel</value></data>
+  <data name="InitialVersion"><value>Version initiale</value></data>
+  <data name="Enabled"><value>Activée</value></data>
+  <data name="Cancel"><value>Annuler</value></data>
+  <data name="Creating"><value>Création…</value></data>
+  <data name="CreateDraft"><value>Créer le brouillon</value></data>
+  <data name="CreateOrchestration"><value>Créer l’orchestration</value></data>
+</root>

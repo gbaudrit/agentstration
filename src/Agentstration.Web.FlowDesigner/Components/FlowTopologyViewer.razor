@@ -1,21 +1,22 @@
 @using Microsoft.AspNetCore.Components.Web
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
 
 <div class="topology-shell" data-layout="@Graph.Layout">
     <div class="topology-toolbar">
         <span>@Graph.Description</span>
         <div class="topology-toolbar-actions">
-            <span class="topology-legend"><i class="declared"></i>Declared <i class="observed"></i>Observed <i class="inactive"></i>Not selected</span>
-            <div class="topology-zoom-controls" role="group" aria-label="Topology zoom controls">
-                <button type="button" @onclick="ZoomOut" aria-label="Zoom out">−</button>
+            <span class="topology-legend"><i class="declared"></i>@Localizer["Declared"] <i class="observed"></i>@Localizer["Observed"] <i class="inactive"></i>@Localizer["NotSelected"]</span>
+            <div class="topology-zoom-controls" role="group" aria-label="@Localizer["TopologyZoomControls"]">
+                <button type="button" @onclick="ZoomOut" aria-label="@Localizer["ZoomOut"]">−</button>
                 <span aria-live="polite">@ZoomPercent%</span>
-                <button type="button" @onclick="ZoomIn" aria-label="Zoom in">+</button>
-                <button type="button" @onclick="Fit">Fit</button>
+                <button type="button" @onclick="ZoomIn" aria-label="@Localizer["ZoomIn"]">+</button>
+                <button type="button" @onclick="Fit">@Localizer["Fit"]</button>
             </div>
         </div>
     </div>
     @if (Graph.Nodes.Count == 0)
     {
-        <div class="topology-empty">No topology is available for this Flow.</div>
+        <div class="topology-empty">@Localizer["NoTopology"]</div>
     }
     else
     {
@@ -50,7 +51,7 @@
                                 <div class="node-content">
                                     <span class="node-icon">@Icon(node.Node.Type)</span>
                                     <span class="node-copy"><strong>@Trim(node.Node.Label, 22)</strong><small>@node.Node.Type</small></span>
-                                    <span class="turn-badge">@(node.Node.TurnCount == 0 ? null : $"{node.Node.TurnCount} turn{(node.Node.TurnCount == 1 ? null : "s")}")</span>
+                                    <span class="turn-badge">@(node.Node.TurnCount == 0 ? null : T(node.Node.TurnCount == 1 ? "TurnCount.One" : "TurnCount.Many", node.Node.TurnCount))</span>
                                     <small class="node-subtitle">@(node.Node.Subtitle is null ? null : Trim(node.Node.Subtitle, 28))</small>
                                 </div>
                             </foreignObject>
@@ -153,17 +154,19 @@
         return $"{node.Type.ToLowerInvariant()} status-{status}{(node.IsCoordinator ? " coordinator" : null)}{(node.IsInitial ? " initial" : null)}";
     }
 
-    private static string NodeDescription(FlowTopologyNode node)
+    private string NodeDescription(FlowTopologyNode node)
     {
         var parts = new List<string> { node.Label, node.Type };
-        if (node.IsInitial) parts.Add("initial participant");
+        if (node.IsInitial) parts.Add(T("InitialParticipant"));
         if (node.Status is not null) parts.Add(node.Status);
-        if (node.TurnCount > 0) parts.Add($"{node.TurnCount} turns");
+        if (node.TurnCount > 0) parts.Add(T(node.TurnCount == 1 ? "TurnCount.One" : "TurnCount.Many", node.TurnCount));
         return string.Join(", ", parts);
     }
 
-    private static string EdgeDescription(FlowTopologyEdge edge) =>
-        $"{edge.From} to {edge.To}{(edge.Label is null ? null : $", {edge.Label}")}, {edge.State.ToString().ToLowerInvariant()}";
+    private string EdgeDescription(FlowTopologyEdge edge) =>
+        T("EdgeDescription", edge.From, edge.To, edge.Label is null ? string.Empty : $", {edge.Label}", T($"EdgeState.{edge.State}"));
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
 
     private static string Icon(string type) => type.ToLowerInvariant() switch
     {

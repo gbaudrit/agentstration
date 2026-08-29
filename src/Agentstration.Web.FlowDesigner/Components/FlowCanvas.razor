@@ -1,11 +1,12 @@
 @implements IDisposable
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
 
-<div class="flow-diagram-canvas" role="application" aria-label="Flow diagram">
-    <div class="flow-zoom-controls" role="group" aria-label="Diagram zoom controls">
-        <button type="button" @onclick="ZoomOut" aria-label="Zoom out">−</button>
+<div class="flow-diagram-canvas" role="application" aria-label="@Localizer["FlowDiagram"]">
+    <div class="flow-zoom-controls" role="group" aria-label="@Localizer["DiagramZoomControls"]">
+        <button type="button" @onclick="ZoomOut" aria-label="@Localizer["ZoomOut"]">−</button>
         <span aria-live="polite">@ZoomPercent%</span>
-        <button type="button" @onclick="ZoomIn" aria-label="Zoom in">+</button>
-        <button type="button" @onclick="Center">Fit</button>
+        <button type="button" @onclick="ZoomIn" aria-label="@Localizer["ZoomIn"]">+</button>
+        <button type="button" @onclick="Center">@Localizer["Fit"]</button>
     </div>
     <CascadingValue Value="diagram" IsFixed="true">
         <DiagramCanvas />
