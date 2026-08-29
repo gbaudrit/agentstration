@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Web.Pages;
 
@@ -14,7 +15,8 @@ namespace Agentstration.Web.Pages;
 public sealed class LoginModel(
     SignInManager<LocalIdentityUser> signIn,
     LocalBootstrapCoordinator bootstrap,
-    IOptions<AgentstrationWebOptions> options) : PageModel
+    IOptions<AgentstrationWebOptions> options,
+    IStringLocalizer<AuthStrings> localizer) : PageModel
 {
     [BindProperty]
     public LoginInput Input { get; set; } = new();
@@ -49,8 +51,8 @@ public sealed class LoginModel(
         if (result.Succeeded) return LocalRedirect(ReturnUrl);
 
         ModelState.AddModelError(string.Empty, result.IsLockedOut
-            ? "This account is locked. Try again later or contact an administrator."
-            : "The username or password is invalid.");
+            ? localizer["AccountLocked"].Value
+            : localizer["InvalidCredentials"].Value);
         return Page();
     }
 

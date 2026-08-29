@@ -1,16 +1,16 @@
 @page "/logout"
 @model LogoutModel
 @{
-    ViewData["Title"] = "Sign out";
+    ViewData["Title"] = Auth["SignOut"];
 }
 
 <header class="auth-heading">
-    <p class="eyebrow">Current session</p>
-    <h1>Sign out?</h1>
-    <p>You will need to authenticate again to access the Agentstration console.</p>
+    <p class="eyebrow">@Auth["CurrentSession"]</p>
+    <h1>@Auth["SignOutQuestion"]</h1>
+    <p>@Auth["SignOutDescription"]</p>
 </header>
 
 <form method="post" class="auth-actions">
-    <button type="submit" class="primary-action">Sign out</button>
-    <a href="/" class="secondary-action">Cancel</a>
+    <button type="submit" class="primary-action">@Auth["SignOut"]</button>
+    <a href="/" class="secondary-action">@Auth["Cancel"]</a>
 </form>

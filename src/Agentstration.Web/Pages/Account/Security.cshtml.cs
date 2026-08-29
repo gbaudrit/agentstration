@@ -4,11 +4,12 @@ using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Web.Pages.Account;
 
 [Authorize(Policy = AgentstrationPolicies.Authenticated)]
-public sealed class SecurityModel(LocalAccountSecurityService security) : PageModel
+public sealed class SecurityModel(LocalAccountSecurityService security, IStringLocalizer<AuthStrings> localizer) : PageModel
 {
     [BindProperty]
     public ChangePasswordInput Input { get; set; } = new();
@@ -19,8 +20,8 @@ public sealed class SecurityModel(LocalAccountSecurityService security) : PageMo
     public LocalAccountSecurityView? Account { get; private set; }
     public string? StatusMessage => Status switch
     {
-        "password-changed" => "Your password was changed and your other sessions were signed out.",
-        "sessions-signed-out" => "Your other sessions were signed out.",
+        "password-changed" => localizer["PasswordChangedStatus"].Value,
+        "sessions-signed-out" => localizer["SessionsSignedOutStatus"].Value,
         _ => null
     };
 

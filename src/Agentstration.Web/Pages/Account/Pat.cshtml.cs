@@ -5,6 +5,7 @@ using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Web.Pages.Account;
 
@@ -12,7 +13,8 @@ namespace Agentstration.Web.Pages.Account;
 public sealed class PatModel(
     PersonalAccessTokenService personalAccessTokens,
     IdentityExperienceService identity,
-    TimeProvider timeProvider) : PageModel
+    TimeProvider timeProvider,
+    IStringLocalizer<AuthStrings> localizer) : PageModel
 {
     [BindProperty]
     public CreateInput Input { get; set; } = new();
@@ -50,7 +52,7 @@ public sealed class PatModel(
         }
         catch (AuthorizationDeniedException exception)
         {
-            ModelState.AddModelError(string.Empty, $"Permission denied: {exception.Message}");
+            ModelState.AddModelError(string.Empty, localizer["PermissionDenied", exception.Message].Value);
             return Page();
         }
         catch (InvalidOperationException exception)
