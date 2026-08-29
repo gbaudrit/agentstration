@@ -4,74 +4,75 @@
 @inject ConsoleContextState ContextState
 @inject IServiceProvider Services
 @inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<PackStrings> Localizer
 
-<PageTitle>@(project?.Value.Definition.DisplayName ?? "Pack Project") · Agentstration</PageTitle>
+<PageTitle>@(project?.Value.Definition.DisplayName ?? T("PackProject")) · Agentstration</PageTitle>
 
 @if (error is not null)
 {
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
 }
 else if (project is null)
 {
-    <LoadingState Message="Loading Pack Project…" />
+    <LoadingState Message="@T("LoadingPackProject")" />
 }
 else
 {
-    <PageHeader Title="@(project.Value.Definition.DisplayName ?? project.Value.Definition.PackName)" Description="Edit metadata, create immutable builds, then install them directly into an authorized local workspace.">
+    <PageHeader Title="@(project.Value.Definition.DisplayName ?? project.Value.Definition.PackName)" Description="@T("PackProject.Description")">
         <Actions>
-            <button class="button-secondary" @onclick="BackToPacks">Back to Packs</button>
-            <button class="button-secondary" disabled="@(busy || !dirty)" @onclick="SaveAsync">Save</button>
-            <button class="button-primary" disabled="@busy" @onclick="BuildAsync">@(building ? "Building…" : "Build Pack")</button>
+            <button class="button-secondary" @onclick="BackToPacks">@T("BackToPacks")</button>
+            <button class="button-secondary" disabled="@(busy || !dirty)" @onclick="SaveAsync">@T("Save")</button>
+            <button class="button-primary" disabled="@busy" @onclick="BuildAsync">@(building ? T("Building") : T("BuildPack"))</button>
         </Actions>
     </PageHeader>
 
     <section class="studio-layout">
         <div class="panel studio-editor">
-            <div class="panel-header"><div><p class="eyebrow">Project definition</p><h2>Manifest metadata</h2></div><StatusBadge Text="@project.Value.Definition.State.ToString()" Status="@ProjectTone" /></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("ProjectDefinition")</p><h2>@T("ManifestMetadata")</h2></div><StatusBadge Text="@T($"ProjectState.{project.Value.Definition.State}")" Status="@ProjectTone" /></div>
             <div class="studio-grid">
-                <label>Publisher<input value="@project.Value.Definition.Publisher" disabled /></label>
-                <label>Name<input value="@project.Value.Definition.PackName" disabled /></label>
-                <label>Version<input @bind="version" @bind:after="MarkDirty" /></label>
-                <label>Display name<input @bind="displayName" @bind:after="MarkDirty" /></label>
+                <label>@T("Publisher")<input value="@project.Value.Definition.Publisher" disabled /></label>
+                <label>@T("Name")<input value="@project.Value.Definition.PackName" disabled /></label>
+                <label>@T("Version")<input @bind="version" @bind:after="MarkDirty" /></label>
+                <label>@T("DisplayName")<input @bind="displayName" @bind:after="MarkDirty" /></label>
             </div>
-            <label class="studio-field">Description<textarea rows="4" @bind="description" @bind:after="MarkDirty"></textarea></label>
+            <label class="studio-field">@T("Description")<textarea rows="4" @bind="description" @bind:after="MarkDirty"></textarea></label>
             <div class="studio-grid">
-                <label>Audience
+                <label>@T("Audience")
                     <select @bind="audience" @bind:after="MarkDirty">
-                        <option value="@PackAudience.Universal">Universal</option>
-                        <option value="@PackAudience.Personal">Personal</option>
-                        <option value="@PackAudience.Professional">Professional</option>
+                        <option value="@PackAudience.Universal">@T("Audience.Universal")</option>
+                        <option value="@PackAudience.Personal">@T("Audience.Personal")</option>
+                        <option value="@PackAudience.Professional">@T("Audience.Professional")</option>
                     </select>
                 </label>
-                <label>Purpose
+                <label>@T("Purpose")
                     <select @bind="purpose" @bind:after="MarkDirty">
-                        <option value="@PackPurpose.Standard">Standard</option>
-                        <option value="@PackPurpose.Sample">Sample</option>
-                        <option value="@PackPurpose.Template">Template</option>
+                        <option value="@PackPurpose.Standard">@T("Purpose.Standard")</option>
+                        <option value="@PackPurpose.Sample">@T("Purpose.Sample")</option>
+                        <option value="@PackPurpose.Template">@T("Purpose.Template")</option>
                     </select>
                 </label>
-                <label>Categories<input @bind="categories" @bind:after="MarkDirty" placeholder="game, sample" /></label>
-                <label>Tags<input @bind="tags" @bind:after="MarkDirty" placeholder="local, experimental" /></label>
+                <label>@T("Categories")<input @bind="categories" @bind:after="MarkDirty" placeholder="game, sample" /></label>
+                <label>@T("Tags")<input @bind="tags" @bind:after="MarkDirty" placeholder="local, experimental" /></label>
             </div>
             <dl class="resource-details studio-origin">
                 @if (project.Value.Definition.Origin is { } origin)
                 {
-                    <dt>Forked from</dt><dd><code>@origin.Publisher/@origin.Name</code> · @origin.Version</dd>
+                    <dt>@T("ForkedFrom")</dt><dd><code>@origin.Publisher/@origin.Name</code> · @origin.Version</dd>
                 }
                 else
                 {
-                    <dt>Source</dt><dd>Workspace resource snapshot</dd>
-                    <dt>Resources</dt><dd>@project.Value.Definition.SourceResources.Count</dd>
+                    <dt>@T("Source")</dt><dd>@T("WorkspaceResourceSnapshot")</dd>
+                    <dt>@T("Resources")</dt><dd>@project.Value.Definition.SourceResources.Count</dd>
                 }
-                <dt>Source hash</dt><dd><code>@ShortHash(project.Value.Definition.SourceArtifact.Sha256)</code></dd>
-                <dt>Revision</dt><dd>@project.Value.Definition.Revision</dd>
+                <dt>@T("SourceHash")</dt><dd><code>@ShortHash(project.Value.Definition.SourceArtifact.Sha256)</code></dd>
+                <dt>@T("Revision")</dt><dd>@project.Value.Definition.Revision</dd>
             </dl>
             @if (project.Value.Definition.SourceResources.Count > 0)
             {
                 <div class="studio-source-resources">
                     @foreach (var resource in project.Value.Definition.SourceResources)
                     {
-                        <span><code>@resource.Kind/@resource.Name</code><small>@(resource.ExplicitlySelected ? "Selected" : "Dependency")</small></span>
+                        <span><code>@resource.Kind/@resource.Name</code><small>@(resource.ExplicitlySelected ? T("Selected") : T("Dependency"))</small></span>
                     }
                 </div>
             }
@@ -79,31 +80,31 @@ else
         </div>
 
         <aside class="panel studio-install">
-            <div class="panel-header"><div><p class="eyebrow">Local deployment</p><h2>Current workspace</h2></div></div>
-            <strong>@(ContextState.Current?.WorkspaceDisplayName ?? "Current workspace")</strong>
-            @if (preview is not null) { <p class="studio-namespace"><span>Namespace</span><code>@preview.Namespace</code></p> }
-            <p class="studio-hint">Preview and installation read the stored build directly. No download or re-upload is required.</p>
+            <div class="panel-header"><div><p class="eyebrow">@T("LocalDeployment")</p><h2>@T("CurrentWorkspace")</h2></div></div>
+            <strong>@(ContextState.Current?.WorkspaceDisplayName ?? T("CurrentWorkspace"))</strong>
+            @if (preview is not null) { <p class="studio-namespace"><span>@T("Namespace")</span><code>@preview.Namespace</code></p> }
+            <p class="studio-hint">@T("StoredBuildHelp")</p>
             @if (selectedBuild is null)
             {
-                <div class="studio-empty-preview"><span>1</span><p>Preview a build from the table below to prepare its installation.</p></div>
+                <div class="studio-empty-preview"><span>1</span><p>@T("PreviewBuildHelp")</p></div>
             }
             else if (preview is not null)
             {
-                <div class="studio-selected-build"><span>Selected build</span><strong>@selectedBuild.Definition.Version</strong><code>@ShortHash(selectedBuild.Definition.Artifact.Sha256)</code></div>
+                <div class="studio-selected-build"><span>@T("SelectedBuild")</span><strong>@selectedBuild.Definition.Version</strong><code>@ShortHash(selectedBuild.Definition.Artifact.Sha256)</code></div>
                 <div class="studio-preview">
                     <StatusBadge Text="@PreviewStatus" Status="@(CanInstall ? UiStatus.Success : UiStatus.Warning)" />
-                    <span>@preview.Resources.Count resources · @preview.Resources.Count(resource => resource.AlreadyExists) conflicts</span>
+                    <span>@T("ResourceConflictCount", preview.Resources.Count, preview.Resources.Count(resource => resource.AlreadyExists))</span>
                 </div>
                 @if (preview.Bindings.Count > 0)
                 {
-                    <section class="studio-bindings" aria-label="Pack resource bindings">
-                        <div><strong>Resource bindings</strong><small>Selections are retained for this Pack identity.</small></div>
+                    <section class="studio-bindings" aria-label="@T("PackResourceBindings")">
+                        <div><strong>@T("ResourceBindings")</strong><small>@T("BindingsRetained")</small></div>
                         @foreach (var binding in preview.Bindings)
                         {
                             <label>
-                                <span>@binding.DisplayName <small>@(binding.Required ? "Required" : "Optional") · @BindingKindLabel(binding.TargetKind)</small></span>
+                                <span>@binding.DisplayName <small>@(binding.Required ? T("Required") : T("Optional")) · @BindingKindLabel(binding.TargetKind)</small></span>
                                 <select value="@SelectedBinding(binding.Name)" @onchange="args => BindingChanged(binding.Name, args)">
-                                    <option value="">Select a @BindingKindLabel(binding.TargetKind).ToLowerInvariant()</option>
+                                    <option value="">@T("SelectBinding", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>
                                     @if (binding.TargetKind == PackBindingTargetKind.ModelProfile)
                                     {
                                         @foreach (var profile in modelProfiles)
@@ -136,7 +137,7 @@ else
                                     {
                                         @foreach (var secret in secrets)
                                         {
-                                            <option value="@BindingValue(secret.Resource.Name, secret.Resource.Namespace)">@secret.Resource.Definition.DisplayName — @secret.Resource.Name (@secret.ValueStatus)</option>
+                                            <option value="@BindingValue(secret.Resource.Name, secret.Resource.Namespace)">@secret.Resource.Definition.DisplayName — @secret.Resource.Name (@T($"SecretStatus.{secret.ValueStatus}"))</option>
                                         }
                                     }
                                 </select>
@@ -146,34 +147,34 @@ else
                 }
                 @if (preview.AlreadyInstalled)
                 {
-                    <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> Reinstall this Pack build</label>
-                    <p class="studio-warning">Resources modified since the previous installation are preserved and can still block replacement.</p>
+                    <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> @T("ReinstallPackBuild")</label>
+                    <p class="studio-warning">@T("ModifiedResourcesPreserved")</p>
                 }
             }
-            <button class="button-primary" disabled="@(selectedBuild is null || busy || !CanInstall)" @onclick="InstallAsync">@(installing ? "Installing…" : "Install locally")</button>
+            <button class="button-primary" disabled="@(selectedBuild is null || busy || !CanInstall)" @onclick="InstallAsync">@(installing ? T("Installing") : T("InstallLocally"))</button>
         </aside>
     </section>
 
     <section class="panel studio-builds">
-        <div class="panel-header"><div><p class="eyebrow">Immutable artifacts</p><h2>Builds</h2></div><span class="studio-hint">Each build is content-addressed and reproducible from its project revision.</span></div>
+        <div class="panel-header"><div><p class="eyebrow">@T("ImmutableArtifacts")</p><h2>@T("Builds")</h2></div><span class="studio-hint">@T("Builds.Description")</span></div>
         @if (builds is null)
         {
-            <LoadingState Message="Loading builds…" />
+            <LoadingState Message="@T("LoadingBuilds")" />
         }
         else if (builds.Count == 0)
         {
-            <EmptyState Title="No build yet" Message="Save the project metadata, then create the first immutable Pack artifact." />
+            <EmptyState Title="@T("NoBuildYet")" Message="@T("NoBuildYetMessage")" />
         }
         else
         {
             <DataGrid TItem="PackProjectBuildResource" Items="builds">
-                <Header><tr><th>Version</th><th>Revision</th><th>Created</th><th>Artifact</th><th></th></tr></Header>
+                <Header><tr><th>@T("Version")</th><th>@T("Revision")</th><th>@T("Created")</th><th>@T("Artifact")</th><th></th></tr></Header>
                 <Row Context="build"><tr class="@(selectedBuild?.Uid == build.Uid ? "selected-build" : null)">
                     <td><strong>@build.Definition.Version</strong></td>
                     <td>@build.Definition.ProjectRevision</td>
                     <td>@build.Definition.CreatedAt.ToLocalTime().ToString("g")</td>
                     <td><code>@ShortHash(build.Definition.Artifact.Sha256)</code><br /><small>@FormatBytes(build.Definition.Artifact.Length)</small></td>
-                    <td class="studio-action-cell"><div class="studio-actions"><button class="text-button" @onclick="() => PreviewAsync(build)">Preview</button><a class="text-button" href="@DownloadPath(build)">Download</a></div></td>
+                    <td class="studio-action-cell"><div class="studio-actions"><button class="text-button" @onclick="() => PreviewAsync(build)">@T("Preview")</button><a class="text-button" href="@DownloadPath(build)">@T("Download")</a></div></td>
                 </tr></Row>
             </DataGrid>
         }
@@ -209,14 +210,15 @@ else
     private bool building;
     private bool installing;
     private bool replaceExisting;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private bool CanInstall => preview is not null
         && (preview.CanInstall || replaceExisting && preview.AlreadyInstalled)
         && preview.Bindings.All(binding => !binding.Required || !string.IsNullOrWhiteSpace(SelectedBinding(binding.Name)));
-    private string PreviewStatus => preview is null ? "Not previewed"
-        : preview.Bindings.Any(binding => binding.Required && string.IsNullOrWhiteSpace(SelectedBinding(binding.Name))) ? "Configuration required"
-        : preview.CanInstall ? "Ready"
-        : preview.AlreadyInstalled ? "Already installed"
-        : "Conflicts";
+    private string PreviewStatus => preview is null ? T("NotPreviewed")
+        : preview.Bindings.Any(binding => binding.Required && string.IsNullOrWhiteSpace(SelectedBinding(binding.Name))) ? T("ConfigurationRequired")
+        : preview.CanInstall ? T("Ready")
+        : preview.AlreadyInstalled ? T("AlreadyInstalled")
+        : T("Conflicts");
     private UiStatus ProjectTone => project?.Value.Definition.State == PackProjectState.Built ? UiStatus.Success : UiStatus.Info;
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
@@ -251,7 +253,7 @@ else
             project = await Client.UpdateProjectAsync(ProjectId,
                 new(version.Trim(), EmptyToNull(displayName), EmptyToNull(description), Split(categories), Split(tags), audience, purpose), project.ETag, cancellation.Token);
             dirty = false;
-            message = "Project saved.";
+            message = T("ProjectSaved");
         });
     }
 
@@ -304,7 +306,7 @@ else
                 preview = await Client.PreviewBuildAsync(ProjectId, selectedBuild.Uid, cancellation.Token);
                 await ConfigureBindingsAsync();
                 replaceExisting = false;
-                message = $"Installed {installed.Value.Definition.Publisher}/{installed.Value.Definition.PackName} in the selected workspace.";
+                message = T("PackInstalled", installed.Value.Definition.Publisher, installed.Value.Definition.PackName);
             });
         }
         finally { installing = false; }
@@ -344,25 +346,25 @@ else
     private string? SelectedBinding(string name) => bindingSelections.GetValueOrDefault(name);
     private void BindingChanged(string name, ChangeEventArgs args) => bindingSelections[name] = args.Value?.ToString() ?? string.Empty;
     private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
-    private static ResourceReference ParseBindingTarget(string value)
+    private ResourceReference ParseBindingTarget(string value)
     {
         var parts = value.Split(':', 2);
-        if (parts.Length != 2) throw new InvalidOperationException("The selected Pack binding is invalid.");
+        if (parts.Length != 2) throw new InvalidOperationException(T("InvalidPackBinding"));
         return new(parts[1], @namespace: ResourceNamespace.Parse(parts[0]));
     }
-    private static string BindingKindLabel(PackBindingTargetKind kind) => kind switch
+    private string BindingKindLabel(PackBindingTargetKind kind) => kind switch
     {
-        PackBindingTargetKind.Secret => "Secret",
-        PackBindingTargetKind.ModelProvider => "Model provider",
-        PackBindingTargetKind.RuntimeProfile => "Runtime profile",
-        PackBindingTargetKind.ExtensionRegistration => "Extension registration",
-        _ => "Model profile"
+        PackBindingTargetKind.Secret => T("Binding.Secret"),
+        PackBindingTargetKind.ModelProvider => T("Binding.ModelProvider"),
+        PackBindingTargetKind.RuntimeProfile => T("Binding.RuntimeProfile"),
+        PackBindingTargetKind.ExtensionRegistration => T("Binding.ExtensionRegistration"),
+        _ => T("Binding.ModelProfile")
     };
     private string PreviewMessage(string buildVersion) => preview?.CanInstall == true
-        ? $"Build {buildVersion} is ready for this workspace."
+        ? T("BuildReadyForWorkspace", buildVersion)
         : preview?.AlreadyInstalled == true
-            ? $"Build {buildVersion} is already installed. Enable reinstall to replace it."
-            : $"Build {buildVersion} conflicts with resources already installed in namespace '{preview?.Namespace}'.";
+            ? T("BuildAlreadyInstalled", buildVersion)
+            : T("BuildConflicts", buildVersion, preview?.Namespace.ToString() ?? string.Empty);
     private void BackToPacks() => Navigation.NavigateTo("/packs");
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static IReadOnlyList<string> Split(string value) => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
