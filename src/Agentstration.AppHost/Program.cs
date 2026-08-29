@@ -52,7 +52,7 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Agentstration__SlotDataPath", slotDataPath)
     .WithEnvironment("Agentstration__Bootstrap__Path", bootstrapPath)
-    .WithEnvironment("Data__Path", Path.Combine(slotDataPath, "data.json"))
+    .WithEnvironment("Data__Directory", slotDataPath)
     .WithEnvironment("Data__ControlPlanePath", Path.Combine(slotDataPath, "control-plane.db"))
     .WithEnvironment("Data__WorkPlanePath", Path.Combine(slotDataPath, "work-plane.db"))
     .WithEnvironment("Data__FlowPath", Path.Combine(slotDataPath, "flow-plane.db"))
