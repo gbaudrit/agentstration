@@ -3,12 +3,13 @@
 @inject IExtensionsClient Client
 @inject IModelProfilesClient ProfilesClient
 @inject NotificationState Notifications
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
 
-<PageTitle>Extensions · Agentstration</PageTitle>
-<PageHeader Title="Extensions" Description="Register AEP endpoints and inspect their immutable option contracts and compatibility with persisted Model Profiles.">
+<PageTitle>@T("Extensions") · Agentstration</PageTitle>
+<PageHeader Title="@T("Extensions")" Description="@T("Extensions.Description")">
     <Actions>
-        <button class="button-secondary" @onclick="DiscoverAsync" disabled="@(loading || discovering)">@(discovering ? "Discovering…" : "Discover extensions")</button>
-        <button class="button-primary" @onclick="StartCreate" disabled="@loading">Register endpoint</button>
+        <button class="button-secondary" @onclick="DiscoverAsync" disabled="@(loading || discovering)">@(discovering ? T("Discovering") : T("DiscoverExtensions"))</button>
+        <button class="button-primary" @onclick="StartCreate" disabled="@loading">@T("RegisterEndpoint")</button>
     </Actions>
 </PageHeader>
 
@@ -19,8 +20,8 @@
 
 <section class="panel resource-section">
     <div class="panel-header">
-        <div><p class="eyebrow">Discovery sources</p><h2>Registered endpoints</h2><p>Workspace-scoped endpoints are persisted and discovered while enabled. Configuration and Aspire sources remain read-only.</p></div>
-        <span>@(registrations?.Count ?? 0) registration(s)</span>
+        <div><p class="eyebrow">@T("DiscoverySources")</p><h2>@T("RegisteredEndpoints")</h2><p>@T("RegisteredEndpoints.Description")</p></div>
+        <span>@T("RegistrationCount", registrations?.Count ?? 0)</span>
     </div>
 
     @if (editing)
@@ -29,37 +30,37 @@
             <DataAnnotationsValidator />
             <ValidationSummary />
             <div class="form-grid">
-                <label>Name<InputText @bind-Value="form.Name" disabled="@(!creating)" /></label>
-                <label>Namespace<InputText @bind-Value="form.Namespace" disabled="@(!creating)" /></label>
-                <label>Display name<InputText @bind-Value="form.DisplayName" /></label>
-                <label>AEP endpoint<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
-                <label>Expected extension ID<InputText @bind-Value="form.ExpectedExtensionId" /><small>Optional identity pin checked during discovery.</small></label>
-                <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> Enabled for discovery</label>
+                <label>@T("Name")<InputText @bind-Value="form.Name" disabled="@(!creating)" /></label>
+                <label>@T("Namespace")<InputText @bind-Value="form.Namespace" disabled="@(!creating)" /></label>
+                <label>@T("DisplayName")<InputText @bind-Value="form.DisplayName" /></label>
+                <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
+                <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /><small>@T("ExpectedExtensionId.Help")</small></label>
+                <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
             </div>
             <div class="panel-actions">
-                <button class="button-primary" type="submit" disabled="@saving">@(creating ? "Create registration" : "Save changes")</button>
-                <button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">Cancel</button>
+                <button class="button-primary" type="submit" disabled="@saving">@(creating ? T("CreateRegistration") : T("SaveChanges"))</button>
+                <button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">@T("Cancel")</button>
             </div>
         </EditForm>
     }
     else if (registrations?.Count > 0)
     {
         <DataGrid TItem="ExtensionRegistrationResource" Items="registrations">
-            <Header><tr><th>Registration</th><th>Endpoint</th><th>Discovery</th><th>Actions</th></tr></Header>
+            <Header><tr><th>@T("Registration")</th><th>@T("Endpoint")</th><th>@T("Discovery")</th><th>@T("Actions")</th></tr></Header>
             <Row Context="registration"><tr>
                 <td><strong>@registration.Definition.DisplayName</strong><br /><code>@registration.Namespace/@registration.Name</code></td>
                 <td><code>@registration.Definition.Endpoint</code></td>
-                <td><StatusBadge Text="@(registration.Definition.Enabled ? "Enabled" : "Disabled")" Status="@ModelManagementUi.Status(registration.Definition.Enabled ? "available" : "disabled")" /></td>
+                <td><StatusBadge Text="@(registration.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@ModelManagementUi.Status(registration.Definition.Enabled ? "available" : "disabled")" /></td>
                 <td>
                     @if (registration.Definition.Source == ExtensionRegistrationSource.Manual)
                     {
-                        <button class="button-secondary" @onclick="() => EditAsync(registration)">Edit</button>
-                        <button class="button-secondary" @onclick="() => ToggleAsync(registration)">@(registration.Definition.Enabled ? "Disable" : "Enable")</button>
-                        <button class="button-danger" @onclick="() => RequestDelete(registration)">Delete</button>
+                        <button class="button-secondary" @onclick="() => EditAsync(registration)">@T("Edit")</button>
+                        <button class="button-secondary" @onclick="() => ToggleAsync(registration)">@(registration.Definition.Enabled ? T("Disable") : T("Enable"))</button>
+                        <button class="button-danger" @onclick="() => RequestDelete(registration)">@T("Delete")</button>
                     }
                     else
                     {
-                        <span>Managed by @registration.Definition.Source</span>
+                        <span>@T("ManagedBy", registration.Definition.Source)</span>
                     }
                 </td>
             </tr></Row>
@@ -67,41 +68,41 @@
     }
     else if (!loading)
     {
-        <p>No manually registered endpoint. Use <strong>Register endpoint</strong>, application configuration, or Aspire discovery.</p>
+        <p>@T("NoRegisteredEndpoint")</p>
     }
 </section>
 
-<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="Delete extension registration" Message="@DeleteMessage" ConfirmLabel="Delete registration" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
+<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="@T("DeleteExtensionRegistration")" Message="@DeleteMessage" ConfirmLabel="@T("DeleteRegistration")" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
 
 @if (migrationPreview is not null)
 {
     <section class="panel resource-section">
         <div class="panel-header">
-            <div><p class="eyebrow">Explicit migration preview</p><h2>@migrationPreview.Value.ProfileNamespace/@migrationPreview.Value.ProfileName</h2><p>No profile value has been changed yet.</p></div>
+            <div><p class="eyebrow">@T("ExplicitMigrationPreview")</p><h2>@migrationPreview.Value.ProfileNamespace/@migrationPreview.Value.ProfileName</h2><p>@T("NoProfileChanged")</p></div>
             <span>@migrationPreview.Value.Source.Version → @migrationPreview.Value.Target.Version</span>
         </div>
         <div class="details-grid">
-            <article><h3>Current options</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Source)</pre></article>
-            <article><h3>Proposed options</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Target)</pre></article>
+            <article><h3>@T("CurrentOptions")</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Source)</pre></article>
+            <article><h3>@T("ProposedOptions")</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Target)</pre></article>
         </div>
         <div class="panel-actions">
-            <button class="button-primary" @onclick="ApplyMigrationAsync" disabled="@migrating">@(migrating ? "Applying…" : "Apply migration")</button>
-            <button class="button-secondary" @onclick="CancelMigration" disabled="@migrating">Cancel</button>
+            <button class="button-primary" @onclick="ApplyMigrationAsync" disabled="@migrating">@(migrating ? T("Applying") : T("ApplyMigration"))</button>
+            <button class="button-secondary" @onclick="CancelMigration" disabled="@migrating">@T("Cancel")</button>
         </div>
     </section>
 }
 
 @if (loading && extensions is null)
 {
-    <LoadingState Message="Discovering extensions…" />
+    <LoadingState Message="@T("DiscoveringExtensions")" />
 }
 else if (error is not null)
 {
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
 }
 else if (extensions?.Count == 0)
 {
-    <EmptyState Title="No extensions discovered" Message="Declare an endpoint under Agentstration:Extensions or start the Aspire AppHost to make an AEP extension discoverable." />
+    <EmptyState Title="@T("NoExtensionsDiscovered")" Message="@T("NoExtensionsDiscoveredMessage")" />
 }
 else
 {
@@ -110,19 +111,19 @@ else
         <section class="panel resource-section">
             <div class="panel-header">
                 <div>
-                    <p class="eyebrow">AEP extension · <code>@extension.RegistrationNamespace/@extension.RegistrationName</code> · @extension.DiscoverySource</p>
+                    <p class="eyebrow">@T("AepExtension") · <code>@extension.RegistrationNamespace/@extension.RegistrationName</code> · @extension.DiscoverySource</p>
                     <h2>@(extension.Extension?.Name ?? extension.RegistrationName)</h2>
-                    <p>@(extension.Extension?.Description ?? extension.Details ?? "Extension identity is not currently available.")</p>
+                    <p>@(extension.Extension?.Description ?? extension.Details ?? T("ExtensionIdentityUnavailable"))</p>
                 </div>
-                <StatusBadge Text="@ModelManagementUi.Label(extension.Status)" Status="@ModelManagementUi.Status(extension.Status)" />
+                <StatusBadge Text="@StatusLabel(extension.Status)" Status="@ModelManagementUi.Status(extension.Status)" />
             </div>
             <dl class="resource-details">
-                <dt>Extension ID</dt><dd><code>@(extension.Extension?.Id ?? "—")</code></dd>
-                <dt>Observed version</dt><dd>@(extension.Extension?.Version ?? "—")</dd>
-                <dt>AEP endpoint</dt><dd><code>@extension.Endpoint</code></dd>
-                <dt>Registration</dt><dd><code>@extension.RegistrationNamespace/@extension.RegistrationName</code></dd>
-                <dt>Model providers</dt><dd>@(extension.Providers.Count == 0 ? "—" : string.Join(", ", extension.Providers.Select(value => $"{value.Namespace}/{value.Name} → {value.ContributionId}")))</dd>
-                <dt>Contributions</dt><dd>@(extension.Contributions.Count == 0 ? "—" : string.Join(", ", extension.Contributions.Select(value => $"{value.Kind}:{value.Id}")))</dd>
+                <dt>@T("ExtensionId")</dt><dd><code>@(extension.Extension?.Id ?? "—")</code></dd>
+                <dt>@T("ObservedVersion")</dt><dd>@(extension.Extension?.Version ?? "—")</dd>
+                <dt>@T("AepEndpoint")</dt><dd><code>@extension.Endpoint</code></dd>
+                <dt>@T("Registration")</dt><dd><code>@extension.RegistrationNamespace/@extension.RegistrationName</code></dd>
+                <dt>@T("ModelProviders")</dt><dd>@(extension.Providers.Count == 0 ? "—" : string.Join(", ", extension.Providers.Select(value => $"{value.Namespace}/{value.Name} → {value.ContributionId}")))</dd>
+                <dt>@T("Contributions")</dt><dd>@(extension.Contributions.Count == 0 ? "—" : string.Join(", ", extension.Contributions.Select(value => $"{value.Kind}:{value.Id}")))</dd>
             </dl>
 
             @if (extension.Contributions.Any(value => value.Kind == "model-provider"))
@@ -130,54 +131,54 @@ else
                 <div class="panel-actions">
                     @foreach (var provider in extension.Providers)
                     {
-                        <a class="button-secondary" href="@ProviderUrl(provider)">Open @provider.Name provider</a>
+                        <a class="button-secondary" href="@ProviderUrl(provider)">@T("OpenProvider", provider.Name)</a>
                     }
                     @foreach (var contribution in extension.Contributions.Where(value => value.Kind == "model-provider" && !extension.Providers.Any(provider => provider.ContributionId == value.Id)))
                     {
-                        <a class="button-primary" href="@ConfigureProviderUrl(extension, contribution)">Configure @contribution.Id provider</a>
+                        <a class="button-primary" href="@ConfigureProviderUrl(extension, contribution)">@T("ConfigureProvider", contribution.Id)</a>
                     }
                 </div>
             }
 
-            <div class="panel-header"><div><h3>Option contracts</h3><p>Every version and schema digest is immutable.</p></div><span>@extension.OptionSets.Count set(s)</span></div>
+            <div class="panel-header"><div><h3>@T("OptionContracts")</h3><p>@T("OptionContracts.Description")</p></div><span>@T("SetCount", extension.OptionSets.Count)</span></div>
             @if (extension.OptionSets.Count == 0)
             {
-                <p class="inline-warning">@(extension.Status == "available" ? "This extension does not publish a versioned option contract." : "Contracts are unavailable because the extension could not be inspected.")</p>
+                <p class="inline-warning">@(extension.Status == "available" ? T("NoVersionedOptionContract") : T("ContractsUnavailable"))</p>
             }
             else
             {
                 <DataGrid TItem="ExtensionOptionSetResponse" Items="extension.OptionSets">
-                    <Header><tr><th>Option set</th><th>Target</th><th>Preferred</th><th>Supported versions</th></tr></Header>
+                    <Header><tr><th>@T("OptionSet")</th><th>@T("Target")</th><th>@T("Preferred")</th><th>@T("SupportedVersions")</th></tr></Header>
                     <Row Context="optionSet"><tr>
                         <td><code>@optionSet.Id</code></td>
                         <td>@optionSet.ContributionKind · <code>@optionSet.ContributionId</code> · @optionSet.Scope</td>
                         <td>@optionSet.PreferredVersion</td>
-                        <td>@foreach (var version in optionSet.Versions) { <div><strong>@version.Version</strong>@(version.Deprecated ? " · deprecated" : null)<br /><code>@version.SchemaDigest</code><details><summary>JSON Schema</summary><pre class="runner-json">@FormatSchema(version.Schema)</pre></details></div> }</td>
+                        <td>@foreach (var version in optionSet.Versions) { <div><strong>@version.Version</strong>@(version.Deprecated ? T("DeprecatedSuffix") : null)<br /><code>@version.SchemaDigest</code><details><summary>@T("JsonSchema")</summary><pre class="runner-json">@FormatSchema(version.Schema)</pre></details></div> }</td>
                     </tr></Row>
                 </DataGrid>
             }
 
-            <div class="panel-header"><div><h3>Persisted usage</h3><p>Profiles remain pinned to the exact contract version they were authored against.</p></div><span>@extension.Usages.Count profile(s)</span></div>
+            <div class="panel-header"><div><h3>@T("PersistedUsage")</h3><p>@T("PersistedUsage.Description")</p></div><span>@T("ProfileCount", extension.Usages.Count)</span></div>
             @if (extension.Usages.Count > 0)
             {
                 <DataGrid TItem="ExtensionOptionUsageResponse" Items="extension.Usages">
-                    <Header><tr><th>Model Profile</th><th>Contract</th><th>Status</th><th>Diagnostics</th></tr></Header>
+                    <Header><tr><th>@T("ModelProfile")</th><th>@T("Contract")</th><th>@T("Status")</th><th>@T("Diagnostics")</th></tr></Header>
                     <Row Context="usage"><tr>
                         <td><a href="@ProfileUrl(usage)">@usage.ProfileName</a><br /><small>@usage.ProfileNamespace</small></td>
-                        <td>@if (string.IsNullOrWhiteSpace(usage.OptionSet)) { <span>Legacy unversioned options</span> } else { <code>@usage.OptionSet@@@usage.Version</code><br /><small>@ShortDigest(usage.SchemaDigest)</small> }</td>
-                        <td><StatusBadge Text="@ModelManagementUi.Label(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" />
+                        <td>@if (string.IsNullOrWhiteSpace(usage.OptionSet)) { <span>@T("LegacyUnversionedOptions")</span> } else { <code>@usage.OptionSet@@@usage.Version</code><br /><small>@ShortDigest(usage.SchemaDigest)</small> }</td>
+                        <td><StatusBadge Text="@StatusLabel(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" />
                             @if (MigrationTarget(extension, usage) is { } targetVersion)
                             {
-                                <br /><button class="button-secondary" @onclick="() => PreviewMigrationAsync(usage, targetVersion)" disabled="@migrating">Migrate to @targetVersion</button>
+                                <br /><button class="button-secondary" @onclick="() => PreviewMigrationAsync(usage, targetVersion)" disabled="@migrating">@T("MigrateTo", targetVersion)</button>
                             }
                         </td>
-                        <td>@(usage.Issues.Count == 0 ? "Compatible" : string.Join(" ", usage.Issues))</td>
+                        <td>@(usage.Issues.Count == 0 ? T("Compatible") : string.Join(" ", usage.Issues))</td>
                     </tr></Row>
                 </DataGrid>
             }
             else
             {
-                <p>No persisted Model Profile uses native options from this extension.</p>
+                <p>@T("NoPersistedUsage")</p>
             }
         </section>
     }
@@ -199,6 +200,8 @@ else
     private ExtensionRegistrationResource? pendingDelete;
     private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
     private bool migrating;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private string StatusLabel(string status) => T($"Status.{status}");
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -229,8 +232,8 @@ else
             await LoadAsync();
             var available = extensions?.Count(value => value.Status == "available") ?? 0;
             discoveryMessage = result.Sources == 0
-                ? "Discovery completed: no configured or Aspire extension endpoint source was found."
-                : $"Discovery completed: {result.Sources} source(s), {result.Created} created, {result.Updated} updated, {result.Unchanged} unchanged; {available} extension(s) available.";
+                ? T("DiscoveryNoSource")
+                : T("DiscoveryCompleted", result.Sources, result.Created, result.Updated, result.Unchanged, available);
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { discovering = false; }
@@ -264,7 +267,7 @@ else
         try
         {
             if (!Uri.TryCreate(form.Endpoint, UriKind.Absolute, out var endpoint))
-                throw new AgentstrationApiException("The endpoint must be an absolute HTTP(S) URL.", Guid.NewGuid().ToString("N"));
+                throw new AgentstrationApiException(T("EndpointMustBeAbsolute"), Guid.NewGuid().ToString("N"));
             var properties = new ExtensionRegistrationProperties { DisplayName = form.DisplayName, Endpoint = endpoint, Enabled = form.Enabled, ExpectedExtensionId = form.ExpectedExtensionId };
             if (creating)
                 _ = await Client.CreateRegistrationAsync(new(form.Name, properties, form.Namespace), cancellation.Token);
@@ -291,7 +294,7 @@ else
 
     private void RequestDelete(ExtensionRegistrationResource registration) => pendingDelete = registration;
     private void CancelDelete() => pendingDelete = null;
-    private string DeleteMessage => $"Delete extension registration '{pendingDelete?.Namespace}/{pendingDelete?.Name}'?";
+    private string DeleteMessage => T("DeleteRegistrationMessage", pendingDelete?.Namespace.ToString() ?? string.Empty, pendingDelete?.Name ?? string.Empty);
 
     private async Task DeleteAsync()
     {
@@ -341,7 +344,7 @@ else
                 cancellation.Token);
             Notifications.Add(new NotificationItem(
                 Guid.NewGuid(),
-                "Extension options migrated",
+                T("ExtensionOptionsMigrated"),
                 $"{preview.Value.ProfileName}: {preview.Value.Source.Version} → {preview.Value.Target.Version}",
                 DateTimeOffset.Now,
                 UiStatus.Success));
