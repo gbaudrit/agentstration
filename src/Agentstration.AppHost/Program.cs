@@ -12,6 +12,15 @@ var configuredBootstrapPath = builder.Configuration["Agentstration:Bootstrap:Pat
 var bootstrapPath = string.IsNullOrWhiteSpace(configuredBootstrapPath)
     ? string.Empty
     : Path.GetFullPath(configuredBootstrapPath, builder.AppHostDirectory);
+var initialBootstrapEnabled = bool.TryParse(
+    builder.Configuration["Agentstration:Bootstrap:InitialBootstrapEnabled"],
+    out var configuredInitialBootstrapEnabled)
+    && configuredInitialBootstrapEnabled;
+var initialBootstrapProfiles = builder.Configuration
+    .GetSection("Agentstration:Bootstrap:InitialProfiles")
+    .GetChildren()
+    .Select(profile => profile.Value ?? string.Empty)
+    .ToArray();
 
 var ollamaEndpoint = builder.Configuration["Ollama:Endpoint"] ?? "http://localhost:11434";
 if (!Uri.TryCreate(ollamaEndpoint, UriKind.Absolute, out var parsedOllamaEndpoint)
@@ -52,6 +61,9 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Agentstration__SlotDataPath", slotDataPath)
     .WithEnvironment("Agentstration__Bootstrap__Path", bootstrapPath)
+    .WithEnvironment(
+        "Agentstration__Bootstrap__InitialBootstrapEnabled",
+        initialBootstrapEnabled ? "true" : "false")
     .WithEnvironment("Data__Directory", slotDataPath)
     .WithEnvironment("Data__ControlPlanePath", Path.Combine(slotDataPath, "control-plane.db"))
     .WithEnvironment("Data__WorkPlanePath", Path.Combine(slotDataPath, "work-plane.db"))
@@ -66,6 +78,8 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint", utilitiesExtension.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WaitFor(ollamaExtension);
+for (var index = 0; index < initialBootstrapProfiles.Length; index++)
+    console.WithEnvironment($"Agentstration__Bootstrap__InitialProfiles__{index}", initialBootstrapProfiles[index]);
 console.WaitFor(llamaCppExtension);
 console.WaitFor(localAiExtension);
 console.WaitFor(utilitiesExtension);

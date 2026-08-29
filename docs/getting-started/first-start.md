@@ -12,6 +12,6 @@ With the standalone Workplace pair running:
 
 First start creates local data under `.agentstration/` relative to the running host. These generated files are ignored by Git. The standalone control, work, runtime, and Flow data stores are logically separated.
 
-The default Development profiles declaratively create the `admin / admin` fixture, Tenant `dev`, and Workspace `default`. A `NoBootstrap` profile leaves the instance empty and exposes `/bootstrap`, which asks for the first global administrator plus the initial Tenant and Workspace. Non-Development unattended deployments must supply an explicit bootstrap manifest path and referenced secret; base settings do not invent an initial topology.
+The default Development launch profiles enable the `development` profile from the declarative bootstrap catalog and create the `admin / admin` fixture, Tenant `dev`, and Workspace `default`. A `NoBootstrap` launch profile leaves the instance empty by setting `InitialBootstrapEnabled` to `false`, while keeping the catalog configuration available, and exposes `/bootstrap`, which asks for the first global administrator plus the initial Tenant and Workspace. Non-Development unattended deployments must explicitly enable initial bootstrap, select one or more ordered profiles, and supply referenced secrets; base settings do not invent an initial topology.
 
 For more executable examples, see [Current capabilities and detailed workflows](../reference/current-capabilities.md).
