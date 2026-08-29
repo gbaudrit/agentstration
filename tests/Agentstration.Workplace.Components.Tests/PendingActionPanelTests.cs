@@ -90,6 +90,8 @@ public sealed class PendingActionPanelTests
 
         Assert.IsTrue(rendered.Markup.Contains("app-shell theme-light", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("side-nav", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("images/agentstration-lockup.png", StringComparison.Ordinal));
+        Assert.AreEqual(1, rendered.FindAll(".brand-mark-compact").Count);
         Assert.IsTrue(rendered.Markup.Contains("Workplace content", StringComparison.Ordinal));
     }
 

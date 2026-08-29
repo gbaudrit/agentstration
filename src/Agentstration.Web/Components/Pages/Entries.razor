@@ -5,21 +5,52 @@
 
 <PageTitle>@T("Entries") · Agentstration</PageTitle>
 <PageHeader Eyebrow="Workplace" Title="@T("Entries")" Description="@T("Entries.Description")">
-    <Actions><a class="button-primary" href="/entries/new">@T("CreateEntry")</a></Actions>
+    <Actions><a class="button-primary entry-create-action" href="/entries/new"><UiIcon Name="plus" />@T("CreateEntry")</a></Actions>
 </PageHeader>
 
 @if (loading) { <LoadingState Message="@T("LoadingEntries")" /> }
 else if (items.Count == 0) { <EmptyState Title="@T("NoEntries")" Message="@T("NoEntriesMessage")" /> }
 else
 {
-    <section class="panel">
-        @foreach (var item in items)
-        {
-            <article class="row">
-                <div><strong><a href="@ConsoleResourceUrls.Entry(item.Value.Id)">@item.Value.DisplayName</a></strong><small>@T("Namespace"): @item.Value.Id.Namespace · @item.Value.Binding.Kind · @ResourceName(item.Value.Binding.ResourceId)</small></div>
-                <StatusBadge Text="@(item.Published is null ? T("Draft") : T("PublishedVersion", item.Published.Version))" Status="@(item.Published is null ? UiStatus.Warning : UiStatus.Success)" />
-            </article>
-        }
+    <section class="entry-catalog" aria-label="@T("EntryCatalog")">
+        <header class="entry-catalog-header">
+            <div>
+                <p class="eyebrow">@T("Catalog")</p>
+                <h2>@T("WorkplaceEntryPoints")</h2>
+                <p>@T("EntryCatalog.Description")</p>
+            </div>
+            <div class="entry-catalog-summary" aria-label="@T("EntrySummary")">
+                <span><strong>@items.Count</strong> @T("TotalLower")</span>
+                <span><strong>@PublishedCount</strong> @T("PublishedLower")</span>
+            </div>
+        </header>
+
+        <div class="entry-card-list">
+            @foreach (var item in items)
+            {
+                <article class="entry-card @(item.Published is null ? "entry-card-draft" : "entry-card-published")">
+                    <a class="entry-card-link" href="@ConsoleResourceUrls.Entry(item.Value.Id)" aria-label="@T("ConfigureNamedEntry", item.Value.DisplayName)">
+                        <span class="entry-card-icon" aria-hidden="true"><UiIcon Name="entry" /></span>
+                        <span class="entry-card-content">
+                            <span class="entry-card-heading">
+                                <span>
+                                    <span class="entry-kind">@T("EntryKind", EnumLabel("Presentation", item.Value.Presentation.Kind))</span>
+                                    <strong>@item.Value.DisplayName</strong>
+                                </span>
+                                <StatusBadge Text="@(item.Published is null ? T("Draft") : T("PublishedVersion", item.Published.Version))" Status="@(item.Published is null ? UiStatus.Warning : UiStatus.Success)" />
+                            </span>
+                            <span class="entry-description">@(string.IsNullOrWhiteSpace(item.Value.Description) ? T("EntryFallbackDescription", ResourceName(item.Value.Binding.ResourceId)) : item.Value.Description)</span>
+                            <span class="entry-metadata">
+                                <span><UiIcon Name="@(item.Value.Binding.Kind == EntryBindingKind.Agent ? "agent" : "workflow")" />@EnumLabel("Binding", item.Value.Binding.Kind) <strong>@ResourceName(item.Value.Binding.ResourceId)</strong></span>
+                                <span><UiIcon Name="layers" />@item.Value.Id.Namespace</span>
+                                <span>@T("DraftRevisionCompact", item.Value.Revision)</span>
+                            </span>
+                        </span>
+                        <span class="entry-card-action">@T("Configure") <span aria-hidden="true">→</span></span>
+                    </a>
+                </article>
+            }
+        </div>
     </section>
 }
 
@@ -27,6 +58,14 @@ else
     private bool loading = true;
     private IReadOnlyList<EntryDraftResponse> items = [];
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    protected override async Task OnInitializedAsync() { items = await Client.GetEntriesAsync(default); loading = false; }
+    private int PublishedCount => items.Count(item => item.Published is not null);
+
+    protected override async Task OnInitializedAsync()
+    {
+        items = await Client.GetEntriesAsync(default);
+        loading = false;
+    }
+
+    private string EnumLabel<TEnum>(string prefix, TEnum value) where TEnum : struct, Enum => T($"{prefix}.{value}");
     private static string ResourceName(string id) => id[(id.LastIndexOf('/') + 1)..];
 }

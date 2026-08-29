@@ -1,4 +1,4 @@
-# ADR-0073 — UI localization uses RESX and Principal culture preferences
+# ADR-0074 — UI localization uses RESX and Principal culture preferences
 
 - Status: Accepted
 - Date: 2026-08-28

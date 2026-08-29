@@ -38,6 +38,14 @@ if ($runScript -notmatch "'ASPIRE_ALLOW_UNSECURED_TRANSPORT'\s*=\s*'true'") {
     throw 'The slot launcher must explicitly allow its loopback HTTP Aspire endpoints.'
 }
 
+$appHost = Get-Content (Join-Path $PSScriptRoot '..\..\src\Agentstration.AppHost\Program.cs') -Raw
+if ($appHost -notmatch '\.WithEnvironment\("Data__Directory",\s*slotDataPath\)') {
+    throw 'The AppHost must configure Data:Directory with the slot data root.'
+}
+if ($appHost -match '\.WithEnvironment\("Data__Path"') {
+    throw 'The AppHost must not use the obsolete Data:Path setting.'
+}
+
 $dashboardUrl = Get-AgentstrationDashboardLoginUrl -Line "Login to the dashboard at $([char]27)[1mhttp://127.0.0.1:17134/login?t=test-token$([char]27)[0m"
 if ($dashboardUrl -ne 'http://127.0.0.1:17134/login?t=test-token') {
     throw "Unable to extract the Aspire dashboard login URL: '$dashboardUrl'."
@@ -46,4 +54,4 @@ if ($null -ne (Get-AgentstrationDashboardLoginUrl -Line 'Application started wit
     throw 'A regular log line must not be treated as an Aspire dashboard URL.'
 }
 
-Write-Host "Slot tool tests passed ($($cases.Count + 5) cases)."
+Write-Host "Slot tool tests passed ($($cases.Count + 7) cases)."

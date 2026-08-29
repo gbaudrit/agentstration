@@ -244,6 +244,7 @@ public partial class Home
     private async Task MarkReadAsync(WorkNotificationId id) { await Api.MarkNotificationReadAsync(CurrentWorkspaceName, id.Value, lifetime.Token); await RefreshNotificationsAsync(); }
     private async Task MarkAllReadAsync() { await Api.MarkAllNotificationsReadAsync(CurrentWorkspaceName, lifetime.Token); await RefreshNotificationsAsync(); }
     private string ArtifactUrl(WorkTaskArtifact artifact) => Api.GetArtifactContentUri(CurrentWorkspaceName, artifact.WorkTaskId.Value, artifact.Id.Value).ToString();
+    private string TaskUrl(WorkTaskResponse task) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/tasks/{task.Id}";
     private string DashboardUrl(string dashboardName) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(dashboardName)}{(RequestedInteractionId is null ? string.Empty : $"?interaction={RequestedInteractionId}")}";
     private string InteractionUrl(Guid interactionId) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(CurrentDashboardName)}?interaction={interactionId}";
     private void DashboardChanged(ChangeEventArgs args) { var name = args.Value?.ToString(); if (!string.IsNullOrWhiteSpace(name)) Navigation.NavigateTo(DashboardUrl(name)); }

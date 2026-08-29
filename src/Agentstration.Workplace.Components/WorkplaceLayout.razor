@@ -7,7 +7,10 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceLayoutStrings> Localizer
 <div class="app-shell @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light") workplace-shell">
     <aside class="sidebar" aria-label="@T("WorkplaceNavigation")">
-        <a class="brand-lockup" href="@HomeUrl" aria-label="@T("WorkplaceHome")"><span class="brand-mark"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></span><span><strong>Agentstration</strong><small>Workplace</small></span></a>
+        <a class="brand-lockup workplace-brand-lockup" href="@HomeUrl" aria-label="@T("WorkplaceHome")">
+            <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
+            <img class="brand-lockup-logo" src="_content/Agentstration.Web.Components/images/agentstration-lockup.png" alt="" width="204" height="38" />
+        </a>
         <nav class="side-nav">
             <NavLink href="@HomeUrl" Match="NavLinkMatch.All"><UiIcon Name="home" /><span class="nav-label">@T("Home")</span></NavLink>
             @if (CurrentWorkspace is null)

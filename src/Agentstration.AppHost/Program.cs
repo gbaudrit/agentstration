@@ -8,6 +8,10 @@ if (!System.Text.RegularExpressions.Regex.IsMatch(slot, "^[a-z0-9](?:[a-z0-9-]{0
 var defaultSlotDataPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", ".agentstration", "slots", slot));
 var slotDataPath = Path.GetFullPath(builder.Configuration["Agentstration:SlotDataPath"] ?? defaultSlotDataPath);
 Directory.CreateDirectory(slotDataPath);
+var configuredBootstrapPath = builder.Configuration["Agentstration:Bootstrap:Path"];
+var bootstrapPath = string.IsNullOrWhiteSpace(configuredBootstrapPath)
+    ? string.Empty
+    : Path.GetFullPath(configuredBootstrapPath, builder.AppHostDirectory);
 
 var ollamaEndpoint = builder.Configuration["Ollama:Endpoint"] ?? "http://localhost:11434";
 if (!Uri.TryCreate(ollamaEndpoint, UriKind.Absolute, out var parsedOllamaEndpoint)
@@ -47,7 +51,8 @@ var utilitiesExtension = builder.AddProject<Projects.Agentstration_Extensions_Ut
 var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-console")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Agentstration__SlotDataPath", slotDataPath)
-    .WithEnvironment("Data__Path", Path.Combine(slotDataPath, "data.json"))
+    .WithEnvironment("Agentstration__Bootstrap__Path", bootstrapPath)
+    .WithEnvironment("Data__Directory", slotDataPath)
     .WithEnvironment("Data__ControlPlanePath", Path.Combine(slotDataPath, "control-plane.db"))
     .WithEnvironment("Data__WorkPlanePath", Path.Combine(slotDataPath, "work-plane.db"))
     .WithEnvironment("Data__FlowPath", Path.Combine(slotDataPath, "flow-plane.db"))

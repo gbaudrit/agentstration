@@ -448,7 +448,8 @@ public static class LocalIdentityServiceCollectionExtensions
     public static IServiceCollection AddAgentstrationLocalIdentity(
         this IServiceCollection services,
         string connectionString,
-        string dataProtectionKeysPath)
+        string dataProtectionKeysPath,
+        bool useDevelopmentPasswordPolicy = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentException.ThrowIfNullOrWhiteSpace(dataProtectionKeysPath);
@@ -459,11 +460,11 @@ public static class LocalIdentityServiceCollectionExtensions
         services.AddDbContext<LocalIdentityDbContext>(options => options.UseSqlite(connectionString));
         services.AddIdentityCore<LocalIdentityUser>(options =>
             {
-                options.Password.RequiredLength = 12;
-                options.Password.RequireDigit = true;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireUppercase = true;
-                options.Password.RequireNonAlphanumeric = true;
+                options.Password.RequiredLength = useDevelopmentPasswordPolicy ? 5 : 12;
+                options.Password.RequireDigit = !useDevelopmentPasswordPolicy;
+                options.Password.RequireLowercase = !useDevelopmentPasswordPolicy;
+                options.Password.RequireUppercase = !useDevelopmentPasswordPolicy;
+                options.Password.RequireNonAlphanumeric = !useDevelopmentPasswordPolicy;
                 options.Lockout.MaxFailedAccessAttempts = 5;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
                 options.User.RequireUniqueEmail = false;
@@ -473,6 +474,7 @@ public static class LocalIdentityServiceCollectionExtensions
             .AddDefaultTokenProviders();
         services.AddScoped<IUserClaimsPrincipalFactory<LocalIdentityUser>, LocalIdentityClaimsPrincipalFactory>();
         services.AddScoped<LocalBootstrapCoordinator>();
+        services.AddScoped<IBootstrapResourceHandler, PlatformAdministratorBootstrapHandler>();
         services.AddScoped<LocalAccountAdministrationService>();
         services.AddScoped<LocalAccountSecurityService>();
         services.AddScoped<LocalAuthenticationService>();

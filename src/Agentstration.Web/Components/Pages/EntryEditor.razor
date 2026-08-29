@@ -21,9 +21,12 @@
 else
 {
     <div class="entry-summary-bar" aria-label="@T("EntryStatus")">
-        <StatusBadge Text="@T("Draft")" Status="UiStatus.Info" />
-        <span>@T("Revision", draftRevision)</span>
-        @if (published is not null)
+        @if (published is null)
+        {
+            <StatusBadge Text="@T("Draft")" Status="UiStatus.Info" />
+            <span>@T("Revision", draftRevision)</span>
+        }
+        else
         {
             <StatusBadge Text="@T("Published")" Status="UiStatus.Success" />
             <span>@T("Version", published.Version)</span>
@@ -57,7 +60,7 @@ else
                     <p class="eyebrow">@T("Definition")</p>
                     <h2>@T("EntrySummary")</h2>
                     <dl class="entry-facts">
-                        <dt>@T("Status")</dt><dd>@T(published is null ? "DraftOnly" : "DraftAndPublished")</dd>
+                        <dt>@T("Status")</dt><dd>@T(published is null ? "Draft" : "Published")</dd>
                         <dt>@T("DraftRevision")</dt><dd>@draftRevision</dd>
                         <dt>@T("PublishedVersionLabel")</dt><dd>@(published?.Version.ToString() ?? T("NotPublished"))</dd>
                         <dt>@T("Presentation")</dt><dd>@EnumLabel("Presentation", presentationKind)</dd>
@@ -215,7 +218,7 @@ else
         else
         {
             <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Versions")</p><h2>@T("PublishedEntry")</h2><p>@T("VersionsHelp")</p></div></div>
+                <div class="panel-header"><div><p class="eyebrow">@T("Versions")</p><h2>@T("PublishedEntry")</h2></div></div>
                 @if (published is null) { <p class="entry-empty-copy">@T("NoPublishedVersion")</p> }
                 else
                 {
