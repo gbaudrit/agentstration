@@ -1,22 +1,23 @@
 @page "/entries"
 @rendermode InteractiveServer
 @inject IEntryAdministrationApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceStrings> Localizer
 
-<PageTitle>Entries · Agentstration</PageTitle>
-<PageHeader Eyebrow="Workplace" Title="Entries" Description="Configure what users can submit, then publish a pinned executable Flow target.">
-    <Actions><a class="button-primary" href="/entries/new">Create entry</a></Actions>
+<PageTitle>@T("Entries") · Agentstration</PageTitle>
+<PageHeader Eyebrow="Workplace" Title="@T("Entries")" Description="@T("Entries.Description")">
+    <Actions><a class="button-primary" href="/entries/new">@T("CreateEntry")</a></Actions>
 </PageHeader>
 
-@if (loading) { <LoadingState Message="Loading Entries…" /> }
-else if (items.Count == 0) { <EmptyState Title="No Entries" Message="Create an Entry and bind it to an Agent or Flow." /> }
+@if (loading) { <LoadingState Message="@T("LoadingEntries")" /> }
+else if (items.Count == 0) { <EmptyState Title="@T("NoEntries")" Message="@T("NoEntriesMessage")" /> }
 else
 {
     <section class="panel">
         @foreach (var item in items)
         {
             <article class="row">
-                <div><strong><a href="@ConsoleResourceUrls.Entry(item.Value.Id)">@item.Value.DisplayName</a></strong><small>Namespace: @item.Value.Id.Namespace · @item.Value.Binding.Kind · @ResourceName(item.Value.Binding.ResourceId)</small></div>
-                <StatusBadge Text="@(item.Published is null ? "Draft" : $"Published v{item.Published.Version}")" Status="@(item.Published is null ? UiStatus.Warning : UiStatus.Success)" />
+                <div><strong><a href="@ConsoleResourceUrls.Entry(item.Value.Id)">@item.Value.DisplayName</a></strong><small>@T("Namespace"): @item.Value.Id.Namespace · @item.Value.Binding.Kind · @ResourceName(item.Value.Binding.ResourceId)</small></div>
+                <StatusBadge Text="@(item.Published is null ? T("Draft") : T("PublishedVersion", item.Published.Version))" Status="@(item.Published is null ? UiStatus.Warning : UiStatus.Success)" />
             </article>
         }
     </section>
@@ -25,6 +26,7 @@ else
 @code {
     private bool loading = true;
     private IReadOnlyList<EntryDraftResponse> items = [];
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     protected override async Task OnInitializedAsync() { items = await Client.GetEntriesAsync(default); loading = false; }
     private static string ResourceName(string id) => id[(id.LastIndexOf('/') + 1)..];
 }

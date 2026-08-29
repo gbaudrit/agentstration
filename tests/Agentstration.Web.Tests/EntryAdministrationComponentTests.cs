@@ -6,16 +6,54 @@ using Agentstration.Work.Contracts;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
+using System.Globalization;
 
 namespace Agentstration.Web.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class EntryAdministrationComponentTests
 {
+    private CultureInfo? originalCulture;
+    private CultureInfo? originalUiCulture;
+
+    [TestInitialize]
+    public void SetEnglishCulture()
+    {
+        originalCulture = CultureInfo.CurrentCulture;
+        originalUiCulture = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+    }
+
+    [TestCleanup]
+    public void RestoreCulture()
+    {
+        CultureInfo.CurrentCulture = originalCulture!;
+        CultureInfo.CurrentUICulture = originalUiCulture!;
+    }
+
+    [TestMethod]
+    public void WorkplaceCatalogAndDashboardUseTheSelectedFrenchCulture()
+    {
+        using var culture = new CultureScope("fr-FR");
+        using var context = CreateContext();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(new FakeEntryAdministrationApiClient());
+
+        var strings = context.Services.GetRequiredService<IStringLocalizer<WorkplaceStrings>>();
+        var rendered = context.Render<Workspaces>();
+
+        Assert.AreEqual("Créer une entrée", strings["CreateEntry"].Value);
+        Assert.AreEqual("Liaison et cible résolue", strings["BindingAndResolvedTarget"].Value);
+        StringAssert.Contains(rendered.Markup, "Composition du tableau de bord");
+        StringAssert.Contains(rendered.Markup, "Publier le tableau de bord");
+    }
+
     [TestMethod]
     public async Task EntryEditorSwitchesResourceKindEditsFieldsAndPublishesPinnedFlow()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var rendered = context.Render<EntryEditor>();
@@ -58,7 +96,7 @@ public sealed class EntryAdministrationComponentTests
     [TestMethod]
     public async Task ExistingEntryExposesRealOverviewUsageAndPublishedVersionAcrossTabs()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var rendered = context.Render<EntryEditor>(parameters => parameters.Add(value => value.Name, "primary"));
@@ -80,7 +118,7 @@ public sealed class EntryAdministrationComponentTests
     [TestMethod]
     public async Task NamespacedPackEntryUsesItsNamespaceAndIsReadOnly()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var @namespace = new Agentstration.Resources.ResourceNamespace("agentstration.daily-life-assistant");
@@ -101,7 +139,7 @@ public sealed class EntryAdministrationComponentTests
     [TestMethod]
     public async Task DashboardEditorPublishesRequestedPackEntryWithItsNamespace()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var @namespace = new Agentstration.Resources.ResourceNamespace("agentstration.daily-life-assistant");
@@ -117,7 +155,7 @@ public sealed class EntryAdministrationComponentTests
     [TestMethod]
     public async Task DashboardEditorKeepsExactlyOnePrimaryEntryWhenPublishing()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var rendered = context.Render<Workspaces>();
@@ -135,7 +173,7 @@ public sealed class EntryAdministrationComponentTests
     [TestMethod]
     public void DashboardEditorCreatesAnEmptyDraftWhenWorkspaceHasNoDashboard()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var client = new FakeEntryAdministrationApiClient { HasDashboard = false };
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
 
@@ -148,7 +186,7 @@ public sealed class EntryAdministrationComponentTests
     [TestMethod]
     public void DashboardEditorDirectsWorkspaceCreationToOrganizationSettings()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var client = new FakeEntryAdministrationApiClient { HasWorkspace = false };
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var rendered = context.Render<Workspaces>();
@@ -157,6 +195,21 @@ public sealed class EntryAdministrationComponentTests
     }
 
     private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
+
+    private static BunitContext CreateContext()
+    {
+        var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        return context;
+    }
+
+    private sealed class CultureScope : IDisposable
+    {
+        private readonly CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        private readonly CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+        public CultureScope(string name) { CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(name); CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(name); }
+        public void Dispose() { CultureInfo.CurrentCulture = originalCulture; CultureInfo.CurrentUICulture = originalUiCulture; }
+    }
 
     private sealed class FakeEntryAdministrationApiClient : IEntryAdministrationApiClient
     {
