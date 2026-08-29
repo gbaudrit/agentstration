@@ -94,6 +94,11 @@ public static class AuthenticationEndpoints
         if (!WebAuthenticationOptions.SupportsLocalAccounts(options.Value.Authentication.Mode)) return Results.NotFound();
         if (await bootstrap.IsInitializedAsync(cancellationToken))
             return Results.Conflict(new { error = "instance_already_initialized" });
+        if (request.Topology is null)
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["topology"] = ["The initial tenant and workspace are required."]
+            });
         var result = await bootstrap.BootstrapAsync(request, cancellationToken);
         if (!result.Succeeded)
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["bootstrap"] = result.Errors.ToArray() });

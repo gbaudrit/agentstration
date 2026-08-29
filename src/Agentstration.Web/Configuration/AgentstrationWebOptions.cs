@@ -35,7 +35,7 @@ public sealed class AuthenticationOptions
     public string? DataProtectionKeysPath { get; set; }
     public string DevelopmentIssuer { get; set; } = Agentstration.Management.Core.LocalBootstrapOptions.DevelopmentIssuer;
     public string DevelopmentSubject { get; set; } = Agentstration.Management.Core.LocalBootstrapOptions.DevelopmentSubject;
-    public string DevelopmentDisplayName { get; set; } = "Local operator";
+    public string DevelopmentDisplayName { get; set; } = "Development operator";
 
     public static bool SupportsLocalAccounts(string mode) =>
         string.Equals(mode, Local, StringComparison.OrdinalIgnoreCase)

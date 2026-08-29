@@ -1,5 +1,7 @@
 # ADR-0042: Authentication and authorization boundaries
 
+The initial topology and Platform administrator coupling described here is superseded by [ADR-0074](0074-initial-topology-is-declarative-and-platform-administration-is-global.md).
+
 Status: Accepted — 2026-08-16
 
 ## Context

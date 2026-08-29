@@ -123,7 +123,7 @@ The login page renders the local username/password form when local accounts are 
 
 ### Current pure-OIDC bootstrap limitation
 
-Pure `Oidc` startup can create the configured development-style Principal, Tenant, Workspace, and Owner assignment from `Agentstration:Bootstrap:ExternalIdentityIssuer` and `ExternalIdentitySubject`. It does not currently provide the invitation/onboarding workflow needed to create arbitrary external-only Principals, and a fresh pure-OIDC installation does not grant that configured Principal the separate `PlatformAdmin` role. Use `Local` or `Hybrid` for the complete supported administration bootstrap until external-only provisioning and first-administrator enrollment are implemented.
+Pure `Oidc` startup does not synthesize a Principal or topology from host settings. It also does not yet provide the invitation/onboarding workflow needed to create an external-only first Platform administrator. Use `Local` or `Hybrid` for supported first-administrator enrollment, or provision the required persisted identity state through a deployment-specific process.
 
 ## Request pipeline and Workspace selection
 
@@ -138,14 +138,14 @@ UseAuthentication
 
 `PrincipalResolutionMiddleware` resolves a local account through the dedicated AccountId claim, an external caller through exact `iss + sub`, or a validated PAT through the trusted Principal and Workspace claims produced by the PAT authentication handler. A missing link, missing Principal, disabled Principal, revoked PAT, or expired PAT does not produce an Agentstration principal feature.
 
-For a resolved active Principal, the middleware loads active Workspace memberships and selects a Workspace in this order:
+For an ordinary resolved active Principal, the middleware loads active Workspace memberships and selects a Workspace in this order:
 
 1. `{workspaceId}` route value;
 2. `X-Agentstration-Workspace` header;
 3. HTTP-only Workspace-selection cookie;
 4. first active membership.
 
-The selected Workspace must be active and belong to the membership. The resulting `RequestContext` contains `PrincipalId`, `TenantId`, and `WorkspaceId`. Workspace authorization never relies on a global role or on an IdP tenant.
+The selected Workspace must be active and belong to the membership. A Platform administrator instead may select any active Workspace across all active Tenants; selection prefers the request, cookie, declared default context, then the first available Workspace. The resulting `RequestContext` contains `PrincipalId`, `TenantId`, and `WorkspaceId`.
 
 ## Local bootstrap
 
@@ -156,13 +156,12 @@ One successful bootstrap creates:
 1. the submitted ASP.NET Core Identity account;
 2. a stable human Principal;
 3. its `LocalIdentity` link;
-4. the initial Tenant and Workspace;
-5. Tenant and Workspace memberships;
-6. the Workspace `Owner` assignment;
-7. the first `PlatformAdministrator` grant;
-8. the authenticated application cookie.
+4. the first global `PlatformAdministrator` grant;
+5. the submitted initial Tenant and Workspace;
+6. the Principal's default navigation context;
+7. the authenticated application cookie.
 
-ASP.NET Core Identity validates and hashes the submitted password. There is no generated or documented default credential. Bootstrap completion is persisted in the Identity database and subsequent attempts return a conflict. If Management provisioning fails, the newly created Identity account is removed as compensation.
+The Platform administrator receives no Tenant membership, Workspace membership, or role assignment; its instance grant authorizes all active current and future Workspaces. ASP.NET Core Identity validates and hashes the submitted password. There is no generated or documented default credential outside the explicit Development bundle. Bootstrap completion is persisted in the Identity database and subsequent attempts return a conflict. If Management provisioning fails, the newly created Identity account is removed as compensation.
 
 ## Local account lifecycle
 
@@ -228,15 +227,15 @@ The protected business verticals cover Management resources, Flow, Runtime, Work
 
 ## Personal access tokens
 
-PATs are delegated credentials for scripts and CLI clients. They are bound to one active human Principal and exactly one Workspace. Their effective authorization is always the intersection of the live RBAC result and the token allow-list; a token can reduce access but never increase it.
+PATs are delegated credentials for scripts and CLI clients. They are bound to one active human Principal and exactly one Workspace. Their effective authorization is always the intersection of the live authorization result and the token allow-list; a token can reduce access but never increase it. Ordinary Principals must retain active Workspace membership, while a global Platform administrator may use a Workspace-scoped PAT without materializing one.
 
-Supported permissions are `workspaces/read`, `resources/read`, `resources/write`, `resources/delete`, `runs/read`, and `runs/execute`. Expiration is mandatory and limited to 365 days. The complete `agt_pat_…` Bearer value is returned once. Only its SHA-256 digest and a non-secret prefix are persisted. A revoked or expired token, a disabled Principal or Workspace, and an inactive Workspace membership all fail authentication immediately.
+Supported permissions are `workspaces/read`, `resources/read`, `resources/write`, `resources/delete`, `runs/read`, and `runs/execute`. Expiration is mandatory and limited to 365 days. The complete `agt_pat_…` Bearer value is returned once. Only its SHA-256 digest and a non-secret prefix are persisted. A revoked or expired token and a disabled Principal or Workspace fail authentication immediately; inactive membership also fails for a non-Platform administrator.
 
 PAT administration is deliberately interactive: a PAT cannot create, list, revoke, or use Platform administration. The owner can revoke one or all tokens; a Platform administrator can list metadata and revoke one or all tokens of another Principal. Revocation affects the next request and does not interrupt already-running work.
 
 ## Platform administrator lifecycle
 
-`PlatformAdmin` is a persisted instance grant, not a Workspace role. Workspace Owner or Admin never implies Platform administrator.
+`PlatformAdmin` is a persisted instance grant, not a Workspace role. Workspace Owner or Admin never implies Platform administrator. Conversely, a Platform administrator needs no membership or role assignment: the authorization boundary grants the complete permission catalog for every active Tenant and Workspace, subject to narrower credential restrictions such as PAT scope.
 
 An active Platform administrator can list grants, grant the role to another active Principal, and revoke another Principal. The supported handover is:
 

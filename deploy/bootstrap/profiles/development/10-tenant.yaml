@@ -1,0 +1,6 @@
+apiVersion: agentstration.io/v1
+kind: Tenant
+metadata:
+  name: dev
+definition:
+  displayName: Development

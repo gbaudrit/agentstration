@@ -52,7 +52,7 @@
                         <label class="context-switcher">
                             <span class="sr-only">Workspace</span>
                             <select value="@context.WorkspaceId" @onchange="SelectWorkspaceAsync" disabled="@switchingWorkspace" aria-label="Current workspace">
-                                @foreach (var workspace in context.Workspaces) { <option value="@workspace.Id">@workspace.DisplayName</option> }
+                                @foreach (var workspace in context.Workspaces) { <option value="@workspace.Id">@WorkspaceLabel(context, workspace)</option> }
                             </select>
                         </label>
                     }
@@ -323,6 +323,10 @@
     }
 
     private static string ShortIdentifier(string value) => value.Length <= 48 ? value : $"…{value[^47..]}";
+    private static string WorkspaceLabel(ConsoleContextSnapshot context, ConsoleWorkspaceOption workspace) =>
+        context.Workspaces.Select(value => value.TenantId).Distinct().Skip(1).Any()
+            ? $"{workspace.TenantDisplayName} / {workspace.DisplayName}"
+            : workspace.DisplayName;
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(async () =>
     {

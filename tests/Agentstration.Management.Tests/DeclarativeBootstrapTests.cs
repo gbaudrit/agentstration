@@ -125,6 +125,58 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task CompleteTopologyIsDeclarativeAndPlatformAdministratorHasGlobalAccessWithoutMemberships()
+    {
+        using var directory = new TemporaryDirectory();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "00-platform-admin.yaml"), PlatformAdministrator());
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "10-dev-tenant.yaml"), Tenant("dev", "Development"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "11-customer-tenant.yaml"), Tenant("customer", "Customer"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "20-default-workspace.yaml"), Workspace("default", "Default workspace", "dev"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "21-customer-workspace.yaml"), Workspace("operations", "Operations", "customer"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "30-default-context.yaml"), DefaultContext("bootstrap-admin", "dev", "default"));
+        await using var factory = Factory(directory.Path, InitialPassword);
+        using var client = factory.CreateClient();
+        using var health = await client.GetAsync("/health");
+        health.EnsureSuccessStatusCode();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var store = scope.ServiceProvider.GetRequiredService<IIdentityStore>();
+        var account = await scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>()
+            .FindByNameAsync("bootstrap-admin");
+        Assert.IsNotNull(account);
+        var principal = await scope.ServiceProvider.GetRequiredService<IPrincipalResolver>()
+            .ResolveLocalAsync(account.Id, default);
+        Assert.IsNotNull(principal);
+        var dev = await store.FindTenantByNameAsync("dev", default);
+        var customer = await store.FindTenantByNameAsync("customer", default);
+        Assert.IsNotNull(dev);
+        Assert.IsNotNull(customer);
+        var defaultWorkspace = await store.FindWorkspaceByNameAsync(dev.Id, "default", default);
+        var operations = await store.FindWorkspaceByNameAsync(customer.Id, "operations", default);
+        Assert.IsNotNull(defaultWorkspace);
+        Assert.IsNotNull(operations);
+
+        var preferences = await store.GetPrincipalPreferencesAsync(principal.Id, default);
+        Assert.IsNotNull(preferences);
+        Assert.AreEqual(dev.Id, preferences.DefaultTenantId);
+        Assert.AreEqual(defaultWorkspace.Id, preferences.DefaultWorkspaceId);
+        Assert.AreEqual(0, (await store.ListMembershipsAsync(dev.Id, default)).Count);
+        Assert.AreEqual(0, (await store.ListMembershipsAsync(customer.Id, default)).Count);
+        Assert.AreEqual(0, (await store.ListWorkspaceMembershipsAsync(principal.Id, default)).Count);
+        Assert.AreEqual(0, (await store.ListRoleAssignmentsAsync(dev.Id, principal.Id, default)).Count);
+        Assert.AreEqual(0, (await store.ListRoleAssignmentsAsync(customer.Id, principal.Id, default)).Count);
+
+        var authorization = scope.ServiceProvider.GetRequiredService<IAuthorizationService>();
+        Assert.IsTrue(await authorization.HasPermissionAsync(
+            new RequestContext(principal.Id, customer.Id, operations.Id),
+            AuthorizationPermissions.WorkspacesWrite,
+            default));
+
+        factory.Services.GetRequiredService<IConfiguration>()["Agentstration:Bootstrap:Secrets:AdminPassword"] = null;
+        Assert.AreEqual(6, await scope.ServiceProvider.GetRequiredService<DeclarativeBootstrapService>().ApplyAsync(default));
+    }
+
+    [TestMethod]
     public async Task ExistingNonAdministratorAccountIsANonFatalConflictWithoutResolvingTheSecret()
     {
         using var directory = new TemporaryDirectory();
@@ -217,6 +269,40 @@ public sealed class DeclarativeBootstrapTests
           email: bootstrap@example.test
           passwordFrom:
             configuration: Agentstration:Bootstrap:Secrets:AdminPassword
+        """;
+
+    private static string Tenant(string name, string displayName) => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: Tenant
+        metadata:
+          name: {{name}}
+        definition:
+          displayName: {{displayName}}
+        """;
+
+    private static string Workspace(string name, string displayName, string tenantName) => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: Workspace
+        metadata:
+          name: {{name}}
+        definition:
+          displayName: {{displayName}}
+          tenantRef:
+            name: {{tenantName}}
+        """;
+
+    private static string DefaultContext(string localAccount, string tenantName, string workspaceName) => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: PrincipalDefaultContext
+        metadata:
+          name: {{localAccount}}
+        definition:
+          principalRef:
+            localAccount: {{localAccount}}
+          tenantRef:
+            name: {{tenantName}}
+          workspaceRef:
+            name: {{workspaceName}}
         """;
 
     private static string Resource(string kind, string name) => $$"""

@@ -89,8 +89,8 @@ public sealed class WorkplaceApiTests
                     .Push(requestContext);
                 var management = dependencyScope.ServiceProvider.GetRequiredService<AgentManagementService>();
                 var identityStore = dependencyScope.ServiceProvider.GetRequiredService<IIdentityStore>();
-                var tenant = await identityStore.FindTenantByNameAsync("local", default);
-                var workspace = await identityStore.FindWorkspaceByNameAsync(tenant!.Id, "personal", default);
+                var tenant = await identityStore.FindTenantByNameAsync("dev", default);
+                var workspace = await identityStore.FindWorkspaceByNameAsync(tenant!.Id, "default", default);
                 var workspaceId = new Agentstration.Resources.WorkspaceId(workspace!.Id);
                 var agent = await management.GetAgentAsync(administered.Value.Binding.ResourceId, default);
                 Assert.IsNotNull(agent);
@@ -168,11 +168,11 @@ public sealed class WorkplaceApiTests
             Assert.AreEqual("Unpublished name", workplaceAfterPublish?.DisplayName);
             Assert.IsFalse(string.IsNullOrWhiteSpace(workplaceAfterPublish?.ResolvedTarget.Version));
 
-            var defaultDashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>("/api/workspaces/personal/dashboard");
+            var defaultDashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>("/api/workspaces/default/dashboard");
             Assert.AreEqual(1, defaultDashboard?.Entries.Count(value => value.Role == DashboardItemRole.Primary));
 
             using var submittedResponse = await client.PostAsJsonAsync(
-                "/api/workspaces/personal/entries/universal-request/interactions",
+                "/api/workspaces/default/entries/universal-request/interactions",
                 new CreateInteractionRequest(new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement("Explain records briefly.") }));
             submittedResponse.EnsureSuccessStatusCode();
             var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
@@ -207,7 +207,7 @@ public sealed class WorkplaceApiTests
             });
             using var client = factory.CreateClient();
             using var submittedResponse = await client.PostAsJsonAsync(
-                "/api/workspaces/personal/entries/quick-answer/interactions",
+                "/api/workspaces/default/entries/quick-answer/interactions",
                 new CreateInteractionRequest(new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement("Remember this idea.") }));
             submittedResponse.EnsureSuccessStatusCode();
             var submitted = await submittedResponse.Content.ReadFromJsonAsync<EntrySubmissionResponse>();
@@ -216,14 +216,14 @@ public sealed class WorkplaceApiTests
             Assert.AreEqual(InteractionStatus.Idle, submitted.Interaction.Status);
 
             using var continuedResponse = await client.PostAsJsonAsync(
-                $"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/messages",
+                $"/api/workspaces/default/interactions/{submitted.Interaction.Id}/messages",
                 new AddConversationMessageRequest("What did I just ask you to remember?"));
             Assert.AreEqual(HttpStatusCode.Accepted, continuedResponse.StatusCode);
             var continued = await continuedResponse.Content.ReadFromJsonAsync<AddConversationMessageResponse>();
             Assert.IsNotNull(continued);
             Assert.IsNull(continued.Task);
             Assert.AreEqual(InteractionStatus.Idle, continued.Interaction.Status);
-            var messages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/messages") ?? [];
+            var messages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/default/interactions/{submitted.Interaction.Id}/messages") ?? [];
             Assert.HasCount(4, messages);
             Assert.AreEqual(ConversationRole.Agentstration, messages[^1].Role);
         }
@@ -248,7 +248,7 @@ public sealed class WorkplaceApiTests
             });
             using var client = factory.CreateClient();
             using var submittedResponse = await client.PostAsJsonAsync(
-                "/api/workspaces/personal/entries/prepare-report/interactions",
+                "/api/workspaces/default/entries/prepare-report/interactions",
                 new CreateInteractionRequest(new Dictionary<string, JsonElement>
                 {
                     ["request"] = JsonSerializer.SerializeToElement("Prepare a monthly report about sales performance.")
@@ -265,7 +265,7 @@ public sealed class WorkplaceApiTests
             Assert.AreEqual(InteractionStatus.Idle, idle?.Status);
 
             using var continuationResponse = await client.PostAsJsonAsync(
-                $"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/messages",
+                $"/api/workspaces/default/interactions/{submitted.Interaction.Id}/messages",
                 new AddConversationMessageRequest("Make it shorter and suitable for executives."));
             Assert.AreEqual(HttpStatusCode.Accepted, continuationResponse.StatusCode);
             var continuation = await continuationResponse.Content.ReadFromJsonAsync<AddConversationMessageResponse>();
@@ -298,15 +298,15 @@ public sealed class WorkplaceApiTests
             var continuedInteraction = await WaitForInteractionStatusAsync(client, submitted.Interaction.Id, InteractionStatus.Idle);
             Assert.AreEqual(InteractionStatus.Idle, continuedInteraction?.Status);
             Assert.AreEqual(outputs.Results[1].FlowRunId, continuedInteraction?.LastFlowRunId);
-            var messages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/messages");
+            var messages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/default/interactions/{submitted.Interaction.Id}/messages");
             var storedMessages = messages ?? [];
             Assert.IsTrue(storedMessages.Any(value => value.Content == "Make it shorter and suitable for executives."));
             Assert.IsTrue(storedMessages.Any(value => value.Role == ConversationRole.Agentstration && value.Content == outputs.Results[1].Content.GetString()), "The conversation must carry the user-facing result instead of a duplicate readiness message.");
-            var history = await client.GetFromJsonAsync<InteractionPageResponse>("/api/workspaces/personal/interactions?take=10");
+            var history = await client.GetFromJsonAsync<InteractionPageResponse>("/api/workspaces/default/interactions?take=10");
             Assert.IsTrue(history!.Value.Any(value => value.Id == submitted.Interaction.Id));
 
             var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
-            Assert.IsTrue(workspaces?.Any(value => value.Name == "personal"));
+            Assert.IsTrue(workspaces?.Any(value => value.Name == "default"));
             var operationalPage = await client.GetFromJsonAsync<WorkTaskOperationsPageResponse>("/api/tasks?page=1&pageSize=1&sort=updatedAt&direction=desc&status=Completed&search=report");
             Assert.IsNotNull(operationalPage); Assert.HasCount(1, operationalPage.Items); Assert.AreEqual(1, operationalPage.TotalCount);
             Assert.AreEqual(2, operationalPage.Items[0].FlowRunCount); Assert.AreEqual(2, operationalPage.Items[0].ResultCount); Assert.AreEqual(0, operationalPage.Items[0].ArtifactCount);
@@ -361,10 +361,10 @@ public sealed class WorkplaceApiTests
             connection.On<TaskResultAddedEvent>("TaskResultAdded", value => resultAdded.TrySetResult(value));
             connection.On<PendingActionResolvedEvent>("PendingActionResolved", value => pendingResolved.TrySetResult(value));
             await connection.StartAsync();
-            await connection.InvokeAsync("SubscribeAsync", "personal", 0L);
+            await connection.InvokeAsync("SubscribeAsync", "default", 0L);
 
             using var submittedResponse = await client.PostAsJsonAsync(
-                "/api/workspaces/personal/entries/guided-request/interactions",
+                "/api/workspaces/default/entries/guided-request/interactions",
                 new CreateInteractionRequest(new Dictionary<string, JsonElement>
                 {
                     ["request"] = JsonSerializer.SerializeToElement("Summarize the standalone Workplace increment")
@@ -377,7 +377,7 @@ public sealed class WorkplaceApiTests
             Assert.IsNull(submitted.Task);
             var attentionPage = await client.GetFromJsonAsync<WorkTaskOperationsPageResponse>("/api/tasks?hasPendingAction=true&page=1&pageSize=25");
             Assert.AreEqual(0, attentionPage?.TotalCount, "A PendingAction without a WorkTask is supervised through its Interaction, not invented as a Task.");
-            var persistedInteraction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}");
+            var persistedInteraction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/default/interactions/{submitted.Interaction.Id}");
             Assert.IsNull(persistedInteraction?.ImmediateResult, "Resume tokens must only be returned to the initiating client and never persisted with an interaction.");
 
             using var wrongWorkspace = await client.PostAsJsonAsync(
@@ -386,28 +386,28 @@ public sealed class WorkplaceApiTests
             Assert.AreEqual(HttpStatusCode.NotFound, wrongWorkspace.StatusCode);
 
             using var invalidToken = await client.PostAsJsonAsync(
-                $"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/pending-actions/{choice.PendingActionId.Value}/responses",
+                $"/api/workspaces/default/interactions/{submitted.Interaction.Id}/pending-actions/{choice.PendingActionId.Value}/responses",
                 new PendingActionResponseRequest("invalid", Choice("concise")));
             Assert.AreEqual(HttpStatusCode.BadRequest, invalidToken.StatusCode);
 
             using var invalidChoice = await client.PostAsJsonAsync(
-                $"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/pending-actions/{choice.PendingActionId.Value}/responses",
+                $"/api/workspaces/default/interactions/{submitted.Interaction.Id}/pending-actions/{choice.PendingActionId.Value}/responses",
                 new PendingActionResponseRequest(choice.ResumeToken, Choice("unsupported")));
             Assert.AreEqual(HttpStatusCode.BadRequest, invalidChoice.StatusCode);
 
             using var choiceResponse = await client.PostAsJsonAsync(
-                $"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/pending-actions/{choice.PendingActionId.Value}/responses",
+                $"/api/workspaces/default/interactions/{submitted.Interaction.Id}/pending-actions/{choice.PendingActionId.Value}/responses",
                 new PendingActionResponseRequest(choice.ResumeToken, Choice("concise")));
             choiceResponse.EnsureSuccessStatusCode();
             var choiceResolution = await choiceResponse.Content.ReadFromJsonAsync<PendingActionResolutionResponse>();
             var resolvedTask = choiceResolution?.Task; Assert.IsNotNull(resolvedTask, "A guided one-click choice must resume directly into the Task.");
             var supervisedActions = await client.GetFromJsonAsync<PendingActionContract[]>($"/api/tasks/{resolvedTask.Id}/pending-actions");
             var supervised = supervisedActions ?? []; Assert.HasCount(1, supervised); Assert.AreEqual(resolvedTask.Id, supervised[0].WorkTaskId); Assert.AreEqual(PendingActionStatus.Completed, supervised[0].Status);
-            persistedInteraction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{submitted.Interaction.Id}");
+            persistedInteraction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/default/interactions/{submitted.Interaction.Id}");
             Assert.IsInstanceOfType<CreateTaskAction>(persistedInteraction?.ImmediateResult);
 
             using var replay = await client.PostAsJsonAsync(
-                $"/api/workspaces/personal/interactions/{submitted.Interaction.Id}/pending-actions/{choice.PendingActionId.Value}/responses",
+                $"/api/workspaces/default/interactions/{submitted.Interaction.Id}/pending-actions/{choice.PendingActionId.Value}/responses",
                 new PendingActionResponseRequest(choice.ResumeToken, Choice("concise")));
             Assert.AreEqual(HttpStatusCode.Conflict, replay.StatusCode);
             var confirmed = choiceResolution;
@@ -419,7 +419,7 @@ public sealed class WorkplaceApiTests
             WorkTaskResponse? task = null;
             for (var attempt = 0; attempt < 100; attempt++)
             {
-                task = await client.GetFromJsonAsync<WorkTaskResponse>($"/api/workspaces/personal/tasks/{confirmed.Task.Id}");
+                task = await client.GetFromJsonAsync<WorkTaskResponse>($"/api/workspaces/default/tasks/{confirmed.Task.Id}");
                 if (task?.Status is WorkTaskStatus.Completed or WorkTaskStatus.Failed) break;
                 await Task.Delay(25);
             }
@@ -431,9 +431,9 @@ public sealed class WorkplaceApiTests
             WorkTaskArtifact[] artifacts = [];
             for (var attempt = 0; attempt < 50; attempt++)
             {
-                activities = await client.GetFromJsonAsync<WorkTaskActivity[]>($"/api/workspaces/personal/tasks/{completedTask.Id}/activities") ?? [];
-                results = await client.GetFromJsonAsync<WorkTaskResult[]>($"/api/workspaces/personal/tasks/{completedTask.Id}/results") ?? [];
-                artifacts = await client.GetFromJsonAsync<WorkTaskArtifact[]>($"/api/workspaces/personal/tasks/{completedTask.Id}/artifacts") ?? [];
+                activities = await client.GetFromJsonAsync<WorkTaskActivity[]>($"/api/workspaces/default/tasks/{completedTask.Id}/activities") ?? [];
+                results = await client.GetFromJsonAsync<WorkTaskResult[]>($"/api/workspaces/default/tasks/{completedTask.Id}/results") ?? [];
+                artifacts = await client.GetFromJsonAsync<WorkTaskArtifact[]>($"/api/workspaces/default/tasks/{completedTask.Id}/artifacts") ?? [];
                 if (activities.Any(value => value.Type == WorkTaskActivityType.TaskCompleted) && results.Length == 1) break;
                 await Task.Delay(20);
             }
@@ -444,12 +444,12 @@ public sealed class WorkplaceApiTests
             Assert.AreEqual(completedTask.Id, (await resultAdded.Task.WaitAsync(TimeSpan.FromSeconds(5))).Result.WorkTaskId.Value);
             Assert.IsNull(typeof(WorkTaskArtifactEventContract).GetProperty("StorageKey"));
 
-            var notifications = await client.GetFromJsonAsync<WorkNotificationPageResponse>("/api/workspaces/personal/notifications?unreadOnly=true");
+            var notifications = await client.GetFromJsonAsync<WorkNotificationPageResponse>("/api/workspaces/default/notifications?unreadOnly=true");
             Assert.IsTrue(notifications!.Value.Count >= 2);
-            var unreadBefore = await client.GetFromJsonAsync<UnreadNotificationCountResponse>("/api/workspaces/personal/notifications/unread-count");
-            using var markRead = await client.PostAsync($"/api/workspaces/personal/notifications/{notifications.Value[0].Id.Value}/read", null);
+            var unreadBefore = await client.GetFromJsonAsync<UnreadNotificationCountResponse>("/api/workspaces/default/notifications/unread-count");
+            using var markRead = await client.PostAsync($"/api/workspaces/default/notifications/{notifications.Value[0].Id.Value}/read", null);
             markRead.EnsureSuccessStatusCode();
-            var unreadAfter = await client.GetFromJsonAsync<UnreadNotificationCountResponse>("/api/workspaces/personal/notifications/unread-count");
+            var unreadAfter = await client.GetFromJsonAsync<UnreadNotificationCountResponse>("/api/workspaces/default/notifications/unread-count");
             Assert.AreEqual(unreadBefore!.Count - 1, unreadAfter!.Count);
         }
         finally
@@ -470,8 +470,8 @@ public sealed class WorkplaceApiTests
         WorkTaskArtifact[] artifacts = [];
         for (var attempt = 0; attempt < 150; attempt++)
         {
-            results = await client.GetFromJsonAsync<WorkTaskResult[]>($"/api/workspaces/personal/tasks/{taskId}/results") ?? [];
-            artifacts = await client.GetFromJsonAsync<WorkTaskArtifact[]>($"/api/workspaces/personal/tasks/{taskId}/artifacts") ?? [];
+            results = await client.GetFromJsonAsync<WorkTaskResult[]>($"/api/workspaces/default/tasks/{taskId}/results") ?? [];
+            artifacts = await client.GetFromJsonAsync<WorkTaskArtifact[]>($"/api/workspaces/default/tasks/{taskId}/artifacts") ?? [];
             if (results.Length >= count) return (results, artifacts);
             await Task.Delay(25);
         }
@@ -486,7 +486,7 @@ public sealed class WorkplaceApiTests
         InteractionResponse? interaction = null;
         for (var attempt = 0; attempt < 150; attempt++)
         {
-            interaction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/personal/interactions/{interactionId}");
+            interaction = await client.GetFromJsonAsync<InteractionResponse>($"/api/workspaces/default/interactions/{interactionId}");
             if (interaction?.Status == expectedStatus) return interaction;
             await Task.Delay(25);
         }

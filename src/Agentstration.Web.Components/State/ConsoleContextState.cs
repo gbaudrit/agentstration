@@ -1,6 +1,12 @@
 namespace Agentstration.Web.Components.State;
 
-public sealed record ConsoleWorkspaceOption(Guid Id, string Name, string DisplayName);
+public sealed record ConsoleWorkspaceOption(
+    Guid Id,
+    Guid TenantId,
+    string TenantName,
+    string TenantDisplayName,
+    string Name,
+    string DisplayName);
 
 public sealed record ConsoleContextSnapshot(
     Guid UserId,
@@ -41,6 +47,6 @@ public sealed class ConsoleContextState(IConsoleContextProvider provider)
 internal sealed class EmptyConsoleContextProvider : IConsoleContextProvider
 {
     public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(new ConsoleContextSnapshot(
-        Guid.Empty, "Local User", Guid.Empty, "local", "Local organization", Guid.Empty, "default", "Default workspace",
-        new HashSet<string>(StringComparer.Ordinal), [new(Guid.Empty, "default", "Default workspace")]));
+        Guid.Empty, "Local User", Guid.Empty, "dev", "Development", Guid.Empty, "default", "Default workspace",
+        new HashSet<string>(StringComparer.Ordinal), [new(Guid.Empty, Guid.Empty, "dev", "Development", "default", "Default workspace")]));
 }

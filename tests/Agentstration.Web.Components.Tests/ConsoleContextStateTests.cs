@@ -9,9 +9,11 @@ public sealed class ConsoleContextStateTests
     public async Task LoadsDynamicOrganizationWorkspaceAndPermissions()
     {
         var workspaceId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
         var snapshot = new ConsoleContextSnapshot(
-            Guid.NewGuid(), "Alice", Guid.NewGuid(), "acme", "ACME", workspaceId, "support", "Support",
-            new HashSet<string>(["resources/read"], StringComparer.Ordinal), [new(workspaceId, "support", "Support")]);
+            Guid.NewGuid(), "Alice", tenantId, "acme", "ACME", workspaceId, "support", "Support",
+            new HashSet<string>(["resources/read"], StringComparer.Ordinal),
+            [new(workspaceId, tenantId, "acme", "ACME", "support", "Support")]);
         var state = new ConsoleContextState(new StubProvider(snapshot));
 
         await state.LoadAsync(default);
