@@ -78,6 +78,8 @@ dotnet run --project src/Agentstration.Web
 
 Open the operations Console at [http://localhost:5100](http://localhost:5100). On a fresh installation, `/bootstrap` creates the first local administrator, organization and workspace; no default credentials exist.
 
+For an explicitly opt-in local Development bootstrap, run `dotnet run --project src/Agentstration.Web --launch-profile BootstrapDevelopment`. That profile loads the versioned Development bootstrap bundle and creates the public local fixture `admin / admin` on a fresh instance. The normal launch profile, published application and Production environment do not activate it.
+
 In the Development environment, the complete interactive HTTP API reference is available at [http://localhost:5100/swagger](http://localhost:5100/swagger), backed by the OpenAPI document at [http://localhost:5100/openapi/v1.json](http://localhost:5100/openapi/v1.json). Swagger supports the current Console session cookie and JWT bearer tokens; SignalR and MCP remain separate transports.
 
 `Managed` is the normal execution mode. Configure an Ollama, llama.cpp or LocalAI provider and bind a Model Profile to run real agents entirely on your machine. The provider endpoint and selected model are resolved from Agentstration's persisted resources.

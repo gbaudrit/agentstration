@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Agentstration.Management.Tests;
 
@@ -133,6 +134,36 @@ public sealed class DeclarativeBootstrapTests
         var exception = await Assert.ThrowsAsync<DeclarativeBootstrapException>(() => Task.Run(() => factory.CreateClient()));
         StringAssert.Contains(exception.Message, "Agentstration:Bootstrap:Secrets:AdminPassword");
         Assert.DoesNotContain(InitialPassword, exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void DevelopmentIdentityPolicyAcceptsThePublicBootstrapCredentialOnlyWhenRequested()
+    {
+        using var directory = new TemporaryDirectory();
+        var developmentServices = new ServiceCollection();
+        developmentServices.AddLogging();
+        developmentServices.AddAgentstrationLocalIdentity(
+            "Data Source=:memory:",
+            directory.Path,
+            useDevelopmentPasswordPolicy: true);
+        using var development = developmentServices.BuildServiceProvider();
+        var developmentPolicy = development.GetRequiredService<IOptions<IdentityOptions>>().Value.Password;
+        Assert.AreEqual(5, developmentPolicy.RequiredLength);
+        Assert.IsFalse(developmentPolicy.RequireDigit);
+        Assert.IsFalse(developmentPolicy.RequireLowercase);
+        Assert.IsFalse(developmentPolicy.RequireUppercase);
+        Assert.IsFalse(developmentPolicy.RequireNonAlphanumeric);
+
+        var defaultServices = new ServiceCollection();
+        defaultServices.AddLogging();
+        defaultServices.AddAgentstrationLocalIdentity("Data Source=:memory:", Path.Combine(directory.Path, "default-keys"));
+        using var defaults = defaultServices.BuildServiceProvider();
+        var defaultPolicy = defaults.GetRequiredService<IOptions<IdentityOptions>>().Value.Password;
+        Assert.AreEqual(12, defaultPolicy.RequiredLength);
+        Assert.IsTrue(defaultPolicy.RequireDigit);
+        Assert.IsTrue(defaultPolicy.RequireLowercase);
+        Assert.IsTrue(defaultPolicy.RequireUppercase);
+        Assert.IsTrue(defaultPolicy.RequireNonAlphanumeric);
     }
 
     private static DeclarativeBootstrapService Service(string contentRoot, IBootstrapResourceHandler handler, string? path = null)

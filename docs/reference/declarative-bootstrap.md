@@ -44,6 +44,16 @@ environment:
 
 The password must satisfy the existing ASP.NET Core Identity policy. Identity validates and hashes it; Agentstration never adds it to the canonical resource or logs it. If the declared account already exists and its Principal is already a Platform administrator, bootstrap skips it without resolving or checking the password. Password changes therefore survive restarts. An existing account without the declared grant is treated as an inconsistent collision and fails startup rather than being silently changed.
 
+## Visual Studio and local Development
+
+The opt-in `BootstrapDevelopment` launch profile activates the versioned bundle under `deploy/bootstrap/profiles/development`. It is available from Visual Studio or the command line:
+
+```powershell
+dotnet run --project src/Agentstration.Web --launch-profile BootstrapDevelopment
+```
+
+This Development-only profile creates the public local account `admin / admin` on a fresh instance. The normal `http` profile does not configure a bootstrap path and therefore creates no default account. The known credential is a development fixture, not a secret: never use this profile for an exposed or production instance. Development relaxes the local Identity password policy to accept it; every other environment retains the strong password policy. Standard .NET configuration can override the password when needed.
+
 Malformed YAML, an unsupported `apiVersion`, an unknown `kind`, a missing required field, or an absent referenced configuration value fails startup explicitly. `PlatformAdministrator` creation also fails if another account has already initialized the instance because bootstrap is not an administrative synchronization mechanism.
 
 ## Extension boundary

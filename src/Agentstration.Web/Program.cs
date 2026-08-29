@@ -89,7 +89,10 @@ builder.Services.AddAgentstrationOpenApi();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSignalR();
-builder.Services.AddAgentstrationLocalIdentity(identityConnectionString, dataProtectionKeysPath);
+builder.Services.AddAgentstrationLocalIdentity(
+    identityConnectionString,
+    dataProtectionKeysPath,
+    useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
 builder.Services.AddScoped<DeclarativeBootstrapService>();
 builder.Services.AddSingleton<SignalRFlowRunEventSink>();
 builder.Services.AddSingleton<WorkplaceFlowConversationProjectionSink>();
