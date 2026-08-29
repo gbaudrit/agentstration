@@ -110,6 +110,9 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Créer un profil de modèle", modelProfileEditor["CreateModelProfile"].Value);
         Assert.AreEqual("Fournisseur et modèle", modelProfileEditor["ProviderAndModel"].Value);
         Assert.AreEqual("La modification de ce profil affectera 1 agent.", modelProfileEditor["ChangingProfileAffects", modelProfileEditor["AgentCount.One", 1].Value].Value);
+        Assert.AreEqual("Résolution effective", modelProfileEditor["EffectiveResolution"].Value);
+        Assert.AreEqual("Non pris en charge", modelProfileEditor["Support.Unsupported"].Value);
+        Assert.AreEqual("Configuration non valide", modelProfileEditor["Status.InvalidConfiguration"].Value);
         Assert.AreEqual("Profils de modèles", modelProfiles["Title"].Value);
         Assert.AreEqual("Fournisseur indisponible", modelProfiles["Status.ProviderUnavailable"].Value);
         Assert.AreEqual("Ce profil de modèle est encore référencé par 2 agents.", modelProfiles["DeleteConflictMessage", modelProfiles["AgentCount.Many", 2].Value].Value);
