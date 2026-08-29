@@ -64,6 +64,13 @@ dotnet run --project src/Agentstration.Web --launch-profile https-NoBootstrap
 
 Build configuration and host environment are independent. For example, `dotnet run --configuration Release` still uses the default `http` launch profile and its Development bootstrap settings. Use a `NoBootstrap` profile or `--no-launch-profile` when bootstrap must be disabled.
 
+When Visual Studio starts `Agentstration.AppHost`, the profile must be selected on that startup project rather than on `Agentstration.Web`. The AppHost `https` profile resolves the Development bundle and passes its absolute path to the orchestrated Console. Select `https-NoBootstrap` to pass an empty path and override the Console's own default launch profile:
+
+```powershell
+dotnet run --project src/Agentstration.AppHost
+dotnet run --project src/Agentstration.AppHost --launch-profile https-NoBootstrap
+```
+
 Malformed YAML, an unsupported `apiVersion`, an unknown `kind`, a missing required field, or an absent referenced configuration value fails startup explicitly. `PlatformAdministrator` creation also fails if another account has already initialized the instance because bootstrap is not an administrative synchronization mechanism.
 
 ## Extension boundary
