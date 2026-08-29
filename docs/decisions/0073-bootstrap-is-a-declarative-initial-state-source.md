@@ -25,4 +25,4 @@ Bootstrap runs after persistence initialization and before the Web host starts s
 - Relative paths resolve against the host content root, while absolute paths support read-only container mounts such as `/app/bootstrap`.
 - Adding a resource kind requires one handler; it does not require modifying the loader.
 - The first declarative Platform administrator remains subject to the existing password policy and one-time local instance initialization rules.
-- The opt-in `BootstrapDevelopment` launch profile supplies a versioned local bundle and the public `admin / admin` fixture; only Development relaxes the Identity password policy, while the normal profile and every other environment retain secure defaults.
+- The standard local `http` and `https` launch profiles supply a versioned Development bundle and the public `admin / admin` fixture. Their explicit `http-NoBootstrap` and `https-NoBootstrap` counterparts omit the bundle. Only Development relaxes the Identity password policy; every other environment retains secure defaults.

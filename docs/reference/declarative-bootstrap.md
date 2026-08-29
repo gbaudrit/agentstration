@@ -46,13 +46,23 @@ The password must satisfy the existing ASP.NET Core Identity policy. Identity va
 
 ## Visual Studio and local Development
 
-The opt-in `BootstrapDevelopment` launch profile activates the versioned bundle under `deploy/bootstrap/profiles/development`. It is available from Visual Studio or the command line:
+The default `http` and `https` launch profiles activate the versioned bundle under `deploy/bootstrap/profiles/development`. They are available from Visual Studio or the command line:
 
 ```powershell
-dotnet run --project src/Agentstration.Web --launch-profile BootstrapDevelopment
+dotnet run --project src/Agentstration.Web
+dotnet run --project src/Agentstration.Web --launch-profile https
 ```
 
-This Development-only profile creates the public local account `admin / admin` on a fresh instance. The normal `http` profile does not configure a bootstrap path and therefore creates no default account. The known credential is a development fixture, not a secret: never use this profile for an exposed or production instance. Development relaxes the local Identity password policy to accept it; every other environment retains the strong password policy. Standard .NET configuration can override the password when needed.
+Both Development profiles create the public local account `admin / admin` on a fresh instance. The known credential is a development fixture, not a secret: never use these profiles for an exposed or production instance. Development relaxes the local Identity password policy to accept it; every other environment retains the strong password policy. Standard .NET configuration can override the password when needed.
+
+Use the corresponding explicit profile when Development must start without declarative bootstrap:
+
+```powershell
+dotnet run --project src/Agentstration.Web --launch-profile http-NoBootstrap
+dotnet run --project src/Agentstration.Web --launch-profile https-NoBootstrap
+```
+
+Build configuration and host environment are independent. For example, `dotnet run --configuration Release` still uses the default `http` launch profile and its Development bootstrap settings. Use a `NoBootstrap` profile or `--no-launch-profile` when bootstrap must be disabled.
 
 Malformed YAML, an unsupported `apiVersion`, an unknown `kind`, a missing required field, or an absent referenced configuration value fails startup explicitly. `PlatformAdministrator` creation also fails if another account has already initialized the instance because bootstrap is not an administrative synchronization mechanism.
 
