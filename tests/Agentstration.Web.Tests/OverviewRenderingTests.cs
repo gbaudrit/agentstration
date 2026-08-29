@@ -19,6 +19,7 @@ public sealed class OverviewRenderingTests
     [TestMethod]
     public void OverviewDisplaysMetricsWhileRunEventsAreStillLoading()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
         var api = new MockApiClient(TimeProvider.System);
         var eventStream = new ControlledEventStream();
@@ -56,7 +57,9 @@ public sealed class OverviewRenderingTests
     [TestMethod]
     public void RunEventFailureRemainsConfinedToItsPanel()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IAgentstrationEventStream>(new FailingEventStream());
 
         var rendered = context.Render<Agentstration.Web.Components.LatestRunEvents>();
@@ -71,6 +74,7 @@ public sealed class OverviewRenderingTests
     [TestMethod]
     public void OverviewDisplaysReadyTilesWithoutWaitingForSlowTiles()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
         var api = new MockApiClient(TimeProvider.System);
         var work = new StubWorkClient();
