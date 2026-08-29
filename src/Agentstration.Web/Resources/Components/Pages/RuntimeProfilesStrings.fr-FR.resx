@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Profils d’exécution</value></data>
+  <data name="Description"><value>Configurez les valeurs d’exécution par défaut indépendamment des paramètres d’inférence du modèle.</value></data>
+  <data name="CreateProfile"><value>Créer un profil d’exécution</value></data>
+  <data name="Retry"><value>Réessayer</value></data>
+  <data name="Loading"><value>Chargement des profils d’exécution…</value></data>
+  <data name="EmptyTitle"><value>Aucun profil d’exécution</value></data>
+  <data name="EmptyMessage"><value>Créez un profil d’exécution avant de déployer des agents.</value></data>
+  <data name="Profile"><value>Profil</value></data>
+  <data name="Namespace"><value>Espace de noms</value></data>
+  <data name="Runtime"><value>Exécution</value></data>
+  <data name="Session"><value>Session</value></data>
+  <data name="Streaming"><value>Diffusion en continu</value></data>
+  <data name="Usage"><value>Utilisation</value></data>
+  <data name="Open"><value>Ouvrir</value></data>
+  <data name="DeploymentCount.One"><value>{0} déploiement</value></data>
+  <data name="DeploymentCount.Many"><value>{0} déploiements</value></data>
+  <data name="Session.Transient"><value>Transitoire</value></data>
+  <data name="Session.Persistent"><value>Persistante</value></data>
+  <data name="Streaming.Automatic"><value>Automatique</value></data>
+  <data name="Streaming.Enabled"><value>Activée</value></data>
+  <data name="Streaming.Disabled"><value>Désactivée</value></data>
+</root>

@@ -96,6 +96,8 @@ public sealed class WorkOperationsComponentTests
         var modelProfiles = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProfilesStrings>>();
         var modelProviderDetails = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProviderDetailsStrings>>();
         var modelProviders = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.ModelProvidersStrings>>();
+        var runtimeProfileEditor = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.RuntimeProfileEditorStrings>>();
+        var runtimeProfiles = context.Services.GetRequiredService<IStringLocalizer<Components.Pages.RuntimeProfilesStrings>>();
 
         Assert.AreEqual("Créer un agent", agents["CreateAgent"].Value);
         Assert.AreEqual("Définissez, publiez et exploitez des ressources d’agents spécialisés.", agents["Description"].Value);
@@ -122,6 +124,11 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("2 modèles", modelProviders["ModelCount.Many", 2].Value);
         Assert.AreEqual("Point de terminaison détenu par l’extension", modelProviderDetails["ExtensionOwnedEndpoint"].Value);
         Assert.AreEqual("Ce fournisseur est référencé par 1 profil de modèle.", modelProviderDetails["ProviderReferencedBy", modelProviderDetails["ProfileCount.One", 1].Value].Value);
+        Assert.AreEqual("Profils d’exécution", runtimeProfiles["Title"].Value);
+        Assert.AreEqual("2 déploiements", runtimeProfiles["DeploymentCount.Many", 2].Value);
+        Assert.AreEqual("Politique d’exécution", runtimeProfileEditor["ExecutionPolicy"].Value);
+        Assert.AreEqual("Requise", runtimeProfileEditor["ToolInvocation.Required"].Value);
+        Assert.AreEqual("Ce profil est utilisé par 1 déploiement. Les modifications prendront effet à la prochaine réconciliation.", runtimeProfileEditor["ProfileUsedWarning", runtimeProfileEditor["DeploymentCount.One", 1].Value].Value);
     }
 
     private static BunitContext CreateContext()
