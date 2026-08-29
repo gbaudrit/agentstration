@@ -28,21 +28,42 @@ public sealed class NamespacedAgentDetailsTests
             .Add(component => component.Name, "concierge"));
 
         Assert.AreEqual(FakeManagementClient.PackNamespace, agents.RequestedNamespace);
+        Assert.AreEqual("true", rendered.Find("#agent-overview-tab").GetAttribute("aria-selected"));
+        Assert.AreEqual(4, rendered.FindAll(".namespaced-agent-metrics .metric-card").Count);
+        Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("Model profile", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("Runtime profile", StringComparison.Ordinal));
+        Assert.AreEqual(2, rendered.FindAll(".namespaced-agent-metrics .metric-card").Count(card => card.TextContent.Contains("Installation binding", StringComparison.Ordinal)));
+        Assert.AreEqual(4, rendered.FindAll(".namespaced-agent-metrics .metric-help").Count);
+        Assert.IsTrue(rendered.FindAll(".namespaced-agent-metrics .metric-tooltip").Any(tooltip => tooltip.TextContent.Contains("logical requirement", StringComparison.Ordinal)));
+        Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("Not ready", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("agent_deployment_not_found", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("model-reasoning", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("local-runtime", StringComparison.Ordinal));
+
+        await rendered.Find("#agent-model-tab").ClickAsync(new());
+
+        Assert.AreEqual("false", rendered.Find("#agent-overview-tab").GetAttribute("aria-selected"));
+        Assert.AreEqual("true", rendered.Find("#agent-model-tab").GetAttribute("aria-selected"));
         var profileLinks = rendered.FindAll("a")
             .Where(link => link.GetAttribute("href")?.Contains("modelprofiles", StringComparison.Ordinal) == true)
             .ToArray();
         Assert.IsTrue(profileLinks.All(link => link.GetAttribute("href") == "/modelprofiles/reasoning?namespace=shared.models"));
         Assert.IsTrue(rendered.Markup.Contains("model-reasoning", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("shared.models/reasoning", StringComparison.Ordinal));
+        Assert.AreEqual(
+            "/packs?publisher=agentstration&name=daily-life-assistant",
+            rendered.FindAll("a").First(link => link.TextContent.Contains("Open Pack installation", StringComparison.Ordinal)).GetAttribute("href"));
+
+        await rendered.Find("#agent-runtime-tab").ClickAsync(new());
+
+        Assert.AreEqual("false", rendered.Find("#agent-model-tab").GetAttribute("aria-selected"));
+        Assert.AreEqual("true", rendered.Find("#agent-runtime-tab").GetAttribute("aria-selected"));
         Assert.IsTrue(rendered.Markup.Contains("local-runtime", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("shared.platform/maf-shared", StringComparison.Ordinal));
         Assert.AreEqual(
             "/runtimeprofiles/maf-shared?namespace=shared.platform",
             rendered.FindAll("a").First(link => link.TextContent.Contains("Open effective runtime profile", StringComparison.Ordinal)).GetAttribute("href"));
         Assert.IsTrue(rendered.Markup.Contains("agentstration/daily-life-assistant", StringComparison.Ordinal));
-        Assert.AreEqual(
-            "/packs?publisher=agentstration&name=daily-life-assistant",
-            rendered.FindAll("a").First(link => link.TextContent.Contains("Open Pack installation", StringComparison.Ordinal)).GetAttribute("href"));
         Assert.IsFalse(rendered.FindAll(".form-actions").Any());
         Assert.IsTrue(rendered.FindAll(".namespaced-agent-actions").Any());
 
@@ -52,6 +73,13 @@ public sealed class NamespacedAgentDetailsTests
         Assert.AreEqual("concierge", runtime.PreparedAgentName);
         Assert.AreEqual(1, runtime.PreparedGeneration);
         Assert.IsTrue(rendered.Markup.Contains("Deployment ready", StringComparison.Ordinal));
+
+        await rendered.Find("#agent-instructions-tab").ClickAsync(new());
+
+        Assert.AreEqual("true", rendered.Find("#agent-instructions-tab").GetAttribute("aria-selected"));
+        Assert.IsTrue(rendered.FindAll(".namespaced-instructions-copy").Any());
+        Assert.IsFalse(rendered.FindAll(".namespaced-instructions pre").Any());
+        Assert.IsTrue(rendered.Find(".namespaced-instructions-copy").TextContent.Contains("Help the user.", StringComparison.Ordinal));
     }
 
     private sealed class FakeRuntimeClient : IAgentRunnerRuntimeClient
@@ -168,8 +196,8 @@ public sealed class NamespacedAgentDetailsTests
 
         public Task<IReadOnlyList<InstalledPackResource>> GetPacksAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, bool replaceExisting, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task UninstallAsync(string publisher, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, bool replaceExisting, bool removeDashboardReferences, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task UninstallAsync(string publisher, string name, string etag, bool removeDashboardReferences, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<InstalledPackResource>> AttachSourceAsync(string publisher, string name, byte[] archive, string fileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<PackProjectResource>> ForkAsync(string publisher, string name, ForkPackCommand command, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<PackProjectResource>> GetProjectsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();

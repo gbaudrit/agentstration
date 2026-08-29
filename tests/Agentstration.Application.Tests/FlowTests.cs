@@ -268,6 +268,14 @@ public sealed class FlowTests
         Assert.AreEqual(12, agent.Usage!.InputTokens);
         Assert.AreEqual("done", completed.Output!.Value.GetString());
         Assert.AreEqual(1, (await runs.ListAsync(created.Value.Id, FlowRunStatus.Succeeded, 0, 20, TestScope, default)).Items.Count);
+
+        var current = await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default);
+        await fixture.Service.DeleteAsync(TestScope.WorkspaceId, created.Value.Id, current!.ETag, default);
+
+        Assert.IsNull(await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default));
+        Assert.IsNull(await fixture.Repository.GetVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", default));
+        Assert.IsNotNull(await fixture.Repository.GetRunAsync(TestScope.WorkspaceId, completed.Id, default));
+        Assert.IsNotEmpty(await fixture.Repository.ListRunEventsAsync(TestScope.WorkspaceId, completed.Id, 0, default));
     }
 
     [TestMethod]
@@ -604,7 +612,7 @@ public sealed class FlowTests
         Assert.IsNotNull(run);
         Assert.AreEqual("1.0.0", run.FlowVersion);
         Assert.AreEqual(3, run.Steps.Count);
-        var requestContext = factory.Services.GetRequiredService<ICurrentRequestContext>().Current;
+        var requestContext = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         Assert.AreEqual(new FlowRunScope(requestContext.TenantId, new(requestContext.WorkspaceId), requestContext.PrincipalId), run.Scope);
         var principal = await factory.Services.GetRequiredService<IIdentityStore>().GetPrincipalAsync(requestContext.PrincipalId, default);
         Assert.AreEqual(principal?.DisplayName, run.StartedBy);
@@ -652,7 +660,7 @@ public sealed class FlowTests
         Assert.AreEqual(HttpStatusCode.Created,
             (await client.PostAsJsonAsync("/api/flows/interactive-api-flow/versions", new CreateFlowVersionRequest("1.0.0"))).StatusCode);
         var service = factory.Services.GetRequiredService<FlowRunService>();
-        var current = factory.Services.GetRequiredService<ICurrentRequestContext>().Current;
+        var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         var principalId = current.PrincipalId.ToString("D");
         var apiScope = new FlowRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId);
 

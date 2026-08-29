@@ -1,4 +1,5 @@
 using Agentstration.ModelProviders;
+using Agentstration.Web.Security;
 using Microsoft.Extensions.AI;
 
 namespace Agentstration.Web.Api.Diagnostics;
@@ -8,7 +9,8 @@ internal sealed class OllamaChatDiagnosticEndpoint
     private const string ProfileResourceId = "reasoning-default";
 
     public static void Map(IEndpointRouteBuilder endpoints) =>
-        endpoints.MapPost("/api/diagnostics/models/ollama/chat", HandleAsync);
+        endpoints.MapPost("/api/diagnostics/models/ollama/chat", HandleAsync)
+            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
 
     private static async Task<IResult> HandleAsync(
         OllamaChatDiagnosticRequest request,

@@ -157,6 +157,7 @@ public enum InstalledPackState
 {
     [JsonStringEnumMemberName("installing")] Installing,
     [JsonStringEnumMemberName("installed")] Installed,
+    [JsonStringEnumMemberName("updating")] Updating,
     [JsonStringEnumMemberName("uninstalling")] Uninstalling,
     [JsonStringEnumMemberName("failed")] Failed,
     [JsonStringEnumMemberName("degraded")] Degraded
@@ -222,7 +223,18 @@ public sealed record PackArchive(
     string Source,
     ReadOnlyMemory<byte> Content = default);
 
-public sealed record PackResourcePreview(string Path, string Kind, string Name, bool AlreadyExists);
+[JsonConverter(typeof(JsonStringEnumConverter<PackResourceChange>))]
+public enum PackResourceChange
+{
+    [JsonStringEnumMemberName("add")] Add,
+    [JsonStringEnumMemberName("update")] Update,
+    [JsonStringEnumMemberName("remove")] Remove,
+    [JsonStringEnumMemberName("conflict")] Conflict
+}
+
+public sealed record PackResourcePreview(string Path, string Kind, string Name, bool AlreadyExists, PackResourceChange Change = PackResourceChange.Add);
+
+public sealed record PackRemovalOptions(bool RemoveDashboardReferences = false, bool CloseInteractions = true);
 
 public sealed record PackInstallationPreview(
     PackMetadata Metadata,
@@ -247,8 +259,9 @@ public interface IPackResourceHandler
     Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken);
     Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
     Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, ResourceNamespace @namespace, string packVersion, CancellationToken cancellationToken);
+    Task<ManagedPackResource> UpdateAsync(PackResourceDocument resource, ManagedPackResource current, PackIdentity pack, string packVersion, CancellationToken cancellationToken);
     Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
-    Task DeleteAsync(ManagedPackResource resource, CancellationToken cancellationToken);
+    Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken);
 }
 
 public sealed record ToolTypeReference(string Extension, string Id);

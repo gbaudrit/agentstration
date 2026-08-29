@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using YamlDotNet.Core;
+using YamlDotNet.Core.Events;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -40,6 +42,21 @@ public static class ResourceManifestSerializer
         var yaml = YamlDeserializer.Deserialize<object?>(manifest);
         var json = JsonSerializer.Serialize(FromYamlObject(yaml), JsonOptions);
         return FromJson<T>(json);
+    }
+
+    public static IReadOnlyList<T> FromYamlDocuments<T>(string manifest)
+    {
+        var parser = new Parser(new StringReader(manifest));
+        parser.Consume<StreamStart>();
+        var resources = new List<T>();
+        while (parser.Accept<DocumentStart>(out _))
+        {
+            var yaml = YamlDeserializer.Deserialize<object?>(parser);
+            var json = JsonSerializer.Serialize(FromYamlObject(yaml), JsonOptions);
+            resources.Add(FromJson<T>(json));
+        }
+        parser.Consume<StreamEnd>();
+        return resources;
     }
 
     private static object? FromJsonElement(JsonElement element) => element.ValueKind switch

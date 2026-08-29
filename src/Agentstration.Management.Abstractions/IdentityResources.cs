@@ -141,11 +141,6 @@ public sealed class SystemOperationRequestContext : ICurrentRequestContext
     public RequestContext Current => throw new InvalidOperationException("System operations do not have a workspace request context.");
 }
 
-public interface IRequestContextInitializer
-{
-    void Initialize(RequestContext context);
-}
-
 public interface IRequestContextScopeFactory
 {
     IDisposable Push(RequestContext context);
@@ -199,7 +194,7 @@ public interface IPlatformAdministratorPolicy
 
 public interface ILocalEnvironmentBootstrapper
 {
-    Task EnsureInitializedAsync(CancellationToken cancellationToken);
+    Task<RequestContext> EnsureInitializedAsync(CancellationToken cancellationToken);
 }
 
 public interface IAuthorizationService

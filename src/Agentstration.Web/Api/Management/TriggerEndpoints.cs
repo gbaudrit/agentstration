@@ -1,6 +1,7 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
+using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
 
@@ -8,18 +9,18 @@ internal sealed class TriggerEndpoints : IManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/triggers", ListAsync);
-        group.MapGet("/triggers/{name}", GetAsync);
-        group.MapPut("/triggers/{name}", PutAsync);
-        group.MapDelete("/triggers/{name}", DeleteAsync);
-        group.MapPost("/triggers/{name}/run", RunNowAsync);
-        group.MapGet("/triggers/{name}/occurrences", HistoryAsync);
-        group.MapGet("/namespaces/{namespace}/triggers", ListNamespacedAsync);
-        group.MapGet("/namespaces/{namespace}/triggers/{name}", GetNamespacedAsync);
-        group.MapPut("/namespaces/{namespace}/triggers/{name}", PutNamespacedAsync);
-        group.MapDelete("/namespaces/{namespace}/triggers/{name}", DeleteNamespacedAsync);
-        group.MapPost("/namespaces/{namespace}/triggers/{name}/run", RunNowNamespacedAsync);
-        group.MapGet("/namespaces/{namespace}/triggers/{name}/occurrences", HistoryNamespacedAsync);
+        group.MapGet("/triggers", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/triggers/{name}", GetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPut("/triggers/{name}", PutAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapDelete("/triggers/{name}", DeleteAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
+        group.MapPost("/triggers/{name}/run", RunNowAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        group.MapGet("/triggers/{name}/occurrences", HistoryAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        group.MapGet("/namespaces/{namespace}/triggers", ListNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/namespaces/{namespace}/triggers/{name}", GetNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPut("/namespaces/{namespace}/triggers/{name}", PutNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapDelete("/namespaces/{namespace}/triggers/{name}", DeleteNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
+        group.MapPost("/namespaces/{namespace}/triggers/{name}/run", RunNowNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        group.MapGet("/namespaces/{namespace}/triggers/{name}/occurrences", HistoryNamespacedAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
     }
 
     private static Task<IResult> ListAsync(TriggerManagementService service, CancellationToken token) => ListCoreAsync(null, service, token);

@@ -13,6 +13,27 @@ namespace Agentstration.Web.Tests;
 public sealed class EntryAdministrationComponentTests
 {
     [TestMethod]
+    public void EntriesCatalogPresentsPublishedResourcesAsConfigurableCards()
+    {
+        using var context = new BunitContext();
+        var client = new FakeEntryAdministrationApiClient
+        {
+            EntryDrafts = [FakeEntryAdministrationApiClient.EntryDraftResponse("prepare-report")]
+        };
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+
+        var rendered = context.Render<Entries>();
+
+        Assert.HasCount(1, rendered.FindAll(".entry-card"));
+        Assert.AreEqual("1 total", rendered.FindAll(".entry-catalog-summary span")[0].TextContent.Trim());
+        Assert.AreEqual("1 published", rendered.FindAll(".entry-catalog-summary span")[1].TextContent.Trim());
+        Assert.IsTrue(rendered.Markup.Contains("Prompt Entry", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("Published v1", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("Configure", StringComparison.Ordinal));
+        Assert.AreEqual("/entries/prepare-report", rendered.Find(".entry-card-link").GetAttribute("href"));
+    }
+
+    [TestMethod]
     public async Task EntryEditorSwitchesResourceKindEditsFieldsAndPublishesPinnedFlow()
     {
         using var context = new BunitContext();
@@ -63,7 +84,13 @@ public sealed class EntryAdministrationComponentTests
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var rendered = context.Render<EntryEditor>(parameters => parameters.Add(value => value.Name, "primary"));
 
-        Assert.IsTrue(rendered.Markup.Contains("Draft and published", StringComparison.Ordinal));
+        Assert.AreEqual("Published", rendered.FindAll(".entry-facts dd")[0].TextContent.Trim());
+        Assert.HasCount(1, rendered.FindAll(".entry-summary-bar .status-badge"));
+        var summary = rendered.Find(".entry-summary-bar").TextContent;
+        Assert.IsTrue(summary.Contains("Published", StringComparison.Ordinal));
+        Assert.IsTrue(summary.Contains("Version 1", StringComparison.Ordinal));
+        Assert.IsFalse(summary.Contains("Draft", StringComparison.Ordinal));
+        Assert.IsFalse(summary.Contains("Revision", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Personal", StringComparison.Ordinal));
         await rendered.Find("[data-testid='entry-tab-usage']").ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("Depends on", StringComparison.Ordinal));
@@ -73,7 +100,7 @@ public sealed class EntryAdministrationComponentTests
 
         await rendered.Find("[data-testid='entry-tab-versions']").ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("Version 1", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Markup.Contains("current published version", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Markup.Contains("fabricated version history", StringComparison.Ordinal));
         Assert.HasCount(1, rendered.FindAll(".entry-version-card"));
     }
 
@@ -170,10 +197,11 @@ public sealed class EntryAdministrationComponentTests
         public Agentstration.Resources.ResourceNamespace RequestedDependencyNamespace { get; private set; }
         public EntryDraft? SavedEntry { get; private set; }
         public WorkplaceDashboardDraft? SavedDashboard { get; private set; }
+        public IReadOnlyList<EntryDraftResponse> EntryDrafts { get; init; } = [];
         public bool HasDashboard { get; init; } = true;
         public bool HasWorkspace { get; set; } = true;
 
-        public Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<EntryDraftResponse>>([]);
+        public Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) => Task.FromResult(EntryDrafts);
         public Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken)
             => GetEntryAsync(Agentstration.Resources.ResourceNamespace.Default, name, cancellationToken);
         public Task<EntryDraftResponse> GetEntryAsync(Agentstration.Resources.ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
@@ -243,6 +271,25 @@ public sealed class EntryAdministrationComponentTests
         public Task DeleteDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken) => Task.CompletedTask;
 
         private static EntryId EntryId(string name, Agentstration.Resources.ResourceNamespace @namespace = default) => new(name, @namespace);
+        internal static EntryDraftResponse EntryDraftResponse(string name)
+        {
+            var published = PublishedEntry(name);
+            var draft = new EntryDraft
+            {
+                WorkspaceId = published.WorkspaceId,
+                Id = published.Id,
+                Name = name,
+                DisplayName = "Prepare a report",
+                Description = "Prepare a useful report.",
+                Revision = 4,
+                UpdatedAt = Now,
+                Presentation = published.Presentation,
+                Binding = new EntryBinding(EntryBindingKind.Flow, FlowResourceId),
+                PublishedBinding = new EntryBinding(EntryBindingKind.Flow, FlowResourceId)
+            };
+            return new(draft, published);
+        }
+
         private static EntryResource PublishedEntry(string name, Agentstration.Resources.ResourceNamespace @namespace = default) => new()
         {
             WorkspaceId = new(WorkspaceResourceId),

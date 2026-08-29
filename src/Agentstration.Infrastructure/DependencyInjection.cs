@@ -47,7 +47,6 @@ public static class DependencyInjection
         services.TryAddSingleton<LocalBootstrapOptions>();
         services.TryAddSingleton<CurrentRequestContext>();
         services.TryAddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
-        services.TryAddSingleton<IRequestContextInitializer>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
         services.TryAddSingleton(new GenAiObservabilityOptions());
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();
@@ -136,7 +135,9 @@ public static class DependencyInjection
         services.AddSingleton<ITriggerSchedulerProjection, QuartzTriggerScheduler>();
         services.AddSingleton<TriggerManagementService>();
         services.AddSingleton<TriggerFiringService>();
-        var schedulerConnectionString = $"Data Source={Path.Combine(dataDirectory, "scheduler.db")}";
+        // Quartz owns a short-lived, local scheduler database. Disabling ADO.NET pooling
+        // ensures its file handles are released when the hosted scheduler shuts down.
+        var schedulerConnectionString = $"Data Source={Path.Combine(dataDirectory, "scheduler.db")};Pooling=False";
         services.AddSingleton<IHostedService>(_ => new QuartzSqliteSchemaInitializer(schedulerConnectionString));
         services.AddQuartz(configuration =>
         {

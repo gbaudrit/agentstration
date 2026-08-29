@@ -45,7 +45,9 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient(services, EntryAdministrationApiClient.AgentResourceCatalogClient, configured.ManagementApi);
         AddClient(services, EntryAdministrationApiClient.FlowResourceCatalogClient, configured.FlowApi);
         services.AddScoped<IWorkOperationsRealtimeClient>(provider => new WorkOperationsRealtimeClient(
-            new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"), provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
+            new Uri(new Uri(configured.WorkApi.BaseAddress, UriKind.Absolute), "hubs/workplace"),
+            provider.GetRequiredService<ConsoleRealtimeSession>(),
+            provider.GetRequiredService<ILogger<WorkOperationsRealtimeClient>>()));
 
         AddClient<FlowApiClient, IFlowApiClient>(services, configured.FlowApi);
         AddClient<ToolGovernanceAuditApiClient, IToolGovernanceAuditClient>(services, configured.RuntimeApi);
@@ -164,6 +166,9 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddSingleton<IAuthorizationHandler, InteractiveUserHandler>();
         services.AddSingleton<ConsoleRealtimeSession>();
         services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build())
             .AddPolicy(AgentstrationPolicies.Authenticated, policy => policy.RequireAuthenticatedUser())
             .AddPolicy(AgentstrationPolicies.PlatformAdmin, policy =>
             {

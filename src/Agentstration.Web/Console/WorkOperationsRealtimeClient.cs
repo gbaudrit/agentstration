@@ -1,3 +1,4 @@
+using Agentstration.Web.Security;
 using Agentstration.Work.Contracts;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -14,9 +15,15 @@ public interface IWorkOperationsRealtimeClient : IAsyncDisposable
     Task StartAsync(IEnumerable<string> workspaceIds, CancellationToken cancellationToken);
 }
 
-public sealed class WorkOperationsRealtimeClient(Uri hubUrl, ILogger<WorkOperationsRealtimeClient> logger) : IWorkOperationsRealtimeClient
+public sealed class WorkOperationsRealtimeClient(
+    Uri hubUrl,
+    ConsoleRealtimeSession realtimeSession,
+    ILogger<WorkOperationsRealtimeClient> logger) : IWorkOperationsRealtimeClient
 {
-    private readonly HubConnection connection = new HubConnectionBuilder().WithUrl(hubUrl).WithAutomaticReconnect().Build();
+    private readonly HubConnection connection = new HubConnectionBuilder()
+        .WithUrl(hubUrl, options => realtimeSession.Configure(hubUrl, options))
+        .WithAutomaticReconnect()
+        .Build();
     private readonly HashSet<string> eventIds = new(StringComparer.Ordinal);
     private readonly List<IDisposable> handlers = [];
     private IReadOnlyList<string> workspaces = [];

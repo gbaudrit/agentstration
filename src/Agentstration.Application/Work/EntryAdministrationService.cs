@@ -106,7 +106,15 @@ public sealed class EntryAdministrationService(
 
     public Task<IReadOnlyList<EntryDependency>> GetDependenciesAsync(EntryId id, CancellationToken cancellationToken) => GetDependenciesAsync(context.WorkspaceId, id, cancellationToken);
 
-    public async Task DeleteAsync(WorkspaceId workspaceId, EntryId id, CancellationToken cancellationToken)
+    public Task DeleteAsync(WorkspaceId workspaceId, EntryId id, CancellationToken cancellationToken) =>
+        DeleteAsync(workspaceId, id, removeDashboardReferences: false, closeInteractions: false, cancellationToken);
+
+    public async Task DeleteAsync(
+        WorkspaceId workspaceId,
+        EntryId id,
+        bool removeDashboardReferences,
+        bool closeInteractions,
+        CancellationToken cancellationToken)
     {
         _ = await repository.GetEntryDraftAsync(workspaceId, id, cancellationToken)
             ?? throw new KeyNotFoundException($"Entry draft '{id}' was not found.");
@@ -118,10 +126,33 @@ public sealed class EntryAdministrationService(
         draftedBy.AddRange((await repository.ListDashboardDraftsAsync(workspaceId, cancellationToken))
                 .Where(dashboard => dashboard.Entries.Any(reference => reference.EntryResourceId == id))
                 .Select(dashboard => dashboard.Name));
-        if (exposedBy.Count > 0 || draftedBy.Count > 0)
+        if ((exposedBy.Count > 0 || draftedBy.Count > 0) && !removeDashboardReferences)
             throw new WorkValidationException("entry_in_use", $"Entry '{id}' is referenced by a Workplace Dashboard.");
-        if (await repository.HasEntryInteractionsAsync(workspaceId, id, cancellationToken))
-            throw new WorkValidationException("entry_in_use", $"Entry '{id}' has durable interactions and cannot be deleted.");
+        var interactions = await repository.ListEntryInteractionsAsync(workspaceId, id, cancellationToken);
+        var active = interactions.Where(value => value.Status is InteractionStatus.Active or InteractionStatus.Processing or InteractionStatus.WaitingForUser).ToArray();
+        if (active.Length > 0)
+            throw new WorkValidationException("entry_interactions_active", $"Entry '{id}' has {active.Length} active interaction(s) and cannot be deleted.");
+        if (interactions.Any(value => value.Status != InteractionStatus.Closed) && !closeInteractions)
+            throw new WorkValidationException("entry_in_use", $"Entry '{id}' has durable interactions and cannot be deleted without closing them.");
+        if (removeDashboardReferences)
+        {
+            var now = timeProvider.GetUtcNow();
+            foreach (var dashboard in await repository.ListDashboardsAsync(workspaceId, cancellationToken))
+            {
+                if (!dashboard.Entries.Any(reference => reference.EntryResourceId == id)) continue;
+                await repository.UpsertDashboardAsync(dashboard with { Entries = dashboard.Entries.Where(reference => reference.EntryResourceId != id).ToArray(), Version = checked(dashboard.Version + 1), PublishedAt = now }, cancellationToken);
+            }
+            foreach (var dashboard in await repository.ListDashboardDraftsAsync(workspaceId, cancellationToken))
+            {
+                if (!dashboard.Entries.Any(reference => reference.EntryResourceId == id)) continue;
+                await repository.UpsertDashboardDraftAsync(dashboard with { Entries = dashboard.Entries.Where(reference => reference.EntryResourceId != id).ToArray(), Revision = checked(dashboard.Revision + 1), UpdatedAt = now }, cancellationToken);
+            }
+        }
+        if (closeInteractions)
+        {
+            foreach (var interaction in interactions.Where(value => value.Status != InteractionStatus.Closed))
+                await repository.SaveInteractionAsync(interaction with { Status = InteractionStatus.Closed, ClosedReason = "entry_uninstalled", LastActivityAt = timeProvider.GetUtcNow(), Version = checked(interaction.Version + 1) }, interaction.Version, cancellationToken);
+        }
         await repository.DeleteEntryAsync(workspaceId, id, cancellationToken);
         await repository.DeleteEntryDraftAsync(workspaceId, id, cancellationToken);
     }

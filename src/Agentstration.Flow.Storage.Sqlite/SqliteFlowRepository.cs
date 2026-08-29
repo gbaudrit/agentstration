@@ -118,8 +118,12 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         if (expectedETag is not null && !string.Equals(definition.ETag, expectedETag, StringComparison.Ordinal))
             throw new FlowConcurrencyException("The supplied ETag does not match the current Flow version.");
         var namespaceValue = id.Namespace.Value;
-        var documents = await context.Documents.Where(value => value.WorkspaceId == workspaceId.Value && value.Namespace == namespaceValue && value.FlowId == id.Value).ToArrayAsync(cancellationToken);
-        context.Documents.RemoveRange(documents);
+        var removable = await context.Documents.Where(value =>
+            value.WorkspaceId == workspaceId.Value
+            && value.Namespace == namespaceValue
+            && value.FlowId == id.Value
+            && (value.Kind == DefinitionKind || value.Kind == VersionKind || value.Kind == DraftKind)).ToArrayAsync(cancellationToken);
+        context.Documents.RemoveRange(removable);
         await SaveUpdateAsync(context, cancellationToken);
     }
 

@@ -80,6 +80,7 @@ public sealed class TriggerTests
     public async Task TargetValidatorAllowsPackNamespaceWithinWorkspaceAndRejectsAnotherWorkspaceAsync()
     {
         await using var fixture = await FlowTargetFixture.CreateAsync();
+        using var requestScope = fixture.OpenScope();
         var packNamespace = new ResourceNamespace("agentstration.installed-pack");
         await fixture.CreatePublishedAsync(fixture.WorkspaceId, packNamespace, "pack-flow");
         await fixture.CreatePublishedAsync(new WorkspaceId(Guid.NewGuid()), packNamespace, "foreign-flow");
@@ -217,6 +218,8 @@ public sealed class TriggerTests
     {
         private readonly string directory;
         private readonly ServiceProvider services;
+        private readonly CurrentRequestContext context;
+        private readonly RequestContext requestContext;
         public WorkspaceId WorkspaceId { get; } = new(Guid.NewGuid());
         public FlowTriggerTargetValidator Validator { get; }
 
@@ -224,6 +227,8 @@ public sealed class TriggerTests
         {
             this.directory = directory;
             this.services = services;
+            this.context = context;
+            requestContext = new(Guid.NewGuid(), Guid.NewGuid(), WorkspaceId.Value);
             Validator = new(services.GetRequiredService<FlowService>(), context);
         }
 
@@ -239,9 +244,10 @@ public sealed class TriggerTests
                 .BuildServiceProvider();
             var fixture = new FlowTargetFixture(directory, services, context);
             await services.GetRequiredService<FlowService>().InitializeAsync(CancellationToken.None);
-            context.Initialize(new(Guid.NewGuid(), Guid.NewGuid(), fixture.WorkspaceId.Value));
             return fixture;
         }
+
+        public IDisposable OpenScope() => context.Push(requestContext);
 
         public async Task CreatePublishedAsync(WorkspaceId workspaceId, ResourceNamespace @namespace, string name)
         {

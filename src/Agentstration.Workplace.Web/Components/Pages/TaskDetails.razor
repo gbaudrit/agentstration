@@ -5,7 +5,7 @@
 
 <PageTitle>@(task?.Title ?? "Task") · Workplace</PageTitle>
 @if (loading) { <LoadingState /> }
-else if (error is not null) { <ServiceUnavailableState Message="@error" OnRetry="RefreshAsync" /> }
+else if (error is not null) { <ServiceUnavailableState Message="@error" /> }
 else if (task is not null)
 {
     <div class="task-page-heading">

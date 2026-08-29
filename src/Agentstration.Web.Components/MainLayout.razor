@@ -12,8 +12,8 @@
 <div class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")">
     <aside class="sidebar" aria-label="Main navigation">
         <a class="brand-lockup" href="/" aria-label="Agentstration Control Plane home">
-            <span class="brand-mark" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></span>
-            <span class="brand-copy"><strong>Agentstration</strong><small>Control plane</small></span>
+            <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
+            <img class="brand-lockup-logo" src="_content/Agentstration.Web.Components/images/agentstration-lockup.png" alt="" width="204" height="38" />
         </a>
         <nav class="side-nav">
             @foreach (var group in NavigationGroups)
@@ -22,8 +22,8 @@
                     @if (!string.IsNullOrWhiteSpace(group.Label)) { <h2>@group.Label</h2> }
                     @foreach (var item in group.Items)
                     {
-                        <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@item.Label" class="@($"domain-{item.Domain}")">
-                            <span class="nav-icon" aria-hidden="true">@item.Icon</span><span class="nav-label">@item.Label</span>
+                        <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@item.Label" title="@item.Label" class="@($"domain-{item.Domain}")">
+                            <span class="nav-icon" aria-hidden="true"><UiIcon Name="@item.Icon" /></span><span class="nav-label">@item.Label</span>
                         </NavLink>
                     }
                 </section>
@@ -123,12 +123,12 @@
 
     private static readonly NavigationGroup[] NavigationGroups =
     [
-        new("", [new("Overview", "/", "⌂")]),
-        new("Build", [new("Agents", "/agents", "◎", "agent"), new("Model profiles", "/modelprofiles", "◇", "model"), new("Flows", "/flows", "⌘", "flow"), new("Entries", "/entries", "↳", "work")]),
-        new("Operate", [new("Triggers", "/triggers", "◷", "work"), new("Deployments", "/deployments", "◉", "runtime"), new("Tasks", "/tasks", "✓", "work")]),
-        new("Runs", [new("Agents Run", "/agent-runs", "▶", "execution"), new("Flow Run", "/flow-runs", "▷", "flow"), new("Run events", "/run-events", "≋")]),
-        new("Configure", [new("Workplace setup", "/workspaces", "▦", "work"), new("Packs", "/packs", "▣"), new("Tools", "/tools", "⌁", "tool"), new("Model providers", "/modelproviders", "⬡", "model"), new("Runtime profiles", "/runtimeprofiles", "◈", "runtime"), new("Secrets", "/secrets", "◆")]),
-        new("System", [new("Extensions", "/extensions", "⬢"), new("Organization", "/settings/organization", "♙"), new("Profile", "/settings/profile", "○"), new("Settings", "/settings", "⚙")])
+        new("", [new("Overview", "/", "home")]),
+        new("Build", [new("Agents", "/agents", "agent", "agent"), new("Model profiles", "/modelprofiles", "layers", "model"), new("Flows", "/flows", "workflow", "flow"), new("Entries", "/entries", "entry", "work")]),
+        new("Operate", [new("Triggers", "/triggers", "clock", "work"), new("Deployments", "/deployments", "server", "runtime"), new("Tasks", "/tasks", "tasks", "work")]),
+        new("Runs", [new("Agents Run", "/agent-runs", "play-circle", "execution"), new("Flow Run", "/flow-runs", "flow-run", "flow"), new("Run events", "/run-events", "activity")]),
+        new("Configure", [new("Workplace setup", "/workspaces", "layout-grid", "work"), new("Packs", "/packs", "package"), new("Tools", "/tools", "wrench", "tool"), new("Model providers", "/modelproviders", "cpu", "model"), new("Runtime profiles", "/runtimeprofiles", "cube", "runtime"), new("Secrets", "/secrets", "key")]),
+        new("System", [new("Extensions", "/extensions", "puzzle"), new("Organization", "/settings/organization", "building"), new("Profile", "/settings/profile", "user-circle"), new("Settings", "/settings", "settings")])
     ];
 
     private static readonly CommandItem[] Commands =

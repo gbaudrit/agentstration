@@ -39,7 +39,7 @@ Flow publication uses immutable semantic versions such as `1.0.0`. This is the v
 
 ## Pack versions
 
-A Pack version identifies one release of a coherent resource bundle. Its conceptual coordinate is `publisher/name/version`, and the initial policy is Semantic Versioning. It does not replace the `apiVersion`, generation, ETag, or immutable publication version of any resource contained by the Pack. Local archive installation is implemented; dependency resolution and Pack updates remain planned.
+A Pack version identifies one release of a coherent resource bundle. Its conceptual coordinate is `publisher/name/version`, and the initial policy is Semantic Versioning. It does not replace the `apiVersion`, generation, ETag, or immutable publication version of any resource contained by the Pack. Local archive installation and modification-safe differential updates are implemented; dependency resolution and three-way merge remain planned.
 
 ## Documentation versions
 
