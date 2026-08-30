@@ -357,6 +357,51 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public async Task FlowClientLoadsEveryRunPageAndRejectsRepeatedContinuationLinks()
+    {
+        var first = CreateFlowRun("run-1");
+        var second = CreateFlowRun("run-2");
+        var requests = new List<string>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            var path = request.RequestUri!.PathAndQuery;
+            requests.Add(path);
+            return path switch
+            {
+                "/api/flowRuns?top=200" => new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new FlowRunPageResponse([first], "/api/flowRuns?skip=1&top=200"))
+                },
+                "/api/flowRuns?skip=1&top=200" => new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new FlowRunPageResponse([second], null))
+                },
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+            };
+        })) { BaseAddress = new Uri("http://localhost/") };
+        var client = new FlowApiClient(httpClient);
+
+        var runs = await client.GetFlowRunsAsync((string?)null, default);
+
+        CollectionAssert.AreEqual(new[] { "run-1", "run-2" }, runs.Select(value => value.Id).ToArray());
+        CollectionAssert.AreEqual(new[] { "/api/flowRuns?top=200", "/api/flowRuns?skip=1&top=200" }, requests);
+
+        var repeatedRequests = 0;
+        using var repeatedHttpClient = new HttpClient(new StubHandler(_ =>
+        {
+            repeatedRequests++;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FlowRunPageResponse([first], "/api/flowRuns?top=200"))
+            };
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        await Assert.ThrowsExactlyAsync<AgentstrationApiException>(() =>
+            new FlowApiClient(repeatedHttpClient).GetFlowRunsAsync((string?)null, default));
+        Assert.AreEqual(1, repeatedRequests);
+    }
+
+    [TestMethod]
     public async Task FlowDesignerLoadsNamespacedPublishedGraphWithoutDraftCallsAndRejectsMutations()
     {
         var now = new DateTimeOffset(2026, 8, 15, 12, 0, 0, TimeSpan.Zero);
@@ -1135,6 +1180,24 @@ public sealed class ApiClientTests
         },
         Status = new RuntimeRunStatus { State = RuntimeRunState.Pending, CreatedAt = DateTimeOffset.UtcNow }
     };
+
+    private static FlowRun CreateFlowRun(string id)
+    {
+        var flowId = new FlowId("paged-flow");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
+        var now = DateTimeOffset.UtcNow;
+        return new FlowRun
+        {
+            WorkspaceId = TestWorkspaceId,
+            Id = id,
+            FlowId = flowId,
+            FlowVersion = "1.0.0",
+            Scope = new FlowRunScope(Guid.Empty, TestWorkspaceId, Guid.Empty),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = now,
+            DefinitionSnapshot = new FlowVersion(TestWorkspaceId, flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now)
+        };
+    }
 
     private static RuntimeRunEvent RunEvent(long sequence, RuntimeRunEventKind kind, string? content = null, RuntimeRunState? state = null) => new()
     {

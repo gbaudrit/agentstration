@@ -46,6 +46,7 @@ public sealed class WorkplaceService(
     IEnumerable<IWorkplaceExternalInputResponder> externalInputResponders,
     IWorkplaceContext context)
 {
+    private const int WorkItemQueryPageSize = 200;
     private const string WorkspaceMetadata = "workplace.workspaceId";
     private const string EntryMetadata = "workplace.entryId";
     private const string InteractionMetadata = "workplace.interactionId";
@@ -302,7 +303,7 @@ public sealed class WorkplaceService(
     {
         var anchor = (await workItems.GetAsync(workspaceId, taskId.ToWorkItemId(), cancellationToken))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         RequireWorkspace(anchor, workspaceId);
-        var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 100, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
+        var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
         return ProjectTask(anchor, LatestExecution(anchor, continuations.Items.Select(value => value.Value).ToArray()), taskId);
     }
 
@@ -332,7 +333,7 @@ public sealed class WorkplaceService(
         {
             var anchor = stored.Value; var taskId = WorkTaskId.FromWorkItem(anchor.Id);
             RequireWorkspace(anchor, workspaceId);
-            var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 100, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
+            var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
             tasks.Add(ProjectTask(anchor, LatestExecution(anchor, continuations.Items.Select(value => value.Value).ToArray()), taskId));
         }
         return new OperationalWorkTaskPage(tasks, Math.Max(0, anchors.TotalCount));
@@ -340,13 +341,16 @@ public sealed class WorkplaceService(
 
     public async Task<IReadOnlyList<WorkTask>> ListTasksAsync(WorkspaceId workspaceId, WorkTaskStatus? status, CancellationToken cancellationToken)
     {
-        var page = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 500), cancellationToken);
-        var items = page.Items.Select(value => value.Value).Where(value => value.Metadata.TryGetValue(WorkspaceMetadata, out var workspace) && workspace == workspaceId.ToString()).ToArray();
-        return items.Where(value => !value.Metadata.ContainsKey(TaskMetadata))
-            .Select(anchor => ProjectTask(anchor, LatestExecution(anchor, items), WorkTaskId.FromWorkItem(anchor.Id)))
-            .Where(task => status is null || task.Status == status)
-            .OrderByDescending(value => value.UpdatedAt)
-            .ToArray();
+        var anchors = await ListRootWorkItemsAsync(workspaceId, cancellationToken);
+        var tasks = new List<WorkTask>(anchors.Count);
+        foreach (var anchor in anchors)
+        {
+            var taskId = WorkTaskId.FromWorkItem(anchor.Id);
+            var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
+            var task = ProjectTask(anchor, LatestExecution(anchor, continuations.Items.Select(value => value.Value).ToArray()), taskId);
+            if (status is null || task.Status == status) tasks.Add(task);
+        }
+        return tasks.OrderByDescending(value => value.UpdatedAt).ThenBy(value => value.Id.Value).ToArray();
     }
 
     public async Task<WorkTask> PauseTaskAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken token) { var current = await GetCurrentExecutionAsync(workspaceId, taskId, token); await workItems.PauseAsync(workspaceId, current.Id, token); return await GetTaskAsync(workspaceId, taskId, token); }
@@ -436,8 +440,27 @@ public sealed class WorkplaceService(
     {
         var anchor = (await workItems.GetAsync(workspaceId, taskId.ToWorkItemId(), token))?.Value ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         RequireWorkspace(anchor, workspaceId);
-        var page = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 100, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), token);
+        var page = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), token);
         return LatestExecution(anchor, page.Items.Select(value => value.Value).ToArray());
+    }
+
+    private async Task<IReadOnlyList<WorkItem>> ListRootWorkItemsAsync(WorkspaceId workspaceId, CancellationToken token)
+    {
+        var items = new List<WorkItem>();
+        var skip = 0;
+        while (true)
+        {
+            var page = await workItems.QueryAsync(new WorkItemQuery(
+                workspaceId,
+                Skip: skip,
+                Take: WorkItemQueryPageSize,
+                IsContinuation: false,
+                SortBy: WorkItemSortField.CreatedAt), token);
+            items.AddRange(page.Items.Select(value => value.Value));
+            if (!page.HasMore || page.Items.Count == 0) break;
+            skip += page.Items.Count;
+        }
+        return items;
     }
 
     private static WorkItem LatestExecution(WorkItem anchor, IReadOnlyList<WorkItem> items) => items

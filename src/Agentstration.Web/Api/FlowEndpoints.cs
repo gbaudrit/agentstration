@@ -200,22 +200,33 @@ public static class FlowEndpoints
     });
 
     private static Task<IResult> ListFlowRunsAsync(string id, FlowRunStatus? status, int? skip, int? top, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
-        ListRunsCoreAsync(new FlowId(id), status, skip, top, service, requestContext, token);
+        ListRunsCoreAsync(new FlowId(id), status, skip, top, $"/api/flows/{Uri.EscapeDataString(id)}/runs", false, service, requestContext, token);
 
     private static Task<IResult> ListNamespacedFlowRunsAsync(string @namespace, string id, FlowRunStatus? status, int? skip, int? top, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
-        ListRunsCoreAsync(new FlowId(id, ResourceNamespace.Parse(@namespace)), status, skip, top, service, requestContext, token);
+        ListRunsCoreAsync(new FlowId(id, ResourceNamespace.Parse(@namespace)), status, skip, top,
+            $"/api/namespaces/{Uri.EscapeDataString(@namespace)}/flows/{Uri.EscapeDataString(id)}/runs", false, service, requestContext, token);
 
     private static Task<IResult> ListRunsAsync(string? flowId, FlowRunStatus? status, int? skip, int? top, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
-        ListRunsCoreAsync(string.IsNullOrWhiteSpace(flowId) ? null : new FlowId(flowId), status, skip, top, service, requestContext, token);
+        ListRunsCoreAsync(string.IsNullOrWhiteSpace(flowId) ? null : new FlowId(flowId), status, skip, top, "/api/flowRuns", true, service, requestContext, token);
 
-    private static Task<IResult> ListRunsCoreAsync(FlowId? flowId, FlowRunStatus? status, int? skip, int? top, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> ListRunsCoreAsync(FlowId? flowId, FlowRunStatus? status, int? skip, int? top, string route, bool includeFlowIdFilter, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         var actualSkip = Math.Max(0, skip ?? 0);
         var actualTop = Math.Clamp(top ?? 50, 1, 200);
         var page = await service.ListAsync(flowId, status, actualSkip, actualTop, CurrentScope(requestContext), token);
-        var next = page.HasMore ? $"/api/flowRuns?skip={actualSkip + actualTop}&top={actualTop}" : null;
+        var next = page.HasMore ? FlowRunNextLink(route, includeFlowIdFilter ? flowId : null, status, actualSkip + actualTop, actualTop) : null;
         return Results.Ok(new FlowRunPageResponse(page.Items.Select(item => item.Value).ToArray(), next));
     });
+
+    private static string FlowRunNextLink(string route, FlowId? flowId, FlowRunStatus? status, int skip, int top)
+    {
+        var filters = new List<string>();
+        if (flowId is not null) filters.Add($"flowId={Uri.EscapeDataString(flowId.Value.Value)}");
+        if (status is not null) filters.Add($"status={Uri.EscapeDataString(status.Value.ToString())}");
+        filters.Add($"skip={skip}");
+        filters.Add($"top={top}");
+        return $"{route}?{string.Join('&', filters)}";
+    }
 
     private static Task<IResult> GetFlowRunAsync(string id, string runId, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {

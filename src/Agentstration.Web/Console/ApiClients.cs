@@ -443,11 +443,38 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     public async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken)
     {
         var path = flowId is null ? "api/flowRuns?top=200" : $"api/flows/{Uri.EscapeDataString(flowId)}/runs?top=200";
-        return (await ApiResponse.ReadAsync<FlowRunPageResponse>(httpClient, path, cancellationToken)).Value;
+        return await GetAllFlowRunPagesAsync(path, cancellationToken);
     }
 
     public async Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
-        (await ApiResponse.ReadAsync<FlowRunPageResponse>(httpClient, $"{FlowPath(@namespace, flowId)}/runs?top=200", cancellationToken)).Value;
+        await GetAllFlowRunPagesAsync($"{FlowPath(@namespace, flowId)}/runs?top=200", cancellationToken);
+
+    private async Task<IReadOnlyList<FlowRun>> GetAllFlowRunPagesAsync(string initialPath, CancellationToken cancellationToken)
+    {
+        var runs = new List<FlowRun>();
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        string? path = initialPath;
+        while (path is not null)
+        {
+            path = NormalizeFlowRunPageLink(path);
+            if (!visited.Add(path))
+                throw new AgentstrationApiException("Flow API returned a repeated pagination link.", Guid.NewGuid().ToString("N"));
+            var page = await ApiResponse.ReadAsync<FlowRunPageResponse>(httpClient, path, cancellationToken);
+            runs.AddRange(page.Value);
+            path = string.IsNullOrWhiteSpace(page.NextLink) ? null : page.NextLink;
+        }
+        return runs;
+    }
+
+    private static string NormalizeFlowRunPageLink(string link)
+    {
+        if (Uri.TryCreate(link, UriKind.Absolute, out _))
+            throw new AgentstrationApiException("Flow API returned an invalid pagination link.", Guid.NewGuid().ToString("N"));
+        var normalized = link.TrimStart('/');
+        if (!normalized.StartsWith("api/", StringComparison.Ordinal))
+            throw new AgentstrationApiException("Flow API returned an invalid pagination link.", Guid.NewGuid().ToString("N"));
+        return normalized;
+    }
 
     public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<FlowRun>(httpClient, $"api/flowRuns/{Uri.EscapeDataString(runId)}", cancellationToken);

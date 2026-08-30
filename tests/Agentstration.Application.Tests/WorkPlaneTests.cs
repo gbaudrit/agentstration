@@ -320,6 +320,54 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public async Task WorkplaceListsEveryRootTaskBeyondRepositoryPageLimitAndProjectsLatestContinuation()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var anchors = new List<WorkItem>();
+        for (var index = 0; index < 205; index++)
+        {
+            var anchor = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry", $"Root {index}", Now.AddSeconds(index),
+                metadata: new Dictionary<string, string>
+                {
+                    ["origin"] = "trigger",
+                    ["workplace.workspaceId"] = WorkplaceId.ToString()
+                });
+            anchors.Add(anchor);
+            await fixture.Repository.CreateAsync(anchor, default);
+        }
+
+        var firstTaskId = WorkTaskId.FromWorkItem(anchors[0].Id);
+        for (var index = 0; index < 210; index++)
+        {
+            var continuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", $"Continuation {index}", Now.AddMinutes(10).AddSeconds(index),
+                metadata: new Dictionary<string, string>
+                {
+                    ["origin"] = "trigger",
+                    ["workplace.workspaceId"] = WorkplaceId.ToString(),
+                    ["workplace.taskId"] = firstTaskId.ToString()
+                });
+            await fixture.Repository.CreateAsync(continuation, default);
+        }
+        var latest = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", "Latest continuation", Now.AddHours(1),
+            metadata: new Dictionary<string, string>
+            {
+                ["origin"] = "trigger",
+                ["workplace.workspaceId"] = WorkplaceId.ToString(),
+                ["workplace.taskId"] = firstTaskId.ToString()
+            });
+        var executionId = WorkExecutionId.New();
+        latest.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddHours(1).AddSeconds(1));
+        latest.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, latest.Id, executionId, Now.AddHours(1).AddSeconds(2), "agent"));
+        await fixture.Repository.CreateAsync(latest, default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+
+        var tasks = await workplace.ListTasksAsync(WorkplaceId, null, default);
+
+        Assert.HasCount(205, tasks);
+        Assert.AreEqual(WorkTaskStatus.Running, tasks.Single(value => value.Id == firstTaskId).Status);
+    }
+
+    [TestMethod]
     public async Task SqliteStorageAllowsTheSameWorkItemIdInDifferentWorkspaces()
     {
         await using var fixture = await WorkFixture.CreateAsync();

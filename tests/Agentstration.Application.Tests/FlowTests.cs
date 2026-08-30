@@ -732,6 +732,60 @@ public sealed class FlowTests
     }
 
     [TestMethod]
+    public async Task FlowRunPaginationPreservesRouteNamespaceAndFiltersAcrossPages()
+    {
+        var queue = new TestFlowRunQueue();
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IFlowRunQueue>();
+                services.AddSingleton<IFlowRunQueue>(queue);
+            });
+        });
+        using var client = factory.CreateClient();
+        var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+        var scope = new FlowRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId);
+        var flows = factory.Services.GetRequiredService<FlowService>();
+        var runs = factory.Services.GetRequiredService<FlowRunService>();
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
+        var defaultFlow = await flows.CreateAsync(scope.WorkspaceId, new CreateFlowCommand("paged-default", null, "1.0.0", true, definition), default);
+        var namespacedFlow = await flows.CreateAsync(scope.WorkspaceId, new CreateFlowCommand("paged-namespaced", null, "1.0.0", true, definition), new ResourceNamespace("team-a"), default);
+        await flows.PublishVersionAsync(scope.WorkspaceId, defaultFlow.Value.Id, "1.0.0", true, default);
+        await flows.PublishVersionAsync(scope.WorkspaceId, namespacedFlow.Value.Id, "1.0.0", true, default);
+        using var input = JsonDocument.Parse("{}");
+        for (var index = 0; index < 3; index++)
+        {
+            await runs.CreateAsync(defaultFlow.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", $"default-{index}", input.RootElement, scope, default);
+            await runs.CreateAsync(namespacedFlow.Value.Id, null, "local", FlowRunTrigger.Manual, "tester", $"namespaced-{index}", input.RootElement, scope, default);
+        }
+
+        var namespaced = await client.GetFromJsonAsync<FlowRunPageResponse>(
+            "/api/namespaces/team-a/flows/paged-namespaced/runs?status=Pending&top=1", JsonOptions);
+        Assert.IsNotNull(namespaced?.NextLink);
+        StringAssert.StartsWith(namespaced.NextLink, "/api/namespaces/team-a/flows/paged-namespaced/runs?");
+        StringAssert.Contains(namespaced.NextLink, "status=Pending");
+        var namespacedIds = new List<string>(namespaced.Value.Select(value => value.Id));
+        var next = namespaced.NextLink;
+        while (next is not null)
+        {
+            var page = await client.GetFromJsonAsync<FlowRunPageResponse>(next, JsonOptions);
+            Assert.IsNotNull(page);
+            namespacedIds.AddRange(page.Value.Select(value => value.Id));
+            next = page.NextLink;
+        }
+        Assert.HasCount(3, namespacedIds);
+
+        var global = await client.GetFromJsonAsync<FlowRunPageResponse>(
+            "/api/flowRuns?flowId=paged-default&status=Pending&top=1", JsonOptions);
+        Assert.IsNotNull(global?.NextLink);
+        StringAssert.StartsWith(global.NextLink, "/api/flowRuns?");
+        StringAssert.Contains(global.NextLink, "flowId=paged-default");
+        StringAssert.Contains(global.NextLink, "status=Pending");
+    }
+
+    [TestMethod]
     public void FlowRunConsoleUsesDistinctRouteFromApi()
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));

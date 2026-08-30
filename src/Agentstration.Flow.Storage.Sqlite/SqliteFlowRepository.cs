@@ -182,11 +182,11 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
             var namespaceValue = flowId.Value.Namespace.Value;
             query = query.Where(value => value.Namespace == namespaceValue && value.FlowId == flowId.Value.Value);
         }
-        var documents = await query.OrderByDescending(value => value.UpdatedAt).Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
+        var documents = await query.OrderByDescending(value => value.UpdatedAt).ThenByDescending(value => value.Key).ToArrayAsync(cancellationToken);
         var runs = documents.Select(ToRun);
         if (status is not null) runs = runs.Where(value => value.Value.Status == status);
-        var items = runs.Take(take).ToArray();
-        return new FlowRunPage(items, documents.Length > take);
+        var page = runs.Skip(skip).Take(take + 1).ToArray();
+        return new FlowRunPage(page.Take(take).ToArray(), page.Length > take);
     }
 
     public async Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(int skip, int take, CancellationToken cancellationToken)
