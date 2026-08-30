@@ -21,6 +21,8 @@ Resource-authored translations are not stored in RESX. A later ADR and executabl
 
 - Existing Principal preference JSON remains readable because the language property is optional; no relational migration is required.
 - Console and Workplace share culture configuration and cookie behavior without introducing a new service boundary.
-- UI migration can proceed feature by feature, beginning with Profile settings.
+- All product-owned text visible to a user, including accessibility labels and validation or status text, must use the appropriate localization catalog. New UI text may not be hard-coded in Razor, Razor Pages, or C#.
+- Every new or changed neutral resource key must include its `fr-FR` translation in the same change. Automated catalog checks enforce valid, duplicate-free, key-symmetric resource pairs.
+- Product UI translations remain separate from Management resource manifests; manifests and protocol-level identifiers stay invariant.
 - A language is not considered supported until both hosts configure it and required resource sets pass completeness tests.
 - Translating manifests, agent output, durable notifications, and historical records remains outside this first increment.
