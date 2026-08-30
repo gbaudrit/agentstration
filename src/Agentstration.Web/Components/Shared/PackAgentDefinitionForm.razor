@@ -1,0 +1,155 @@
+@using System.Text.Json.Nodes
+@namespace Agentstration.Web.Components
+
+<div class="resource-form pack-agent-definition-form" data-testid="pack-agent-definition-form">
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">Identity</p><h3>Agent resource</h3></div>@if (ReadOnly) { <StatusBadge Text="Read only" Status="UiStatus.Neutral" /> }</div>
+        <div class="form-grid">
+            <label><span>Name</span><input value="@name" disabled /></label>
+            <label><span>Handler</span><input @bind="handler" disabled="@ReadOnly" /></label>
+            <label><span>Display name</span><input @bind="displayName" disabled="@ReadOnly" /></label>
+            <label class="form-span-2"><span>Description</span><textarea rows="3" @bind="description" disabled="@ReadOnly"></textarea></label>
+            <label class="form-span-2"><span>Instructions</span><textarea rows="9" @bind="instructions" disabled="@ReadOnly"></textarea></label>
+        </div>
+    </section>
+
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">References</p><h3>Model, runtime and tools</h3></div></div>
+        <div class="form-grid">
+            <label><span>Model profile</span><input @bind="modelProfile" disabled="@ReadOnly" /><small>Use <code>binding:name</code>, <code>namespace/name</code>, or a resource name.</small></label>
+            <label><span>Runtime profile</span><input @bind="runtimeProfile" disabled="@ReadOnly" /><small>Use <code>binding:name</code>, <code>namespace/name</code>, or a resource name.</small></label>
+            <label class="form-span-2"><span>Tools</span><textarea rows="4" @bind="tools" disabled="@ReadOnly"></textarea><small>One binding or resource reference per line.</small></label>
+            <label><span>Tags</span><textarea rows="5" @bind="tags" disabled="@ReadOnly"></textarea><small>One key=value pair per line.</small></label>
+            <label><span>Annotations</span><textarea rows="5" @bind="annotations" disabled="@ReadOnly"></textarea><small>One key=value pair per line.</small></label>
+        </div>
+    </section>
+
+    <section class="panel form-section">
+        <div class="panel-header"><div><p class="eyebrow">Advanced definition</p><h3>Pipeline and settings</h3></div></div>
+        <div class="form-grid">
+            <label><span>Behaviors</span><textarea rows="4" @bind="behaviors" disabled="@ReadOnly"></textarea><small>One identifier per line.</small></label>
+            <label><span>Middleware</span><textarea rows="4" @bind="middleware" disabled="@ReadOnly"></textarea><small>One identifier per line.</small></label>
+            <label><span>Context providers</span><textarea rows="4" @bind="contextProviders" disabled="@ReadOnly"></textarea><small>One identifier per line.</small></label>
+            <label><span>Settings (JSON)</span><textarea class="form-code-editor" rows="8" @bind="settings" disabled="@ReadOnly"></textarea></label>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Source { get; set; } = string.Empty;
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private JsonObject? sourceRoot;
+    private string name = string.Empty;
+    private string displayName = string.Empty;
+    private string description = string.Empty;
+    private string handler = "prompt-agent";
+    private string instructions = string.Empty;
+    private string modelProfile = string.Empty;
+    private string runtimeProfile = string.Empty;
+    private string tools = string.Empty;
+    private string tags = string.Empty;
+    private string annotations = string.Empty;
+    private string behaviors = string.Empty;
+    private string middleware = string.Empty;
+    private string contextProviders = string.Empty;
+    private string settings = "{}";
+    private string? loadedSource;
+
+    protected override void OnParametersSet()
+    {
+        if (string.Equals(Source, loadedSource, StringComparison.Ordinal)) return;
+        var element = ResourceManifestSerializer.FromYaml<JsonElement>(Source);
+        sourceRoot = JsonNode.Parse(element.GetRawText())?.AsObject() ?? throw new JsonException("The Agent source must be an object.");
+        var metadata = RequiredObject(sourceRoot, "metadata");
+        var definition = RequiredObject(sourceRoot, "definition");
+        name = Text(metadata["name"]);
+        displayName = Text(definition["displayName"]);
+        description = Text(definition["description"]);
+        handler = Text(definition["handler"], "prompt-agent");
+        instructions = Text(definition["instructions"]);
+        modelProfile = ReadReference(definition["modelProfile"]);
+        runtimeProfile = ReadReference(definition["runtimeProfile"]);
+        tools = ReadReferences(definition["tools"]);
+        tags = ReadMap(metadata["tags"]);
+        annotations = ReadMap(metadata["annotations"]);
+        behaviors = ReadStrings(definition["behaviors"]);
+        middleware = ReadStrings(definition["middleware"]);
+        contextProviders = ReadStrings(definition["contextProviders"]);
+        settings = definition["settings"]?.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) ?? "{}";
+        loadedSource = Source;
+    }
+
+    public bool TryBuildSource(out string source, out string? error)
+    {
+        source = Source;
+        error = null;
+        if (ReadOnly) return true;
+        try
+        {
+            var root = sourceRoot?.DeepClone().AsObject() ?? throw new JsonException("The Agent source is unavailable.");
+            var metadata = RequiredObject(root, "metadata");
+            var definition = RequiredObject(root, "definition");
+            metadata["tags"] = WriteMap(tags);
+            metadata["annotations"] = WriteMap(annotations);
+            definition["displayName"] = Required(displayName, "Display name");
+            definition["description"] = NullIfWhiteSpace(description);
+            definition["handler"] = Required(handler, "Handler");
+            definition["instructions"] = Required(instructions, "Instructions");
+            definition["modelProfile"] = WriteReference(modelProfile, required: true);
+            var runtimeReference = WriteReference(runtimeProfile, required: false);
+            if (runtimeReference is null) definition.Remove("runtimeProfile"); else definition["runtimeProfile"] = runtimeReference;
+            definition["tools"] = WriteReferences(tools);
+            definition["behaviors"] = WriteStrings(behaviors);
+            definition["middleware"] = WriteStrings(middleware);
+            definition["contextProviders"] = WriteStrings(contextProviders);
+            definition["settings"] = JsonNode.Parse(string.IsNullOrWhiteSpace(settings) ? "{}" : settings)?.AsObject() ?? new JsonObject();
+            var element = JsonSerializer.Deserialize<JsonElement>(root.ToJsonString());
+            source = ResourceManifestSerializer.ToYaml(element);
+            return true;
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException or FormatException)
+        {
+            error = exception.Message;
+            return false;
+        }
+    }
+
+    private static JsonObject RequiredObject(JsonObject owner, string property) => owner[property] as JsonObject ?? throw new JsonException($"'{property}' must be an object.");
+    private static string Text(JsonNode? node, string fallback = "") => node?.GetValue<string>() ?? fallback;
+    private static string Required(string value, string label) => !string.IsNullOrWhiteSpace(value) ? value.Trim() : throw new ArgumentException($"{label} is required.");
+    private static string? NullIfWhiteSpace(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string ReadReference(JsonNode? node)
+    {
+        if (node is not JsonObject value) return string.Empty;
+        if (value["binding"] is { } binding) return $"binding:{Text(binding)}";
+        var name = Text(value["name"]);
+        var @namespace = Text(value["namespace"]);
+        return string.IsNullOrWhiteSpace(@namespace) ? name : $"{@namespace}/{name}";
+    }
+    private static JsonObject? WriteReference(string value, bool required)
+    {
+        value = value.Trim();
+        if (value.Length == 0) return required ? throw new ArgumentException("A model profile reference is required.") : null;
+        if (value.StartsWith("binding:", StringComparison.OrdinalIgnoreCase)) return new JsonObject { ["binding"] = Required(value[8..], "Binding") };
+        var separator = value.IndexOf('/');
+        return separator > 0 ? new JsonObject { ["namespace"] = value[..separator].Trim(), ["name"] = Required(value[(separator + 1)..], "Resource name") } : new JsonObject { ["name"] = value };
+    }
+    private static string ReadReferences(JsonNode? node) => node is JsonArray values ? string.Join(Environment.NewLine, values.Select(ReadReference).Where(value => value.Length > 0)) : string.Empty;
+    private static JsonArray WriteReferences(string value) => new(Split(value).Select(item => (JsonNode?)WriteReference(item, required: true)).ToArray());
+    private static string ReadStrings(JsonNode? node) => node is JsonArray values ? string.Join(Environment.NewLine, values.Select(value => Text(value))) : string.Empty;
+    private static JsonArray WriteStrings(string value) => new(Split(value).Select(item => (JsonNode?)item).ToArray());
+    private static string ReadMap(JsonNode? node) => node is JsonObject values ? string.Join(Environment.NewLine, values.Select(pair => $"{pair.Key}={Text(pair.Value)}")) : string.Empty;
+    private static JsonObject WriteMap(string value)
+    {
+        var result = new JsonObject();
+        foreach (var line in Split(value))
+        {
+            var parts = line.Split('=', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length != 2 || parts[0].Length == 0) throw new FormatException($"'{line}' must use key=value syntax.");
+            result[parts[0]] = parts[1];
+        }
+        return result;
+    }
+    private static string[] Split(string value) => value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}

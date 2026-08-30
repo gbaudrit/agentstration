@@ -573,6 +573,12 @@ public sealed class PackTests
         Assert.IsTrue(installed.Definition.ManagedResources.All(resource => resource.Namespace == installed.Definition.Namespace));
         Assert.IsNotNull(installed.Definition.SourceArtifact);
 
+        var installedSources = await client.GetFromJsonAsync<PackProjectSourceDocument[]>("/api/packs/agentstration/who-am-i/resources/source");
+        Assert.IsNotNull(installedSources);
+        var installedJudgeSource = installedSources.Single(resource => resource.Path == "agents/who-am-i-judge.yaml");
+        Assert.IsTrue(installedJudgeSource.Source.Contains("binding: conversational-model", StringComparison.Ordinal));
+        Assert.IsFalse(installedJudgeSource.Source.Contains("reasoning-default", StringComparison.Ordinal));
+
         var defaultFlows = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows?top=100");
         Assert.IsNotNull(defaultFlows);
         Assert.IsFalse(defaultFlows.Value.Any(flow => flow.Id == "who-am-i-game"));
@@ -626,6 +632,20 @@ public sealed class PackTests
         Assert.AreEqual(PackAudience.Personal, project.Definition.Audience);
         Assert.AreEqual(PackPurpose.Sample, project.Definition.Purpose);
 
+        var projectResources = await client.GetFromJsonAsync<PackProjectSourceDocument[]>($"/api/pack-projects/{project.Uid:D}/resources");
+        Assert.IsNotNull(projectResources);
+        var judgeSource = projectResources.Single(resource => resource.Path == "agents/who-am-i-judge.yaml");
+        Assert.IsTrue(judgeSource.Source.Contains("displayName: Who Am I? Judge", StringComparison.Ordinal));
+        using var updateSourceRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/pack-projects/{project.Uid:D}/resources")
+        {
+            Content = JsonContent.Create(new UpdatePackProjectSourceCommand(
+                judgeSource.Path,
+                judgeSource.Source.Replace("displayName: Who Am I? Judge", "displayName: Forked Judge", StringComparison.Ordinal)))
+        };
+        updateSourceRequest.Headers.IfMatch.ParseAdd(forkResponse.Headers.ETag?.Tag ?? throw new AssertFailedException("Fork response requires an ETag."));
+        using var updateSourceResponse = await client.SendAsync(updateSourceRequest);
+        Assert.AreEqual(HttpStatusCode.OK, updateSourceResponse.StatusCode, await updateSourceResponse.Content.ReadAsStringAsync());
+
         using var buildResponse = await client.PostAsync($"/api/pack-projects/{project.Uid:D}/builds", null);
         Assert.AreEqual(HttpStatusCode.Created, buildResponse.StatusCode, await buildResponse.Content.ReadAsStringAsync());
         var build = await buildResponse.Content.ReadFromJsonAsync<PackProjectBuildResource>();
@@ -669,6 +689,10 @@ public sealed class PackTests
         using var forkAgentResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/agents/who-am-i-judge");
         Assert.AreEqual(HttpStatusCode.OK, sourceAgentResponse.StatusCode);
         Assert.AreEqual(HttpStatusCode.OK, forkAgentResponse.StatusCode);
+        using var sourceAgent = JsonDocument.Parse(await sourceAgentResponse.Content.ReadAsStreamAsync());
+        using var forkAgent = JsonDocument.Parse(await forkAgentResponse.Content.ReadAsStreamAsync());
+        Assert.AreEqual("Who Am I? Judge", sourceAgent.RootElement.GetProperty("definition").GetProperty("displayName").GetString());
+        Assert.AreEqual("Forked Judge", forkAgent.RootElement.GetProperty("definition").GetProperty("displayName").GetString());
         using var forkFlowResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/flows/who-am-i-game/versions/0.1.0");
         Assert.AreEqual(HttpStatusCode.OK, forkFlowResponse.StatusCode, await forkFlowResponse.Content.ReadAsStringAsync());
         using var forkEntryResponse = await client.GetAsync("/api/namespaces/local.who-am-i-lab/entries/who-am-i");

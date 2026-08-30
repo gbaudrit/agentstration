@@ -41,6 +41,9 @@ public sealed record PackProjectSourceResource(
     string Path,
     bool ExplicitlySelected);
 
+public sealed record PackProjectSourceDocument(string Path, string Kind, string Name, string Source);
+public sealed record UpdatePackProjectSourceCommand(string Path, string Source);
+
 public sealed record PackProjectProperties
 {
     public required string Publisher { get; init; }

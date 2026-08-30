@@ -58,6 +58,7 @@ public sealed partial class PackAuthoringService(
                 Categories = sourceArchive.Manifest.Metadata.Categories.ToArray(),
                 Tags = sourceArchive.Manifest.Metadata.Tags.ToArray(),
                 Origin = new(source.Publisher, source.Name, installed.Value.Definition.Version, sourceArtifact.Sha256, installed.Value.Name),
+                SourceResources = SourceResources(sourceArchive),
                 SourceArtifact = sourceArtifact,
                 CreatedAt = now,
                 UpdatedAt = now
@@ -86,6 +87,61 @@ public sealed partial class PackAuthoringService(
         {
             Generation = checked(current.Value.Generation + 1),
             Definition = definition,
+            Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
+        }, etag, false, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PackProjectSourceDocument>> ListSourceDocumentsAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        var project = await RequiredProjectAsync(projectId, cancellationToken);
+        var archive = await ReadSourceArchiveAsync(project.Value.Definition.SourceArtifact, cancellationToken);
+        return archive.Resources
+            .OrderBy(resource => resource.Path, StringComparer.Ordinal)
+            .Select(resource => new PackProjectSourceDocument(resource.Path, resource.Kind, resource.Name, JsonSerializer.Serialize(resource.Manifest, JsonOptions)))
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<PackProjectSourceDocument>> ListInstalledSourceDocumentsAsync(PackIdentity identity, CancellationToken cancellationToken)
+    {
+        var installed = await installations.GetAsync(identity, cancellationToken) ?? throw new PackNotFoundException(identity);
+        if (installed.Value.Definition.SourceArtifact is not { } sourceArtifact) return [];
+        var archive = await ReadSourceArchiveAsync(sourceArtifact, cancellationToken);
+        return archive.Resources
+            .OrderBy(resource => resource.Path, StringComparer.Ordinal)
+            .Select(resource => new PackProjectSourceDocument(resource.Path, resource.Kind, resource.Name, JsonSerializer.Serialize(resource.Manifest, JsonOptions)))
+            .ToArray();
+    }
+
+    public async Task<StoredResource<PackProjectResource>> UpdateSourceDocumentAsync(Guid projectId, UpdatePackProjectSourceCommand command, string etag, CancellationToken cancellationToken)
+    {
+        var current = await RequiredProjectAsync(projectId, cancellationToken);
+        if (!string.Equals(current.ETag, etag, StringComparison.Ordinal)) throw new ControlPlaneConcurrencyException("The Pack Project changed while its source was being edited.");
+        var source = await ReadArtifactAsync(current.Value.Definition.SourceArtifact, cancellationToken);
+        await using var sourceStream = new MemoryStream(source, writable: false);
+        var archive = await archiveReader.ReadAsync(sourceStream, current.Value.Definition.SourceArtifact.FileName, cancellationToken);
+        var existing = archive.Resources.SingleOrDefault(resource => string.Equals(resource.Path, command.Path, StringComparison.Ordinal))
+            ?? throw new PackValidationException("pack_project_resource_not_found", $"Pack source resource '{command.Path}' was not found.");
+        var manifest = JsonSerializer.Deserialize<JsonElement>(command.Source, JsonOptions);
+        var identity = ReadIdentity(manifest, command.Path);
+        if (!string.Equals(identity.Kind, existing.Kind, StringComparison.Ordinal) || !string.Equals(identity.Name, existing.Name, StringComparison.Ordinal))
+            throw new PackValidationException("pack_project_resource_identity_immutable", "A Pack source resource kind and metadata.name cannot be changed in place.");
+        var bytes = BuildArchive(source, archive.Manifest, existing.Path, manifest);
+        await using (var validationStream = new MemoryStream(bytes, writable: false))
+            archive = await archiveReader.ReadAsync(validationStream, current.Value.Definition.SourceArtifact.FileName, cancellationToken);
+        var artifact = await artifacts.SaveAsync(bytes, current.Value.Definition.SourceArtifact.FileName, cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        return await store.PutAsync(current.Value with
+        {
+            Generation = checked(current.Value.Generation + 1),
+            Definition = current.Value.Definition with
+            {
+                SourceArtifact = artifact,
+                SourceResources = SourceResources(archive),
+                State = PackProjectState.Draft,
+                Revision = checked(current.Value.Definition.Revision + 1),
+                LastBuildId = null,
+                UpdatedAt = now
+            },
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
         }, etag, false, cancellationToken);
     }
@@ -198,6 +254,13 @@ public sealed partial class PackAuthoringService(
         return await archiveReader.ReadAsync(stream, build.Value.Definition.Artifact.FileName, cancellationToken);
     }
 
+    private async Task<PackArchive> ReadSourceArchiveAsync(PackArtifactReference reference, CancellationToken cancellationToken)
+    {
+        var bytes = await ReadArtifactAsync(reference, cancellationToken);
+        await using var stream = new MemoryStream(bytes, writable: false);
+        return await archiveReader.ReadAsync(stream, reference.FileName, cancellationToken);
+    }
+
     private async Task<StoredResource<PackProjectResource>> RequiredProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
         await GetProjectAsync(projectId, cancellationToken) ?? throw new KeyNotFoundException($"Pack Project '{projectId}' was not found.");
 
@@ -213,6 +276,9 @@ public sealed partial class PackAuthoringService(
     }
 
     private static byte[] BuildArchive(byte[] source, PackManifest manifest)
+        => BuildArchive(source, manifest, null, default);
+
+    private static byte[] BuildArchive(byte[] source, PackManifest manifest, string? replacementPath, JsonElement replacement)
     {
         using var input = new ZipArchive(new MemoryStream(source, writable: false), ZipArchiveMode.Read);
         using var outputStream = new MemoryStream();
@@ -224,10 +290,19 @@ public sealed partial class PackAuthoringService(
                          .Where(value => !string.IsNullOrEmpty(value.Name) && !IsManifest(value.FullName))
                          .OrderBy(value => value.FullName.Replace('\\', '/'), StringComparer.Ordinal))
             {
-                using var sourceStream = entry.Open();
-                using var content = new MemoryStream();
-                sourceStream.CopyTo(content);
-                Write(output, entry.FullName.Replace('\\', '/'), content.ToArray());
+                var path = entry.FullName.Replace('\\', '/');
+                if (string.Equals(path, replacementPath, StringComparison.Ordinal))
+                {
+                    var replacementBytes = JsonSerializer.SerializeToUtf8Bytes(replacement, JsonOptions);
+                    Write(output, path, replacementBytes);
+                }
+                else
+                {
+                    using var sourceStream = entry.Open();
+                    using var content = new MemoryStream();
+                    sourceStream.CopyTo(content);
+                    Write(output, path, content.ToArray());
+                }
             }
         }
         return outputStream.ToArray();
@@ -242,6 +317,20 @@ public sealed partial class PackAuthoringService(
     }
 
     private static bool IsManifest(string path) => path.Replace('\\', '/') is "pack.yaml" or "pack.yml" or "pack.json";
+    private static IReadOnlyList<PackProjectSourceResource> SourceResources(PackArchive archive) => archive.Resources.Select(resource =>
+    {
+        var metadata = resource.Manifest.GetProperty("metadata");
+        var @namespace = metadata.TryGetProperty("namespace", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString()! : Agentstration.Resources.ResourceNamespace.DefaultValue;
+        return new PackProjectSourceResource(resource.Kind, resource.Name, @namespace, resource.Path, true);
+    }).ToArray();
+    private static (string Kind, string Name) ReadIdentity(JsonElement manifest, string path)
+    {
+        if (manifest.ValueKind != JsonValueKind.Object || !manifest.TryGetProperty("kind", out var kind) || kind.ValueKind != JsonValueKind.String
+            || !manifest.TryGetProperty("metadata", out var metadata) || metadata.ValueKind != JsonValueKind.Object
+            || !metadata.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String)
+            throw new PackValidationException("pack_project_resource_invalid", $"Pack source resource '{path}' requires kind and metadata.name.");
+        return (kind.GetString()!, name.GetString()!);
+    }
     private static string BuildFileName(PackProjectProperties value) => $"{value.Publisher}-{value.PackName}-{value.Version}.pack.zip";
 
     internal static void ValidateCoordinate(string publisher, string name, string version)

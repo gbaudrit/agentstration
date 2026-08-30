@@ -28,9 +28,9 @@ else
     {
         <ResourceHeader ResourceType="Agent" Domain="agent" Icon="◎" Name="@model.DisplayName" Description="@model.Description" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
             <Metadata><span><code>@model.Name</code></span><span>Generation @generation</span></Metadata>
-            <Actions><a class="button-primary" href="@RunUrl">Run</a><button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">Reconcile deployment</button></Actions>
+            <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">Run</a> }<button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">Reconcile deployment</button></Actions>
         </ResourceHeader>
-        <ResourceTabs Label="Agent sections"><a class="active" href="@OverviewUrl">Overview</a><a href="#definition">Definition</a><span>Deployments</span><a href="@RunUrl">Runs</a><span>Metrics</span><span>Events</span><span>Source</span></ResourceTabs>
+        <ResourceTabs Label="Agent sections"><button type="button" class="@(!sourceMode ? "active" : null)" @onclick="ShowDefinition">Definition</button><span>Deployments</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">Runs</a> } else { <span>Runs</span> }<span>Metrics</span><span>Events</span><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">YAML</button></ResourceTabs>
         <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? "Modified · not saved" : "Saved definition")" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
             <Actions>@if (!IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">Apply generation</button> }</Actions>
         </StateComparison>
@@ -45,6 +45,22 @@ else
         <div class="form-alert form-alert-success" role="status">@successMessage</div>
     }
 
+    @if (IsNew)
+    {
+        <ResourceTabs Label="Agent editor mode"><button type="button" class="@(!sourceMode ? "active" : null)" @onclick="ShowDefinition">Form</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">YAML</button></ResourceTabs>
+    }
+
+    @if (sourceMode)
+    {
+        <section class="panel form-section" data-testid="agent-yaml-editor">
+            <div class="panel-header"><div><p class="eyebrow">Raw resource</p><h2>Agent YAML</h2><p>Edit the same desired definition exposed by the form. Runtime status and generated fields are not part of this manifest.</p></div></div>
+            @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
+            <label><span>Resource manifest</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput"></textarea></label>
+            <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">Apply to form</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create from YAML" : "Save YAML")</button></div>
+        </section>
+    }
+    else
+    {
     <EditForm Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" FormName="agent-editor" class="resource-form" @oninput="MarkDirty" @onchange="MarkDirty">
         <DataAnnotationsValidator />
         <ValidationSummary />
@@ -106,6 +122,7 @@ else
             </UnsavedChangesBar>
         }
     </EditForm>
+    }
 }
 
 @code {
@@ -121,6 +138,8 @@ else
     private string? errorId;
     private string? successMessage;
     private string? modelResolutionWarning;
+    private string rawYaml = string.Empty;
+    private string? rawError;
     private AgentModelResponse? agentModel;
     private AgentRuntimeReadinessResponse? readiness;
     private string provisioningStatus = "Valid";
@@ -129,7 +148,9 @@ else
     private bool saving;
     private bool isDirty;
     private bool applyRuntimeOnSubmit = true;
+    private bool sourceMode;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Default;
     private string OverviewUrl => $"/agents/{Uri.EscapeDataString(Name ?? string.Empty)}";
     private string RunUrl => $"{OverviewUrl}/run";
     private bool IsStateSynchronized => !isDirty && readiness?.Ready == true && readiness.Generation == generation;
@@ -151,7 +172,7 @@ else
             runtimeProfiles = await RuntimeProfilesClient.GetRuntimeProfilesAsync(cancellation.Token);
             if (IsNew)
             {
-                model = new AgentEditorModel();
+                model = new AgentEditorModel { Namespace = AgentResourceNamespace.Value };
                 var runtimeProfile = runtimeProfiles.FirstOrDefault();
                 if (runtimeProfile is not null)
                 {
@@ -161,7 +182,7 @@ else
             }
             else
             {
-                var snapshot = await Client.GetAgentAsync(Name!, cancellation.Token);
+                var snapshot = await Client.GetAgentAsync(AgentResourceNamespace, Name!, cancellation.Token);
                 model = AgentEditorModel.FromResource(snapshot.Value);
                 etag = snapshot.ETag;
                 resourceId = snapshot.Value.Uid.ToString("D");
@@ -194,6 +215,47 @@ else
     }
 
     private void MarkDirty(EventArgs _) => isDirty = true;
+    private void ShowDefinition() => sourceMode = false;
+    private void ShowSource()
+    {
+        if (model is null) return;
+        rawError = null;
+        try { rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest()); }
+        catch (Exception exception) { rawError = exception.Message; }
+        sourceMode = true;
+    }
+
+    private bool ApplyRawYaml()
+    {
+        if (model is null) return false;
+        rawError = null;
+        try
+        {
+            var request = ResourceManifestSerializer.FromYaml<AgentResourceRequest>(rawYaml);
+            if (!string.Equals(request.ApiVersion, ManagementApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException($"apiVersion must be '{ManagementApiVersions.CoreV1}'.");
+            if (!string.Equals(request.Kind, ResourceKinds.Agent, StringComparison.Ordinal)) throw new ArgumentException($"kind must be '{ResourceKinds.Agent}'.");
+            if (!request.Metadata.Namespace.IsDefault) throw new ArgumentException("Pack-owned Agent definitions are read-only here; fork the Pack and edit its project source instead.");
+            if (!IsNew && !string.Equals(request.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException("metadata.name is immutable for an existing Agent.");
+            model = AgentEditorModel.FromRequest(request);
+            _ = model.ToRequest();
+            rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest());
+            isDirty = true;
+            successMessage = "YAML applied to the editable definition. Save to persist it.";
+            return true;
+        }
+        catch (Exception exception)
+        {
+            rawError = exception.Message;
+            return false;
+        }
+    }
+
+    private async Task SaveRawAsync()
+    {
+        if (!ApplyRawYaml()) return;
+        await SaveAsync(applyRuntime: false);
+        if (!IsNew) ShowSource();
+    }
     private bool IsToolAssigned(string id) => model?.ToolNames.Split(['\r','\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Contains(id, StringComparer.Ordinal) == true;
     private void ToggleTool(string id, bool selected)
     {
@@ -231,14 +293,14 @@ else
     {
         agentModel = null;
         modelResolutionWarning = null;
-        try { agentModel = await AgentsModelClient.GetAgentModelResolutionAsync(name, cancellation.Token); }
+        try { agentModel = await AgentsModelClient.GetAgentModelResolutionAsync(AgentResourceNamespace, name, cancellation.Token); }
         catch (AgentstrationApiException exception) { modelResolutionWarning = exception.Message; }
     }
 
     private async Task LoadReadinessAsync(string name, long desiredGeneration)
     {
         readiness = null;
-        try { readiness = await RuntimeClient.GetAgentReadinessAsync(name, desiredGeneration, cancellation.Token); }
+        try { readiness = await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, name, desiredGeneration, cancellation.Token); }
         catch (AgentstrationApiException) { }
     }
 
@@ -262,7 +324,7 @@ else
             isDirty = false;
             if (applyRuntime)
             {
-                var activation = await RuntimeClient.PrepareAgentAsync(snapshot.Value.Name, snapshot.Value.Generation, cancellation.Token);
+                var activation = await RuntimeClient.PrepareAgentAsync(snapshot.Value.Namespace, snapshot.Value.Name, snapshot.Value.Generation, cancellation.Token);
                 if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 {
                     var message = $"The agent definition was saved, but generation {snapshot.Value.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";
@@ -299,7 +361,7 @@ else
         errorMessage = null;
         try
         {
-            var activation = await RuntimeClient.PrepareAgentAsync(model.Name, generation, cancellation.Token);
+            var activation = await RuntimeClient.PrepareAgentAsync(AgentResourceNamespace, model.Name, generation, cancellation.Token);
             await LoadReadinessAsync(model.Name, generation);
             successMessage = string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal) ? $"Generation {generation} is active." : $"Reconciliation completed with state {activation.State}.";
         }

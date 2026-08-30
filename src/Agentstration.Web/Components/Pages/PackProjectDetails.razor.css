@@ -10,8 +10,13 @@
 .studio-origin dt { color: var(--muted); }
 .studio-origin dd { margin: 0; overflow-wrap: anywhere; }
 .studio-source-resources { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
-.studio-source-resources span { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.studio-source-resources article { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.studio-source-resources article > div:first-child { display: grid; gap: 3px; }
 .studio-source-resources small { color: var(--muted); }
+.studio-source-actions { display: flex; align-items: center; gap: 10px; }
+.studio-source-actions .active { color: var(--primary); text-decoration: underline; text-underline-offset: 4px; }
+.studio-source-resources + .resource-section { margin-top: 16px; }
+.studio-builds .form-code-editor { width: 100%; resize: vertical; }
 .studio-install { align-self: start; display: grid; gap: 16px; }
 .studio-checkbox { display: flex; align-items: flex-start; gap: 8px; font-size: .82rem; }
 .studio-checkbox input { margin-top: 2px; }

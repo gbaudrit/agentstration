@@ -19,7 +19,7 @@ else if (agent is not null)
 {
     <ResourceHeader ResourceType="Agent" Domain="agent" Icon="◎" Name="@agent.Definition.DisplayName" Description="@agent.Definition.Description" StatusText="@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())" Status="@StatusPresentation.Tone(agent.Status.ProvisioningState.ToString())">
         <Metadata><span><code>@AgentResourceNamespace.Value/@agent.Metadata.Name</code></span><span>Generation @agent.Generation</span></Metadata>
-        <Actions><button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="/agents">Back to agents</a></Actions>
+        <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="/agents">Back to agents</a></Actions>
     </ResourceHeader>
     <nav class="section-tabs namespaced-agent-tabs" role="tablist" aria-label="Agent details">
         @foreach (var tab in Enum.GetValues<PageTab>())
@@ -36,7 +36,7 @@ else if (agent is not null)
                 <MetricCard Label="Runtime profile" Value="@RuntimeBindingStatus" Detail="@RuntimeBindingDetail" HelpText="@RuntimeBindingHelp" Status="@RuntimeBindingTone" />
                 <MetricCard Label="Deployment" Value="@DeploymentOverviewStatus" Detail="@DeploymentOverviewDetail" HelpText="The local Runtime deployment prepared for this exact Agent generation. Not ready means it still needs reconciliation or preparation failed." Status="@DeploymentTone" />
             </section>
-            <p class="muted namespaced-agent-provenance">This Agent is managed by its namespaced source. Fork or repack its Pack to change the definition.</p>
+            <p class="muted namespaced-agent-provenance">This Agent is managed by its namespaced Pack source. Its definition is read-only in the Console.</p>
             <article class="panel definition-grid">
                 <div><span class="field-label">Namespace</span><code>@AgentResourceNamespace.Value</code></div>
                 <div><span class="field-label">Resource name</span><code>@agent.Metadata.Name</code></div>
@@ -112,11 +112,18 @@ else if (agent is not null)
                 <div class="namespaced-agent-actions"><button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="@RuntimeProfileUrl">Open effective runtime profile</a>@if (ownerPack is not null) { <a class="button-secondary" href="@PackUrl">Open Pack installation</a> }</div>
             </section>
         }
+        else if (activeTab == PageTab.Definition)
+        {
+            <section data-testid="pack-agent-definition">
+                <div class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Original definition</p><h2>Agent source form</h2><p>This is the declarative definition retained in the Pack archive, before installation bindings are resolved.</p></div><StatusBadge Text="Read only" Status="UiStatus.Neutral" /></div></div>
+                <PackAgentDefinitionForm Source="@DefinitionYaml" ReadOnly="true" />
+            </section>
+        }
         else
         {
-            <section class="panel namespaced-instructions">
-                <div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Instructions</h2></div></div>
-                <div class="namespaced-instructions-copy">@agent.Definition.Instructions</div>
+            <section class="panel namespaced-instructions" data-testid="pack-agent-yaml">
+                <div class="panel-header"><div><p class="eyebrow">Original definition</p><h2>Agent source YAML</h2><p>The unmodified Pack manifest is shown directly from its retained source archive.</p></div><StatusBadge Text="Read only" Status="UiStatus.Neutral" /></div>
+                <textarea class="form-code-editor runner-json namespaced-definition-source" rows="30" readonly aria-label="Original Agent YAML definition">@DefinitionYaml</textarea>
             </section>
         }
     </main>
@@ -125,9 +132,11 @@ else if (agent is not null)
 @code {
     [Parameter] public string AgentNamespace { get; set; } = string.Empty;
     [Parameter] public string Name { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private AgentResource? agent;
     private InstalledPackResource? ownerPack;
+    private PackProjectSourceDocument? originalSource;
     private IReadOnlyList<PackBindingResolution> modelBindings = [];
     private IReadOnlyList<PackBindingResolution> runtimeBindings = [];
     private AgentRuntimeReadinessResponse? readiness;
@@ -172,6 +181,13 @@ else if (agent is not null)
             ? "Included in the same Pack namespace and managed together with the Agent."
             : "Referenced explicitly by the Agent definition outside its Pack namespace.";
     private UiStatus RuntimeBindingTone => runtimeBindings.Count > 0 ? UiStatus.Info : ownerPack is null ? UiStatus.Warning : UiStatus.Neutral;
+    private string DefinitionYaml => originalSource?.Source ?? (agent is null ? string.Empty : ResourceManifestSerializer.ToYaml(new AgentResourceRequest
+    {
+        ApiVersion = agent.ApiVersion,
+        Kind = agent.Kind,
+        Metadata = agent.Metadata,
+        Definition = agent.Definition
+    }));
 
     protected override async Task OnParametersSetAsync()
     {
@@ -181,6 +197,7 @@ else if (agent is not null)
         {
             agent = (await Client.GetAgentAsync(AgentResourceNamespace, Name, cancellation.Token)).Value;
             await Task.WhenAll(LoadPackContextAsync(), LoadReadinessAsync());
+            if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = PageTab.Definition;
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
@@ -216,6 +233,7 @@ else if (agent is not null)
     private async Task LoadPackContextAsync()
     {
         ownerPack = null;
+        originalSource = null;
         modelBindings = [];
         runtimeBindings = [];
         if (agent is null
@@ -225,6 +243,9 @@ else if (agent is not null)
         try
         {
             ownerPack = (await PacksClient.GetPackAsync(publisher, packName, cancellation.Token)).Value;
+            originalSource = (await PacksClient.GetPackResourcesAsync(publisher, packName, cancellation.Token))
+                .SingleOrDefault(resource => string.Equals(resource.Kind, ResourceKinds.Agent, StringComparison.Ordinal)
+                    && string.Equals(resource.Name, agent.Metadata.Name, StringComparison.Ordinal));
             modelBindings = ownerPack.Definition.Bindings
                 .Where(binding => binding.TargetKind == PackBindingTargetKind.ModelProfile
                     && binding.Target.Resolve(ResourceNamespace.Default, ResourceKinds.ModelProfile) == ModelProfileAddress)
@@ -239,9 +260,8 @@ else if (agent is not null)
 
     private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";
     private static string TabId(PageTab tab) => $"agent-{tab.ToString().ToLowerInvariant()}-tab";
-    private static string TabLabel(PageTab tab) => tab switch { PageTab.Model => "Model", PageTab.Runtime => "Runtime", _ => tab.ToString() };
-
-    private enum PageTab { Overview, Model, Runtime, Instructions }
+    private static string TabLabel(PageTab tab) => tab switch { PageTab.Yaml => "YAML", _ => tab.ToString() };
+    private enum PageTab { Overview, Definition, Model, Runtime, Yaml }
 
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }
