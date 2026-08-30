@@ -9,6 +9,9 @@ artifacts/
 *.user
 *.suo
 *.db
+# SQLite creates these transient sidecars next to database files; they are runtime state, not source fixtures.
+*.db-shm
+*.db-wal
 *.log
 docs/site/node_modules/
 docs/site/build/
