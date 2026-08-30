@@ -51,9 +51,13 @@ public sealed class AgentEditorModel
                 ModelProfile = new ResourceReference(ModelProfileName.Trim(), @namespace: ResourceNamespace.Parse(ModelProfileNamespace))
             }) with
             {
-                DisplayName = DisplayName.Trim(), Description = NullIfWhiteSpace(Description), Handler = Handler.Trim(), Instructions = Instructions.Trim(),
+                DisplayName = DisplayName.Trim(),
+                Description = NullIfWhiteSpace(Description),
+                Handler = Handler.Trim(),
+                Instructions = Instructions.Trim(),
                 ModelProfile = new ResourceReference(ModelProfileName.Trim(), @namespace: ResourceNamespace.Parse(ModelProfileNamespace)),
-                RuntimeProfile = new ResourceReference(RuntimeProfileName.Trim(), @namespace: ResourceNamespace.Parse(RuntimeProfileNamespace)), Tools = tools
+                RuntimeProfile = new ResourceReference(RuntimeProfileName.Trim(), @namespace: ResourceNamespace.Parse(RuntimeProfileNamespace)),
+                Tools = tools
             }
         };
     }
