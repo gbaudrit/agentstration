@@ -8,6 +8,7 @@
 @inject NavigationManager Navigation
 @inject IConfiguration Configuration
 @inject IHostEnvironment HostEnvironment
+@inject WorkplaceContextState WorkplaceContext
 
 <PageTitle>Workplace · Agentstration</PageTitle>
 
@@ -15,12 +16,20 @@
 else if (loadError is not null) { <ServiceUnavailableState Message="@loadError" /> }
 else
 {
-    <div class="workplace-heading"><div><p class="eyebrow">Workspace</p><h1>@(workspace?.DisplayName ?? "Workplace")</h1></div><RealtimeStatus Connected="RealtimeConnected" /></div>
+    <div class="workplace-heading">
+        <div><p class="eyebrow">Workspace</p><h1>@(workspace?.DisplayName ?? "Workplace")</h1></div>
+        <RealtimeStatus Connected="RealtimeConnected" />
+    </div>
     <nav class="dashboard-navigation" aria-label="Dashboards">
-        <div class="dashboard-links">@foreach (var item in dashboards) { <NavLink href="@DashboardUrl(item.Name)" Match="NavLinkMatch.All">@item.DisplayName</NavLink> }</div>
+        <div class="dashboard-links">
+            @foreach (var item in dashboards)
+            {
+                <NavLink href="@DashboardUrl(item.Name)" Match="NavLinkMatch.All"><UiIcon Name="layout-grid" /> <span>@item.DisplayName</span></NavLink>
+            }
+        </div>
         <label class="dashboard-select"><span>Dashboard</span><select value="@dashboard?.Name" @onchange="DashboardChanged">@foreach (var item in dashboards) { <option value="@item.Name">@item.DisplayName</option> }</select></label>
     </nav>
-    <section class="mobile-welcome" aria-label="Welcome"><p>@workspace?.DisplayName</p><h1>@dashboard?.DisplayName</h1><span>@(dashboard?.Description ?? "What would you like to do today?")</span></section>
+    <section class="mobile-welcome" aria-label="Welcome"><small>Welcome back</small><h1>Bonjour, @UserDisplayName</h1><span>Que voulez-vous faire aujourd’hui&nbsp;?</span></section>
     <div class="workplace-shell">
         <div class="workplace-primary">
             @if (interaction is null)
@@ -29,6 +38,21 @@ else
                 {
                     <PrimaryEntryContainer Busy="busy"><EntryRenderer Definition="@ToDefinition(primary)" Role="DashboardItemRole.Primary" OnSubmit="values => SubmitAsync(primary, values)" Disabled="busy" Busy="busy" /></PrimaryEntryContainer>
                 }
+                <section class="mobile-dashboards" aria-label="Dashboards">
+                    <div class="section-heading"><h2>Vos espaces</h2></div>
+                    <div class="mobile-dashboard-cards">
+                        @foreach (var item in dashboards)
+                        {
+                            <NavLink class="@(string.Equals(item.Name, dashboard?.Name, StringComparison.Ordinal) ? "is-selected" : null)" href="@DashboardUrl(item.Name)" Match="NavLinkMatch.All" aria-current="@(string.Equals(item.Name, dashboard?.Name, StringComparison.Ordinal) ? "page" : null)">
+                                <span class="mobile-dashboard-art" aria-hidden="true">
+                                    @if (!string.IsNullOrWhiteSpace(item.ImageUrl)) { <img src="@item.ImageUrl" alt="" /> }
+                                    else { <UiIcon Name="@DashboardIcon(item)" /> }
+                                </span>
+                                <span>@item.DisplayName</span>
+                            </NavLink>
+                        }
+                    </div>
+                </section>
                 @if (featuredEntries.Count > 0)
                 {
                     <section class="featured-entries"><div class="section-heading"><div><p class="eyebrow">Featured</p><h2>Featured tools</h2></div></div><div class="standard-entry-grid">@foreach(var entry in featuredEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Featured" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>

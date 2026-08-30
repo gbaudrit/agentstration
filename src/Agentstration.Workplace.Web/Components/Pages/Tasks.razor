@@ -1,5 +1,6 @@
 @page "/w/{WorkspaceName}/tasks"
 @inject IWorkplaceApiClient Api
+@inject WorkplaceContextState WorkplaceContext
 <PageTitle>Tasks · Workplace</PageTitle>
 <PageHeader Title="Tasks" Description="Follow work that continues beyond the conversation." Eyebrow="Workplace" />
 <FilterBar><label class="sr-only" for="task-status">Filter by status</label><select id="task-status" @bind="filter"><option value="">All statuses</option>@foreach(var value in Enum.GetValues<WorkTaskStatus>()){<option value="@value">@Label(value)</option>}</select></FilterBar>
@@ -12,6 +13,6 @@ else { <div class="task-cards">@foreach(var task in Filtered){<a class="task-lis
     private IReadOnlyList<WorkTaskResponse> tasks=[]; private string filter=""; private bool loading=true; private string? error;
     private IEnumerable<WorkTaskResponse> Filtered=>string.IsNullOrWhiteSpace(filter)?tasks:tasks.Where(value=>value.Status.ToString()==filter);
     protected override Task OnInitializedAsync()=>LoadAsync();
-    private async Task LoadAsync(){loading=true;error=null;try{tasks=await Api.ListTasksAsync(WorkspaceName,null,default);}catch{error="Tasks could not be loaded from the local Work API.";}finally{loading=false;}}
+    private async Task LoadAsync(){loading=true;error=null;try{var workspace=await Api.GetWorkspaceAsync(WorkspaceName,default);WorkplaceContext.SetWorkspace(workspace.Name,workspace.DisplayName,workspace.OrganizationName,workspace.OrganizationDisplayName,workspace.UserDisplayName);tasks=await Api.ListTasksAsync(WorkspaceName,null,default);}catch{error="Tasks could not be loaded from the local Work API.";}finally{loading=false;}}
     private static string Label(WorkTaskStatus value)=>value switch{WorkTaskStatus.ActionRequired=>"Needs input",WorkTaskStatus.Running=>"In progress",_=>value.ToString()};
 }

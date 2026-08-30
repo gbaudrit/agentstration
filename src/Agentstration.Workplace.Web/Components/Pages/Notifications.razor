@@ -1,6 +1,7 @@
 @page "/w/{WorkspaceName}/notifications"
 @implements IDisposable
 @inject IWorkplaceApiClient Api
+@inject WorkplaceContextState WorkplaceContext
 
 <PageTitle>Notifications · Workplace</PageTitle>
 <PageHeader Title="Notifications" Description="Workspace-level updates requiring your attention." Eyebrow="Workplace" />
@@ -32,7 +33,12 @@ else
     {
         loading = true;
         error = null;
-        try { items = await Api.ListNotificationsAsync(WorkspaceName, false, lifetime.Token); }
+        try
+        {
+            var workspace = await Api.GetWorkspaceAsync(WorkspaceName, lifetime.Token);
+            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName);
+            items = await Api.ListNotificationsAsync(WorkspaceName, false, lifetime.Token);
+        }
         catch when (!lifetime.IsCancellationRequested) { error = "Notifications could not be loaded from the local Work API."; }
         finally { loading = false; }
     }

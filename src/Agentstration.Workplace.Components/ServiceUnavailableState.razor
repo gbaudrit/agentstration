@@ -1,6 +1,6 @@
 <section class="service-unavailable" role="alert">
-    <span><UiIcon Name="offline" /></span>
-    <div><h2>Workplace is temporarily unavailable</h2><p>@Message</p></div>
+    <span class="service-unavailable-icon" aria-hidden="true"><UiIcon Name="offline" /></span>
+    <div class="service-unavailable-copy"><span class="service-unavailable-kicker">Connection interrupted</span><h2>Workplace is temporarily unavailable</h2><p>@Message</p></div>
     <form method="get" action="@Navigation.Uri" data-enhance="false">
         <button class="button-primary" type="submit"><UiIcon Name="refresh" /> Try again</button>
     </form>

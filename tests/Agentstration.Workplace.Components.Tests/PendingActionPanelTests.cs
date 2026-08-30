@@ -1,4 +1,5 @@
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Work;
 using Agentstration.Workplace.Components;
 using Bunit;
@@ -89,8 +90,16 @@ public sealed class PendingActionPanelTests
 
         Assert.IsTrue(rendered.Markup.Contains("app-shell theme-light", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("side-nav", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Markup.Contains("images/agentstration-lockup.png", StringComparison.Ordinal));
-        Assert.AreEqual(1, rendered.FindAll(".brand-mark-compact").Count);
+        Assert.IsTrue(rendered.Markup.Contains("images/agentstration-workplace-lockup.png", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("images/agentstration-workplace-lockup-dark.png", StringComparison.Ordinal));
+        Assert.AreEqual(2, rendered.FindAll(".workplace-brand-lockup .brand-lockup-logo").Count);
+        Assert.AreEqual(2, rendered.FindAll(".navigation-group").Count);
+        Assert.AreEqual("Work", rendered.Find(".navigation-group h2").TextContent);
+        Assert.AreEqual(3, rendered.FindAll(".side-nav .nav-icon").Count);
+        Assert.AreEqual("Accueil", rendered.Find(".nav-label-mobile").TextContent);
+        Assert.AreEqual("Activité", rendered.FindAll(".nav-label-mobile")[1].TextContent);
+        Assert.AreEqual(1, rendered.FindAll(".mobile-profile").Count);
+        Assert.AreEqual(0, rendered.FindAll(".side-nav-notifications").Count);
         Assert.IsTrue(rendered.Markup.Contains("Workplace content", StringComparison.Ordinal));
     }
 
@@ -106,9 +115,29 @@ public sealed class PendingActionPanelTests
 
         Assert.AreEqual(1, rendered.FindAll(".side-nav a.active").Count);
         var disabled = rendered.FindAll(".side-nav a.side-nav-disabled");
-        Assert.AreEqual(2, disabled.Count);
+        Assert.AreEqual(1, disabled.Count);
         Assert.IsTrue(disabled.All(value => value.GetAttribute("aria-disabled") == "true"));
         Assert.IsTrue(disabled.All(value => value.GetAttribute("tabindex") == "-1"));
         Assert.IsTrue(disabled.All(value => !value.HasAttribute("href")));
+    }
+
+    [TestMethod]
+    public void WorkplaceLayoutUsesTheWorkspaceDisplayNameOutsideUrls()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddAgentstrationWebComponents();
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("w/personal");
+        context.Services.GetRequiredService<WorkplaceContextState>().SetWorkspace("personal", "Personal Space", "acme", "ACME Europe");
+
+        var rendered = context.Render<WorkplaceLayout>(parameters => parameters
+            .Add(value => value.Body, builder => builder.AddContent(0, "Workplace content")));
+
+        Assert.AreEqual("ACME Europe/Personal Space Workplace", rendered.Find(".breadcrumb").TextContent);
+        Assert.AreEqual("Personal Space Workplace", rendered.Find(".breadcrumb a").TextContent);
+        Assert.AreEqual("Personal Space", rendered.Find(".sidebar-footer strong").TextContent);
+        Assert.AreEqual("ACME Europe", rendered.Find(".sidebar-footer small").TextContent);
+        Assert.AreEqual("/w/personal", rendered.Find(".breadcrumb a").GetAttribute("href"));
+        Assert.AreEqual(0, rendered.FindAll(".environment-chip").Count);
     }
 }

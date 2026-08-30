@@ -72,13 +72,25 @@ public static class WorkplaceEndpoints
     public static async Task<IResult> ListWorkspacesAsync(IdentityExperienceService service, CancellationToken token)
     {
         var context = await service.GetContextAsync(token);
-        return Results.Ok(context.AvailableWorkspaces.Where(value => value.Id == context.Context.WorkspaceId).Select(value => new WorkplaceWorkspaceResponse(value.Id, value.Name, value.DisplayName)));
+        return Results.Ok(context.AvailableWorkspaces
+            .Where(value => value.Id == context.Context.WorkspaceId)
+            .Select(value => new WorkplaceWorkspaceResponse(value.Id, value.Name, value.DisplayName, context.TenantName, context.TenantDisplayName, context.UserDisplayName)));
     }
-    private static async Task<IResult> GetWorkspaceAsync(string workspaceName, IIdentityStore store, ICurrentRequestContext context, CancellationToken token)
+    private static async Task<IResult> GetWorkspaceAsync(string workspaceName, IdentityExperienceService service, CancellationToken token)
     {
-        if (!Guid.TryParse(workspaceName, out var workspaceId)) return Results.NotFound();
-        var workspace = await store.GetWorkspaceAsync(context.Current.TenantId, workspaceId, token);
-        return workspace is null ? Results.NotFound() : Results.Ok(new WorkplaceWorkspaceResponse(workspace.Id, workspace.Name, workspace.DisplayName));
+        var context = await service.GetContextAsync(token);
+        var workspace = context.AvailableWorkspaces.FirstOrDefault(value =>
+            value.Id == context.Context.WorkspaceId
+            && (string.Equals(value.Id.ToString("D"), workspaceName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value.Name, workspaceName, StringComparison.Ordinal)));
+        if (workspace is null) return Results.NotFound();
+        return Results.Ok(new WorkplaceWorkspaceResponse(
+            workspace.Id,
+            workspace.Name,
+            workspace.DisplayName,
+            context.TenantName,
+            context.TenantDisplayName,
+            context.UserDisplayName));
     }
     private static Task<IResult> ListDashboardsAsync(string workspaceName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok((await service.ListDashboardsAsync(WorkspaceId(workspaceName), token)).Select(ToResponse)));
     private static Task<IResult> GetDashboardAsync(string workspaceName, string dashboardName, WorkplaceService service, CancellationToken token) => ExecuteAsync(async () => Results.Ok(ToResponse(await service.GetDashboardAsync(WorkspaceId(workspaceName), DashboardResourceId(dashboardName), token))));
