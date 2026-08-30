@@ -6,8 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Options;
 
 namespace Agentstration.Web.Pages;
 

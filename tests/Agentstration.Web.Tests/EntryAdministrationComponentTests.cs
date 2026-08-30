@@ -1,3 +1,4 @@
+using System.Globalization;
 using Agentstration.Management.Abstractions;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
@@ -7,7 +8,6 @@ using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
-using System.Globalization;
 
 namespace Agentstration.Web.Tests;
 

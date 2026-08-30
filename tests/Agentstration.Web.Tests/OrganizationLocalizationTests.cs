@@ -1,9 +1,9 @@
+using System.Globalization;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
-using System.Globalization;
 
 namespace Agentstration.Web.Tests;
 

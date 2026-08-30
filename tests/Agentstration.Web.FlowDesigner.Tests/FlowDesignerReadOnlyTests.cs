@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
@@ -10,7 +11,6 @@ using Bunit;
 using Bunit.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
-using System.Globalization;
 using FlowDesignerComponent = Agentstration.Web.FlowDesigner.Components.FlowDesigner;
 
 namespace Agentstration.Web.FlowDesigner.Tests;
@@ -107,7 +107,7 @@ public sealed class FlowDesignerReadOnlyTests
             return new(new FlowDraft { WorkspaceId = WorkspaceId, Id = "draft", FlowId = new("sample"), DisplayName = "Sample", Definition = definition, CreatedAt = now, UpdatedAt = now }, "\"etag\"");
         }
 
-    private static readonly Agentstration.Resources.WorkspaceId WorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        private static readonly Agentstration.Resources.WorkspaceId WorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));
     }
 
     private sealed class CultureScope : IDisposable
