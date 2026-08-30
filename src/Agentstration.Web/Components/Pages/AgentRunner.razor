@@ -5,15 +5,17 @@
 @inject IAgentRunnerRuntimeClient RuntimeClient
 @inject IAgentsModelClient ModelsClient
 @inject IJSRuntime JavaScript
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerInspectorStrings> InspectorLocalizer
 
-<PageTitle>Agent Runner · Agentstration</PageTitle>
-<PageHeader Title="Agent Runner" Description="Create and inspect a direct Runtime Plane run without creating a Work Item.">
-    <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(agent is null || preparing)">@(preparing ? "Reconciling…" : "Reconcile runtime")</button><a class="button-secondary" href="@BackUrl">Back to agent</a></Actions>
+<PageTitle>@T("PageTitle")</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")">
+    <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(agent is null || preparing)">@(preparing ? T("Reconciling") : T("ReconcileRuntime"))</button><a class="button-secondary" href="@BackUrl">@T("BackToAgent")</a></Actions>
 </PageHeader>
 
 @if (loading)
 {
-    <LoadingState Message="Loading runner…" />
+    <LoadingState Message="@T("Loading")" />
 }
 else if (agent is null)
 {
@@ -23,28 +25,28 @@ else
 {
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
-        <div class="form-alert form-alert-danger" role="alert"><strong>Runtime error</strong><span>@errorMessage</span></div>
+        <div class="form-alert form-alert-danger" role="alert"><strong>@T("RuntimeError")</strong><span>@errorMessage</span></div>
     }
     @if (connectionLost)
     {
-        <div class="form-alert form-alert-danger" role="alert"><strong>Event stream disconnected</strong><span>The console could not resume the SSE stream.</span></div>
+        <div class="form-alert form-alert-danger" role="alert"><strong>@T("StreamDisconnected")</strong><span>@T("StreamDisconnectedMessage")</span></div>
     }
 
     <section class="runner-config panel">
-        <div><span>Agent</span><strong>@agent.Definition.DisplayName</strong></div>
-        <div><span>Version</span><strong>@agent.Generation</strong></div>
-        <div><span>Runtime</span><strong>@(state.Run?.Status.Runtime ?? "Local")</strong></div>
-        <div><span>Model profile</span><strong>@ResourceName(agent.Definition.ModelProfile.ResourceId)</strong></div>
-        <div><span>Provider</span><strong>@(modelResolution?.Resolved.Provider?.Name ?? "Not resolved")</strong></div>
-        <div><span>Model</span><strong>@(modelResolution?.Resolved.Model.Name ?? "Not resolved")</strong></div>
-        <div><span>Deployment</span><strong><StatusBadge Text="@(readiness?.State ?? "Unknown")" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /></strong></div>
-        <div><span>Runtime profile</span><strong>@(readiness?.RuntimeProfileId is null ? "Not resolved" : ResourceName(readiness.RuntimeProfileId))</strong></div>
-        <div><span>Execution mode</span><strong>Interactive</strong></div>
+        <div><span>@T("Agent")</span><strong>@agent.Definition.DisplayName</strong></div>
+        <div><span>@T("Version")</span><strong>@agent.Generation</strong></div>
+        <div><span>@T("Runtime")</span><strong>@(state.Run?.Status.Runtime ?? T("Local"))</strong></div>
+        <div><span>@T("ModelProfile")</span><strong>@ResourceName(agent.Definition.ModelProfile.ResourceId)</strong></div>
+        <div><span>@T("Provider")</span><strong>@(modelResolution?.Resolved.Provider?.Name ?? T("NotResolved"))</strong></div>
+        <div><span>@T("Model")</span><strong>@(modelResolution?.Resolved.Model.Name ?? T("NotResolved"))</strong></div>
+        <div><span>@T("Deployment")</span><strong><StatusBadge Text="@(readiness?.State ?? T("Unknown"))" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /></strong></div>
+        <div><span>@T("RuntimeProfile")</span><strong>@(readiness?.RuntimeProfileId is null ? T("NotResolved") : ResourceName(readiness.RuntimeProfileId))</strong></div>
+        <div><span>@T("ExecutionMode")</span><strong>@T("Interactive")</strong></div>
     </section>
 
     @if (readiness is { Ready: false })
     {
-        <div class="form-alert form-alert-warning" role="status"><strong>Runtime not ready</strong><span>@readiness.Error</span><button class="text-button" @onclick="PrepareRuntimeAsync" disabled="@preparing">@(preparing ? "Activating…" : "Retry activation")</button><button class="text-button" @onclick="LoadExecutionContextAsync">Refresh</button></div>
+        <div class="form-alert form-alert-warning" role="status"><strong>@T("RuntimeNotReady")</strong><span>@readiness.Error</span><button class="text-button" @onclick="PrepareRuntimeAsync" disabled="@preparing">@(preparing ? T("Activating") : T("RetryActivation"))</button><button class="text-button" @onclick="LoadExecutionContextAsync">@T("Refresh")</button></div>
     }
     @if (!string.IsNullOrWhiteSpace(modelWarning))
     {
@@ -55,22 +57,22 @@ else
         <DataAnnotationsValidator />
         <ValidationSummary />
         <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">Quick Run</p><h2>User input</h2></div><button class="text-button" type="button" @onclick="() => advanced = !advanced">@(advanced ? "Hide advanced" : "Advanced Run")</button></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("QuickRun")</p><h2>@T("UserInput")</h2></div><button class="text-button" type="button" @onclick="() => advanced = !advanced">@(advanced ? T("HideAdvanced") : T("AdvancedRun"))</button></div>
             <div class="form-grid">
-                <label class="form-span-2"><span>Prompt</span><InputTextArea @bind-Value="model.Prompt" rows="7" placeholder="Ask this agent to perform a task…" /><ValidationMessage For="() => model.Prompt" /></label>
+                <label class="form-span-2"><span>@T("Prompt")</span><InputTextArea @bind-Value="model.Prompt" rows="7" placeholder="@T("PromptPlaceholder")" /><ValidationMessage For="() => model.Prompt" /></label>
                 @if (advanced)
                 {
-                    <label><span>Context · JSON or text</span><InputTextArea @bind-Value="model.Context" rows="7" /></label>
-                    <label><span>Runtime parameter overrides · JSON</span><InputTextArea @bind-Value="model.RuntimeParameters" rows="7" placeholder="{ &quot;temperature&quot;: 0.2 }" /><small>Overrides remain subject to Model Profile policy resolution.</small></label>
-                    <label><span>Timeout · seconds</span><InputNumber @bind-Value="model.TimeoutSeconds" /><ValidationMessage For="() => model.TimeoutSeconds" /></label>
-                    <label><span>Streaming</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@value</option> }</InputSelect><small>Automatic inherits the runtime profile default.</small></label>
-                    <label><span>Tool arguments</span><InputSelect @bind-Value="model.ToolArgumentRetention"><option value="@ToolArgumentRetentionMode.Inherit">Inherit host default</option><option value="@ToolArgumentRetentionMode.Retain">Retain for this Run</option><option value="@ToolArgumentRetentionMode.DoNotRetain">Do not retain for this Run</option></InputSelect><small>The host maximum capture length still applies.</small></label>
+                    <label><span>@T("Context")</span><InputTextArea @bind-Value="model.Context" rows="7" /></label>
+                    <label><span>@T("RuntimeParameterOverrides")</span><InputTextArea @bind-Value="model.RuntimeParameters" rows="7" placeholder="{ &quot;temperature&quot;: 0.2 }" /><small>@T("RuntimeParameterOverridesHelp")</small></label>
+                    <label><span>@T("TimeoutSeconds")</span><InputNumber @bind-Value="model.TimeoutSeconds" /><ValidationMessage For="() => model.TimeoutSeconds" /></label>
+                    <label><span>@T("Streaming")</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@T($"Streaming.{value}")</option> }</InputSelect><small>@T("StreamingHelp")</small></label>
+                    <label><span>@T("ToolArguments")</span><InputSelect @bind-Value="model.ToolArgumentRetention"><option value="@ToolArgumentRetentionMode.Inherit">@T("ToolArguments.Inherit")</option><option value="@ToolArgumentRetentionMode.Retain">@T("ToolArguments.Retain")</option><option value="@ToolArgumentRetentionMode.DoNotRetain">@T("ToolArguments.DoNotRetain")</option></InputSelect><small>@T("ToolArgumentsHelp")</small></label>
                 }
             </div>
             <div class="runner-actions">
-                <button class="button-primary" type="submit" disabled="@(IsBusy || !CanRun)">@(IsBusy ? "Running…" : "Run")</button>
-                <button class="button-danger" type="button" @onclick="CancelAsync" disabled="@(!CanCancel)">Stop</button>
-                <button class="button-secondary" type="button" @onclick="RetryAsync" disabled="@(state.Run is null || IsBusy)">Retry</button>
+                <button class="button-primary" type="submit" disabled="@(IsBusy || !CanRun)">@(IsBusy ? T("Running") : T("Run"))</button>
+                <button class="button-danger" type="button" @onclick="CancelAsync" disabled="@(!CanCancel)">@T("Stop")</button>
+                <button class="button-secondary" type="button" @onclick="RetryAsync" disabled="@(state.Run is null || IsBusy)">@T("Retry")</button>
             </div>
         </section>
     </EditForm>
@@ -81,68 +83,69 @@ else
             <div class="runner-tabs" role="tablist">
                 @foreach (var tab in Tabs)
                 {
-                    <button class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@tab</button>
+                    <button class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@TabLabel(tab)</button>
                 }
             </div>
             <div class="runner-tab-content">
                 @if (activeTab == "Response")
                 {
-                    <div class="runner-response"><pre>@(string.IsNullOrWhiteSpace(state.Response) ? "Waiting for the agent response…" : state.Response)</pre></div>
+                    <div class="runner-response"><pre>@(string.IsNullOrWhiteSpace(state.Response) ? I("WaitingResponse") : state.Response)</pre></div>
                 }
                 else if (activeTab == "Execution")
                 {
                     <dl class="runner-details">
-                        <dt>Run ID</dt><dd><code>@state.Run.Id</code></dd>
-                        <dt>Status</dt><dd><StatusBadge Text="@state.State.ToString()" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
-                        <dt>Duration</dt><dd>@Duration(state.Run)</dd>
-                        <dt>Agent version</dt><dd>@state.Run.Properties.Agent.Version</dd>
-                        <dt>Model profile</dt><dd>@(state.Run.Status.ModelProfile ?? "Not resolved")</dd>
-                        <dt>Resolved model</dt><dd>@(state.Run.Status.ResolvedModel ?? "Provider did not report it")</dd>
-                        <dt>Temperature</dt><dd>@(state.Run.Status.EffectiveTemperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Profile default")</dd>
-                        <dt>Maximum output tokens</dt><dd>@(state.Run.Status.EffectiveMaxOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Provider default")</dd>
-                        <dt>Tool arguments</dt><dd>@ToolArgumentRetentionLabel(state.Run.Properties.Execution.PersistToolArguments)</dd>
-                        <dt>Tokens</dt><dd>@(state.Run.Status.InputTokens?.ToString() ?? "—") input · @(state.Run.Status.OutputTokens?.ToString() ?? "—") output</dd>
-                        <dt>Started</dt><dd>@(state.Run.Status.StartedAt?.LocalDateTime.ToString("G") ?? "Pending")</dd>
-                        <dt>Completed</dt><dd>@(state.Run.Status.CompletedAt?.LocalDateTime.ToString("G") ?? "—")</dd>
-                        <dt>Initiator</dt><dd>@state.Run.Properties.Initiator</dd>
-                        <dt>Origin</dt><dd>@state.Run.Properties.Origin</dd>
+                        <dt>@I("RunId")</dt><dd><code>@state.Run.Id</code></dd>
+                        <dt>@I("Status")</dt><dd><StatusBadge Text="@I($"RunState.{state.State}")" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /></dd>
+                        <dt>@I("Duration")</dt><dd>@Duration(state.Run)</dd>
+                        <dt>@I("AgentVersion")</dt><dd>@state.Run.Properties.Agent.Version</dd>
+                        <dt>@I("ModelProfile")</dt><dd>@(state.Run.Status.ModelProfile ?? I("NotResolved"))</dd>
+                        <dt>@I("ResolvedModel")</dt><dd>@(state.Run.Status.ResolvedModel ?? I("ModelNotReported"))</dd>
+                        <dt>@I("Temperature")</dt><dd>@(state.Run.Status.EffectiveTemperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? I("ProfileDefault"))</dd>
+                        <dt>@I("MaximumOutputTokens")</dt><dd>@(state.Run.Status.EffectiveMaxOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? I("ProviderDefault"))</dd>
+                        <dt>@I("ToolArguments")</dt><dd>@ToolArgumentRetentionLabel(state.Run.Properties.Execution.PersistToolArguments)</dd>
+                        <dt>@I("Tokens")</dt><dd>@(state.Run.Status.InputTokens?.ToString() ?? "—") @I("Input") · @(state.Run.Status.OutputTokens?.ToString() ?? "—") @I("Output")</dd>
+                        <dt>@I("Started")</dt><dd>@(state.Run.Status.StartedAt?.LocalDateTime.ToString("G") ?? I("Pending"))</dd>
+                        <dt>@I("Completed")</dt><dd>@(state.Run.Status.CompletedAt?.LocalDateTime.ToString("G") ?? "—")</dd>
+                        <dt>@I("Initiator")</dt><dd>@state.Run.Properties.Initiator</dd>
+                        <dt>@I("Origin")</dt><dd>@state.Run.Properties.Origin</dd>
                     </dl>
                 }
                 else if (activeTab == "Messages")
                 {
                     <div class="runner-messages">
                         @foreach (var message in state.Run.Properties.Input.Messages) { <article><strong>@message.Role</strong><pre>@message.Content</pre></article> }
-                        @if (!string.IsNullOrWhiteSpace(state.Response)) { <article><strong>Assistant</strong><pre>@state.Response</pre></article> }
+                        @if (!string.IsNullOrWhiteSpace(state.Response)) { <article><strong>@I("Assistant")</strong><pre>@state.Response</pre></article> }
                     </div>
                 }
                 else if (activeTab == "Tools")
                 {
                     var tools = state.ToolCalls;
-                    @if (tools.Count == 0) { <EmptyState Title="No tool calls" Message="This run has not reported a tool invocation." /> }
-                    else { @foreach (var tool in tools) { <details><summary>@tool.Name · @tool.State</summary><p><a class="text-button" href="@GovernanceUrl(state.Run.Id, tool)">Inspect governance decision</a></p><pre>@tool.Arguments</pre><pre>@(tool.Error ?? tool.Result)</pre></details> } }
+                    @if (tools.Count == 0) { <EmptyState Title="@I("NoToolCalls")" Message="@I("NoToolCallsMessage")" /> }
+                    else { @foreach (var tool in tools) { <details><summary>@tool.Name · @tool.State</summary><p><a class="text-button" href="@GovernanceUrl(state.Run.Id, tool)">@I("InspectGovernanceDecision")</a></p><pre>@tool.Arguments</pre><pre>@(tool.Error ?? tool.Result)</pre></details> } }
                 }
                 else if (activeTab == "Trace")
                 {
-                    <ol class="runner-trace">@foreach (var item in state.Events) { <li><time>@item.Timestamp.LocalDateTime.ToString("T")</time><strong>@(item.Step ?? item.Kind.ToString())</strong><span>@item.Message</span></li> }</ol>
+                    @if (state.Events.Count == 0) { <EmptyState Title="@I("NoTraceEvents")" Message="@I("NoTraceEventsMessage")" /> }
+                    else { <ol class="runner-trace">@foreach (var item in state.Events) { <li><time>@item.Timestamp.LocalDateTime.ToString("T")</time><strong>@(item.Step ?? item.Kind.ToString())</strong><span>@item.Message</span></li> }</ol> }
                 }
                 else if (activeTab == "Raw")
                 {
-                    <div class="runner-raw-actions"><button class="button-secondary" @onclick="() => CopyAsync(rawRequest)">Copy request JSON</button><button class="button-secondary" @onclick="() => CopyAsync(RawResponse)">Copy response JSON</button></div>
-                    <h3>Request</h3><pre class="runner-json">@rawRequest</pre>
-                    <h3>Run and events</h3><pre class="runner-json">@RawResponse</pre>
+                    <div class="runner-raw-actions"><button class="button-secondary" @onclick="() => CopyAsync(rawRequest)">@I("CopyRequestJson")</button><button class="button-secondary" @onclick="() => CopyAsync(RawResponse)">@I("CopyResponseJson")</button></div>
+                    <h3>@I("Request")</h3><pre class="runner-json">@rawRequest</pre>
+                    <h3>@I("RunAndEvents")</h3><pre class="runner-json">@RawResponse</pre>
                 }
             </div>
         </section>
     }
 
     <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">History</p><h2>Recent agent runs</h2></div></div>
-        @if (history.Count == 0) { <EmptyState Title="No runs yet" Message="Start a Quick Run to create this agent's first Runtime resource." /> }
+        <div class="panel-header"><div><p class="eyebrow">@I("History")</p><h2>@I("RecentAgentRuns")</h2></div></div>
+        @if (history.Count == 0) { <EmptyState Title="@I("NoRunsYet")" Message="@I("NoRunsYetMessage")" /> }
         else
         {
             <DataGrid TItem="RuntimeRun" Items="history">
-                <Header><tr><th>Run</th><th>Date</th><th>Status</th><th>Duration</th><th>Initiator</th><th>Version</th><th>Prompt</th><th>Origin</th></tr></Header>
-                <Row Context="run"><tr><td><a href="/runs/@run.Id"><code>@ShortId(run.Id)</code></a></td><td>@run.Status.CreatedAt.LocalDateTime.ToString("g")</td><td><StatusBadge Text="@run.Status.State.ToString()" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></td><td>@Duration(run)</td><td>@run.Properties.Initiator</td><td>@run.Properties.Agent.Version</td><td>@PromptPreview(run)</td><td>@run.Properties.Origin</td></tr></Row>
+                <Header><tr><th>@I("Run")</th><th>@I("Date")</th><th>@I("Status")</th><th>@I("Duration")</th><th>@I("Initiator")</th><th>@I("Version")</th><th>@I("Prompt")</th><th>@I("Origin")</th></tr></Header>
+                <Row Context="run"><tr><td><a href="/runs/@run.Id"><code>@ShortId(run.Id)</code></a></td><td>@run.Status.CreatedAt.LocalDateTime.ToString("g")</td><td><StatusBadge Text="@I($"RunState.{run.Status.State}")" Status="@PlatformDashboardService.ToStatus(run.Status.State.ToString())" /></td><td>@Duration(run)</td><td>@run.Properties.Initiator</td><td>@run.Properties.Agent.Version</td><td>@PromptPreview(run)</td><td>@run.Properties.Origin</td></tr></Row>
             </DataGrid>
         }
     </section>
@@ -153,6 +156,9 @@ else
     [Parameter] public string? RunId { get; set; }
 
     private static readonly string[] Tabs = ["Response", "Execution", "Messages", "Tools", "Trace", "Raw"];
+    private string T(string key) => Localizer[key];
+    private string I(string key) => InspectorLocalizer[key];
+    private string TabLabel(string tab) => InspectorLocalizer[$"Tab.{tab}"];
     private readonly CancellationTokenSource cancellation = new();
     private readonly AgentRunnerState state = new();
     private CancellationTokenSource? observation;
@@ -329,8 +335,8 @@ else
     private static string ResourceName(string id) => id;
     private static string ShortId(string id) => id.Length > 13 ? id[..13] : id;
     private static string PromptPreview(RuntimeRun run) { var value = run.Properties.Input.Messages.LastOrDefault(message => message.Role == RuntimeMessageRole.User)?.Content ?? "—"; return value.Length > 60 ? $"{value[..60]}…" : value; }
-    private static string Duration(RuntimeRun run) { var start = run.Status.StartedAt ?? run.Status.CreatedAt; var end = run.Status.CompletedAt; return end is null ? "Live" : (end.Value - start).ToString("g"); }
-    private static string ToolArgumentRetentionLabel(bool? value) => value switch { true => "Retain for this Run", false => "Do not retain for this Run", null => "Inherit host default" };
+    private string Duration(RuntimeRun run) { var start = run.Status.StartedAt ?? run.Status.CreatedAt; var end = run.Status.CompletedAt; return end is null ? I("Live") : (end.Value - start).ToString("g"); }
+    private string ToolArgumentRetentionLabel(bool? value) => value switch { true => T("ToolArguments.Retain"), false => T("ToolArguments.DoNotRetain"), null => T("ToolArguments.Inherit") };
     private static string GovernanceUrl(string runId, RuntimeToolCall tool) => $"/tool-governance/runtime/{Uri.EscapeDataString(runId)}?toolCallId={Uri.EscapeDataString(tool.Id)}&invocationId={Uri.EscapeDataString(tool.InvocationId)}";
     private static CreateRuntimeRunRequest ToRequest(RuntimeRun run) => new() { Agent = run.Properties.Agent, Input = run.Properties.Input, Execution = run.Properties.Execution, Origin = run.Properties.Origin };
 

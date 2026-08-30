@@ -63,14 +63,16 @@ public sealed class IdentityFoundationTests
         await store.AddPrincipalAsync(secondPrincipal, default);
 
         await store.UpsertPrincipalPreferencesAsync(
-            new PrincipalPreferences(firstPrincipalId, ThemePreference.Dark, DateTimeOffset.UtcNow),
+            new PrincipalPreferences(firstPrincipalId, ThemePreference.Dark, DateTimeOffset.UtcNow, "fr-FR"),
             default);
         await store.UpsertPrincipalPreferencesAsync(
             new PrincipalPreferences(secondPrincipal.Id, ThemePreference.Light, DateTimeOffset.UtcNow),
             default);
 
         Assert.AreEqual(ThemePreference.Dark, (await store.GetPrincipalPreferencesAsync(firstPrincipalId, default))?.Theme);
+        Assert.AreEqual("fr-FR", (await store.GetPrincipalPreferencesAsync(firstPrincipalId, default))?.Language);
         Assert.AreEqual(ThemePreference.Light, (await store.GetPrincipalPreferencesAsync(secondPrincipal.Id, default))?.Theme);
+        Assert.IsNull((await store.GetPrincipalPreferencesAsync(secondPrincipal.Id, default))?.Language);
     }
 
     [TestMethod]

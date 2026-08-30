@@ -23,6 +23,7 @@ public sealed class WorkplaceHostTests
     public void FirstVisitKeepsLoadingWhileRedirectingToTheCanonicalWorkspace()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         using var httpClient = new HttpClient(new WorkspaceListHandler())
         {
             BaseAddress = new Uri("http://localhost/")
@@ -44,6 +45,7 @@ public sealed class WorkplaceHostTests
     public void WorkspaceArrivalSelectsTheConfiguredDefaultDashboard()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         using var httpClient = new HttpClient(new DefaultDashboardHandler()) { BaseAddress = new Uri("http://localhost/") };
         context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
         context.Services.AddSingleton(new WorkplaceRealtimeClient(new Uri("http://localhost/hubs/workplace"), null));
@@ -61,6 +63,7 @@ public sealed class WorkplaceHostTests
     public void UnavailableStateRetryUsesANativePageReloadWithoutBlazorInteractivity()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var navigation = context.Services.GetRequiredService<NavigationManager>();
         navigation.NavigateTo("w/personal");
 

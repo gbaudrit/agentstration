@@ -1,25 +1,29 @@
 @page "/tools"
 @inject IToolsClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
 
-<PageTitle>Tools · Agentstration</PageTitle>
-<PageHeader Title="Tools" Description="Govern provider-backed capabilities before assigning them to agents.">
-    <Actions><a class="button-secondary" href="/tools/providers">Providers</a><button class="button-secondary" @onclick="LoadAsync">Refresh</button></Actions>
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")">
+    <Actions><a class="button-secondary" href="/tools/providers">@T("Providers")</a><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button></Actions>
 </PageHeader>
-<ResourceTabs Label="Tool sections"><a class="active" href="/tools">Catalog</a><a href="/tools/providers">Providers</a></ResourceTabs>
+<ResourceTabs Label="@T("SectionsLabel")"><a class="active" href="/tools">@T("Catalog")</a><a href="/tools/providers">@T("Providers")</a></ResourceTabs>
 
-@if (loading) { <LoadingState Message="Loading tool catalog…" /> }
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
 else if (error is not null) { <ErrorState Message="@error" /> }
-else if (tools.Count == 0) { <EmptyState Title="No discovered tools" Message="Create a Tool Provider and refresh discovery. Newly discovered tools remain disabled by default." /> }
+else if (tools.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
 else
 {
     <DataGrid TItem="ToolResource" Items="tools">
-        <Header><tr><th>Tool</th><th>Provider</th><th>Availability</th><th>Enabled</th><th></th></tr></Header>
-        <Row Context="tool"><tr><td><strong>@tool.Definition.DisplayName</strong><br /><code>@tool.Definition.ExternalId</code></td><td>@ResourceName(tool.Definition.Provider?.ResourceId)</td><td><StatusBadge Text="@(tool.Definition.Discovery?.Available == true ? "Available" : "Unavailable")" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@(tool.Definition.Enabled ? "Yes" : "No")</td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.Name)}")">Details →</a></td></tr></Row>
+        <Header><tr><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th></th></tr></Header>
+        <Row Context="tool"><tr><td><strong>@tool.Definition.DisplayName</strong><br /><code>@tool.Definition.ExternalId</code></td><td>@ResourceName(tool.Definition.Provider?.ResourceId)</td><td><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.Name)}")">@T("Details")</a></td></tr></Row>
     </DataGrid>
 }
 
 @code {
     private IReadOnlyList<ToolResource> tools = []; private bool loading = true; private string? error;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
+    private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync() { loading = true; error = null; try { tools = await Client.GetToolsAsync(); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
     private static string ResourceName(string? id) => id ?? "—";

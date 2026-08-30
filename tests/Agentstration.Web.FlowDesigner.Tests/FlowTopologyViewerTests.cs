@@ -1,5 +1,7 @@
 using Agentstration.Web.FlowDesigner.Components;
 using Bunit;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Web.FlowDesigner.Tests;
 
@@ -10,6 +12,8 @@ public sealed class FlowTopologyViewerTests
     public void CanvasExposesZoomControlsInReadOnlyMode()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var strings = context.Services.GetRequiredService<IStringLocalizer<FlowDesignerStrings>>();
         var graph = new FlowTopologyGraph(
             [new("step:input", "input", "Input", "input", 0, 0)],
             [],
@@ -19,10 +23,10 @@ public sealed class FlowTopologyViewerTests
             .Add(component => component.Graph, graph));
 
         Assert.AreEqual("100%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());
-        rendered.Find("button[aria-label='Zoom in']").Click();
+        rendered.Find($"button[aria-label='{strings["ZoomIn"].Value}']").Click();
         Assert.AreEqual("115%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());
-        Assert.IsNotNull(rendered.Find("button[aria-label='Zoom out']"));
-        rendered.FindAll(".topology-zoom-controls button").Single(button => button.TextContent.Trim() == "Fit").Click();
+        Assert.IsNotNull(rendered.Find($"button[aria-label='{strings["ZoomOut"].Value}']"));
+        rendered.FindAll(".topology-zoom-controls button").Single(button => button.TextContent.Trim() == strings["Fit"].Value).Click();
         Assert.AreEqual("100%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());
     }
 
@@ -30,6 +34,7 @@ public sealed class FlowTopologyViewerTests
     public void ViewerRendersDirectedEdgesAndSupportsNodeSelection()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var selected = string.Empty;
         var graph = new FlowTopologyGraph(
             [

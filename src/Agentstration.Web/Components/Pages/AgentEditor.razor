@@ -8,37 +8,38 @@
 @inject IToolsClient ToolsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
 
-<PageTitle>@(IsNew ? "Create agent" : Name) · Agentstration</PageTitle>
+<PageTitle>@(IsNew ? T("CreateAgent") : Name) · Agentstration</PageTitle>
 
 @if (IsNew)
 {
-    <PageHeader Eyebrow="Agent" Title="Create agent" Description="Define the desired state for a new specialized agent resource.">
-        <Actions><a class="button-secondary" href="/agents">Back to agents</a></Actions>
+    <PageHeader Eyebrow="@T("Agent")" Title="@T("CreateAgent")" Description="@T("CreateDescription")">
+        <Actions><a class="button-secondary" href="/agents">@T("BackToAgents")</a></Actions>
     </PageHeader>
 }
 
 @if (loading || model is null)
 {
-    <LoadingState Message="Loading agent resource…" />
+    <LoadingState Message="@T("Loading")" />
 }
 else
 {
     @if (!IsNew)
     {
-        <ResourceHeader ResourceType="Agent" Domain="agent" Icon="◎" Name="@model.DisplayName" Description="@model.Description" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
-            <Metadata><span><code>@model.Name</code></span><span>Generation @generation</span></Metadata>
-            <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">Run</a> }<button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">Reconcile deployment</button></Actions>
+        <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@model.DisplayName" Description="@model.Description" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
+            <Metadata><span><code>@model.Name</code></span><span>@T("Generation", generation)</span></Metadata>
+            <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }<button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button></Actions>
         </ResourceHeader>
-        <ResourceTabs Label="Agent sections"><button type="button" class="@(!sourceMode ? "active" : null)" @onclick="ShowDefinition">Definition</button><span>Deployments</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">Runs</a> } else { <span>Runs</span> }<span>Metrics</span><span>Events</span><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">YAML</button></ResourceTabs>
-        <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? "Modified · not saved" : "Saved definition")" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
-            <Actions>@if (!IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">Apply generation</button> }</Actions>
+        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
+            <Actions>@if (!IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
         </StateComparison>
     }
 
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
-        <div class="form-alert form-alert-danger" role="alert"><strong>Unable to apply</strong><span>@errorMessage</span>@if (!string.IsNullOrWhiteSpace(errorId)) { <code>@errorId</code> }</div>
+        <div class="form-alert form-alert-danger" role="alert"><strong>@T("UnableToApply")</strong><span>@errorMessage</span>@if (!string.IsNullOrWhiteSpace(errorId)) { <code>@errorId</code> }</div>
     }
     @if (!string.IsNullOrWhiteSpace(successMessage))
     {
@@ -47,16 +48,16 @@ else
 
     @if (IsNew)
     {
-        <ResourceTabs Label="Agent editor mode"><button type="button" class="@(!sourceMode ? "active" : null)" @onclick="ShowDefinition">Form</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">YAML</button></ResourceTabs>
+        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
     }
 
     @if (sourceMode)
     {
         <section class="panel form-section" data-testid="agent-yaml-editor">
-            <div class="panel-header"><div><p class="eyebrow">Raw resource</p><h2>Agent YAML</h2><p>Edit the same desired definition exposed by the form. Runtime status and generated fields are not part of this manifest.</p></div></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("AgentYaml")</h2><p>@T("AgentYamlHelp")</p></div></div>
             @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
-            <label><span>Resource manifest</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput"></textarea></label>
-            <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">Apply to form</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create from YAML" : "Save YAML")</button></div>
+            <label><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput"></textarea></label>
+            <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></div>
         </section>
     }
     else
@@ -66,59 +67,59 @@ else
         <ValidationSummary />
 
         <section class="panel form-section" id="definition">
-            <div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Resource coordinates</h2></div>@if (!IsNew) { <StatusBadge Text="@($"Generation {generation}")" Status="UiStatus.Info" /> }</div>
+            <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ResourceCoordinates")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("Generation", generation)" Status="UiStatus.Info" /> }</div>
             <div class="form-grid">
-                <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
-                <label><span>Handler</span><InputText @bind-Value="model.Handler" /><ValidationMessage For="() => model.Handler" /></label>
-                <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
+                <label><span>@T("Handler")</span><InputText @bind-Value="model.Handler" /><ValidationMessage For="() => model.Handler" /></label>
+                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
             </div>
-            @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">UID: <code>@resourceId</code></p> }
+            @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">@T("Uid"): <code>@resourceId</code></p> }
         </section>
 
         <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Behavior and model</h2></div></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("BehaviorAndModel")</h2></div></div>
             <div class="form-grid">
-                <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
+                <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
                 <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" SelectFirstWhenMissing="@IsNew" /><ValidationMessage For="() => model.ModelProfileName" /></div>
-                <label class="form-span-2"><span>Runtime profile</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option> }</select><small>Used when this Agent is prepared for local execution.</small></label>
-                <label class="form-span-2"><span>Instructions</span><InputTextArea @bind-Value="model.Instructions" rows="6" /><ValidationMessage For="() => model.Instructions" /></label>
+                <label class="form-span-2"><span>@T("RuntimeProfile")</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option> }</select><small>@T("RuntimeProfileHelp")</small></label>
+                <label class="form-span-2"><span>@T("Instructions")</span><InputTextArea @bind-Value="model.Instructions" rows="6" /><ValidationMessage For="() => model.Instructions" /></label>
             </div>
         </section>
 
         @if (!IsNew)
         {
             <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">Model configuration</p><h2>Declared and resolved</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelManagementUi.Label(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
+                <div class="panel-header"><div><p class="eyebrow">@T("ModelConfiguration")</p><h2>@T("DeclaredAndResolved")</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelStatusLabel(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
                 <div class="declaration-resolution-grid">
-                    <article><h3>Declared configuration</h3><dl class="resource-details"><dt>Model profile</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? model.ModelProfileName)</dd><dt>Name</dt><dd><code>@model.ModelProfileName</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">Open model profile →</a> }</article>
-                    <article><h3>Resolved configuration</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>Provider</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? "Not resolved")</dd><dt>Contribution</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? "Not resolved")</dd><dt>Model</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>Status</dt><dd>@ModelManagementUi.Label(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">Open provider →</a> }}</article>
+                    <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? model.ModelProfileName)</dd><dt>@T("Name")</dt><dd><code>@model.ModelProfileName</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">@T("OpenModelProfile") →</a> }</article>
+                    <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">@T("OpenProvider") →</a> }}</article>
                 </div>
             </section>
         }
 
         <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">References</p><h2>Tools and tags</h2></div></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("References")</p><h2>@T("ToolsAndTags")</h2></div></div>
             <div class="form-grid">
-                <div><span class="field-label">Governed tools</span>
-                    @if (catalogTools.Count == 0) { <small>No discovered tools are available. Configure them under Tools.</small> }
+                <div><span class="field-label">@T("GovernedTools")</span>
+                    @if (catalogTools.Count == 0) { <small>@T("NoDiscoveredTools")</small> }
                     @foreach (var tool in catalogTools)
                     {
                         var assigned = IsToolAssigned(tool.Metadata.Name); var usable = tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
-                        <label><input type="checkbox" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => ToggleTool(tool.Metadata.Name, (bool)args.Value!)" /> <span>@tool.Definition.DisplayName</span><small>@(tool.Definition.Provider?.Name ?? "—") · @(usable ? "Available" : assigned ? "Assigned but unavailable or disabled" : "Not usable")</small></label>
+                        <label><input type="checkbox" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => ToggleTool(tool.Metadata.Name, (bool)args.Value!)" /> <span>@tool.Definition.DisplayName</span><small>@(tool.Definition.Provider?.Name ?? "—") · @(usable ? T("Available") : assigned ? T("AssignedUnavailable") : T("NotUsable"))</small></label>
                     }
                 </div>
-                <label><span>Tags</span><InputTextArea @bind-Value="model.Tags" rows="7" /><small>One key=value pair per line.</small></label>
+                <label><span>@T("Tags")</span><InputTextArea @bind-Value="model.Tags" rows="7" /><small>@T("TagsHelp")</small></label>
             </div>
         </section>
 
         @if (IsNew)
         {
-            <div class="form-actions"><a class="button-secondary" href="/agents">Cancel</a><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? "Creating…" : "Create and deploy")</button></div>
+            <div class="form-actions"><a class="button-secondary" href="/agents">@T("Cancel")</a><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Creating") : T("CreateAndDeploy"))</button></div>
         }
         else
         {
             <UnsavedChangesBar IsVisible="@isDirty">
-                <Actions><button class="button-secondary" type="button" @onclick="DiscardAsync" disabled="@saving">Discard</button><button class="button-secondary" type="submit" @onclick="() => applyRuntimeOnSubmit = false" disabled="@saving">Save draft</button><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? "Applying…" : "Save and apply")</button></Actions>
+                <Actions><button class="button-secondary" type="button" @onclick="DiscardAsync" disabled="@saving">@T("Discard")</button><button class="button-secondary" type="submit" @onclick="() => applyRuntimeOnSubmit = false" disabled="@saving">@T("SaveDraft")</button><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Applying") : T("SaveAndApply"))</button></Actions>
             </UnsavedChangesBar>
         }
     </EditForm>
@@ -127,6 +128,9 @@ else
 
 @code {
     [Parameter] public string? Name { get; set; }
+
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string ModelStatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "ready" => "Ready", "succeeded" => "Succeeded", "starting" => "Starting", "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "unavailable" => "Unavailable", "invalidconfiguration" => "InvalidConfiguration", "incompatible" => "Incompatible", "failed" => "Failed", _ => "Unknown" }}"];
 
     private readonly CancellationTokenSource cancellation = new();
     private AgentEditorModel? model;
@@ -155,10 +159,10 @@ else
     private string RunUrl => $"{OverviewUrl}/run";
     private bool IsStateSynchronized => !isDirty && readiness?.Ready == true && readiness.Generation == generation;
     private long? ActiveGeneration => readiness?.Ready == true ? readiness.Generation : null;
-    private string ActiveStatus => readiness?.Ready == true ? StatusPresentation.Label(readiness.State) : readiness?.Error ?? readiness?.State ?? "Not deployed";
+    private string ActiveStatus => readiness?.Ready == true ? StatusPresentation.Label(readiness.State) : readiness?.Error ?? readiness?.State ?? T("NotDeployed");
     private string? ActiveRuntime => readiness?.RuntimeProfileId is null ? readiness?.DeploymentId : ResourceName(readiness.RuntimeProfileId);
-    private string StateSummary => IsStateSynchronized ? $"Generation {generation} is ready." : isDirty ? "Save or apply the modified desired definition." : "The current generation is not active.";
-    private string HeaderStatus => readiness?.Ready == true ? "Ready" : StatusPresentation.Label(provisioningStatus);
+    private string StateSummary => IsStateSynchronized ? T("GenerationReady", generation) : isDirty ? T("SaveOrApplyModified") : T("CurrentGenerationNotActive");
+    private string HeaderStatus => readiness?.Ready == true ? T("Ready") : StatusPresentation.Label(provisioningStatus);
     private string RuntimeProfileValue => model is null ? string.Empty : $"{model.RuntimeProfileNamespace}:{model.RuntimeProfileName}";
     private UiStatus HeaderStatusTone => readiness?.Ready == true ? UiStatus.Success : StatusPresentation.Tone(provisioningStatus);
 
@@ -232,15 +236,15 @@ else
         try
         {
             var request = ResourceManifestSerializer.FromYaml<AgentResourceRequest>(rawYaml);
-            if (!string.Equals(request.ApiVersion, ManagementApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException($"apiVersion must be '{ManagementApiVersions.CoreV1}'.");
-            if (!string.Equals(request.Kind, ResourceKinds.Agent, StringComparison.Ordinal)) throw new ArgumentException($"kind must be '{ResourceKinds.Agent}'.");
-            if (!request.Metadata.Namespace.IsDefault) throw new ArgumentException("Pack-owned Agent definitions are read-only here; fork the Pack and edit its project source instead.");
-            if (!IsNew && !string.Equals(request.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException("metadata.name is immutable for an existing Agent.");
+            if (!string.Equals(request.ApiVersion, ManagementApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException(T("ApiVersionRequired", ManagementApiVersions.CoreV1));
+            if (!string.Equals(request.Kind, ResourceKinds.Agent, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", ResourceKinds.Agent));
+            if (!request.Metadata.Namespace.IsDefault) throw new ArgumentException(T("PackAgentReadOnly"));
+            if (!IsNew && !string.Equals(request.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("AgentNameImmutable"));
             model = AgentEditorModel.FromRequest(request);
             _ = model.ToRequest();
             rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest());
             isDirty = true;
-            successMessage = "YAML applied to the editable definition. Save to persist it.";
+            successMessage = T("YamlApplied");
             return true;
         }
         catch (Exception exception)
@@ -327,15 +331,15 @@ else
                 var activation = await RuntimeClient.PrepareAgentAsync(snapshot.Value.Namespace, snapshot.Value.Name, snapshot.Value.Generation, cancellation.Token);
                 if (!string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 {
-                    var message = $"The agent definition was saved, but generation {snapshot.Value.Generation} could not be activated (runtime state: {activation.State}). The previous healthy generation remains active.";
-                    Notifications.Add(new NotificationItem(Guid.NewGuid(), "Runtime activation failed", message, DateTimeOffset.Now, UiStatus.Warning));
+                    var message = T("ActivationFailedMessage", snapshot.Value.Generation, activation.State);
+                    Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ActivationFailed"), message, DateTimeOffset.Now, UiStatus.Warning));
                     if (wasNew) Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.Name)}");
                     else { errorMessage = message; await LoadAgentModelAsync(snapshot.Value.Name); await LoadReadinessAsync(snapshot.Value.Name, snapshot.Value.Generation); }
                     return;
                 }
             }
 
-            successMessage = wasNew ? (applyRuntime ? "Agent created and deployed." : "Agent draft created.") : applyRuntime ? $"Agent updated and generation {snapshot.Value.Generation} activated." : $"Desired generation {snapshot.Value.Generation} saved without changing the active deployment.";
+            successMessage = wasNew ? (applyRuntime ? T("AgentCreatedDeployed") : T("AgentDraftCreated")) : applyRuntime ? T("AgentUpdatedActivated", snapshot.Value.Generation) : T("GenerationSavedWithoutDeployment", snapshot.Value.Generation);
             Notifications.Add(new NotificationItem(Guid.NewGuid(), successMessage, snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
             if (wasNew)
                 Navigation.NavigateTo($"/agents/{Uri.EscapeDataString(snapshot.Value.Name)}");
@@ -348,7 +352,7 @@ else
         catch (ArgumentException exception) { errorMessage = exception.Message; }
         catch (AgentstrationApiException exception)
         {
-            errorMessage = exception.IsConcurrencyConflict ? "This agent changed on the server. Reload the page before saving again." : exception.Message;
+            errorMessage = exception.IsConcurrencyConflict ? T("ConcurrencyConflict") : exception.Message;
             errorId = exception.ErrorId;
         }
         finally { saving = false; }
@@ -363,7 +367,7 @@ else
         {
             var activation = await RuntimeClient.PrepareAgentAsync(AgentResourceNamespace, model.Name, generation, cancellation.Token);
             await LoadReadinessAsync(model.Name, generation);
-            successMessage = string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal) ? $"Generation {generation} is active." : $"Reconciliation completed with state {activation.State}.";
+            successMessage = string.Equals(activation.State, OperationalState.Ready.ToString(), StringComparison.Ordinal) ? T("GenerationActive", generation) : T("ReconciliationCompleted", activation.State);
         }
         catch (AgentstrationApiException exception) { errorMessage = exception.Message; errorId = exception.ErrorId; }
         finally { saving = false; }

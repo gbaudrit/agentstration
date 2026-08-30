@@ -1,33 +1,33 @@
 @page "/account/pat"
 @model Agentstration.Web.Pages.Account.PatModel
 @{
-    ViewData["Title"] = "Personal access tokens";
+    ViewData["Title"] = Auth["PersonalAccessTokens"];
 }
 
 <header class="auth-heading">
-    <p class="eyebrow">Account</p>
-    <h1>Personal access tokens</h1>
-    <p>Create scoped credentials for scripts and command-line clients. A token never grants more access than your live Workspace membership.</p>
+    <p class="eyebrow">@Auth["Account"]</p>
+    <h1>@Auth["PersonalAccessTokens"]</h1>
+    <p>@Auth["TokensDescription"]</p>
 </header>
 
 @if (Model.CreatedToken is not null)
 {
     <section class="token-secret" role="status">
-        <strong>Copy this token now</strong>
-        <p>It will not be shown again.</p>
+        <strong>@Auth["CopyTokenNow"]</strong>
+        <p>@Auth["TokenShownOnce"]</p>
         <code>@Model.CreatedToken</code>
     </section>
 }
 
 <section class="security-section">
-    <h2>Create a token</h2>
+    <h2>@Auth["CreateToken"]</h2>
     <form method="post" asp-page-handler="Create" class="auth-form">
         <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
-        <label asp-for="Input.Name"></label>
-        <input asp-for="Input.Name" autocomplete="off" placeholder="CLI on my laptop" />
+        <label asp-for="Input.Name">@Auth["Name"]</label>
+        <input asp-for="Input.Name" autocomplete="off" placeholder="@Auth["TokenNamePlaceholder"]" />
         <span asp-validation-for="Input.Name" class="field-error"></span>
 
-        <label asp-for="Input.WorkspaceId">Workspace</label>
+        <label asp-for="Input.WorkspaceId">@Auth["Workspace"]</label>
         <select asp-for="Input.WorkspaceId">
             @foreach (var workspace in Model.Workspaces)
             {
@@ -35,16 +35,16 @@
             }
         </select>
 
-        <label asp-for="Input.ExpiresInDays"></label>
+        <label asp-for="Input.ExpiresInDays">@Auth["ExpiresIn"]</label>
         <select asp-for="Input.ExpiresInDays">
-            <option value="30">30 days</option>
-            <option value="90">90 days</option>
-            <option value="180">180 days</option>
-            <option value="365">365 days</option>
+            <option value="30">@Auth["Days", 30]</option>
+            <option value="90">@Auth["Days", 90]</option>
+            <option value="180">@Auth["Days", 180]</option>
+            <option value="365">@Auth["Days", 365]</option>
         </select>
 
         <fieldset class="permission-grid">
-            <legend>Permissions</legend>
+            <legend>@Auth["Permissions"]</legend>
             @foreach (var permission in Model.SupportedPermissions.Order(StringComparer.Ordinal))
             {
                 <label>
@@ -54,27 +54,27 @@
             }
         </fieldset>
         <span asp-validation-for="Input.Permissions" class="field-error"></span>
-        <button type="submit" class="primary-action">Create token</button>
+        <button type="submit" class="primary-action">@Auth["CreateToken"]</button>
     </form>
 </section>
 
 <section class="security-section security-section-separated">
     <div class="section-heading-row">
         <div>
-            <h2>Existing tokens</h2>
-            <p>Revocation takes effect on the next request.</p>
+            <h2>@Auth["ExistingTokens"]</h2>
+            <p>@Auth["RevocationDescription"]</p>
         </div>
         @if (Model.Tokens.Any(token => Model.Status(token) == "Active"))
         {
             <form method="post" asp-page-handler="RevokeAll">
-                <button type="submit" class="danger-action">Revoke all</button>
+                <button type="submit" class="danger-action">@Auth["RevokeAll"]</button>
             </form>
         }
     </div>
 
     @if (Model.Tokens.Count == 0)
     {
-        <p class="account-unavailable">No personal access token has been created.</p>
+        <p class="account-unavailable">@Auth["NoTokens"]</p>
     }
     else
     {
@@ -86,13 +86,13 @@
                     <div>
                         <strong>@token.Name</strong>
                         <code>@token.TokenPrefix…</code>
-                        <small>@status · expires @token.ExpiresAt.ToLocalTime().ToString("g") · last used @(token.LastUsedAt?.ToLocalTime().ToString("g") ?? "never")</small>
+                        <small>@Auth[$"TokenStatus.{status}"] · @Auth["ExpiresAt", token.ExpiresAt.ToLocalTime().ToString("g")] · @Auth["LastUsed", token.LastUsedAt?.ToLocalTime().ToString("g") ?? Auth["Never"]]</small>
                     </div>
                     @if (status == "Active")
                     {
                         <form method="post" asp-page-handler="Revoke">
                             <input type="hidden" name="tokenId" value="@token.Id" />
-                            <button type="submit" class="danger-action">Revoke</button>
+                            <button type="submit" class="danger-action">@Auth["Revoke"]</button>
                         </form>
                     }
                 </article>
@@ -101,4 +101,4 @@
     }
 </section>
 
-<a href="/account/security" class="auth-back-link">← Account security</a>
+<a href="/account/security" class="auth-back-link">← @Auth["AccountSecurity"]</a>

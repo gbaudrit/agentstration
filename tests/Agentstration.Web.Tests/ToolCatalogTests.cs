@@ -15,6 +15,7 @@ public sealed class ToolCatalogTests
     {
         using var context = new BunitContext();
         var client = new CatalogClient();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolsClient>(client);
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Tools>();

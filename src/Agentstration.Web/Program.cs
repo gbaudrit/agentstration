@@ -12,6 +12,7 @@ using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Web;
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Configuration;
 using Agentstration.Web.Features.Flows;
 using Agentstration.Web.Features.Workplace;
@@ -88,6 +89,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddAgentstrationOpenApi();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddAgentstrationLocalization(builder.Configuration);
 builder.Services.AddSignalR();
 builder.Services.AddAgentstrationLocalIdentity(
     identityConnectionString,
@@ -156,6 +158,7 @@ if (genAiObservability.HttpPayloadCapture.Enabled)
 }
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseRequestLocalization();
 app.UseAuthentication();
 app.UseMiddleware<PrincipalResolutionMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
@@ -164,6 +167,7 @@ app.UseAuthorization();
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapAgentstrationOpenApi();
 app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
+app.MapAgentstrationCultureEndpoint().AllowAnonymous();
 app.MapAgentstrationAuthentication();
 app.MapAgentstrationLocalAccountAdministration();
 app.MapAgentstrationIdentityApi();

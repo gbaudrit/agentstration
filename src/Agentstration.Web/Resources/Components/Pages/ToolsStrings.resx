@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Tools</value></data>
+  <data name="Description"><value>Govern provider-backed capabilities before assigning them to agents.</value></data>
+  <data name="Providers"><value>Providers</value></data>
+  <data name="Refresh"><value>Refresh</value></data>
+  <data name="SectionsLabel"><value>Tool sections</value></data>
+  <data name="Catalog"><value>Catalog</value></data>
+  <data name="Loading"><value>Loading tool catalog…</value></data>
+  <data name="EmptyTitle"><value>No discovered tools</value></data>
+  <data name="EmptyMessage"><value>Create a Tool Provider and refresh discovery. Newly discovered tools remain disabled by default.</value></data>
+  <data name="Tool"><value>Tool</value></data>
+  <data name="Provider"><value>Provider</value></data>
+  <data name="Availability"><value>Availability</value></data>
+  <data name="Enabled"><value>Enabled</value></data>
+  <data name="Available"><value>Available</value></data>
+  <data name="Unavailable"><value>Unavailable</value></data>
+  <data name="Yes"><value>Yes</value></data>
+  <data name="No"><value>No</value></data>
+  <data name="Details"><value>Details →</value></data>
+</root>

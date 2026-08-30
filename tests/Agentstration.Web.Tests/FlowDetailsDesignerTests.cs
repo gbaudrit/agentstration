@@ -22,22 +22,26 @@ public sealed class FlowDetailsDesignerTests
     public void NamespacedFlowOrdersDefinitionSecondAndExposesReadOnlyYamlLast()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters
             .Add(component => component.FlowId, "sample")
             .Add(component => component.FlowNamespace, "pack.sample"));
 
-        var overviewLink = rendered.FindAll("a").Single(link => link.TextContent.Trim() == "read-only Flow Designer");
+        var overviewLink = rendered.FindAll("a").Single(link => link.TextContent.Trim() == strings["ReadOnlyDesigner"].Value);
         Assert.AreEqual("/namespaces/pack.sample/flows/sample/designer", overviewLink.GetAttribute("href"));
-        CollectionAssert.AreEqual(new[] { "Overview", "Definition", "Runs", "Deployments", "YAML" }, rendered.FindAll("nav.section-tabs button").Select(button => button.TextContent.Trim()).ToArray());
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == "Definition").Click();
+        CollectionAssert.AreEqual(
+            new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Runs"].Value, strings["Tab.Deployments"].Value, strings["Tab.YAML"].Value },
+            rendered.FindAll("nav.section-tabs button").Select(button => button.TextContent.Trim()).ToArray());
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
 
         var link = rendered.Find("a.button-primary");
         Assert.AreEqual("/namespaces/pack.sample/flows/sample/designer", link.GetAttribute("href"));
         Assert.AreEqual(new ResourceNamespace("pack.sample"), client.RequestedNamespace);
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == "YAML").Click();
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.YAML"].Value).Click();
         var yaml = rendered.Find("[data-testid='flow-yaml-viewer'] textarea");
         Assert.IsTrue(yaml.HasAttribute("readonly"));
         Assert.IsTrue(yaml.TextContent.Contains("entryStep: input", StringComparison.Ordinal));
@@ -47,17 +51,19 @@ public sealed class FlowDetailsDesignerTests
     public void NamespacedOrchestrationPageShowsPublishedDefinitionWithoutSaveOrPublish()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub(orchestration: true);
         context.Services.AddSingleton<IFlowApiClient>(client);
         context.Services.AddSingleton<IManagementApiClient>(new ManagementClientStub());
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowOrchestrationEditorStrings>>();
 
         var rendered = context.Render<FlowOrchestrationEditor>(parameters => parameters
             .Add(component => component.FlowId, "review")
             .Add(component => component.FlowNamespace, "pack.sample"));
 
-        StringAssert.Contains(rendered.Markup, "Read only");
-        StringAssert.Contains(rendered.Markup, "Published version");
-        Assert.IsFalse(rendered.FindAll("button").Any(button => button.TextContent.Contains("Save", StringComparison.Ordinal) || button.TextContent.Contains("Publish", StringComparison.Ordinal)));
+        StringAssert.Contains(rendered.Markup, strings["ReadOnly"].Value);
+        StringAssert.Contains(rendered.Markup, strings["PublishedVersion"].Value);
+        Assert.IsFalse(rendered.FindAll("button").Any(button => button.TextContent.Contains(strings["Save"].Value, StringComparison.Ordinal) || button.TextContent.Contains(strings["PublishAndActivate"].Value, StringComparison.Ordinal)));
         Assert.IsTrue(rendered.Find("fieldset.orchestration-configuration").HasAttribute("disabled"));
     }
 
@@ -65,14 +71,16 @@ public sealed class FlowDetailsDesignerTests
     public void MissingFlowRunRendersNotFoundStateInsteadOfThrowing()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
         context.Services.AddSingleton(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
 
         var rendered = context.Render<FlowRunDetails>(parameters => parameters
             .Add(component => component.RunId, "flowrun-missing"));
 
-        StringAssert.Contains(rendered.Markup, "Flow Run not found");
-        StringAssert.Contains(rendered.Markup, "does not exist in the current workspace");
+        StringAssert.Contains(rendered.Markup, strings["NotFoundTitle"].Value);
+        StringAssert.Contains(rendered.Markup, strings["NotFoundMessage"].Value);
         Assert.AreEqual("/flow-runs", rendered.Find("a.button-secondary").GetAttribute("href"));
     }
 

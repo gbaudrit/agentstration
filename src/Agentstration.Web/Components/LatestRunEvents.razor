@@ -1,15 +1,16 @@
 @implements IDisposable
 @inject IAgentstrationEventStream EventStream
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
 
 <article class="panel">
-    <div class="panel-header"><h2>Latest run events</h2><a href="/run-events">Open run activity →</a></div>
+    <div class="panel-header"><h2>@T("LatestRunEvents")</h2><a href="/run-events">@T("OpenRunActivity") →</a></div>
     @if (loading)
     {
-        <LoadingState Message="Loading run events…" />
+        <LoadingState Message="@T("LoadingRunEvents")" />
     }
     else if (unavailable)
     {
-        <EmptyState Title="Run events unavailable" Message="" />
+        <EmptyState Title="@T("RunEventsUnavailable")" Message="" />
     }
     else
     {
@@ -23,6 +24,7 @@
     private bool loading = true;
     private bool unavailable;
     private bool disposed;
+    private string T(string key) => Localizer[key];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

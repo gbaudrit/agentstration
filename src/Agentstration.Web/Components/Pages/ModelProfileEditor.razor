@@ -6,70 +6,71 @@
 @inject IExtensionsClient ExtensionsClient
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfileEditorStrings> Localizer
 
-<PageTitle>@(IsNew ? "Create model profile" : $"{Name} · Model profile") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? "Create model profile" : model?.DisplayName ?? Name)" Description="Declare a reusable provider and model selection without coupling agents to technical endpoints.">
-    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">Delete</button> }<a class="button-secondary" href="/modelprofiles">Back</a></Actions>
+<PageTitle>@(IsNew ? T("CreateModelProfile") : $"{Name} · {T("ModelProfile")}") · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? T("CreateModelProfile") : model?.DisplayName ?? Name)" Description="@T("Description")">
+    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button> }<a class="button-secondary" href="/modelprofiles">@T("Back")</a></Actions>
 </PageHeader>
 
 @if (loading || model is null)
 {
-    <LoadingState Message="Loading model profile…" />
+    <LoadingState Message="@T("Loading")" />
 }
 else
 {
-    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@(error.IsConcurrencyConflict ? "This model profile has been modified by another user." : "Unable to save")</strong><span>@error.Message</span>@if (error.IsConcurrencyConflict) { <button class="text-button" @onclick="LoadAsync">Reload current version</button> }</div> }
+    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@(error.IsConcurrencyConflict ? T("ConcurrencyConflict") : T("UnableToSave"))</strong><span>@error.Message</span>@if (error.IsConcurrencyConflict) { <button class="text-button" @onclick="LoadAsync">@T("ReloadCurrentVersion")</button> }</div> }
     @if (!string.IsNullOrWhiteSpace(warning)) { <div class="form-alert form-alert-warning" role="status">@warning</div> }
-    @if (!IsNew && usages.Count > 0) { <div class="form-alert form-alert-warning" role="status">Changing this profile will affect @usages.Count agent(s).</div> }
+    @if (!IsNew && usages.Count > 0) { <div class="form-alert form-alert-warning" role="status">@T("ChangingProfileAffects", AgentCount(usages.Count))</div> }
 
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-profile-editor" class="resource-form">
         <DataAnnotationsValidator /><ValidationSummary />
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Profile resource</h2></div>@if (resolution is not null) { <StatusBadge Text="@ModelManagementUi.Label(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProfileResource")</h2></div>@if (resolution is not null) { <StatusBadge Text="@StatusLabel(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
             <div class="form-grid">
-                <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
-                <label><span>Namespace</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
-                <label><span>Display name</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
-                <label class="form-span-2"><span>Description</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
+                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
+                <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
+                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <label class="form-span-2"><span>@T("DescriptionLabel")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>
         </section>
 
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Model selection</p><h2>Provider and model</h2></div></div>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("ModelSelection")</p><h2>@T("ProviderAndModel")</h2></div></div>
             <div class="form-grid">
-                <label><span>Provider</span><select value="@SelectedProvider" @onchange="ProviderChangedAsync"><option value="">Select a provider</option>@foreach (var provider in providers) { <option value="@ProviderKey(provider)">@provider.Properties.DisplayName — @provider.Namespace/@provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
-                <label><span>Model</span><select @bind="model.ModelName" disabled="@loadingModels"><option value="">@(loadingModels ? "Loading models…" : "Select a model")</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — not currently discovered</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @ModelManagementUi.Label(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
+                <label><span>@T("Provider")</span><select value="@SelectedProvider" @onchange="ProviderChangedAsync"><option value="">@T("SelectProvider")</option>@foreach (var provider in providers) { <option value="@ProviderKey(provider)">@provider.Properties.DisplayName — @provider.Namespace/@provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
+                <label><span>@T("Model")</span><select @bind="model.ModelName" disabled="@loadingModels"><option value="">@(loadingModels ? T("LoadingModels") : T("SelectModel"))</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — @T("NotCurrentlyDiscovered")</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @StatusLabel(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
             </div>
-            @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderName)) { <p class="inline-warning">No model is currently reported by this provider. An existing model name may remain configured while the provider is unavailable.</p> }
+            @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderName)) { <p class="inline-warning">@T("NoModelsReported")</p> }
         </section>
 
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Defaults</p><h2>Generation</h2></div><span>Canonical</span></div>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Defaults")</p><h2>@T("Generation")</h2></div><span>@T("Canonical")</span></div>
             <div class="form-grid">
-                <label><span>Temperature</span><InputNumber @bind-Value="model.Temperature" step="0.1" /><ValidationMessage For="() => model.Temperature" /><small>Optional, from 0 to 2.</small></label>
-                <label><span>Top P</span><InputNumber @bind-Value="model.TopP" step="0.05" /><ValidationMessage For="() => model.TopP" /><small>Optional, from 0 to 1.</small></label>
-                <label><span>Top K</span><InputNumber @bind-Value="model.TopK" /><ValidationMessage For="() => model.TopK" /></label>
-                <label><span>Maximum output tokens</span><InputNumber @bind-Value="model.MaxOutputTokens" /><ValidationMessage For="() => model.MaxOutputTokens" /></label>
-                <label><span>Seed</span><InputNumber @bind-Value="model.Seed" /><small>Use a fixed seed when the provider supports it.</small></label>
-                <label class="form-span-2"><span>Stop sequences</span><InputTextArea @bind-Value="model.StopSequences" rows="3" /><small>One sequence per line.</small></label>
+                <label><span>@T("Temperature")</span><InputNumber @bind-Value="model.Temperature" step="0.1" /><ValidationMessage For="() => model.Temperature" /><small>@T("OptionalZeroToTwo")</small></label>
+                <label><span>@T("TopP")</span><InputNumber @bind-Value="model.TopP" step="0.05" /><ValidationMessage For="() => model.TopP" /><small>@T("OptionalZeroToOne")</small></label>
+                <label><span>@T("TopK")</span><InputNumber @bind-Value="model.TopK" /><ValidationMessage For="() => model.TopK" /></label>
+                <label><span>@T("MaximumOutputTokens")</span><InputNumber @bind-Value="model.MaxOutputTokens" /><ValidationMessage For="() => model.MaxOutputTokens" /></label>
+                <label><span>@T("Seed")</span><InputNumber @bind-Value="model.Seed" /><small>@T("SeedHelp")</small></label>
+                <label class="form-span-2"><span>@T("StopSequences")</span><InputTextArea @bind-Value="model.StopSequences" rows="3" /><small>@T("OneSequencePerLine")</small></label>
             </div>
         </section>
 
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Inference</p><h2>Reasoning and output</h2></div></div>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Inference")</p><h2>@T("ReasoningAndOutput")</h2></div></div>
             <div class="form-grid">
-                <label><span>Reasoning mode</span><InputSelect @bind-Value="model.ReasoningMode">@foreach (var value in Enum.GetValues<ReasoningMode>()) { <option value="@value">@value</option> }</InputSelect></label>
-                <label><span>Reasoning effort</span><InputSelect @bind-Value="model.ReasoningEffort"><option value="">Provider default</option>@foreach (var value in Enum.GetValues<ReasoningEffort>()) { <option value="@value">@value</option> }</InputSelect><small>Leave empty when reasoning is disabled.</small></label>
-                <label><span>Output format</span><InputSelect @bind-Value="model.OutputFormat">@foreach (var value in Enum.GetValues<ModelOutputFormat>()) { <option value="@value">@value</option> }</InputSelect></label>
-                <label class="checkbox-field"><InputCheckbox @bind-Value="model.StrictOutput" /><span>Strict structured output</span></label>
+                <label><span>@T("ReasoningMode")</span><InputSelect @bind-Value="model.ReasoningMode">@foreach (var value in Enum.GetValues<ReasoningMode>()) { <option value="@value">@value</option> }</InputSelect></label>
+                <label><span>@T("ReasoningEffort")</span><InputSelect @bind-Value="model.ReasoningEffort"><option value="">@T("ProviderDefault")</option>@foreach (var value in Enum.GetValues<ReasoningEffort>()) { <option value="@value">@value</option> }</InputSelect><small>@T("ReasoningEffortHelp")</small></label>
+                <label><span>@T("OutputFormat")</span><InputSelect @bind-Value="model.OutputFormat">@foreach (var value in Enum.GetValues<ModelOutputFormat>()) { <option value="@value">@value</option> }</InputSelect></label>
+                <label class="checkbox-field"><InputCheckbox @bind-Value="model.StrictOutput" /><span>@T("StrictStructuredOutput")</span></label>
                 @if (model.OutputFormat == ModelOutputFormat.JsonSchema)
                 {
-                    <label class="form-span-2"><span>JSON schema</span><InputTextArea @bind-Value="model.JsonSchema" rows="10" class="runner-json" /><small>A valid JSON schema is required.</small></label>
+                    <label class="form-span-2"><span>@T("JsonSchema")</span><InputTextArea @bind-Value="model.JsonSchema" rows="10" class="runner-json" /><small>@T("JsonSchemaRequired")</small></label>
                 }
             </div>
         </section>
 
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Adapter</p><h2>Provider options</h2></div><span>@(optionEditor is null ? "Advanced" : $"{optionEditor.Contract.Id}@{optionEditor.Version.Version}")</span></div>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Adapter")</p><h2>@T("ProviderOptions")</h2></div><span>@(optionEditor is null ? T("Advanced") : $"{optionEditor.Contract.Id}@{optionEditor.Version.Version}")</span></div>
             @if (optionEditor is { CanGuide: true } && !rawOptions)
             {
                 <div class="form-grid">
-                    <label class="checkbox-field form-span-2"><input type="checkbox" checked="@optionEditor.Enabled" @onchange="SetProviderOptionsEnabled" /><span>Configure provider-native options</span></label>
+                    <label class="checkbox-field form-span-2"><input type="checkbox" checked="@optionEditor.Enabled" @onchange="SetProviderOptionsEnabled" /><span>@T("ConfigureProviderOptions")</span></label>
                     @if (optionEditor.Enabled)
                     {
                         @foreach (var field in optionEditor.Fields)
@@ -80,7 +81,7 @@ else
                             }
                             else if (field.AllowedValues.Count > 0)
                             {
-                                <label><span>@FieldLabel(field)</span><select value="@field.Value" @onchange="args => SetOption(field, args.Value?.ToString())"><option value="">Provider default</option>@foreach (var value in field.AllowedValues) { <option value="@value">@value</option> }</select>@FieldHelp(field)</label>
+                                <label><span>@FieldLabel(field)</span><select value="@field.Value" @onchange="args => SetOption(field, args.Value?.ToString())"><option value="">@T("ProviderDefault")</option>@foreach (var value in field.AllowedValues) { <option value="@value">@value</option> }</select>@FieldHelp(field)</label>
                             }
                             else if (field.Kind is ExtensionOptionFieldKind.JsonObject or ExtensionOptionFieldKind.JsonValue)
                             {
@@ -93,56 +94,58 @@ else
                         }
                     }
                 </div>
-                <div class="panel-actions"><button class="button-secondary" type="button" @onclick="() => rawOptions = true">Edit raw JSON</button><a class="text-button" href="/extensions">Inspect contract</a></div>
+                <div class="panel-actions"><button class="button-secondary" type="button" @onclick="() => rawOptions = true">@T("EditRawJson")</button><a class="text-button" href="/extensions">@T("InspectContract")</a></div>
             }
             else
             {
                 @if (optionEditor?.UnavailableReason is { } reason) { <p class="inline-warning">@reason</p> }
-                <div class="form-grid"><label class="form-span-2"><span>Provider-specific JSON</span><InputTextArea @bind-Value="model.ProviderOptionsJson" rows="8" class="runner-json form-code-editor" /><small>Each provider value pins <code>optionSet</code>, <code>version</code>, <code>schemaDigest</code>, and <code>values</code>.</small></label></div>
-                @if (optionEditor?.CanGuide == true) { <div class="panel-actions"><button class="button-secondary" type="button" @onclick="UseGuidedOptions">Return to guided editor</button></div> }
+                <div class="form-grid"><label class="form-span-2"><span>@T("ProviderSpecificJson")</span><InputTextArea @bind-Value="model.ProviderOptionsJson" rows="8" class="runner-json form-code-editor" /><small>@T("ProviderJsonHelpPrefix") <code>optionSet</code>, <code>version</code>, <code>schemaDigest</code> @T("And") <code>values</code>.</small></label></div>
+                @if (optionEditor?.CanGuide == true) { <div class="panel-actions"><button class="button-secondary" type="button" @onclick="UseGuidedOptions">@T("ReturnToGuidedEditor")</button></div> }
             }
         </section>
 
-        <div class="form-actions"><a class="button-secondary" href="/modelprofiles">Cancel</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create profile" : "Save changes")</button></div>
+        <div class="form-actions"><a class="button-secondary" href="/modelprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateProfile") : T("SaveChanges"))</button></div>
     </EditForm>
 
     @if (!IsNew)
     {
         <section class="details-grid resource-section">
-            <article class="panel"><div class="panel-header"><div><p class="eyebrow">Overview</p><h2>Effective resolution</h2></div><button class="button-secondary" type="button" @onclick="RefreshResolutionAsync" disabled="@diagnosing">@(diagnosing ? "Checking…" : "Refresh diagnosis")</button></div>
-                @if (resolution is null) { <p>Resolution is not available.</p> } else { <dl class="resource-details"><dt>Declared profile</dt><dd>@resolution.Profile.DisplayName <code>@resolution.Profile.Name</code></dd><dt>Resolved provider</dt><dd>@(resolution.Provider?.DisplayName ?? resolution.Provider?.Name ?? "Not resolved")</dd><dt>Provider connection</dt><dd>@ModelManagementUi.Label(resolution.Provider?.Status ?? "unknown")</dd><dt>Resolved model</dt><dd>@resolution.Model.Name</dd><dt>Model status</dt><dd>@ModelManagementUi.Label(resolution.Model.Status ?? "unknown")</dd><dt>Profile status</dt><dd>@ModelManagementUi.Label(resolution.Status)</dd></dl>@foreach (var item in resolution.Warnings) { <p class="inline-warning">@item</p> } }
+            <article class="panel"><div class="panel-header"><div><p class="eyebrow">@T("Overview")</p><h2>@T("EffectiveResolution")</h2></div><button class="button-secondary" type="button" @onclick="RefreshResolutionAsync" disabled="@diagnosing">@(diagnosing ? T("Checking") : T("RefreshDiagnosis"))</button></div>
+                @if (resolution is null) { <p>@T("ResolutionUnavailable")</p> } else { <dl class="resource-details"><dt>@T("DeclaredProfile")</dt><dd>@resolution.Profile.DisplayName <code>@resolution.Profile.Name</code></dd><dt>@T("ResolvedProvider")</dt><dd>@(resolution.Provider?.DisplayName ?? resolution.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("ProviderConnection")</dt><dd>@StatusLabel(resolution.Provider?.Status)</dd><dt>@T("ResolvedModel")</dt><dd>@resolution.Model.Name</dd><dt>@T("ModelStatus")</dt><dd>@StatusLabel(resolution.Model.Status)</dd><dt>@T("ProfileStatus")</dt><dd>@StatusLabel(resolution.Status)</dd></dl>@foreach (var item in resolution.Warnings) { <p class="inline-warning">@item</p> } }
             </article>
-            <article class="panel" id="agents"><div class="panel-header"><div><p class="eyebrow">Usages</p><h2>Agents</h2></div><span>@usages.Count</span></div>
-                @if (usages.Count == 0) { <p>No agent references this profile.</p> } else { <ul class="resource-links">@foreach (var usage in usages) { <li><a href="@AgentUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul> }
+            <article class="panel" id="agents"><div class="panel-header"><div><p class="eyebrow">@T("Usages")</p><h2>@T("Agents")</h2></div><span>@usages.Count</span></div>
+                @if (usages.Count == 0) { <p>@T("NoAgentReferences")</p> } else { <ul class="resource-links">@foreach (var usage in usages) { <li><a href="@AgentUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul> }
             </article>
         </section>
-        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">Compatibility</p><h2>Effective capabilities</h2></div><span>Provider · model · adapter</span></div>
+        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">@T("Compatibility")</p><h2>@T("EffectiveCapabilities")</h2></div><span>@T("CapabilitySources")</span></div>
             @if (resolution?.Capabilities is not { Count: > 0 })
             {
-                <EmptyState Title="Capabilities unavailable" Message="Refresh the diagnosis after the provider and model become available." />
+                <EmptyState Title="@T("CapabilitiesUnavailable")" Message="@T("CapabilitiesUnavailableMessage")" />
             }
             else
             {
-                <DataGrid TItem="ModelCapabilityResponse" Items="resolution.Capabilities"><Header><tr><th>Capability</th><th>Provider</th><th>Model</th><th>Adapter</th><th>Effective</th><th>Values</th></tr></Header><Row Context="capability"><tr><td><strong>@capability.Name</strong></td><td>@SupportLabel(capability.ProviderSupport)</td><td>@SupportLabel(capability.ModelSupport)</td><td>@SupportLabel(capability.AdapterSupport)</td><td><strong>@SupportLabel(capability.EffectiveSupport)</strong></td><td>@(capability.SupportedValues.Count == 0 ? "—" : string.Join(", ", capability.SupportedValues))</td></tr></Row></DataGrid>
+                <DataGrid TItem="ModelCapabilityResponse" Items="resolution.Capabilities"><Header><tr><th>@T("Capability")</th><th>@T("Provider")</th><th>@T("Model")</th><th>@T("Adapter")</th><th>@T("Effective")</th><th>@T("Values")</th></tr></Header><Row Context="capability"><tr><td><strong>@capability.Name</strong></td><td>@SupportLabel(capability.ProviderSupport)</td><td>@SupportLabel(capability.ModelSupport)</td><td>@SupportLabel(capability.AdapterSupport)</td><td><strong>@SupportLabel(capability.EffectiveSupport)</strong></td><td>@(capability.SupportedValues.Count == 0 ? "—" : string.Join(", ", capability.SupportedValues))</td></tr></Row></DataGrid>
             }
             @if (resolution?.Incompatibilities is { Count: > 0 })
             {
-                <div class="form-alert form-alert-danger" role="alert"><strong>Profile configuration is incompatible</strong>@foreach (var issue in resolution.Incompatibilities) { <span><code>@issue.Capability</code> — @issue.Message</span> }</div>
+                <div class="form-alert form-alert-danger" role="alert"><strong>@T("ProfileIncompatible")</strong>@foreach (var issue in resolution.Incompatibilities) { <span><code>@issue.Capability</code> — @issue.Message</span> }</div>
             }
             else if (resolution?.Capabilities is { Count: > 0 })
             {
-                <p class="inline-info">The profile options are compatible with the provider, model and AEP adapter. Runtime capabilities and agent tools are evaluated when an agent is resolved.</p>
+                <p class="inline-info">@T("ProfileCompatible")</p>
             }
         </section>
-        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">Definition</p><h2>Declarative resource</h2></div><span>Read only</span></div><pre class="runner-json">@Definition</pre></section>
+        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("DeclarativeResource")</h2></div><span>@T("ReadOnly")</span></div><pre class="runner-json">@Definition</pre></section>
     }
 }
 
-<ConfirmationDialog IsOpen="@confirmDelete" Title="Delete model profile" Message="@($"Delete model profile '{Name}'?")" ConfirmLabel="Delete model profile" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
     private readonly CancellationTokenSource cancellation = new();
     private ModelProfileEditorModel? model; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
     private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
@@ -157,7 +160,7 @@ else
         {
             if (model is null) return string.Empty;
             try { return JsonSerializer.Serialize(new { apiVersion = ManagementApiVersions.CoreV1, kind = ResourceKinds.ModelProfile, metadata = new { name = model.Name, @namespace = model.Namespace }, definition = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
-            catch (ArgumentException) { return "The declarative definition is unavailable until the configuration is structurally valid."; }
+            catch (ArgumentException) { return T("DeclarativeDefinitionUnavailable"); }
         }
     }
     protected override Task OnParametersSetAsync() => LoadAsync();
@@ -198,7 +201,7 @@ else
         if (string.IsNullOrWhiteSpace(model.ProviderName)) return;
         loadingModels = true;
         try { models = await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, cancellation.Token); }
-        catch (AgentstrationApiException exception) { warning = $"Models cannot currently be discovered: {exception.Message}"; }
+        catch (AgentstrationApiException exception) { warning = T("ModelsCannotBeDiscovered", exception.Message); }
         finally { loadingModels = false; }
     }
     private async Task SaveAsync()
@@ -210,7 +213,7 @@ else
             ResourceSnapshot<ModelProfileResource> snapshot = IsNew
                 ? await Client.CreateModelProfileAsync(model.ToCreateRequest(), cancellation.Token)
                 : await Client.UpdateModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, model.ToPutRequest(), etag!, cancellation.Token);
-            etag = snapshot.ETag; Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? "Model profile created" : "Model profile updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
+            etag = snapshot.ETag; Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
             Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name));
         }
         catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); }
@@ -224,11 +227,11 @@ else
         catch (AgentstrationApiException exception) { error = exception; }
         finally { diagnosing = false; }
     }
-    private void RequestDelete() { if (usages.Count > 0) { warning = $"This model profile cannot be deleted because it is used by {usages.Count} agent(s): {string.Join(", ", usages.Select(item => item.DisplayName))}."; return; } confirmDelete = true; }
+    private void RequestDelete() { if (usages.Count > 0) { warning = T("CannotDeleteUsedProfile", AgentCount(usages.Count), string.Join(", ", usages.Select(item => item.DisplayName))); return; } confirmDelete = true; }
     private async Task DeleteAsync()
     {
         if (model is null || etag is null) return; confirmDelete = false;
-        try { await Client.DeleteModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), "Model profile deleted", model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
+        try { await Client.DeleteModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeletedNotification"), model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
         catch (AgentstrationApiException exception) { error = exception; }
     }
     private static bool IsUnavailable(AvailableModelResponse model) => string.Equals(model.Status, "unavailable", StringComparison.OrdinalIgnoreCase);
@@ -262,14 +265,28 @@ else
     private static void SetBooleanOption(ExtensionOptionFieldEditor field, ChangeEventArgs args) => field.Value = args.Value is true ? "true" : "false";
     private static bool BooleanValue(ExtensionOptionFieldEditor field) => bool.TryParse(field.Value, out var value) && value;
     private static string FieldLabel(ExtensionOptionFieldEditor field) => field.Required ? $"{field.Name} *" : field.Name;
-    private static Microsoft.AspNetCore.Components.RenderFragment FieldHelp(ExtensionOptionFieldEditor field) => builder =>
+    private Microsoft.AspNetCore.Components.RenderFragment FieldHelp(ExtensionOptionFieldEditor field) => builder =>
     {
         var text = field.Description;
-        if (string.IsNullOrWhiteSpace(text) && (field.Minimum is not null || field.Maximum is not null)) text = $"Range: {field.Minimum ?? "−∞"} to {field.Maximum ?? "+∞"}.";
+        if (string.IsNullOrWhiteSpace(text) && (field.Minimum is not null || field.Maximum is not null)) text = T("Range", field.Minimum ?? "−∞", field.Maximum ?? "+∞");
         if (string.IsNullOrWhiteSpace(text)) return;
         builder.OpenElement(0, "small"); builder.AddContent(1, text); builder.CloseElement();
     };
-    private static string SupportLabel(string support) => support switch { "native" => "Native", "emulated" => "Emulated", "partial" => "Partial", _ => "Unsupported" };
+    private string SupportLabel(string support) => Localizer[$"Support.{support switch { "native" => "Native", "emulated" => "Emulated", "partial" => "Partial", _ => "Unsupported" }}"];
+    private string StatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch
+    {
+        "available" => "Available",
+        "ready" => "Ready",
+        "succeeded" => "Succeeded",
+        "starting" => "Starting",
+        "providerunavailable" => "ProviderUnavailable",
+        "modelunavailable" => "ModelUnavailable",
+        "unavailable" => "Unavailable",
+        "invalidconfiguration" => "InvalidConfiguration",
+        "incompatible" => "Incompatible",
+        "failed" => "Failed",
+        _ => "Unknown"
+    }}"];
     private static string AgentUrl(ModelProfileUsageResponse usage) => $"/agents/{Uri.EscapeDataString(usage.Name)}";
     private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";
     private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/modelprofiles/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";

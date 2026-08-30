@@ -2,8 +2,9 @@
 @page "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
 @using Agentstration.Resources
 @rendermode InteractiveServer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.FlowDesigner.Components.FlowDesignerStrings> Localizer
 
-<PageTitle>Flow Designer · Agentstration</PageTitle>
+<PageTitle>@Localizer["PageTitle"] · Agentstration</PageTitle>
 <div class="flow-designer-page">
     <Agentstration.Web.FlowDesigner.Components.FlowDesigner ResourceId="@FlowId" Namespace="@DesignerNamespace" />
 </div>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Tool providers</value></data>
+  <data name="Description"><value>Configure AEP extensions and generic MCP servers that expose tools.</value></data>
+  <data name="Catalog"><value>Catalog</value></data>
+  <data name="AddProvider"><value>Add provider</value></data>
+  <data name="SectionsLabel"><value>Tool sections</value></data>
+  <data name="Providers"><value>Providers</value></data>
+  <data name="Loading"><value>Loading Tool Providers…</value></data>
+  <data name="EmptyTitle"><value>No Tool Providers</value></data>
+  <data name="EmptyMessage"><value>Add an MCP or AEP provider to discover tools.</value></data>
+  <data name="Name"><value>Name</value></data>
+  <data name="Type"><value>Type</value></data>
+  <data name="Status"><value>Status</value></data>
+  <data name="Tools"><value>Tools</value></data>
+  <data name="Enabled"><value>Enabled</value></data>
+  <data name="Yes"><value>Yes</value></data>
+  <data name="No"><value>No</value></data>
+  <data name="Manage"><value>Manage →</value></data>
+  <data name="Status.connected"><value>Connected</value></data>
+  <data name="Status.error"><value>Error</value></data>
+  <data name="Status.notDiscovered"><value>Not discovered</value></data>
+</root>

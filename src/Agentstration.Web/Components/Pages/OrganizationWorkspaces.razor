@@ -1,30 +1,31 @@
 @page "/settings/organization/workspaces"
 @inject Agentstration.Management.Core.IdentityAdministrationService Service
 @inject ConsoleContextState ContextState
+@inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
-<PageTitle>Workspaces · Organization · Agentstration</PageTitle>
-<PageHeader Title="Workspaces" Description="Resource-management boundaries available in the current organization." />
+<PageTitle>@T("Workspaces") · @T("Organization") · Agentstration</PageTitle>
+<PageHeader Title="@T("Workspaces")" Description="@T("Workspaces.Description")" />
 <OrganizationSettingsNav />
 
-@if (loading) { <LoadingState Message="Loading workspaces…" /> }
-else if (!string.IsNullOrWhiteSpace(loadError)) { <ErrorState Title="Unable to load workspaces" Message="@loadError" /> }
+@if (loading) { <LoadingState Message="@T("LoadingWorkspaces")" /> }
+else if (!string.IsNullOrWhiteSpace(loadError)) { <ErrorState Title="@T("UnableLoadWorkspaces")" Message="@loadError" /> }
 else
 {
     @if (CanCreate)
     {
         <section class="panel workspace-create-panel">
-            <div class="panel-header"><h2>Create workspace</h2></div>
+            <div class="panel-header"><h2>@T("CreateWorkspace")</h2></div>
             <div class="workspace-create-form">
-                <label><span>Display name</span><input value="@displayName" @oninput="DisplayNameChanged" /></label>
-                <label><span>Technical name</span><input value="@technicalName" @oninput="TechnicalNameChanged" placeholder="support" /></label>
-                <button class="button-primary" @onclick="CreateAsync" disabled="@(!CanSubmit)">@(busy ? "Creating…" : "Create workspace")</button>
+                <label><span>@T("DisplayName")</span><input value="@displayName" @oninput="DisplayNameChanged" /></label>
+                <label><span>@T("TechnicalName")</span><input value="@technicalName" @oninput="TechnicalNameChanged" placeholder="support" /></label>
+                <button class="button-primary" @onclick="CreateAsync" disabled="@(!CanSubmit)">@(busy ? T("Creating") : T("CreateWorkspace"))</button>
             </div>
             @if (!string.IsNullOrWhiteSpace(operationError)) { <p class="inline-warning" role="alert">@operationError</p> }
         </section>
     }
     <DataGrid TItem="Agentstration.Management.Abstractions.Workspace" Items="workspaces">
-        <Header><tr><th>Workspace</th><th>Technical name</th><th>Status</th><th>Created</th><th>Context</th></tr></Header>
-        <Row Context="workspace"><tr><td><strong>@workspace.DisplayName</strong><br /><small>@workspace.Id</small></td><td><code>@workspace.Name</code></td><td><StatusBadge Text="@workspace.Status.ToString()" Status="UiStatus.Success" /></td><td>@workspace.CreatedAt.ToLocalTime().ToString("g")</td><td>@if(workspace.Id == ContextState.Current?.WorkspaceId){<StatusBadge Text="Current" Status="UiStatus.Info" />}</td></tr></Row>
+        <Header><tr><th>@T("Workspace")</th><th>@T("TechnicalName")</th><th>@T("Status")</th><th>@T("Created")</th><th>@T("Context")</th></tr></Header>
+        <Row Context="workspace"><tr><td><strong>@workspace.DisplayName</strong><br /><small>@workspace.Id</small></td><td><code>@workspace.Name</code></td><td><StatusBadge Text="@T($"Status.{workspace.Status}")" Status="UiStatus.Success" /></td><td>@workspace.CreatedAt.ToLocalTime().ToString("g")</td><td>@if(workspace.Id == ContextState.Current?.WorkspaceId){<StatusBadge Text="@T("Current")" Status="UiStatus.Info" />}</td></tr></Row>
     </DataGrid>
 }
 
@@ -37,6 +38,7 @@ else
     private bool loading = true;
     private bool busy;
     private bool technicalNameEdited;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private bool CanCreate => ContextState.HasPermission(AuthorizationPermissions.WorkspacesWrite);
     private bool CanSubmit => !busy && displayName.Trim().Length >= 2 && technicalName.Trim().Length >= 2;
 

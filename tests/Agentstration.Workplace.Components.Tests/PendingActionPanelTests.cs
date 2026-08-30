@@ -1,3 +1,4 @@
+using System.Globalization;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Work;
@@ -5,6 +6,7 @@ using Agentstration.Workplace.Components;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Workplace.Components.Tests;
 
@@ -85,6 +87,7 @@ public sealed class PendingActionPanelTests
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddAgentstrationWebComponents();
+        var localizer = context.Services.GetRequiredService<IStringLocalizer<WorkplaceLayoutStrings>>();
         var rendered = context.Render<WorkplaceLayout>(parameters => parameters
             .Add(value => value.Body, builder => builder.AddContent(0, "Workplace content")));
 
@@ -94,10 +97,10 @@ public sealed class PendingActionPanelTests
         Assert.IsTrue(rendered.Markup.Contains("images/agentstration-workplace-lockup-dark.png", StringComparison.Ordinal));
         Assert.AreEqual(2, rendered.FindAll(".workplace-brand-lockup .brand-lockup-logo").Count);
         Assert.AreEqual(2, rendered.FindAll(".navigation-group").Count);
-        Assert.AreEqual("Work", rendered.Find(".navigation-group h2").TextContent);
+        Assert.AreEqual(localizer["Work"].Value, rendered.Find(".navigation-group h2").TextContent);
         Assert.AreEqual(3, rendered.FindAll(".side-nav .nav-icon").Count);
-        Assert.AreEqual("Accueil", rendered.Find(".nav-label-mobile").TextContent);
-        Assert.AreEqual("Activité", rendered.FindAll(".nav-label-mobile")[1].TextContent);
+        Assert.AreEqual(localizer["Home"].Value, rendered.Find(".nav-label").TextContent);
+        Assert.AreEqual(localizer["Activity"].Value, rendered.FindAll(".nav-label")[1].TextContent);
         Assert.AreEqual(1, rendered.FindAll(".mobile-profile").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav-notifications").Count);
         Assert.IsTrue(rendered.Markup.Contains("Workplace content", StringComparison.Ordinal));
@@ -122,19 +125,48 @@ public sealed class PendingActionPanelTests
     }
 
     [TestMethod]
+    [DoNotParallelize]
+    public void WorkplaceLayoutUsesTheSelectedCulture()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
+            using var context = new BunitContext();
+            context.JSInterop.Mode = JSRuntimeMode.Loose;
+            context.Services.AddAgentstrationWebComponents();
+
+            var rendered = context.Render<WorkplaceLayout>(parameters => parameters
+                .Add(value => value.Body, builder => builder.AddContent(0, "Contenu")));
+
+            StringAssert.Contains(rendered.Markup, "Accueil");
+            StringAssert.Contains(rendered.Markup, "Activité");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
+    }
+
+    [TestMethod]
     public void WorkplaceLayoutUsesTheWorkspaceDisplayNameOutsideUrls()
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddAgentstrationWebComponents();
+        var localizer = context.Services.GetRequiredService<IStringLocalizer<WorkplaceLayoutStrings>>();
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("w/personal");
         context.Services.GetRequiredService<WorkplaceContextState>().SetWorkspace("personal", "Personal Space", "acme", "ACME Europe");
 
         var rendered = context.Render<WorkplaceLayout>(parameters => parameters
             .Add(value => value.Body, builder => builder.AddContent(0, "Workplace content")));
 
-        Assert.AreEqual("ACME Europe/Personal Space Workplace", rendered.Find(".breadcrumb").TextContent);
-        Assert.AreEqual("Personal Space Workplace", rendered.Find(".breadcrumb a").TextContent);
+        var workplaceLabel = localizer["NamedWorkplace", "Personal Space"].Value;
+        Assert.AreEqual($"ACME Europe/{workplaceLabel}", rendered.Find(".breadcrumb").TextContent);
+        Assert.AreEqual(workplaceLabel, rendered.Find(".breadcrumb a").TextContent);
         Assert.AreEqual("Personal Space", rendered.Find(".sidebar-footer strong").TextContent);
         Assert.AreEqual("ACME Europe", rendered.Find(".sidebar-footer small").TextContent);
         Assert.AreEqual("/w/personal", rendered.Find(".breadcrumb a").GetAttribute("href"));

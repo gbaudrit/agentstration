@@ -14,7 +14,9 @@ public sealed class ExtensionsConsoleTests
     [TestMethod]
     public void ConfiguredModelProviderContributionKeepsAnAccessibleAction()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: true));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
@@ -32,7 +34,9 @@ public sealed class ExtensionsConsoleTests
     [TestMethod]
     public void DiscoveredModelProviderContributionOffersConfiguration()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
@@ -50,7 +54,9 @@ public sealed class ExtensionsConsoleTests
     [TestMethod]
     public async Task DiscoverButtonInvokesDiscoveryAndShowsResult()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false);
         context.Services.AddSingleton<IExtensionsClient>(client);
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());

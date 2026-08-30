@@ -4,48 +4,54 @@
 @inject IRuntimeProfilesClient Client
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
+@inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeProfileEditorStrings> Localizer
 
-<PageTitle>@(IsNew ? "Create runtime profile" : $"{Name} · Runtime profile") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? "Create runtime profile" : model?.DisplayName ?? Name)" Description="Select execution, session, tool and streaming behavior for an agent deployment.">
-    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">Delete</button> }<a class="button-secondary" href="/runtimeprofiles">Back</a></Actions>
+<PageTitle>@(IsNew ? T("CreateProfile") : $"{Name} · {T("RuntimeProfile")}") · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? T("CreateProfile") : model?.DisplayName ?? Name)" Description="@T("Description")">
+    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button> }<a class="button-secondary" href="/runtimeprofiles">@T("Back")</a></Actions>
 </PageHeader>
 
-@if (model is null) { <LoadingState Message="Loading runtime profile…" /> }
+@if (model is null) { <LoadingState Message="@T("Loading")" /> }
 else
 {
-    @if (error is not null) { <div class="form-alert form-alert-danger"><strong>Unable to save</strong><span>@error.Message</span></div> }
-    @if (usages.Count > 0) { <div class="form-alert form-alert-warning">This profile is used by @usages.Count deployment(s). Changes affect their next reconciliation.</div> }
+    @if (error is not null) { <div class="form-alert form-alert-danger"><strong>@T("UnableToSave")</strong><span>@error.Message</span></div> }
+    @if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("ProfileUsedWarning", DeploymentCount(usages.Count))</div> }
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="runtime-profile-editor" class="resource-form">
         <DataAnnotationsValidator /><ValidationSummary />
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Identity</p><h2>Runtime resource</h2></div></div><div class="form-grid">
-            <label><span>Name</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /></label><label><span>Display name</span><InputText @bind-Value="model.DisplayName" /></label>
-            <label><span>Namespace</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /></label>
-            <label class="form-span-2"><span>Runtime type</span><InputText @bind-Value="model.RuntimeType" /><small>Use <code>microsoft-agent-framework</code> for the standalone runtime.</small></label>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("RuntimeResource")</h2></div></div><div class="form-grid">
+            <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /></label><label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /></label>
+            <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /></label>
+            <label class="form-span-2"><span>@T("RuntimeType")</span><InputText @bind-Value="model.RuntimeType" /><small>@T("RuntimeTypeHelpPrefix") <code>microsoft-agent-framework</code> @T("RuntimeTypeHelpSuffix")</small></label>
         </div></section>
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Defaults</p><h2>Execution policy</h2></div></div><div class="form-grid">
-            <label><span>Session mode</span><InputSelect @bind-Value="model.SessionMode">@foreach (var value in Enum.GetValues<RuntimeSessionMode>()) { <option value="@value">@value</option> }</InputSelect></label>
-            <label><span>Tool invocation</span><InputSelect @bind-Value="model.ToolInvocation">@foreach (var value in Enum.GetValues<RuntimeToolInvocationMode>()) { <option value="@value">@value</option> }</InputSelect></label>
-            <label><span>Streaming</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@value</option> }</InputSelect></label>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Defaults")</p><h2>@T("ExecutionPolicy")</h2></div></div><div class="form-grid">
+            <label><span>@T("SessionMode")</span><InputSelect @bind-Value="model.SessionMode">@foreach (var value in Enum.GetValues<RuntimeSessionMode>()) { <option value="@value">@SessionLabel(value)</option> }</InputSelect></label>
+            <label><span>@T("ToolInvocation")</span><InputSelect @bind-Value="model.ToolInvocation">@foreach (var value in Enum.GetValues<RuntimeToolInvocationMode>()) { <option value="@value">@ToolInvocationLabel(value)</option> }</InputSelect></label>
+            <label><span>@T("Streaming")</span><InputSelect @bind-Value="model.Streaming">@foreach (var value in Enum.GetValues<StreamingMode>()) { <option value="@value">@StreamingLabel(value)</option> }</InputSelect></label>
         </div></section>
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">Adapter</p><h2>Runtime options</h2></div><span>Advanced</span></div><div class="form-grid"><label class="form-span-2"><span>Runtime-specific JSON</span><InputTextArea @bind-Value="model.RuntimeOptionsJson" rows="8" class="runner-json form-code-editor" /><small>Top-level keys must match the runtime type.</small></label></div></section>
-        <div class="form-actions"><a class="button-secondary" href="/runtimeprofiles">Cancel</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? "Saving…" : IsNew ? "Create profile" : "Save changes")</button></div>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Adapter")</p><h2>@T("RuntimeOptions")</h2></div><span>@T("Advanced")</span></div><div class="form-grid"><label class="form-span-2"><span>@T("RuntimeSpecificJson")</span><InputTextArea @bind-Value="model.RuntimeOptionsJson" rows="8" class="runner-json form-code-editor" /><small>@T("RuntimeJsonHelp")</small></label></div></section>
+        <div class="form-actions"><a class="button-secondary" href="/runtimeprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateProfileAction") : T("SaveChanges"))</button></div>
     </EditForm>
-    @if (!IsNew && usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>Deployments</h2><span>@usages.Count</span></div><ul>@foreach (var usage in usages) { <li><strong>@usage.Name</strong> · @usage.Environment</li> }</ul></section> }
+    @if (!IsNew && usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("Deployments")</h2><span>@usages.Count</span></div><ul>@foreach (var usage in usages) { <li><strong>@usage.Name</strong> · @usage.Environment</li> }</ul></section> }
 }
 
-<ConfirmationDialog IsOpen="@confirmDelete" Title="Delete runtime profile" Message="@($"Delete runtime profile '{Name}'?")" ConfirmLabel="Delete runtime profile" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string DeploymentCount(int count) => T(count == 1 ? "DeploymentCount.One" : "DeploymentCount.Many", count);
+    private string SessionLabel(RuntimeSessionMode value) => Localizer[$"Session.{value}"];
+    private string ToolInvocationLabel(RuntimeToolInvocationMode value) => Localizer[$"ToolInvocation.{value}"];
+    private string StreamingLabel(StreamingMode value) => Localizer[$"Streaming.{value}"];
     private readonly CancellationTokenSource cancellation = new();
     private RuntimeProfileEditorModel? model; private IReadOnlyList<RuntimeProfileUsageResponse> usages = []; private string? etag; private AgentstrationApiException? error; private bool saving; private bool confirmDelete;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
     protected override Task OnParametersSetAsync() => LoadAsync();
     private async Task LoadAsync() { error = null; if (IsNew) { model = new RuntimeProfileEditorModel { Namespace = SelectedNamespace.Value }; return; } try { var snapshot = await Client.GetRuntimeProfileAsync(SelectedNamespace, Name!, cancellation.Token); model = RuntimeProfileEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag; usages = (await Client.GetRuntimeProfileUsagesAsync(SelectedNamespace, model.Name, cancellation.Token)).Value; } catch (AgentstrationApiException exception) { error = exception; model ??= new RuntimeProfileEditorModel { Namespace = SelectedNamespace.Value }; } }
-    private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var @namespace = ResourceNamespace.Parse(model.Namespace); var snapshot = IsNew ? await Client.CreateRuntimeProfileAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateRuntimeProfileAsync(@namespace, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? "Runtime profile created" : "Runtime profile updated", snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name)); } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
-    private void RequestDelete() { if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException($"This profile is used by {usages.Count} deployment(s).", Guid.NewGuid().ToString("N")); }
+    private async Task SaveAsync() { if (model is null || saving) return; saving = true; error = null; try { var @namespace = ResourceNamespace.Parse(model.Namespace); var snapshot = IsNew ? await Client.CreateRuntimeProfileAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateRuntimeProfileAsync(@namespace, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name)); } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
+    private void RequestDelete() { if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException(T("ProfileUsedError", DeploymentCount(usages.Count)), Guid.NewGuid().ToString("N")); }
     private async Task DeleteAsync() { if (model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteRuntimeProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Navigation.NavigateTo("/runtimeprofiles"); } catch (AgentstrationApiException exception) { error = exception; } }
     private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/runtimeprofiles/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }

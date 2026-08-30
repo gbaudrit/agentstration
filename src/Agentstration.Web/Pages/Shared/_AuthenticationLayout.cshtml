@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="@System.Globalization.CultureInfo.CurrentUICulture.Name">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,9 +10,9 @@
 <body>
     <main class="auth-shell">
         <section class="auth-card">
-            <a class="auth-brand" href="/" aria-label="Agentstration home">
+            <a class="auth-brand" href="/" aria-label="@Auth["AgentstrationHome"]">
                 <img src="~/_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" />
-                <span><strong>Agentstration</strong><small>Control plane</small></span>
+                <span><strong>Agentstration</strong><small>@Auth["ControlPlane"]</small></span>
             </a>
             @RenderBody()
         </section>

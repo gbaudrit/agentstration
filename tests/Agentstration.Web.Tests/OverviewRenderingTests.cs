@@ -19,6 +19,7 @@ public sealed class OverviewRenderingTests
     [TestMethod]
     public void OverviewDisplaysMetricsWhileRunEventsAreStillLoading()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
         var api = new MockApiClient(TimeProvider.System);
         var eventStream = new ControlledEventStream();
@@ -31,6 +32,7 @@ public sealed class OverviewRenderingTests
             NullLogger<PlatformDashboardService>.Instance));
         context.Services.AddSingleton<IAgentstrationEventStream>(eventStream);
         context.Services.AddSingleton(new PlatformStatusState());
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Home>();
 
@@ -55,7 +57,9 @@ public sealed class OverviewRenderingTests
     [TestMethod]
     public void RunEventFailureRemainsConfinedToItsPanel()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IAgentstrationEventStream>(new FailingEventStream());
 
         var rendered = context.Render<Agentstration.Web.Components.LatestRunEvents>();
@@ -70,6 +74,7 @@ public sealed class OverviewRenderingTests
     [TestMethod]
     public void OverviewDisplaysReadyTilesWithoutWaitingForSlowTiles()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
         var api = new MockApiClient(TimeProvider.System);
         var work = new StubWorkClient();
@@ -83,14 +88,15 @@ public sealed class OverviewRenderingTests
             NullLogger<PlatformDashboardService>.Instance));
         context.Services.AddSingleton<IAgentstrationEventStream>(new ControlledEventStream());
         context.Services.AddSingleton(new PlatformStatusState());
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Home>();
 
         rendered.WaitForAssertion(() =>
         {
             var cards = rendered.FindAll(".overview-metric-grid > *");
-            var agents = cards.Single(card => card.TextContent.Contains("Defined agents", StringComparison.Ordinal));
-            var tasks = cards.Single(card => card.TextContent.Contains("Tasks running", StringComparison.Ordinal));
+            var agents = cards[0];
+            var tasks = cards[4];
             Assert.IsFalse(agents.ClassList.Contains("metric-card-loading"));
             Assert.IsTrue(tasks.ClassList.Contains("metric-card-loading"));
             Assert.IsTrue(work.IsSummaryPending);

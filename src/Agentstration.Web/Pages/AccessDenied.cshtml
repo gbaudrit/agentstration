@@ -1,16 +1,16 @@
 @page "/access-denied"
 @model AccessDeniedModel
 @{
-    ViewData["Title"] = "Access denied";
+    ViewData["Title"] = Auth["AccessDenied"];
 }
 
 <header class="auth-heading">
-    <p class="eyebrow">Authorization</p>
-    <h1>Access denied</h1>
-    <p>Your identity is valid, but it does not have permission to access this resource.</p>
+    <p class="eyebrow">@Auth["Authorization"]</p>
+    <h1>@Auth["AccessDenied"]</h1>
+    <p>@Auth["AccessDeniedDescription"]</p>
 </header>
 
 <div class="auth-actions">
-    <a href="/" class="primary-action">Return to the console</a>
-    <a href="/logout" class="secondary-action">Use another account</a>
+    <a href="/" class="primary-action">@Auth["ReturnToConsole"]</a>
+    <a href="/logout" class="secondary-action">@Auth["UseAnotherAccount"]</a>
 </div>

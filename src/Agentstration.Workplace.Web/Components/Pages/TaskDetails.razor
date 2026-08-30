@@ -3,32 +3,33 @@
 @inject IWorkplaceApiClient Api
 @inject WorkplaceRealtimeClient Realtime
 @inject WorkplaceContextState WorkplaceContext
+@inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplacePageStrings> Localizer
 
-<PageTitle>@(task?.Title ?? "Task") · Workplace</PageTitle>
+<PageTitle>@(task?.Title ?? T("Task")) · Workplace</PageTitle>
 @if (loading) { <LoadingState /> }
 else if (error is not null) { <ServiceUnavailableState Message="@error" /> }
 else if (task is not null)
 {
     <div class="task-page-heading">
-        <div><a class="back-link" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks")">← Tasks</a><p class="eyebrow">Task</p><h1>@task.Title</h1>@if (!string.IsNullOrWhiteSpace(task.Description)){<p>@task.Description</p>}</div>
+        <div><a class="back-link" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks")">← @T("Tasks")</a><p class="eyebrow">@T("Task")</p><h1>@task.Title</h1>@if (!string.IsNullOrWhiteSpace(task.Description)){<p>@task.Description</p>}</div>
         <div class="task-heading-status"><RealtimeStatus Connected="@(Realtime.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)" /><TaskStatusBadge Value="task.Status" /></div>
     </div>
     <div class="task-actions">
-        @if (task.Status == WorkTaskStatus.Running) { <button class="button-secondary" disabled="@busy" @onclick="PauseAsync">Pause</button> }
-        @if (task.Status == WorkTaskStatus.Paused) { <button class="button-primary" disabled="@busy" @onclick="ResumeAsync">Resume</button> }
-        @if (task.Status is WorkTaskStatus.Pending or WorkTaskStatus.Running or WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused) { <button class="button-danger" disabled="@busy" @onclick="CancelAsync">Cancel</button> }
+        @if (task.Status == WorkTaskStatus.Running) { <button class="button-secondary" disabled="@busy" @onclick="PauseAsync">@T("Pause")</button> }
+        @if (task.Status == WorkTaskStatus.Paused) { <button class="button-primary" disabled="@busy" @onclick="ResumeAsync">@T("Resume")</button> }
+        @if (task.Status is WorkTaskStatus.Pending or WorkTaskStatus.Running or WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused) { <button class="button-danger" disabled="@busy" @onclick="CancelAsync">@T("Cancel")</button> }
     </div>
-    <section class="mobile-task-focus" aria-label="Task status"><div class="task-orbit"><span></span><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></div><TaskStatusBadge Value="task.Status" />@if (!string.IsNullOrWhiteSpace(task.Description)) { <p>@task.Description</p> }</section>
+    <section class="mobile-task-focus" aria-label="@T("TaskStatus")"><div class="task-orbit"><span></span><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /></div><TaskStatusBadge Value="task.Status" />@if (!string.IsNullOrWhiteSpace(task.Description)) { <p>@task.Description</p> }</section>
     @if (!string.IsNullOrWhiteSpace(commandError)) { <p class="task-command-error" role="alert">@commandError</p> }
     <div class="task-detail-grid">
         <div class="task-detail-primary">
-            <section class="detail-panel"><div class="detail-heading"><p class="eyebrow">Progress</p><h2>What is happening</h2></div><TaskProgressTimeline Activities="activities" Status="task.Status" /></section>
+            <section class="detail-panel"><div class="detail-heading"><p class="eyebrow">@T("Progress")</p><h2>@T("WhatIsHappening")</h2></div><TaskProgressTimeline Activities="activities" Status="task.Status" /></section>
             @foreach (var result in results.OrderByDescending(value => value.CreatedAt)) { <TaskResultView Result="result" /> }
-            <section class="detail-panel"><div class="detail-heading"><p class="eyebrow">Conversation</p><h2>Request context</h2></div>@if(messages.Count==0){<div class="compact-empty"><EmptyState Title="No messages" Message="This task has no conversation context." /></div>}else{<div class="task-messages">@foreach(var message in messages){<ConversationMessageView Message="message" />}</div>}</section>
+            <section class="detail-panel"><div class="detail-heading"><p class="eyebrow">@T("Conversation")</p><h2>@T("RequestContext")</h2></div>@if(messages.Count==0){<div class="compact-empty"><EmptyState Title="@T("NoMessages")" Message="@T("NoConversationContext")" /></div>}else{<div class="task-messages">@foreach(var message in messages){<ConversationMessageView Message="message" />}</div>}</section>
         </div>
-        <aside><section class="detail-panel"><div class="detail-heading"><p class="eyebrow">Output</p><h2>Deliverables</h2></div><ArtifactList Artifacts="artifacts" ContentUrl="ArtifactUrl" /></section><section class="task-facts"><div><span>Created</span><strong>@task.CreatedAt.LocalDateTime.ToString("g")</strong></div><div><span>Last update</span><strong>@task.UpdatedAt.LocalDateTime.ToString("g")</strong></div></section></aside>
+        <aside><section class="detail-panel"><div class="detail-heading"><p class="eyebrow">@T("Output")</p><h2>@T("Deliverables")</h2></div><ArtifactList Artifacts="artifacts" ContentUrl="ArtifactUrl" /></section><section class="task-facts"><div><span>@T("Created")</span><strong>@task.CreatedAt.LocalDateTime.ToString("g")</strong></div><div><span>@T("LastUpdate")</span><strong>@task.UpdatedAt.LocalDateTime.ToString("g")</strong></div></section></aside>
     </div>
-    @if (interaction is not null) { <ConversationComposer Busy="busy" DisabledReason="@(interaction.Status == InteractionStatus.WaitingForUser ? "Return to the conversation to answer the pending question." : interaction.Status == InteractionStatus.Closed ? "This conversation is closed." : null)" OnSubmit="ContinueAsync" /> }
+    @if (interaction is not null) { <ConversationComposer Busy="busy" DisabledReason="@(interaction.Status == InteractionStatus.WaitingForUser ? T("ReturnToConversation") : interaction.Status == InteractionStatus.Closed ? T("ConversationClosed") : null)" OnSubmit="ContinueAsync" /> }
 }
 
 @code {
@@ -59,11 +60,11 @@ else if (task is not null)
         catch when (!lifetime.IsCancellationRequested) { }
         await RefreshAsync();
     }
-    private async Task RefreshAsync(){loading=task is null;error=null;try{task=await Api.GetTaskAsync(WorkspaceName,TaskId,lifetime.Token);if(task.InteractionId is { } interactionId){interaction=await Api.GetInteractionAsync(WorkspaceName,interactionId,lifetime.Token);messages=await Api.ListMessagesAsync(WorkspaceName,interactionId,lifetime.Token);}else{interaction=null;messages=[];}activities=await Api.ListActivitiesAsync(WorkspaceName,TaskId,lifetime.Token);results=await Api.ListResultsAsync(WorkspaceName,TaskId,lifetime.Token);artifacts=await Api.ListArtifactsAsync(WorkspaceName,TaskId,lifetime.Token);}catch when(!lifetime.IsCancellationRequested){error="This task could not be loaded from the local Work API.";}finally{loading=false;}}
-    private Task ContinueAsync(string content) => interaction is null ? Task.CompletedTask : ExecuteCommandAsync(() => Api.AddMessageAsync(WorkspaceName, interaction.Id, content, lifetime.Token), "Your follow-up could not be sent. Please try again.");
-    private Task PauseAsync() => ExecuteCommandAsync(() => Api.PauseTaskAsync(WorkspaceName, TaskId, lifetime.Token), "This task could not be paused. Refresh its state and try again.");
-    private Task ResumeAsync() => ExecuteCommandAsync(() => Api.ResumeTaskAsync(WorkspaceName, TaskId, lifetime.Token), "This task could not be resumed. Refresh its state and try again.");
-    private Task CancelAsync() => ExecuteCommandAsync(() => Api.CancelTaskAsync(WorkspaceName, TaskId, lifetime.Token), "This task could not be cancelled. Refresh its state and try again.");
+    private async Task RefreshAsync(){loading=task is null;error=null;try{task=await Api.GetTaskAsync(WorkspaceName,TaskId,lifetime.Token);if(task.InteractionId is { } interactionId){interaction=await Api.GetInteractionAsync(WorkspaceName,interactionId,lifetime.Token);messages=await Api.ListMessagesAsync(WorkspaceName,interactionId,lifetime.Token);}else{interaction=null;messages=[];}activities=await Api.ListActivitiesAsync(WorkspaceName,TaskId,lifetime.Token);results=await Api.ListResultsAsync(WorkspaceName,TaskId,lifetime.Token);artifacts=await Api.ListArtifactsAsync(WorkspaceName,TaskId,lifetime.Token);}catch when(!lifetime.IsCancellationRequested){error=T("TaskLoadError");}finally{loading=false;}}
+    private Task ContinueAsync(string content) => interaction is null ? Task.CompletedTask : ExecuteCommandAsync(() => Api.AddMessageAsync(WorkspaceName, interaction.Id, content, lifetime.Token), T("FollowUpSendError"));
+    private Task PauseAsync() => ExecuteCommandAsync(() => Api.PauseTaskAsync(WorkspaceName, TaskId, lifetime.Token), T("TaskPauseError"));
+    private Task ResumeAsync() => ExecuteCommandAsync(() => Api.ResumeTaskAsync(WorkspaceName, TaskId, lifetime.Token), T("TaskResumeError"));
+    private Task CancelAsync() => ExecuteCommandAsync(() => Api.CancelTaskAsync(WorkspaceName, TaskId, lifetime.Token), T("TaskCancelError"));
     private async Task ExecuteCommandAsync(Func<Task> command, string failureMessage)
     {
         if (busy) return;
@@ -77,5 +78,6 @@ else if (task is not null)
         if (state == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected) _ = InvokeAsync(RefreshAsync);
     }
     private string ArtifactUrl(WorkTaskArtifact value)=>Api.GetArtifactContentUri(WorkspaceName,TaskId,value.Id.Value).ToString();
+    private string T(string key) => Localizer[key];
     public void Dispose(){Realtime.StateChanged-=HandleRealtimeStateChanged;realtimeSubscription?.Dispose();lifetime.Cancel();lifetime.Dispose();GC.SuppressFinalize(this);}
 }

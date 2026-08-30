@@ -1,8 +1,10 @@
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
 <section class="source-editor">
-    <header><h2>YAML definition</h2><button class="button-secondary" disabled="@IsReadOnly" @onclick="Apply">Apply valid YAML</button></header>
+    <header><h2>@Localizer["YamlDefinition"]</h2><button class="button-secondary" disabled="@IsReadOnly" @onclick="Apply">@Localizer["ApplyValidYaml"]</button></header>
     <StandaloneCodeEditor @ref="editor" Id="flow-source-monaco" ConstructionOptions="Options" OnDidChangeModelContent="Changed" />
     @if (Error is not null) { <p class="error-panel">@Error</p> }
-    <p class="muted">Invalid source is preserved; the canvas continues to show the last valid definition.</p>
+    <p class="muted">@Localizer["InvalidSourceHelp"]</p>
 </section>
 
 @code {

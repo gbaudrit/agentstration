@@ -35,6 +35,7 @@ public sealed record PrincipalPreferences(
     Guid PrincipalId,
     ThemePreference Theme,
     DateTimeOffset UpdatedAt,
+    string? Language = null,
     Guid? DefaultTenantId = null,
     Guid? DefaultWorkspaceId = null);
 

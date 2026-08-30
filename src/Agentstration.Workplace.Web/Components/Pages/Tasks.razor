@@ -1,18 +1,20 @@
 @page "/w/{WorkspaceName}/tasks"
 @inject IWorkplaceApiClient Api
 @inject WorkplaceContextState WorkplaceContext
-<PageTitle>Tasks · Workplace</PageTitle>
-<PageHeader Title="Tasks" Description="Follow work that continues beyond the conversation." Eyebrow="Workplace" />
-<FilterBar><label class="sr-only" for="task-status">Filter by status</label><select id="task-status" @bind="filter"><option value="">All statuses</option>@foreach(var value in Enum.GetValues<WorkTaskStatus>()){<option value="@value">@Label(value)</option>}</select></FilterBar>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplacePageStrings> Localizer
+<PageTitle>@T("Tasks") · Workplace</PageTitle>
+<PageHeader Title="@T("Tasks")" Description="@T("TasksDescription")" Eyebrow="Workplace" />
+<FilterBar><label class="sr-only" for="task-status">@T("FilterByStatus")</label><select id="task-status" @bind="filter"><option value="">@T("AllStatuses")</option>@foreach(var value in Enum.GetValues<WorkTaskStatus>()){<option value="@value">@Label(value)</option>}</select></FilterBar>
 @if (loading) { <LoadingState /> }
 else if (error is not null) { <ServiceUnavailableState Message="@error" /> }
-else if (!Filtered.Any()) { <EmptyState Title="No matching tasks" Message="Start a request from Home or change the status filter." /> }
-else { <div class="task-cards">@foreach(var task in Filtered){<a class="task-list-card" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")"><div><TaskStatusBadge Value="task.Status" /><h2>@task.Title</h2></div><small>Updated @task.UpdatedAt.LocalDateTime.ToString("g")</small></a>}</div> }
+else if (!Filtered.Any()) { <EmptyState Title="@T("NoMatchingTasks")" Message="@T("NoMatchingTasksHelp")" /> }
+else { <div class="task-cards">@foreach(var task in Filtered){<a class="task-list-card" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")"><div><TaskStatusBadge Value="task.Status" /><h2>@task.Title</h2></div><small>@T("Updated") @task.UpdatedAt.LocalDateTime.ToString("g")</small></a>}</div> }
 @code {
     [Parameter] public string WorkspaceName { get; set; } = string.Empty;
     private IReadOnlyList<WorkTaskResponse> tasks=[]; private string filter=""; private bool loading=true; private string? error;
     private IEnumerable<WorkTaskResponse> Filtered=>string.IsNullOrWhiteSpace(filter)?tasks:tasks.Where(value=>value.Status.ToString()==filter);
     protected override Task OnInitializedAsync()=>LoadAsync();
-    private async Task LoadAsync(){loading=true;error=null;try{var workspace=await Api.GetWorkspaceAsync(WorkspaceName,default);WorkplaceContext.SetWorkspace(workspace.Name,workspace.DisplayName,workspace.OrganizationName,workspace.OrganizationDisplayName,workspace.UserDisplayName);tasks=await Api.ListTasksAsync(WorkspaceName,null,default);}catch{error="Tasks could not be loaded from the local Work API.";}finally{loading=false;}}
-    private static string Label(WorkTaskStatus value)=>value switch{WorkTaskStatus.ActionRequired=>"Needs input",WorkTaskStatus.Running=>"In progress",_=>value.ToString()};
+    private async Task LoadAsync(){loading=true;error=null;try{var workspace=await Api.GetWorkspaceAsync(WorkspaceName,default);WorkplaceContext.SetWorkspace(workspace.Name,workspace.DisplayName,workspace.OrganizationName,workspace.OrganizationDisplayName,workspace.UserDisplayName);tasks=await Api.ListTasksAsync(WorkspaceName,null,default);}catch{error=T("TasksLoadError");}finally{loading=false;}}
+    private string Label(WorkTaskStatus value)=>value switch{WorkTaskStatus.ActionRequired=>T("NeedsInput"),WorkTaskStatus.Running=>T("InProgress"),_=>T($"TaskStatus.{value}")};
+    private string T(string key) => Localizer[key];
 }

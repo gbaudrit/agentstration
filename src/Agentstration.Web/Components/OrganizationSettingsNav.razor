@@ -1,7 +1,8 @@
-<nav class="organization-tabs" aria-label="Organization settings">
-    <NavLink class="organization-tab" href="/settings/organization" Match="NavLinkMatch.All">General</NavLink>
-    <NavLink class="organization-tab" href="/settings/organization/workspaces">Workspaces</NavLink>
-    <NavLink class="organization-tab" href="/settings/organization/members">Members</NavLink>
-    <NavLink class="organization-tab" href="/settings/organization/access">Access control</NavLink>
-    <NavLink class="organization-tab" href="/settings/organization/security-audit">Security audit</NavLink>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.OrganizationStrings> Localizer
+<nav class="organization-tabs" aria-label="@Localizer["OrganizationSettings"]">
+    <NavLink class="organization-tab" href="/settings/organization" Match="NavLinkMatch.All">@Localizer["General"]</NavLink>
+    <NavLink class="organization-tab" href="/settings/organization/workspaces">@Localizer["Workspaces"]</NavLink>
+    <NavLink class="organization-tab" href="/settings/organization/members">@Localizer["Members"]</NavLink>
+    <NavLink class="organization-tab" href="/settings/organization/access">@Localizer["AccessControl"]</NavLink>
+    <NavLink class="organization-tab" href="/settings/organization/security-audit">@Localizer["SecurityAudit"]</NavLink>
 </nav>

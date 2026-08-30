@@ -88,7 +88,7 @@ Local launch uses ASP.NET Core Identity with a dedicated SQLite credential store
 
 `identity.db` is upgraded with versioned EF Core migrations. The persistent Data Protection key ring defaults beside the local data file and can be changed with `Agentstration:Authentication:DataProtectionKeysPath`. Back up and protect both stores; the key directory contains sensitive material required to keep cookies and Identity lifecycle tokens valid across restarts.
 
-Authenticated users can read and update their own profile preferences through `GET/PUT /api/identity/preferences`. The first delivered preference is the theme (`System`, `Light`, or `Dark`). The server derives the target Principal from the authenticated session or access token; clients cannot submit a Principal identifier. Preferences live in the Management Control Plane rather than the ASP.NET Core Identity credential database.
+Authenticated users can read and update their own profile preferences through `GET/PUT /api/identity/preferences`. Preferences include the theme (`System`, `Light`, or `Dark`) and an optional supported BCP 47 language; a missing language keeps automatic browser selection. The server derives the target Principal from the authenticated session or access token; clients cannot submit a Principal identifier. Preferences live in the Management Control Plane rather than the ASP.NET Core Identity credential database.
 
 The Console exposes `/settings/profile` for reviewing the current Principal and explicitly selecting the system, light, or dark appearance. The selection is saved immediately through the same preference state used by the Console and Workplace shell theme controls. Credential management remains isolated at `/account/security`.
 

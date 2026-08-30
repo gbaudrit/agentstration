@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Fournisseurs d’outils</value></data>
+  <data name="Description"><value>Configurez les extensions AEP et les serveurs MCP génériques qui exposent des outils.</value></data>
+  <data name="Catalog"><value>Catalogue</value></data>
+  <data name="AddProvider"><value>Ajouter un fournisseur</value></data>
+  <data name="SectionsLabel"><value>Sections des outils</value></data>
+  <data name="Providers"><value>Fournisseurs</value></data>
+  <data name="Loading"><value>Chargement des fournisseurs d’outils…</value></data>
+  <data name="EmptyTitle"><value>Aucun fournisseur d’outils</value></data>
+  <data name="EmptyMessage"><value>Ajoutez un fournisseur MCP ou AEP pour découvrir des outils.</value></data>
+  <data name="Name"><value>Nom</value></data>
+  <data name="Type"><value>Type</value></data>
+  <data name="Status"><value>État</value></data>
+  <data name="Tools"><value>Outils</value></data>
+  <data name="Enabled"><value>Activé</value></data>
+  <data name="Yes"><value>Oui</value></data>
+  <data name="No"><value>Non</value></data>
+  <data name="Manage"><value>Gérer →</value></data>
+  <data name="Status.connected"><value>Connecté</value></data>
+  <data name="Status.error"><value>Erreur</value></data>
+  <data name="Status.notDiscovered"><value>Non découvert</value></data>
+</root>

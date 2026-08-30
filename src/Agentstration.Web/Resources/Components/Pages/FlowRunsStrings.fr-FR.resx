@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title"><value>Exécutions de Flow</value></data>
+  <data name="Description"><value>Recherchez et diagnostiquez les exécutions de toutes les versions publiées des Flows.</value></data>
+  <data name="Definitions"><value>Définitions</value></data>
+  <data name="Runs"><value>Exécutions</value></data>
+  <data name="Deployments"><value>Déploiements</value></data>
+  <data name="SearchPlaceholder"><value>Rechercher une exécution ou un Flow</value></data>
+  <data name="AllStatuses"><value>Tous les états</value></data>
+  <data name="AllTriggers"><value>Tous les déclencheurs</value></data>
+  <data name="Version"><value>Version</value></data>
+  <data name="Deployment"><value>Déploiement</value></data>
+  <data name="Loading"><value>Chargement des exécutions de Flow…</value></data>
+  <data name="EmptyTitle"><value>Aucune exécution de Flow correspondante</value></data>
+  <data name="EmptyMessage"><value>Ajustez les filtres ou démarrez un Flow depuis son onglet Exécutions.</value></data>
+  <data name="Status"><value>État</value></data>
+  <data name="Flow"><value>Flow</value></data>
+  <data name="Started"><value>Démarrée</value></data>
+  <data name="Duration"><value>Durée</value></data>
+  <data name="Trigger"><value>Déclencheur</value></data>
+  <data name="StartedBy"><value>Démarrée par</value></data>
+  <data name="Pending"><value>En attente</value></data>
+  <data name="Inspect"><value>Inspecter</value></data>
+  <data name="Status.Pending"><value>En attente</value></data>
+  <data name="Status.Running"><value>En cours</value></data>
+  <data name="Status.WaitingForInput"><value>En attente d’une saisie</value></data>
+  <data name="Status.Succeeded"><value>Réussie</value></data>
+  <data name="Status.Failed"><value>Échouée</value></data>
+  <data name="Status.Cancelled"><value>Annulée</value></data>
+  <data name="Status.TimedOut"><value>Délai dépassé</value></data>
+  <data name="Trigger.Manual"><value>Manuel</value></data>
+  <data name="Trigger.Api"><value>API</value></data>
+  <data name="Trigger.WorkItem"><value>Élément de travail</value></data>
+  <data name="Trigger.Flow"><value>Flow</value></data>
+  <data name="Trigger.Schedule"><value>Planification</value></data>
+  <data name="Trigger.Event"><value>Événement</value></data>
+</root>

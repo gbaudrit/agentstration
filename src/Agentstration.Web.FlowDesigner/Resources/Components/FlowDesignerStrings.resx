@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="PageTitle"><value>Flow Designer</value></data>
+  <data name="Unavailable"><value>Flow Designer unavailable</value></data>
+  <data name="Flows"><value>Flows</value></data>
+  <data name="Published"><value>Published {0}</value></data>
+  <data name="Draft"><value>Draft</value></data>
+  <data name="Revision"><value>Revision {0}</value></data>
+  <data name="PublishedVersion"><value>Published version {0}</value></data>
+  <data name="ReadOnly"><value>Read only</value></data>
+  <data name="Mode.Designer"><value>Designer</value></data>
+  <data name="Mode.Definition"><value>Definition</value></data>
+  <data name="Mode.Split"><value>Split</value></data>
+  <data name="Undo"><value>Undo</value></data><data name="Redo"><value>Redo</value></data>
+  <data name="Validate"><value>Validate</value></data><data name="RunDraft"><value>Run draft</value></data>
+  <data name="Save"><value>Save</value></data><data name="Version"><value>Version</value></data>
+  <data name="PublishVersion"><value>Publish version</value></data><data name="Publish"><value>Publish</value></data>
+  <data name="Steps"><value>Steps</value></data>
+  <data name="Step.input"><value>Input</value></data><data name="Step.agent"><value>Agent</value></data>
+  <data name="Step.router"><value>Router</value></data><data name="Step.condition"><value>Condition</value></data>
+  <data name="Step.transform"><value>Transform</value></data><data name="Step.output"><value>Output</value></data>
+  <data name="Step.failure"><value>Failure</value></data>
+  <data name="HorizontalLayout"><value>Horizontal layout</value></data><data name="VerticalLayout"><value>Vertical layout</value></data><data name="Center"><value>Center</value></data>
+  <data name="Inspector"><value>Inspector</value></data><data name="SelectStep"><value>Select a step to edit it.</value></data>
+  <data name="DisplayName"><value>Display name</value></data><data name="TechnicalName"><value>Technical name</value></data><data name="Type"><value>Type</value></data>
+  <data name="Agent"><value>Agent</value></data><data name="RouterOutput"><value>Router output</value></data>
+  <data name="LoadAgents"><value>Load agents</value></data><data name="AddAll"><value>Add all</value></data>
+  <data name="AvailableAgents.One"><value>{0} agent available. Routes are explicit and remain immutable references when published.</value></data>
+  <data name="AvailableAgents.Many"><value>{0} agents available. Routes are explicit and remain immutable references when published.</value></data>
+  <data name="RouteKey"><value>Route key</value></data><data name="Description"><value>Description</value></data><data name="Examples"><value>Examples</value></data><data name="AddRoute"><value>Add route</value></data>
+  <data name="LeftValue"><value>Left value</value></data><data name="Operator"><value>Operator</value></data><data name="RightValue"><value>Right value</value></data>
+  <data name="ErrorCode"><value>Error code</value></data><data name="Message"><value>Message</value></data><data name="DeleteStep"><value>Delete step</value></data>
+  <data name="Transitions"><value>Transitions</value></data><data name="From"><value>From</value></data><data name="Event"><value>Event</value></data><data name="To"><value>To</value></data><data name="AddTransition"><value>Add transition</value></data>
+  <data name="Validation"><value>Validation</value></data><data name="IssueCount.One"><value>{0} issue</value></data><data name="IssueCount.Many"><value>{0} issues</value></data>
+  <data name="PublishedDefinitionHelp"><value>This published definition is displayed without creating a Draft.</value></data>
+  <data name="ValidationHelp"><value>Validate the Draft to check structure, reachability, expressions and resources.</value></data>
+  <data name="RunDraftRevision"><value>Run Draft revision {0}</value></data><data name="InputJson"><value>Input JSON</value></data><data name="Cancel"><value>Cancel</value></data>
+  <data name="SaveState.Saving"><value>Saving…</value></data><data name="SaveState.UnsavedChanges"><value>Unsaved changes</value></data><data name="SaveState.SaveFailed"><value>Save failed</value></data><data name="SaveState.Saved"><value>Saved</value></data>
+  <data name="FlowDiagram"><value>Flow diagram</value></data><data name="DiagramZoomControls"><value>Diagram zoom controls</value></data>
+  <data name="ZoomOut"><value>Zoom out</value></data><data name="ZoomIn"><value>Zoom in</value></data><data name="Fit"><value>Fit</value></data>
+  <data name="YamlDefinition"><value>YAML definition</value></data><data name="ApplyValidYaml"><value>Apply valid YAML</value></data>
+  <data name="InvalidSourceHelp"><value>Invalid source is preserved; the canvas continues to show the last valid definition.</value></data>
+  <data name="Declared"><value>Declared</value></data><data name="Observed"><value>Observed</value></data><data name="NotSelected"><value>Not selected</value></data>
+  <data name="TopologyZoomControls"><value>Topology zoom controls</value></data><data name="NoTopology"><value>No topology is available for this Flow.</value></data>
+  <data name="TurnCount.One"><value>{0} turn</value></data><data name="TurnCount.Many"><value>{0} turns</value></data><data name="InitialParticipant"><value>initial participant</value></data>
+  <data name="EdgeDescription"><value>{0} to {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>declared</value></data><data name="EdgeState.Observed"><value>observed</value></data><data name="EdgeState.Inactive"><value>not selected</value></data>
+</root>

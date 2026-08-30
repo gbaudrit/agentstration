@@ -1,23 +1,26 @@
 @page "/flows"
 @implements IDisposable
 @inject IFlowApiClient Client
-<PageTitle>Flows · Agentstration</PageTitle>
-<PageHeader Title="Flows" Description="Define orchestrations and inspect every execution from one operational workspace.">
-    <Actions><a class="button-primary" href="/flows/new">New flow</a><a class="button-secondary" href="/flow-runs">View all runs</a></Actions>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings> Localizer
+<PageTitle>@T("PageTitle")</PageTitle>
+<PageHeader Title="@T("Flows")" Description="@T("Description")">
+    <Actions><a class="button-primary" href="/flows/new">@T("NewFlow")</a><a class="button-secondary" href="/flow-runs">@T("ViewAllRuns")</a></Actions>
 </PageHeader>
-<nav class="section-tabs" aria-label="Flow sections"><a class="active" href="/flows">Definitions</a><a href="/flow-runs">Runs</a><a href="/flows#deployments">Deployments</a></nav>
+<nav class="section-tabs" aria-label="@T("FlowSections")"><a class="active" href="/flows">@T("Definitions")</a><a href="/flow-runs">@T("Runs")</a><a href="/flows#deployments">@T("Deployments")</a></nav>
 @if (items is null) { <LoadingState /> }
-else if (items.Count == 0) { <EmptyState Title="No Flow definitions" Message="Create and publish a Flow through the API to begin." /> }
+else if (items.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
 else
 {
     <DataGrid TItem="FlowSummary" Items="items">
-        <Header><tr><th>Flow</th><th>Namespace</th><th>Kind</th><th>Version</th><th>Status</th><th>Updated</th><th></th></tr></Header>
-        <Row Context="item"><tr><td><strong>@item.Name</strong><br/><code>@item.Id</code></td><td><code>@item.Namespace.Value</code></td><td>@item.Kind</td><td>@item.Version</td><td><StatusBadge Text="@item.Status" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td><a class="text-button" href="@item.DetailsUrl">Open</a></td></tr></Row>
+        <Header><tr><th>@T("Flow")</th><th>@T("Namespace")</th><th>@T("Kind")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Updated")</th><th></th></tr></Header>
+        <Row Context="item"><tr><td><strong>@item.Name</strong><br/><code>@item.Id</code></td><td><code>@item.Namespace.Value</code></td><td>@item.Kind</td><td>@item.Version</td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td><a class="text-button" href="@item.DetailsUrl">@T("Open")</a></td></tr></Row>
     </DataGrid>
 }
 @code {
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<FlowSummary>? items;
     protected override async Task OnInitializedAsync() => items = await Client.GetFlowsAsync(cancellation.Token);
+    private string T(string key) => Localizer[key];
+    private string StatusLabel(string value) { var localized = Localizer[$"Status.{value}"]; return localized.ResourceNotFound ? value : localized.Value; }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

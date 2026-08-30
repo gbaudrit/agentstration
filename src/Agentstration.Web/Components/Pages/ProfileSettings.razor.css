@@ -24,6 +24,9 @@
 .theme-option-copy small { min-height:2.4em; color:var(--muted); line-height:1.2; }
 .theme-selection { position:absolute; right:9px; bottom:9px; display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:var(--primary); color:#fff; font-size:.72rem; }
 .profile-error { margin:0; color:#c83b48; font-size:.82rem; }
+.profile-language { display:grid; gap:8px; padding-top:24px; border-top:1px solid var(--border); }
+.profile-language p { margin:0; color:var(--muted); }
+.profile-language select { width:min(100%,320px); }
 .account-security-panel { display:grid; gap:12px; }
 .account-security-panel .button-secondary { justify-self:start; margin-top:8px; text-decoration:none; }
 @media(max-width:920px){.profile-settings-layout{grid-template-columns:1fr}.theme-options{grid-template-columns:repeat(3,minmax(140px,1fr));overflow-x:auto}}

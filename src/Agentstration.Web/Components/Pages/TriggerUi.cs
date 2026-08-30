@@ -1,14 +1,15 @@
 using Agentstration.Management.Abstractions;
+using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Web.Components.Pages;
 
 public static class TriggerUi
 {
-    public static string ScheduleLabel(TriggerSchedule? value) => value is null ? "—" : value.Type switch
+    public static string ScheduleLabel(TriggerSchedule? value, IStringLocalizer<TriggerStrings>? localizer = null) => value is null ? "—" : value.Type switch
     {
         TriggerScheduleType.Cron => $"{value.Expression} · {value.TimeZone}",
-        TriggerScheduleType.Interval => $"Every {value.Every} · from {FormatDate(value.StartAt)}",
-        _ => $"Once · {FormatDate(value.At)}"
+        TriggerScheduleType.Interval => Format(localizer, "Schedule.Interval", "Every {0} · from {1}", value.Every ?? "—", FormatDate(value.StartAt)),
+        _ => Format(localizer, "Schedule.Once", "Once · {0}", FormatDate(value.At))
     };
 
     public static string FormatDate(DateTimeOffset? value) => value is null ? "—" : value.Value.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture);
@@ -34,6 +35,8 @@ public static class TriggerUi
     }
 
     public static DateTime LocalInput(DateTimeOffset value, string timeZone) => DateTime.SpecifyKind(TimeZoneInfo.ConvertTime(value, TimeZoneInfo.FindSystemTimeZoneById(timeZone)).DateTime, DateTimeKind.Unspecified);
-    public static string OccurrenceLabel(DateTimeOffset value, string timeZone, DateTimeOffset now) { var scheduled = TimeZoneInfo.ConvertTime(value, TimeZoneInfo.FindSystemTimeZoneById(timeZone)); var relative = value <= now ? "due" : Relative(value - now); var sign = scheduled.Offset < TimeSpan.Zero ? "-" : "+"; return $"{scheduled:ddd d MMM yyyy · HH:mm} ({timeZone}, UTC{sign}{scheduled.Offset.Duration():hh\\:mm}) · {relative}"; }
-    private static string Relative(TimeSpan value) => value.TotalDays >= 2 ? $"in {(int)value.TotalDays} days" : value.TotalHours >= 2 ? $"in {(int)value.TotalHours} hours" : $"in {Math.Max(1, (int)value.TotalMinutes)} minutes";
+    public static string OccurrenceLabel(DateTimeOffset value, string timeZone, DateTimeOffset now, IStringLocalizer<TriggerStrings>? localizer = null) { var scheduled = TimeZoneInfo.ConvertTime(value, TimeZoneInfo.FindSystemTimeZoneById(timeZone)); var relative = value <= now ? Text(localizer, "Due", "due") : Relative(value - now, localizer); var sign = scheduled.Offset < TimeSpan.Zero ? "-" : "+"; return $"{scheduled:ddd d MMM yyyy · HH:mm} ({timeZone}, UTC{sign}{scheduled.Offset.Duration():hh\\:mm}) · {relative}"; }
+    private static string Relative(TimeSpan value, IStringLocalizer<TriggerStrings>? localizer) => value.TotalDays >= 2 ? Format(localizer, "Relative.Days", "in {0} days", (int)value.TotalDays) : value.TotalHours >= 2 ? Format(localizer, "Relative.Hours", "in {0} hours", (int)value.TotalHours) : Format(localizer, "Relative.Minutes", "in {0} minutes", Math.Max(1, (int)value.TotalMinutes));
+    private static string Text(IStringLocalizer<TriggerStrings>? localizer, string key, string fallback) => localizer is null ? fallback : localizer[key].Value;
+    private static string Format(IStringLocalizer<TriggerStrings>? localizer, string key, string fallback, params object[] arguments) => localizer is null ? string.Format(System.Globalization.CultureInfo.CurrentCulture, fallback, arguments) : localizer[key, arguments].Value;
 }

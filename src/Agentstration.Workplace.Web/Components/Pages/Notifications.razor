@@ -2,9 +2,10 @@
 @implements IDisposable
 @inject IWorkplaceApiClient Api
 @inject WorkplaceContextState WorkplaceContext
+@inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplacePageStrings> Localizer
 
-<PageTitle>Notifications · Workplace</PageTitle>
-<PageHeader Title="Notifications" Description="Workspace-level updates requiring your attention." Eyebrow="Workplace" />
+<PageTitle>@T("Notifications") · Workplace</PageTitle>
+<PageHeader Title="@T("Notifications")" Description="@T("NotificationsDescription")" Eyebrow="Workplace" />
 
 @if (loading)
 {
@@ -39,7 +40,7 @@ else
             WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName);
             items = await Api.ListNotificationsAsync(WorkspaceName, false, lifetime.Token);
         }
-        catch when (!lifetime.IsCancellationRequested) { error = "Notifications could not be loaded from the local Work API."; }
+        catch when (!lifetime.IsCancellationRequested) { error = T("NotificationsLoadError"); }
         finally { loading = false; }
     }
 
@@ -52,7 +53,7 @@ else
         busy = true;
         error = null;
         try { await action(); items = await Api.ListNotificationsAsync(WorkspaceName, false, lifetime.Token); }
-        catch when (!lifetime.IsCancellationRequested) { error = "Notifications could not be updated. Please try again."; }
+        catch when (!lifetime.IsCancellationRequested) { error = T("NotificationsUpdateError"); }
         finally { busy = false; }
     }
 
@@ -62,4 +63,6 @@ else
         lifetime.Dispose();
         GC.SuppressFinalize(this);
     }
+
+    private string T(string key) => Localizer[key];
 }

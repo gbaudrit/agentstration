@@ -1,49 +1,51 @@
 @inherits LayoutComponentBase
 @implements IAsyncDisposable
+@using Agentstration.Web.Components.Localization
 @inject NavigationManager Navigation
 @inject UserPreferencesState Preferences
 @inject WorkplaceContextState WorkplaceContext
 @inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceLayoutStrings> Localizer
 <div class="app-shell @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light") workplace-shell">
-    <aside class="sidebar" aria-label="Workplace navigation">
-<a class="brand-lockup workplace-brand-lockup" href="@HomeUrl" aria-label="Agentstration Workplace home">
-    <img class="brand-lockup-logo brand-lockup-logo-light" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup.png" alt="Agentstration Workplace" />
-    <img class="brand-lockup-logo brand-lockup-logo-dark" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-dark.png" alt="Agentstration Workplace" />
-</a>
+    <aside class="sidebar" aria-label="@T("WorkplaceNavigation")">
+        <a class="brand-lockup workplace-brand-lockup" href="@HomeUrl" aria-label="@T("WorkplaceHome")">
+            <img class="brand-lockup-logo brand-lockup-logo-light" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup.png" alt="" />
+            <img class="brand-lockup-logo brand-lockup-logo-dark" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-dark.png" alt="" />
+        </a>
         <nav class="side-nav">
-            <section class="navigation-group" aria-label="Overview">
+            <section class="navigation-group" aria-label="@T("Overview")">
                 <NavLink href="@HomeUrl" Match="NavLinkMatch.All">
-                    <span class="nav-icon" aria-hidden="true"><UiIcon Name="home" /></span><span class="nav-label nav-label-desktop">Home</span><span class="nav-label nav-label-mobile">Accueil</span>
+                    <span class="nav-icon" aria-hidden="true"><UiIcon Name="home" /></span><span class="nav-label">@T("Home")</span>
                 </NavLink>
             </section>
-            <section class="navigation-group" aria-label="Work">
-                <h2>Work</h2>
+            <section class="navigation-group" aria-label="@T("Work")">
+                <h2>@T("Work")</h2>
                 @if (CurrentWorkspace is null)
                 {
                     <a class="side-nav-disabled" aria-disabled="true" tabindex="-1">
-                        <span class="nav-icon nav-icon-desktop" aria-hidden="true"><UiIcon Name="tasks" /></span><span class="nav-icon nav-icon-mobile" aria-hidden="true"><UiIcon Name="activity" /></span><span class="nav-label nav-label-desktop">Tasks</span><span class="nav-label nav-label-mobile">Activité</span>
+                        <span class="nav-icon nav-icon-desktop" aria-hidden="true"><UiIcon Name="tasks" /></span><span class="nav-icon nav-icon-mobile" aria-hidden="true"><UiIcon Name="activity" /></span><span class="nav-label">@T("Activity")</span>
                     </a>
                 }
                 else
                 {
                     <NavLink href="@TasksUrl">
-                        <span class="nav-icon nav-icon-desktop" aria-hidden="true"><UiIcon Name="tasks" /></span><span class="nav-icon nav-icon-mobile" aria-hidden="true"><UiIcon Name="activity" /></span><span class="nav-label nav-label-desktop">Tasks</span><span class="nav-label nav-label-mobile">Activité</span>
+                        <span class="nav-icon nav-icon-desktop" aria-hidden="true"><UiIcon Name="tasks" /></span><span class="nav-icon nav-icon-mobile" aria-hidden="true"><UiIcon Name="activity" /></span><span class="nav-label">@T("Activity")</span>
                     </NavLink>
                 }
             </section>
-            <span class="mobile-profile" aria-label="Profil de @UserDisplayName" title="@UserDisplayName"><span aria-hidden="true">@UserInitials</span></span>
+            <span class="mobile-profile" aria-label="@F("ProfileFor", UserDisplayName)" title="@UserDisplayName"><span aria-hidden="true">@UserInitials</span></span>
         </nav>
         <div class="sidebar-footer"><strong>@WorkspaceDisplayName</strong><small>@OrganizationDisplayName</small></div>
     </aside>
     <div class="workspace">
         <header class="mobile-appbar">
-            <a class="mobile-brand" href="@HomeUrl" aria-label="Agentstration Workplace home">
-                <img class="mobile-brand-logo mobile-brand-logo-light" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup.png" alt="Agentstration Workplace" />
-                <img class="mobile-brand-logo mobile-brand-logo-dark" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-dark.png" alt="Agentstration Workplace" />
+            <a class="mobile-brand" href="@HomeUrl" aria-label="@T("WorkplaceHome")">
+                <img class="mobile-brand-logo mobile-brand-logo-light" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup.png" alt="" />
+                <img class="mobile-brand-logo mobile-brand-logo-dark" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-dark.png" alt="" />
             </a>
-            <a class="mobile-notifications" href="@NotificationsUrl" aria-label="Open notifications"><UiIcon Name="notifications" /></a>
+            <a class="mobile-notifications" href="@NotificationsUrl" aria-label="@T("OpenNotifications")"><UiIcon Name="notifications" /></a>
         </header>
-        <header class="topbar"><div class="topbar-start"><nav class="breadcrumb" aria-label="Current organization and workspace"><span>@OrganizationDisplayName</span><span>/</span><a href="@HomeUrl">@(WorkspaceDisplayName + " Workplace")</a></nav></div><div class="topbar-actions"><button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="Toggle color theme" title="@(Preferences.Error ?? $"Theme: {Preferences.Theme}")"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button><a class="icon-button" href="@NotificationsUrl" aria-label="Open notifications"><UiIcon Name="notifications" /></a></div></header><main class="content">@Body</main>
+        <header class="topbar"><div class="topbar-start"><nav class="breadcrumb" aria-label="@T("CurrentOrganizationWorkspace")"><span>@OrganizationDisplayName</span><span>/</span><a href="@HomeUrl">@F("NamedWorkplace", WorkspaceDisplayName)</a></nav></div><div class="topbar-actions"><button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="@T("ToggleColorTheme")" title="@(Preferences.Error ?? F("ThemeValue", Preferences.Theme))"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button><a class="icon-button" href="@NotificationsUrl" aria-label="@T("OpenNotifications")"><UiIcon Name="notifications" /></a></div></header><main class="content">@Body</main>
     </div>
 </div>
 
@@ -63,6 +65,7 @@
         if (!firstRender) return;
         themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/theme-preferences.js");
         Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
+        CultureNavigation.NavigateToPreferredCulture(Navigation, Preferences.Language);
     }
 
     private Task ToggleThemeAsync() => Preferences.ToggleThemeAsync(lifetimeCancellation.Token);
@@ -82,6 +85,8 @@
     private string HomeUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}";
     private string TasksUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}/tasks";
     private string NotificationsUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}/notifications";
+    private string T(string key) => Localizer[key];
+    private string F(string key, params object[] arguments) => Localizer[key, arguments];
     private string WorkspaceDisplayName
     {
         get
@@ -94,15 +99,15 @@
 
             return workspaceName is { Length: > 0 }
                 ? char.ToUpperInvariant(workspaceName[0]) + workspaceName[1..].Replace('-', ' ')
-                : "My";
+                : T("My");
         }
     }
     private string OrganizationDisplayName => WorkplaceContext.Current?.OrganizationDisplayName is { Length: > 0 } displayName
         ? displayName
-        : "Organization";
+        : T("Organization");
     private string UserDisplayName => WorkplaceContext.Current?.UserDisplayName is { Length: > 0 } displayName
         ? displayName
-        : "Utilisateur";
+        : T("User");
     private string UserInitials => string.Concat(UserDisplayName
         .Split(' ', StringSplitOptions.RemoveEmptyEntries)
         .Take(2)

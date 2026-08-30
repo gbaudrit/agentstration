@@ -95,6 +95,15 @@ Web -> Management / Flow / Runtime public boundaries
 - Provider-specific behavior belongs behind the existing Model Provider, Runtime, AEP, MCP and `IChatClient` boundaries.
 - Centralize NuGet versions in `Directory.Packages.props`; do not put package versions in individual project files.
 
+## Internationalization
+
+- Every product-owned string visible to a user must be localized through `IStringLocalizer` and the appropriate RESX catalog. Do not hard-code UI labels, headings, descriptions, help text, status text, validation messages, accessibility labels, or action text in Razor, Razor Pages, or C#.
+- English (`en-US`) is the neutral source and fallback culture. Every new or changed resource key must include a complete French (`fr-FR`) translation in the same change.
+- Reuse a feature catalog or a shared UI catalog when ownership is clear; do not create a new catalog for isolated strings or place product UI translations in resource manifests.
+- Keep API property names, resource identities, enum values, error codes, persisted values, protocol formats, and other technical identifiers invariant. Localize their presentation at the UI boundary.
+- User-authored resource content is outside product RESX catalogs. Preserve the manifest source locale and use the localization-sidecar model defined for those resources when that vertical is available.
+- Update localization rendering tests when observable text changes. Resource catalogs must remain valid, duplicate-free, and key-symmetric between the neutral and `fr-FR` files.
+
 ## Local Launch Profiles
 
 The standard Development profiles use `deploy/bootstrap/profiles` as the bootstrap catalog, enable initial bootstrap, and apply its `development` profile to a fresh local instance with the public fixture account `admin / admin`. This credential is disposable local test data, not a secret, and must never be reused outside local Development.

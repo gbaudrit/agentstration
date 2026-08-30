@@ -1,3 +1,4 @@
+using System.Globalization;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Resources;
@@ -11,17 +12,20 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class NamespacedAgentDetailsTests
 {
     [TestMethod]
     public async Task PageShowsPackBindingsAndDeploysTheExactNamespacedAgent()
     {
+        using var culture = new CultureScope("en-US");
         using var context = new BunitContext();
         var agents = new FakeManagementClient();
         var runtime = new FakeRuntimeClient();
         context.Services.AddSingleton<IManagementApiClient>(agents);
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         context.Services.AddSingleton<IAgentRunnerRuntimeClient>(runtime);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<NamespacedAgentDetails>(parameters => parameters
             .Add(component => component.AgentNamespace, FakeManagementClient.PackNamespace.Value)
@@ -40,11 +44,10 @@ public sealed class NamespacedAgentDetailsTests
         Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("agent_deployment_not_found", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("model-reasoning", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("local-runtime", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Markup.Contains("definition is read-only in the Console", StringComparison.Ordinal));
-
         Assert.IsFalse(rendered.FindAll("button:not([role='tab'])").Any(button => button.TextContent.Trim() == "Definition"));
         await rendered.Find("#agent-definition-tab").ClickAsync(new());
         Assert.AreEqual("true", rendered.Find("#agent-definition-tab").GetAttribute("aria-selected"));
+        Assert.IsTrue(rendered.Markup.Contains("Review the original Agent fields.", StringComparison.Ordinal));
         var definition = rendered.Find("[data-testid='pack-agent-definition-form']");
         Assert.IsTrue(definition.QuerySelectorAll("input:not([disabled]), textarea:not([disabled])").Length == 0);
         Assert.IsTrue(definition.QuerySelectorAll("textarea").Any(field => field.GetAttribute("value")?.Contains("Original instructions from the Pack.", StringComparison.Ordinal) == true));
@@ -93,6 +96,19 @@ public sealed class NamespacedAgentDetailsTests
         var source = rendered.Find("[data-testid='pack-agent-yaml'] textarea");
         Assert.IsTrue(source.HasAttribute("readonly"));
         Assert.IsTrue(source.TextContent.Contains("binding: model-reasoning", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void FrenchCatalogLocalizesNamespacedAgentOperations()
+    {
+        using var culture = new CultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var localizer = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<NamespacedAgentDetailsStrings>>();
+
+        Assert.AreEqual("Vue d’ensemble", localizer["Tab.Overview"].Value);
+        Assert.AreEqual("Liaison d’installation", localizer["InstallationBinding"].Value);
+        Assert.AreEqual("Déployer la génération 4", localizer["DeployGeneration", 4].Value);
     }
 
     private sealed class FakeRuntimeClient : IAgentRunnerRuntimeClient
@@ -246,5 +262,23 @@ public sealed class NamespacedAgentDetailsTests
         public Task<IReadOnlyList<PackProjectBuildResource>> GetBuildsAsync(Guid projectId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<PackInstallationPreview> PreviewBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<InstalledPackResource>> InstallBuildAsync(Guid projectId, Guid buildId, bool replaceExisting, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class CultureScope : IDisposable
+    {
+        private readonly CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        private readonly CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+
+        public CultureScope(string name)
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(name);
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(name);
+        }
+
+        public void Dispose()
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 }

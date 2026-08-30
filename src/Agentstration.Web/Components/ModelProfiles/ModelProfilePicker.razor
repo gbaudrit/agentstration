@@ -1,29 +1,30 @@
 @implements IDisposable
 @inject IModelProfilesClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfilePickerStrings> Localizer
 
 <div class="model-profile-picker">
     <label>
-        <span>Search model profiles</span>
-        <input value="@search" @oninput="SearchChanged" placeholder="Name, provider or model" aria-label="Search model profiles" />
+        <span>@T("SearchModelProfiles")</span>
+        <input value="@search" @oninput="SearchChanged" placeholder="@T("SearchPlaceholder")" aria-label="@T("SearchModelProfiles")" />
     </label>
     @if (loading)
     {
-        <LoadingState Message="Loading model profiles…" />
+        <LoadingState Message="@T("Loading")" />
     }
     else if (error is not null)
     {
-        <div class="form-alert form-alert-danger" role="alert">@error.Message <button type="button" class="text-button" @onclick="LoadAsync">Retry</button></div>
+        <div class="form-alert form-alert-danger" role="alert">@error.Message <button type="button" class="text-button" @onclick="LoadAsync">@T("Retry")</button></div>
     }
     else if (filtered.Count == 0)
     {
-        <EmptyState Title="No model profiles" Message="Create a model profile or change the search." />
+        <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" />
     }
     else
     {
         <label>
-            <span>Model profile</span>
-            <select value="@CurrentValue" @onchange="SelectAsync" aria-label="Model profile">
-                <option value="">Select a model profile</option>
+            <span>@T("ModelProfile")</span>
+            <select value="@CurrentValue" @onchange="SelectAsync" aria-label="@T("ModelProfile")">
+                <option value="">@T("SelectModelProfile")</option>
                 @foreach (var profile in filtered)
                 {
                     <option value="@ProfileValue(profile)" disabled="@ModelManagementUi.IsInvalid(profile)">@OptionLabel(profile)</option>
@@ -35,26 +36,26 @@
     @if (Selected is not null)
     {
         <article class="model-summary-card">
-            <div><p class="eyebrow">Selected model profile</p><strong>@Selected.Properties.DisplayName</strong><code>@Selected.Namespace/@Selected.Name</code></div>
+            <div><p class="eyebrow">@T("SelectedModelProfile")</p><strong>@Selected.Properties.DisplayName</strong><code>@Selected.Namespace/@Selected.Name</code></div>
             <dl class="compact-details">
-                <dt>Provider</dt><dd>@(Selected.Properties.Provider.DisplayName ?? Selected.Properties.Provider.Name)</dd>
-                <dt>Model</dt><dd>@Selected.Properties.Model.Name</dd>
-                <dt>Status</dt><dd><StatusBadge Text="@ModelManagementUi.Label(Selected.Properties.Status)" Status="@ModelManagementUi.Status(Selected.Properties.Status)" /></dd>
+                <dt>@T("Provider")</dt><dd>@(Selected.Properties.Provider.DisplayName ?? Selected.Properties.Provider.Name)</dd>
+                <dt>@T("Model")</dt><dd>@Selected.Properties.Model.Name</dd>
+                <dt>@T("Status")</dt><dd><StatusBadge Text="@StatusLabel(Selected.Properties.Status)" Status="@ModelManagementUi.Status(Selected.Properties.Status)" /></dd>
             </dl>
-            <a class="text-button" href="@ProfileUrl(Selected)">View model profile →</a>
+            <a class="text-button" href="@ProfileUrl(Selected)">@T("ViewModelProfile") →</a>
             @if (string.Equals(Selected.Properties.Status, "providerUnavailable", StringComparison.OrdinalIgnoreCase))
             {
-                <p class="inline-warning">The provider for this profile is currently unavailable.</p>
+                <p class="inline-warning">@T("ProviderUnavailableMessage")</p>
             }
             else if (string.Equals(Selected.Properties.Status, "modelUnavailable", StringComparison.OrdinalIgnoreCase))
             {
-                <p class="inline-warning">The selected model is currently unavailable.</p>
+                <p class="inline-warning">@T("ModelUnavailableMessage")</p>
             }
         </article>
     }
     else if (!loading)
     {
-        <p class="resource-hint">Agents reference a reusable logical profile. Provider endpoints and model names are resolved separately.</p>
+        <p class="resource-hint">@T("Hint")</p>
     }
 </div>
 
@@ -115,8 +116,10 @@
         await SelectedChanged.InvokeAsync(selected);
     }
 
-    private static string OptionLabel(ModelProfileSummaryResponse item) =>
-        $"{item.Properties.DisplayName} — {item.Namespace}/{item.Name} · {item.Properties.Provider.Name} / {item.Properties.Model.Name} · {ModelManagementUi.Label(item.Properties.Status)}";
+    private string T(string key) => Localizer[key];
+    private string StatusLabel(string? status) { var key = $"Status.{status ?? "unknown"}"; var localized = Localizer[key]; return localized.ResourceNotFound ? ModelManagementUi.Label(status) : localized.Value; }
+    private string OptionLabel(ModelProfileSummaryResponse item) =>
+        $"{item.Properties.DisplayName} — {item.Namespace}/{item.Name} · {item.Properties.Provider.Name} / {item.Properties.Model.Name} · {StatusLabel(item.Properties.Status)}";
 
     private static string ProfileValue(ModelProfileSummaryResponse item) => $"{item.Namespace}:{item.Name}";
 

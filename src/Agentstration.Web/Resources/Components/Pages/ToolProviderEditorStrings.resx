@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="AddProvider"><value>Add Tool Provider</value></data>
+  <data name="Description"><value>Tool discovery is explicit governance: discovered tools are disabled until approved.</value></data>
+  <data name="Back"><value>Back</value></data>
+  <data name="TestConnection"><value>Test connection</value></data>
+  <data name="RefreshDiscovery"><value>Refresh discovery</value></data>
+  <data name="Loading"><value>Loading provider…</value></data>
+  <data name="SectionsLabel"><value>Provider sections</value></data>
+  <data name="Overview"><value>Overview</value></data>
+  <data name="Tools"><value>Tools</value></data>
+  <data name="Connection"><value>Connection</value></data>
+  <data name="Name"><value>Name</value></data>
+  <data name="DisplayName"><value>Display name</value></data>
+  <data name="ProviderType"><value>Provider type</value></data>
+  <data name="Enabled"><value>Enabled</value></data>
+  <data name="Status"><value>Status</value></data>
+  <data name="LastDiscovery"><value>Last discovery</value></data>
+  <data name="Never"><value>Never</value></data>
+  <data name="AepExtensionId"><value>AEP extension ID</value></data>
+  <data name="Transport"><value>Transport</value></data>
+  <data name="Command"><value>Command</value></data>
+  <data name="Arguments"><value>Arguments (one per line)</value></data>
+  <data name="WorkingDirectory"><value>Working directory</value></data>
+  <data name="EnvironmentReferences"><value>Environment references</value></data>
+  <data name="EnvironmentReferencesHelp"><value>Values are configuration references; secrets are never stored in this resource.</value></data>
+  <data name="Endpoint"><value>Endpoint</value></data>
+  <data name="Saving"><value>Saving…</value></data>
+  <data name="SaveProvider"><value>Save provider</value></data>
+  <data name="ToolsDiscovered"><value>Discovered tools: {0}. New tools are disabled by default.</value></data>
+  <data name="NoToolsTitle"><value>No tools discovered</value></data>
+  <data name="NoToolsMessage"><value>Refresh discovery after validating the connection.</value></data>
+  <data name="Inspect"><value>Inspect →</value></data>
+  <data name="ToolCount.One"><value>{0} tool</value></data>
+  <data name="ToolCount.Many"><value>{0} tools</value></data>
+  <data name="Available"><value>Available</value></data>
+  <data name="Unavailable"><value>Unavailable</value></data>
+  <data name="Status.connected"><value>Connected</value></data>
+  <data name="Status.error"><value>Error</value></data>
+  <data name="Status.notDiscovered"><value>Not discovered</value></data>
+  <data name="SavedAndRefreshed"><value>Provider saved and discovery refreshed.</value></data>
+  <data name="SavedWithStatus"><value>Provider saved; discovery status: {0}.</value></data>
+  <data name="ConnectionSucceeded"><value>Connected. Protocol negotiation succeeded. Discovered tools: {0}.</value></data>
+  <data name="DiscoverySummary"><value>Discovery: {0} unchanged, {1} new, {2} changed, {3} unavailable.</value></data>
+</root>

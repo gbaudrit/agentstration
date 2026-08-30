@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @implements IAsyncDisposable
+@using Agentstration.Web.Components.Localization
 @inject NavigationState Navigation
 @inject UserPreferencesState Preferences
 @inject NotificationState Notifications
@@ -8,41 +9,42 @@
 @inject IJSRuntime JS
 @inject IResourceSearchProvider ResourceSearch
 @inject ConsoleContextState ContextState
+@inject Microsoft.Extensions.Localization.IStringLocalizer<MainLayoutStrings> Localizer
 
 <div class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")">
-    <aside class="sidebar" aria-label="Main navigation">
-        <a class="brand-lockup" href="/" aria-label="Agentstration Control Plane home">
+    <aside class="sidebar" aria-label="@T("MainNavigation")">
+        <a class="brand-lockup" href="/" aria-label="@T("ControlPlaneHome")">
             <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
             <img class="brand-lockup-logo" src="_content/Agentstration.Web.Components/images/agentstration-lockup.png" alt="" width="204" height="38" />
         </a>
         <nav class="side-nav">
             @foreach (var group in NavigationGroups)
             {
-                <section class="navigation-group" aria-label="@group.Label">
-                    @if (!string.IsNullOrWhiteSpace(group.Label)) { <h2>@group.Label</h2> }
+                <section class="navigation-group" aria-label="@T(group.LabelKey)">
+                    @if (!string.IsNullOrWhiteSpace(group.LabelKey)) { <h2>@T(group.LabelKey)</h2> }
                     @foreach (var item in group.Items)
                     {
-                        <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@item.Label" title="@item.Label" class="@($"domain-{item.Domain}")">
-                            <span class="nav-icon" aria-hidden="true"><UiIcon Name="@item.Icon" /></span><span class="nav-label">@item.Label</span>
+                        <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@T(item.LabelKey)" title="@T(item.LabelKey)" class="@($"domain-{item.Domain}")">
+                            <span class="nav-icon" aria-hidden="true"><UiIcon Name="@item.Icon" /></span><span class="nav-label">@T(item.LabelKey)</span>
                         </NavLink>
                     }
                 </section>
             }
         </nav>
-        <a class="sidebar-footer" href="/" aria-label="Open platform health">
-            <HealthIndicator Label="Platform" StatusText="@PlatformStatus.Label" Status="@PlatformStatus.Status" />
-            @if (PlatformStatus.Status is UiStatus.Warning or UiStatus.Danger) { <small>Requires attention</small> }
+        <a class="sidebar-footer" href="/" aria-label="@T("OpenPlatformHealth")">
+            <HealthIndicator Label="@T("Platform")" StatusText="@PlatformStatus.Label" Status="@PlatformStatus.Status" />
+            @if (PlatformStatus.Status is UiStatus.Warning or UiStatus.Danger) { <small>@T("RequiresAttention")</small> }
         </a>
     </aside>
 
     <div class="workspace">
         <header class="topbar">
             <div class="topbar-start">
-                <button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="Toggle navigation" aria-expanded="@(!Navigation.IsSidebarCollapsed)">☰</button>
-                <nav class="breadcrumb" aria-label="Current organization and workspace"><a href="/settings/organization">@(ContextState.Current?.TenantDisplayName ?? "Organization")</a><span>/</span><strong>@CurrentSection</strong></nav>
+                <button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="@T("ToggleNavigation")" aria-expanded="@(!Navigation.IsSidebarCollapsed)">☰</button>
+                <nav class="breadcrumb" aria-label="@T("CurrentOrganizationWorkspace")"><a href="/settings/organization">@(ContextState.Current?.TenantDisplayName ?? T("OrganizationFallback"))</a><span>/</span><strong>@CurrentSection</strong></nav>
             </div>
-            <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="Open command palette">
-                <span aria-hidden="true">⌕</span><span>Search pages or commands…</span><kbd>Ctrl K</kbd>
+            <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="@T("OpenCommandPalette")">
+                <span aria-hidden="true">⌕</span><span>@T("SearchPagesCommands")</span><kbd>Ctrl K</kbd>
             </button>
             <div class="topbar-actions">
                 @if (ContextState.Current is { } context)
@@ -50,22 +52,22 @@
                     @if (context.Workspaces.Count > 1)
                     {
                         <label class="context-switcher">
-                            <span class="sr-only">Workspace</span>
-                            <select value="@context.WorkspaceId" @onchange="SelectWorkspaceAsync" disabled="@switchingWorkspace" aria-label="Current workspace">
+                            <span class="sr-only">@T("Workspace")</span>
+                            <select value="@context.WorkspaceId" @onchange="SelectWorkspaceAsync" disabled="@switchingWorkspace" aria-label="@T("CurrentWorkspace")">
                                 @foreach (var workspace in context.Workspaces) { <option value="@workspace.Id">@WorkspaceLabel(context, workspace)</option> }
                             </select>
                         </label>
                     }
                     else
                     {
-                        <span class="context-workspace-static" title="Only one workspace is available">@context.WorkspaceDisplayName</span>
+                        <span class="context-workspace-static" title="@T("OnlyOneWorkspace")">@context.WorkspaceDisplayName</span>
                     }
                 }
                 <EnvironmentSwitcher />
-                <button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="Toggle color theme" title="@(Preferences.Error ?? $"Theme: {Preferences.Theme}")"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button>
-                <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="Notifications"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
-                <a class="icon-button" href="/account/security" aria-label="Account security" title="Account security"><UiIcon Name="shield-check" /></a>
-                <a class="icon-button" href="/logout" aria-label="Sign out" title="Sign out"><UiIcon Name="log-out" /></a>
+                <button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="@T("ToggleColorTheme")" title="@(Preferences.Error ?? F("ThemeValue", Preferences.Theme))"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button>
+                <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="@T("Notifications")"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
+                <a class="icon-button" href="/account/security" aria-label="@T("AccountSecurity")" title="@T("AccountSecurity")"><UiIcon Name="shield-check" /></a>
+                <a class="icon-button" href="/logout" aria-label="@T("SignOut")" title="@T("SignOut")"><UiIcon Name="log-out" /></a>
             </div>
         </header>
         <main class="content" id="main-content">@Body</main>
@@ -73,30 +75,30 @@
 
     @if (Notifications.IsPanelOpen)
     {
-        <aside class="notification-panel" aria-label="Notifications">
-            <header><div><p class="eyebrow">Activity</p><h2>Notifications</h2></div><button class="icon-button" @onclick="Notifications.TogglePanel" aria-label="Close notifications">×</button></header>
-            @if (Notifications.Items.Count == 0) { <EmptyState Title="All quiet" Message="Operational notices will appear here." /> }
-            else { <button class="text-button" @onclick="Notifications.MarkAllRead">Mark all as read</button>@foreach (var item in Notifications.Items) { <article class="notification-item"><StatusIndicator Text="@item.Title" Status="@item.Status" /><p>@item.Message</p><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time></article> } }
+        <aside class="notification-panel" aria-label="@T("Notifications")">
+            <header><div><p class="eyebrow">@T("Activity")</p><h2>@T("Notifications")</h2></div><button class="icon-button" @onclick="Notifications.TogglePanel" aria-label="@T("CloseNotifications")">×</button></header>
+            @if (Notifications.Items.Count == 0) { <EmptyState Title="@T("AllQuiet")" Message="@T("OperationalNotices")" /> }
+            else { <button class="text-button" @onclick="Notifications.MarkAllRead">@T("MarkAllRead")</button>@foreach (var item in Notifications.Items) { <article class="notification-item"><StatusIndicator Text="@item.Title" Status="@item.Status" /><p>@item.Message</p><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time></article> } }
         </aside>
     }
 
     @if (commandPaletteOpen)
     {
         <div class="command-palette-backdrop" @onclick="CloseCommandPalette">
-            <section class="command-palette" role="dialog" aria-modal="true" aria-label="Command palette" @onclick:stopPropagation="true">
+            <section class="command-palette" role="dialog" aria-modal="true" aria-label="@T("CommandPalette")" @onclick:stopPropagation="true">
                 <header>
                     <span aria-hidden="true">⌕</span>
-                    <input @ref="commandInput" value="@commandQuery" @oninput="UpdateCommandQuery" @onkeydown="HandleCommandKeyDown" placeholder="Search pages or commands…" aria-label="Search pages or commands" autocomplete="off" />
-                    <button class="command-palette-close" type="button" @onclick="CloseCommandPalette" aria-label="Close command palette">Esc</button>
+                    <input @ref="commandInput" value="@commandQuery" @oninput="UpdateCommandQuery" @onkeydown="HandleCommandKeyDown" placeholder="@T("SearchPagesCommands")" aria-label="@T("SearchPagesCommandsAria")" autocomplete="off" />
+                    <button class="command-palette-close" type="button" @onclick="CloseCommandPalette" aria-label="@T("CloseCommandPalette")">Esc</button>
                 </header>
-                <div class="command-results" role="listbox" aria-label="Matching destinations" aria-busy="@searchingResources">
+                <div class="command-results" role="listbox" aria-label="@T("MatchingDestinations")" aria-busy="@searchingResources">
                     @if (searchingResources)
                     {
-                        <p class="command-searching"><span class="command-search-spinner" aria-hidden="true"></span>Searching resources…</p>
+                        <p class="command-searching"><span class="command-search-spinner" aria-hidden="true"></span>@T("SearchingResources")</p>
                     }
                     @if (DisplayedCommands.Count == 0 && !searchingResources)
                     {
-                        <p class="command-empty">No matching page, command or resource.</p>
+                        <p class="command-empty">@T("NoMatch")</p>
                     }
                     else
                     {
@@ -110,62 +112,63 @@
                         }
                     }
                 </div>
-                <footer><span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span><span><kbd>↵</kbd> Open</span><span><kbd>Esc</kbd> Close</span></footer>
+                <footer><span><kbd>↑</kbd><kbd>↓</kbd> @T("Navigate")</span><span><kbd>↵</kbd> @T("Open")</span><span><kbd>Esc</kbd> @T("Close")</span></footer>
             </section>
         </div>
     }
 </div>
 
 @code {
-    private sealed record NavigationItem(string Label, string Url, string Icon, string Domain = "neutral");
-    private sealed record NavigationGroup(string Label, IReadOnlyList<NavigationItem> Items);
+    private sealed record NavigationItem(string LabelKey, string Url, string Icon, string Domain = "neutral");
+    private sealed record NavigationGroup(string LabelKey, IReadOnlyList<NavigationItem> Items);
+    private sealed record CommandDefinition(string LabelKey, string Url, string Icon, string CategoryKey, string Keywords = "");
     private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null);
 
     private static readonly NavigationGroup[] NavigationGroups =
     [
-        new("", [new("Overview", "/", "home")]),
-        new("Build", [new("Agents", "/agents", "agent", "agent"), new("Model profiles", "/modelprofiles", "layers", "model"), new("Flows", "/flows", "workflow", "flow"), new("Entries", "/entries", "entry", "work")]),
-        new("Operate", [new("Triggers", "/triggers", "clock", "work"), new("Deployments", "/deployments", "server", "runtime"), new("Tasks", "/tasks", "tasks", "work")]),
-        new("Runs", [new("Agents Run", "/agent-runs", "play-circle", "execution"), new("Flow Run", "/flow-runs", "flow-run", "flow"), new("Run events", "/run-events", "activity")]),
-        new("Configure", [new("Workplace setup", "/workspaces", "layout-grid", "work"), new("Packs", "/packs", "package"), new("Tools", "/tools", "wrench", "tool"), new("Model providers", "/modelproviders", "cpu", "model"), new("Runtime profiles", "/runtimeprofiles", "cube", "runtime"), new("Secrets", "/secrets", "key")]),
-        new("System", [new("Extensions", "/extensions", "puzzle"), new("Organization", "/settings/organization", "building"), new("Profile", "/settings/profile", "user-circle"), new("Settings", "/settings", "settings")])
+        new("", [new("Nav.Overview", "/", "home")]),
+        new("Group.Build", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.ModelProfiles", "/modelprofiles", "layers", "model"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Entries", "/entries", "entry", "work")]),
+        new("Group.Operate", [new("Nav.Triggers", "/triggers", "clock", "work"), new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.Tasks", "/tasks", "tasks", "work")]),
+        new("Group.Runs", [new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
+        new("Group.Configure", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work"), new("Nav.Packs", "/packs", "package"), new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key")]),
+        new("Group.System", [new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Profile", "/settings/profile", "user-circle"), new("Nav.Settings", "/settings", "settings")])
     ];
 
-    private static readonly CommandItem[] Commands =
+    private static readonly CommandDefinition[] CommandDefinitions =
     [
-        new("Overview", "/", "⌂", "Navigate"),
-        new("Agents", "/agents", "◎", "Build", "agent resources"),
-        new("Create agent", "/agents/new", "+", "Command", "new agent"),
-        new("Model profiles", "/modelprofiles", "◇", "Build", "models"),
-        new("Create model profile", "/modelprofiles/new", "+", "Command", "new model"),
-        new("Flows", "/flows", "⌘", "Build", "workflow designer"),
-        new("Create flow", "/flows/new", "+", "Command", "new workflow"),
-        new("Entries", "/entries", "↳", "Build", "workplace entry"),
-        new("Create entry", "/entries/new", "+", "Command", "new workplace entry"),
-        new("Deployments", "/deployments", "◉", "Operate", "agent runtime deployments"),
-        new("Agents Run", "/agent-runs", "▶", "Runs", "agent execution history"),
-        new("Flow runs", "/flow-runs", "▷", "Runs", "workflow executions"),
-        new("Tasks", "/tasks", "✓", "Operate", "work tasks supervision"),
-        new("Triggers", "/triggers", "◷", "Operate", "schedule automation"),
-        new("Run events", "/run-events", "≋", "Runs", "persisted runtime flow activity"),
-        new("Model providers", "/modelproviders", "⬡", "Configure", "providers"),
-        new("Tools", "/tools", "⌁", "Configure", "tool catalog providers MCP AEP"),
-        new("Create tool provider", "/tools/providers/new", "+", "Command", "new MCP AEP provider"),
-        new("Workplace setup", "/workspaces", "▦", "Configure", "workspace composition primary entries"),
-        new("Packs", "/packs", "▣", "Configure", "package distribution install archive resources"),
-        new("Create model provider", "/modelproviders/new", "+", "Command", "new provider"),
-        new("Runtime profiles", "/runtimeprofiles", "◈", "Configure", "runtime configuration"),
-        new("Create runtime profile", "/runtimeprofiles/new", "+", "Command", "new runtime profile"),
-        new("Secrets", "/secrets", "◆", "Configure", "credentials Vaults write only"),
-        new("Create Secret", "/secrets/new", "+", "Command", "new credential"),
-        new("Vaults", "/vaults", "▰", "Configure", "secret storage providers"),
-        new("Create Vault", "/vaults/new", "+", "Command", "new secret storage"),
-        new("Settings", "/settings", "⚙", "System", "configuration"),
-        new("Profile settings", "/settings/profile", "○", "System", "appearance theme personal preferences"),
-        new("Extensions", "/extensions", "⬢", "System", "AEP option contracts compatibility"),
-        new("Organization", "/settings/organization", "♙", "System", "tenant organization"),
-        new("Organization workspaces", "/settings/organization/workspaces", "▦", "System", "tenant workspaces"),
-        new("Organization members", "/settings/organization/members", "♙", "System", "users memberships roles")
+        new("Nav.Overview", "/", "⌂", "Navigate"),
+        new("Nav.Agents", "/agents", "◎", "Group.Build", "agent resources agents ressources"),
+        new("Command.CreateAgent", "/agents/new", "+", "Command", "new nouveau agent"),
+        new("Nav.ModelProfiles", "/modelprofiles", "◇", "Group.Build", "models modèles"),
+        new("Command.CreateModelProfile", "/modelprofiles/new", "+", "Command", "new nouveau model modèle"),
+        new("Nav.Flows", "/flows", "⌘", "Group.Build", "workflow designer flux conception"),
+        new("Command.CreateFlow", "/flows/new", "+", "Command", "new nouveau workflow flux"),
+        new("Nav.Entries", "/entries", "↳", "Group.Build", "workplace entry entrée"),
+        new("Command.CreateEntry", "/entries/new", "+", "Command", "new nouvelle workplace entry entrée"),
+        new("Nav.Deployments", "/deployments", "◉", "Group.Operate", "agent runtime deployments déploiements"),
+        new("Nav.AgentRuns", "/agent-runs", "▶", "Group.Runs", "agent execution history exécution historique"),
+        new("Nav.FlowRuns", "/flow-runs", "▷", "Group.Runs", "workflow executions flux exécutions"),
+        new("Nav.Tasks", "/tasks", "✓", "Group.Operate", "work tasks supervision tâches"),
+        new("Nav.Triggers", "/triggers", "◷", "Group.Operate", "schedule automation planification automatisation"),
+        new("Nav.RunEvents", "/run-events", "≋", "Group.Runs", "persisted runtime flow activity événements"),
+        new("Nav.ModelProviders", "/modelproviders", "⬡", "Group.Configure", "providers fournisseurs"),
+        new("Nav.Tools", "/tools", "⌁", "Group.Configure", "tool catalog providers outils fournisseurs MCP AEP"),
+        new("Command.CreateToolProvider", "/tools/providers/new", "+", "Command", "new nouveau MCP AEP provider fournisseur"),
+        new("Nav.WorkplaceSetup", "/workspaces", "▦", "Group.Configure", "workspace composition primary entries espace composition"),
+        new("Nav.Packs", "/packs", "▣", "Group.Configure", "package distribution install archive resources paquet installation"),
+        new("Command.CreateModelProvider", "/modelproviders/new", "+", "Command", "new nouveau provider fournisseur"),
+        new("Nav.RuntimeProfiles", "/runtimeprofiles", "◈", "Group.Configure", "runtime configuration exécution"),
+        new("Command.CreateRuntimeProfile", "/runtimeprofiles/new", "+", "Command", "new nouveau runtime profile profil"),
+        new("Nav.Secrets", "/secrets", "◆", "Group.Configure", "credentials Vaults write only secrets identifiants coffres"),
+        new("Command.CreateSecret", "/secrets/new", "+", "Command", "new nouveau credential secret"),
+        new("Command.Vaults", "/vaults", "▰", "Group.Configure", "secret storage providers coffres stockage"),
+        new("Command.CreateVault", "/vaults/new", "+", "Command", "new nouveau secret storage coffre"),
+        new("Nav.Settings", "/settings", "⚙", "Group.System", "configuration paramètres"),
+        new("Command.ProfileSettings", "/settings/profile", "○", "Group.System", "appearance theme personal preferences apparence thème préférences"),
+        new("Nav.Extensions", "/extensions", "⬢", "Group.System", "AEP option contracts compatibility extensions"),
+        new("Nav.Organization", "/settings/organization", "♙", "Group.System", "tenant organization organisation"),
+        new("Command.OrganizationWorkspaces", "/settings/organization/workspaces", "▦", "Group.System", "tenant workspaces espaces"),
+        new("Command.OrganizationMembers", "/settings/organization/members", "♙", "Group.System", "users memberships roles membres rôles")
     ];
 
     private IJSObjectReference? commandModule;
@@ -182,6 +185,8 @@
     private IReadOnlyList<CommandItem> resourceCommands = [];
     private CancellationTokenSource? resourceSearchCancellation;
     private readonly CancellationTokenSource lifetimeCancellation = new();
+    private IReadOnlyList<CommandItem> Commands => CommandDefinitions.Select(command => new CommandItem(
+        T(command.LabelKey), command.Url, command.Icon, T(command.CategoryKey), command.Keywords)).ToArray();
     private IReadOnlyList<CommandItem> FilteredCommands => Commands
         .Where(command => string.IsNullOrWhiteSpace(commandQuery)
             || command.Label.Contains(commandQuery, StringComparison.OrdinalIgnoreCase)
@@ -203,7 +208,7 @@
             return NavigationGroups.SelectMany(group => group.Items)
                 .Where(item => item.Url == "/" ? path == "/" : path.StartsWith(item.Url, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(item => item.Url.Length)
-                .FirstOrDefault()?.Label ?? "Control plane";
+                .FirstOrDefault() is { } item ? T(item.LabelKey) : T("ControlPlane");
         }
     }
 
@@ -230,6 +235,7 @@
             Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
             selfReference = DotNetObjectReference.Create(this);
             commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", selfReference);
+            if (CultureNavigation.NavigateToPreferredCulture(NavigationManager, Preferences.Language)) return;
         }
 
         if (focusCommandInput && commandRegistration is not null)
@@ -323,6 +329,8 @@
     }
 
     private static string ShortIdentifier(string value) => value.Length <= 48 ? value : $"…{value[^47..]}";
+    private string T(string key) => string.IsNullOrEmpty(key) ? string.Empty : Localizer[key];
+    private string F(string key, params object[] arguments) => Localizer[key, arguments];
     private static string WorkspaceLabel(ConsoleContextSnapshot context, ConsoleWorkspaceOption workspace) =>
         context.Workspaces.Select(value => value.TenantId).Distinct().Skip(1).Any()
             ? $"{workspace.TenantDisplayName} / {workspace.DisplayName}"

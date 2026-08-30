@@ -1,5 +1,6 @@
 using Agentstration.Web.Components;
 using Bunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
 
@@ -34,6 +35,7 @@ public sealed class PackAgentDefinitionFormTests
     public async Task EditableFormUpdatesTheOriginalPackManifestWithoutResolvingBindings()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var rendered = context.Render<PackAgentDefinitionForm>(parameters => parameters.Add(component => component.Source, Source));
 
         await rendered.FindAll("input")[2].ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "Forked welcome" });
@@ -49,6 +51,7 @@ public sealed class PackAgentDefinitionFormTests
     public void ReadOnlyFormDisablesEveryDefinitionControl()
     {
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var rendered = context.Render<PackAgentDefinitionForm>(parameters => parameters
             .Add(component => component.Source, Source)
             .Add(component => component.ReadOnly, true));

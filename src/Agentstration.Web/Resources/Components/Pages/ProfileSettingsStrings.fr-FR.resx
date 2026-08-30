@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="PageTitle" xml:space="preserve"><value>Paramètres du profil · Agentstration</value></data>
+  <data name="PersonalSettings" xml:space="preserve"><value>Paramètres personnels</value></data>
+  <data name="ProfileSettings" xml:space="preserve"><value>Paramètres du profil</value></data>
+  <data name="PageDescription" xml:space="preserve"><value>Consultez et personnalisez les préférences associées à votre Principal Agentstration.</value></data>
+  <data name="CurrentProfile" xml:space="preserve"><value>Profil actuel</value></data>
+  <data name="ProfileDescription" xml:space="preserve"><value>Ces paramètres suivent votre profil Agentstration, quelle que soit la méthode d’authentification utilisée.</value></data>
+  <data name="Appearance" xml:space="preserve"><value>Apparence</value></data>
+  <data name="AppearanceDescription" xml:space="preserve"><value>Choisissez l’apparence de la Console pour ce profil.</value></data>
+  <data name="Saving" xml:space="preserve"><value>Enregistrement…</value></data>
+  <data name="ColorTheme" xml:space="preserve"><value>Thème de couleurs</value></data>
+  <data name="ThemeSystem" xml:space="preserve"><value>Système</value></data>
+  <data name="ThemeSystemDescription" xml:space="preserve"><value>Suivre la préférence de cet appareil.</value></data>
+  <data name="ThemeLight" xml:space="preserve"><value>Clair</value></data>
+  <data name="ThemeLightDescription" xml:space="preserve"><value>Toujours utiliser l’apparence claire.</value></data>
+  <data name="ThemeDark" xml:space="preserve"><value>Sombre</value></data>
+  <data name="ThemeDarkDescription" xml:space="preserve"><value>Toujours utiliser l’apparence sombre.</value></data>
+  <data name="Language" xml:space="preserve"><value>Langue</value></data>
+  <data name="LanguageDescription" xml:space="preserve"><value>Choisissez la langue utilisée par la Console et le Workplace.</value></data>
+  <data name="LanguageAutomatic" xml:space="preserve"><value>Automatique — préférence du navigateur</value></data>
+  <data name="Account" xml:space="preserve"><value>Compte</value></data>
+  <data name="Security" xml:space="preserve"><value>Sécurité</value></data>
+  <data name="SecurityDescription" xml:space="preserve"><value>Les identifiants, le mot de passe et les méthodes d’authentification sont gérés séparément des préférences du profil.</value></data>
+  <data name="ManageAccountSecurity" xml:space="preserve"><value>Gérer la sécurité du compte</value></data>
+  <data name="ManageTokens" xml:space="preserve"><value>Gérer les jetons d’accès personnels</value></data>
+  <data name="CurrentUser" xml:space="preserve"><value>Utilisateur actuel</value></data>
+</root>

@@ -14,7 +14,9 @@ public sealed class ModelProfilePickerTests
     [TestMethod]
     public void NewAgentSelectionReplacesAMissingDefaultWithTheDisplayedProfile()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         string? selectedName = null;
         ModelProfileSummaryResponse? selectedProfile = null;
