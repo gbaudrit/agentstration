@@ -9,6 +9,7 @@ public sealed class AgentEditorModel
 {
     [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
     public string Name { get; set; } = string.Empty;
+    [Required] public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
     [Required] public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
     [Required] public string Handler { get; set; } = "prompt-agent";
@@ -20,6 +21,7 @@ public sealed class AgentEditorModel
     public string ToolNames { get; set; } = string.Empty;
     public string Tags { get; set; } = string.Empty;
     public string Annotations { get; set; } = string.Empty;
+    public AgentProperties? SourceDefinition { get; set; }
 
     public bool SelectModelProfile(ModelProfileSummaryResponse profile)
     {
@@ -41,16 +43,17 @@ public sealed class AgentEditorModel
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.Agent,
-            Metadata = new ResourceMetadata { Name = Name.Trim(), Tags = ParseMap(Tags, "tag"), Annotations = ParseMap(Annotations, "annotation") },
-            Definition = new AgentProperties
+            Metadata = new ResourceMetadata { Name = Name.Trim(), Namespace = ResourceNamespace.Parse(Namespace), Tags = ParseMap(Tags, "tag"), Annotations = ParseMap(Annotations, "annotation") },
+            Definition = (SourceDefinition ?? new AgentProperties
             {
                 DisplayName = DisplayName.Trim(),
-                Description = NullIfWhiteSpace(Description),
-                Handler = Handler.Trim(),
                 Instructions = Instructions.Trim(),
+                ModelProfile = new ResourceReference(ModelProfileName.Trim(), @namespace: ResourceNamespace.Parse(ModelProfileNamespace))
+            }) with
+            {
+                DisplayName = DisplayName.Trim(), Description = NullIfWhiteSpace(Description), Handler = Handler.Trim(), Instructions = Instructions.Trim(),
                 ModelProfile = new ResourceReference(ModelProfileName.Trim(), @namespace: ResourceNamespace.Parse(ModelProfileNamespace)),
-                RuntimeProfile = new ResourceReference(RuntimeProfileName.Trim(), @namespace: ResourceNamespace.Parse(RuntimeProfileNamespace)),
-                Tools = tools
+                RuntimeProfile = new ResourceReference(RuntimeProfileName.Trim(), @namespace: ResourceNamespace.Parse(RuntimeProfileNamespace)), Tools = tools
             }
         };
     }
@@ -58,6 +61,7 @@ public sealed class AgentEditorModel
     public static AgentEditorModel FromResource(AgentResource resource) => new()
     {
         Name = resource.Metadata.Name,
+        Namespace = resource.Namespace.Value,
         DisplayName = resource.Definition.DisplayName,
         Description = resource.Definition.Description,
         Handler = resource.Definition.Handler,
@@ -68,7 +72,26 @@ public sealed class AgentEditorModel
         RuntimeProfileNamespace = (resource.Definition.RuntimeProfile.Namespace ?? resource.Namespace).Value,
         ToolNames = string.Join(Environment.NewLine, resource.Definition.Tools.Select(tool => tool.Name)),
         Tags = Format(resource.Metadata.Tags),
-        Annotations = Format(resource.Metadata.Annotations)
+        Annotations = Format(resource.Metadata.Annotations),
+        SourceDefinition = resource.Definition
+    };
+
+    public static AgentEditorModel FromRequest(AgentResourceRequest request) => new()
+    {
+        Name = request.Metadata.Name,
+        Namespace = request.Metadata.Namespace.Value,
+        DisplayName = request.Definition.DisplayName,
+        Description = request.Definition.Description,
+        Handler = request.Definition.Handler,
+        Instructions = request.Definition.Instructions,
+        ModelProfileName = request.Definition.ModelProfile.Name,
+        ModelProfileNamespace = (request.Definition.ModelProfile.Namespace ?? ResourceNamespace.Default).Value,
+        RuntimeProfileName = request.Definition.RuntimeProfile.Name,
+        RuntimeProfileNamespace = (request.Definition.RuntimeProfile.Namespace ?? ResourceNamespace.Default).Value,
+        ToolNames = string.Join(Environment.NewLine, request.Definition.Tools.Select(tool => tool.Name)),
+        Tags = Format(request.Metadata.Tags),
+        Annotations = Format(request.Metadata.Annotations),
+        SourceDefinition = request.Definition
     };
 
     private static IReadOnlyDictionary<string, string> ParseMap(string value, string label)

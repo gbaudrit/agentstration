@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
@@ -15,6 +16,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
         group.MapPost("/packs", InstallAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         group.MapGet("/packs", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapGet("/packs/{publisher}/{name}", GetAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/packs/{publisher}/{name}/resources/source", ListInstalledPackResourcesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapPost("/packs/{publisher}/{name}/source", AttachSourceAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         group.MapPost("/packs/{publisher}/{name}/fork", ForkAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         group.MapDelete("/packs/{publisher}/{name}", UninstallAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
@@ -24,6 +26,8 @@ internal sealed class PackEndpoints : IManagementEndpoint
         group.MapGet("/pack-projects", ListProjectsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapGet("/pack-projects/{projectId:guid}", GetProjectAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapPut("/pack-projects/{projectId:guid}", UpdateProjectAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        group.MapGet("/pack-projects/{projectId:guid}/resources", ListProjectResourcesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapPut("/pack-projects/{projectId:guid}/resources", UpdateProjectResourceAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         group.MapPost("/pack-projects/{projectId:guid}/builds", BuildAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         group.MapGet("/pack-projects/{projectId:guid}/builds", ListBuildsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapGet("/pack-projects/{projectId:guid}/builds/{buildId:guid}/download", DownloadBuildAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
@@ -194,6 +198,35 @@ internal sealed class PackEndpoints : IManagementEndpoint
         {
             var etag = ManagementHttp.IfMatch(request) ?? throw new ControlPlaneConcurrencyException("Updating a Pack Project requires If-Match.");
             var project = await service.UpdateProjectAsync(projectId, command, etag, token);
+            return ManagementHttp.ResourceResult(project, response, StatusCodes.Status200OK);
+        });
+
+    private static Task<IResult> ListProjectResourcesAsync(Guid projectId, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var resources = await service.ListSourceDocumentsAsync(projectId, token);
+            return Results.Ok(resources.Select(resource => resource with
+            {
+                Source = ResourceManifestSerializer.ToYaml(ResourceManifestSerializer.FromJson<JsonElement>(resource.Source))
+            }));
+        });
+
+    private static Task<IResult> ListInstalledPackResourcesAsync(string publisher, string name, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var resources = await service.ListInstalledSourceDocumentsAsync(new(publisher, name), token);
+            return Results.Ok(resources.Select(resource => resource with
+            {
+                Source = ResourceManifestSerializer.ToYaml(ResourceManifestSerializer.FromJson<JsonElement>(resource.Source))
+            }));
+        });
+
+    private static Task<IResult> UpdateProjectResourceAsync(Guid projectId, UpdatePackProjectSourceCommand command, HttpRequest request, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var etag = ManagementHttp.IfMatch(request) ?? throw new ControlPlaneConcurrencyException("Updating a Pack Project resource requires If-Match.");
+            var manifest = ResourceManifestSerializer.FromYaml<JsonElement>(command.Source);
+            var project = await service.UpdateSourceDocumentAsync(projectId, command with { Source = ResourceManifestSerializer.ToJson(manifest) }, etag, token);
             return ManagementHttp.ResourceResult(project, response, StatusCodes.Status200OK);
         });
 

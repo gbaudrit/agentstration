@@ -19,7 +19,7 @@ namespace Agentstration.Web.Tests;
 public sealed class FlowDetailsDesignerTests
 {
     [TestMethod]
-    public void NamespacedFlowKeepsDesignerTabAndUsesNamespacedLink()
+    public void NamespacedFlowOrdersDefinitionSecondAndExposesReadOnlyYamlLast()
     {
         using var context = new BunitContext();
         var client = new FlowClientStub();
@@ -31,11 +31,16 @@ public sealed class FlowDetailsDesignerTests
 
         var overviewLink = rendered.FindAll("a").Single(link => link.TextContent.Trim() == "read-only Flow Designer");
         Assert.AreEqual("/namespaces/pack.sample/flows/sample/designer", overviewLink.GetAttribute("href"));
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == "Designer").Click();
+        CollectionAssert.AreEqual(new[] { "Overview", "Definition", "Runs", "Deployments", "YAML" }, rendered.FindAll("nav.section-tabs button").Select(button => button.TextContent.Trim()).ToArray());
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == "Definition").Click();
 
         var link = rendered.Find("a.button-primary");
         Assert.AreEqual("/namespaces/pack.sample/flows/sample/designer", link.GetAttribute("href"));
         Assert.AreEqual(new ResourceNamespace("pack.sample"), client.RequestedNamespace);
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == "YAML").Click();
+        var yaml = rendered.Find("[data-testid='flow-yaml-viewer'] textarea");
+        Assert.IsTrue(yaml.HasAttribute("readonly"));
+        Assert.IsTrue(yaml.TextContent.Contains("entryStep: input", StringComparison.Ordinal));
     }
 
     [TestMethod]

@@ -28,7 +28,7 @@ else
             </p>
         }
     }
-    else if (activeTab == "Designer")
+    else if (activeTab == "Definition")
     {
         <div class="toolbar"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@EditorLabel</a></div>
         <section class="designer-layout">
@@ -52,9 +52,17 @@ else
         <div class="toolbar"><button class="button-primary" @onclick="OpenRun">Run flow</button><a class="button-secondary" href="/flow-runs">All Flow Runs</a></div>
         @if(runs.Count == 0){<EmptyState Title="No runs yet" Message="Run the active published version to create the first trace." />}else{<RunGrid Runs="runs" />}
     }
-    else
+    else if (activeTab == "Deployments")
     {
         <DataGrid TItem="FlowVersionResponse" Items="versions"><Header><tr><th>Deployment</th><th>Version</th><th>Status</th><th>Published</th></tr></Header><Row Context="version"><tr><td><code>local</code></td><td>@version.Version</td><td><StatusBadge Text="@(version.Version == flow.ActiveVersion ? "Active" : "Published")" Status="@(version.Version == flow.ActiveVersion ? UiStatus.Success : UiStatus.Info)" /></td><td>@version.PublishedAt.LocalDateTime.ToString("g")</td></tr></Row></DataGrid>
+    }
+    else
+    {
+        <section class="panel form-section" data-testid="flow-yaml-viewer">
+            <div class="panel-header"><div><p class="eyebrow">Raw definition</p><h2>Flow YAML</h2><p>@(FlowResourceNamespace.IsDefault ? "The current Flow graph source. Open the Flow Designer to modify and validate it." : "The active Pack-owned Flow definition is displayed in read-only mode.")</p></div><StatusBadge Text="@(FlowResourceNamespace.IsDefault ? "Source" : "Read only")" Status="UiStatus.Neutral" /></div>
+            <textarea class="form-code-editor runner-json" rows="30" readonly aria-label="Flow YAML definition">@FlowYaml</textarea>
+            @if (FlowResourceNamespace.IsDefault) { <div class="form-actions"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">Open YAML editor</a></div> }
+        </section>
     }
     @if (showRun)
     {
@@ -64,7 +72,8 @@ else
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
-    private static readonly string[] Tabs = ["Overview", "Designer", "Runs", "Deployments"];
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    private static readonly string[] Tabs = ["Overview", "Definition", "Runs", "Deployments", "YAML"];
     private readonly CancellationTokenSource cancellation = new();
     private FlowResponse? flow; private IReadOnlyList<FlowVersionResponse> versions=[]; private IReadOnlyList<FlowRun> runs=[];
     private string activeTab="Overview", inputJson="{\n  \"prompt\": \"How can I optimize this SQL query?\"\n}", deployment="local", runVersion=""; private string? selectedNode,error; private bool showRun,submitting;
@@ -73,6 +82,7 @@ else
     private IReadOnlyList<string> AvailableTabs => Tabs;
     private OrchestrationFlowDefinition? Orchestration => flow?.Definition as OrchestrationFlowDefinition;
     private bool IsOrchestration => Orchestration is not null;
+    private string FlowYaml => flow?.Graph is { } graph ? Agentstration.Flow.Application.FlowDraftService.ToYaml(graph) : flow is null ? string.Empty : ResourceManifestSerializer.ToYaml(flow.Definition);
     private string EditorUrl
     {
         get
@@ -89,7 +99,7 @@ else
     private FlowTopologyGraph Topology => flow is null ? new([], [], "horizontal", "Flow topology") : FlowTopologyProjector.Project(flow.Definition, flow.Graph);
     private FlowTopologyNode? SelectedTopologyNode => Topology.FindBySelection(selectedNode);
     private int TopologyNodeCount => Topology.Nodes.Count(node => node.Type is not "input" and not "output" and not "conversation" and not "manager");
-    protected override async Task OnParametersSetAsync(){flow=await Client.GetFlowAsync(FlowResourceNamespace,FlowId,cancellation.Token);versions=await Client.GetFlowVersionsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runs=await Client.GetFlowRunsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runVersion=flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";}
+    protected override async Task OnParametersSetAsync(){flow=await Client.GetFlowAsync(FlowResourceNamespace,FlowId,cancellation.Token);versions=await Client.GetFlowVersionsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runs=await Client.GetFlowRunsAsync(FlowResourceNamespace,FlowId,cancellation.Token);runVersion=flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";if(string.Equals(View,"definition",StringComparison.OrdinalIgnoreCase))activeTab="Definition";else if(string.Equals(View,"yaml",StringComparison.OrdinalIgnoreCase))activeTab="YAML";}
     private void SelectNode(string name)=>selectedNode=name;
     private void OpenRun(){activeTab="Runs";showRun=true;error=null;if(flow?.Metadata.TryGetValue("agentstration.io/sample-input",out var sampleInput)==true)inputJson=sampleInput;}
     private async Task SubmitRunAsync(){try{submitting=true;error=null;using var document=JsonDocument.Parse(inputJson);var run=await Client.CreateFlowRunAsync(FlowResourceNamespace,FlowId,new CreateFlowRunRequest(document.RootElement.Clone(),runVersion,deployment,FlowRunTrigger.Manual),cancellation.Token);Navigation.NavigateTo($"/flow-runs/{run.Id}");}catch(Exception exception){error=exception.Message;}finally{submitting=false;}}

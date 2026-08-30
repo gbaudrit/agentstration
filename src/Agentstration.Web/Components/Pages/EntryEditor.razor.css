@@ -257,11 +257,34 @@
     gap: 18px;
 }
 
+.entry-yaml-field {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+}
+
+.entry-yaml-field .form-code-editor {
+    width: 100%;
+    min-height: min(60vh, 640px);
+    max-height: none;
+    overflow: auto;
+    overflow-wrap: normal;
+    resize: vertical;
+    white-space: pre;
+}
+
 @media (max-width: 1024px) {
     .entry-overview-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+
+.entry-definition-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
+.entry-definition-fields:disabled { opacity: 1; }
+.entry-definition-fields:disabled input,
+.entry-definition-fields:disabled textarea,
+.entry-definition-fields:disabled select,
+.entry-definition-fields:disabled button { cursor: default; }
 
 @media (max-width: 760px) {
     .entry-overview-grid,
