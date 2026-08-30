@@ -18,6 +18,12 @@ public sealed class ConsoleContextProvider(IdentityExperienceService experience)
             view.WorkspaceName,
             view.WorkspaceDisplayName,
             new HashSet<string>(view.Permissions, StringComparer.Ordinal),
-            view.AvailableWorkspaces.Select(workspace => new ConsoleWorkspaceOption(workspace.Id, workspace.Name, workspace.DisplayName)).ToArray());
+            view.AvailableWorkspaces.Select(workspace => new ConsoleWorkspaceOption(
+                workspace.Id,
+                workspace.TenantId,
+                workspace.TenantName,
+                workspace.TenantDisplayName,
+                workspace.Name,
+                workspace.DisplayName)).ToArray());
     }
 }

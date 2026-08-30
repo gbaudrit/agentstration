@@ -67,15 +67,15 @@ else
                 <dt>@T("SourceHash")</dt><dd><code>@ShortHash(project.Value.Definition.SourceArtifact.Sha256)</code></dd>
                 <dt>@T("Revision")</dt><dd>@project.Value.Definition.Revision</dd>
             </dl>
-            @if (project.Value.Definition.SourceResources.Count > 0)
-            {
+              @if (project.Value.Definition.SourceResources.Count > 0)
+              {
                 <div class="studio-source-resources">
                     @foreach (var resource in project.Value.Definition.SourceResources)
                     {
                         <span><code>@resource.Kind/@resource.Name</code><small>@(resource.ExplicitlySelected ? T("Selected") : T("Dependency"))</small></span>
                     }
                 </div>
-            }
+              }
             @if (message is not null) { <p class="@(hasError ? "error-panel" : "studio-message")" role="status">@message</p> }
         </div>
 
@@ -155,6 +155,42 @@ else
         </aside>
     </section>
 
+    <section class="panel studio-builds" data-testid="pack-source-resources">
+        <div class="panel-header"><div><p class="eyebrow">@T("EditableSource")</p><h2>@T("PackResources")</h2><p>@T("PackResourcesHelp")</p></div><span>@T("ResourceCount", sourceDocuments?.Count ?? 0)</span></div>
+        @if (sourceDocuments is null)
+        {
+            <LoadingState Message="@T("LoadingPackResources")" />
+        }
+        else if (sourceDocuments.Count == 0)
+        {
+            <EmptyState Title="@T("NoSourceResource")" Message="@T("NoSourceResourceHelp")" />
+        }
+        else
+        {
+            <div class="studio-source-resources">
+                @foreach (var resource in sourceDocuments)
+                {
+                    <article><div><code>@resource.Kind/@resource.Name</code><small>@resource.Path</small></div><div class="studio-source-actions">@if (CanUseForm(resource)) { <button type="button" class="text-button" @onclick="() => SelectSource(resource, SourceView.Form)">@T("Form")</button> }<button type="button" class="text-button" @onclick="() => SelectSource(resource, SourceView.Yaml)">@T("Yaml")</button></div></article>
+                }
+            </div>
+        }
+        @if (selectedSource is not null)
+        {
+            <div class="resource-section" data-testid="pack-source-editor">
+                <div class="panel-header"><div><p class="eyebrow">@selectedSource.Path</p><h3>@selectedSource.Kind/@selectedSource.Name</h3></div><div class="studio-source-actions">@if (CanUseForm(selectedSource)) { <button type="button" class="text-button @(sourceView == SourceView.Form ? "active" : null)" @onclick="() => sourceView = SourceView.Form">@T("Form")</button> }<button type="button" class="text-button @(sourceView == SourceView.Yaml ? "active" : null)" @onclick="() => sourceView = SourceView.Yaml">@T("Yaml")</button><button class="icon-button" type="button" @onclick="CloseSource" aria-label="@T("CloseSourceEditor")">×</button></div></div>
+                @if (sourceView == SourceView.Form && CanUseForm(selectedSource))
+                {
+                    <PackAgentDefinitionForm @key="selectedSource.Path" @ref="agentSourceForm" Source="@sourceYaml" />
+                }
+                else
+                {
+                    <textarea class="form-code-editor runner-json" rows="30" @bind="sourceYaml" @bind:event="oninput" aria-label="@T("PackSourceYaml")"></textarea>
+                }
+                <div class="form-actions"><button class="button-secondary" type="button" @onclick="CloseSource">@T("Cancel")</button><button class="button-primary" type="button" disabled="@busy" @onclick="SaveSourceAsync">@(busy ? T("Saving") : T("SaveResource"))</button></div>
+            </div>
+        }
+    </section>
+
     <section class="panel studio-builds">
         <div class="panel-header"><div><p class="eyebrow">@T("ImmutableArtifacts")</p><h2>@T("Builds")</h2></div><span class="studio-hint">@T("Builds.Description")</span></div>
         @if (builds is null)
@@ -187,6 +223,11 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private ResourceSnapshot<PackProjectResource>? project;
     private IReadOnlyList<PackProjectBuildResource>? builds;
+    private IReadOnlyList<PackProjectSourceDocument>? sourceDocuments;
+    private PackProjectSourceDocument? selectedSource;
+    private PackAgentDefinitionForm? agentSourceForm;
+    private SourceView sourceView;
+    private string sourceYaml = string.Empty;
     private PackProjectBuildResource? selectedBuild;
     private PackInstallationPreview? preview;
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
@@ -231,6 +272,7 @@ else
             if (ContextState.Current is null) await ContextState.LoadAsync(cancellation.Token);
             project = await Client.GetProjectAsync(ProjectId, cancellation.Token);
             builds = await Client.GetBuildsAsync(ProjectId, cancellation.Token);
+            sourceDocuments = await Client.GetProjectResourcesAsync(ProjectId, cancellation.Token);
             var definition = project.Value.Definition;
             version = definition.Version;
             audience = definition.Audience;
@@ -245,6 +287,31 @@ else
     }
 
     private void MarkDirty() { dirty = true; message = null; preview = null; selectedBuild = null; bindingSelections.Clear(); }
+    private static bool CanUseForm(PackProjectSourceDocument source) => string.Equals(source.Kind, ResourceKinds.Agent, StringComparison.Ordinal);
+    private void SelectSource(PackProjectSourceDocument source, SourceView view) { selectedSource = source; sourceYaml = source.Source; sourceView = view; message = null; agentSourceForm = null; }
+    private void CloseSource() { selectedSource = null; sourceYaml = string.Empty; agentSourceForm = null; }
+    private async Task SaveSourceAsync()
+    {
+        if (project is null || selectedSource is null) return;
+        if (sourceView == SourceView.Form && agentSourceForm is not null && !agentSourceForm.TryBuildSource(out sourceYaml, out var formError))
+        {
+            hasError = true;
+            message = formError;
+            return;
+        }
+        var path = selectedSource.Path;
+        await ExecuteAsync(async () =>
+        {
+            project = await Client.UpdateProjectResourceAsync(ProjectId, new(path, sourceYaml), project.ETag, cancellation.Token);
+            sourceDocuments = await Client.GetProjectResourcesAsync(ProjectId, cancellation.Token);
+            selectedSource = sourceDocuments.Single(resource => string.Equals(resource.Path, path, StringComparison.Ordinal));
+            sourceYaml = selectedSource.Source;
+            agentSourceForm = null;
+            builds = await Client.GetBuildsAsync(ProjectId, cancellation.Token);
+            preview = null; selectedBuild = null; dirty = false;
+            message = $"Saved {selectedSource.Kind}/{selectedSource.Name} in Pack Project revision {project.Value.Definition.Revision}.";
+        });
+    }
     private async Task SaveAsync()
     {
         if (project is null) return;
@@ -321,6 +388,8 @@ else
         catch (AgentstrationApiException exception) { hasError = true; message = exception.Message; }
         finally { busy = false; }
     }
+
+    private enum SourceView { Form, Yaml }
 
     private string DownloadPath(PackProjectBuildResource build) => $"/api/pack-projects/{ProjectId:D}/builds/{build.Uid:D}/download";
     private async Task ConfigureBindingsAsync()

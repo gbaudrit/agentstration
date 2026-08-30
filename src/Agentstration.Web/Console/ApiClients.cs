@@ -98,8 +98,14 @@ public interface IEntryAdministrationApiClient
     Task<EntryDraftResponse> GetEntryAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetEntryAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");
     Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken);
+    Task<EntryDraft> SaveEntryAsync(ResourceNamespace @namespace, EntryDraft draft, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? SaveEntryAsync(draft, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");
     Task<EntryValidationResponse> ValidateEntryAsync(string name, CancellationToken cancellationToken);
+    Task<EntryValidationResponse> ValidateEntryAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? ValidateEntryAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");
     Task<EntryResource> PublishEntryAsync(string name, CancellationToken cancellationToken);
+    Task<EntryResource> PublishEntryAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? PublishEntryAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");
     Task<IReadOnlyList<EntryDependencyResponse>> GetDependenciesAsync(string name, CancellationToken cancellationToken);
     Task<IReadOnlyList<EntryDependencyResponse>> GetDependenciesAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetDependenciesAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");
@@ -307,23 +313,29 @@ public sealed class EntryAdministrationApiClient(HttpClient httpClient, IHttpCli
     public Task<EntryDraftResponse> GetEntryAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<EntryDraftResponse>(httpClient, EntryPath(@namespace, name), cancellationToken);
 
-    public async Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken)
+    public Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken) => SaveEntryAsync(draft.Id.Namespace, draft, cancellationToken);
+
+    public async Task<EntryDraft> SaveEntryAsync(ResourceNamespace @namespace, EntryDraft draft, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PutAsJsonAsync($"api/management/entries/{Uri.EscapeDataString(draft.Name)}", draft, cancellationToken);
+        using var response = await httpClient.PutAsJsonAsync(EntryPath(@namespace, draft.Name), draft, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<EntryDraft>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty Entry draft.", Guid.NewGuid().ToString("N"));
     }
 
-    public async Task<EntryValidationResponse> ValidateEntryAsync(string name, CancellationToken cancellationToken)
+    public Task<EntryValidationResponse> ValidateEntryAsync(string name, CancellationToken cancellationToken) => ValidateEntryAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    public async Task<EntryValidationResponse> ValidateEntryAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync($"api/management/entries/{Uri.EscapeDataString(name)}/validate", null, cancellationToken);
+        using var response = await httpClient.PostAsync($"{EntryPath(@namespace, name)}/validate", null, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<EntryValidationResponse>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty Entry validation.", Guid.NewGuid().ToString("N"));
     }
 
-    public async Task<EntryResource> PublishEntryAsync(string name, CancellationToken cancellationToken)
+    public Task<EntryResource> PublishEntryAsync(string name, CancellationToken cancellationToken) => PublishEntryAsync(ResourceNamespace.Default, name, cancellationToken);
+
+    public async Task<EntryResource> PublishEntryAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync($"api/management/entries/{Uri.EscapeDataString(name)}/publish", null, cancellationToken);
+        using var response = await httpClient.PostAsync($"{EntryPath(@namespace, name)}/publish", null, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<EntryResource>(cancellationToken) ?? throw new AgentstrationApiException("Work API returned an empty published Entry.", Guid.NewGuid().ToString("N"));
     }

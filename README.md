@@ -76,9 +76,9 @@ cd agentstration
 dotnet run --project src/Agentstration.Web
 ```
 
-Open the operations Console at [http://localhost:5100](http://localhost:5100). In local Development, the default `http` and `https` launch profiles load the versioned bootstrap bundle and create the public fixture `admin / admin` on a fresh instance.
+Open the operations Console at [http://localhost:5100](http://localhost:5100). In local Development, the default `http` and `https` launch profiles enable the `development` profile from the versioned bootstrap catalog and create the public fixture `admin / admin`, Tenant `dev`, and Workspace `default` on a fresh instance.
 
-Use `--launch-profile http-NoBootstrap` or `--launch-profile https-NoBootstrap` to start Development without declarative bootstrap. Published applications, Production, and runs using `--no-launch-profile` do not activate the Development bundle. Without declarative bootstrap, `/bootstrap` remains available to create the first local administrator, organization and workspace interactively.
+Use `--launch-profile http-NoBootstrap` or `--launch-profile https-NoBootstrap` to start Development without applying initial profiles. These launch profiles retain the catalog path and selected profiles but set `InitialBootstrapEnabled` to `false`. Published applications, Production, and runs using `--no-launch-profile` do not activate the Development profile. Without declarative bootstrap, `/bootstrap` remains available to create the first global local administrator plus the initial Tenant and Workspace interactively.
 
 When `Agentstration.AppHost` is the Visual Studio startup project, select its `https` profile for the default bootstrap or `https-NoBootstrap` to disable it for the orchestrated Console resource.
 

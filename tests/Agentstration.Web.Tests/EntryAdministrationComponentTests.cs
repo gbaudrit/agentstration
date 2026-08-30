@@ -79,7 +79,7 @@ public sealed class EntryAdministrationComponentTests
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var rendered = context.Render<EntryEditor>();
 
-        Assert.HasCount(5, rendered.FindAll("[role='tab']"));
+        Assert.HasCount(6, rendered.FindAll("[role='tab']"));
         Assert.AreEqual("true", rendered.Find("[data-testid='entry-tab-overview']").GetAttribute("aria-selected"));
         await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("Direct Agent Flow", StringComparison.Ordinal));
@@ -112,6 +112,32 @@ public sealed class EntryAdministrationComponentTests
         await rendered.Find("[data-testid='entry-tab-preview']").ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("Current draft presentation", StringComparison.Ordinal));
         Assert.IsTrue(rendered.FindAll(".entry-renderer input").All(value => value.HasAttribute("disabled")));
+    }
+
+    [TestMethod]
+    public async Task EntryEditorRawYamlUsesTheSameEditableDraftAndSavePath()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeEntryAdministrationApiClient();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var rendered = context.Render<EntryEditor>(parameters => parameters.Add(value => value.Name, "primary"));
+
+        await rendered.Find("[data-testid='entry-tab-yaml']").ClickAsync(new());
+
+        var editor = rendered.Find("[data-testid='entry-yaml-editor'] textarea");
+        Assert.IsTrue(editor.ParentElement!.ClassList.Contains("entry-yaml-field"));
+        var yaml = editor.GetAttribute("value") ?? editor.TextContent;
+        Assert.IsTrue(yaml.Contains("kind: Entry", StringComparison.Ordinal));
+        Assert.IsTrue(yaml.Contains("suggestions:", StringComparison.Ordinal));
+        Assert.IsTrue(yaml.Contains("fields:", StringComparison.Ordinal));
+        await editor.InputAsync(new ChangeEventArgs { Value = yaml.Replace("displayName: Prepare a report", "displayName: YAML entry", StringComparison.Ordinal) });
+        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Save YAML draft", StringComparison.Ordinal)).ClickAsync(new());
+
+        Assert.IsNotNull(client.SavedEntry);
+        Assert.AreEqual("YAML entry", client.SavedEntry.DisplayName);
+        Assert.HasCount(1, client.SavedEntry.Presentation.Suggestions);
+        Assert.HasCount(1, client.SavedEntry.Presentation.Fields);
     }
 
     [TestMethod]
@@ -154,9 +180,19 @@ public sealed class EntryAdministrationComponentTests
             .Add(value => value.EntryNamespace, @namespace.Value));
 
         Assert.AreEqual(@namespace, client.RequestedNamespace);
-        Assert.HasCount(4, rendered.FindAll("[role='tab']"));
-        Assert.IsFalse(rendered.Markup.Contains("entry-tab-definition", StringComparison.Ordinal));
+        Assert.HasCount(6, rendered.FindAll("[role='tab']"));
+        Assert.IsTrue(rendered.Markup.Contains("entry-tab-definition", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("managed by its namespaced Pack source", StringComparison.Ordinal));
+        await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
+        Assert.IsTrue(rendered.Find("[data-testid='entry-definition-fields']").HasAttribute("disabled"));
+        Assert.IsFalse(rendered.FindAll("button").Any(value => value.TextContent.Contains("Save draft", StringComparison.Ordinal)));
+        Assert.IsTrue(rendered.Markup.Contains("Prompt starters", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains("Input schema", StringComparison.Ordinal));
+        await rendered.Find("[data-testid='entry-tab-yaml']").ClickAsync(new());
+        var yamlEditor = rendered.Find("[data-testid='entry-yaml-editor'] textarea");
+        Assert.IsTrue(yamlEditor.HasAttribute("readonly"));
+        Assert.IsTrue(yamlEditor.ParentElement!.ClassList.Contains("entry-yaml-field"));
+        Assert.IsFalse(rendered.FindAll("button").Any(value => value.TextContent.Contains("Save YAML", StringComparison.Ordinal)));
         var workplaceLink = rendered.FindAll("a").Single(value => value.TextContent.Contains("Use in Workplace", StringComparison.Ordinal));
         Assert.AreEqual("workspaces?entry=main&entryNamespace=agentstration.daily-life-assistant", workplaceLink.GetAttribute("href")?.TrimStart('/'));
         await rendered.Find("[data-testid='entry-tab-usage']").ClickAsync(new());
@@ -248,6 +284,7 @@ public sealed class EntryAdministrationComponentTests
         public List<EntryBindingKind> RequestedKinds { get; } = [];
         public Agentstration.Resources.ResourceNamespace RequestedNamespace { get; private set; }
         public Agentstration.Resources.ResourceNamespace RequestedDependencyNamespace { get; private set; }
+        public Agentstration.Resources.ResourceNamespace SavedNamespace { get; private set; }
         public EntryDraft? SavedEntry { get; private set; }
         public WorkplaceDashboardDraft? SavedDashboard { get; private set; }
         public IReadOnlyList<EntryDraftResponse> EntryDrafts { get; init; } = [];
@@ -280,8 +317,11 @@ public sealed class EntryAdministrationComponentTests
             return Task.FromResult(new EntryDraftResponse(draft, published));
         }
         public Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken) { SavedEntry = draft with { Revision = 2, UpdatedAt = Now }; return Task.FromResult(SavedEntry); }
+        public Task<EntryDraft> SaveEntryAsync(Agentstration.Resources.ResourceNamespace @namespace, EntryDraft draft, CancellationToken cancellationToken) { SavedNamespace = @namespace; return SaveEntryAsync(draft, cancellationToken); }
         public Task<EntryValidationResponse> ValidateEntryAsync(string name, CancellationToken cancellationToken) => Task.FromResult(new EntryValidationResponse(true, []));
+        public Task<EntryValidationResponse> ValidateEntryAsync(Agentstration.Resources.ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => ValidateEntryAsync(name, cancellationToken);
         public Task<EntryResource> PublishEntryAsync(string name, CancellationToken cancellationToken) => Task.FromResult(PublishedEntry(name));
+        public Task<EntryResource> PublishEntryAsync(Agentstration.Resources.ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => Task.FromResult(PublishedEntry(name, @namespace));
         public Task<IReadOnlyList<EntryDependencyResponse>> GetDependenciesAsync(string name, CancellationToken cancellationToken) =>
             GetDependenciesAsync(Agentstration.Resources.ResourceNamespace.Default, name, cancellationToken);
         public Task<IReadOnlyList<EntryDependencyResponse>> GetDependenciesAsync(Agentstration.Resources.ResourceNamespace @namespace, string name, CancellationToken cancellationToken)

@@ -38,6 +38,7 @@ public partial class Home
     private bool RealtimeConnected => Realtime.State.ToString() == "Connected";
     private string CurrentWorkspaceName => WorkspaceName ?? workspace?.Name ?? throw new InvalidOperationException("A Workspace route is required.");
     private string CurrentDashboardName => dashboard?.Name ?? DashboardName ?? throw new InvalidOperationException("A Dashboard route is required.");
+    private string UserDisplayName => WorkplaceContext.Current?.UserDisplayName is { Length: > 0 } displayName ? displayName : T("You");
     [Parameter] public string? WorkspaceName { get; set; }
     [Parameter] public string? DashboardName { get; set; }
     [Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "interaction")] public Guid? RequestedInteractionId { get; set; }
@@ -68,7 +69,7 @@ public partial class Home
         }
         catch when (!lifetime.IsCancellationRequested)
         {
-            loadError = "The requested conversation could not be loaded from the local Work API.";
+            loadError = T("ConversationLoadError");
         }
     }
 
@@ -90,16 +91,19 @@ public partial class Home
             }
 
             workspace = await Api.GetWorkspaceAsync(workspaceName, lifetime.Token);
+            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName);
+            dashboards = await Api.ListDashboardsAsync(workspaceName, lifetime.Token);
             if (string.IsNullOrWhiteSpace(DashboardName))
             {
-                var defaultDashboard = await Api.GetDefaultDashboardAsync(workspaceName, lifetime.Token);
+                var defaultDashboard = dashboards.SingleOrDefault(value => value.IsDefault)
+                    ?? await Api.GetDefaultDashboardAsync(workspaceName, lifetime.Token);
                 navigationPending = true;
                 Navigation.NavigateTo(DashboardUrl(defaultDashboard.Name), replace: true);
                 return;
             }
 
-            dashboard = await Api.GetDashboardAsync(workspaceName, DashboardName, lifetime.Token);
-            dashboards = await Api.ListDashboardsAsync(workspaceName, lifetime.Token);
+            dashboard = dashboards.SingleOrDefault(value => string.Equals(value.Name, DashboardName, StringComparison.Ordinal))
+                ?? await Api.GetDashboardAsync(workspaceName, DashboardName, lifetime.Token);
             var reference = dashboard.Entries.FirstOrDefault(value => value.Role == DashboardItemRole.Primary);
             primary = reference is null ? null : await Api.GetEntryAsync(EntryId(reference), lifetime.Token);
             var featured = dashboard.Entries.Where(value => value.Role == DashboardItemRole.Featured).OrderBy(value => value.Order);
@@ -112,7 +116,7 @@ public partial class Home
             realtimeSubscription ??= Realtime.OnWorkspaceChanged(HandleRealtimeEvent);
             try { await Realtime.StartAsync(workspace.Id.ToString("D"), 0, lifetime.Token); } catch when (!lifetime.IsCancellationRequested) { }
         }
-        catch when (!lifetime.IsCancellationRequested) { loadError = "Workplace connects to Agentstration Console for its data. Start the Console and complete first-time setup if prompted, then try again."; }
+        catch when (!lifetime.IsCancellationRequested) { loadError = T("WorkplaceLoadError"); }
         finally { if (!navigationPending) loading = false; }
     }
 
@@ -128,7 +132,7 @@ public partial class Home
             if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id);
             await RefreshOverviewAsync();
         }
-        catch when (!lifetime.IsCancellationRequested) { interactionError = "Your request could not be sent. Please try again."; }
+        catch when (!lifetime.IsCancellationRequested) { interactionError = T("RequestSendError"); }
         finally { busy = false; }
     }
 
@@ -144,7 +148,7 @@ public partial class Home
             if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id);
             await RefreshOverviewAsync();
         }
-        catch when (!lifetime.IsCancellationRequested) { interactionError = "That response could not be applied. It may have expired; start a new request if retrying does not work."; }
+        catch when (!lifetime.IsCancellationRequested) { interactionError = T("ResponseApplyError"); }
         finally { busy = false; }
     }
 
@@ -160,7 +164,7 @@ public partial class Home
             if (interaction.TaskId is not null) await RefreshActiveTaskAsync(interaction.TaskId.Value);
             await RefreshOverviewAsync();
         }
-        catch when (!lifetime.IsCancellationRequested) { interactionError = "Your follow-up could not be sent. Please try again."; }
+        catch when (!lifetime.IsCancellationRequested) { interactionError = T("FollowUpSendError"); }
         finally { busy = false; }
     }
 
@@ -215,7 +219,7 @@ public partial class Home
             }
             catch when (!lifetime.IsCancellationRequested)
             {
-                interactionError = "The latest conversation state could not be restored. Please try again.";
+                interactionError = T("ConversationRestoreError");
             }
         }
         StateHasChanged();
@@ -248,9 +252,20 @@ public partial class Home
     private string DashboardUrl(string dashboardName) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(dashboardName)}{(RequestedInteractionId is null ? string.Empty : $"?interaction={RequestedInteractionId}")}";
     private string InteractionUrl(Guid interactionId) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(CurrentDashboardName)}?interaction={interactionId}";
     private void DashboardChanged(ChangeEventArgs args) { var name = args.Value?.ToString(); if (!string.IsNullOrWhiteSpace(name)) Navigation.NavigateTo(DashboardUrl(name)); }
+    private static string DashboardIcon(WorkplaceDashboardResponse value)
+    {
+        var key = $"{value.Name} {value.DisplayName}".ToLowerInvariant();
+        if (key.Contains("home", StringComparison.Ordinal) || key.Contains("maison", StringComparison.Ordinal)) return "home";
+        if (key.Contains("travel", StringComparison.Ordinal) || key.Contains("voyage", StringComparison.Ordinal) || key.Contains("trip", StringComparison.Ordinal)) return "plane";
+        if (key.Contains("cook", StringComparison.Ordinal) || key.Contains("kitchen", StringComparison.Ordinal) || key.Contains("cuisine", StringComparison.Ordinal)) return "chef-hat";
+        if (key.Contains("document", StringComparison.Ordinal) || key.Contains("file", StringComparison.Ordinal)) return "folder";
+        if (key.Contains("shop", StringComparison.Ordinal) || key.Contains("achat", StringComparison.Ordinal)) return "shopping-bag";
+        return "layout-grid";
+    }
     private static EntryId EntryId(DashboardEntryReferenceResponse reference) => new(reference.EntryResourceId, reference.Namespace);
-    private static string ConversationTitle(InteractionResponse value) => value.Messages.FirstOrDefault(message => message.Role == ConversationRole.User)?.Content ?? "Conversation";
-    private static string ConversationStatus(InteractionStatus value) => value switch { InteractionStatus.Idle => "Ready to continue", InteractionStatus.Processing => "In progress", InteractionStatus.WaitingForUser => "Needs input", InteractionStatus.Closed => "Closed", _ => value.ToString() };
+    private string ConversationTitle(InteractionResponse value) => value.Messages.FirstOrDefault(message => message.Role == ConversationRole.User)?.Content ?? T("Conversation");
+    private string ConversationStatus(InteractionStatus value) => value switch { InteractionStatus.Idle => T("ReadyToContinue"), InteractionStatus.Processing => T("InProgress"), InteractionStatus.WaitingForUser => T("NeedsInput"), InteractionStatus.Closed => T("Closed"), _ => value.ToString() };
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private static EntryResource ToDefinition(EntryResponse value) => new() { WorkspaceId = new(value.WorkspaceId), Id = new(value.Id, value.Namespace), Name = value.Name, DisplayName = value.DisplayName, Description = value.Description, Presentation = value.Presentation, ResolvedTarget = value.ResolvedTarget, Behavior = value.Behavior, ApiVersion = value.ApiVersion, Type = value.Type, Version = value.Version, PublishedAt = value.PublishedAt };
     public void Dispose() { Realtime.StateChanged -= HandleRealtimeStateChanged; realtimeSubscription?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); GC.SuppressFinalize(this); }
 }

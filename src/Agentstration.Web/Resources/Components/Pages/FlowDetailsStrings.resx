@@ -65,4 +65,5 @@
   <data name="OpenFlowDesigner"><value>Open Flow Designer</value></data>
   <data name="ViewInFlowDesigner"><value>View in Flow Designer</value></data>
   <data name="FlowTopology"><value>Flow topology</value></data>
+<data name="Tab.Definition"><value>Definition</value></data><data name="Tab.YAML"><value>YAML</value></data><data name="RawDefinition"><value>Raw definition</value></data><data name="FlowYaml"><value>Flow YAML</value></data><data name="FlowYamlEditableHelp"><value>Edit the complete Flow definition as YAML.</value></data><data name="FlowYamlReadOnlyHelp"><value>This published Flow definition is read-only.</value></data><data name="Source"><value>Source</value></data><data name="ReadOnly"><value>Read-only</value></data><data name="FlowYamlDefinition"><value>Flow YAML definition</value></data><data name="OpenYamlEditor"><value>Open YAML editor</value></data>
 </root>

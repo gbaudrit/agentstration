@@ -70,4 +70,5 @@
   <data name="DirectRuntimeReferenceHelp"><value>Référencé explicitement par la définition de l’agent hors de l’espace de noms de son Pack.</value></data>
   <data name="GenerationActiveThroughDeployment"><value>La génération {0} est active via le déploiement « {1} ».</value></data>
   <data name="RuntimePreparationCompleted"><value>La préparation de l’exécution s’est terminée avec l’état « {0} ».</value></data>
+<data name="OriginalDefinition"><value>Définition d’origine</value></data><data name="AgentSourceForm"><value>Formulaire de la source de l’agent</value></data><data name="AgentSourceFormHelp"><value>Consultez les champs d’origine de l’agent.</value></data><data name="ReadOnly"><value>Lecture seule</value></data><data name="AgentSourceYaml"><value>YAML de la source de l’agent</value></data><data name="AgentSourceYamlHelp"><value>Consultez la ressource Agent d’origine au format YAML.</value></data><data name="OriginalAgentYamlDefinition"><value>Définition YAML d’origine de l’agent</value></data><data name="Tab.Definition"><value>Définition</value></data><data name="Tab.Yaml"><value>YAML</value></data>
 </root>

@@ -10,6 +10,8 @@ public interface IPacksClient
 {
     Task<IReadOnlyList<InstalledPackResource>> GetPacksAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<InstalledPackResource>> GetPackAsync(string publisher, string name, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PackProjectSourceDocument>> GetPackResourcesAsync(string publisher, string name, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<PackProjectSourceDocument>>([]);
     Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, bool replaceExisting, bool removeDashboardReferences, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken);
     Task UninstallAsync(string publisher, string name, string etag, bool removeDashboardReferences, CancellationToken cancellationToken);
@@ -24,6 +26,10 @@ public interface IPacksClient
     Task<IReadOnlyList<PackProjectResource>> GetProjectsAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<PackProjectResource>> GetProjectAsync(Guid projectId, CancellationToken cancellationToken);
     Task<ResourceSnapshot<PackProjectResource>> UpdateProjectAsync(Guid projectId, UpdatePackProjectCommand command, string etag, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PackProjectSourceDocument>> GetProjectResourcesAsync(Guid projectId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Pack Project source editing.");
+    Task<ResourceSnapshot<PackProjectResource>> UpdateProjectResourceAsync(Guid projectId, UpdatePackProjectSourceCommand command, string etag, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Pack Project source editing.");
     Task<PackProjectBuildResource> BuildAsync(Guid projectId, CancellationToken cancellationToken);
     Task<IReadOnlyList<PackProjectBuildResource>> GetBuildsAsync(Guid projectId, CancellationToken cancellationToken);
     Task<PackInstallationPreview> PreviewBuildAsync(Guid projectId, Guid buildId, CancellationToken cancellationToken);
@@ -42,6 +48,9 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
         using var response = await httpClient.GetAsync(Path(publisher, name), cancellationToken);
         return await ReadInstalledAsync(response, cancellationToken);
     }
+
+    public async Task<IReadOnlyList<PackProjectSourceDocument>> GetPackResourcesAsync(string publisher, string name, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<PackProjectSourceDocument[]>(httpClient, $"{Path(publisher, name)}/resources/source", cancellationToken);
 
     public async Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken)
     {
@@ -111,6 +120,18 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
     public async Task<ResourceSnapshot<PackProjectResource>> UpdateProjectAsync(Guid projectId, UpdatePackProjectCommand command, string etag, CancellationToken cancellationToken)
     {
         using var message = new HttpRequestMessage(HttpMethod.Put, ProjectPath(projectId));
+        message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        message.Content = JsonContent.Create(command);
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        return await ReadResourceAsync<PackProjectResource>(response, "Pack Project", cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PackProjectSourceDocument>> GetProjectResourcesAsync(Guid projectId, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<PackProjectSourceDocument[]>(httpClient, $"{ProjectPath(projectId)}/resources", cancellationToken);
+
+    public async Task<ResourceSnapshot<PackProjectResource>> UpdateProjectResourceAsync(Guid projectId, UpdatePackProjectSourceCommand command, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Put, $"{ProjectPath(projectId)}/resources");
         message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         message.Content = JsonContent.Create(command);
         using var response = await httpClient.SendAsync(message, cancellationToken);

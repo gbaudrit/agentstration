@@ -54,9 +54,10 @@ public sealed class PersonalAccessTokenAuthenticationHandler(
         var principal = await identities.GetPrincipalAsync(token.PrincipalId, Context.RequestAborted);
         var workspace = await identities.GetWorkspaceAsync(token.WorkspaceId, Context.RequestAborted);
         var membership = await identities.FindWorkspaceMembershipAsync(token.WorkspaceId, token.PrincipalId, Context.RequestAborted);
+        var platformAdministrator = await identities.IsPlatformAdministratorAsync(token.PrincipalId, Context.RequestAborted);
         if (principal is not { Status: PrincipalStatus.Active, Kind: PrincipalKind.Human }
             || workspace?.Status != WorkspaceStatus.Active
-            || membership?.Status != MembershipStatus.Active)
+            || !platformAdministrator && membership?.Status != MembershipStatus.Active)
             return AuthenticateResult.Fail("The personal access token is no longer authorized.");
 
         await tokens.RecordUseAsync(token.Id, now, LastUseWriteInterval, Context.RequestAborted);

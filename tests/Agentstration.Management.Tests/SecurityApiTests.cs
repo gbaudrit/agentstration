@@ -65,11 +65,11 @@ public sealed class SecurityApiTests
         var probes = new[] { resourceRead, resourceWrite, resourceDelete, runsExecute, hubRead };
 
         await AssertAccessMatrixAsync(anonymous, probes, [false, false, false, false, false]);
-        await AssertAccessMatrixAsync(viewerClient, probes, [true, false, false, false, true]);
+        await AssertAccessMatrixAsync(viewerClient, probes, [true, true, true, true, true]);
         await AssertAccessMatrixAsync(memberClient, probes, [true, false, false, true, true]);
         await AssertAccessMatrixAsync(adminClient, probes, [true, true, true, true, true]);
         await AssertAccessMatrixAsync(patClient, probes, [true, false, false, false, false]);
-        foreach (var deniedClient in new[] { anonymous, viewerClient, patClient })
+        foreach (var deniedClient in new[] { anonymous, patClient })
         {
             using var deniedMcp = await deniedClient.SendAsync(Json(HttpMethod.Post, "/mcp", "{}"));
             Assert.IsTrue(deniedMcp.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden);
@@ -77,9 +77,10 @@ public sealed class SecurityApiTests
 
         using var platformAccess = await viewerClient.GetAsync("/api/identity/platform");
         Assert.AreEqual(HttpStatusCode.OK, platformAccess.StatusCode);
-        using var workspaceWriteStillDenied = await viewerClient.SendAsync(resourceWrite.Request());
-        Assert.AreEqual(HttpStatusCode.Forbidden, workspaceWriteStillDenied.StatusCode,
-            "PlatformAdmin must not imply Workspace resource permissions.");
+        using var platformWorkspaceWrite = await viewerClient.SendAsync(resourceWrite.Request());
+        Assert.AreNotEqual(HttpStatusCode.Unauthorized, platformWorkspaceWrite.StatusCode);
+        Assert.AreNotEqual(HttpStatusCode.Forbidden, platformWorkspaceWrite.StatusCode,
+            "PlatformAdmin must authorize resources in every active Workspace.");
         using var vaultInitialization = await viewerClient.PostAsync("/api/vaults/missing/initialize", null);
         Assert.AreNotEqual(HttpStatusCode.Unauthorized, vaultInitialization.StatusCode);
         Assert.AreNotEqual(HttpStatusCode.Forbidden, vaultInitialization.StatusCode);
@@ -247,6 +248,8 @@ public sealed class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.OK, bootstrapPage.StatusCode);
         var bootstrapHtml = await bootstrapPage.Content.ReadAsStringAsync();
         StringAssert.Contains(bootstrapHtml, "Initialize Agentstration");
+        StringAssert.Contains(bootstrapHtml, "Tenant name");
+        StringAssert.Contains(bootstrapHtml, "Workspace name");
         Assert.IsFalse(bootstrapHtml.Contains(LocalPassword, StringComparison.Ordinal));
 
         using var missingAntiforgery = await client.PostAsync("/bootstrap", new FormUrlEncodedContent(new Dictionary<string, string>
@@ -263,6 +266,10 @@ public sealed class SecurityApiTests
         {
             ["__RequestVerificationToken"] = bootstrapToken,
             ["ReturnUrl"] = "/agents",
+            ["Input.TenantName"] = "interactive",
+            ["Input.TenantDisplayName"] = "Interactive tenant",
+            ["Input.WorkspaceName"] = "default",
+            ["Input.WorkspaceDisplayName"] = "Default workspace",
             ["Input.DisplayName"] = "Web administrator",
             ["Input.UserName"] = "web-admin",
             ["Input.Email"] = "web-admin@example.test",
@@ -493,7 +500,8 @@ public sealed class SecurityApiTests
             userName = "local-admin",
             password = LocalPassword,
             displayName = "Local administrator",
-            email = "admin-before@example.test"
+            email = "admin-before@example.test",
+            topology = BootstrapTopology()
         });
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
 
@@ -504,7 +512,8 @@ public sealed class SecurityApiTests
         {
             userName = "second-admin",
             password = LocalPassword,
-            displayName = "Second administrator"
+            displayName = "Second administrator",
+            topology = BootstrapTopology()
         });
         Assert.AreEqual(HttpStatusCode.Conflict, repeated.StatusCode);
 
@@ -549,6 +558,36 @@ public sealed class SecurityApiTests
     }
 
     [TestMethod]
+    public async Task PlatformAdministratorCanSelectAWorkspaceCreatedLaterWithoutMembership()
+    {
+        await using var factory = Factory("Local");
+        using var client = UnredirectedClient(factory);
+        await BootstrapAsync(client, "global-admin");
+        var initial = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.IsNotNull(initial);
+
+        var store = factory.Services.GetRequiredService<IIdentityStore>();
+        var now = DateTimeOffset.UtcNow;
+        var tenant = new Tenant(Guid.NewGuid(), "second", "Second tenant", TenantStatus.Active, now);
+        var workspace = new Workspace(Guid.NewGuid(), tenant.Id, "operations", "Operations", WorkspaceStatus.Active, now);
+        await store.AddTenantAsync(tenant, default);
+        await store.AddWorkspaceAsync(workspace, default);
+        Assert.IsNull(await store.FindMembershipAsync(tenant.Id, initial.Context.PrincipalId, default));
+        Assert.IsNull(await store.FindWorkspaceMembershipAsync(workspace.Id, initial.Context.PrincipalId, default));
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/identity/context");
+        request.Headers.Add("X-Agentstration-Workspace", workspace.Id.ToString("D"));
+        using var response = await client.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        var selected = await response.Content.ReadFromJsonAsync<ConsoleContextView>();
+        Assert.IsNotNull(selected);
+        Assert.AreEqual(tenant.Id, selected.Context.TenantId);
+        Assert.AreEqual(workspace.Id, selected.Context.WorkspaceId);
+        Assert.IsTrue(selected.AvailableWorkspaces.Any(value => value.Id == initial.Context.WorkspaceId));
+        Assert.IsTrue(selected.AvailableWorkspaces.Any(value => value.Id == workspace.Id));
+    }
+
+    [TestMethod]
     public async Task WorkspaceOwnerIsNotImplicitlyPlatformAdministrator()
     {
         await using var factory = Factory("Local");
@@ -557,7 +596,8 @@ public sealed class SecurityApiTests
         {
             userName = "platform-admin",
             password = LocalPassword,
-            displayName = "Platform administrator"
+            displayName = "Platform administrator",
+            topology = BootstrapTopology()
         });
         Assert.AreEqual(HttpStatusCode.Created, bootstrapped.StatusCode);
 
@@ -611,7 +651,8 @@ public sealed class SecurityApiTests
         {
             userName = "account-admin",
             password = LocalPassword,
-            displayName = "Account administrator"
+            displayName = "Account administrator",
+            topology = BootstrapTopology()
         });
         Assert.AreEqual(HttpStatusCode.Created, bootstrap.StatusCode);
         var context = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
@@ -882,7 +923,8 @@ public sealed class SecurityApiTests
         {
             userName = "membership-admin",
             password = LocalPassword,
-            displayName = "Membership administrator"
+            displayName = "Membership administrator",
+            topology = BootstrapTopology()
         });
         Assert.AreEqual(HttpStatusCode.Created, bootstrap.StatusCode);
         var context = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
@@ -901,15 +943,15 @@ public sealed class SecurityApiTests
 
         using var promoted = await client.PutAsJsonAsync(
             $"/api/identity/workspaces/{context.Context.WorkspaceId:D}/memberships/{account.PrincipalId:D}",
-            new { role = BuiltInIdentityRoles.Admin });
+            new { role = BuiltInIdentityRoles.Owner });
         Assert.AreEqual(HttpStatusCode.OK, promoted.StatusCode);
         var memberships = await client.GetFromJsonAsync<WorkspaceMemberView[]>(
             $"/api/identity/workspaces/{context.Context.WorkspaceId:D}/memberships");
         Assert.IsNotNull(memberships);
-        Assert.AreEqual(BuiltInIdentityRoles.Admin, memberships.Single(value => value.Principal.Id == account.PrincipalId).Role);
+        Assert.AreEqual(BuiltInIdentityRoles.Owner, memberships.Single(value => value.Principal.Id == account.PrincipalId).Role);
 
         using var removeLastOwner = await client.DeleteAsync(
-            $"/api/identity/workspaces/{context.Context.WorkspaceId:D}/memberships/{context.Context.PrincipalId:D}");
+            $"/api/identity/workspaces/{context.Context.WorkspaceId:D}/memberships/{account.PrincipalId:D}");
         Assert.AreEqual(HttpStatusCode.Conflict, removeLastOwner.StatusCode);
 
         using var logout = await client.PostAsync("/api/auth/logout", null);
@@ -1012,10 +1054,14 @@ public sealed class SecurityApiTests
         {
             userName,
             password = LocalPassword,
-            displayName = "Security test user"
+            displayName = "Security test user",
+            topology = BootstrapTopology()
         });
         Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
     }
+
+    private static LocalBootstrapTopology BootstrapTopology() =>
+        new("test", "Test tenant", "default", "Default workspace");
 
     private static async Task LoginAsync(HttpClient client, string userName, string password)
     {

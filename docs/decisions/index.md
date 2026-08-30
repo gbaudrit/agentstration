@@ -103,4 +103,6 @@ Use **Proposed** when implementation or repository evidence does not establish a
 71. [ADR-0071 — Remove the legacy content and mission vertical](0071-remove-legacy-content-vertical.md)
 72. [ADR-0072 — Pack updates reconcile stable resources and preserve Work history](0072-pack-updates-reconcile-stable-resources.md)
 73. [ADR-0073 — Bootstrap is a declarative initial-state source](0073-bootstrap-is-a-declarative-initial-state-source.md)
-74. [ADR-0074 — UI localization uses RESX and Principal culture preferences](0074-ui-localization-uses-resx-and-principal-culture-preferences.md)
+74. [ADR-0074 — Initial topology is declarative and Platform administration is global](0074-initial-topology-is-declarative-and-platform-administration-is-global.md)
+75. [ADR-0075 — Bootstrap files are an ordered profile catalog](0075-bootstrap-files-are-an-ordered-profile-catalog.md)
+76. [ADR-0076 — UI localization uses RESX and Principal culture preferences](0076-ui-localization-uses-resx-and-principal-culture-preferences.md)

@@ -8,6 +8,8 @@
 @inject NavigationManager Navigation
 @inject IConfiguration Configuration
 @inject IHostEnvironment HostEnvironment
+@inject WorkplaceContextState WorkplaceContext
+@inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplacePageStrings> Localizer
 
 <PageTitle>Workplace · Agentstration</PageTitle>
 
@@ -15,12 +17,20 @@
 else if (loadError is not null) { <ServiceUnavailableState Message="@loadError" /> }
 else
 {
-    <div class="workplace-heading"><div><p class="eyebrow">Workspace</p><h1>@(workspace?.DisplayName ?? "Workplace")</h1></div><RealtimeStatus Connected="RealtimeConnected" /></div>
-    <nav class="dashboard-navigation" aria-label="Dashboards">
-        <div class="dashboard-links">@foreach (var item in dashboards) { <NavLink href="@DashboardUrl(item.Name)" Match="NavLinkMatch.All">@item.DisplayName</NavLink> }</div>
-        <label class="dashboard-select"><span>Dashboard</span><select value="@dashboard?.Name" @onchange="DashboardChanged">@foreach (var item in dashboards) { <option value="@item.Name">@item.DisplayName</option> }</select></label>
+    <div class="workplace-heading">
+        <div><p class="eyebrow">@T("Workspace")</p><h1>@(workspace?.DisplayName ?? "Workplace")</h1></div>
+        <RealtimeStatus Connected="RealtimeConnected" />
+    </div>
+    <nav class="dashboard-navigation" aria-label="@T("Dashboards")">
+        <div class="dashboard-links">
+            @foreach (var item in dashboards)
+            {
+                <NavLink href="@DashboardUrl(item.Name)" Match="NavLinkMatch.All"><UiIcon Name="layout-grid" /> <span>@item.DisplayName</span></NavLink>
+            }
+        </div>
+        <label class="dashboard-select"><span>@T("Dashboard")</span><select value="@dashboard?.Name" @onchange="DashboardChanged">@foreach (var item in dashboards) { <option value="@item.Name">@item.DisplayName</option> }</select></label>
     </nav>
-    <section class="mobile-welcome" aria-label="Welcome"><p>@workspace?.DisplayName</p><h1>@dashboard?.DisplayName</h1><span>@(dashboard?.Description ?? "What would you like to do today?")</span></section>
+    <section class="mobile-welcome" aria-label="@T("Welcome")"><small>@T("WelcomeBack")</small><h1>@T("HelloUser", UserDisplayName)</h1><span>@T("WhatWouldYouLike")</span></section>
     <div class="workplace-shell">
         <div class="workplace-primary">
             @if (interaction is null)
@@ -29,33 +39,48 @@ else
                 {
                     <PrimaryEntryContainer Busy="busy"><EntryRenderer Definition="@ToDefinition(primary)" Role="DashboardItemRole.Primary" OnSubmit="values => SubmitAsync(primary, values)" Disabled="busy" Busy="busy" /></PrimaryEntryContainer>
                 }
+                <section class="mobile-dashboards" aria-label="@T("Dashboards")">
+                    <div class="section-heading"><h2>@T("YourSpaces")</h2></div>
+                    <div class="mobile-dashboard-cards">
+                        @foreach (var item in dashboards)
+                        {
+                            <NavLink class="@(string.Equals(item.Name, dashboard?.Name, StringComparison.Ordinal) ? "is-selected" : null)" href="@DashboardUrl(item.Name)" Match="NavLinkMatch.All" aria-current="@(string.Equals(item.Name, dashboard?.Name, StringComparison.Ordinal) ? "page" : null)">
+                                <span class="mobile-dashboard-art" aria-hidden="true">
+                                    @if (!string.IsNullOrWhiteSpace(item.ImageUrl)) { <img src="@item.ImageUrl" alt="" /> }
+                                    else { <UiIcon Name="@DashboardIcon(item)" /> }
+                                </span>
+                                <span>@item.DisplayName</span>
+                            </NavLink>
+                        }
+                    </div>
+                </section>
                 @if (featuredEntries.Count > 0)
                 {
-                    <section class="featured-entries"><div class="section-heading"><div><p class="eyebrow">Featured</p><h2>Featured tools</h2></div></div><div class="standard-entry-grid">@foreach(var entry in featuredEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Featured" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
+                    <section class="featured-entries"><div class="section-heading"><div><p class="eyebrow">@T("Featured")</p><h2>@T("FeaturedTools")</h2></div></div><div class="standard-entry-grid">@foreach(var entry in featuredEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Featured" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
                 }
                 @if (standardEntries.Count > 0)
                 {
-                    <button class="mobile-tools-toggle" type="button" aria-expanded="@showMoreEntries" @onclick="() => showMoreEntries = !showMoreEntries"><UiIcon Name="plus" /> @(showMoreEntries ? "Hide other tools" : "More ways to start")</button>
-                    <section class="standard-entries @(showMoreEntries ? "mobile-open" : null)"><div class="section-heading"><div><p class="eyebrow">Shortcuts</p><h2>Other ways to start</h2></div></div><div class="standard-entry-grid">@foreach(var entry in standardEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Standard" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
+                    <button class="mobile-tools-toggle" type="button" aria-expanded="@showMoreEntries" @onclick="() => showMoreEntries = !showMoreEntries"><UiIcon Name="plus" /> @(showMoreEntries ? T("HideOtherTools") : T("MoreWaysToStart"))</button>
+                    <section class="standard-entries @(showMoreEntries ? "mobile-open" : null)"><div class="section-heading"><div><p class="eyebrow">@T("Shortcuts")</p><h2>@T("OtherWaysToStart")</h2></div></div><div class="standard-entry-grid">@foreach(var entry in standardEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Standard" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
                 }
             }
             else
             {
                 <InteractionView Messages="messages" Action="currentAction" PendingAction="pendingAction" ActionTimestamp="interaction.LastActivityAt" Presentation="@(activeEntry?.Presentation ?? new EntryPresentation())" Status="interaction.Status" Task="activeTask" Activities="activities" Results="results" Artifacts="artifacts" Busy="busy" DiagnosticsEnabled="HostEnvironment.IsDevelopment()" RealtimeConnected="RealtimeConnected" Error="@interactionError" OnPendingAction="RespondAsync" OnMessage="ContinueAsync" OnNewRequest="NewRequest" ArtifactContentUrl="ArtifactUrl" TaskDetailsUrl="TaskUrl" />
             }
-            @if (interaction is null && primary is null && featuredEntries.Count == 0 && standardEntries.Count == 0) { <EmptyState Title="Empty dashboard" Message="This Dashboard has no Entries configured yet." /> }
+            @if (interaction is null && primary is null && featuredEntries.Count == 0 && standardEntries.Count == 0) { <EmptyState Title="@T("EmptyDashboard")" Message="@T("EmptyDashboardHelp")" /> }
             <section class="home-section recent-work @(tasks.Count == 0 ? "is-empty" : null)">
-                <div class="section-heading"><div><p class="eyebrow">Work</p><h2>Recent tasks</h2></div><a href="@($"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/tasks")">View all</a></div>
-                @if (tasks.Count == 0) { <div class="compact-empty"><EmptyState Title="No tasks yet" Message="Start with a request above. Tasks that need more time will appear here." /></div> }
-                else { <div class="task-cards">@foreach (var item in tasks.Take(4)) { <a class="task-card-link" href="@($"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/tasks/{item.Id}")"><TaskStatusBadge Value="item.Status" /><strong>@item.Title</strong><small>Updated @item.UpdatedAt.LocalDateTime.ToString("g")</small></a> }</div> }
+                <div class="section-heading"><div><p class="eyebrow">@T("Work")</p><h2>@T("RecentTasks")</h2></div><a href="@($"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/tasks")">@T("ViewAll")</a></div>
+                @if (tasks.Count == 0) { <div class="compact-empty"><EmptyState Title="@T("NoTasksYet")" Message="@T("NoTasksYetHelp")" /></div> }
+                else { <div class="task-cards">@foreach (var item in tasks.Take(4)) { <a class="task-card-link" href="@($"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/tasks/{item.Id}")"><TaskStatusBadge Value="item.Status" /><strong>@item.Title</strong><small>@T("Updated") @item.UpdatedAt.LocalDateTime.ToString("g")</small></a> }</div> }
             </section>
             @if (recentInteractions.Count > 0)
             {
-                <section class="home-section recent-conversations"><div class="section-heading"><div><p class="eyebrow">History</p><h2>Recent conversations</h2></div></div><div class="conversation-cards">@foreach(var item in recentInteractions.Where(value => value.Id != interaction?.Id).Take(5)){<a href="@InteractionUrl(item.Id)"><span>@ConversationTitle(item)</span><small>@ConversationStatus(item.Status) · @item.LastActivityAt.LocalDateTime.ToString("g")</small></a>}</div></section>
+                <section class="home-section recent-conversations"><div class="section-heading"><div><p class="eyebrow">@T("History")</p><h2>@T("RecentConversations")</h2></div></div><div class="conversation-cards">@foreach(var item in recentInteractions.Where(value => value.Id != interaction?.Id).Take(5)){<a href="@InteractionUrl(item.Id)"><span>@ConversationTitle(item)</span><small>@ConversationStatus(item.Status) · @item.LastActivityAt.LocalDateTime.ToString("g")</small></a>}</div></section>
             }
         </div>
         <aside class="attention-rail">
-            <section class="attention-summary"><div><strong>@tasks.Count(value => value.Status == WorkTaskStatus.ActionRequired)</strong><span>Need your input</span></div><div><strong>@unread</strong><span>Unread updates</span></div></section>
+            <section class="attention-summary"><div><strong>@tasks.Count(value => value.Status == WorkTaskStatus.ActionRequired)</strong><span>@T("NeedYourInput")</span></div><div><strong>@unread</strong><span>@T("UnreadUpdates")</span></div></section>
             <NotificationCenter Notifications="notifications.Take(5).ToArray()" OnMarkRead="MarkReadAsync" OnMarkAllRead="MarkAllReadAsync" />
         </aside>
     </div>

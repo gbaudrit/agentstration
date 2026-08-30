@@ -93,7 +93,7 @@ else
                 <div class="pack-resource-list">
                     @foreach (var resource in selected.Value.Definition.ManagedResources)
                     {
-                        <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div></article>
+                        <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div>@if (DefinitionFormUrl(resource) is { } formUrl) { <a class="text-button" href="@formUrl">@T("Form")</a> }</article>
                     }
                 </div>
             }
@@ -504,6 +504,13 @@ else
     private string? SelectedBinding(string name) => bindingSelections.GetValueOrDefault(name);
     private void BindingChanged(string name, ChangeEventArgs args) => bindingSelections[name] = args.Value?.ToString() ?? string.Empty;
     private static string BindingValue(string name, ResourceNamespace @namespace) => $"{@namespace.Value}:{name}";
+    private static string? DefinitionFormUrl(ManagedPackResource resource) => resource.Kind switch
+    {
+        ResourceKinds.Agent => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/agents/{Uri.EscapeDataString(resource.Name)}?view=definition",
+        ResourceKinds.Flow => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/flows/{Uri.EscapeDataString(resource.Name)}?view=definition",
+        ResourceKinds.Entry => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/entries/{Uri.EscapeDataString(resource.Name)}?view=definition",
+        _ => null
+    };
     private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";
     private ResourceReference ParseBindingTarget(string value)
     {

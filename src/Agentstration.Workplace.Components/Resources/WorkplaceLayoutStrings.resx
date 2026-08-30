@@ -5,4 +5,9 @@
   <data name="Home" xml:space="preserve"><value>Home</value></data><data name="Tasks" xml:space="preserve"><value>Tasks</value></data><data name="Notifications" xml:space="preserve"><value>Notifications</value></data><data name="LocalMode" xml:space="preserve"><value>Local mode</value></data>
   <data name="OpenNotifications" xml:space="preserve"><value>Open notifications</value></data><data name="MyWorkplace" xml:space="preserve"><value>My Workplace</value></data><data name="NamedWorkplace" xml:space="preserve"><value>{0} Workplace</value></data>
   <data name="ToggleColorTheme" xml:space="preserve"><value>Toggle color theme</value></data><data name="ThemeValue" xml:space="preserve"><value>Theme: {0}</value></data>
+  <data name="ConnectionInterrupted" xml:space="preserve"><value>Connection interrupted</value></data>
+  <data name="WorkplaceUnavailable" xml:space="preserve"><value>Workplace is temporarily unavailable</value></data>
+  <data name="TryAgain" xml:space="preserve"><value>Try again</value></data>
+  <data name="WorkApiCheck" xml:space="preserve"><value>Check that the local Work API is running, then retry.</value></data>
+  <data name="Overview" xml:space="preserve"><value>Overview</value></data><data name="Work" xml:space="preserve"><value>Work</value></data><data name="Activity" xml:space="preserve"><value>Activity</value></data><data name="ProfileFor" xml:space="preserve"><value>Profile for {0}</value></data><data name="CurrentOrganizationWorkspace" xml:space="preserve"><value>Current organization and workspace</value></data><data name="My" xml:space="preserve"><value>My</value></data><data name="Organization" xml:space="preserve"><value>Organization</value></data><data name="User" xml:space="preserve"><value>User</value></data>
 </root>

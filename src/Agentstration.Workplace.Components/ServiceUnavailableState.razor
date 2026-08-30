@@ -1,11 +1,14 @@
 <section class="service-unavailable" role="alert">
-    <span><UiIcon Name="offline" /></span>
-    <div><h2>Workplace is temporarily unavailable</h2><p>@Message</p></div>
+    <span class="service-unavailable-icon" aria-hidden="true"><UiIcon Name="offline" /></span>
+    <div class="service-unavailable-copy"><span class="service-unavailable-kicker">@T("ConnectionInterrupted")</span><h2>@T("WorkplaceUnavailable")</h2><p>@EffectiveMessage</p></div>
     <form method="get" action="@Navigation.Uri" data-enhance="false">
-        <button class="button-primary" type="submit"><UiIcon Name="refresh" /> Try again</button>
+        <button class="button-primary" type="submit"><UiIcon Name="refresh" /> @T("TryAgain")</button>
     </form>
 </section>
 @code {
+    [Inject] private Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceLayoutStrings> Localizer { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
-    [Parameter] public string Message { get; set; } = "Check that the local Work API is running, then retry.";
+    [Parameter] public string? Message { get; set; }
+    private string EffectiveMessage => Message ?? T("WorkApiCheck");
+    private string T(string key) => Localizer[key];
 }

@@ -819,6 +819,36 @@ public sealed class ApiClientTests
     }
 
     [TestMethod]
+    public void AgentEditorRawYamlRoundTripsEditableDefinition()
+    {
+        var expected = new AgentEditorModel
+        {
+            Name = "welcome",
+            DisplayName = "Welcome agent",
+            Description = "Routes requests.",
+            Instructions = "Help and route the user.",
+            ModelProfileName = "reasoning",
+            RuntimeProfileName = "maf-shared",
+            ToolNames = "search",
+            Tags = "role=welcome"
+        };
+
+        var yaml = ResourceManifestSerializer.ToYaml(expected.ToRequest());
+        var parsed = ResourceManifestSerializer.FromYaml<AgentResourceRequest>(yaml);
+        var actual = AgentEditorModel.FromRequest(parsed);
+        actual.SourceDefinition = parsed.Definition with { Behaviors = ["handoff"], Middleware = ["audit"] };
+        var roundTripped = actual.ToRequest();
+
+        Assert.AreEqual(expected.DisplayName, actual.DisplayName);
+        Assert.AreEqual(expected.Description, actual.Description);
+        Assert.AreEqual(expected.Instructions, actual.Instructions);
+        Assert.AreEqual(expected.ToolNames, actual.ToolNames);
+        Assert.AreEqual(expected.Tags, actual.Tags);
+        CollectionAssert.AreEqual(new[] { "handoff" }, roundTripped.Definition.Behaviors.ToArray());
+        CollectionAssert.AreEqual(new[] { "audit" }, roundTripped.Definition.Middleware.ToArray());
+    }
+
+    [TestMethod]
     public void AgentRunnerBuildsVersionedRuntimePayloadAndValidatesJson()
     {
         var agent = CreateAgentResource("web-agent") with { Generation = 7 };

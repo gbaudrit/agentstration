@@ -5,4 +5,9 @@
   <data name="Home" xml:space="preserve"><value>Accueil</value></data><data name="Tasks" xml:space="preserve"><value>Tâches</value></data><data name="Notifications" xml:space="preserve"><value>Notifications</value></data><data name="LocalMode" xml:space="preserve"><value>Mode local</value></data>
   <data name="OpenNotifications" xml:space="preserve"><value>Ouvrir les notifications</value></data><data name="MyWorkplace" xml:space="preserve"><value>Mon Workplace</value></data><data name="NamedWorkplace" xml:space="preserve"><value>Workplace {0}</value></data>
   <data name="ToggleColorTheme" xml:space="preserve"><value>Changer le thème de couleurs</value></data><data name="ThemeValue" xml:space="preserve"><value>Thème : {0}</value></data>
+  <data name="ConnectionInterrupted" xml:space="preserve"><value>Connexion interrompue</value></data>
+  <data name="WorkplaceUnavailable" xml:space="preserve"><value>Le Workplace est temporairement indisponible</value></data>
+  <data name="TryAgain" xml:space="preserve"><value>Réessayer</value></data>
+  <data name="WorkApiCheck" xml:space="preserve"><value>Vérifiez que l’API Work locale est démarrée, puis réessayez.</value></data>
+  <data name="Overview" xml:space="preserve"><value>Accueil</value></data><data name="Work" xml:space="preserve"><value>Travail</value></data><data name="Activity" xml:space="preserve"><value>Activité</value></data><data name="ProfileFor" xml:space="preserve"><value>Profil de {0}</value></data><data name="CurrentOrganizationWorkspace" xml:space="preserve"><value>Organisation et workspace actuels</value></data><data name="My" xml:space="preserve"><value>Mon</value></data><data name="Organization" xml:space="preserve"><value>Organisation</value></data><data name="User" xml:space="preserve"><value>Utilisateur</value></data>
 </root>

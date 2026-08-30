@@ -8,7 +8,9 @@
       "applicationUrl": "http://localhost:5100",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles/development"
+        "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles",
+        "Agentstration__Bootstrap__InitialBootstrapEnabled": "true",
+        "Agentstration__Bootstrap__InitialProfiles__0": "development"
       }
     },
     "https": {
@@ -18,7 +20,9 @@
       "applicationUrl": "https://localhost:7100;http://localhost:5100",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles/development"
+        "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles",
+        "Agentstration__Bootstrap__InitialBootstrapEnabled": "true",
+        "Agentstration__Bootstrap__InitialProfiles__0": "development"
       }
     },
     "http-NoBootstrap": {
@@ -27,7 +31,10 @@
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5100",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles",
+        "Agentstration__Bootstrap__InitialBootstrapEnabled": "false",
+        "Agentstration__Bootstrap__InitialProfiles__0": "development"
       }
     },
     "https-NoBootstrap": {
@@ -36,7 +43,10 @@
       "launchBrowser": true,
       "applicationUrl": "https://localhost:7100;http://localhost:5100",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Agentstration__Bootstrap__Path": "../../deploy/bootstrap/profiles",
+        "Agentstration__Bootstrap__InitialBootstrapEnabled": "false",
+        "Agentstration__Bootstrap__InitialProfiles__0": "development"
       }
     }
   }

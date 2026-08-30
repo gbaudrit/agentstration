@@ -24,7 +24,14 @@ public sealed class PrincipalPreferencesService(IIdentityStore store, TimeProvid
             throw new ArgumentException("Theme must be one of: System, Light, Dark.", nameof(theme));
 
         var normalizedLanguage = NormalizeLanguage(language);
-        var preferences = new PrincipalPreferences(principalId, parsedTheme, timeProvider.GetUtcNow(), normalizedLanguage);
+        var current = await store.GetPrincipalPreferencesAsync(principalId, cancellationToken);
+        var preferences = new PrincipalPreferences(
+            principalId,
+            parsedTheme,
+            timeProvider.GetUtcNow(),
+            normalizedLanguage,
+            current?.DefaultTenantId,
+            current?.DefaultWorkspaceId);
         await store.UpsertPrincipalPreferencesAsync(preferences, cancellationToken);
         return preferences;
     }

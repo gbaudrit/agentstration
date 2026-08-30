@@ -1,0 +1,11 @@
+apiVersion: agentstration.io/v1
+kind: PrincipalDefaultContext
+metadata:
+  name: admin
+definition:
+  principalRef:
+    localAccount: admin
+  tenantRef:
+    name: dev
+  workspaceRef:
+    name: default

@@ -45,6 +45,7 @@ public sealed class PacksComponentTests
         Assert.IsTrue(rendered.Markup.Contains("Managed resources", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("reasoning-default", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("default/openai-production", StringComparison.Ordinal));
+        Assert.AreEqual("/namespaces/agentstration.starter/agents/assistant?view=definition", rendered.FindAll("a").Single(link => link.TextContent.Trim() == "Form").GetAttribute("href"));
     }
 
     [TestMethod]
@@ -208,8 +209,8 @@ public sealed class PacksComponentTests
                 ],
                 ManagedResources =
                 [
-                    new ManagedPackResource { Kind = ResourceKinds.ModelProfile, Name = "reasoning-default", Path = "profiles/reasoning.yaml", VersionToken = "v1" },
-                    new ManagedPackResource { Kind = ResourceKinds.Agent, Name = "assistant", Path = "agents/assistant.yaml", VersionToken = "v1" }
+                    new ManagedPackResource { Namespace = new ResourceNamespace("agentstration.starter"), Kind = ResourceKinds.ModelProfile, Name = "reasoning-default", Path = "profiles/reasoning.yaml", VersionToken = "v1" },
+                    new ManagedPackResource { Namespace = new ResourceNamespace("agentstration.starter"), Kind = ResourceKinds.Agent, Name = "assistant", Path = "agents/assistant.yaml", VersionToken = "v1" }
                 ]
             }
         };

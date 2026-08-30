@@ -65,4 +65,5 @@
   <data name="OpenFlowDesigner"><value>Ouvrir le Flow Designer</value></data>
   <data name="ViewInFlowDesigner"><value>Voir dans le Flow Designer</value></data>
   <data name="FlowTopology"><value>Topologie du Flow</value></data>
+<data name="Tab.Definition"><value>Définition</value></data><data name="Tab.YAML"><value>YAML</value></data><data name="RawDefinition"><value>Définition brute</value></data><data name="FlowYaml"><value>YAML du flux</value></data><data name="FlowYamlEditableHelp"><value>Modifiez la définition complète du flux au format YAML.</value></data><data name="FlowYamlReadOnlyHelp"><value>La définition publiée de ce flux est en lecture seule.</value></data><data name="Source"><value>Source</value></data><data name="ReadOnly"><value>Lecture seule</value></data><data name="FlowYamlDefinition"><value>Définition YAML du flux</value></data><data name="OpenYamlEditor"><value>Ouvrir l’éditeur YAML</value></data>
 </root>

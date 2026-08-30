@@ -70,4 +70,5 @@
   <data name="DirectRuntimeReferenceHelp"><value>Referenced explicitly by the Agent definition outside its Pack namespace.</value></data>
   <data name="GenerationActiveThroughDeployment"><value>Generation {0} is active through deployment '{1}'.</value></data>
   <data name="RuntimePreparationCompleted"><value>Runtime preparation completed with state '{0}'.</value></data>
+<data name="OriginalDefinition"><value>Original definition</value></data><data name="AgentSourceForm"><value>Agent source form</value></data><data name="AgentSourceFormHelp"><value>Review the original Agent fields.</value></data><data name="ReadOnly"><value>Read-only</value></data><data name="AgentSourceYaml"><value>Agent source YAML</value></data><data name="AgentSourceYamlHelp"><value>Review the original Agent resource as YAML.</value></data><data name="OriginalAgentYamlDefinition"><value>Original Agent YAML definition</value></data><data name="Tab.Definition"><value>Definition</value></data><data name="Tab.Yaml"><value>YAML</value></data>
 </root>

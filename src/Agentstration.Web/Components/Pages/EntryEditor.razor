@@ -91,18 +91,27 @@ else
         else if (activeTab == EntryTab.Definition)
         {
             <div class="entry-definition-toolbar">
-                <div><p class="eyebrow">@T("Definition")</p><h2>@T("DraftRevisionValue", draftRevision)</h2></div>
-                <div class="entry-primary-actions" aria-label="@T("EntryActions")">
-                    <button class="button-secondary" type="button" @onclick="SaveAsync" disabled="@busy">@T("SaveDraft")</button>
-                    <button class="button-secondary" type="button" @onclick="ValidateAsync" disabled="@busy">@T("Validate")</button>
-                    <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy">@T("PublishPinnedVersion")</button>
-                </div>
+                <div><p class="eyebrow">@T("Definition")</p><h2>@(IsPackOwned ? T("PackEntryDefinition") : T("DraftRevisionValue", draftRevision))</h2></div>
+                @if (IsPackOwned)
+                {
+                    <StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" />
+                }
+                else
+                {
+                    <div class="entry-primary-actions" aria-label="@T("EntryActions")">
+                        <button class="button-secondary" type="button" @onclick="SaveAsync" disabled="@busy">@T("SaveDraft")</button>
+                        <button class="button-secondary" type="button" @onclick="ValidateAsync" disabled="@busy">@T("Validate")</button>
+                        <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy">@T("PublishPinnedVersion")</button>
+                    </div>
+                }
             </div>
 
             @if (validation is not null && !validation.IsValid)
             {
                 <div class="form-alert form-alert-danger" role="alert"><strong>@T("ValidationIssues")</strong><ul>@foreach (var issue in validation.Issues) { <li><code>@issue.Code</code> — @issue.Message</li> }</ul></div>
             }
+
+            <fieldset class="entry-definition-fields" disabled="@IsPackOwned" data-testid="entry-definition-fields">
 
             <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("General")</p><h2>@T("Identity")</h2></div></div>
@@ -116,9 +125,11 @@ else
             <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Presentation")</p><h2>@T("WorkplaceAppearance")</h2></div></div>
                 <div class="form-grid">
-                    <label><span>@T("Presentation")</span><select data-testid="presentation-kind" @bind="presentationKind"><option value="Prompt">@T("Presentation.Prompt")</option><option value="Form">@T("Presentation.Form")</option></select></label>
-                    <label><span>@T("Placeholder")</span><input @bind="placeholder" /></label>
-                    <label class="entry-toggle"><input type="checkbox" @bind="allowAttachments" /><span>@T("AllowAttachments")</span></label>
+                <label><span>@T("Presentation")</span><select data-testid="presentation-kind" @bind="presentationKind"><option value="Prompt">@T("Presentation.Prompt")</option><option value="Form">@T("Presentation.Form")</option></select></label>
+                <label><span>@T("Placeholder")</span><input @bind="placeholder" /></label>
+                <label><span>@T("Icon")</span><input @bind="icon" placeholder="@T("IconExample")" /></label>
+                <label class="entry-toggle"><input type="checkbox" @bind="allowAttachments" /><span>@T("AllowAttachments")</span></label>
+                <label class="entry-toggle"><input type="checkbox" @bind="allowVoiceInput" /><span>@T("AllowVoiceInput")</span></label>
                 </div>
             </section>
 
@@ -143,6 +154,8 @@ else
                             <div class="form-grid">
                                 <label><span>@T("Name")</span><input @bind="field.Name" /></label>
                                 <label><span>@T("Label")</span><input @bind="field.Label" /></label>
+                                <label><span>@T("Description")</span><input @bind="field.Description" /></label>
+                                <label><span>@T("Placeholder")</span><input @bind="field.Placeholder" /></label>
                                 <label><span>@T("Type")</span><select @bind="field.Type">@foreach (var type in Enum.GetValues<EntryFieldType>()) { <option value="@type">@EnumLabel("FieldType", type)</option> }</select></label>
                                 @if (field.Type is EntryFieldType.Choice or EntryFieldType.MultiChoice) { <label><span>@T("OptionsValueLabel")</span><input @bind="field.Options" /></label> }
                                 <div class="entry-toggle-group">
@@ -192,6 +205,7 @@ else
                     <div class="entry-card-list">@foreach (var suggestion in suggestions) { <article class="entry-suggestion-card" @key="suggestion"><div class="form-grid"><label><span>@T("Label")</span><input @bind="suggestion.Label" /></label><label><span>@T("Value")</span><input @bind="suggestion.Value" /></label><div class="entry-row-actions form-span-2"><button type="button" class="text-button entry-remove" @onclick="() => RemoveSuggestion(suggestion)">@T("Remove")</button></div></div></article> }</div>
                 }
             </section>
+            </fieldset>
         }
         else if (activeTab == EntryTab.Preview)
         {
@@ -215,7 +229,7 @@ else
                 </article>
             </section>
         }
-        else
+        else if (activeTab == EntryTab.Versions)
         {
             <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Versions")</p><h2>@T("PublishedEntry")</h2></div></div>
@@ -226,20 +240,40 @@ else
                 }
             </section>
         }
+        else
+        {
+            <section class="panel form-section" data-testid="entry-yaml-editor">
+                <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("EntryYaml")</h2><p>@T(IsPackOwned ? "EntryYamlReadOnlyHelp" : "EntryYamlEditableHelp")</p></div>@if (IsPackOwned) { <StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /> }</div>
+                @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
+                @if (IsPackOwned)
+                {
+                    <label class="entry-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="30" readonly>@rawYaml</textarea></label>
+                }
+                else
+                {
+                    <label class="entry-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="30" @bind="rawYaml" @bind:event="oninput"></textarea></label>
+                    <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@busy">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy">@(busy ? T("Saving") : T("SaveYamlDraft"))</button></div>
+                }
+            </section>
+        }
     </main>
 }
 
 @code {
     [Parameter] public string Name { get; set; } = "new";
     [Parameter] public string? EntryNamespace { get; set; }
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
     private static readonly EntryTab[] Tabs = Enum.GetValues<EntryTab>();
-    private static readonly EntryTab[] NamespacedTabs = [EntryTab.Overview, EntryTab.Preview, EntryTab.Usage, EntryTab.Versions];
+    private static readonly EntryTab[] NamespacedTabs = [EntryTab.Overview, EntryTab.Definition, EntryTab.Preview, EntryTab.Usage, EntryTab.Versions, EntryTab.Yaml];
     private bool IsNew => string.Equals(Name, "new", StringComparison.OrdinalIgnoreCase);
     private ResourceNamespace EntryResourceNamespace => string.IsNullOrWhiteSpace(EntryNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(EntryNamespace);
+    private bool IsPackOwned => !EntryResourceNamespace.IsDefault;
     private IReadOnlyList<EntryTab> AvailableTabs => EntryResourceNamespace.IsDefault ? Tabs : NamespacedTabs;
     private bool loading = true, busy, hasError;
     private long draftRevision = 1;
-    private string resourceName = "", displayName = "", description = "", placeholder = "Ask Agentstration", resourceId = "", message = "";
+    private string resourceName = "", displayName = "", description = "", placeholder = "Ask Agentstration", icon = "", resourceId = "", message = "";
+    private string rawYaml = "";
+    private string? rawError;
     private EntryTab activeTab = EntryTab.Overview;
     private EntryBindingKind bindingKind = EntryBindingKind.Agent;
     private EntryPresentationKind presentationKind = EntryPresentationKind.Prompt;
@@ -248,7 +282,7 @@ else
     private EntryTaskDisplay taskDisplay = EntryTaskDisplay.Auto;
     private EntryResultDisplay resultDisplay = EntryResultDisplay.Auto;
     private TaskCreationMode taskMode = TaskCreationMode.Automatic;
-    private bool allowConversation = true, streamResponse = true, allowAttachments;
+    private bool allowConversation = true, streamResponse = true, allowAttachments, allowVoiceInput, rawPublish;
     private readonly List<EditorField> fields = [new() { Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true, Primary = true }];
     private readonly List<EditorSuggestion> suggestions = [];
     private EntryResource? published;
@@ -275,17 +309,20 @@ else
     {
         if (!IsNew)
         {
-            var response = await Client.GetEntryAsync(EntryResourceNamespace, Name, default); var draft = response.Value; published = response.Published; publishedBinding = draft.PublishedBinding; draftRevision = draft.Revision;
-            resourceName = draft.Name; displayName = draft.DisplayName; description = draft.Description ?? ""; placeholder = draft.Presentation.Placeholder ?? ""; presentationKind = draft.Presentation.Kind; participantsVisibility = draft.Presentation.Participants.Visibility; progressVisibility = draft.Presentation.Progress.Visibility; taskDisplay = draft.Presentation.Task.Display; resultDisplay = draft.Presentation.Results.Display; bindingKind = draft.Binding.Kind; resourceId = draft.Binding.ResourceId; taskMode = draft.Behavior.TaskCreationMode; allowConversation = draft.Behavior.AllowConversation; streamResponse = draft.Behavior.StreamResponse; allowAttachments = draft.Presentation.AllowAttachments;
-            fields.Clear(); fields.AddRange(draft.Presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")) }));
+            var response = await Client.GetEntryAsync(EntryResourceNamespace, Name, default); var draft = response.Value; published = response.Published; rawPublish = published is not null; publishedBinding = draft.PublishedBinding; draftRevision = draft.Revision;
+            resourceName = draft.Name; displayName = draft.DisplayName; description = draft.Description ?? ""; placeholder = draft.Presentation.Placeholder ?? ""; icon = draft.Presentation.Icon ?? ""; presentationKind = draft.Presentation.Kind; participantsVisibility = draft.Presentation.Participants.Visibility; progressVisibility = draft.Presentation.Progress.Visibility; taskDisplay = draft.Presentation.Task.Display; resultDisplay = draft.Presentation.Results.Display; bindingKind = draft.Binding.Kind; resourceId = draft.Binding.ResourceId; taskMode = draft.Behavior.TaskCreationMode; allowConversation = draft.Behavior.AllowConversation; streamResponse = draft.Behavior.StreamResponse; allowAttachments = draft.Presentation.AllowAttachments; allowVoiceInput = draft.Presentation.AllowVoiceInput;
+            fields.Clear(); fields.AddRange(draft.Presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Description = value.Description ?? "", Placeholder = value.Placeholder ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")), DefaultValue = value.DefaultValue, Validation = value.Validation }));
             suggestions.Clear(); suggestions.AddRange(draft.Presentation.Suggestions.Select(value => new EditorSuggestion { Label = value.Label, Value = value.Value }));
             dependencies = await Client.GetDependenciesAsync(EntryResourceNamespace, Name, default);
         }
         await LoadDashboardUsagesAsync();
-        await LoadResourcesAsync(); loading = false;
+        await LoadResourcesAsync();
+        if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = EntryTab.Definition;
+        else if (string.Equals(View, "yaml", StringComparison.OrdinalIgnoreCase)) { PrepareRawYaml(); activeTab = EntryTab.Yaml; }
+        loading = false;
     }
 
-    private void SelectTab(EntryTab tab) { activeTab = tab; message = ""; }
+    private void SelectTab(EntryTab tab) { if (tab == EntryTab.Yaml) PrepareRawYaml(); activeTab = tab; message = ""; }
     private static string TabId(EntryTab tab) => $"entry-tab-{tab.ToString().ToLowerInvariant()}";
     private string TabLabel(EntryTab tab) => T($"Tab.{tab}");
     private DashboardEntryReference? UsageReference(WorkplaceDashboardDraftResponse dashboard) => dashboard.Published?.Entries.FirstOrDefault(value => value.EntryResourceId == new EntryId(EntryIdValue, EntryResourceNamespace));
@@ -304,23 +341,48 @@ else
     private async Task BindingKindChanged(ChangeEventArgs args) { bindingKind = Enum.Parse<EntryBindingKind>(args.Value?.ToString() ?? "Agent"); resourceId = ""; await LoadResourcesAsync(); }
     private async Task LoadResourcesAsync() { resources = await Client.GetResourcesAsync(bindingKind, default); var selected = SelectedResource; if (selected is not null) resourceId = ResourceKey(selected); }
     private static string ResourceKey(ResourcePickerItem resource) => $"{resource.Namespace.Value}:{resource.ResourceId}";
-    private void AddField() => fields.Add(new EditorField { Name = $"field{fields.Count + 1}", Label = "New field", Type = EntryFieldType.Text, Primary = fields.Count == 0 });
+    private void AddField() => fields.Add(new EditorField { Name = $"field{fields.Count + 1}", Label = T("NewField"), Type = EntryFieldType.Text, Primary = fields.Count == 0 });
     private void RemoveField(EditorField field) { fields.Remove(field); if (fields.Count > 0 && fields.All(value => !value.Primary)) fields[0].Primary = true; }
     private void SetPrimary(EditorField field) { foreach (var value in fields) value.Primary = ReferenceEquals(value, field); }
     private void MoveField(EditorField field, int offset) { var index = fields.IndexOf(field); var target = index + offset; if (index < 0 || target < 0 || target >= fields.Count) return; fields.RemoveAt(index); fields.Insert(target, field); }
-    private void AddSuggestion() => suggestions.Add(new EditorSuggestion { Label = "Suggestion", Value = "" });
+    private void AddSuggestion() => suggestions.Add(new EditorSuggestion { Label = T("Suggestion"), Value = "" });
     private void RemoveSuggestion(EditorSuggestion suggestion) => suggestions.Remove(suggestion);
-    private EntryPresentation Presentation() => new() { Kind = presentationKind, Placeholder = placeholder, AllowAttachments = allowAttachments, Participants = new(participantsVisibility), Progress = new(progressVisibility), Task = new(taskDisplay), Results = new(resultDisplay), Fields = fields.Select((value, index) => new EntryFieldDefinition { Name = value.Name.Trim(), Label = string.IsNullOrWhiteSpace(value.Label) ? null : value.Label.Trim(), Type = value.Type, Required = value.Required, Role = value.Primary ? EntryFieldRole.PrimaryInput : EntryFieldRole.Standard, Order = index, Options = ParseOptions(value.Options), Validation = value.Type is EntryFieldType.Prompt or EntryFieldType.Text or EntryFieldType.Textarea or EntryFieldType.Conversation ? new EntryFieldValidation(1, 10_000) : null }).ToArray(), Suggestions = suggestions.Where(value => !string.IsNullOrWhiteSpace(value.Label) && !string.IsNullOrWhiteSpace(value.Value)).Select(value => new EntrySuggestion(value.Label.Trim(), value.Value.Trim())).ToArray() };
+    private EntryPresentation Presentation() => new() { Kind = presentationKind, Placeholder = NullIfWhiteSpace(placeholder), Icon = NullIfWhiteSpace(icon), AllowAttachments = allowAttachments, AllowVoiceInput = allowVoiceInput, Participants = new(participantsVisibility), Progress = new(progressVisibility), Task = new(taskDisplay), Results = new(resultDisplay), Fields = fields.Select((value, index) => new EntryFieldDefinition { Name = value.Name.Trim(), Label = NullIfWhiteSpace(value.Label), Description = NullIfWhiteSpace(value.Description), Placeholder = NullIfWhiteSpace(value.Placeholder), Type = value.Type, Required = value.Required, Role = value.Primary ? EntryFieldRole.PrimaryInput : EntryFieldRole.Standard, Order = index, Options = ParseOptions(value.Options), DefaultValue = value.DefaultValue, Validation = value.Validation ?? (value.Type is EntryFieldType.Prompt or EntryFieldType.Text or EntryFieldType.Textarea or EntryFieldType.Conversation ? new EntryFieldValidation(1, 10_000) : null) }).ToArray(), Suggestions = suggestions.Where(value => !string.IsNullOrWhiteSpace(value.Label) && !string.IsNullOrWhiteSpace(value.Value)).Select(value => new EntrySuggestion(value.Label.Trim(), value.Value.Trim())).ToArray() };
     private static IReadOnlyList<EntryFieldOption> ParseOptions(string options) => options.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(value => { var parts = value.Split(':', 2, StringSplitOptions.TrimEntries); return new EntryFieldOption(parts[0], parts.Length == 2 ? parts[1] : parts[0]); }).ToArray();
     private EntryBehavior Behavior() => new(taskMode, allowConversation, streamResponse, new EntryConversationBehavior(allowConversation));
     private Agentstration.Resources.WorkspaceId CurrentWorkspaceId => new(workspaces.FirstOrDefault()?.Id ?? published?.WorkspaceId.Value ?? Guid.Empty);
     private EntryDraft Draft() => new() { WorkspaceId = CurrentWorkspaceId, Id = new(EntryIdValue, EntryResourceNamespace), Name = resourceName.Trim(), DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Presentation = Presentation(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace), PublishedBinding = publishedBinding, Behavior = Behavior(), Revision = draftRevision };
-    private async Task SaveAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; publishedBinding = saved.PublishedBinding; message = T("EntryDraftSaved", saved.Revision); if (IsNew) Navigation.NavigateTo($"/entries/{saved.Name}", forceLoad: true); }); }
-    private async Task ValidateAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(resourceName, default); message = T(validation.IsValid ? "EntryValid" : "ValidationFoundErrors"); hasError = !validation.IsValid; }); }
-    private async Task PublishAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(resourceName, default); if (!validation.IsValid) { hasError = true; message = T("ResolveValidationErrors"); return; } published = await Client.PublishEntryAsync(resourceName, default); publishedBinding = saved.Binding; dependencies = await Client.GetDependenciesAsync(resourceName, default); await LoadDashboardUsagesAsync(); message = T("EntryPublished", published.Version, published.ResolvedTarget.Version); }); }
+    private RawEntryResource RawResource() => new() { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Entry, Metadata = new() { Name = resourceName.Trim() }, Definition = new() { DisplayName = displayName.Trim(), Description = NullIfWhiteSpace(description), Presentation = Presentation(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace), Behavior = Behavior(), Publish = rawPublish } };
+    private void PrepareRawYaml() { rawError = null; try { rawYaml = ResourceManifestSerializer.ToYaml(RawResource()); } catch (Exception exception) { rawError = exception.Message; } }
+    private bool ApplyRawYaml()
+    {
+        rawError = null;
+        try
+        {
+            var manifest = ResourceManifestSerializer.FromYaml<RawEntryResource>(rawYaml);
+            if (!string.Equals(manifest.ApiVersion, ManagementApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException(T("ApiVersionRequired", ManagementApiVersions.CoreV1));
+            if (!string.Equals(manifest.Kind, ResourceKinds.Entry, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", ResourceKinds.Entry));
+            if (!IsNew && !string.Equals(manifest.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("EntryNameImmutable"));
+            resourceName = manifest.Metadata.Name; displayName = manifest.Definition.DisplayName ?? manifest.Metadata.Name; description = manifest.Definition.Description ?? "";
+            var presentation = manifest.Definition.Presentation; presentationKind = presentation.Kind; placeholder = presentation.Placeholder ?? ""; icon = presentation.Icon ?? ""; allowAttachments = presentation.AllowAttachments; allowVoiceInput = presentation.AllowVoiceInput; participantsVisibility = presentation.Participants.Visibility; progressVisibility = presentation.Progress.Visibility; taskDisplay = presentation.Task.Display; resultDisplay = presentation.Results.Display;
+            fields.Clear(); fields.AddRange(presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Description = value.Description ?? "", Placeholder = value.Placeholder ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")), DefaultValue = value.DefaultValue, Validation = value.Validation }));
+            suggestions.Clear(); suggestions.AddRange(presentation.Suggestions.Select(value => new EditorSuggestion { Label = value.Label, Value = value.Value }));
+            bindingKind = manifest.Definition.Binding.Kind; resourceId = manifest.Definition.Binding.Namespace is { } ns ? $"{ns.Value}:{manifest.Definition.Binding.ResourceId}" : manifest.Definition.Binding.ResourceId; taskMode = manifest.Definition.Behavior.TaskCreationMode; allowConversation = manifest.Definition.Behavior.AllowConversation; streamResponse = manifest.Definition.Behavior.StreamResponse; rawPublish = manifest.Definition.Publish;
+            rawYaml = ResourceManifestSerializer.ToYaml(RawResource()); message = T("YamlApplied"); return true;
+        }
+        catch (Exception exception) { rawError = exception.Message; return false; }
+    }
+    private async Task SaveRawAsync() { if (!ApplyRawYaml()) return; if (rawPublish) await PublishAsync(); else await SaveAsync(); }
+    private static string? NullIfWhiteSpace(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private async Task SaveAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(EntryResourceNamespace, Draft(), default); draftRevision = saved.Revision; publishedBinding = saved.PublishedBinding; message = T("EntryDraftSaved", saved.Revision); if (IsNew) Navigation.NavigateTo($"/entries/{saved.Name}", forceLoad: true); }); }
+    private async Task ValidateAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(EntryResourceNamespace, Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(EntryResourceNamespace, resourceName, default); message = T(validation.IsValid ? "EntryValid" : "ValidationFoundErrors"); hasError = !validation.IsValid; }); }
+    private async Task PublishAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(EntryResourceNamespace, Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(EntryResourceNamespace, resourceName, default); if (!validation.IsValid) { hasError = true; message = T("ResolveValidationErrors"); return; } published = await Client.PublishEntryAsync(EntryResourceNamespace, resourceName, default); publishedBinding = saved.Binding; dependencies = await Client.GetDependenciesAsync(EntryResourceNamespace, resourceName, default); await LoadDashboardUsagesAsync(); message = T("EntryPublished", published.Version, published.ResolvedTarget.Version); }); }
     private async Task ExecuteAsync(Func<Task> action) { busy = true; hasError = false; message = ""; try { await action(); } catch (Exception exception) { hasError = true; message = exception.Message; } finally { busy = false; } }
     private Task PreviewSubmitted(IReadOnlyDictionary<string, JsonElement> _) => Task.CompletedTask;
-    private enum EntryTab { Overview, Definition, Preview, Usage, Versions }
-    private sealed class EditorField { public string Name { get; set; } = ""; public string Label { get; set; } = ""; public string Options { get; set; } = ""; public EntryFieldType Type { get; set; } public bool Required { get; set; } public bool Primary { get; set; } }
+    private enum EntryTab { Overview, Definition, Preview, Usage, Versions, Yaml }
+    private sealed class EditorField { public string Name { get; set; } = ""; public string Label { get; set; } = ""; public string Description { get; set; } = ""; public string Placeholder { get; set; } = ""; public string Options { get; set; } = ""; public EntryFieldType Type { get; set; } public bool Required { get; set; } public bool Primary { get; set; } public JsonElement? DefaultValue { get; set; } public EntryFieldValidation? Validation { get; set; } }
     private sealed class EditorSuggestion { public string Label { get; set; } = ""; public string Value { get; set; } = ""; }
+    private sealed record RawEntryMetadata { public required string Name { get; init; } }
+    private sealed record RawEntryDefinition { public string? DisplayName { get; init; } public string? Description { get; init; } public required EntryPresentation Presentation { get; init; } public required EntryBinding Binding { get; init; } public EntryBehavior Behavior { get; init; } = new(); public bool Publish { get; init; } }
+    private sealed record RawEntryResource { public required string ApiVersion { get; init; } public required string Kind { get; init; } public required RawEntryMetadata Metadata { get; init; } public required RawEntryDefinition Definition { get; init; } }
 }

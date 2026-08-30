@@ -106,7 +106,7 @@ Web -> Management / Flow / Runtime public boundaries
 
 ## Local Launch Profiles
 
-The standard Development profiles bootstrap a fresh local instance from `deploy/bootstrap/profiles/development` with the public fixture account `admin / admin`. This credential is disposable local test data, not a secret, and must never be reused outside local Development.
+The standard Development profiles use `deploy/bootstrap/profiles` as the bootstrap catalog, enable initial bootstrap, and apply its `development` profile to a fresh local instance with the public fixture account `admin / admin`. This credential is disposable local test data, not a secret, and must never be reused outside local Development.
 
 For direct Web startup:
 
@@ -130,9 +130,9 @@ dotnet run --project src/Agentstration.AppHost
 dotnet run --project src/Agentstration.AppHost --launch-profile https-NoBootstrap
 ```
 
-In Visual Studio, select the profile on the configured startup project. When `Agentstration.AppHost` is the startup project, its profile resolves and forwards the bootstrap path to the Console; profiles from `Agentstration.Web` do not appear in that selector.
+In Visual Studio, select the profile on the configured startup project. When `Agentstration.AppHost` is the startup project, its profile resolves and forwards the bootstrap catalog path, activation flag, and ordered initial profiles to the Console; profiles from `Agentstration.Web` do not appear in that selector.
 
-Build configuration and host environment are independent. `--configuration Release` still uses the selected Development launch profile and does not disable bootstrap. Use a `NoBootstrap` profile or `--no-launch-profile` when bootstrap must be omitted intentionally.
+Build configuration and host environment are independent. `--configuration Release` still uses the selected Development launch profile and does not disable bootstrap. Use a `NoBootstrap` profile or `--no-launch-profile` when initial bootstrap must be omitted intentionally. `NoBootstrap` controls `Agentstration:Bootstrap:InitialBootstrapEnabled`; it does not hide the catalog or erase `InitialProfiles`.
 
 ## C# Conventions
 

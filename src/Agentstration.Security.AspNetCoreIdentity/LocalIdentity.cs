@@ -61,7 +61,18 @@ public sealed class LocalIdentityClaimsPrincipalFactory(
     }
 }
 
-public sealed record LocalBootstrapRequest(string UserName, string Password, string DisplayName, string? Email);
+public sealed record LocalBootstrapTopology(
+    string TenantName,
+    string TenantDisplayName,
+    string WorkspaceName,
+    string WorkspaceDisplayName);
+
+public sealed record LocalBootstrapRequest(
+    string UserName,
+    string Password,
+    string DisplayName,
+    string? Email,
+    LocalBootstrapTopology? Topology = null);
 public sealed record LocalBootstrapResult(bool Succeeded, Guid? PrincipalId, IReadOnlyList<string> Errors);
 public sealed record CreateLocalAccountRequest(string UserName, string Password, string DisplayName, string? Email, Guid WorkspaceId, string Role);
 public sealed record LocalAccountView(
@@ -82,6 +93,7 @@ public sealed class LocalBootstrapCoordinator(
     UserManager<LocalIdentityUser> users,
     LocalIdentityDbContext database,
     IInitialPrincipalProvisioner provisioner,
+    IInitialTopologyProvisioner topologyProvisioner,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
     LocalBootstrapLock bootstrapLock)
@@ -119,11 +131,19 @@ public sealed class LocalBootstrapCoordinator(
 
             try
             {
-                await provisioner.ProvisionAsync(new InitialPrincipalProvisioning(
+                var provisioned = await provisioner.ProvisionAsync(new InitialPrincipalProvisioning(
                     accountId,
                     principalId,
                     request.DisplayName.Trim(),
                     account.Email), cancellationToken);
+                InitialTopologyProvisioningResult? topology = null;
+                if (request.Topology is { } requestedTopology)
+                    topology = await topologyProvisioner.ProvisionAsync(new(
+                        provisioned.Principal.Id,
+                        requestedTopology.TenantName,
+                        requestedTopology.TenantDisplayName,
+                        requestedTopology.WorkspaceName,
+                        requestedTopology.WorkspaceDisplayName), cancellationToken);
                 database.BootstrapStates.Add(new BootstrapState
                 {
                     Id = 1,
@@ -135,7 +155,9 @@ public sealed class LocalBootstrapCoordinator(
                     SecurityAuditActions.InstanceBootstrapped,
                     ActorPrincipalId: principalId,
                     TargetPrincipalId: principalId,
-                    TargetAccountId: accountId), cancellationToken);
+                    TargetAccountId: accountId,
+                    TenantId: topology?.Tenant.Id,
+                    WorkspaceId: topology?.Workspace.Id), cancellationToken);
                 return new(true, principalId, []);
             }
             catch
@@ -148,6 +170,18 @@ public sealed class LocalBootstrapCoordinator(
         {
             bootstrapLock.Semaphore.Release();
         }
+    }
+}
+
+public sealed class LocalAccountPrincipalResolver(
+    UserManager<LocalIdentityUser> users,
+    IPrincipalResolver principals) : ILocalAccountPrincipalResolver
+{
+    public async Task<Principal?> ResolveByUserNameAsync(string userName, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var account = await users.FindByNameAsync(userName.Trim());
+        return account is null ? null : await principals.ResolveLocalAsync(account.Id, cancellationToken);
     }
 }
 
@@ -474,6 +508,7 @@ public static class LocalIdentityServiceCollectionExtensions
             .AddDefaultTokenProviders();
         services.AddScoped<IUserClaimsPrincipalFactory<LocalIdentityUser>, LocalIdentityClaimsPrincipalFactory>();
         services.AddScoped<LocalBootstrapCoordinator>();
+        services.AddScoped<ILocalAccountPrincipalResolver, LocalAccountPrincipalResolver>();
         services.AddScoped<IBootstrapResourceHandler, PlatformAdministratorBootstrapHandler>();
         services.AddScoped<LocalAccountAdministrationService>();
         services.AddScoped<LocalAccountSecurityService>();

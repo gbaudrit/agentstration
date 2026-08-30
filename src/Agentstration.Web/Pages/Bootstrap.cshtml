@@ -7,12 +7,24 @@
 <header class="auth-heading">
     <p class="eyebrow">@Auth["FirstTimeSetup"]</p>
     <h1>@Auth["InitializeAgentstration"]</h1>
-    <p>@Auth["InitializeDescription"]</p>
+    <p>@Auth["InitializeTopologyDescription"]</p>
 </header>
 
 <form method="post" class="auth-form">
     <input type="hidden" asp-for="ReturnUrl" />
     <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+    <label asp-for="Input.TenantName">@Auth["TenantName"]</label>
+    <input asp-for="Input.TenantName" autocomplete="off" />
+    <span asp-validation-for="Input.TenantName" class="field-error"></span>
+    <label asp-for="Input.TenantDisplayName">@Auth["TenantDisplayName"]</label>
+    <input asp-for="Input.TenantDisplayName" autocomplete="organization" />
+    <span asp-validation-for="Input.TenantDisplayName" class="field-error"></span>
+    <label asp-for="Input.WorkspaceName">@Auth["WorkspaceName"]</label>
+    <input asp-for="Input.WorkspaceName" autocomplete="off" />
+    <span asp-validation-for="Input.WorkspaceName" class="field-error"></span>
+    <label asp-for="Input.WorkspaceDisplayName">@Auth["WorkspaceDisplayName"]</label>
+    <input asp-for="Input.WorkspaceDisplayName" autocomplete="off" />
+    <span asp-validation-for="Input.WorkspaceDisplayName" class="field-error"></span>
     <label asp-for="Input.DisplayName">@Auth["DisplayName"]</label>
     <input asp-for="Input.DisplayName" autocomplete="name" autofocus />
     <span asp-validation-for="Input.DisplayName" class="field-error"></span>

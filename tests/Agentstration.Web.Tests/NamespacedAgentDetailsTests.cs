@@ -32,6 +32,7 @@ public sealed class NamespacedAgentDetailsTests
             .Add(component => component.Name, "concierge"));
 
         Assert.AreEqual(FakeManagementClient.PackNamespace, agents.RequestedNamespace);
+        CollectionAssert.AreEqual(new[] { "Overview", "Definition", "Model", "Runtime", "YAML" }, rendered.FindAll("[role='tab']").Select(tab => tab.TextContent.Trim()).ToArray());
         Assert.AreEqual("true", rendered.Find("#agent-overview-tab").GetAttribute("aria-selected"));
         Assert.AreEqual(4, rendered.FindAll(".namespaced-agent-metrics .metric-card").Count);
         Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("Model profile", StringComparison.Ordinal));
@@ -43,6 +44,15 @@ public sealed class NamespacedAgentDetailsTests
         Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("agent_deployment_not_found", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("model-reasoning", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("local-runtime", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.FindAll("button:not([role='tab'])").Any(button => button.TextContent.Trim() == "Definition"));
+        await rendered.Find("#agent-definition-tab").ClickAsync(new());
+        Assert.AreEqual("true", rendered.Find("#agent-definition-tab").GetAttribute("aria-selected"));
+        Assert.IsTrue(rendered.Markup.Contains("Review the original Agent fields.", StringComparison.Ordinal));
+        var definition = rendered.Find("[data-testid='pack-agent-definition-form']");
+        Assert.IsTrue(definition.QuerySelectorAll("input:not([disabled]), textarea:not([disabled])").Length == 0);
+        Assert.IsTrue(definition.QuerySelectorAll("textarea").Any(field => field.GetAttribute("value")?.Contains("Original instructions from the Pack.", StringComparison.Ordinal) == true));
+        Assert.IsTrue(definition.InnerHtml.Contains("binding:model-reasoning", StringComparison.Ordinal));
+        await rendered.Find("#agent-overview-tab").ClickAsync(new());
 
         await rendered.Find("#agent-model-tab").ClickAsync(new());
 
@@ -78,12 +88,14 @@ public sealed class NamespacedAgentDetailsTests
         Assert.AreEqual(1, runtime.PreparedGeneration);
         Assert.IsTrue(rendered.Markup.Contains("Deployment ready", StringComparison.Ordinal));
 
-        await rendered.Find("#agent-instructions-tab").ClickAsync(new());
+        await rendered.Find("#agent-definition-tab").ClickAsync(new());
 
-        Assert.AreEqual("true", rendered.Find("#agent-instructions-tab").GetAttribute("aria-selected"));
-        Assert.IsTrue(rendered.FindAll(".namespaced-instructions-copy").Any());
-        Assert.IsFalse(rendered.FindAll(".namespaced-instructions pre").Any());
-        Assert.IsTrue(rendered.Find(".namespaced-instructions-copy").TextContent.Contains("Help the user.", StringComparison.Ordinal));
+        Assert.AreEqual("true", rendered.Find("#agent-definition-tab").GetAttribute("aria-selected"));
+        Assert.IsTrue(rendered.Find("[data-testid='pack-agent-definition-form']").QuerySelectorAll("input:not([disabled]), textarea:not([disabled])").Length == 0);
+        await rendered.Find("#agent-yaml-tab").ClickAsync(new());
+        var source = rendered.Find("[data-testid='pack-agent-yaml'] textarea");
+        Assert.IsTrue(source.HasAttribute("readonly"));
+        Assert.IsTrue(source.TextContent.Contains("binding: model-reasoning", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -179,6 +191,32 @@ public sealed class NamespacedAgentDetailsTests
 
     private sealed class FakePacksClient : IPacksClient
     {
+        public Task<IReadOnlyList<PackProjectSourceDocument>> GetPackResourcesAsync(string publisher, string name, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<PackProjectSourceDocument>>([new(
+                "agents/concierge.yaml",
+                ResourceKinds.Agent,
+                "concierge",
+                """
+                apiVersion: agentstration.io/v1
+                kind: Agent
+                metadata:
+                  name: concierge
+                definition:
+                  displayName: Concierge
+                  description: Original source
+                  handler: prompt-agent
+                  instructions: Original instructions from the Pack.
+                  modelProfile:
+                    binding: model-reasoning
+                  runtimeProfile:
+                    binding: local-runtime
+                  tools: []
+                  behaviors: []
+                  middleware: []
+                  contextProviders: []
+                  settings: {}
+                """)]);
+
         public Task<ResourceSnapshot<InstalledPackResource>> GetPackAsync(string publisher, string name, CancellationToken cancellationToken)
         {
             var resource = new InstalledPackResource

@@ -6,11 +6,11 @@ public sealed class LocalBootstrapOptions
 {
     public const string DevelopmentIssuer = "https://agentstration.local/development";
     public const string DevelopmentSubject = "local-operator";
-    public string TenantName { get; set; } = "local";
-    public string TenantDisplayName { get; set; } = "Local organization";
-    public string WorkspaceName { get; set; } = "personal";
-    public string WorkspaceDisplayName { get; set; } = "Personal";
-    public string PrincipalDisplayName { get; set; } = "Local operator";
+    public string TenantName { get; set; } = "dev";
+    public string TenantDisplayName { get; set; } = "Development";
+    public string WorkspaceName { get; set; } = "default";
+    public string WorkspaceDisplayName { get; set; } = "Default workspace";
+    public string PrincipalDisplayName { get; set; } = "Development operator";
     public string ExternalIdentityIssuer { get; set; } = DevelopmentIssuer;
     public string ExternalIdentitySubject { get; set; } = DevelopmentSubject;
 }
@@ -64,8 +64,7 @@ public sealed class ExternalIdentityPrincipalResolver(IIdentityStore store) : IP
 public sealed class InitialPrincipalProvisioner(
     IIdentityStore store,
     ISecurityAuditWriter audit,
-    TimeProvider timeProvider,
-    LocalBootstrapOptions options) : IInitialPrincipalProvisioner
+    TimeProvider timeProvider) : IInitialPrincipalProvisioner
 {
     public async Task<InitialPrincipalProvisioningResult> ProvisionAsync(InitialPrincipalProvisioning request, CancellationToken cancellationToken)
     {
@@ -73,39 +72,82 @@ public sealed class InitialPrincipalProvisioner(
             throw new InvalidOperationException("The local account is already linked to an Agentstration principal.");
 
         var now = timeProvider.GetUtcNow();
-        var tenant = await store.FindTenantByNameAsync(options.TenantName, cancellationToken);
-        if (tenant is null)
-        {
-            tenant = new Tenant(Guid.NewGuid(), options.TenantName, options.TenantDisplayName, TenantStatus.Active, now);
-            await store.AddTenantAsync(tenant, cancellationToken);
-        }
-
-        var workspace = await store.FindWorkspaceByNameAsync(tenant.Id, options.WorkspaceName, cancellationToken);
-        if (workspace is null)
-        {
-            workspace = new Workspace(Guid.NewGuid(), tenant.Id, options.WorkspaceName, options.WorkspaceDisplayName, WorkspaceStatus.Active, now);
-            await store.AddWorkspaceAsync(workspace, cancellationToken);
-        }
-
         var principal = new Principal(request.PrincipalId, PrincipalKind.Human, request.DisplayName, request.Email, PrincipalStatus.Active, now);
         await store.AddPrincipalAsync(principal, cancellationToken);
         await store.AddLocalIdentityAsync(new LocalIdentity(request.AccountId, principal.Id, now), cancellationToken);
-        await store.AddMembershipAsync(new TenantMembership(Guid.NewGuid(), tenant.Id, principal.Id, MembershipStatus.Active, now), cancellationToken);
-        await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), workspace.Id, principal.Id, MembershipStatus.Active, now), cancellationToken);
-
         await BuiltInIdentityRoles.EnsureAsync(store, cancellationToken);
-        var owner = await store.FindRoleDefinitionByNameAsync(BuiltInIdentityRoles.Owner, cancellationToken)
-            ?? throw new InvalidOperationException("The Owner role could not be initialized.");
-        await store.AddRoleAssignmentAsync(new RoleAssignment(Guid.NewGuid(), tenant.Id, principal.Id, PrincipalType.User, owner.Id, AuthorizationScopes.Workspace(workspace.Id)), cancellationToken);
         await store.AddPlatformAdministratorAsync(new PlatformAdministrator(principal.Id, now), cancellationToken);
         await audit.WriteAsync(new(
             SecurityAuditActions.PlatformAdministratorGranted,
             ActorPrincipalId: principal.Id,
             TargetPrincipalId: principal.Id,
-            TargetAccountId: request.AccountId,
-            TenantId: tenant.Id,
-            WorkspaceId: workspace.Id), cancellationToken);
-        return new InitialPrincipalProvisioningResult(principal, tenant, workspace);
+            TargetAccountId: request.AccountId), cancellationToken);
+        return new InitialPrincipalProvisioningResult(principal);
+    }
+}
+
+public sealed class InitialTopologyProvisioner(
+    IIdentityStore store,
+    TimeProvider timeProvider) : IInitialTopologyProvisioner
+{
+    public async Task<InitialTopologyProvisioningResult> ProvisionAsync(
+        InitialTopologyProvisioning request,
+        CancellationToken cancellationToken)
+    {
+        var principal = await store.GetPrincipalAsync(request.PrincipalId, cancellationToken)
+            ?? throw new InvalidOperationException("The initial Principal does not exist.");
+        if (!await store.IsPlatformAdministratorAsync(principal.Id, cancellationToken))
+            throw new InvalidOperationException("The initial Principal is not a Platform administrator.");
+
+        var tenantName = IdentityBootstrapValidation.Name(request.TenantName, "Tenant");
+        var tenantDisplayName = IdentityBootstrapValidation.DisplayName(request.TenantDisplayName, "Tenant");
+        var workspaceName = IdentityBootstrapValidation.Name(request.WorkspaceName, "Workspace");
+        var workspaceDisplayName = IdentityBootstrapValidation.DisplayName(request.WorkspaceDisplayName, "Workspace");
+        var now = timeProvider.GetUtcNow();
+
+        var tenant = await store.FindTenantByNameAsync(tenantName, cancellationToken);
+        if (tenant is null)
+        {
+            tenant = new Tenant(Guid.NewGuid(), tenantName, tenantDisplayName, TenantStatus.Active, now);
+            await store.AddTenantAsync(tenant, cancellationToken);
+        }
+
+        var workspace = await store.FindWorkspaceByNameAsync(tenant.Id, workspaceName, cancellationToken);
+        if (workspace is null)
+        {
+            workspace = new Workspace(Guid.NewGuid(), tenant.Id, workspaceName, workspaceDisplayName, WorkspaceStatus.Active, now);
+            await store.AddWorkspaceAsync(workspace, cancellationToken);
+        }
+
+        var preferences = await store.GetPrincipalPreferencesAsync(principal.Id, cancellationToken)
+            ?? new PrincipalPreferences(principal.Id, ThemePreference.System, now);
+        await store.UpsertPrincipalPreferencesAsync(preferences with
+        {
+            DefaultTenantId = tenant.Id,
+            DefaultWorkspaceId = workspace.Id,
+            UpdatedAt = now
+        }, cancellationToken);
+        return new InitialTopologyProvisioningResult(tenant, workspace);
+    }
+}
+
+internal static class IdentityBootstrapValidation
+{
+    public static string Name(string value, string resource)
+    {
+        value = value.Trim().ToLowerInvariant();
+        if (value.Length is < 2 or > 64
+            || value.Any(character => !(char.IsAsciiLetterOrDigit(character) || character == '-')))
+            throw new ArgumentException($"{resource} names must contain 2-64 lowercase letters, digits, or hyphens.");
+        return value;
+    }
+
+    public static string DisplayName(string value, string resource)
+    {
+        value = value.Trim();
+        if (value.Length is < 2 or > 120)
+            throw new ArgumentException($"{resource} display names must contain 2-120 characters.");
+        return value;
     }
 }
 
@@ -360,16 +402,28 @@ public sealed class LocalEnvironmentBootstrapper(
     }
 }
 
-public sealed class PermissionAuthorizationService(IIdentityStore store) : IAuthorizationService
+public sealed class PermissionAuthorizationService(
+    IIdentityStore store,
+    IPlatformAuthorizationService platformAuthorization) : IAuthorizationService
 {
     public async Task<IReadOnlySet<string>> GetPermissionsAsync(RequestContext context, CancellationToken cancellationToken)
     {
         var principal = await store.GetPrincipalAsync(context.PrincipalId, cancellationToken);
         if (principal?.Status != PrincipalStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
-        var membership = await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, cancellationToken);
-        if (membership?.Status != MembershipStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
         var workspace = await store.GetWorkspaceAsync(context.TenantId, context.WorkspaceId, cancellationToken);
         if (workspace?.Status != WorkspaceStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
+        var tenant = await store.GetTenantAsync(context.TenantId, cancellationToken);
+        if (tenant?.Status != TenantStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
+
+        if (await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken))
+        {
+            var platformPermissions = new HashSet<string>(AuthorizationPermissions.All, StringComparer.Ordinal);
+            ApplyRestriction(platformPermissions, context);
+            return platformPermissions;
+        }
+
+        var membership = await store.FindWorkspaceMembershipAsync(context.WorkspaceId, context.PrincipalId, cancellationToken);
+        if (membership?.Status != MembershipStatus.Active) return new HashSet<string>(StringComparer.Ordinal);
 
         var tenantScope = AuthorizationScopes.Tenant(context.TenantId);
         var workspaceScope = AuthorizationScopes.Workspace(context.WorkspaceId);
@@ -382,14 +436,17 @@ public sealed class PermissionAuthorizationService(IIdentityStore store) : IAuth
             var role = await store.GetRoleDefinitionAsync(assignment.RoleDefinitionId, cancellationToken);
             if (role is not null) permissions.UnionWith(role.Permissions);
         }
-        if (context.Restriction is { } restriction)
-        {
-            if (restriction.WorkspaceId != context.WorkspaceId)
-                permissions.Clear();
-            else
-                permissions.IntersectWith(restriction.Permissions);
-        }
+        ApplyRestriction(permissions, context);
         return permissions;
+    }
+
+    private static void ApplyRestriction(HashSet<string> permissions, RequestContext context)
+    {
+        if (context.Restriction is not { } restriction) return;
+        if (restriction.WorkspaceId != context.WorkspaceId)
+            permissions.Clear();
+        else
+            permissions.IntersectWith(restriction.Permissions);
     }
 
     public async Task<bool> HasPermissionAsync(RequestContext context, string permission, CancellationToken cancellationToken) =>
@@ -409,7 +466,15 @@ public sealed record TenantAdministrationView(
 public sealed record MemberAdministrationView(Principal Principal, TenantMembership Membership, IReadOnlyList<ExternalIdentity> ExternalIdentities, IReadOnlyList<AssignedRoleView> Roles);
 public sealed record AssignedRoleView(RoleDefinition Role, string Scope);
 
-public sealed record ConsoleWorkspaceView(Guid Id, string Name, string DisplayName, WorkspaceStatus Status, IReadOnlyList<string> Permissions);
+public sealed record ConsoleWorkspaceView(
+    Guid Id,
+    Guid TenantId,
+    string TenantName,
+    string TenantDisplayName,
+    string Name,
+    string DisplayName,
+    WorkspaceStatus Status,
+    IReadOnlyList<string> Permissions);
 public sealed record ConsoleContextView(
     RequestContext Context,
     string UserDisplayName,
@@ -465,7 +530,8 @@ public sealed class IdentityAdministrationService(
         var now = timeProvider.GetUtcNow();
         var workspace = new Workspace(Guid.NewGuid(), context.TenantId, name, displayName, WorkspaceStatus.Active, now);
         await store.AddWorkspaceAsync(workspace, cancellationToken);
-        await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), workspace.Id, context.PrincipalId, MembershipStatus.Active, now), cancellationToken);
+        if (!await store.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken))
+            await store.AddWorkspaceMembershipAsync(new WorkspaceMembership(Guid.NewGuid(), workspace.Id, context.PrincipalId, MembershipStatus.Active, now), cancellationToken);
         return workspace;
     }
 }
@@ -473,31 +539,47 @@ public sealed class IdentityAdministrationService(
 public sealed class IdentityExperienceService(
     IIdentityStore store,
     ICurrentRequestContext requestContext,
-    IAuthorizationService authorization)
+    IAuthorizationService authorization,
+    IPlatformAuthorizationService platformAuthorization)
 {
     public async Task<ConsoleContextView> GetContextAsync(CancellationToken cancellationToken)
     {
         var context = requestContext.Current;
-        var tenant = await store.GetTenantAsync(context.TenantId, cancellationToken) ?? throw new InvalidOperationException("The current tenant no longer exists.");
         var principal = await store.GetPrincipalAsync(context.PrincipalId, cancellationToken) ?? throw new InvalidOperationException("The current principal no longer exists.");
-        var workspaces = await store.ListWorkspacesAsync(context.TenantId, cancellationToken);
         var available = new List<ConsoleWorkspaceView>();
-        foreach (var workspace in workspaces.Where(value => value.Status == WorkspaceStatus.Active))
+        var tenants = await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken)
+            ? await store.ListTenantsAsync(cancellationToken)
+            : (await store.GetTenantAsync(context.TenantId, cancellationToken)) is { } currentTenant
+                ? [currentTenant]
+                : throw new InvalidOperationException("The current tenant no longer exists.");
+        foreach (var tenant in tenants.Where(value => value.Status == TenantStatus.Active))
         {
-            var candidate = context with { WorkspaceId = workspace.Id };
-            var permissions = await authorization.GetPermissionsAsync(candidate, cancellationToken);
-            if (permissions.Contains(AuthorizationPermissions.WorkspacesRead))
-                available.Add(new ConsoleWorkspaceView(workspace.Id, workspace.Name, workspace.DisplayName, workspace.Status, permissions.Order(StringComparer.Ordinal).ToArray()));
+            var workspaces = await store.ListWorkspacesAsync(tenant.Id, cancellationToken);
+            foreach (var workspace in workspaces.Where(value => value.Status == WorkspaceStatus.Active))
+            {
+                var candidate = context with { TenantId = tenant.Id, WorkspaceId = workspace.Id };
+                var permissions = await authorization.GetPermissionsAsync(candidate, cancellationToken);
+                if (permissions.Contains(AuthorizationPermissions.WorkspacesRead))
+                    available.Add(new ConsoleWorkspaceView(
+                        workspace.Id,
+                        tenant.Id,
+                        tenant.Name,
+                        tenant.DisplayName,
+                        workspace.Name,
+                        workspace.DisplayName,
+                        workspace.Status,
+                        permissions.Order(StringComparer.Ordinal).ToArray()));
+            }
         }
         var currentWorkspace = available.SingleOrDefault(value => value.Id == context.WorkspaceId)
             ?? available.FirstOrDefault()
             ?? throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead);
-        var selectedContext = context with { WorkspaceId = currentWorkspace.Id };
+        var selectedContext = context with { TenantId = currentWorkspace.TenantId, WorkspaceId = currentWorkspace.Id };
         return new ConsoleContextView(
             selectedContext,
             principal.DisplayName,
-            tenant.Name,
-            tenant.DisplayName,
+            currentWorkspace.TenantName,
+            currentWorkspace.TenantDisplayName,
             currentWorkspace.Name,
             currentWorkspace.DisplayName,
             currentWorkspace.Permissions,
@@ -506,7 +588,9 @@ public sealed class IdentityExperienceService(
 
     public async Task<RequestContext> ValidateWorkspaceSelectionAsync(Guid workspaceId, CancellationToken cancellationToken)
     {
-        var context = requestContext.Current with { WorkspaceId = workspaceId };
+        var workspace = await store.GetWorkspaceAsync(workspaceId, cancellationToken)
+            ?? throw new AuthorizationDeniedException(AuthorizationPermissions.WorkspacesRead);
+        var context = requestContext.Current with { TenantId = workspace.TenantId, WorkspaceId = workspaceId };
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.WorkspacesRead, cancellationToken);
         return context;
     }

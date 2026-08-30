@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
         services.AddSingleton<IPrincipalResolver, ExternalIdentityPrincipalResolver>();
         services.AddSingleton<IInitialPrincipalProvisioner, InitialPrincipalProvisioner>();
+        services.AddSingleton<IInitialTopologyProvisioner, InitialTopologyProvisioner>();
         services.AddSingleton<ILocalPrincipalProvisioner, LocalPrincipalProvisioner>();
         services.AddSingleton<IPlatformAuthorizationService, PlatformAuthorizationService>();
         services.AddSingleton<PlatformAdministratorLifecycleLock>();
@@ -88,6 +89,9 @@ public static class DependencyInjection
         services.AddSingleton<ISecurityAuditWriter>(provider => provider.GetRequiredService<SecurityAuditService>());
         services.AddSingleton<ILocalEnvironmentBootstrapper, LocalEnvironmentBootstrapper>();
         services.AddSingleton<IdentityAdministrationService>();
+        services.AddScoped<IBootstrapResourceHandler, TenantBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, WorkspaceBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, PrincipalDefaultContextBootstrapResourceHandler>();
         services.AddSingleton<WorkspaceMembershipAdministrationService>();
         services.AddSingleton<IdentityExperienceService>();
         services.AddSingleton<PrincipalPreferencesService>();
