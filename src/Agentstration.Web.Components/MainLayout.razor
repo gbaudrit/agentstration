@@ -11,9 +11,9 @@
 
 <div class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")">
     <aside class="sidebar" aria-label="Main navigation">
-        <a class="brand-lockup control-plane-brand" href="/" aria-label="Agentstration Control Plane home">
-            <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="40" height="40" /></span>
-            <span class="brand-copy"><strong>Agentstration</strong><small>Control Plane</small></span>
+        <a class="brand-lockup" href="/" aria-label="Agentstration Control Plane home">
+            <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
+            <img class="brand-lockup-logo" src="_content/Agentstration.Web.Components/images/agentstration-lockup.png" alt="" width="204" height="38" />
         </a>
         <nav class="side-nav">
             @foreach (var group in NavigationGroups)
