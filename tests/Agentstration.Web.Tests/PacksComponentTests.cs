@@ -1,10 +1,10 @@
+using System.Globalization;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
-using System.Globalization;
 
 namespace Agentstration.Web.Tests;
 

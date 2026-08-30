@@ -1,3 +1,4 @@
+using System.Globalization;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Work;
@@ -6,7 +7,6 @@ using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
-using System.Globalization;
 
 namespace Agentstration.Workplace.Components.Tests;
 
