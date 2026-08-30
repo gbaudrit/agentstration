@@ -567,6 +567,9 @@ public sealed class WorkPlaneTests
         using var client = factory.CreateClient();
         var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
         var workspace = workspaces!.Single(value => value.Name == "default");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(workspace.OrganizationName));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(workspace.OrganizationDisplayName));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(workspace.UserDisplayName));
         var workspaceRoute = workspace.Id.ToString("D");
         var dashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>($"/api/workspaces/{workspaceRoute}/dashboard");
         Assert.AreEqual(DashboardItemRole.Primary, dashboard!.Entries.Single(value => value.Role == DashboardItemRole.Primary).Role);

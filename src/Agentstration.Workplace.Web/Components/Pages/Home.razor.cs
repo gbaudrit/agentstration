@@ -38,6 +38,7 @@ public partial class Home
     private bool RealtimeConnected => Realtime.State.ToString() == "Connected";
     private string CurrentWorkspaceName => WorkspaceName ?? workspace?.Name ?? throw new InvalidOperationException("A Workspace route is required.");
     private string CurrentDashboardName => dashboard?.Name ?? DashboardName ?? throw new InvalidOperationException("A Dashboard route is required.");
+    private string UserDisplayName => WorkplaceContext.Current?.UserDisplayName is { Length: > 0 } displayName ? displayName : "vous";
     [Parameter] public string? WorkspaceName { get; set; }
     [Parameter] public string? DashboardName { get; set; }
     [Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "interaction")] public Guid? RequestedInteractionId { get; set; }
@@ -90,16 +91,19 @@ public partial class Home
             }
 
             workspace = await Api.GetWorkspaceAsync(workspaceName, lifetime.Token);
+            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName);
+            dashboards = await Api.ListDashboardsAsync(workspaceName, lifetime.Token);
             if (string.IsNullOrWhiteSpace(DashboardName))
             {
-                var defaultDashboard = await Api.GetDefaultDashboardAsync(workspaceName, lifetime.Token);
+                var defaultDashboard = dashboards.SingleOrDefault(value => value.IsDefault)
+                    ?? await Api.GetDefaultDashboardAsync(workspaceName, lifetime.Token);
                 navigationPending = true;
                 Navigation.NavigateTo(DashboardUrl(defaultDashboard.Name), replace: true);
                 return;
             }
 
-            dashboard = await Api.GetDashboardAsync(workspaceName, DashboardName, lifetime.Token);
-            dashboards = await Api.ListDashboardsAsync(workspaceName, lifetime.Token);
+            dashboard = dashboards.SingleOrDefault(value => string.Equals(value.Name, DashboardName, StringComparison.Ordinal))
+                ?? await Api.GetDashboardAsync(workspaceName, DashboardName, lifetime.Token);
             var reference = dashboard.Entries.FirstOrDefault(value => value.Role == DashboardItemRole.Primary);
             primary = reference is null ? null : await Api.GetEntryAsync(EntryId(reference), lifetime.Token);
             var featured = dashboard.Entries.Where(value => value.Role == DashboardItemRole.Featured).OrderBy(value => value.Order);
@@ -248,6 +252,16 @@ public partial class Home
     private string DashboardUrl(string dashboardName) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(dashboardName)}{(RequestedInteractionId is null ? string.Empty : $"?interaction={RequestedInteractionId}")}";
     private string InteractionUrl(Guid interactionId) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(CurrentDashboardName)}?interaction={interactionId}";
     private void DashboardChanged(ChangeEventArgs args) { var name = args.Value?.ToString(); if (!string.IsNullOrWhiteSpace(name)) Navigation.NavigateTo(DashboardUrl(name)); }
+    private static string DashboardIcon(WorkplaceDashboardResponse value)
+    {
+        var key = $"{value.Name} {value.DisplayName}".ToLowerInvariant();
+        if (key.Contains("home", StringComparison.Ordinal) || key.Contains("maison", StringComparison.Ordinal)) return "home";
+        if (key.Contains("travel", StringComparison.Ordinal) || key.Contains("voyage", StringComparison.Ordinal) || key.Contains("trip", StringComparison.Ordinal)) return "plane";
+        if (key.Contains("cook", StringComparison.Ordinal) || key.Contains("kitchen", StringComparison.Ordinal) || key.Contains("cuisine", StringComparison.Ordinal)) return "chef-hat";
+        if (key.Contains("document", StringComparison.Ordinal) || key.Contains("file", StringComparison.Ordinal)) return "folder";
+        if (key.Contains("shop", StringComparison.Ordinal) || key.Contains("achat", StringComparison.Ordinal)) return "shopping-bag";
+        return "layout-grid";
+    }
     private static EntryId EntryId(DashboardEntryReferenceResponse reference) => new(reference.EntryResourceId, reference.Namespace);
     private static string ConversationTitle(InteractionResponse value) => value.Messages.FirstOrDefault(message => message.Role == ConversationRole.User)?.Content ?? "Conversation";
     private static string ConversationStatus(InteractionStatus value) => value switch { InteractionStatus.Idle => "Ready to continue", InteractionStatus.Processing => "In progress", InteractionStatus.WaitingForUser => "Needs input", InteractionStatus.Closed => "Closed", _ => value.ToString() };
