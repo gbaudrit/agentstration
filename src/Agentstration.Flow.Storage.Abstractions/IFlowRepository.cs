@@ -25,7 +25,8 @@ public interface IFlowRepository
     Task<IReadOnlyList<StoredFlowVersion>> ListVersionsAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken);
     Task<StoredFlowRun> CreateRunAsync(FlowRun run, CancellationToken cancellationToken);
     Task<StoredFlowRun?> GetRunAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken);
-    Task<FlowRunPage> ListRunsAsync(WorkspaceId workspaceId, FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken);
+    Task<StoredFlowRun?> GetRunAsync(FlowRunScope scope, string runId, CancellationToken cancellationToken);
+    Task<FlowRunPage> ListRunsAsync(FlowRunScope scope, FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(int skip, int take, CancellationToken cancellationToken);
     Task<StoredFlowRun> UpdateRunAsync(FlowRun run, string expectedETag, CancellationToken cancellationToken);

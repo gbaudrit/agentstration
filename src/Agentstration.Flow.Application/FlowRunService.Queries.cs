@@ -13,12 +13,11 @@ public sealed partial class FlowRunService
 
     public async Task<StoredFlowRun?> GetAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)
     {
-        var stored = await repository.GetRunAsync(scope.WorkspaceId, runId, cancellationToken);
-        return stored is not null && HasScope(stored.Value, scope) ? stored : null;
+        return await repository.GetRunAsync(scope, runId, cancellationToken);
     }
 
     public Task<FlowRunPage> ListAsync(FlowId? flowId, FlowRunStatus? status, int skip, int take, FlowRunScope scope, CancellationToken cancellationToken) =>
-        repository.ListRunsAsync(scope.WorkspaceId, flowId, status, skip, take, cancellationToken);
+        repository.ListRunsAsync(scope, flowId, status, skip, take, cancellationToken);
 
     public async Task<IReadOnlyList<StoredInputRequest>> ListInputsAsync(
         string runId,
@@ -26,7 +25,7 @@ public sealed partial class FlowRunService
         FlowRunScope scope,
         CancellationToken cancellationToken)
     {
-        _ = await RequiredAsync(scope.WorkspaceId, runId, cancellationToken);
+        _ = await RequiredAsync(runId, scope, cancellationToken);
         return await repository.ListInputRequestsAsync(scope.WorkspaceId, runId, status, cancellationToken);
     }
 
@@ -36,7 +35,7 @@ public sealed partial class FlowRunService
         FlowRunScope scope,
         CancellationToken cancellationToken)
     {
-        _ = await RequiredAsync(scope.WorkspaceId, runId, cancellationToken);
+        _ = await RequiredAsync(runId, scope, cancellationToken);
         return await repository.GetInputRequestAsync(scope.WorkspaceId, runId, requestId, cancellationToken);
     }
 
@@ -45,7 +44,7 @@ public sealed partial class FlowRunService
         string? etag = null;
         while (!cancellationToken.IsCancellationRequested)
         {
-            var stored = await RequiredAsync(scope.WorkspaceId, runId, cancellationToken);
+            var stored = await RequiredAsync(runId, scope, cancellationToken);
             if (!string.Equals(etag, stored.ETag, StringComparison.Ordinal))
             {
                 etag = stored.ETag;
@@ -56,14 +55,16 @@ public sealed partial class FlowRunService
         }
     }
 
-    public Task<IReadOnlyList<FlowRunEvent>> ListEventsAsync(FlowRunScope scope, string runId, long afterSequence, CancellationToken cancellationToken) =>
-        repository.ListRunEventsAsync(scope.WorkspaceId, runId, afterSequence, cancellationToken);
+    public async Task<IReadOnlyList<FlowRunEvent>> ListEventsAsync(FlowRunScope scope, string runId, long afterSequence, CancellationToken cancellationToken)
+    {
+        _ = await RequiredAsync(runId, scope, cancellationToken);
+        return await repository.ListRunEventsAsync(scope.WorkspaceId, runId, afterSequence, cancellationToken);
+    }
 
     private async Task<StoredFlowRun> RequiredAsync(WorkspaceId workspaceId, string id, CancellationToken token) => await repository.GetRunAsync(workspaceId, id, token) ?? throw new FlowRunNotFoundException(id);
 
     private async Task<StoredFlowRun> RequiredAsync(string id, FlowRunScope scope, CancellationToken token) =>
         await GetAsync(id, scope, token) ?? throw new FlowRunNotFoundException(id);
 
-    private static bool HasScope(FlowRun run, FlowRunScope scope) => run.Scope == scope;
 }
 

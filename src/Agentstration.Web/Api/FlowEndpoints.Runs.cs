@@ -113,7 +113,7 @@ public static partial class FlowEndpoints
         return Results.Accepted($"/api/flowRuns/{runId}", (await service.RespondAsync(runId, inputId, body.Value, principal, scope, token)).Value);
     });
 
-    private static async Task ObserveRunAsync(string runId, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token)
+    private static Task<IResult> ObserveRunAsync(string runId, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         response.ContentType = "text/event-stream";
         response.Headers.CacheControl = "no-cache";
@@ -122,11 +122,11 @@ public static partial class FlowEndpoints
             await response.WriteAsync($"data: {JsonSerializer.Serialize(run, JsonOptions)}\n\n", token);
             await response.Body.FlushAsync(token);
         }
-    }
+        return Results.Empty;
+    });
 
     private static Task<IResult> ListRunEventsAsync(string runId, long? afterSequence, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        _ = await RequiredRunAsync(runId, service, CurrentScope(requestContext), token);
         return Results.Ok(await service.ListEventsAsync(CurrentScope(requestContext), runId, Math.Max(0, afterSequence ?? 0), token));
     });
 
