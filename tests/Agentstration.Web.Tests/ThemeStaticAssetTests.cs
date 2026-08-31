@@ -1,0 +1,25 @@
+namespace Agentstration.Web.Tests;
+
+[TestClass]
+public sealed class ThemeStaticAssetTests
+{
+    [TestMethod]
+    public async Task FormTokensResolveInsideTheSelectedTheme()
+    {
+        var css = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "TestAssets", "design-tokens.css"));
+
+        var appShellStart = css.IndexOf(".app-shell {", StringComparison.Ordinal);
+        var darkThemeStart = css.IndexOf(".app-shell.theme-dark {", StringComparison.Ordinal);
+        Assert.IsGreaterThanOrEqualTo(0, appShellStart);
+        Assert.IsGreaterThan(appShellStart, darkThemeStart);
+
+        var appShellTokens = css[appShellStart..darkThemeStart];
+        StringAssert.Contains(appShellTokens, "--field-background: var(--color-surface-muted);");
+        StringAssert.Contains(appShellTokens, "--field-border: var(--color-border-strong);");
+        StringAssert.Contains(appShellTokens, "color-scheme: light;");
+
+        var darkThemeEnd = css.IndexOf("/* Shared form controls", darkThemeStart, StringComparison.Ordinal);
+        Assert.IsGreaterThan(darkThemeStart, darkThemeEnd);
+        StringAssert.Contains(css[darkThemeStart..darkThemeEnd], "color-scheme: dark;");
+    }
+}
