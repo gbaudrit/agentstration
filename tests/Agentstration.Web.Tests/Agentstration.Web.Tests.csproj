@@ -7,4 +7,7 @@
   <PackageReference Include="bunit" />
   <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../../src/Agentstration.Web.Components/wwwroot/design-tokens.css" Link="TestAssets/design-tokens.css" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
