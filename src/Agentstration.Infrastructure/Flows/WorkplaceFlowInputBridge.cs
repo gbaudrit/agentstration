@@ -4,6 +4,7 @@ using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
+using Agentstration.Management.Abstractions;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
@@ -235,7 +236,10 @@ public sealed class WorkplaceFlowInputProjectionSink(
     private static Guid DeterministicGuid(string value) => new(SHA256.HashData(Encoding.UTF8.GetBytes(value)).AsSpan(0, 16));
 }
 
-public sealed class WorkplaceFlowInputResponder(FlowRunService flowRuns, WorkItemService workItems) : IWorkplaceExternalInputResponder
+public sealed class WorkplaceFlowInputResponder(
+    FlowRunService flowRuns,
+    WorkItemService workItems,
+    ICurrentRequestContext requestContext) : IWorkplaceExternalInputResponder
 {
     public bool CanRespond(PendingAction action) => action.ExternalInputRequestId is not null && action.FlowRunId is not null;
 
@@ -248,7 +252,9 @@ public sealed class WorkplaceFlowInputResponder(FlowRunService flowRuns, WorkIte
         var value = action.Kind == PendingActionKind.ConfirmationRequired
             ? values["confirmed"]
             : values["response"];
-        await flowRuns.RespondAsync(action.FlowRunId!, action.ExternalInputRequestId!, value, principalId, action.WorkspaceId, cancellationToken);
+        var current = requestContext.Current;
+        var scope = new FlowRunScope(current.TenantId, new(current.WorkspaceId), current.PrincipalId);
+        await flowRuns.RespondAsync(action.FlowRunId!, action.ExternalInputRequestId!, value, principalId, scope, cancellationToken);
         if (action.WorkTaskId is { } taskId)
         {
             var stored = await workItems.GetAsync(action.WorkspaceId, taskId.ToWorkItemId(), cancellationToken);

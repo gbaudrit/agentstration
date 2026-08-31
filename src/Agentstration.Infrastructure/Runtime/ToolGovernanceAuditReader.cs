@@ -1,13 +1,16 @@
 using System.Text.Json;
 using Agentstration.Flow;
 using Agentstration.Flow.Storage.Abstractions;
+using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Infrastructure.Runtime;
 
 public sealed class ToolGovernanceAuditReader(
     IRuntimeRunStore runtimeRuns,
-    IFlowRepository flowRuns) : IToolGovernanceAuditReader
+    IFlowRepository flowRuns,
+    ICurrentRequestContext requestContext) : IToolGovernanceAuditReader
 {
     public async Task<ToolGovernanceAuditPage> ListAsync(
         ToolGovernanceAuditQuery query,
@@ -49,7 +52,10 @@ public sealed class ToolGovernanceAuditReader(
         ToolGovernanceAuditQuery query,
         CancellationToken cancellationToken)
     {
-        if (await flowRuns.GetRunAsync(query.WorkspaceId, query.RunId, cancellationToken) is null)
+        var current = requestContext.Current;
+        var scope = new FlowRunScope(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId);
+        if (scope.WorkspaceId != query.WorkspaceId
+            || await flowRuns.GetRunAsync(scope, query.RunId, cancellationToken) is null)
             throw new ToolGovernanceAuditRunNotFoundException(query.RunId);
         var events = await flowRuns.ListRunEventsAsync(
             query.WorkspaceId,

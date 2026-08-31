@@ -152,6 +152,10 @@ public sealed partial class FlowRunService
         return await RespondAsync(run, requestId, value, principalId, cancellationToken);
     }
 
+    /// <summary>
+    /// Responds to a Flow Run input during trusted system or runtime processing. User-facing callers must use the
+    /// overload accepting <see cref="FlowRunScope"/> so the complete durable scope is enforced.
+    /// </summary>
     public async Task<StoredInputRequest> RespondAsync(
         string runId,
         string requestId,

@@ -130,16 +130,20 @@ public sealed partial class FlowTests
         var otherTenant = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "other-tenant", input.RootElement, otherTenantScope, default);
         var otherPrincipal = await runs.CreateAsync(created.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "other-principal", input.RootElement, otherPrincipalScope, default);
         var otherWorkspace = await runs.CreateAsync(otherFlow.Value.Id, null, "local", FlowRunTrigger.Manual, "principal", "other-workspace", input.RootElement, otherWorkspaceScope, default);
-        var request = await fixture.Repository.CreateInputRequestAsync(new InputRequest
-        {
-            WorkspaceId = TestScope.WorkspaceId,
-            Id = "private-input",
-            RunId = otherPrincipal.Value.Id,
-            RuntimeRequestId = "runtime-private-input",
-            Prompt = "Private prompt",
-            CreatedAt = Now,
-            ExpiresAt = Now.AddMinutes(5)
-        }, default);
+        async Task<StoredInputRequest> CreatePrivateInputAsync(StoredFlowRun run, string id) =>
+            await fixture.Repository.CreateInputRequestAsync(new InputRequest
+            {
+                WorkspaceId = run.Value.WorkspaceId,
+                Id = id,
+                RunId = run.Value.Id,
+                RuntimeRequestId = $"runtime-{id}",
+                Prompt = "Private prompt",
+                CreatedAt = Now,
+                ExpiresAt = Now.AddMinutes(5)
+            }, default);
+        var otherTenantRequest = await CreatePrivateInputAsync(otherTenant, "other-tenant-input");
+        var otherPrincipalRequest = await CreatePrivateInputAsync(otherPrincipal, "other-principal-input");
+        var otherWorkspaceRequest = await CreatePrivateInputAsync(otherWorkspace, "other-workspace-input");
 
         Assert.IsNotNull(await runs.GetAsync(own.Value.Id, TestScope, default));
         Assert.IsNull(await runs.GetAsync(otherTenant.Value.Id, TestScope, default));
@@ -147,18 +151,42 @@ public sealed partial class FlowTests
         Assert.IsNull(await runs.GetAsync(otherWorkspace.Value.Id, TestScope, default));
         var page = await runs.ListAsync(null, null, 0, 20, TestScope, default);
         CollectionAssert.AreEqual(new[] { own.Value.Id }, page.Items.Select(item => item.Value.Id).ToArray());
-        CollectionAssert.AreEqual(new[] { request.Value.Id },
+        CollectionAssert.AreEqual(new[] { otherPrincipalRequest.Value.Id },
             (await runs.ListInputsAsync(otherPrincipal.Value.Id, null, otherPrincipalScope, default)).Select(item => item.Value.Id).ToArray());
-        Assert.AreEqual(request.Value.Id,
-            (await runs.GetInputAsync(otherPrincipal.Value.Id, request.Value.Id, otherPrincipalScope, default))?.Value.Id);
+        Assert.AreEqual(otherPrincipalRequest.Value.Id,
+            (await runs.GetInputAsync(otherPrincipal.Value.Id, otherPrincipalRequest.Value.Id, otherPrincipalScope, default))?.Value.Id);
         Assert.IsNotEmpty(await runs.ListEventsAsync(otherPrincipalScope, otherPrincipal.Value.Id, 0, default));
 
         await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.ListInputsAsync(otherPrincipal.Value.Id, null, TestScope, default));
-        await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.GetInputAsync(otherPrincipal.Value.Id, request.Value.Id, TestScope, default));
+        await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.GetInputAsync(otherPrincipal.Value.Id, otherPrincipalRequest.Value.Id, TestScope, default));
         await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.ListEventsAsync(TestScope, otherPrincipal.Value.Id, 0, default));
         await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.CancelAsync(otherPrincipal.Value.Id, TestScope, default));
         await using var observation = runs.ObserveAsync(otherPrincipal.Value.Id, TestScope, default).GetAsyncEnumerator();
         await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => observation.MoveNextAsync().AsTask());
+
+        foreach (var inaccessible in new[]
+        {
+            (Run: otherTenant, Request: otherTenantRequest),
+            (Run: otherPrincipal, Request: otherPrincipalRequest),
+            (Run: otherWorkspace, Request: otherWorkspaceRequest)
+        })
+        {
+            await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.RespondAsync(
+                inaccessible.Run.Value.Id,
+                inaccessible.Request.Value.Id,
+                JsonSerializer.SerializeToElement("forbidden response"),
+                TestScope.PrincipalId.ToString("D"),
+                TestScope,
+                default));
+            var unchanged = await fixture.Repository.GetInputRequestAsync(
+                inaccessible.Run.Value.WorkspaceId,
+                inaccessible.Run.Value.Id,
+                inaccessible.Request.Value.Id,
+                default);
+            Assert.IsNotNull(unchanged);
+            Assert.AreEqual(InputRequestStatus.Pending, unchanged.Value.Status);
+            Assert.IsNull(unchanged.Value.Response);
+        }
     }
 
     [TestMethod]

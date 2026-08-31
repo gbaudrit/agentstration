@@ -9,6 +9,10 @@ namespace Agentstration.Flow.Application;
 
 public sealed partial class FlowRunService
 {
+    /// <summary>
+    /// Retrieves a Flow Run for trusted system and runtime processing. User-facing callers must use the
+    /// <see cref="GetAsync(string, FlowRunScope, CancellationToken)"/> overload so the complete durable scope is enforced.
+    /// </summary>
     public Task<StoredFlowRun?> GetAsync(WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) => repository.GetRunAsync(workspaceId, runId, cancellationToken);
 
     public async Task<StoredFlowRun?> GetAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)
