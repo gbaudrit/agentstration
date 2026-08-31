@@ -24,6 +24,8 @@ public sealed class FlowDbContext(DbContextOptions<FlowDbContext> options) : DbC
         document.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
         document.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         document.HasIndex(value => new { value.WorkspaceId, value.Namespace, value.Kind, value.FlowId, value.Version });
+        document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.TenantId, value.PrincipalId, value.UpdatedAt, value.Key });
+        document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.TenantId, value.PrincipalId, value.Namespace, value.FlowId, value.UpdatedAt, value.Key });
     }
 }
 
@@ -35,6 +37,8 @@ internal sealed class FlowDocument
     public required string FlowId { get; set; }
     public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
     public string? Version { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid PrincipalId { get; set; }
     public required string Payload { get; set; }
     public required string ETag { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
@@ -158,6 +162,8 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
         var document = Document(run.WorkspaceId, RunKey(run.WorkspaceId, run.Id), RunKind, run.FlowId, run.FlowVersion, run, now);
+        document.TenantId = run.Scope.TenantId;
+        document.PrincipalId = run.Scope.PrincipalId;
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
         return new StoredFlowRun(run, document.ETag, now);
@@ -170,13 +176,28 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         return document is null ? null : ToRun(document);
     }
 
-    public async Task<FlowRunPage> ListRunsAsync(WorkspaceId workspaceId, FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken)
+    public async Task<StoredFlowRun?> GetRunAsync(FlowRunScope scope, string runId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value =>
+            value.Key == RunKey(scope.WorkspaceId, runId)
+            && value.TenantId == scope.TenantId
+            && value.PrincipalId == scope.PrincipalId,
+            cancellationToken);
+        return document is null ? null : ToRun(document);
+    }
+
+    public async Task<FlowRunPage> ListRunsAsync(FlowRunScope scope, FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         take = Math.Min(take, 200);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var query = context.Documents.AsNoTracking().Where(value => value.WorkspaceId == workspaceId.Value && value.Kind == RunKind);
+        var query = context.Documents.AsNoTracking().Where(value =>
+            value.WorkspaceId == scope.WorkspaceId.Value
+            && value.Kind == RunKind
+            && value.TenantId == scope.TenantId
+            && value.PrincipalId == scope.PrincipalId);
         if (flowId is not null)
         {
             var namespaceValue = flowId.Value.Namespace.Value;
@@ -221,6 +242,8 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
             throw new FlowConcurrencyException("The Flow Run execution scope is immutable.");
         var now = timeProvider.GetUtcNow();
         document.Payload = JsonSerializer.Serialize(run, JsonOptions);
+        document.TenantId = run.Scope.TenantId;
+        document.PrincipalId = run.Scope.PrincipalId;
         document.ETag = NewETag();
         document.UpdatedAt = now;
         await SaveUpdateAsync(context, cancellationToken);

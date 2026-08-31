@@ -4,10 +4,13 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Application.Work;
+using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
+using Agentstration.Flow.Storage.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Work.Storage.Abstractions;
@@ -185,6 +188,101 @@ public sealed class WorkplaceApiTests
             Assert.IsNotNull(run);
             Assert.AreEqual("system-direct-agent-dotnet-expert", run.Value.FlowId.Value);
             Assert.AreEqual(Agentstration.Flow.FlowRunStatus.Succeeded, run.Value.Status);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (Directory.Exists(dataDirectory)) Directory.Delete(dataDirectory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task TaskFlowRunEndpointEnforcesTenantWorkspaceAndPrincipalScope()
+    {
+        var dataDirectory = Path.Combine(Path.GetTempPath(), "agentstration-work-api-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dataDirectory);
+        try
+        {
+            await using var factory = new WebApplicationFactory<WorkApiProgram>().WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.UseSetting("Data:Directory", dataDirectory);
+            });
+            using var client = factory.CreateClient();
+            var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+            var ownerScope = new FlowRunScope(current.TenantId, new WorkspaceId(current.WorkspaceId), current.PrincipalId);
+            var otherPrincipalScope = ownerScope with { PrincipalId = Guid.NewGuid() };
+            var otherTenantScope = ownerScope with { TenantId = Guid.NewGuid() };
+            var otherWorkspaceScope = ownerScope with { WorkspaceId = new WorkspaceId(Guid.NewGuid()) };
+
+            using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current))
+            {
+                var workItems = factory.Services.GetRequiredService<IWorkItemRepository>();
+                var item = WorkItem.Create(
+                    WorkItemId.New(),
+                    ownerScope.WorkspaceId,
+                    "isolation-test",
+                    "Verify scoped Flow Run access",
+                    TimeProvider.System.GetUtcNow(),
+                    metadata: new Dictionary<string, string>
+                    {
+                        ["workplace.entryId"] = "isolation-test",
+                        ["workplace.interactionId"] = Guid.NewGuid().ToString("D")
+                    });
+                await workItems.CreateAsync(item, default);
+                var taskId = WorkTaskId.FromWorkItem(item.Id);
+                var runs = factory.Services.GetRequiredService<IFlowRepository>();
+
+                FlowRun NewRun(string id, FlowRunScope scope, string secret)
+                {
+                    var definition = new FlowVersion(
+                        scope.WorkspaceId,
+                        new FlowId("isolation-flow"),
+                        "1.0.0",
+                        null,
+                        new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent")),
+                        new Dictionary<string, string>(),
+                        TimeProvider.System.GetUtcNow());
+                    return new FlowRun
+                    {
+                        WorkspaceId = scope.WorkspaceId,
+                        Id = id,
+                        FlowId = definition.FlowId,
+                        FlowVersion = definition.Version,
+                        Scope = scope,
+                        WorkTaskId = taskId.ToString(),
+                        Input = JsonSerializer.SerializeToElement(new { secret }),
+                        CreatedAt = TimeProvider.System.GetUtcNow(),
+                        DefinitionSnapshot = definition
+                    };
+                }
+
+                var own = NewRun("owned-run", ownerScope, "owned-content");
+                var otherPrincipal = NewRun("other-principal-run", otherPrincipalScope, "other-principal-secret");
+                var otherTenant = NewRun("other-tenant-run", otherTenantScope, "other-tenant-secret");
+                var otherWorkspace = NewRun("other-workspace-run", otherWorkspaceScope, "other-workspace-secret");
+                foreach (var run in new[] { own, otherPrincipal, otherTenant, otherWorkspace })
+                    await runs.CreateRunAsync(run, default);
+
+                using var ownerResponse = await client.GetAsync($"/api/tasks/{taskId}/flow-runs/{own.Id}");
+                Assert.AreEqual(HttpStatusCode.OK, ownerResponse.StatusCode);
+                var visible = await ownerResponse.Content.ReadFromJsonAsync<FlowRun>();
+                Assert.AreEqual(own.Id, visible?.Id);
+
+                foreach (var inaccessible in new[]
+                {
+                    (Run: otherPrincipal, Secret: "other-principal-secret"),
+                    (Run: otherTenant, Secret: "other-tenant-secret"),
+                    (Run: otherWorkspace, Secret: "other-workspace-secret")
+                })
+                {
+                    using var response = await client.GetAsync($"/api/tasks/{taskId}/flow-runs/{inaccessible.Run.Id}");
+                    Assert.AreEqual(HttpStatusCode.NotFound, response.StatusCode);
+                    var body = await response.Content.ReadAsStringAsync();
+                    Assert.DoesNotContain(inaccessible.Secret, body, StringComparison.Ordinal);
+                    Assert.DoesNotContain("isolation-flow", body, StringComparison.Ordinal);
+                }
+            }
         }
         finally
         {

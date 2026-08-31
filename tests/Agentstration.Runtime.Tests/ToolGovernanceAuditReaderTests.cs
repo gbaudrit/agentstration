@@ -3,6 +3,8 @@ using Agentstration.Flow;
 using Agentstration.Flow.Storage.Abstractions;
 using Agentstration.Flow.Storage.Sqlite;
 using Agentstration.Infrastructure.Runtime;
+using Agentstration.Management.Abstractions;
+using Agentstration.Management.Core;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Storage.Sqlite;
@@ -15,6 +17,8 @@ namespace Agentstration.Runtime.Tests;
 public sealed class ToolGovernanceAuditReaderTests
 {
     private static readonly WorkspaceId Workspace = new(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+    private static readonly Guid Tenant = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid Principal = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
     [TestMethod]
     public async Task RuntimeAuditFiltersAndPaginatesDurableGovernanceEvents()
@@ -25,7 +29,9 @@ public sealed class ToolGovernanceAuditReaderTests
             await runtimeRuns.AppendEventAsync(RuntimeEvent(1, "attempt-1", "lookup", Evaluation("managed:guard", "default/ToolExecutionHook/guard", 3, ToolExecutionHookEvaluationKind.Allowed)), default);
             await runtimeRuns.AppendEventAsync(RuntimeEvent(2, "attempt-2", "lookup", Evaluation("managed:guard", "default/ToolExecutionHook/guard", 4, ToolExecutionHookEvaluationKind.Denied, "blocked")), default);
             await runtimeRuns.AppendEventAsync(RuntimeEvent(3, "attempt-3", "other", Evaluation("local:audit", null, null, ToolExecutionHookEvaluationKind.Allowed)), default);
-            var reader = new ToolGovernanceAuditReader(runtimeRuns, flowRuns);
+            var requestContext = new CurrentRequestContext();
+            using var requestScope = requestContext.Push(new RequestContext(Principal, Tenant, Workspace.Value));
+            var reader = new ToolGovernanceAuditReader(runtimeRuns, flowRuns, requestContext);
 
             var invalid = await Assert.ThrowsExactlyAsync<ToolGovernanceAuditValidationException>(() => reader.ListAsync(new ToolGovernanceAuditQuery
             {
@@ -76,6 +82,11 @@ public sealed class ToolGovernanceAuditReaderTests
         await WithStoresAsync(async (runtimeRuns, flowRuns) =>
         {
             await flowRuns.CreateRunAsync(FlowRun(), default);
+            await flowRuns.CreateRunAsync(FlowRun() with
+            {
+                Id = "other-principal-flow-run",
+                Scope = new FlowRunScope(Tenant, Workspace, Guid.NewGuid())
+            }, default);
             var governance = new[]
             {
                 Evaluation("managed:guard", "default/ToolExecutionHook/guard", 7, ToolExecutionHookEvaluationKind.Denied, "blocked")
@@ -100,7 +111,9 @@ public sealed class ToolGovernanceAuditReaderTests
                     Result = new { secret = "must-not-project" }
                 }),
                 DateTimeOffset.UnixEpoch), default);
-            var reader = new ToolGovernanceAuditReader(runtimeRuns, flowRuns);
+            var requestContext = new CurrentRequestContext();
+            using var requestScope = requestContext.Push(new RequestContext(Principal, Tenant, Workspace.Value));
+            var reader = new ToolGovernanceAuditReader(runtimeRuns, flowRuns, requestContext);
 
             var page = await reader.ListAsync(new ToolGovernanceAuditQuery
             {
@@ -123,6 +136,12 @@ public sealed class ToolGovernanceAuditReaderTests
                 OwnerKind = ToolExecutionOwnerKind.FlowRun,
                 WorkspaceId = new WorkspaceId(Guid.NewGuid()),
                 RunId = "flow-run"
+            }));
+            await Assert.ThrowsExactlyAsync<ToolGovernanceAuditRunNotFoundException>(() => reader.ListAsync(new ToolGovernanceAuditQuery
+            {
+                OwnerKind = ToolExecutionOwnerKind.FlowRun,
+                WorkspaceId = Workspace,
+                RunId = "other-principal-flow-run"
             }));
         });
     }
@@ -149,7 +168,9 @@ public sealed class ToolGovernanceAuditReaderTests
                 }
             };
             await runtimeRuns.AppendEventAsync(runEvent, default);
-            var reader = new ToolGovernanceAuditReader(runtimeRuns, flowRuns);
+            var requestContext = new CurrentRequestContext();
+            using var requestScope = requestContext.Push(new RequestContext(Principal, Tenant, Workspace.Value));
+            var reader = new ToolGovernanceAuditReader(runtimeRuns, flowRuns, requestContext);
 
             var page = await reader.ListAsync(new ToolGovernanceAuditQuery
             {
@@ -259,7 +280,7 @@ public sealed class ToolGovernanceAuditReaderTests
             FlowId = version.FlowId,
             FlowVersion = version.Version,
             Trigger = FlowRunTrigger.Manual,
-            Scope = new FlowRunScope(Guid.NewGuid(), Workspace, Guid.NewGuid()),
+            Scope = new FlowRunScope(Tenant, Workspace, Principal),
             Input = JsonSerializer.SerializeToElement(new { prompt = "test" }),
             CreatedAt = DateTimeOffset.UnixEpoch,
             DefinitionSnapshot = version

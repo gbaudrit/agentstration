@@ -88,7 +88,7 @@ public static class WorkOperationsEndpoints
     }, token);
     private static Task<IResult> FlowRunAsync(Guid taskId, string runId, WorkplaceService service, FlowRunService flowRuns, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value =>
     {
-        var run = await flowRuns.GetAsync(value.WorkspaceId, runId, token);
+        var run = await flowRuns.GetAsync(runId, CurrentScope(requestContext), token);
         if (run is null || !string.Equals(run.Value.WorkTaskId, value.Task.Id.ToString(), StringComparison.OrdinalIgnoreCase))
             throw new KeyNotFoundException($"FlowRun '{runId}' was not found for Task '{taskId}'.");
         return Results.Ok(run.Value);

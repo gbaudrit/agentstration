@@ -152,6 +152,10 @@ public sealed partial class FlowRunService
         return await RespondAsync(run, requestId, value, principalId, cancellationToken);
     }
 
+    /// <summary>
+    /// Responds to a Flow Run input during trusted system or runtime processing. User-facing callers must use the
+    /// overload accepting <see cref="FlowRunScope"/> so the complete durable scope is enforced.
+    /// </summary>
     public async Task<StoredInputRequest> RespondAsync(
         string runId,
         string requestId,
@@ -234,7 +238,7 @@ public sealed partial class FlowRunService
 
     public async Task<StoredFlowRun> CancelAsync(string runId, FlowRunScope scope, CancellationToken cancellationToken)
     {
-        var stored = await RequiredAsync(scope.WorkspaceId, runId, cancellationToken);
+        var stored = await RequiredAsync(runId, scope, cancellationToken);
         if (stored.Value.Status.IsTerminal()) return stored;
         cancellations.Cancel(new FlowRunKey(scope.WorkspaceId, runId));
         var now = timeProvider.GetUtcNow();
