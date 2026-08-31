@@ -100,9 +100,10 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
 
     private static string NormalizeFlowRunPageLink(string link)
     {
-        if (Uri.TryCreate(link, UriKind.Absolute, out _))
+        var candidate = link.Trim();
+        if (candidate.StartsWith("//", StringComparison.Ordinal))
             throw new AgentstrationApiException("Flow API returned an invalid pagination link.", Guid.NewGuid().ToString("N"));
-        var normalized = link.TrimStart('/');
+        var normalized = candidate.TrimStart('/');
         if (!normalized.StartsWith("api/", StringComparison.Ordinal))
             throw new AgentstrationApiException("Flow API returned an invalid pagination link.", Guid.NewGuid().ToString("N"));
         return normalized;
@@ -244,4 +245,3 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
         return new FlowResourceSnapshot(value, etag);
     }
 }
-

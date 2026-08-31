@@ -255,6 +255,27 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    [DataRow("https://example.test/api/flowRuns?skip=1&top=200")]
+    [DataRow("//example.test/api/flowRuns?skip=1&top=200")]
+    public async Task FlowClientRejectsExternalRunPaginationLinks(string nextLink)
+    {
+        var requests = 0;
+        using var httpClient = new HttpClient(new StubHandler(_ =>
+        {
+            requests++;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FlowRunPageResponse([CreateFlowRun("run-1")], nextLink))
+            };
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        await Assert.ThrowsExactlyAsync<AgentstrationApiException>(() =>
+            new FlowApiClient(httpClient).GetFlowRunsAsync((string?)null, default));
+
+        Assert.AreEqual(1, requests);
+    }
+
+    [TestMethod]
     public async Task FlowDesignerLoadsNamespacedPublishedGraphWithoutDraftCallsAndRejectsMutations()
     {
         var now = new DateTimeOffset(2026, 8, 15, 12, 0, 0, TimeSpan.Zero);
@@ -311,4 +332,3 @@ public sealed partial class ApiClientTests
     }
 
 }
-
