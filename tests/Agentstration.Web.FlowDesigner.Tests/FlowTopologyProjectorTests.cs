@@ -71,7 +71,8 @@ public sealed class FlowTopologyProjectorTests
         var events = new[]
         {
             Event(1, "researcher"),
-            Event(2, "reviewer")
+            HandoffEvent(2, "researcher", "reviewer"),
+            Event(3, "reviewer")
         };
 
         var topology = FlowTopologyProjector.Project(run, events);
@@ -79,8 +80,34 @@ public sealed class FlowTopologyProjectorTests
         Assert.IsTrue(topology.FindBySelection("researcher")!.IsInitial);
         Assert.AreEqual(FlowTopologyEdgeState.Observed,
             topology.Edges.Single(edge => edge.From == "participant:researcher" && edge.To == "participant:reviewer").State);
+        Assert.Contains("#1", topology.Edges.Single(edge => edge.From == "participant:researcher" && edge.To == "participant:reviewer").Label!, StringComparison.Ordinal);
         Assert.AreEqual(FlowTopologyEdgeState.Declared,
             topology.Edges.Single(edge => edge.From == "participant:reviewer" && edge.To == "participant:researcher").State);
+        Assert.HasCount(1, topology.Transfers);
+        Assert.AreEqual(new FlowTopologyTransfer(1, "researcher", "reviewer", 2), topology.Transfers[0]);
+    }
+
+    [TestMethod]
+    public void HandoffProjectionNumbersRepeatedTransfersInExecutionOrder()
+    {
+        var definition = Orchestration(new HandoffOrchestrationPattern(
+            "researcher",
+            [new FlowHandoff("researcher", "reviewer"), new FlowHandoff("reviewer", "researcher")],
+            Autonomous: true));
+        var events = new[]
+        {
+            HandoffEvent(10, "researcher", "reviewer"),
+            HandoffEvent(20, "reviewer", "researcher"),
+            HandoffEvent(30, "researcher", "reviewer")
+        };
+
+        var topology = FlowTopologyProjector.Project(Run(definition), events);
+
+        Assert.HasCount(3, topology.Transfers);
+        Assert.AreEqual("handoff · #1, #3",
+            topology.Edges.Single(edge => edge.From == "participant:researcher" && edge.To == "participant:reviewer").Label);
+        Assert.AreEqual("handoff · #2",
+            topology.Edges.Single(edge => edge.From == "participant:reviewer" && edge.To == "participant:researcher").Label);
     }
 
     [TestMethod]
@@ -165,6 +192,15 @@ public sealed class FlowTopologyProjectorTests
         FlowRunEventType.ParticipantTurnStarted,
         participant,
         JsonSerializer.SerializeToElement(new { turn = sequence }),
+        DateTimeOffset.UtcNow);
+
+    private static FlowRunEvent HandoffEvent(long sequence, string from, string to) => new(
+        WorkspaceId,
+        "run-1",
+        sequence,
+        FlowRunEventType.ParticipantHandoff,
+        from,
+        JsonSerializer.SerializeToElement(new { from, to }),
         DateTimeOffset.UtcNow);
 
     private static readonly Agentstration.Resources.WorkspaceId WorkspaceId = new(Guid.Parse("11111111-1111-1111-1111-111111111111"));

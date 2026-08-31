@@ -66,16 +66,19 @@ else
             @if (!string.IsNullOrWhiteSpace(inputError)) { <p class="validation-error">@inputError</p> }
         </article>
     }
-    <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" />
+    <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun" />
     @if (realtimeError is not null)
     {
         <div class="panel realtime-warning" role="status"><span>@realtimeError</span><button class="button-secondary" @onclick="ConnectAsync">@T("RetryLiveUpdates")</button></div>
     }
-    <section class="designer-layout run-layout">
+    <section class="designer-layout run-layout @(inspectorVisible ? null : "inspector-collapsed")">
         <div>
-            <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep" />
+            <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
+                                ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible" />
             <article class="panel io-panel"><div class="panel-header"><h2>@T("RunInputAndOutput")</h2></div><div class="io-grid"><div><span class="field-label">@T("Input")</span><pre>@Pretty(run.Input)</pre></div><div><span class="field-label">@T("Output")</span><pre>@Pretty(run.Output)</pre></div></div></article>
         </div>
+        @if (inspectorVisible)
+        {
         <article class="panel inspector step-inspector">
             <div class="panel-header"><h2>@T("StepDiagnostic")</h2></div>
             @if (selected is null)
@@ -89,6 +92,7 @@ else
                 @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@selected.Error.Message</p></div> }
             }
         </article>
+        }
     </section>
 }
 
@@ -108,11 +112,13 @@ else
     private AgentstrationApiException? loadError;
     private bool notFound;
     private string? realtimeError;
+    private bool IsHandoffRun => run?.DefinitionSnapshot.Definition is OrchestrationFlowDefinition { Pattern: HandoffOrchestrationPattern };
     private int streamingRenderScheduled;
     private string responseText = string.Empty;
     private string selectedChoice = string.Empty;
     private string? inputError;
     private bool submittingInput;
+    private bool inspectorVisible = true;
     private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(run, eventBuffer.Snapshot());
 
     protected override async Task OnParametersSetAsync()
@@ -258,6 +264,7 @@ else
     }
 
     private void SelectStep(string name) => selected = run?.Steps.FirstOrDefault(value => value.StepName == name);
+    private void SetInspectorVisible(bool value) => inspectorVisible = value;
     private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, cancellation.Token);
     private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private static string Pretty(JsonElement? value) => value is null ? "—" : Pretty(value.Value);

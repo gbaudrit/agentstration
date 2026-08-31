@@ -120,7 +120,7 @@ public sealed partial class FlowTests
             FlowOrchestrationExecutionRequest request,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            Assert.AreEqual(FlowOrchestrationStrategy.Sequential, request.Definition.Strategy);
+            Assert.AreEqual(FlowOrchestrationStrategy.Handoff, request.Definition.Strategy);
             Assert.IsTrue(request.Definition.Participants.All(participant =>
                 participant.Namespace == new ResourceNamespace("daily-life-assistant")));
             cancellationToken.ThrowIfCancellationRequested();
@@ -129,13 +129,14 @@ public sealed partial class FlowTests
             yield return new FlowParticipantTurnCompleted("researcher", 1);
             var researcher = Participant("researcher", 1, "draft");
             yield return new FlowParticipantCompleted(researcher);
+            yield return new FlowParticipantHandoff("researcher", "reviewer");
             yield return new FlowParticipantTurnStarted("reviewer", 2);
             yield return new FlowParticipantDelta("reviewer", "reviewed");
             yield return new FlowParticipantTurnCompleted("reviewer", 2);
             var reviewer = Participant("reviewer", 2, "reviewed");
             yield return new FlowParticipantCompleted(reviewer);
             yield return new FlowExecutionCompleted(new FlowOrchestrationResult(
-                FlowOrchestrationStrategy.Sequential,
+                FlowOrchestrationStrategy.Handoff,
                 JsonSerializer.SerializeToElement("reviewed"),
                 [researcher, reviewer]));
             await Task.CompletedTask;

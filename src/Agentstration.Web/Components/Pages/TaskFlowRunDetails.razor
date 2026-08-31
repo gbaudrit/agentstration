@@ -33,11 +33,14 @@ else
     {
         <article class="panel run-error"><strong>@run.Error.Code</strong><p>@run.Error.Message</p><code>@run.Error.Details</code></article>
     }
-    <section class="designer-layout run-layout">
+    <section class="designer-layout run-layout @(inspectorVisible ? null : "inspector-collapsed")">
         <div>
-            <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep" />
+            <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
+                                ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible" />
             <article class="panel io-panel"><div class="panel-header"><h2>@T("RunInputOutput")</h2></div><div class="io-grid"><div><span class="field-label">@T("Input")</span><pre>@Pretty(run.Input)</pre></div><div><span class="field-label">@T("Output")</span><pre>@Pretty(run.Output)</pre></div></div></article>
         </div>
+        @if (inspectorVisible)
+        {
         <article class="panel inspector step-inspector">
             <div class="panel-header"><h2>@T("StepDiagnostic")</h2></div>
             @if (selected is null) { <p class="muted">@T("SelectStep")</p> }
@@ -47,6 +50,7 @@ else
                 <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
             }
         </article>
+        }
     </section>
 }
 
@@ -57,6 +61,7 @@ else
     private FlowRun? run;
     private FlowStepRun? selected;
     private bool unavailable, notFound;
+    private bool inspectorVisible = true;
     private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(run);
     protected override async Task OnParametersSetAsync() => await LoadAsync();
     private async Task LoadAsync()
@@ -67,6 +72,7 @@ else
         catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or Polly.Timeout.TimeoutRejectedException) { unavailable = true; run = null; }
     }
     private void SelectStep(string name) => selected = run?.Steps.FirstOrDefault(value => value.StepName == name);
+    private void SetInspectorVisible(bool value) => inspectorVisible = value;
     private string T(string key) => Localizer[key];
     private string Label(string prefix, object value) { var raw = value.ToString() ?? string.Empty; var localized = Localizer[$"{prefix}.{raw}"]; return localized.ResourceNotFound ? raw : localized.Value; }
     private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });

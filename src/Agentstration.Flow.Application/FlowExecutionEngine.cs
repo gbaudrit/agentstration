@@ -23,6 +23,8 @@ public sealed record FlowParticipantDelta(string ParticipantId, string Content) 
 
 public sealed record FlowParticipantTurnCompleted(string ParticipantId, int Turn) : FlowExecutionEvent;
 
+public sealed record FlowParticipantHandoff(string FromParticipantId, string ToParticipantId) : FlowExecutionEvent;
+
 public sealed record FlowParticipantCompleted(FlowParticipantResult Result) : FlowExecutionEvent;
 
 public sealed record FlowExecutionCompleted(FlowOrchestrationResult Result) : FlowExecutionEvent;

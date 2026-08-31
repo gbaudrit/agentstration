@@ -31,6 +31,7 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine
             participant => new ParticipantState(participants[participant.Id], terminationPhrase),
             StringComparer.Ordinal);
         var nextTurn = 0;
+        string? lastTurnParticipantId = null;
         var serializedTurns = request.Definition.Pattern is not ConcurrentOrchestrationPattern;
         List<ChatMessage>? finalMessages = null;
         var unsupportedOutputTypes = new HashSet<string>(StringComparer.Ordinal);
@@ -126,6 +127,11 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine
                     }
                     if (state.Active is null)
                     {
+                        if (request.Definition.Pattern is HandoffOrchestrationPattern
+                            && lastTurnParticipantId is not null
+                            && !string.Equals(lastTurnParticipantId, actor.Id, StringComparison.Ordinal))
+                            yield return new FlowParticipantHandoff(lastTurnParticipantId, actor.Id);
+                        lastTurnParticipantId = actor.Id;
                         state.Start(++nextTurn, responseId);
                         yield return new FlowParticipantTurnStarted(actor.Id, nextTurn);
                     }
@@ -173,6 +179,11 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine
                     }
                     if (state.Active is null)
                     {
+                        if (request.Definition.Pattern is HandoffOrchestrationPattern
+                            && lastTurnParticipantId is not null
+                            && !string.Equals(lastTurnParticipantId, actor.Id, StringComparison.Ordinal))
+                            yield return new FlowParticipantHandoff(lastTurnParticipantId, actor.Id);
+                        lastTurnParticipantId = actor.Id;
                         state.Start(++nextTurn, responseId);
                         yield return new FlowParticipantTurnStarted(actor.Id, nextTurn);
                     }

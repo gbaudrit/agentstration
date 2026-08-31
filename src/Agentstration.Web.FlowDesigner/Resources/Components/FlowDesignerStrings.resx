@@ -46,4 +46,7 @@
   <data name="TopologyZoomControls"><value>Topology zoom controls</value></data><data name="NoTopology"><value>No topology is available for this Flow.</value></data>
   <data name="TurnCount.One"><value>{0} turn</value></data><data name="TurnCount.Many"><value>{0} turns</value></data><data name="InitialParticipant"><value>initial participant</value></data>
   <data name="EdgeDescription"><value>{0} to {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>declared</value></data><data name="EdgeState.Observed"><value>observed</value></data><data name="EdgeState.Inactive"><value>not selected</value></data>
+  <data name="ObservedPath"><value>Observed path</value></data><data name="ObservedPathCount"><value>Path ({0})</value></data><data name="ObservedPathSummary"><value>{0} handoffs in execution order</value></data>
+  <data name="ObservedHandoffSequence"><value>Observed handoff sequence</value></data><data name="CloseObservedPath"><value>Close observed path</value></data><data name="ObservedTransferDescription"><value>Handoff {0}: {1} to {2}</value></data>
+  <data name="ExpandTopology"><value>Expand</value></data><data name="ReduceTopology"><value>Reduce</value></data><data name="ShowDiagnostics"><value>Show diagnostics</value></data><data name="HideDiagnostics"><value>Hide diagnostics</value></data>
 </root>

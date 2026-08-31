@@ -23,18 +23,32 @@
         <ol class="flow-timeline-list" aria-live="polite">
             @foreach (var item in Activity)
             {
-                <li class="flow-timeline-item @Tone(item.Type)">
+                <li class="flow-timeline-item @Tone(item)">
                     <time datetime="@item.Timestamp.ToString("O", CultureInfo.InvariantCulture)">@item.Timestamp.ToLocalTime().ToString("T", CultureInfo.CurrentCulture)</time>
                     <span class="flow-timeline-node"></span>
                     <div class="flow-timeline-content">
                         <strong>@Title(item)</strong>
-                        @if (item.IsStream)
+                        @if (item.IsTurn)
+                        {
+                            <div class="flow-turn-message @(item.IsCompleted ? "completed" : "streaming")">
+                                <div><span>@T("ParticipantMessage")</span><em>@T(item.IsCompleted ? "Completed" : "Streaming")</em></div>
+                                <pre>@(string.IsNullOrWhiteSpace(item.Text) ? T(item.IsCompleted ? "NoVisibleTextOutput" : "WaitingForParticipantResponse") : item.Text)</pre>
+                            </div>
+                            <small>@DeltaCount(item.DeltaCount) · #@item.FirstSequence–@item.LastSequence</small>
+                        }
+                        else if (item.IsStream)
                         {
                             <pre class="flow-stream-output">@(string.IsNullOrEmpty(item.Text) ? T("WaitingForOutput") : item.Text)</pre>
-                            <small>@DeltaCount(item.Count) · #@item.FirstSequence–@item.LastSequence</small>
+                            <small>@DeltaCount(item.DeltaCount) · #@item.FirstSequence–@item.LastSequence</small>
                         }
                         else
                         {
+                            @if (item.Type == FlowRunEventType.ParticipantHandoff && item.HandoffFrom is not null && item.HandoffTo is not null)
+                            {
+                                <div class="flow-handoff-route" aria-label="@T("HandoffAriaLabel", item.HandoffFrom, item.HandoffTo)">
+                                    <span>@item.HandoffFrom</span><b aria-hidden="true">→</b><span>@item.HandoffTo</span>
+                                </div>
+                            }
                             @if (!string.IsNullOrWhiteSpace(item.Detail)) { <p>@item.Detail</p> }
                             <small>#@item.FirstSequence · @EventTypeLabel(item.Type)</small>
                         }
@@ -74,44 +88,100 @@
 
     [Parameter] public IReadOnlyList<FlowRunEvent> Events { get; set; } = [];
     [Parameter] public bool IsLive { get; set; }
+    [Parameter] public bool InferParticipantHandoffs { get; set; }
 
-    private IReadOnlyList<TimelineItem> Activity => BuildActivity(Events);
+    private IReadOnlyList<TimelineItem> Activity => BuildActivity(Events, InferParticipantHandoffs);
     private IReadOnlyList<FlowRunEvent> FilteredRawEvents => Events.Where(value => string.IsNullOrEmpty(rawType) || string.Equals(value.Type.ToString(), rawType, StringComparison.Ordinal)).OrderBy(value => value.Sequence).ToArray();
     private IReadOnlyList<FlowRunEvent> VisibleRawEvents => FilteredRawEvents.TakeLast(rawLimit).ToArray();
 
     private void LoadMoreRawEvents() => rawLimit += RawPageSize;
 
-    private static IReadOnlyList<TimelineItem> BuildActivity(IReadOnlyList<FlowRunEvent> events)
+    private static IReadOnlyList<TimelineItem> BuildActivity(IReadOnlyList<FlowRunEvent> events, bool inferParticipantHandoffs)
     {
         var activity = new List<TimelineItem>();
+        var activeTurns = new Dictionary<string, TimelineItem>(StringComparer.Ordinal);
+        var inferHandoffs = inferParticipantHandoffs && !events.Any(value => value.Type == FlowRunEventType.ParticipantHandoff);
+        string? lastParticipant = null;
         foreach (var runEvent in events.OrderBy(value => value.Sequence))
         {
+            if (runEvent.Type == FlowRunEventType.ParticipantTurnStarted && runEvent.StepId is not null)
+            {
+                if (inferHandoffs
+                    && lastParticipant is not null
+                    && !string.Equals(lastParticipant, runEvent.StepId, StringComparison.Ordinal))
+                {
+                    var inferred = runEvent with
+                    {
+                        Type = FlowRunEventType.ParticipantHandoff,
+                        StepId = lastParticipant,
+                        Payload = JsonSerializer.SerializeToElement(new { from = lastParticipant, to = runEvent.StepId })
+                    };
+                    activity.Add(TimelineItem.Event(inferred, string.Empty));
+                }
+                lastParticipant = runEvent.StepId;
+                var turn = TimelineItem.ParticipantTurn(runEvent);
+                activeTurns[runEvent.StepId] = turn;
+                activity.Add(turn);
+                continue;
+            }
             if (runEvent.Type == FlowRunEventType.StepOutputDelta)
             {
                 var text = DeltaText(runEvent.Payload);
-                if (activity.LastOrDefault() is { IsStream: true } current && string.Equals(current.StepId, runEvent.StepId, StringComparison.Ordinal)) current.Append(text, runEvent.Sequence);
+                if (runEvent.StepId is not null && activeTurns.TryGetValue(runEvent.StepId, out var activeTurn)) activeTurn.Append(text, runEvent.Sequence);
+                else if (activity.LastOrDefault() is { IsStream: true } current && string.Equals(current.StepId, runEvent.StepId, StringComparison.Ordinal)) current.Append(text, runEvent.Sequence);
                 else activity.Add(TimelineItem.Stream(runEvent, text));
                 continue;
             }
-            activity.Add(TimelineItem.Event(runEvent, Payload(runEvent.Payload)));
+            if (runEvent.Type == FlowRunEventType.ParticipantTurnCompleted
+                && runEvent.StepId is not null
+                && activeTurns.Remove(runEvent.StepId, out var completedTurn))
+            {
+                completedTurn.Complete(runEvent.Sequence);
+                continue;
+            }
+            if (runEvent.Type == FlowRunEventType.StepRunCompleted
+                && runEvent.StepId is not null
+                && activeTurns.Remove(runEvent.StepId, out var finalTurn))
+            {
+                if (finalTurn.DeltaCount == 0) activity.Remove(finalTurn);
+                else finalTurn.Complete(runEvent.Sequence);
+            }
+            if (runEvent.Type == FlowRunEventType.FlowRunCompleted && activeTurns.Count > 0)
+            {
+                foreach (var activeTurn in activeTurns.Values)
+                {
+                    if (activeTurn.DeltaCount == 0) activity.Remove(activeTurn);
+                    else activeTurn.Complete(runEvent.Sequence);
+                }
+                activeTurns.Clear();
+            }
+            activity.Add(TimelineItem.Event(runEvent, runEvent.Type == FlowRunEventType.ParticipantHandoff ? string.Empty : Payload(runEvent.Payload)));
         }
         return activity;
     }
 
     private string Title(TimelineItem item)
     {
+        if (item.IsTurn)
+            return T(item.IsCompleted ? "ParticipantTurnCompleted" : "ParticipantTurnStarted",
+                item.StepId ?? T("Participant"), item.Turn?.ToString(CultureInfo.InvariantCulture) ?? "—");
         if (item.IsStream) return T("StreamingOutput", item.StepId ?? T("Step"));
+        if (item.Type == FlowRunEventType.ParticipantHandoff)
+            return T("Event.ParticipantHandoff", item.HandoffFrom ?? item.StepId ?? T("Participant"), item.HandoffTo ?? T("Participant"));
         var subject = item.Type is FlowRunEventType.ParticipantTurnStarted or FlowRunEventType.ParticipantTurnCompleted
             ? item.StepId ?? T("Participant")
             : item.StepId ?? T("Step");
         return T($"Event.{item.Type}", subject);
     }
 
-    private static string Tone(FlowRunEventType type) => type switch
+    private static string Tone(TimelineItem item) => item.IsTurn
+        ? item.IsCompleted ? "flow-timeline-success" : "flow-timeline-info"
+        : item.Type switch
     {
         FlowRunEventType.FlowRunCompleted or FlowRunEventType.StepRunCompleted => "flow-timeline-success",
         FlowRunEventType.FlowRunFailed or FlowRunEventType.StepRunFailed => "flow-timeline-danger",
         FlowRunEventType.FlowRunCancelled or FlowRunEventType.FlowRunTimedOut or FlowRunEventType.InputExpired => "flow-timeline-warning",
+        FlowRunEventType.ParticipantHandoff => "flow-timeline-handoff",
         FlowRunEventType.FlowRunStarted or FlowRunEventType.FlowRunResumed or FlowRunEventType.InputRequested or FlowRunEventType.InputReceived or FlowRunEventType.StepRunStarted or FlowRunEventType.ParticipantTurnStarted or FlowRunEventType.StepOutputDelta => "flow-timeline-info",
         _ => string.Empty
     };
@@ -138,23 +208,44 @@
         return value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : value.GetRawText();
     }
 
+    private static string? PayloadString(JsonElement? payload, string propertyName) =>
+        payload is { ValueKind: JsonValueKind.Object } value
+        && value.TryGetProperty(propertyName, out var property)
+        && property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : null;
+
+    private static int? PayloadInt(JsonElement? payload, string propertyName) =>
+        payload is { ValueKind: JsonValueKind.Object } value
+        && value.TryGetProperty(propertyName, out var property)
+        && property.TryGetInt32(out var result)
+            ? result
+            : null;
+
     private enum TimelineView { Activity, Raw }
 
     private sealed class TimelineItem
     {
         private readonly StringBuilder text = new();
-        private TimelineItem(FlowRunEvent runEvent, bool isStream, string initialText) { Type = runEvent.Type; StepId = runEvent.StepId; Timestamp = runEvent.Timestamp; FirstSequence = runEvent.Sequence; LastSequence = runEvent.Sequence; IsStream = isStream; text.Append(initialText); Detail = isStream ? string.Empty : initialText; }
+        private TimelineItem(FlowRunEvent runEvent, bool isStream, bool isTurn, string initialText) { Type = runEvent.Type; StepId = runEvent.StepId; Timestamp = runEvent.Timestamp; FirstSequence = runEvent.Sequence; LastSequence = runEvent.Sequence; IsStream = isStream; IsTurn = isTurn; Turn = isTurn ? PayloadInt(runEvent.Payload, "turn") : null; text.Append(initialText); Detail = isStream || isTurn ? string.Empty : initialText; HandoffFrom = PayloadString(runEvent.Payload, "from") ?? (runEvent.Type == FlowRunEventType.ParticipantHandoff ? runEvent.StepId : null); HandoffTo = PayloadString(runEvent.Payload, "to"); DeltaCount = isStream ? 1 : 0; }
         public FlowRunEventType Type { get; }
         public string? StepId { get; }
         public DateTimeOffset Timestamp { get; }
         public long FirstSequence { get; }
         public long LastSequence { get; private set; }
         public bool IsStream { get; }
+        public bool IsTurn { get; }
+        public bool IsCompleted { get; private set; }
+        public int? Turn { get; }
         public string Text => text.ToString();
         public string Detail { get; }
-        public int Count { get; private set; } = 1;
-        public static TimelineItem Stream(FlowRunEvent runEvent, string text) => new(runEvent, true, text);
-        public static TimelineItem Event(FlowRunEvent runEvent, string detail) => new(runEvent, false, detail);
-        public void Append(string value, long sequence) { text.Append(value); LastSequence = sequence; Count++; }
+        public string? HandoffFrom { get; }
+        public string? HandoffTo { get; }
+        public int DeltaCount { get; private set; }
+        public static TimelineItem Stream(FlowRunEvent runEvent, string text) => new(runEvent, true, false, text);
+        public static TimelineItem ParticipantTurn(FlowRunEvent runEvent) => new(runEvent, false, true, string.Empty);
+        public static TimelineItem Event(FlowRunEvent runEvent, string detail) => new(runEvent, false, false, detail);
+        public void Append(string value, long sequence) { text.Append(value); LastSequence = sequence; DeltaCount++; }
+        public void Complete(long sequence) { LastSequence = sequence; IsCompleted = true; }
     }
 }

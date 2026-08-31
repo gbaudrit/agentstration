@@ -543,6 +543,9 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             new[] { "agent-1", "agent-2" },
             events.OfType<FlowParticipantTurnStarted>().Select(value => value.ParticipantId).ToArray(),
             string.Join(", ", events.Select(value => value.GetType().Name)));
+        var handoff = events.OfType<FlowParticipantHandoff>().Single();
+        Assert.AreEqual("agent-1", handoff.FromParticipantId);
+        Assert.AreEqual("agent-2", handoff.ToParticipantId);
         CollectionAssert.AreEqual(
             new[] { string.Empty, "HANDOFF_OK" },
             events.OfType<FlowParticipantCompleted>()

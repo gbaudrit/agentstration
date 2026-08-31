@@ -40,4 +40,7 @@
   <data name="TopologyZoomControls"><value>Contrôles de zoom de la topologie</value></data><data name="NoTopology"><value>Aucune topologie n’est disponible pour ce Flow.</value></data>
   <data name="TurnCount.One"><value>{0} tour</value></data><data name="TurnCount.Many"><value>{0} tours</value></data><data name="InitialParticipant"><value>participant initial</value></data>
   <data name="EdgeDescription"><value>{0} vers {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>déclaré</value></data><data name="EdgeState.Observed"><value>observé</value></data><data name="EdgeState.Inactive"><value>non sélectionné</value></data>
+  <data name="ObservedPath"><value>Parcours observé</value></data><data name="ObservedPathCount"><value>Parcours ({0})</value></data><data name="ObservedPathSummary"><value>{0} transferts dans l’ordre d’exécution</value></data>
+  <data name="ObservedHandoffSequence"><value>Séquence des transferts observés</value></data><data name="CloseObservedPath"><value>Fermer le parcours observé</value></data><data name="ObservedTransferDescription"><value>Transfert {0} : {1} vers {2}</value></data>
+  <data name="ExpandTopology"><value>Agrandir</value></data><data name="ReduceTopology"><value>Réduire</value></data><data name="ShowDiagnostics"><value>Afficher le diagnostic</value></data><data name="HideDiagnostics"><value>Masquer le diagnostic</value></data>
 </root>
