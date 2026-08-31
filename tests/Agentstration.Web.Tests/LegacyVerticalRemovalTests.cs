@@ -90,7 +90,7 @@ public sealed class LegacyVerticalRemovalTests
         new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("Data:Directory", dataDirectory ?? Path.Combine(Path.GetTempPath(), $"agentstration-web-tests-{Guid.NewGuid():N}"));
+            if (dataDirectory is not null) builder.UseSetting("Data:TestingDirectory", dataDirectory);
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
         });
 }

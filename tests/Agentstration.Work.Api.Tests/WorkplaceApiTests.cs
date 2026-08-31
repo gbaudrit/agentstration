@@ -36,7 +36,7 @@ public sealed class WorkplaceApiTests
             await using var factory = new WebApplicationFactory<WorkApiProgram>().WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Testing");
-                builder.UseSetting("Data:Directory", dataDirectory);
+                builder.UseSetting("Data:TestingDirectory", dataDirectory);
             });
             using var client = factory.CreateClient();
 
@@ -206,7 +206,7 @@ public sealed class WorkplaceApiTests
             await using var factory = new WebApplicationFactory<WorkApiProgram>().WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Testing");
-                builder.UseSetting("Data:Directory", dataDirectory);
+                builder.UseSetting("Data:TestingDirectory", dataDirectory);
             });
             using var client = factory.CreateClient();
             var current = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
@@ -301,7 +301,7 @@ public sealed class WorkplaceApiTests
             await using var factory = new WebApplicationFactory<WorkApiProgram>().WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Testing");
-                builder.UseSetting("Data:Directory", dataDirectory);
+                builder.UseSetting("Data:TestingDirectory", dataDirectory);
             });
             using var client = factory.CreateClient();
             using var submittedResponse = await client.PostAsJsonAsync(
@@ -342,7 +342,7 @@ public sealed class WorkplaceApiTests
             await using var factory = new WebApplicationFactory<WorkApiProgram>().WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Testing");
-                builder.UseSetting("Data:Directory", dataDirectory);
+                builder.UseSetting("Data:TestingDirectory", dataDirectory);
             });
             using var client = factory.CreateClient();
             using var submittedResponse = await client.PostAsJsonAsync(
@@ -440,7 +440,7 @@ public sealed class WorkplaceApiTests
             await using var factory = new WebApplicationFactory<WorkApiProgram>().WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Testing");
-                builder.UseSetting("Data:Directory", dataDirectory);
+                builder.UseSetting("Data:TestingDirectory", dataDirectory);
             });
             using var client = factory.CreateClient();
             var taskCreated = new TaskCompletionSource<TaskCreatedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);

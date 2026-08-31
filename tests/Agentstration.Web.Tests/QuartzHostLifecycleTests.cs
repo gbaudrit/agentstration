@@ -1,12 +1,38 @@
 using System.Net;
+using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
 
 [TestClass]
 public sealed class QuartzHostLifecycleTests
 {
+    [TestMethod]
+    public async Task UnconfiguredTestingHostDeletesItsOwnedDataDirectoryAfterShutdown()
+    {
+        string directory;
+        await using (var factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        }))
+        {
+            using var client = factory.CreateClient();
+            Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
+            directory = factory.Services.GetRequiredService<TestingDataDirectoryCleanupService>().DirectoryPath;
+            Assert.IsTrue(Directory.Exists(directory));
+            Assert.IsTrue(File.Exists(Path.Combine(directory, "control-plane.db")));
+            Assert.IsTrue(File.Exists(Path.Combine(directory, "work-plane.db")));
+            Assert.IsTrue(File.Exists(Path.Combine(directory, "flow-plane.db")));
+            Assert.IsTrue(File.Exists(Path.Combine(directory, "runtime-plane.db")));
+            Assert.IsTrue(File.Exists(Path.Combine(directory, "identity.db")));
+        }
+
+        Assert.IsFalse(Directory.Exists(directory));
+    }
+
     [TestMethod]
     public async Task SchedulerDatabaseIsReleasedAfterEveryHostShutdown()
     {
@@ -36,7 +62,7 @@ public sealed class QuartzHostLifecycleTests
         new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("Data:Directory", dataDirectory);
+            builder.UseSetting("Data:TestingDirectory", dataDirectory);
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
         });
 }

@@ -4,6 +4,7 @@ using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -342,6 +343,7 @@ public sealed class DeclarativeBootstrapTests
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
+            builder.UseSetting("Data:TestingDirectory", Path.Combine(path, ".test-data"));
             builder.UseSetting("Agentstration:Authentication:Mode", "Local");
             builder.UseSetting("Agentstration:Bootstrap:Path", Directory.GetParent(path)!.FullName);
             builder.UseSetting("Agentstration:Bootstrap:InitialBootstrapEnabled", "true");
@@ -433,6 +435,10 @@ public sealed class DeclarativeBootstrapTests
         }
 
         public string Path { get; }
-        public void Dispose() => Directory.Delete(Path, recursive: true);
+        public void Dispose()
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(Path, recursive: true);
+        }
     }
 }
