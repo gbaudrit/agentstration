@@ -47,6 +47,11 @@ public sealed class WorkItemService(
 
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
 
+    internal Task<IReadOnlyDictionary<WorkTaskId, StoredWorkItem>> ListLatestContinuationsAsync(
+        WorkspaceId workspaceId,
+        IReadOnlyCollection<WorkTaskId> taskIds,
+        CancellationToken cancellationToken) => repository.ListLatestContinuationsAsync(workspaceId, taskIds, cancellationToken);
+
     public Task<StoredWorkItem> SubmitAsync(SubmitWorkItemCommand command, CancellationToken cancellationToken) =>
         SubmitAsync(command, null, cancellationToken);
 
