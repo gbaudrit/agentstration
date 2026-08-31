@@ -146,8 +146,9 @@ public sealed partial class ModelManagementApiTests
                 SchemaDigest = target.SchemaDigest,
                 Values = JsonSerializer.SerializeToElement(new { name = source.Values.GetProperty("legacyName").GetString() })
             });
+        }
     }
-}
+
     private static CreateModelProfileRequest Request(string name, string model) => new(
         name,
         new ModelProfileProperties

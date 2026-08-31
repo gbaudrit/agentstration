@@ -94,7 +94,7 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine(
                 }
                 if (content is UsageContent usage) MergeUsage(usage.Details);
             }
-}
+        }
         public void MergeUsage(UsageDetails? usage)
         {
             if (usage is null || Active is null) return;

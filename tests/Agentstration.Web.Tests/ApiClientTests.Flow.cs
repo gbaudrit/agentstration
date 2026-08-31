@@ -231,7 +231,10 @@ public sealed partial class ApiClientTests
                 },
                 _ => new HttpResponseMessage(HttpStatusCode.NotFound)
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
         var client = new FlowApiClient(httpClient);
 
         var runs = await client.GetFlowRunsAsync((string?)null, default);
@@ -247,7 +250,10 @@ public sealed partial class ApiClientTests
             {
                 Content = JsonContent.Create(new FlowRunPageResponse([first], "/api/flowRuns?top=200"))
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
 
         await Assert.ThrowsExactlyAsync<AgentstrationApiException>(() =>
             new FlowApiClient(repeatedHttpClient).GetFlowRunsAsync((string?)null, default));
@@ -267,7 +273,10 @@ public sealed partial class ApiClientTests
             {
                 Content = JsonContent.Create(new FlowRunPageResponse([CreateFlowRun("run-1")], nextLink))
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost/")
+        };
 
         await Assert.ThrowsExactlyAsync<AgentstrationApiException>(() =>
             new FlowApiClient(httpClient).GetFlowRunsAsync((string?)null, default));
