@@ -16,6 +16,8 @@ public sealed class RuntimeProfileManagementService(
     IAgentDeploymentReconciler reconciler)
 {
     public static string ProfileId(string name) => name;
+    public void ValidateForCreate(RuntimeProfileResource resource) => Validate(resource);
+
     public async Task<StoredResource<RuntimeProfileResource>> CreateAsync(RuntimeProfileResource resource, CancellationToken cancellationToken)
     {
         Validate(resource);

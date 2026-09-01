@@ -30,6 +30,7 @@ public static class ResourceKinds
     public const string ToolProvider = "ToolProvider";
     public const string ToolExecutionHook = "ToolExecutionHook";
     public const string Trigger = "Trigger";
+    public const string BootstrapApplication = "BootstrapApplication";
 }
 
 public sealed record ResourceMetadata

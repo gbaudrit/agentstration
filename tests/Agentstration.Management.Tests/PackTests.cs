@@ -160,6 +160,51 @@ public sealed class PackTests
     }
 
     [TestMethod]
+    public async Task BootstrapPackInstallationPreviewsAndInstallsALocalArchiveOnce()
+    {
+        await using var fixture = await PackFixture.CreateAsync();
+        var resourceHandler = new FakeHandler("First", 10, []);
+        var packService = new PackManagementService(fixture.Store, [resourceHandler], TimeProvider.System);
+        var handler = new PackInstallationBootstrapResourceHandler(new ZipPackArchiveReader(), packService);
+        var profilePath = Path.Combine(Path.GetTempPath(), "agentstration-bootstrap-pack-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(profilePath);
+        try
+        {
+            await using (var archive = CreateZip(new Dictionary<string, string>
+            {
+                ["pack.yaml"] = Manifest("resources/one.yaml"),
+                ["resources/one.yaml"] = Resource("First", "one")
+            }))
+            {
+                await File.WriteAllBytesAsync(Path.Combine(profilePath, "tools.zip"), archive.ToArray());
+            }
+            var document = new BootstrapResourceDocument
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = BootstrapResourceKinds.PackInstallation,
+                Metadata = new ResourceMetadata { Name = "tools" },
+                Definition = JsonSerializer.SerializeToElement(new { source = new { path = "tools.zip" } })
+            };
+            var operation = new BootstrapResourceOperationContext(
+                "workspace-tools",
+                profilePath,
+                BootstrapProfileScope.Workspace,
+                new(Guid.NewGuid(), Guid.NewGuid()));
+
+            var preview = await handler.PlanAsync(document, operation, new(), default);
+            Assert.AreEqual(BootstrapResourceDisposition.Create, preview.Disposition);
+            Assert.AreEqual(BootstrapResourceDisposition.Create, preview.Details?.Single().Disposition);
+            Assert.AreEqual(BootstrapResourceApplyResult.Created, await handler.ApplyAsync(document, operation, default));
+            Assert.AreEqual(BootstrapResourceDisposition.Skip, (await handler.PlanAsync(document, operation, new(), default)).Disposition);
+            Assert.AreEqual(BootstrapResourceApplyResult.Skipped, await handler.ApplyAsync(document, operation, default));
+        }
+        finally
+        {
+            Directory.Delete(profilePath, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public async Task FailedInstallationCompensatesAppliedResourcesAndRecordsFailure()
     {
         await using var fixture = await PackFixture.CreateAsync();

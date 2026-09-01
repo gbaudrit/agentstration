@@ -12,6 +12,12 @@ public sealed class ModelProviderManagementService(
     TimeProvider timeProvider) : IModelProviderConfigurationStore
 {
     public static string ModelProviderId(string name) => name;
+    public async Task ValidateForCreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
+    {
+        ValidateIdentity(resource);
+        _ = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, cancellationToken);
+    }
+
     public async Task<StoredResource<ModelProviderResource>> CreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);

@@ -1,0 +1,14 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: solution-discovery
+definition:
+  displayName: Découvrir Agentstration
+  description: Crée une équipe de spécialistes et une expérience conversationnelle de découverte dans le Workspace sélectionné.
+  targetScope: workspace
+  bindings:
+    - name: agent-model
+      targetKind: modelProfile
+      displayName: Modèle des agents
+      description: Profil de modèle partagé par les quatre agents de découverte.
+      required: true
