@@ -27,7 +27,6 @@ else
         <div><span class="field-label">@T("DefinitionState")</span><strong>@Label("DefinitionState", run.DefinitionState)</strong></div>
         <div><span class="field-label">@T("TriggerStartedBy")</span><strong>@Label("Trigger", run.Trigger) · @(run.StartedBy ?? "—")</strong></div>
         <div><span class="field-label">@T("CorrelationId")</span><code>@run.CorrelationId</code></div>
-        <div><span class="field-label">@T("Duration")</span><strong>@Duration(run.StartedAt, run.CompletedAt)</strong></div>
     </section>
     @if (run.Error is not null)
     {

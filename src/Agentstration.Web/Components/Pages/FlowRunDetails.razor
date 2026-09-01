@@ -32,7 +32,6 @@ else
         <div><span class="field-label">@T("Deployment")</span><strong>@(run.DeploymentResourceId ?? "—")</strong></div>
         <div><span class="field-label">@T("TriggerAndStartedBy")</span><strong>@TriggerLabel(run.Trigger) · @(run.StartedBy ?? "—")</strong></div>
         <div><span class="field-label">@T("CorrelationId")</span><code>@run.CorrelationId</code></div>
-        <div><span class="field-label">@T("Duration")</span><strong>@Duration(run.StartedAt, run.CompletedAt)</strong></div>
     </section>
     @if (run.Error is not null)
     {
