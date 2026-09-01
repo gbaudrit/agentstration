@@ -11,16 +11,41 @@
         </div>
     </div>
     <div class="flow-timeline-tabs" role="tablist" aria-label="@T("TimelineViewsAriaLabel")">
-        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Activity)" class="@(activeView == TimelineView.Activity ? "active" : null)" @onclick="() => activeView = TimelineView.Activity">@T("Activity")</button>
+        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Summary ? "true" : "false")" class="@(activeView == TimelineView.Summary ? "active" : null)" @onclick="() => activeView = TimelineView.Summary">@T("Summary")</button>
+        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Activity ? "true" : "false")" class="@(activeView == TimelineView.Activity ? "active" : null)" @onclick="() => activeView = TimelineView.Activity">@T("Activity")</button>
         @if (HasHandoffView)
         {
-            <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Handoffs)" class="@(activeView == TimelineView.Handoffs ? "active" : null)" @onclick="() => activeView = TimelineView.Handoffs">@T("Handoffs")</button>
+            <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Handoffs ? "true" : "false")" class="@(activeView == TimelineView.Handoffs ? "active" : null)" @onclick="() => activeView = TimelineView.Handoffs">@T("Handoffs")</button>
         }
-        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Raw)" class="@(activeView == TimelineView.Raw ? "active" : null)" @onclick="() => activeView = TimelineView.Raw">@T("RawEvents")</button>
+        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Raw ? "true" : "false")" class="@(activeView == TimelineView.Raw ? "active" : null)" @onclick="() => activeView = TimelineView.Raw">@T("RawEvents")</button>
     </div>
     @if (Events.Count == 0)
     {
         <div class="flow-timeline-empty">@T("WaitingForEvents")</div>
+    }
+    else if (activeView == TimelineView.Summary)
+    {
+        <section class="flow-execution-summary" aria-label="@T("Summary")">
+            <div class="flow-summary-metrics">
+                <div><span>@T("SummaryDuration")</span><strong>@Elapsed</strong></div>
+                <div><span>@T("SummaryCompletedSteps")</span><strong>@CompletedStepCount</strong></div>
+                <div><span>@T("SummaryTurns")</span><strong>@TurnCount</strong></div>
+                <div><span>@T("SummaryParticipants")</span><strong>@Participants.Count</strong></div>
+                <div><span>@T("SummaryHandoffs")</span><strong>@Handoffs.Count</strong></div>
+            </div>
+            @if (ParticipantPath.Count > 0)
+            {
+                <div class="flow-participant-path">
+                    <strong>@T("ParticipantPath")</strong>
+                    <ol>
+                        @for (var index = 0; index < ParticipantPath.Count; index++)
+                        {
+                            <li>@if (index > 0) { <b aria-hidden="true">→</b> }<span>@ParticipantPath[index]</span></li>
+                        }
+                    </ol>
+                </div>
+            }
+        </section>
     }
     else if (activeView == TimelineView.Activity)
     {
@@ -127,6 +152,11 @@
     private IReadOnlyList<TimelineItem> Activity => BuildActivity(Events, InferParticipantHandoffs);
     private IReadOnlyList<TimelineItem> Handoffs => Activity.Where(value => value.Type == FlowRunEventType.ParticipantHandoff && value.HandoffFrom is not null && value.HandoffTo is not null).ToArray();
     private bool HasHandoffView => InferParticipantHandoffs || Events.Any(value => value.Type == FlowRunEventType.ParticipantHandoff);
+    private int CompletedStepCount => Events.Count(value => value.Type == FlowRunEventType.StepRunCompleted);
+    private int TurnCount => Events.Count(value => value.Type == FlowRunEventType.ParticipantTurnCompleted);
+    private IReadOnlyList<string> Participants => ParticipantNames();
+    private IReadOnlyList<string> ParticipantPath => BuildParticipantPath();
+    private string Elapsed => Events.Count < 2 ? "—" : FormatElapsed(Events.Max(value => value.Timestamp) - Events.Min(value => value.Timestamp));
     private IReadOnlyList<FlowRunEvent> FilteredRawEvents => Events.Where(value => string.IsNullOrEmpty(rawType) || string.Equals(value.Type.ToString(), rawType, StringComparison.Ordinal)).OrderBy(value => value.Sequence).ToArray();
     private IReadOnlyList<FlowRunEvent> VisibleRawEvents => FilteredRawEvents.TakeLast(rawLimit).ToArray();
 
@@ -136,6 +166,34 @@
     {
         if (!HasHandoffView && activeView == TimelineView.Handoffs) activeView = TimelineView.Activity;
     }
+
+    private IReadOnlyList<string> ParticipantNames() => Activity
+        .Where(value => value.IsTurn && value.StepId is not null)
+        .Select(value => value.StepId!)
+        .Concat(Handoffs.SelectMany(value => new[] { value.HandoffFrom!, value.HandoffTo! }))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
+    private IReadOnlyList<string> BuildParticipantPath()
+    {
+        if (Handoffs.Count > 0)
+        {
+            var path = new List<string> { Handoffs[0].HandoffFrom! };
+            path.AddRange(Handoffs.Select(value => value.HandoffTo!));
+            return path;
+        }
+
+        var result = new List<string>();
+        foreach (var participant in Activity.Where(value => value.IsTurn && value.StepId is not null).Select(value => value.StepId!))
+        {
+            if (result.Count == 0 || !string.Equals(result[^1], participant, StringComparison.Ordinal)) result.Add(participant);
+        }
+        return result;
+    }
+
+    private static string FormatElapsed(TimeSpan value) => value.TotalSeconds >= 1
+        ? $"{value.TotalSeconds.ToString("0.##", CultureInfo.CurrentCulture)} s"
+        : $"{value.TotalMilliseconds.ToString("0", CultureInfo.CurrentCulture)} ms";
 
     private static IReadOnlyList<TimelineItem> BuildActivity(IReadOnlyList<FlowRunEvent> events, bool inferParticipantHandoffs)
     {
@@ -263,7 +321,7 @@
             ? result
             : null;
 
-    private enum TimelineView { Activity, Handoffs, Raw }
+    private enum TimelineView { Summary, Activity, Handoffs, Raw }
 
     private sealed class TimelineItem
     {
