@@ -20,18 +20,43 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
 {
     public async Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken)
     {
-        var path = "api/agents?allNamespaces=true&top=1000";
-        var page = await ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, path, cancellationToken);
+        var agentsTask = ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, "api/agents?allNamespaces=true&top=1000", cancellationToken);
+        var deploymentsTask = ApiResponse.ReadAsync<PagedResponse<AgentDeployment>>(httpClient, "api/deployments?top=1000", cancellationToken);
+        await Task.WhenAll(agentsTask, deploymentsTask);
+        var page = await agentsTask;
+        var deployments = (await deploymentsTask).Value;
         return page.Value.Select(agent =>
         {
             var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ResourceKinds.ModelProfile);
-            return new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), "Not deployed", DateTimeOffset.MinValue, modelProfile.Name)
+            var deployment = FindCurrentDeployment(agent, deployments);
+            return new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), DeploymentStatus(deployment), deployment?.UpdatedAt ?? DateTimeOffset.MinValue, modelProfile.Name)
             {
                 Namespace = agent.Namespace,
-                ModelProfileNamespace = modelProfile.Namespace
+                ModelProfileNamespace = modelProfile.Namespace,
+                DeploymentId = deployment?.Metadata.Name
             };
         }).ToArray();
     }
+
+    private static AgentDeployment? FindCurrentDeployment(AgentResource agent, IReadOnlyList<AgentDeployment> deployments)
+    {
+        var canonicalName = $"{agent.Metadata.Name}--g{agent.Generation:000000}";
+        return deployments
+            .Where(deployment =>
+                deployment.AgentNamespace == agent.Namespace
+                && string.Equals(deployment.AgentName, agent.Metadata.Name, StringComparison.Ordinal))
+            .OrderByDescending(deployment => string.Equals(deployment.Metadata.Name, canonicalName, StringComparison.Ordinal))
+            .ThenByDescending(deployment => deployment.DesiredState == DesiredAgentState.Running)
+            .ThenByDescending(deployment => deployment.UpdatedAt)
+            .FirstOrDefault();
+    }
+
+    private static string DeploymentStatus(AgentDeployment? deployment) => deployment switch
+    {
+        null => "Not deployed",
+        { DesiredState: DesiredAgentState.Stopped } => "Stopped",
+        _ => deployment.OperationalState.ToString()
+    };
 
     public async Task<IReadOnlyList<DeploymentSummary>> GetDeploymentsAsync(CancellationToken cancellationToken)
     {
