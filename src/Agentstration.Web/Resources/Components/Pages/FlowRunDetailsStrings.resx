@@ -29,7 +29,7 @@
   <data name="RunInputAndOutput"><value>Run input and output</value></data>
   <data name="Input"><value>Input</value></data>
   <data name="Output"><value>Output</value></data>
-  <data name="StepDiagnostic"><value>Step diagnostic</value></data>
+  <data name="StepDiagnostic"><value>Step details</value></data>
   <data name="SelectStep"><value>Select a step to inspect its execution.</value></data>
   <data name="Type"><value>Type</value></data>
   <data name="Attempt"><value>Attempt</value></data>
@@ -72,6 +72,11 @@
   <data name="EventCount.Many"><value>{0} events</value></data>
   <data name="TimelineViewsAriaLabel"><value>Execution timeline views</value></data>
   <data name="Activity"><value>Activity</value></data>
+  <data name="Handoffs"><value>Handoffs</value></data>
+  <data name="ObservedPath"><value>Observed path</value></data>
+  <data name="HandoffCount.One"><value>{0} handoff</value></data>
+  <data name="HandoffCount.Many"><value>{0} handoffs</value></data>
+  <data name="NoHandoffs"><value>No handoff has been observed yet.</value></data>
   <data name="RawEvents"><value>Raw events</value></data>
   <data name="WaitingForEvents"><value>Waiting for execution events…</value></data>
   <data name="WaitingForOutput"><value>Waiting for output…</value></data>

@@ -59,11 +59,10 @@ public sealed class FlowTopologyViewerTests
     }
 
     [TestMethod]
-    public void ObservedPathUsesVerticalPanelAndHighlightsSelectedHandoff()
+    public void ObservedHandoffsRemainVisibleOnGraphWithoutAPathOverlay()
     {
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        var selected = string.Empty;
         var graph = new FlowTopologyGraph(
             [
                 new("participant:welcome", "welcome", "Welcome", "agent", 0, 0),
@@ -77,18 +76,12 @@ public sealed class FlowTopologyViewerTests
         };
 
         var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
-            .Add(component => component.Graph, graph)
-            .Add(component => component.SelectedKeyChanged, value => selected = value));
+            .Add(component => component.Graph, graph));
 
         Assert.IsEmpty(rendered.FindAll(".topology-path-panel"));
-        Assert.IsEmpty(rendered.FindAll(".topology-observed-path"));
-
-        rendered.Find("button.path-toggle").Click();
-
-        Assert.HasCount(1, rendered.FindAll(".topology-path-panel ol li"));
-        rendered.Find(".topology-path-panel ol li button").Click();
-        Assert.AreEqual("advisor", selected);
-        Assert.HasCount(1, rendered.FindAll(".topology-edge.path-selected"));
+        Assert.IsEmpty(rendered.FindAll("button.path-toggle"));
+        Assert.HasCount(1, rendered.FindAll(".topology-edge.observed"));
+        Assert.Contains("#1", rendered.Markup, StringComparison.Ordinal);
     }
 
     [TestMethod]

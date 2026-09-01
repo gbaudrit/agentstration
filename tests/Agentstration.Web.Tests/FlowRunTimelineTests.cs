@@ -159,6 +159,12 @@ public sealed class FlowRunTimelineTests
 
         Assert.HasCount(1, rendered.FindAll(".flow-handoff-route"));
         Assert.Contains(strings["Event.ParticipantHandoff", "researcher", "reviewer"].Value, rendered.Markup, StringComparison.Ordinal);
+
+        rendered.FindAll("[role=tab]").Single(tab => tab.TextContent.Trim() == strings["Handoffs"].Value).Click();
+
+        Assert.HasCount(1, rendered.FindAll(".flow-handoff-list li"));
+        Assert.AreEqual("researcher→reviewer", rendered.Find(".flow-handoff-participants").TextContent.Replace(" ", string.Empty, StringComparison.Ordinal));
+        Assert.Contains(strings["HandoffCount.One", 1].Value, rendered.Markup, StringComparison.Ordinal);
     }
 
     private static BunitContext CreateContext()

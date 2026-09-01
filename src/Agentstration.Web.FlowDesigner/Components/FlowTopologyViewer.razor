@@ -6,16 +6,10 @@
         <span class="topology-description">@Graph.Description</span>
         <div class="topology-toolbar-actions">
             <span class="topology-legend"><i class="declared"></i>@Localizer["Declared"] <i class="observed"></i>@Localizer["Observed"] <i class="inactive"></i>@Localizer["NotSelected"]</span>
-            @if (Graph.Transfers.Count > 0)
-            {
-                <button class="topology-tool-button path-toggle" type="button" aria-expanded="@pathOpen" @onclick="TogglePath">
-                    <span aria-hidden="true">↪</span> @T("ObservedPathCount", Graph.Transfers.Count)
-                </button>
-            }
             @if (ShowInspectorControl)
             {
                 <button class="topology-tool-button inspector-toggle" type="button" aria-pressed="@InspectorVisible" @onclick="ToggleInspectorAsync">
-                    <span aria-hidden="true">▥</span> @Localizer[InspectorVisible ? "HideDiagnostics" : "ShowDiagnostics"]
+                    <span aria-hidden="true">▥</span> @Localizer[InspectorVisible ? "HideInfo" : "ShowInfo"]
                 </button>
             }
             <div class="topology-zoom-controls" role="group" aria-label="@Localizer["TopologyZoomControls"]">
@@ -78,28 +72,6 @@
             </svg>
             </div>
         }
-        @if (pathOpen && Graph.Transfers.Count > 0)
-        {
-            <aside class="topology-path-panel" aria-label="@Localizer["ObservedHandoffSequence"]">
-                <header>
-                    <div><strong>@Localizer["ObservedPath"]</strong><small>@T("ObservedPathSummary", Graph.Transfers.Count)</small></div>
-                    <button type="button" aria-label="@Localizer["CloseObservedPath"]" @onclick="TogglePath">×</button>
-                </header>
-                <ol>
-                    @foreach (var transfer in Graph.Transfers)
-                    {
-                        <li>
-                            <button type="button" class="@(selectedTransferOrder == transfer.Order ? "selected" : null)"
-                                    aria-pressed="@(selectedTransferOrder == transfer.Order)"
-                                    aria-label="@T("ObservedTransferDescription", transfer.Order, transfer.From, transfer.To)"
-                                    @onclick="() => SelectTransferAsync(transfer)">
-                                <b>#@transfer.Order</b><span>@transfer.From</span><i aria-hidden="true">→</i><span>@transfer.To</span>
-                            </button>
-                        </li>
-                    }
-                </ol>
-            </aside>
-        }
     </div>
 </div>
 
@@ -114,15 +86,13 @@
     private double CanvasHeight { get; set; } = 260;
     private double Zoom { get; set; } = 1;
     private bool expanded;
-    private bool pathOpen;
-    private int? selectedTransferOrder;
     private int ZoomPercent => (int)Math.Round(Zoom * 100);
 
     [Parameter, EditorRequired] public FlowTopologyGraph Graph { get; set; } = new([], [], "horizontal", "Flow topology");
     [Parameter] public string? SelectedKey { get; set; }
     [Parameter] public EventCallback<string> SelectedKeyChanged { get; set; }
     [Parameter] public bool ShowInspectorControl { get; set; }
-    [Parameter] public bool InspectorVisible { get; set; } = true;
+    [Parameter] public bool InspectorVisible { get; set; }
     [Parameter] public EventCallback<bool> InspectorVisibleChanged { get; set; }
 
     private string DeclaredMarker => $"{markerPrefix}-declared";
@@ -183,15 +153,7 @@
 
     private void ToggleExpanded() => expanded = !expanded;
 
-    private void TogglePath() => pathOpen = !pathOpen;
-
     private Task ToggleInspectorAsync() => InspectorVisibleChanged.InvokeAsync(!InspectorVisible);
-
-    private async Task SelectTransferAsync(FlowTopologyTransfer transfer)
-    {
-        selectedTransferOrder = transfer.Order;
-        await SelectAsync(transfer.To);
-    }
 
     private Task OnNodeKeyDownAsync(KeyboardEventArgs eventArgs, string key) =>
         eventArgs.Key is "Enter" or " " ? SelectAsync(key) : Task.CompletedTask;
@@ -203,19 +165,7 @@
         _ => DeclaredMarker
     };
 
-    private string EdgeClass(FlowTopologyEdge edge) =>
-        $"{edge.Kind.ToString().ToLowerInvariant()} {edge.State.ToString().ToLowerInvariant()}{(IsSelectedTransfer(edge) ? " path-selected" : null)}";
-
-    private bool IsSelectedTransfer(FlowTopologyEdge edge)
-    {
-        var transfer = selectedTransferOrder is null
-            ? null
-            : Graph.Transfers.FirstOrDefault(value => value.Order == selectedTransferOrder);
-        if (transfer is null) return false;
-        var from = Graph.Nodes.FirstOrDefault(node => string.Equals(node.SelectionKey, transfer.From, StringComparison.Ordinal));
-        var to = Graph.Nodes.FirstOrDefault(node => string.Equals(node.SelectionKey, transfer.To, StringComparison.Ordinal));
-        return from?.Id == edge.From && to?.Id == edge.To;
-    }
+    private static string EdgeClass(FlowTopologyEdge edge) => $"{edge.Kind.ToString().ToLowerInvariant()} {edge.State.ToString().ToLowerInvariant()}";
 
     private static string NodeClass(FlowTopologyNode node)
     {

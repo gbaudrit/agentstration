@@ -61,7 +61,7 @@ else
     private FlowRun? run;
     private FlowStepRun? selected;
     private bool unavailable, notFound;
-    private bool inspectorVisible = true;
+    private bool inspectorVisible;
     private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(run);
     protected override async Task OnParametersSetAsync() => await LoadAsync();
     private async Task LoadAsync()

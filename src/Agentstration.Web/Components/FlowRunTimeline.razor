@@ -12,6 +12,10 @@
     </div>
     <div class="flow-timeline-tabs" role="tablist" aria-label="@T("TimelineViewsAriaLabel")">
         <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Activity)" class="@(activeView == TimelineView.Activity ? "active" : null)" @onclick="() => activeView = TimelineView.Activity">@T("Activity")</button>
+        @if (HasHandoffView)
+        {
+            <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Handoffs)" class="@(activeView == TimelineView.Handoffs ? "active" : null)" @onclick="() => activeView = TimelineView.Handoffs">@T("Handoffs")</button>
+        }
         <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Raw)" class="@(activeView == TimelineView.Raw ? "active" : null)" @onclick="() => activeView = TimelineView.Raw">@T("RawEvents")</button>
     </div>
     @if (Events.Count == 0)
@@ -57,6 +61,35 @@
             }
         </ol>
     }
+    else if (activeView == TimelineView.Handoffs)
+    {
+        <section class="flow-handoff-summary" aria-label="@T("Handoffs")">
+            <div class="flow-handoff-summary-header">
+                <strong>@T("ObservedPath")</strong>
+                <span>@HandoffCount(Handoffs.Count)</span>
+            </div>
+            @if (Handoffs.Count == 0)
+            {
+                <p class="flow-handoff-empty">@T("NoHandoffs")</p>
+            }
+            else
+            {
+                <ol class="flow-handoff-list">
+                    @for (var index = 0; index < Handoffs.Count; index++)
+                    {
+                        var handoff = Handoffs[index];
+                        <li>
+                            <div class="flow-handoff-order"><b>#@(index + 1)</b><time datetime="@handoff.Timestamp.ToString("O", CultureInfo.InvariantCulture)">@handoff.Timestamp.ToLocalTime().ToString("T", CultureInfo.CurrentCulture)</time></div>
+                            <div class="flow-handoff-participants" aria-label="@T("HandoffAriaLabel", handoff.HandoffFrom!, handoff.HandoffTo!)">
+                                <span>@handoff.HandoffFrom</span><b aria-hidden="true">→</b><span>@handoff.HandoffTo</span>
+                            </div>
+                            <small>#@handoff.FirstSequence</small>
+                        </li>
+                    }
+                </ol>
+            }
+        </section>
+    }
     else
     {
         <div class="flow-raw-toolbar">
@@ -81,6 +114,7 @@
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string EventCount(int count) => T(count == 1 ? "EventCount.One" : "EventCount.Many", count);
     private string DeltaCount(int count) => T(count == 1 ? "DeltaCount.One" : "DeltaCount.Many", count);
+    private string HandoffCount(int count) => T(count == 1 ? "HandoffCount.One" : "HandoffCount.Many", count);
     private string EventTypeLabel(FlowRunEventType value) => Localizer[$"EventType.{value}"];
     private TimelineView activeView;
     private string rawType = string.Empty;
@@ -91,10 +125,17 @@
     [Parameter] public bool InferParticipantHandoffs { get; set; }
 
     private IReadOnlyList<TimelineItem> Activity => BuildActivity(Events, InferParticipantHandoffs);
+    private IReadOnlyList<TimelineItem> Handoffs => Activity.Where(value => value.Type == FlowRunEventType.ParticipantHandoff && value.HandoffFrom is not null && value.HandoffTo is not null).ToArray();
+    private bool HasHandoffView => InferParticipantHandoffs || Events.Any(value => value.Type == FlowRunEventType.ParticipantHandoff);
     private IReadOnlyList<FlowRunEvent> FilteredRawEvents => Events.Where(value => string.IsNullOrEmpty(rawType) || string.Equals(value.Type.ToString(), rawType, StringComparison.Ordinal)).OrderBy(value => value.Sequence).ToArray();
     private IReadOnlyList<FlowRunEvent> VisibleRawEvents => FilteredRawEvents.TakeLast(rawLimit).ToArray();
 
     private void LoadMoreRawEvents() => rawLimit += RawPageSize;
+
+    protected override void OnParametersSet()
+    {
+        if (!HasHandoffView && activeView == TimelineView.Handoffs) activeView = TimelineView.Activity;
+    }
 
     private static IReadOnlyList<TimelineItem> BuildActivity(IReadOnlyList<FlowRunEvent> events, bool inferParticipantHandoffs)
     {
@@ -222,7 +263,7 @@
             ? result
             : null;
 
-    private enum TimelineView { Activity, Raw }
+    private enum TimelineView { Activity, Handoffs, Raw }
 
     private sealed class TimelineItem
     {

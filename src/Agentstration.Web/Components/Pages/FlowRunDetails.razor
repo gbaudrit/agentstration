@@ -118,7 +118,7 @@ else
     private string selectedChoice = string.Empty;
     private string? inputError;
     private bool submittingInput;
-    private bool inspectorVisible = true;
+    private bool inspectorVisible;
     private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(run, eventBuffer.Snapshot());
 
     protected override async Task OnParametersSetAsync()

@@ -29,7 +29,7 @@
   <data name="RunInputAndOutput"><value>Entrée et sortie de l’exécution</value></data>
   <data name="Input"><value>Entrée</value></data>
   <data name="Output"><value>Sortie</value></data>
-  <data name="StepDiagnostic"><value>Diagnostic de l’étape</value></data>
+  <data name="StepDiagnostic"><value>Infos de l’étape</value></data>
   <data name="SelectStep"><value>Sélectionnez une étape pour inspecter son exécution.</value></data>
   <data name="Type"><value>Type</value></data>
   <data name="Attempt"><value>Tentative</value></data>
@@ -72,6 +72,11 @@
   <data name="EventCount.Many"><value>{0} événements</value></data>
   <data name="TimelineViewsAriaLabel"><value>Vues de la chronologie d’exécution</value></data>
   <data name="Activity"><value>Activité</value></data>
+  <data name="Handoffs"><value>Transferts</value></data>
+  <data name="ObservedPath"><value>Parcours observé</value></data>
+  <data name="HandoffCount.One"><value>{0} transfert</value></data>
+  <data name="HandoffCount.Many"><value>{0} transferts</value></data>
+  <data name="NoHandoffs"><value>Aucun transfert n’a encore été observé.</value></data>
   <data name="RawEvents"><value>Événements bruts</value></data>
   <data name="WaitingForEvents"><value>En attente d’événements d’exécution…</value></data>
   <data name="WaitingForOutput"><value>En attente de sortie…</value></data>
