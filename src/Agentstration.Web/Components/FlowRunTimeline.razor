@@ -47,7 +47,17 @@
                         @for (var index = 0; index < ParticipantPath.Count; index++)
                         {
                             <li>
-                                @if (index > 0) { <b class="flow-participant-arrow" aria-hidden="true">→</b> }
+                                @if (index > 0)
+                                {
+                                    @if (Handoffs.Count >= index)
+                                    {
+                                        <b class="flow-participant-transfer" title="@T("HandoffNumber", index)" aria-label="@T("HandoffNumber", index)">#@index</b>
+                                    }
+                                    else
+                                    {
+                                        <b class="flow-participant-arrow" aria-hidden="true">→</b>
+                                    }
+                                }
                                 @if (ParticipantUrls.TryGetValue(ParticipantPath[index], out var participantUrl))
                                 {
                                     <a class="flow-participant-chip" href="@participantUrl">

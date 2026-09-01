@@ -57,8 +57,8 @@ public sealed record FlowTopologyGraph(
 
 public static class FlowTopologyProjector
 {
-    private const double HorizontalGap = 220;
-    private const double VerticalGap = 120;
+    private const double HorizontalGap = 300;
+    private const double VerticalGap = 170;
 
     public static FlowTopologyGraph Project(FlowDefinition definition, FlowGraphDefinition? graph = null) =>
         ProjectCore(definition, graph, null, []);
@@ -216,22 +216,51 @@ public static class FlowTopologyProjector
         IReadOnlyList<FlowRunEvent> events,
         IReadOnlyDictionary<string, int> turns)
     {
-        var nodes = new List<FlowTopologyNode> { SystemNode("input", "Input", "input", 0, 0, run) };
-        nodes.AddRange(definition.Participants.Select((participant, index) =>
+        var participantOrder = definition.Participants
+            .Select((participant, index) => (participant.Id, index))
+            .ToDictionary(item => item.Id, item => item.index, StringComparer.Ordinal);
+        var ranks = HandoffRanks(definition, pattern, participantOrder);
+        var rankGroups = definition.Participants
+            .GroupBy(participant => ranks[participant.Id])
+            .OrderBy(group => group.Key)
+            .Select(group => group.OrderBy(participant => participantOrder[participant.Id]).ToArray())
+            .ToArray();
+        var maximumRows = Math.Max(1, rankGroups.Select(group => group.Length).DefaultIfEmpty(1).Max());
+        var centerY = (maximumRows - 1) * VerticalGap / 2;
+        var nodes = new List<FlowTopologyNode> { SystemNode("input", "Input", "input", 0, centerY, run) };
+        foreach (var group in rankGroups)
         {
-            var node = ParticipantNode(participant, HorizontalGap + (index % 2) * HorizontalGap, (index / 2) * VerticalGap, run, turns);
-            return node with { IsInitial = participant.Id == pattern.InitialParticipant };
-        }));
-        var outputY = Math.Max(0, ((definition.Participants.Count - 1) / 2) * VerticalGap / 2);
-        nodes.Add(SystemNode("output", "Output", "output", HorizontalGap * 3, outputY, run));
+            var rank = ranks[group[0].Id];
+            var firstY = centerY - ((group.Length - 1) * VerticalGap / 2);
+            nodes.AddRange(group.Select((participant, index) =>
+                ParticipantNode(participant, HorizontalGap * (rank + 1), firstY + (index * VerticalGap), run, turns) with
+                {
+                    IsInitial = participant.Id == pattern.InitialParticipant
+                }));
+        }
+
+        var maximumRank = ranks.Values.DefaultIfEmpty(0).Max();
+        nodes.Add(SystemNode("output", "Output", "output", HorizontalGap * (maximumRank + 2), centerY, run));
 
         var observedTransfers = ObservedParticipantTransfers(events);
         var observedOrders = observedTransfers
             .GroupBy(transfer => (transfer.From, transfer.To))
             .ToDictionary(group => group.Key, group => group.Select(transfer => transfer.Order).ToArray());
+        var initialParticipantObserved = events.Any(item =>
+                item.Type == FlowRunEventType.ParticipantTurnStarted
+                && string.Equals(item.StepId, pattern.InitialParticipant, StringComparison.Ordinal))
+            || observedTransfers.Any(transfer => string.Equals(transfer.From, pattern.InitialParticipant, StringComparison.Ordinal));
+        var terminalParticipant = run?.Status == FlowRunStatus.Succeeded
+            ? LastObservedParticipant(events, observedTransfers)
+            : null;
         var edges = new List<FlowTopologyEdge>
         {
-            new("handoff-entry", "system:input", $"participant:{pattern.InitialParticipant}", "initial")
+            new(
+                "handoff-entry",
+                "system:input",
+                $"participant:{pattern.InitialParticipant}",
+                "initial",
+                State: initialParticipantObserved ? FlowTopologyEdgeState.Observed : FlowTopologyEdgeState.Declared)
         };
         edges.AddRange(pattern.Handoffs.Select((route, index) =>
         {
@@ -246,11 +275,47 @@ public static class FlowTopologyProjector
         }));
         edges.AddRange(definition.Participants.Select(participant => new FlowTopologyEdge(
             $"terminal:{participant.Id}", $"participant:{participant.Id}", "system:output", "terminal",
-            FlowTopologyEdgeKind.Dynamic)));
+            FlowTopologyEdgeKind.Dynamic,
+            participant.Id == terminalParticipant ? FlowTopologyEdgeState.Observed : FlowTopologyEdgeState.Declared)));
         return new(nodes, edges, "directed", "Handoff orchestration with declared routes")
         {
             Transfers = observedTransfers
         };
+    }
+
+    private static IReadOnlyDictionary<string, int> HandoffRanks(
+        OrchestrationFlowDefinition definition,
+        HandoffOrchestrationPattern pattern,
+        IReadOnlyDictionary<string, int> participantOrder)
+    {
+        var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
+        if (participantOrder.ContainsKey(pattern.InitialParticipant))
+        {
+            ranks[pattern.InitialParticipant] = 0;
+            var queue = new Queue<string>();
+            queue.Enqueue(pattern.InitialParticipant);
+            while (queue.TryDequeue(out var source))
+            {
+                foreach (var target in pattern.Handoffs
+                    .Where(route => route.From == source && participantOrder.ContainsKey(route.To))
+                    .Select(route => route.To)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(target => participantOrder[target]))
+                {
+                    if (ranks.ContainsKey(target)) continue;
+                    ranks[target] = ranks[source] + 1;
+                    queue.Enqueue(target);
+                }
+            }
+        }
+
+        var fallbackRank = ranks.Values.DefaultIfEmpty(-1).Max() + 1;
+        foreach (var participant in definition.Participants.Where(participant => !ranks.ContainsKey(participant.Id)))
+        {
+            ranks[participant.Id] = fallbackRank;
+        }
+
+        return ranks;
     }
 
     private static FlowTopologyGraph ProjectGroupChat(
@@ -417,6 +482,16 @@ public static class FlowTopologyProjector
             .Select((pair, index) => new FlowTopologyTransfer(index + 1, pair.from.Participant, pair.to.Participant, pair.to.Sequence))
             .ToArray();
     }
+
+    private static string? LastObservedParticipant(
+        IReadOnlyList<FlowRunEvent> events,
+        IReadOnlyList<FlowTopologyTransfer> transfers) =>
+        events
+            .Where(item => item.Type == FlowRunEventType.ParticipantTurnStarted && item.StepId is not null)
+            .OrderByDescending(item => item.Sequence)
+            .Select(item => item.StepId)
+            .FirstOrDefault()
+        ?? transfers.LastOrDefault()?.To;
 
     private static string? PayloadString(System.Text.Json.JsonElement? payload, string propertyName) =>
         payload is { ValueKind: System.Text.Json.JsonValueKind.Object }

@@ -84,6 +84,7 @@
   <data name="ObservedPath"><value>Parcours observé</value></data>
   <data name="HandoffCount.One"><value>{0} transfert</value></data>
   <data name="HandoffCount.Many"><value>{0} transferts</value></data>
+  <data name="HandoffNumber"><value>Transfert n° {0}</value></data>
   <data name="NoHandoffs"><value>Aucun transfert n’a encore été observé.</value></data>
   <data name="RawEvents"><value>Événements bruts</value></data>
   <data name="InputOutputTab"><value>Entrée / sortie</value></data>
