@@ -12,6 +12,12 @@ public sealed record BootstrapTargetWorkspace(
 
 public sealed record BootstrapTargetTenant(Guid Id, string Name, string DisplayName);
 
+public sealed record BootstrapBindingTargetOption(
+    string Name,
+    string Namespace,
+    string DisplayName,
+    bool Planned = false);
+
 public sealed record BootstrapManagementView(
     BootstrapCatalogSnapshot Catalog,
     IReadOnlyList<BootstrapTargetTenant> Tenants,
@@ -71,6 +77,63 @@ public sealed class BootstrapProfileManagementService(
         var targetContext = await ResolveTargetContextAsync(selection.Target, actorPrincipalId, cancellationToken);
         using var operationScope = PushTargetScope(targetContext);
         return await bootstrap.PreviewAsync(selection, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<BootstrapBindingTargetOption>> GetBindingTargetsAsync(
+        BootstrapApplicationTarget? target,
+        BootstrapBindingTargetKind targetKind,
+        IReadOnlyList<string> profiles,
+        Guid actorPrincipalId,
+        CancellationToken cancellationToken)
+    {
+        await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        if (target?.TenantId is null || target.WorkspaceId is null)
+            throw new DeclarativeBootstrapException("Bootstrap binding targets require a Tenant and Workspace target.");
+        var targetContext = await ResolveTargetContextAsync(target, actorPrincipalId, cancellationToken);
+        using var operationScope = PushTargetScope(targetContext);
+        var existing = targetKind switch
+        {
+            BootstrapBindingTargetKind.ModelProfile => Options(
+                await store.ListAsync<ModelProfileResource>(ResourceKinds.ModelProfile, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.ModelProvider => Options(
+                await store.ListAsync<ModelProviderResource>(ResourceKinds.ModelProvider, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.RuntimeProfile => Options(
+                await store.ListAsync<RuntimeProfileResource>(ResourceKinds.RuntimeProfile, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.ExtensionRegistration => Options(
+                await store.ListAsync<ExtensionRegistrationResource>(ResourceKinds.ExtensionRegistration, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.Secret => Options(
+                await store.ListAsync<SecretResource>(ResourceKinds.Secret, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
+            _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")
+        };
+        var resourceKind = targetKind switch
+        {
+            BootstrapBindingTargetKind.ModelProfile => ResourceKinds.ModelProfile,
+            BootstrapBindingTargetKind.ModelProvider => ResourceKinds.ModelProvider,
+            BootstrapBindingTargetKind.RuntimeProfile => ResourceKinds.RuntimeProfile,
+            BootstrapBindingTargetKind.ExtensionRegistration => ResourceKinds.ExtensionRegistration,
+            BootstrapBindingTargetKind.Secret => ResourceKinds.Secret,
+            _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")
+        };
+        var planned = (await catalog.LoadAsync(profiles, cancellationToken))
+            .SelectMany(profile => profile.Resources)
+            .Where(source => string.Equals(source.Resource.Kind, resourceKind, StringComparison.Ordinal))
+            .Select(source => new BootstrapBindingTargetOption(
+                source.Resource.Metadata.Name,
+                source.Resource.Metadata.Namespace.Value,
+                source.Resource.Metadata.Name,
+                Planned: true));
+        return existing.Concat(planned)
+            .GroupBy(option => (option.Namespace, option.Name))
+            .Select(group => group.OrderBy(option => option.Planned).First())
+            .OrderBy(option => option.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(option => option.Namespace, StringComparer.Ordinal)
+            .ThenBy(option => option.Name, StringComparer.Ordinal)
+            .ToArray();
     }
 
     public async Task<BootstrapApplicationResource?> GetApplicationAsync(
@@ -292,4 +355,12 @@ public sealed class BootstrapProfileManagementService(
         if (!await platformAuthorization.IsPlatformAdministratorAsync(actorPrincipalId, cancellationToken))
             throw new AuthorizationDeniedException("platform/admin");
     }
+
+    private static IReadOnlyList<BootstrapBindingTargetOption> Options<T>(
+        IReadOnlyList<StoredResource<T>> resources,
+        Func<T, string> displayName) where T : Resource =>
+        resources.Select(resource => new BootstrapBindingTargetOption(
+            resource.Value.Name,
+            resource.Value.Namespace.Value,
+            displayName(resource.Value))).ToArray();
 }

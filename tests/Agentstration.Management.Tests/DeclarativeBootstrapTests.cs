@@ -505,6 +505,15 @@ public sealed class DeclarativeBootstrapTests
             new(tenant.Id, workspace.Id));
         var management = scope.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
 
+        var bindingTargets = await management.GetBindingTargetsAsync(
+            selection.Target,
+            BootstrapBindingTargetKind.ModelProfile,
+            selection.Profiles,
+            principal.Id,
+            default);
+        var plannedBindingTarget = bindingTargets.Single(value => value.Name == "bootstrap-model");
+        Assert.IsTrue(plannedBindingTarget.Planned);
+
         var preview = await management.PreviewAsync(selection, principal.Id, default);
 
         Assert.IsTrue(
@@ -517,6 +526,13 @@ public sealed class DeclarativeBootstrapTests
         Assert.AreEqual("bootstrap-model", application.Definition.Bindings.Single().Target.Name);
         Assert.HasCount(6, application.Definition.Resources);
         Assert.IsTrue(application.Definition.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
+        var persistedBindingTargets = await management.GetBindingTargetsAsync(
+            selection.Target,
+            BootstrapBindingTargetKind.ModelProfile,
+            selection.Profiles,
+            principal.Id,
+            default);
+        Assert.IsFalse(persistedBindingTargets.Single(value => value.Name == "bootstrap-model").Planned);
 
         using (scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>()
             .Push(new RequestContext(principal.Id, tenant.Id, workspace.Id)))
