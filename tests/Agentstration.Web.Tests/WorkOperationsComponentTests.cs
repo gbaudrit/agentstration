@@ -126,6 +126,7 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("En attente d’une saisie", flowRuns["Status.WaitingForInput"].Value);
         Assert.AreEqual("Déroulement", flowRunDetails["ExecutionTimeline"].Value);
         Assert.AreEqual("Synthèse", flowRunDetails["Summary"].Value);
+        Assert.AreEqual("Entrée / sortie", flowRunDetails["InputOutputTab"].Value);
         Assert.AreEqual("3 événements", flowRunDetails["EventCount.Many", 3].Value);
         Assert.AreEqual("Réponse demandée", flowRunDetails["Event.InputRequested", "agent-1"].Value);
         Assert.AreEqual("Vue d’ensemble", flowDetails["Tab.Overview"].Value);

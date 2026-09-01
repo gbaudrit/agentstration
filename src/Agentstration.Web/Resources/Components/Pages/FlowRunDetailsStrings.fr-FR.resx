@@ -71,6 +71,7 @@
   <data name="EventCount.One"><value>{0} événement</value></data>
   <data name="EventCount.Many"><value>{0} événements</value></data>
   <data name="TimelineViewsAriaLabel"><value>Vues du déroulement de l’exécution</value></data>
+  <data name="RunViewsAriaLabel"><value>Vues de l’exécution de Flow</value></data>
   <data name="Summary"><value>Synthèse</value></data>
   <data name="SummaryDuration"><value>Durée</value></data>
   <data name="SummaryCompletedSteps"><value>Étapes terminées</value></data>
@@ -85,6 +86,7 @@
   <data name="HandoffCount.Many"><value>{0} transferts</value></data>
   <data name="NoHandoffs"><value>Aucun transfert n’a encore été observé.</value></data>
   <data name="RawEvents"><value>Événements bruts</value></data>
+  <data name="InputOutputTab"><value>Entrée / sortie</value></data>
   <data name="WaitingForEvents"><value>En attente d’événements d’exécution…</value></data>
   <data name="WaitingForOutput"><value>En attente de sortie…</value></data>
   <data name="ParticipantMessage"><value>Message du participant</value></data>

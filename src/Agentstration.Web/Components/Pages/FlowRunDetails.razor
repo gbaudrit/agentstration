@@ -26,13 +26,12 @@ else
     <PageHeader Title="@T("FlowRun")" Description="@run.Id">
         <Actions>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId)">@T("FlowDefinition")</a></Actions>
     </PageHeader>
-    <section class="run-summary">
-        <div><span class="field-label">@T("Status")</span><StatusBadge Text="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></div>
-        <div><span class="field-label">@T("FlowAndVersion")</span><strong>@run.FlowId.Value · @run.FlowVersion</strong></div>
-        <div><span class="field-label">@T("Deployment")</span><strong>@(run.DeploymentResourceId ?? "—")</strong></div>
-        <div><span class="field-label">@T("TriggerAndStartedBy")</span><strong>@TriggerLabel(run.Trigger) · @(run.StartedBy ?? "—")</strong></div>
-        <div><span class="field-label">@T("CorrelationId")</span><code>@run.CorrelationId</code></div>
-    </section>
+    <nav class="section-tabs flow-run-page-tabs" role="tablist" aria-label="@T("RunViewsAriaLabel")">
+        @foreach (var tab in AvailableTabs)
+        {
+            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="flow-run-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@TabLabel(tab)</button>
+        }
+    </nav>
     @if (run.Error is not null)
     {
         <article class="panel run-error"><strong>@run.Error.Code</strong><p>@run.Error.Message</p><code>@run.Error.Details</code></article>
@@ -65,34 +64,58 @@ else
             @if (!string.IsNullOrWhiteSpace(inputError)) { <p class="validation-error">@inputError</p> }
         </article>
     }
-    <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun" />
     @if (realtimeError is not null)
     {
         <div class="panel realtime-warning" role="status"><span>@realtimeError</span><button class="button-secondary" @onclick="ConnectAsync">@T("RetryLiveUpdates")</button></div>
     }
-    <section class="designer-layout run-layout @(inspectorVisible ? null : "inspector-collapsed")">
-        <div>
-            <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
-                                ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible" />
-            <article class="panel io-panel"><div class="panel-header"><h2>@T("RunInputAndOutput")</h2></div><div class="io-grid"><div><span class="field-label">@T("Input")</span><pre>@Pretty(run.Input)</pre></div><div><span class="field-label">@T("Output")</span><pre>@Pretty(run.Output)</pre></div></div></article>
-        </div>
-        @if (inspectorVisible)
+    <main id="flow-run-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
+        @if (activeTab == RunTab.Summary)
         {
-        <article class="panel inspector step-inspector">
-            <div class="panel-header"><h2>@T("StepDiagnostic")</h2></div>
-            @if (selected is null)
-            {
-                <p class="muted">@T("SelectStep")</p>
-            }
-            else
-            {
-                <dl class="details-list"><dt>@T("Status")</dt><dd>@StepStatusLabel(selected.Status)</dd><dt>@T("Type")</dt><dd>@selected.StepType</dd><dt>@T("Duration")</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>@T("Attempt")</dt><dd>@selected.Attempt</dd><dt>@T("Transition")</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>@T("Agent")</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>@T("AgentVersion")</dt><dd>@(selected.AgentVersion?.ToString() ?? "—")</dd><dt>@T("ModelProfile")</dt><dd>@(selected.ModelProfileResourceId ?? "—")</dd><dt>@T("Provider")</dt><dd>@(selected.Provider ?? "—")</dd><dt>@T("Tokens")</dt><dd>@TokenUsage(selected.Usage)</dd><dt>@T("Tools")</dt><dd>@(selected.Tools.Count == 0 ? "—" : string.Join(", ", selected.Tools))</dd></dl>
-                <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
-                @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@selected.Error.Message</p></div> }
-            }
-        </article>
+            <article class="panel flow-run-overview">
+                <section class="run-summary flow-run-overview-identity">
+                    <div><span class="field-label">@T("Status")</span><StatusBadge Text="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></div>
+                    <div><span class="field-label">@T("FlowAndVersion")</span><strong>@run.FlowId.Value · @run.FlowVersion</strong></div>
+                    <div><span class="field-label">@T("Deployment")</span><strong>@(run.DeploymentResourceId ?? "—")</strong></div>
+                    <div><span class="field-label">@T("TriggerAndStartedBy")</span><strong>@TriggerLabel(run.Trigger) · @(run.StartedBy ?? "—")</strong></div>
+                    <div><span class="field-label">@T("CorrelationId")</span><code>@run.CorrelationId</code></div>
+                </section>
+                <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun"
+                                 View="@FlowRunTimeline.TimelineView.Summary" ShowHeader="false" ShowNavigation="false" Embedded="true" />
+                <section class="designer-layout run-layout flow-run-overview-topology @(inspectorVisible ? null : "inspector-collapsed")">
+                    <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
+                                        ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible" />
+                    @if (inspectorVisible)
+                    {
+                    <article class="panel inspector step-inspector">
+                        <div class="panel-header"><h2>@T("StepDiagnostic")</h2></div>
+                        @if (selected is null)
+                        {
+                            <p class="muted">@T("SelectStep")</p>
+                        }
+                        else
+                        {
+                            <dl class="details-list"><dt>@T("Status")</dt><dd>@StepStatusLabel(selected.Status)</dd><dt>@T("Type")</dt><dd>@selected.StepType</dd><dt>@T("Duration")</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>@T("Attempt")</dt><dd>@selected.Attempt</dd><dt>@T("Transition")</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>@T("Agent")</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>@T("AgentVersion")</dt><dd>@(selected.AgentVersion?.ToString() ?? "—")</dd><dt>@T("ModelProfile")</dt><dd>@(selected.ModelProfileResourceId ?? "—")</dd><dt>@T("Provider")</dt><dd>@(selected.Provider ?? "—")</dd><dt>@T("Tokens")</dt><dd>@TokenUsage(selected.Usage)</dd><dt>@T("Tools")</dt><dd>@(selected.Tools.Count == 0 ? "—" : string.Join(", ", selected.Tools))</dd></dl>
+                            <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
+                            @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@selected.Error.Message</p></div> }
+                        }
+                    </article>
+                    }
+                </section>
+            </article>
         }
-    </section>
+        else if (activeTab == RunTab.InputOutput)
+        {
+            <section class="flow-run-io-panels" aria-label="@T("RunInputAndOutput")">
+                <article class="panel io-panel flow-run-tab-card"><div class="panel-header"><h2>@T("Input")</h2></div><pre>@Pretty(run.Input)</pre></article>
+                <article class="panel io-panel flow-run-tab-card"><div class="panel-header"><h2>@T("Output")</h2></div><pre>@Pretty(run.Output)</pre></article>
+            </section>
+        }
+        else
+        {
+            <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun"
+                             View="@SelectedTimelineView" ShowHeader="false" ShowNavigation="false" />
+        }
+    </main>
 }
 
 @code {
@@ -118,7 +141,29 @@ else
     private string? inputError;
     private bool submittingInput;
     private bool inspectorVisible;
+    private RunTab activeTab;
+    private static readonly RunTab[] StandardTabs = [RunTab.Summary, RunTab.Activity, RunTab.InputOutput, RunTab.RawEvents];
+    private static readonly RunTab[] HandoffTabs = [RunTab.Summary, RunTab.Activity, RunTab.Handoffs, RunTab.InputOutput, RunTab.RawEvents];
+    private IReadOnlyList<RunTab> AvailableTabs => IsHandoffRun ? HandoffTabs : StandardTabs;
+    private FlowRunTimeline.TimelineView SelectedTimelineView => activeTab switch
+    {
+        RunTab.Activity => FlowRunTimeline.TimelineView.Activity,
+        RunTab.Handoffs => FlowRunTimeline.TimelineView.Handoffs,
+        RunTab.RawEvents => FlowRunTimeline.TimelineView.Raw,
+        _ => FlowRunTimeline.TimelineView.Summary
+    };
     private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(run, eventBuffer.Snapshot());
+
+    private string TabLabel(RunTab tab) => T(tab switch
+    {
+        RunTab.Summary => "Summary",
+        RunTab.Activity => "Activity",
+        RunTab.Handoffs => "Handoffs",
+        RunTab.InputOutput => "InputOutputTab",
+        RunTab.RawEvents => "RawEvents",
+        _ => throw new ArgumentOutOfRangeException(nameof(tab))
+    });
+    private static string TabId(RunTab tab) => $"flow-run-tab-{tab.ToString().ToLowerInvariant()}";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -142,6 +187,7 @@ else
             return;
         }
         await RefreshInputAsync();
+        if (!IsHandoffRun && activeTab == RunTab.Handoffs) activeTab = RunTab.Summary;
         selected = run.Steps.FirstOrDefault();
         eventBuffer.Clear();
         await ReplayAsync();
@@ -275,4 +321,6 @@ else
         if (hub is not null) _ = hub.DisposeAsync();
         cancellation.Dispose();
     }
+
+    private enum RunTab { Summary, Activity, Handoffs, InputOutput, RawEvents }
 }

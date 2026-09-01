@@ -71,6 +71,7 @@
   <data name="EventCount.One"><value>{0} event</value></data>
   <data name="EventCount.Many"><value>{0} events</value></data>
   <data name="TimelineViewsAriaLabel"><value>Run progress views</value></data>
+  <data name="RunViewsAriaLabel"><value>Flow Run views</value></data>
   <data name="Summary"><value>Summary</value></data>
   <data name="SummaryDuration"><value>Duration</value></data>
   <data name="SummaryCompletedSteps"><value>Completed steps</value></data>
@@ -85,6 +86,7 @@
   <data name="HandoffCount.Many"><value>{0} handoffs</value></data>
   <data name="NoHandoffs"><value>No handoff has been observed yet.</value></data>
   <data name="RawEvents"><value>Raw events</value></data>
+  <data name="InputOutputTab"><value>Input / output</value></data>
   <data name="WaitingForEvents"><value>Waiting for execution events…</value></data>
   <data name="WaitingForOutput"><value>Waiting for output…</value></data>
   <data name="ParticipantMessage"><value>Participant message</value></data>

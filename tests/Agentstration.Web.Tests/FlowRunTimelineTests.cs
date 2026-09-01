@@ -203,6 +203,26 @@ public sealed class FlowRunTimelineTests
         Assert.Contains("2 s", rendered.Markup, StringComparison.Ordinal);
     }
 
+    [TestMethod]
+    public void ExternalViewRendersActivityWithoutNestedNavigation()
+    {
+        using var context = CreateContext();
+        var now = DateTimeOffset.UtcNow;
+        var rendered = context.Render<FlowRunTimeline>(parameters => parameters
+            .Add(value => value.Events, new[]
+            {
+                Event(1, FlowRunEventType.ParticipantTurnStarted, "researcher", new { turn = 1 }, now),
+                Event(2, FlowRunEventType.ParticipantTurnCompleted, "researcher", new { turn = 1 }, now.AddSeconds(1))
+            })
+            .Add(value => value.View, FlowRunTimeline.TimelineView.Activity)
+            .Add(value => value.ShowHeader, false)
+            .Add(value => value.ShowNavigation, false));
+
+        Assert.IsEmpty(rendered.FindAll("[role=tab]"));
+        Assert.IsEmpty(rendered.FindAll(".flow-timeline-header"));
+        Assert.HasCount(1, rendered.FindAll(".flow-timeline-item"));
+    }
+
     private static BunitContext CreateContext()
     {
         var context = new BunitContext();

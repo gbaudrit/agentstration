@@ -2,7 +2,9 @@
 @using System.Text
 @inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.FlowRunDetailsStrings> Localizer
 
-<article class="panel flow-run-timeline">
+<section class="@(Embedded ? "flow-run-timeline flow-run-timeline-embedded" : "panel flow-run-timeline")">
+    @if (ShowHeader)
+    {
     <div class="flow-timeline-header">
         <div><p class="eyebrow">@T("ExecutionTrace")</p><h2>@T("ExecutionTimeline")</h2></div>
         <div class="flow-timeline-summary">
@@ -10,20 +12,24 @@
             <span>@EventCount(Events.Count)</span>
         </div>
     </div>
+    }
+    @if (ShowNavigation)
+    {
     <div class="flow-timeline-tabs" role="tablist" aria-label="@T("TimelineViewsAriaLabel")">
-        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Summary ? "true" : "false")" class="@(activeView == TimelineView.Summary ? "active" : null)" @onclick="() => activeView = TimelineView.Summary">@T("Summary")</button>
-        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Activity ? "true" : "false")" class="@(activeView == TimelineView.Activity ? "active" : null)" @onclick="() => activeView = TimelineView.Activity">@T("Activity")</button>
+        <button type="button" role="tab" aria-selected="@(CurrentView == TimelineView.Summary ? "true" : "false")" class="@(CurrentView == TimelineView.Summary ? "active" : null)" @onclick="() => activeView = TimelineView.Summary">@T("Summary")</button>
+        <button type="button" role="tab" aria-selected="@(CurrentView == TimelineView.Activity ? "true" : "false")" class="@(CurrentView == TimelineView.Activity ? "active" : null)" @onclick="() => activeView = TimelineView.Activity">@T("Activity")</button>
         @if (HasHandoffView)
         {
-            <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Handoffs ? "true" : "false")" class="@(activeView == TimelineView.Handoffs ? "active" : null)" @onclick="() => activeView = TimelineView.Handoffs">@T("Handoffs")</button>
+            <button type="button" role="tab" aria-selected="@(CurrentView == TimelineView.Handoffs ? "true" : "false")" class="@(CurrentView == TimelineView.Handoffs ? "active" : null)" @onclick="() => activeView = TimelineView.Handoffs">@T("Handoffs")</button>
         }
-        <button type="button" role="tab" aria-selected="@(activeView == TimelineView.Raw ? "true" : "false")" class="@(activeView == TimelineView.Raw ? "active" : null)" @onclick="() => activeView = TimelineView.Raw">@T("RawEvents")</button>
+        <button type="button" role="tab" aria-selected="@(CurrentView == TimelineView.Raw ? "true" : "false")" class="@(CurrentView == TimelineView.Raw ? "active" : null)" @onclick="() => activeView = TimelineView.Raw">@T("RawEvents")</button>
     </div>
+    }
     @if (Events.Count == 0)
     {
         <div class="flow-timeline-empty">@T("WaitingForEvents")</div>
     }
-    else if (activeView == TimelineView.Summary)
+    else if (CurrentView == TimelineView.Summary)
     {
         <section class="flow-execution-summary" aria-label="@T("Summary")">
             <div class="flow-summary-metrics">
@@ -47,7 +53,7 @@
             }
         </section>
     }
-    else if (activeView == TimelineView.Activity)
+    else if (CurrentView == TimelineView.Activity)
     {
         <ol class="flow-timeline-list" aria-live="polite">
             @foreach (var item in Activity)
@@ -86,7 +92,7 @@
             }
         </ol>
     }
-    else if (activeView == TimelineView.Handoffs)
+    else if (CurrentView == TimelineView.Handoffs)
     {
         <section class="flow-handoff-summary" aria-label="@T("Handoffs")">
             <div class="flow-handoff-summary-header">
@@ -132,7 +138,7 @@
             <button type="button" class="button-secondary flow-load-events" @onclick="LoadMoreRawEvents">@T("LoadOlderEvents", RawPageSize)</button>
         }
     }
-</article>
+</section>
 
 @code {
     private const int RawPageSize = 200;
@@ -148,7 +154,12 @@
     [Parameter] public IReadOnlyList<FlowRunEvent> Events { get; set; } = [];
     [Parameter] public bool IsLive { get; set; }
     [Parameter] public bool InferParticipantHandoffs { get; set; }
+    [Parameter] public TimelineView? View { get; set; }
+    [Parameter] public bool ShowHeader { get; set; } = true;
+    [Parameter] public bool ShowNavigation { get; set; } = true;
+    [Parameter] public bool Embedded { get; set; }
 
+    private TimelineView CurrentView => View ?? activeView;
     private IReadOnlyList<TimelineItem> Activity => BuildActivity(Events, InferParticipantHandoffs);
     private IReadOnlyList<TimelineItem> Handoffs => Activity.Where(value => value.Type == FlowRunEventType.ParticipantHandoff && value.HandoffFrom is not null && value.HandoffTo is not null).ToArray();
     private bool HasHandoffView => InferParticipantHandoffs || Events.Any(value => value.Type == FlowRunEventType.ParticipantHandoff);
@@ -164,7 +175,7 @@
 
     protected override void OnParametersSet()
     {
-        if (!HasHandoffView && activeView == TimelineView.Handoffs) activeView = TimelineView.Activity;
+        if (View is null && !HasHandoffView && activeView == TimelineView.Handoffs) activeView = TimelineView.Activity;
     }
 
     private IReadOnlyList<string> ParticipantNames() => Activity
@@ -321,7 +332,7 @@
             ? result
             : null;
 
-    private enum TimelineView { Summary, Activity, Handoffs, Raw }
+    public enum TimelineView { Summary, Activity, Handoffs, Raw }
 
     private sealed class TimelineItem
     {
