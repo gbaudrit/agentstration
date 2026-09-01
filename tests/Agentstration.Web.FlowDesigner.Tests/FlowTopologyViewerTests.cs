@@ -2,6 +2,7 @@ using Agentstration.Web.FlowDesigner.Components;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
+using System.Globalization;
 
 namespace Agentstration.Web.FlowDesigner.Tests;
 
@@ -64,6 +65,7 @@ public sealed class FlowTopologyViewerTests
     [TestMethod]
     public void ObservedHandoffsRemainVisibleOnGraphWithoutAPathOverlay()
     {
+        using var culture = new CultureScope("fr-FR");
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var graph = new FlowTopologyGraph(
@@ -84,7 +86,11 @@ public sealed class FlowTopologyViewerTests
         Assert.IsEmpty(rendered.FindAll(".topology-path-panel"));
         Assert.IsEmpty(rendered.FindAll("button.path-toggle"));
         Assert.HasCount(1, rendered.FindAll(".topology-edge.observed"));
-        Assert.Contains("#1", rendered.Markup, StringComparison.Ordinal);
+        var badge = rendered.Find(".transfer-badge");
+        Assert.AreEqual("#1", badge.QuerySelector("text")!.TextContent.Trim());
+        Assert.Contains("participant:welcome", badge.GetAttribute("aria-label")!, StringComparison.Ordinal);
+        Assert.DoesNotContain(",", badge.GetAttribute("transform")!, StringComparison.Ordinal);
+        Assert.AreNotEqual("translate(0 0)", badge.GetAttribute("transform"));
     }
 
     [TestMethod]
@@ -123,8 +129,8 @@ public sealed class FlowTopologyViewerTests
                 new("system:output", "output", "Output", "output", 600, 0)
             ],
             [
-                new("forward", "participant:welcome", "participant:advisor", "handoff · #1", FlowTopologyEdgeKind.Conditional),
-                new("backward", "participant:advisor", "participant:welcome", "handoff · #2", FlowTopologyEdgeKind.Conditional),
+                new("forward", "participant:welcome", "participant:advisor", "handoff · #1", FlowTopologyEdgeKind.Conditional, FlowTopologyEdgeState.Observed),
+                new("backward", "participant:advisor", "participant:welcome", "handoff · #2, #4", FlowTopologyEdgeKind.Conditional, FlowTopologyEdgeState.Observed),
                 new("terminal:welcome", "participant:welcome", "system:output", "terminal", FlowTopologyEdgeKind.Dynamic),
                 new("terminal:advisor", "participant:advisor", "system:output", "terminal", FlowTopologyEdgeKind.Dynamic)
             ],
@@ -141,7 +147,9 @@ public sealed class FlowTopologyViewerTests
         Assert.Contains(" C ", backward!, StringComparison.Ordinal);
         Assert.DoesNotContain(" Q ", forward!, StringComparison.Ordinal);
         Assert.DoesNotContain(" Q ", backward!, StringComparison.Ordinal);
-        Assert.HasCount(2, rendered.FindAll(".edge-label-wrap"));
+        Assert.IsEmpty(rendered.FindAll(".edge-label-wrap"));
+        Assert.HasCount(2, rendered.FindAll(".transfer-badge"));
+        Assert.AreEqual("#2 · #4", rendered.Find("[data-edge-label='backward'] text").TextContent.Trim());
         Assert.IsFalse(rendered.Find("svg").ClassList.Contains("fit"));
         Assert.Contains("px", rendered.Find("svg").GetAttribute("style")!, StringComparison.Ordinal);
     }
@@ -172,5 +180,23 @@ public sealed class FlowTopologyViewerTests
         Assert.AreNotEqual(downward, upward);
         Assert.Contains("C 312", downward!, StringComparison.Ordinal);
         Assert.Contains("C 296", upward!, StringComparison.Ordinal);
+    }
+
+    private sealed class CultureScope : IDisposable
+    {
+        private readonly CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        private readonly CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+
+        public CultureScope(string name)
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(name);
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(name);
+        }
+
+        public void Dispose()
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 }

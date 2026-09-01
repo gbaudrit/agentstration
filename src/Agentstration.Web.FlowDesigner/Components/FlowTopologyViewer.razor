@@ -43,7 +43,15 @@
                         <path class="topology-edge @EdgeClass(edge.Edge)" data-edge-id="@edge.Edge.Id" d="@edge.Path" marker-end="url(#@Marker(edge.Edge.State))" marker-start="@(edge.Edge.Bidirectional ? $"url(#{Marker(edge.Edge.State)})" : null)">
                             <title>@EdgeDescription(edge.Edge)</title>
                         </path>
-                        @if (ShowLabel(edge.Edge))
+                        @if (ShowTransferBadge(edge.Edge))
+                        {
+                            <g class="transfer-badge" data-edge-label="@edge.Edge.Id" transform="@Translate(edge.LabelX, edge.LabelY)" role="img" aria-label="@EdgeDescription(edge.Edge)">
+                                <rect x="@Number(-edge.LabelWidth / 2)" y="-10" width="@Number(edge.LabelWidth)" height="20" rx="10" />
+                                <text text-anchor="middle" dominant-baseline="central">@TransferBadgeText(edge.Edge)</text>
+                                <title>@EdgeDescription(edge.Edge)</title>
+                            </g>
+                        }
+                        else if (ShowLabel(edge.Edge))
                         {
                             <foreignObject class="edge-label-wrap" x="@(edge.LabelX - (edge.LabelWidth / 2))" y="@(edge.LabelY - 11)" width="@edge.LabelWidth" height="22">
                                 <div class="edge-label">@edge.Edge.Label</div>
@@ -150,6 +158,19 @@
 
     private static bool ShowLabel(FlowTopologyEdge edge) =>
         !string.IsNullOrWhiteSpace(edge.Label) && edge.Label is not "handoff" and not "terminal";
+
+    private static bool ShowTransferBadge(FlowTopologyEdge edge) =>
+        edge.State == FlowTopologyEdgeState.Observed
+        && edge.Label?.StartsWith("handoff · ", StringComparison.Ordinal) == true;
+
+    private static string TransferBadgeText(FlowTopologyEdge edge) =>
+        edge.Label!["handoff · ".Length..].Replace(", ", " · ", StringComparison.Ordinal);
+
+    private static string Translate(double x, double y) =>
+        FormattableString.Invariant($"translate({x} {y})");
+
+    private static string Number(double value) =>
+        value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private static string NodeClass(FlowTopologyNode node)
     {

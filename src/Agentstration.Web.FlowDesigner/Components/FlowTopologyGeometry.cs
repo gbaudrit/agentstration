@@ -15,6 +15,8 @@ internal sealed record FlowTopologyGeometry(
     private const double PortGap = 14;
     private const double BypassLaneGap = 16;
     private const double BypassLaneDistance = 52;
+    private const double TransferBadgeOffset = 18;
+    private const double TransferBadgeProgress = 0.72;
 
     public static FlowTopologyGeometry Calculate(FlowTopologyGraph graph)
     {
@@ -35,7 +37,7 @@ internal sealed record FlowTopologyGeometry(
             .Select(edge => Sides(edge, byId[edge.From], byId[edge.To], bypasses[edge.Id]))
             .ToDictionary(item => item.Edge.Id, StringComparer.Ordinal);
         var portOffsets = PortOffsets(validEdges, byId, endpointSides);
-        var edges = validEdges.Select(edge =>
+        var routedEdges = validEdges.Select(edge =>
         {
             var sides = endpointSides[edge.Id];
             var start = Anchor(byId[edge.From], sides.Start, portOffsets[new EdgeEndpoint(edge.Id, true)]);
@@ -46,6 +48,13 @@ internal sealed record FlowTopologyGeometry(
 
         var canvasWidth = Math.Max(600, nodes.Max(node => node.X) + NodeWidth + OuterPadding);
         var canvasHeight = Math.Max(240, nodes.Max(node => node.Y) + NodeHeight + OuterPadding);
+        var edges = routedEdges.Select(edge => IsTransferBadge(edge.Edge)
+            ? edge with
+            {
+                LabelX = Math.Clamp(edge.LabelX, (edge.LabelWidth / 2) + 8, canvasWidth - (edge.LabelWidth / 2) - 8),
+                LabelY = Math.Clamp(edge.LabelY, 14, canvasHeight - 14)
+            }
+            : edge).ToArray();
         return new(nodes, edges, canvasWidth, canvasHeight);
     }
 
@@ -172,26 +181,22 @@ internal sealed record FlowTopologyGeometry(
             var loopY = end.Y - 42;
             return new(edge,
                 Svg($"M {start.X} {start.Y} C {loopX} {start.Y}, {loopX} {loopY}, {end.X} {loopY} C {end.X - 32} {loopY}, {end.X - 32} {end.Y}, {end.X} {end.Y}"),
-                loopX, loopY - 12, LabelWidth(edge.Label));
+                loopX, IsTransferBadge(edge) ? loopY : loopY - 12, LabelWidth(edge));
         }
 
-        if (start == end) return new(edge, Svg($"M {start.X} {start.Y}"), start.X, start.Y, LabelWidth(edge.Label));
+        if (start == end) return new(edge, Svg($"M {start.X} {start.Y}"), start.X, start.Y, LabelWidth(edge));
 
         var laneOffset = hasReverse && string.CompareOrdinal(edge.From, edge.To) > 0 ? BypassLaneGap : 0;
         if (bypass == BypassDirection.Right)
         {
             var laneX = Math.Max(start.X, end.X) + BypassLaneDistance + laneOffset;
-            return new(edge,
-                Svg($"M {start.X} {start.Y} C {laneX} {start.Y}, {laneX} {end.Y}, {end.X} {end.Y}"),
-                laneX, ((start.Y + end.Y) / 2) - 12, LabelWidth(edge.Label));
+            return Positioned(edge, start, new(laneX, start.Y), new(laneX, end.Y), end);
         }
 
         if (bypass == BypassDirection.Below)
         {
             var laneY = Math.Max(start.Y, end.Y) + BypassLaneDistance + laneOffset;
-            return new(edge,
-                Svg($"M {start.X} {start.Y} C {start.X} {laneY}, {end.X} {laneY}, {end.X} {end.Y}"),
-                (start.X + end.X) / 2, laneY - 12, LabelWidth(edge.Label));
+            return Positioned(edge, start, new(start.X, laneY), new(end.X, laneY), end);
         }
 
         var horizontal = startSide is PortSide.Left or PortSide.Right && endSide is PortSide.Left or PortSide.Right;
@@ -199,12 +204,79 @@ internal sealed record FlowTopologyGeometry(
         var controlY = horizontal ? start.Y : (start.Y + end.Y) / 2;
         var secondControlX = horizontal ? controlX : end.X;
         var secondControlY = horizontal ? end.Y : controlY;
-        return new(edge,
-            Svg($"M {start.X} {start.Y} C {controlX} {controlY}, {secondControlX} {secondControlY}, {end.X} {end.Y}"),
-            (start.X + end.X) / 2, ((start.Y + end.Y) / 2) - 12, LabelWidth(edge.Label));
+        return Positioned(edge, start, new(controlX, controlY), new(secondControlX, secondControlY), end);
     }
 
-    private static double LabelWidth(string? label) => label is null ? 0 : Math.Clamp(30 + (label.Length * 5.5), 84, 184);
+    private static FlowTopologyPositionedEdge Positioned(
+        FlowTopologyEdge edge,
+        FlowTopologyPoint start,
+        FlowTopologyPoint firstControl,
+        FlowTopologyPoint secondControl,
+        FlowTopologyPoint end)
+    {
+        var path = Svg($"M {start.X} {start.Y} C {firstControl.X} {firstControl.Y}, {secondControl.X} {secondControl.Y}, {end.X} {end.Y}");
+        if (!IsTransferBadge(edge))
+        {
+            return new(edge, path, (start.X + end.X) / 2, ((start.Y + end.Y) / 2) - 12, LabelWidth(edge));
+        }
+
+        var point = CubicPoint(start, firstControl, secondControl, end, TransferBadgeProgress);
+        var tangent = CubicTangent(start, firstControl, secondControl, end, TransferBadgeProgress);
+        var length = Math.Sqrt((tangent.X * tangent.X) + (tangent.Y * tangent.Y));
+        var offsetX = length == 0 ? 0 : (tangent.Y / length) * TransferBadgeOffset;
+        var offsetY = length == 0 ? -TransferBadgeOffset : (-tangent.X / length) * TransferBadgeOffset;
+        return new(edge, path, point.X + offsetX, point.Y + offsetY, LabelWidth(edge));
+    }
+
+    private static FlowTopologyPoint CubicPoint(
+        FlowTopologyPoint start,
+        FlowTopologyPoint firstControl,
+        FlowTopologyPoint secondControl,
+        FlowTopologyPoint end,
+        double progress)
+    {
+        var remaining = 1 - progress;
+        return new(
+            (remaining * remaining * remaining * start.X)
+                + (3 * remaining * remaining * progress * firstControl.X)
+                + (3 * remaining * progress * progress * secondControl.X)
+                + (progress * progress * progress * end.X),
+            (remaining * remaining * remaining * start.Y)
+                + (3 * remaining * remaining * progress * firstControl.Y)
+                + (3 * remaining * progress * progress * secondControl.Y)
+                + (progress * progress * progress * end.Y));
+    }
+
+    private static FlowTopologyPoint CubicTangent(
+        FlowTopologyPoint start,
+        FlowTopologyPoint firstControl,
+        FlowTopologyPoint secondControl,
+        FlowTopologyPoint end,
+        double progress)
+    {
+        var remaining = 1 - progress;
+        return new(
+            (3 * remaining * remaining * (firstControl.X - start.X))
+                + (6 * remaining * progress * (secondControl.X - firstControl.X))
+                + (3 * progress * progress * (end.X - secondControl.X)),
+            (3 * remaining * remaining * (firstControl.Y - start.Y))
+                + (6 * remaining * progress * (secondControl.Y - firstControl.Y))
+                + (3 * progress * progress * (end.Y - secondControl.Y)));
+    }
+
+    private static double LabelWidth(FlowTopologyEdge edge)
+    {
+        if (edge.Label is null) return 0;
+        return IsTransferBadge(edge)
+            ? Math.Clamp(18 + (TransferBadgeText(edge.Label).Length * 6), 30, 88)
+            : Math.Clamp(30 + (edge.Label.Length * 5.5), 84, 184);
+    }
+
+    private static bool IsTransferBadge(FlowTopologyEdge edge) =>
+        edge.State == FlowTopologyEdgeState.Observed
+        && edge.Label?.StartsWith("handoff · ", StringComparison.Ordinal) == true;
+
+    private static string TransferBadgeText(string label) => label["handoff · ".Length..].Replace(", ", " · ", StringComparison.Ordinal);
 
     private static double CenterX(FlowTopologyPositionedNode node) => node.X + (NodeWidth / 2);
 

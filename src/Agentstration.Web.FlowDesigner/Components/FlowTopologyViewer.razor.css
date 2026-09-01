@@ -29,6 +29,7 @@ marker path{fill:var(--primary)}
 marker.observed-marker path{fill:#2bb673}
 marker.inactive-marker path{fill:var(--muted);opacity:.55}
 .edge-label-wrap{pointer-events:none;overflow:visible}.edge-label{display:grid;box-sizing:border-box;height:22px;padding:0 6px;place-items:center;border:1px solid color-mix(in srgb,var(--border) 72%,transparent);border-radius:9px;background:color-mix(in srgb,var(--surface-2) 92%,transparent);box-shadow:0 1px 3px rgba(11,24,45,.14);color:var(--muted);font-size:10px;text-align:center;white-space:nowrap}
+.transfer-badge{cursor:help}.transfer-badge rect{fill:#2bb673;stroke:var(--surface-2);stroke-width:2;filter:drop-shadow(0 1px 2px rgba(11,24,45,.24))}.transfer-badge text{fill:#fff;font-family:var(--font-sans);font-size:9px;font-weight:800;pointer-events:none}
 .topology-node{cursor:pointer;outline:none}
 .topology-node rect{fill:var(--surface);stroke:var(--border);stroke-width:2;filter:drop-shadow(0 3px 5px rgba(20,40,75,.12));transition:stroke .15s,stroke-width .15s}
 .topology-node:hover rect,.topology-node:focus rect,.topology-node.selected rect{stroke:var(--primary);stroke-width:3}

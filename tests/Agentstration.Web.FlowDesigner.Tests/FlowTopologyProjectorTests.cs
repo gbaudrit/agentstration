@@ -79,6 +79,8 @@ public sealed class FlowTopologyProjectorTests
 
         Assert.IsTrue(topology.FindBySelection("researcher")!.IsInitial);
         Assert.AreEqual(FlowTopologyEdgeState.Observed,
+            topology.Edges.Single(edge => edge.Id == "handoff-entry").State);
+        Assert.AreEqual(FlowTopologyEdgeState.Observed,
             topology.Edges.Single(edge => edge.From == "participant:researcher" && edge.To == "participant:reviewer").State);
         Assert.Contains("#1", topology.Edges.Single(edge => edge.From == "participant:researcher" && edge.To == "participant:reviewer").Label!, StringComparison.Ordinal);
         Assert.AreEqual(FlowTopologyEdgeState.Declared,
@@ -149,6 +151,8 @@ public sealed class FlowTopologyProjectorTests
 
         var topology = FlowTopologyProjector.Project(definition);
 
+        Assert.AreEqual(FlowTopologyEdgeState.Declared,
+            topology.Edges.Single(edge => edge.Id == "handoff-entry").State);
         var welcome = topology.FindBySelection("welcome")!;
         var advisor = topology.FindBySelection("solution-advisor")!;
         var technical = topology.FindBySelection("technical-expert")!;

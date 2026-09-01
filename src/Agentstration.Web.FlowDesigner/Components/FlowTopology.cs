@@ -246,12 +246,21 @@ public static class FlowTopologyProjector
         var observedOrders = observedTransfers
             .GroupBy(transfer => (transfer.From, transfer.To))
             .ToDictionary(group => group.Key, group => group.Select(transfer => transfer.Order).ToArray());
+        var initialParticipantObserved = events.Any(item =>
+                item.Type == FlowRunEventType.ParticipantTurnStarted
+                && string.Equals(item.StepId, pattern.InitialParticipant, StringComparison.Ordinal))
+            || observedTransfers.Any(transfer => string.Equals(transfer.From, pattern.InitialParticipant, StringComparison.Ordinal));
         var terminalParticipant = run?.Status == FlowRunStatus.Succeeded
             ? LastObservedParticipant(events, observedTransfers)
             : null;
         var edges = new List<FlowTopologyEdge>
         {
-            new("handoff-entry", "system:input", $"participant:{pattern.InitialParticipant}", "initial")
+            new(
+                "handoff-entry",
+                "system:input",
+                $"participant:{pattern.InitialParticipant}",
+                "initial",
+                State: initialParticipantObserved ? FlowTopologyEdgeState.Observed : FlowTopologyEdgeState.Declared)
         };
         edges.AddRange(pattern.Handoffs.Select((route, index) =>
         {

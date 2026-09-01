@@ -205,6 +205,8 @@ public sealed class FlowRunTimelineTests
         Assert.HasCount(5, rendered.FindAll(".flow-summary-metrics>div"));
         CollectionAssert.AreEqual(new[] { "researcher", "reviewer" }, rendered.FindAll(".flow-participant-name").Select(value => value.TextContent).ToArray());
         Assert.AreEqual("/namespaces/sample/agents/researcher", rendered.Find(".flow-participant-path a").GetAttribute("href"));
+        Assert.AreEqual("#1", rendered.Find(".flow-participant-transfer").TextContent.Trim());
+        Assert.AreEqual(strings["HandoffNumber", 1].Value, rendered.Find(".flow-participant-transfer").GetAttribute("aria-label"));
         Assert.Contains("2 s", rendered.Markup, StringComparison.Ordinal);
     }
 
