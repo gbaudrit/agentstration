@@ -28,6 +28,8 @@ public sealed class FlowTopologyViewerTests
         Assert.IsNotNull(rendered.Find($"button[aria-label='{strings["ZoomOut"].Value}']"));
         rendered.FindAll(".topology-zoom-controls button").Single(button => button.TextContent.Trim() == strings["Fit"].Value).Click();
         Assert.AreEqual("100%", rendered.Find(".topology-zoom-controls span").TextContent.Trim());
+        Assert.IsTrue(rendered.Find("svg").ClassList.Contains("fit"));
+        Assert.Contains("width:100%", rendered.Find("svg").GetAttribute("style")!, StringComparison.Ordinal);
     }
 
     [TestMethod]
@@ -51,6 +53,7 @@ public sealed class FlowTopologyViewerTests
 
         Assert.HasCount(2, rendered.FindAll("[role=button]"));
         Assert.HasCount(1, rendered.FindAll(".topology-edge.conditional"));
+        Assert.IsTrue(rendered.FindAll("marker").All(marker => marker.GetAttribute("markerUnits") == "userSpaceOnUse"));
         Assert.AreEqual("Conditional workflow", rendered.Find("svg").GetAttribute("aria-label"));
 
         rendered.FindAll("[role=button]")[1].Click();
@@ -106,5 +109,38 @@ public sealed class FlowTopologyViewerTests
 
         rendered.Find("button.inspector-toggle").Click();
         Assert.AreEqual(false, inspectorVisible);
+    }
+
+    [TestMethod]
+    public void ViewerSeparatesOppositeHandoffsAndUsesIntrinsicCanvasWidth()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var graph = new FlowTopologyGraph(
+            [
+                new("participant:welcome", "welcome", "Welcome", "agent", 0, 0),
+                new("participant:advisor", "advisor", "Advisor", "agent", 300, 0),
+                new("system:output", "output", "Output", "output", 600, 0)
+            ],
+            [
+                new("forward", "participant:welcome", "participant:advisor", "handoff · #1", FlowTopologyEdgeKind.Conditional),
+                new("backward", "participant:advisor", "participant:welcome", "handoff · #2", FlowTopologyEdgeKind.Conditional),
+                new("terminal:welcome", "participant:welcome", "system:output", "terminal", FlowTopologyEdgeKind.Dynamic),
+                new("terminal:advisor", "participant:advisor", "system:output", "terminal", FlowTopologyEdgeKind.Dynamic)
+            ],
+            "directed",
+            "Handoff orchestration");
+
+        var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph));
+
+        var forward = rendered.Find("path[data-edge-id='forward']").GetAttribute("d");
+        var backward = rendered.Find("path[data-edge-id='backward']").GetAttribute("d");
+        Assert.AreNotEqual(forward, backward);
+        Assert.Contains(" Q ", forward!, StringComparison.Ordinal);
+        Assert.Contains(" Q ", backward!, StringComparison.Ordinal);
+        Assert.HasCount(2, rendered.FindAll(".edge-label-wrap"));
+        Assert.IsFalse(rendered.Find("svg").ClassList.Contains("fit"));
+        Assert.Contains("px", rendered.Find("svg").GetAttribute("style")!, StringComparison.Ordinal);
     }
 }

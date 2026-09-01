@@ -31,21 +31,24 @@
         else
         {
             <div class="topology-viewport">
-            <svg class="topology-canvas" style="width: @ZoomPercent%; min-width: @(600 * Zoom)px" viewBox="0 0 @CanvasWidth @CanvasHeight" role="img" aria-label="@Graph.Description">
+            <svg class="topology-canvas @(fitToViewport ? "fit" : null)" style="@CanvasStyle" viewBox="0 0 @CanvasWidth @CanvasHeight" role="img" aria-label="@Graph.Description">
                 <defs>
-                    <marker id="@DeclaredMarker" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,4 L0,8 z" /></marker>
-                    <marker id="@ObservedMarker" class="observed-marker" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,4 L0,8 z" /></marker>
-                    <marker id="@InactiveMarker" class="inactive-marker" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,4 L0,8 z" /></marker>
+                    <marker id="@DeclaredMarker" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" /></marker>
+                    <marker id="@ObservedMarker" class="observed-marker" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" /></marker>
+                    <marker id="@InactiveMarker" class="inactive-marker" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" /></marker>
                 </defs>
                 <g class="topology-edges">
                     @foreach (var edge in Edges)
                     {
-                        <path class="topology-edge @EdgeClass(edge.Edge)" d="@EdgePath(edge)" marker-end="url(#@Marker(edge.Edge.State))" marker-start="@(edge.Edge.Bidirectional ? $"url(#{Marker(edge.Edge.State)})" : null)">
+                        <path class="topology-edge @EdgeClass(edge.Edge)" data-edge-id="@edge.Edge.Id" d="@edge.Path" marker-end="url(#@Marker(edge.Edge.State))" marker-start="@(edge.Edge.Bidirectional ? $"url(#{Marker(edge.Edge.State)})" : null)">
                             <title>@EdgeDescription(edge.Edge)</title>
                         </path>
-                        <foreignObject class="edge-label-wrap" x="@(edge.LabelX - 60)" y="@(edge.LabelY - 10)" width="120" height="20">
-                            <div class="edge-label">@edge.Edge.Label</div>
-                        </foreignObject>
+                        @if (ShowLabel(edge.Edge))
+                        {
+                            <foreignObject class="edge-label-wrap" x="@(edge.LabelX - (edge.LabelWidth / 2))" y="@(edge.LabelY - 11)" width="@edge.LabelWidth" height="22">
+                                <div class="edge-label">@edge.Edge.Label</div>
+                            </foreignObject>
+                        }
                     }
                 </g>
                 <g class="topology-nodes">
@@ -56,7 +59,7 @@
                            aria-label="@NodeDescription(node.Node)"
                            @onclick="() => SelectAsync(node.Node.SelectionKey)"
                             @onkeydown="eventArgs => OnNodeKeyDownAsync(eventArgs, node.Node.SelectionKey)">
-                            <rect width="@NodeWidth" height="@NodeHeight" rx="11" />
+                            <rect width="@FlowTopologyGeometry.NodeWidth" height="@FlowTopologyGeometry.NodeHeight" rx="11" />
                             <foreignObject x="8" y="8" width="156" height="62">
                                 <div class="node-content">
                                     <span class="node-icon">@Icon(node.Node.Type)</span>
@@ -76,17 +79,18 @@
 </div>
 
 @code {
-    private const int NodeWidth = 172;
-    private const int NodeHeight = 76;
-    private const double Padding = 50;
     private readonly string markerPrefix = $"topology-{Guid.NewGuid():N}";
-    private IReadOnlyList<PositionedNode> Nodes { get; set; } = [];
-    private IReadOnlyList<PositionedEdge> Edges { get; set; } = [];
+    private IReadOnlyList<FlowTopologyPositionedNode> Nodes { get; set; } = [];
+    private IReadOnlyList<FlowTopologyPositionedEdge> Edges { get; set; } = [];
     private double CanvasWidth { get; set; } = 600;
     private double CanvasHeight { get; set; } = 260;
     private double Zoom { get; set; } = 1;
     private bool expanded;
+    private bool fitToViewport;
     private int ZoomPercent => (int)Math.Round(Zoom * 100);
+    private string CanvasStyle => fitToViewport
+        ? "width:100%;min-width:0"
+        : $"width:{(CanvasWidth * Zoom).ToString(System.Globalization.CultureInfo.InvariantCulture)}px;min-width:{(CanvasWidth * Zoom).ToString(System.Globalization.CultureInfo.InvariantCulture)}px";
 
     [Parameter, EditorRequired] public FlowTopologyGraph Graph { get; set; } = new([], [], "horizontal", "Flow topology");
     [Parameter] public string? SelectedKey { get; set; }
@@ -101,55 +105,32 @@
 
     protected override void OnParametersSet()
     {
-        if (Graph.Nodes.Count == 0)
-        {
-            Nodes = [];
-            Edges = [];
-            CanvasWidth = 600;
-            CanvasHeight = 260;
-            return;
-        }
-        var minimumX = Graph.Nodes.Min(node => node.X);
-        var minimumY = Graph.Nodes.Min(node => node.Y);
-        Nodes = Graph.Nodes.Select(node => new PositionedNode(node, node.X - minimumX + Padding, node.Y - minimumY + Padding)).ToArray();
-        var byId = Nodes.ToDictionary(node => node.Node.Id, StringComparer.Ordinal);
-        Edges = Graph.Edges
-            .Where(edge => byId.ContainsKey(edge.From) && byId.ContainsKey(edge.To))
-            .Select(edge => Position(edge, byId[edge.From], byId[edge.To]))
-            .ToArray();
-        CanvasWidth = Math.Max(600, Nodes.Max(node => node.X) + NodeWidth + Padding);
-        CanvasHeight = Math.Max(240, Nodes.Max(node => node.Y) + NodeHeight + Padding);
-    }
-
-    private static PositionedEdge Position(FlowTopologyEdge edge, PositionedNode from, PositionedNode to)
-    {
-        var fromCenterX = from.X + NodeWidth / 2d;
-        var fromCenterY = from.Y + NodeHeight / 2d;
-        var toCenterX = to.X + NodeWidth / 2d;
-        var toCenterY = to.Y + NodeHeight / 2d;
-        var horizontal = Math.Abs(toCenterX - fromCenterX) >= Math.Abs(toCenterY - fromCenterY);
-        var startX = horizontal ? from.X + (toCenterX >= fromCenterX ? NodeWidth : 0) : fromCenterX;
-        var startY = horizontal ? fromCenterY : from.Y + (toCenterY >= fromCenterY ? NodeHeight : 0);
-        var endX = horizontal ? to.X + (toCenterX >= fromCenterX ? 0 : NodeWidth) : toCenterX;
-        var endY = horizontal ? toCenterY : to.Y + (toCenterY >= fromCenterY ? 0 : NodeHeight);
-        return new(edge, startX, startY, endX, endY, (startX + endX) / 2, (startY + endY) / 2 - 7);
-    }
-
-    private static string EdgePath(PositionedEdge edge)
-    {
-        var distance = Math.Abs(edge.EndX - edge.StartX) + Math.Abs(edge.EndY - edge.StartY);
-        if (distance < 220) return $"M {edge.StartX} {edge.StartY} L {edge.EndX} {edge.EndY}";
-        var controlX = (edge.StartX + edge.EndX) / 2;
-        return $"M {edge.StartX} {edge.StartY} C {controlX} {edge.StartY}, {controlX} {edge.EndY}, {edge.EndX} {edge.EndY}";
+        var geometry = FlowTopologyGeometry.Calculate(Graph);
+        Nodes = geometry.Nodes;
+        Edges = geometry.Edges;
+        CanvasWidth = geometry.CanvasWidth;
+        CanvasHeight = geometry.CanvasHeight;
     }
 
     private Task SelectAsync(string key) => SelectedKeyChanged.InvokeAsync(key);
 
-    private void ZoomIn() => Zoom = Math.Min(2.5, Zoom + 0.15);
+    private void ZoomIn()
+    {
+        fitToViewport = false;
+        Zoom = Math.Min(2.5, Zoom + 0.15);
+    }
 
-    private void ZoomOut() => Zoom = Math.Max(0.5, Zoom - 0.15);
+    private void ZoomOut()
+    {
+        fitToViewport = false;
+        Zoom = Math.Max(0.5, Zoom - 0.15);
+    }
 
-    private void Fit() => Zoom = 1;
+    private void Fit()
+    {
+        Zoom = 1;
+        fitToViewport = true;
+    }
 
     private void ToggleExpanded() => expanded = !expanded;
 
@@ -166,6 +147,9 @@
     };
 
     private static string EdgeClass(FlowTopologyEdge edge) => $"{edge.Kind.ToString().ToLowerInvariant()} {edge.State.ToString().ToLowerInvariant()}";
+
+    private static bool ShowLabel(FlowTopologyEdge edge) =>
+        !string.IsNullOrWhiteSpace(edge.Label) && edge.Label is not "handoff" and not "terminal";
 
     private static string NodeClass(FlowTopologyNode node)
     {
@@ -203,6 +187,4 @@
 
     private static string Trim(string value, int length) => value.Length <= length ? value : $"{value[..(length - 1)]}…";
 
-    private sealed record PositionedNode(FlowTopologyNode Node, double X, double Y);
-    private sealed record PositionedEdge(FlowTopologyEdge Edge, double StartX, double StartY, double EndX, double EndY, double LabelX, double LabelY);
 }

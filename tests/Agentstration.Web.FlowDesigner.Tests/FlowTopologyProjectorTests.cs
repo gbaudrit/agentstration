@@ -111,6 +111,40 @@ public sealed class FlowTopologyProjectorTests
     }
 
     [TestMethod]
+    public void HandoffProjectionRanksParticipantsFromInitialRouteAndLeavesRoomBetweenLanes()
+    {
+        var definition = new OrchestrationFlowDefinition(
+            [
+                new(FlowTargetKind.Agent, "welcome"),
+                new(FlowTargetKind.Agent, "solution-advisor"),
+                new(FlowTargetKind.Agent, "technical-expert"),
+                new(FlowTargetKind.Agent, "integration-expert")
+            ],
+            new HandoffOrchestrationPattern(
+                "welcome",
+                [
+                    new("welcome", "solution-advisor"),
+                    new("welcome", "technical-expert"),
+                    new("solution-advisor", "integration-expert"),
+                    new("technical-expert", "integration-expert"),
+                    new("integration-expert", "welcome")
+                ]));
+
+        var topology = FlowTopologyProjector.Project(definition);
+
+        var welcome = topology.FindBySelection("welcome")!;
+        var advisor = topology.FindBySelection("solution-advisor")!;
+        var technical = topology.FindBySelection("technical-expert")!;
+        var integration = topology.FindBySelection("integration-expert")!;
+        var output = topology.Nodes.Single(node => node.Id == "system:output");
+        Assert.IsTrue(advisor.X - welcome.X >= 300);
+        Assert.AreEqual(advisor.X, technical.X);
+        Assert.IsTrue(Math.Abs(advisor.Y - technical.Y) >= 170);
+        Assert.IsTrue(integration.X - advisor.X >= 300);
+        Assert.IsTrue(output.X - integration.X >= 300);
+    }
+
+    [TestMethod]
     public void GroupChatProjectionUsesSharedConversationHubAndObservedTurnOrder()
     {
         var definition = Orchestration(new GroupChatOrchestrationPattern(8));
