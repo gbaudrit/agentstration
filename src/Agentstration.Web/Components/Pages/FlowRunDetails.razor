@@ -80,7 +80,7 @@ else
                     <div><span class="field-label">@T("CorrelationId")</span><code>@run.CorrelationId</code></div>
                 </section>
                 <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun"
-                                 View="@FlowRunTimeline.TimelineView.Summary" ShowHeader="false" ShowNavigation="false" Embedded="true" />
+                                 View="@FlowRunTimeline.TimelineView.Summary" ShowHeader="false" ShowNavigation="false" Embedded="true" ParticipantUrls="@ParticipantUrls" />
                 <section class="designer-layout run-layout flow-run-overview-topology @(inspectorVisible ? null : "inspector-collapsed")">
                     <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
                                         ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible" />
@@ -145,6 +145,7 @@ else
     private static readonly RunTab[] StandardTabs = [RunTab.Summary, RunTab.Activity, RunTab.InputOutput, RunTab.RawEvents];
     private static readonly RunTab[] HandoffTabs = [RunTab.Summary, RunTab.Activity, RunTab.Handoffs, RunTab.InputOutput, RunTab.RawEvents];
     private IReadOnlyList<RunTab> AvailableTabs => IsHandoffRun ? HandoffTabs : StandardTabs;
+    private IReadOnlyDictionary<string, string> ParticipantUrls => BuildParticipantUrls();
     private FlowRunTimeline.TimelineView SelectedTimelineView => activeTab switch
     {
         RunTab.Activity => FlowRunTimeline.TimelineView.Activity,
@@ -164,6 +165,24 @@ else
         _ => throw new ArgumentOutOfRangeException(nameof(tab))
     });
     private static string TabId(RunTab tab) => $"flow-run-tab-{tab.ToString().ToLowerInvariant()}";
+
+    private IReadOnlyDictionary<string, string> BuildParticipantUrls()
+    {
+        if (run?.DefinitionSnapshot.Definition is not OrchestrationFlowDefinition orchestration) return new Dictionary<string, string>(StringComparer.Ordinal);
+        return orchestration.Participants.ToDictionary(
+            participant => participant.Id,
+            participant => ParticipantUrl(participant, run.FlowId.Namespace),
+            StringComparer.Ordinal);
+    }
+
+    private static string ParticipantUrl(FlowTargetReference participant, ResourceNamespace ownerNamespace)
+    {
+        var @namespace = participant.Namespace ?? ownerNamespace;
+        if (participant.Kind == FlowTargetKind.Flow) return ConsoleResourceUrls.Flow(new FlowId(participant.Id, @namespace));
+        return @namespace.IsDefault
+            ? $"/agents/{Uri.EscapeDataString(participant.Id)}"
+            : $"/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(participant.Id)}";
+    }
 
     protected override async Task OnParametersSetAsync()
     {

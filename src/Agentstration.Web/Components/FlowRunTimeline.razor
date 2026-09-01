@@ -46,7 +46,17 @@
                     <ol>
                         @for (var index = 0; index < ParticipantPath.Count; index++)
                         {
-                            <li>@if (index > 0) { <b aria-hidden="true">→</b> }<span>@ParticipantPath[index]</span></li>
+                            <li>
+                                @if (index > 0) { <b aria-hidden="true">→</b> }
+                                @if (ParticipantUrls.TryGetValue(ParticipantPath[index], out var participantUrl))
+                                {
+                                    <a href="@participantUrl">@ParticipantPath[index]</a>
+                                }
+                                else
+                                {
+                                    <span>@ParticipantPath[index]</span>
+                                }
+                            </li>
                         }
                     </ol>
                 </div>
@@ -158,6 +168,7 @@
     [Parameter] public bool ShowHeader { get; set; } = true;
     [Parameter] public bool ShowNavigation { get; set; } = true;
     [Parameter] public bool Embedded { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string> ParticipantUrls { get; set; } = new Dictionary<string, string>(StringComparer.Ordinal);
 
     private TimelineView CurrentView => View ?? activeView;
     private IReadOnlyList<TimelineItem> Activity => BuildActivity(Events, InferParticipantHandoffs);

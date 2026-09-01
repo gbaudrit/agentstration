@@ -194,12 +194,17 @@ public sealed class FlowRunTimelineTests
             Event(3, FlowRunEventType.ParticipantTurnCompleted, "researcher", new { turn = 1 }, now.AddSeconds(1)),
             Event(4, FlowRunEventType.ParticipantHandoff, "researcher", new { from = "researcher", to = "reviewer" }, now.AddSeconds(1)),
             Event(5, FlowRunEventType.StepRunCompleted, "reviewer", null, now.AddSeconds(2))
+        }).Add(value => value.ParticipantUrls, new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["researcher"] = "/namespaces/sample/agents/researcher",
+            ["reviewer"] = "/namespaces/sample/agents/reviewer"
         }));
 
         var summaryTab = rendered.FindAll("[role=tab]").Single(tab => tab.TextContent.Trim() == strings["Summary"].Value);
         Assert.AreEqual("true", summaryTab.GetAttribute("aria-selected"));
         Assert.HasCount(5, rendered.FindAll(".flow-summary-metrics>div"));
         Assert.AreEqual("researcher→reviewer", rendered.Find(".flow-participant-path ol").TextContent.Replace(" ", string.Empty, StringComparison.Ordinal));
+        Assert.AreEqual("/namespaces/sample/agents/researcher", rendered.Find(".flow-participant-path a").GetAttribute("href"));
         Assert.Contains("2 s", rendered.Markup, StringComparison.Ordinal);
     }
 
