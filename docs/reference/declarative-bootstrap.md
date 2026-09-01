@@ -81,6 +81,40 @@ definition:
 
 A Platform administrator has instance-wide access to every active Tenant and Workspace, including resources created later. Bootstrap does not create Tenant memberships, Workspace memberships, or role assignments for that Principal. Ordinary Principals still require their normal memberships and roles.
 
+## Manual profile application and bindings
+
+After initialization, a Platform administrator can open **System → Bootstrap profiles** to compose profiles in lexical dependency order, choose an explicit Tenant or Workspace target, resolve profile bindings, preview the complete application, and apply it. Preview is side-effect free and its digest covers the ordered profile contents, scope, target, and binding selections. The retained application history records the actor, target, selections, outcomes, and partial failures.
+
+Only Workspace profiles can declare bindings. Each declaration is typed and may provide a default target for non-interactive application:
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: solution-discovery
+definition:
+  displayName: Solution discovery
+  targetScope: workspace
+  bindings:
+    - name: agent-model
+      targetKind: modelProfile
+      displayName: Agent model
+      required: true
+      defaultTarget:
+        name: reasoning-default
+        namespace: default
+```
+
+An ordinary resource references the declaration through a reserved structured object:
+
+```yaml
+definition:
+  modelProfile:
+    binding: agent-model
+```
+
+The resolver replaces only an object containing the single `binding` property with the selected `ResourceReference`; it does not perform string interpolation. A selection cannot cross Workspace boundaries. It may reference existing state or a compatible resource planned earlier in the same composed application. Required unresolved bindings, unknown names, malformed placeholders, and unavailable or type-incompatible targets invalidate preview. Secret bindings carry only a resource reference, never the secret value.
+
 ## Credentials and deployment
 
 Configure the path without putting a production password in YAML:
@@ -146,10 +180,10 @@ dotnet run --project src/Agentstration.AppHost --launch-profile https-NoBootstra
 
 An invalid or duplicate profile name, a missing selected profile, malformed YAML, an unsupported `apiVersion`, an unknown `kind`, a missing required field, a missing referenced resource, or an absent referenced configuration value fails enabled startup explicitly.
 
-`InitialBootstrapEnabled` controls startup application only. It does not disable profile loading itself: the same application service can apply an explicit ordered profile list independently of the startup flag. This is the boundary intended for a future PlatformAdmin-only validation and application UI; no such HTTP or UI surface is exposed yet.
+`InitialBootstrapEnabled` controls startup application only. It does not disable profile loading itself: the PlatformAdmin-only Console and HTTP API can preview and apply explicit ordered profile lists independently of the startup flag.
 
 ## Extension boundary
 
 Each supported kind is implemented by an `IBootstrapResourceHandler`, which owns its business identity and calls the existing resource boundary. This avoids assuming that all resources use `kind + metadata.name` as their existence key.
 
-`PackInstallation` is not supported yet. A future Pack-owned handler can add source resolution and delegate installation to the existing Pack service without changing the YAML loader.
+Workspace profiles support direct editable `ModelProvider`, `RuntimeProfile`, `ModelProfile`, `Agent`, `Flow`, and `Entry` manifests. They also support `PackInstallation` with a bounded local ZIP source beneath the profile directory; those contained resources retain normal Pack ownership and immutability.

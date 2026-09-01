@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
+using Agentstration.Infrastructure.Declarative;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Work;
@@ -195,12 +196,12 @@ public sealed class WorkspacePackResourceCatalog(
     {
         var flow = (await flows.GetAsync(workplaceContext.WorkspaceId, new(key.Name, key.NamespaceValue), token))?.Value
             ?? throw new KeyNotFoundException($"Flow '{key.Name}' was not found.");
-        var envelope = new PackResourceEnvelope<PackFlowDefinition>
+        var envelope = new DeclarativeResourceEnvelope<DeclarativeFlowDefinition>
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.Flow,
             Metadata = new ResourceMetadata { Name = flow.Name },
-            Definition = new PackFlowDefinition
+            Definition = new DeclarativeFlowDefinition
             {
                 DisplayName = flow.DisplayName,
                 Description = flow.Description,
@@ -294,12 +295,12 @@ public sealed class WorkspacePackResourceCatalog(
     {
         var entry = await workplace.GetEntryDraftAsync(workplaceContext.WorkspaceId, new(key.Name, key.NamespaceValue), token)
             ?? throw new KeyNotFoundException($"Entry '{key.Name}' was not found.");
-        var envelope = new PackResourceEnvelope<PackEntryDefinition>
+        var envelope = new DeclarativeResourceEnvelope<DeclarativeEntryDefinition>
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.Entry,
             Metadata = new ResourceMetadata { Name = entry.Name },
-            Definition = new PackEntryDefinition
+            Definition = new DeclarativeEntryDefinition
             {
                 DisplayName = entry.DisplayName,
                 Description = entry.Description,

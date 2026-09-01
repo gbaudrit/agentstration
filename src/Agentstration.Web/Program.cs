@@ -96,6 +96,9 @@ builder.Services.AddAgentstrationLocalIdentity(
     dataProtectionKeysPath,
     useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
 builder.Services.AddScoped<DeclarativeBootstrapService>();
+builder.Services.AddSingleton<BootstrapProfileCatalog>();
+builder.Services.AddSingleton<BootstrapApplicationLock>();
+builder.Services.AddScoped<BootstrapProfileManagementService>();
 builder.Services.AddSingleton<SignalRFlowRunEventSink>();
 builder.Services.AddSingleton<WorkplaceFlowConversationProjectionSink>();
 builder.Services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRunEventSink(
@@ -171,6 +174,7 @@ app.MapAgentstrationCultureEndpoint().AllowAnonymous();
 app.MapAgentstrationAuthentication();
 app.MapAgentstrationLocalAccountAdministration();
 app.MapAgentstrationIdentityApi();
+app.MapAgentstrationBootstrapProfiles();
 app.MapAgentstrationManagementApi();
 app.MapAgentstrationModelManagementApi();
 app.MapAgentstrationWorkApi();

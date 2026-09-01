@@ -1,0 +1,57 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: solution-discovery
+definition:
+  displayName: Découvrir Agentstration
+  description: Une équipe de spécialistes se transmet la conversation selon les sujets abordés par l'utilisateur.
+  version: 0.1.3
+  enabled: true
+  spec:
+    flowKind: orchestration
+    participants:
+      - kind: agent
+        id: accueil
+      - kind: agent
+        id: conseiller-solution
+      - kind: agent
+        id: expert-technique
+      - kind: agent
+        id: expert-integration
+    pattern:
+      strategy: handoff
+      initialParticipant: accueil
+      autonomous: true
+      maximumTurnsPerParticipant: 4
+      terminationPhrase: "[[HANDOFF_COMPLETE]]"
+      handoffs:
+        - from: accueil
+          to: conseiller-solution
+        - from: accueil
+          to: expert-technique
+        - from: accueil
+          to: expert-integration
+        - from: conseiller-solution
+          to: expert-technique
+        - from: conseiller-solution
+          to: expert-integration
+        - from: conseiller-solution
+          to: accueil
+        - from: expert-technique
+          to: conseiller-solution
+        - from: expert-technique
+          to: expert-integration
+        - from: expert-technique
+          to: accueil
+        - from: expert-integration
+          to: conseiller-solution
+        - from: expert-integration
+          to: expert-technique
+        - from: expert-integration
+          to: accueil
+  metadata:
+    bootstrapProfile: solution-discovery
+    audience: professional
+    strategy: handoff
+  publish: true
+  activate: true

@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: development
+definition:
+  displayName: Local development
+  description: Creates the disposable local administrator and Development topology.
+  targetScope: instance

@@ -32,6 +32,7 @@ internal static class OpenApiSuccessResponseCatalog
             ?? Workplace(verb, path)
             ?? Management(verb, path)
             ?? ModelManagement(verb, path)
+            ?? Bootstrap(verb, path)
             ?? Identity(verb, path);
     }
 
@@ -352,6 +353,19 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.EndsWith("/external-identities/{externalIdentityId}", StringComparison.OrdinalIgnoreCase)) return NoContent("Unlink an external identity");
         if (path.EndsWith("/external-identities", StringComparison.OrdinalIgnoreCase)) return method == "POST" ? Json<ExternalIdentity>(200, "Link an external identity") : Json<IReadOnlyList<ExternalIdentity>>(200, "List external identities");
         if (path == "/api/identity/audit-events") return Json<IReadOnlyList<SecurityAuditEvent>>(200, "List security audit events");
+        return null;
+    }
+
+    private static OpenApiSuccessResponse? Bootstrap(string method, string path)
+    {
+        if (path == "/api/bootstrap/profiles" && method == "GET")
+            return Json<Agentstration.Web.Hosting.BootstrapManagementView>(200, "List bootstrap profiles and applications");
+        if (path == "/api/bootstrap/profiles/preview" && method == "POST")
+            return Json<Agentstration.Web.Hosting.BootstrapCompositionPreview>(200, "Preview bootstrap profiles");
+        if (path == "/api/bootstrap/applications" && method == "POST")
+            return Json<BootstrapApplicationResource>(201, "Apply bootstrap profiles");
+        if (path == "/api/bootstrap/applications/{applicationId}" && method == "GET")
+            return Json<BootstrapApplicationResource>(200, "Get a bootstrap application");
         return null;
     }
 

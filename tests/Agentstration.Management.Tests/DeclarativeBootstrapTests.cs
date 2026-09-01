@@ -1,6 +1,12 @@
+using Agentstration.Flow;
+using Agentstration.Flow.Application;
 using Agentstration.Management.Abstractions;
+using Agentstration.Management.Core;
+using Agentstration.Resources;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Web.Hosting;
+using Agentstration.Work;
+using Agentstration.Work.Storage.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -67,6 +73,47 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task CatalogListingRejectsAnUnboundedNumberOfProfiles()
+    {
+        using var directory = new TemporaryDirectory();
+        for (var index = 0; index < 129; index++)
+            Directory.CreateDirectory(Path.Combine(directory.Path, $"profile-{index:D3}"));
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agentstration:Bootstrap:Path"] = directory.Path
+        }).Build();
+        var catalog = new BootstrapProfileCatalog(configuration, new TestHostEnvironment(directory.Path));
+
+        var snapshot = await catalog.GetSnapshotAsync(default);
+
+        StringAssert.Contains(snapshot.Error, "more than 128 profiles");
+        Assert.HasCount(0, snapshot.Profiles);
+    }
+
+    [TestMethod]
+    public async Task VersionedSolutionDiscoveryProfileDeclaresSixResourcesAndItsModelBinding()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var profilesPath = Path.Combine(repositoryRoot, "deploy", "bootstrap", "profiles");
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agentstration:Bootstrap:Path"] = profilesPath
+        }).Build();
+        var catalog = new BootstrapProfileCatalog(configuration, new TestHostEnvironment(repositoryRoot));
+
+        var snapshot = await catalog.GetSnapshotAsync(default);
+        var profile = snapshot.Profiles.Single(value => value.Name == "solution-discovery");
+
+        Assert.IsTrue(profile.Valid, profile.Error);
+        Assert.AreEqual(BootstrapProfileScope.Workspace, profile.Scope);
+        Assert.AreEqual(6, profile.ResourceCount);
+        var binding = profile.Bindings.Single();
+        Assert.AreEqual("agent-model", binding.Name);
+        Assert.AreEqual(BootstrapBindingTargetKind.ModelProfile, binding.TargetKind);
+        Assert.IsTrue(binding.Required);
+    }
+
+    [TestMethod]
     public async Task InvalidYamlUnknownKindAndUnsupportedApiVersionFailClearly()
     {
         using var directory = new TemporaryDirectory();
@@ -79,7 +126,7 @@ public sealed class DeclarativeBootstrapTests
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "00-unknown.yaml"), Resource("Unknown", "one"));
         var unknown = await Assert.ThrowsAsync<DeclarativeBootstrapException>(
             () => Service(directory.Path, new RecordingHandler(), directory.Path).ApplyAsync(default));
-        StringAssert.Contains(unknown.Message, "unknown kind 'Unknown'");
+        StringAssert.Contains(unknown.Message, "Unknown bootstrap resource kind 'Unknown'");
 
         File.Delete(Path.Combine(directory.Path, "00-unknown.yaml"));
         await File.WriteAllTextAsync(
@@ -123,6 +170,99 @@ public sealed class DeclarativeBootstrapTests
         Assert.AreEqual(0, await service.ApplyAsync(default));
         Assert.AreEqual(2, await service.ApplyProfilesAsync(["development", "base"], default));
         CollectionAssert.AreEqual(new[] { "development", "base" }, handler.Names);
+    }
+
+    [TestMethod]
+    public async Task ProfileDescriptorDefinesScopeAndRequiresAnExplicitMatchingTarget()
+    {
+        using var directory = new TemporaryDirectory();
+        var profile = Directory.CreateDirectory(Path.Combine(directory.Path, "workspace-tools"));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "profile.yaml"), Profile("workspace-tools", "workspace"));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "10-resource.yaml"), Resource("Recording", "tooling"));
+        var handler = new RecordingHandler(BootstrapProfileScope.Workspace);
+        var service = ServiceForProfiles(directory.Path, handler, ["workspace-tools"], enabled: false);
+
+        var missingTarget = await Assert.ThrowsAsync<DeclarativeBootstrapException>(
+            () => service.PreviewAsync(new(["workspace-tools"]), default));
+        StringAssert.Contains(missingTarget.Message, "require a Tenant and Workspace target");
+
+        var target = new BootstrapApplicationTarget(Guid.NewGuid(), Guid.NewGuid());
+        var preview = await service.PreviewAsync(new(["workspace-tools"], target), default);
+
+        Assert.AreEqual(BootstrapProfileScope.Workspace, preview.Scope);
+        Assert.AreEqual(target, preview.Target);
+        Assert.IsTrue(preview.CanApply);
+        Assert.AreEqual(BootstrapResourceDisposition.Create, preview.Resources.Single().Disposition);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(preview.Digest));
+    }
+
+    [TestMethod]
+    public async Task WorkspaceProfileBindingsResolveStructuredReferencesAndParticipateInTheDigest()
+    {
+        using var directory = new TemporaryDirectory();
+        var profile = Directory.CreateDirectory(Path.Combine(directory.Path, "bound-agents"));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "profile.yaml"), ProfileWithBinding("bound-agents"));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "10-resource.yaml"), $$"""
+            apiVersion: {{ManagementApiVersions.CoreV1}}
+            kind: Recording
+            metadata:
+              name: bound-resource
+            definition:
+              modelProfile:
+                binding: agent-model
+            """);
+        var handler = new BindingCaptureHandler();
+        var service = ServiceForProfiles(directory.Path, handler, ["bound-agents"], enabled: false);
+        var target = new BootstrapApplicationTarget(Guid.NewGuid(), Guid.NewGuid());
+
+        var missing = await Assert.ThrowsAsync<DeclarativeBootstrapException>(
+            () => service.PreviewAsync(new(["bound-agents"], target), default));
+        StringAssert.Contains(missing.Message, "bound-agents/agent-model");
+
+        var selection = new BootstrapProfileSelection(
+            ["bound-agents"],
+            target,
+            [new("bound-agents", "agent-model", new("reasoning-default", @namespace: ResourceNamespace.Default))]);
+        var preview = await service.PreviewAsync(selection, default);
+        var changed = await service.PreviewAsync(selection with
+        {
+            Bindings = [new("bound-agents", "agent-model", new("reasoning-fast", @namespace: ResourceNamespace.Default))]
+        }, default);
+        var execution = await service.ExecuteAsync(selection, default);
+
+        Assert.IsTrue(preview.CanApply);
+        Assert.AreNotEqual(preview.Digest, changed.Digest);
+        Assert.AreEqual("reasoning-default", handler.Applied.Definition.GetProperty("modelProfile").GetProperty("name").GetString());
+        Assert.AreEqual("default", handler.Applied.Definition.GetProperty("modelProfile").GetProperty("namespace").GetString());
+        Assert.IsNull(execution.Error);
+    }
+
+    [TestMethod]
+    public async Task ProfileBindingDefaultTargetIsUsedAndUnknownSelectionsAreRejected()
+    {
+        using var directory = new TemporaryDirectory();
+        var profile = Directory.CreateDirectory(Path.Combine(directory.Path, "default-binding"));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "profile.yaml"), ProfileWithBinding("default-binding", includeDefault: true));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "10-resource.yaml"), $$"""
+            apiVersion: {{ManagementApiVersions.CoreV1}}
+            kind: Recording
+            metadata:
+              name: bound-resource
+            definition:
+              modelProfile:
+                binding: agent-model
+            """);
+        var handler = new BindingCaptureHandler();
+        var service = ServiceForProfiles(directory.Path, handler, ["default-binding"], enabled: false);
+        var target = new BootstrapApplicationTarget(Guid.NewGuid(), Guid.NewGuid());
+
+        var preview = await service.PreviewAsync(new(["default-binding"], target), default);
+        Assert.AreEqual("reasoning-default", preview.Bindings.Single().Target.Name);
+
+        var exception = await Assert.ThrowsAsync<DeclarativeBootstrapException>(() => service.PreviewAsync(
+            new(["default-binding"], target, [new("default-binding", "unknown", new("anything"))]),
+            default));
+        StringAssert.Contains(exception.Message, "is not declared");
     }
 
     [TestMethod]
@@ -179,6 +319,97 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task ManualApplicationRequiresPreviewAndPersistsItsOutcome()
+    {
+        using var directory = new TemporaryDirectory();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "00-platform-admin.yaml"), PlatformAdministrator());
+        await using var factory = Factory(directory.Path, InitialPassword);
+        using var client = factory.CreateClient();
+        using var health = await client.GetAsync("/health");
+        health.EnsureSuccessStatusCode();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var account = await scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>()
+            .FindByNameAsync("bootstrap-admin");
+        Assert.IsNotNull(account);
+        var principal = await scope.ServiceProvider.GetRequiredService<IPrincipalResolver>()
+            .ResolveLocalAsync(account.Id, default);
+        Assert.IsNotNull(principal);
+        factory.Services.GetRequiredService<IConfiguration>()["Agentstration:Bootstrap:Secrets:AdminPassword"] = null;
+        var selection = new BootstrapProfileSelection([Path.GetFileName(directory.Path)]);
+        var management = scope.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
+
+        var preview = await management.PreviewAsync(selection, principal.Id, default);
+        Assert.IsTrue(preview.CanApply);
+        Assert.IsTrue(preview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
+        var application = await management.ApplyAsync(selection, preview.Digest, principal.Id, default);
+
+        Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Definition.Status);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(application.ETag));
+        Assert.IsTrue(application.Definition.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
+        using var systemScope = scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var history = await scope.ServiceProvider.GetRequiredService<IControlPlaneStore>()
+            .ListAllAsync<BootstrapApplicationResource>(ResourceKinds.BootstrapApplication, default);
+        Assert.AreEqual(application.Metadata.Name, history.Single().Value.Metadata.Name);
+        Assert.AreEqual(
+            application.Metadata.Name,
+            (await management.GetApplicationAsync(application.Metadata.Name, principal.Id, default))?.Metadata.Name);
+
+        var staleName = Guid.NewGuid().ToString("N");
+        var stale = application with
+        {
+            Metadata = application.Metadata with { Name = staleName },
+            ETag = null,
+            Status = new ResourceStatus { ProvisioningState = ProvisioningState.Creating },
+            Definition = application.Definition with
+            {
+                Status = BootstrapApplicationStatus.Running,
+                CompletedAt = null,
+                Error = null,
+                Resources = []
+            }
+        };
+        _ = await scope.ServiceProvider.GetRequiredService<IControlPlaneStore>().PutAsync(stale, null, true, default);
+        var recovered = await management.GetApplicationAsync(staleName, principal.Id, default);
+        Assert.AreEqual(BootstrapApplicationStatus.Interrupted, recovered?.Definition.Status);
+        Assert.IsNotNull(recovered?.Definition.CompletedAt);
+    }
+
+    [TestMethod]
+    public async Task InterruptedManualApplicationIsFinalizedInHistory()
+    {
+        using var directory = new TemporaryDirectory();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "00-platform-admin.yaml"), PlatformAdministrator());
+        await using var factory = Factory(directory.Path, InitialPassword, services =>
+            services.AddScoped<IBootstrapResourceHandler, InterruptingHandler>());
+        using var client = factory.CreateClient();
+        using var health = await client.GetAsync("/health");
+        health.EnsureSuccessStatusCode();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "99-interrupt.yaml"), Resource("Interrupting", "stop"));
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var account = await scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>()
+            .FindByNameAsync("bootstrap-admin");
+        Assert.IsNotNull(account);
+        var principal = await scope.ServiceProvider.GetRequiredService<IPrincipalResolver>()
+            .ResolveLocalAsync(account.Id, default);
+        Assert.IsNotNull(principal);
+        var management = scope.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
+        var selection = new BootstrapProfileSelection([Path.GetFileName(directory.Path)]);
+        var preview = await management.PreviewAsync(selection, principal.Id, default);
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            () => management.ApplyAsync(selection, preview.Digest, principal.Id, default));
+
+        using var systemScope = scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var application = (await scope.ServiceProvider.GetRequiredService<IControlPlaneStore>()
+            .ListAllAsync<BootstrapApplicationResource>(ResourceKinds.BootstrapApplication, default)).Single().Value;
+        Assert.AreEqual(BootstrapApplicationStatus.Interrupted, application.Definition.Status);
+        Assert.IsNotNull(application.Definition.CompletedAt);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(application.Definition.Error));
+    }
+
+    [TestMethod]
     public async Task CompleteTopologyIsDeclarativeAndPlatformAdministratorHasGlobalAccessWithoutMemberships()
     {
         using var directory = new TemporaryDirectory();
@@ -228,6 +459,128 @@ public sealed class DeclarativeBootstrapTests
 
         factory.Services.GetRequiredService<IConfiguration>()["Agentstration:Bootstrap:Secrets:AdminPassword"] = null;
         Assert.AreEqual(6, await scope.ServiceProvider.GetRequiredService<DeclarativeBootstrapService>().ApplyAsync(default));
+    }
+
+    [TestMethod]
+    public async Task WorkspaceResourcesCanBeAppliedDirectlyAndRemainIndependentFromPacks()
+    {
+        using var directory = new TemporaryDirectory();
+        var initial = Directory.CreateDirectory(Path.Combine(directory.Path, "initial"));
+        var resources = Directory.CreateDirectory(Path.Combine(directory.Path, "workspace-resources"));
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "00-platform-admin.yaml"), PlatformAdministrator());
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "10-tenant.yaml"), Tenant("dev", "Development"));
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "20-workspace.yaml"), Workspace("default", "Default workspace", "dev"));
+        await File.WriteAllTextAsync(Path.Combine(initial.FullName, "30-default-context.yaml"), DefaultContext("bootstrap-admin", "dev", "default"));
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "profile.yaml"), ProfileWithBinding("workspace-resources", includeDefault: true, defaultTargetName: "bootstrap-model"));
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "10-model-provider.yaml"), ModelProvider());
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "20-runtime-profile.yaml"), RuntimeProfile());
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "30-model-profile.yaml"), ModelProfile());
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "40-agent.yaml"), Agent());
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "50-flow.yaml"), Flow());
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "60-entry.yaml"), Entry());
+        await using var factory = Factory(initial.FullName, InitialPassword, configureOllamaExtension: true);
+        using var client = factory.CreateClient();
+        using var health = await client.GetAsync("/health");
+        health.EnsureSuccessStatusCode();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var account = await scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>()
+            .FindByNameAsync("bootstrap-admin");
+        Assert.IsNotNull(account);
+        var principal = await scope.ServiceProvider.GetRequiredService<IPrincipalResolver>()
+            .ResolveLocalAsync(account.Id, default);
+        Assert.IsNotNull(principal);
+        var identities = scope.ServiceProvider.GetRequiredService<IIdentityStore>();
+        var tenant = await identities.FindTenantByNameAsync("dev", default);
+        Assert.IsNotNull(tenant);
+        var workspace = await identities.FindWorkspaceByNameAsync(tenant.Id, "default", default);
+        Assert.IsNotNull(workspace);
+        using (scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>()
+            .Push(new RequestContext(principal.Id, tenant.Id, workspace.Id)))
+        {
+            _ = await scope.ServiceProvider.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverAsync(default);
+        }
+        var selection = new BootstrapProfileSelection(
+            ["workspace-resources"],
+            new(tenant.Id, workspace.Id));
+        var management = scope.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
+
+        var bindingTargets = await management.GetBindingTargetsAsync(
+            selection.Target,
+            BootstrapBindingTargetKind.ModelProfile,
+            selection.Profiles,
+            principal.Id,
+            default);
+        var plannedBindingTarget = bindingTargets.Single(value => value.Name == "bootstrap-model");
+        Assert.IsTrue(plannedBindingTarget.Planned);
+
+        var preview = await management.PreviewAsync(selection, principal.Id, default);
+
+        Assert.IsTrue(
+            preview.CanApply,
+            string.Join(Environment.NewLine, preview.Resources.Select(resource => $"{resource.Kind}/{resource.Name}: {resource.Message}")));
+        Assert.HasCount(6, preview.Resources);
+        Assert.IsTrue(preview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
+        var application = await management.ApplyAsync(selection, preview.Digest, principal.Id, default);
+        Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Definition.Status);
+        Assert.AreEqual("bootstrap-model", application.Definition.Bindings.Single().Target.Name);
+        Assert.HasCount(6, application.Definition.Resources);
+        Assert.IsTrue(application.Definition.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
+        var persistedBindingTargets = await management.GetBindingTargetsAsync(
+            selection.Target,
+            BootstrapBindingTargetKind.ModelProfile,
+            selection.Profiles,
+            principal.Id,
+            default);
+        Assert.IsFalse(persistedBindingTargets.Single(value => value.Name == "bootstrap-model").Planned);
+
+        using (scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>()
+            .Push(new RequestContext(principal.Id, tenant.Id, workspace.Id)))
+        {
+            var provider = await scope.ServiceProvider.GetRequiredService<ModelProviderManagementService>()
+                .GetAsync("bootstrap-provider", default);
+            var runtime = await scope.ServiceProvider.GetRequiredService<RuntimeProfileManagementService>()
+                .GetAsync("bootstrap-runtime", default);
+            var model = await scope.ServiceProvider.GetRequiredService<ModelProfileManagementService>()
+                .GetAsync("bootstrap-model", default);
+            var agent = await scope.ServiceProvider.GetRequiredService<AgentManagementService>()
+                .GetAgentAsync("bootstrap-agent", default);
+            var flow = await scope.ServiceProvider.GetRequiredService<FlowService>()
+                .GetAsync(new(workspace.Id), new("bootstrap-flow"), default);
+            var entry = await scope.ServiceProvider.GetRequiredService<IWorkplaceRepository>()
+                .GetEntryAsync(new(workspace.Id), new("bootstrap-entry"), default);
+
+            Assert.IsNotNull(provider);
+            Assert.IsNotNull(runtime);
+            Assert.IsNotNull(model);
+            Assert.IsNotNull(agent);
+            Assert.IsNotNull(flow);
+            Assert.IsNotNull(entry);
+            Assert.IsTrue(flow.Value.ActiveVersion is not null);
+            Assert.IsFalse(provider.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));
+            Assert.IsFalse(runtime.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));
+            Assert.IsFalse(model.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));
+            Assert.IsFalse(agent.Value.Metadata.Annotations.ContainsKey(PackProvenanceAnnotations.Name));
+            Assert.IsFalse(flow.Value.Metadata.ContainsKey(PackProvenanceAnnotations.Name));
+        }
+
+        var secondPreview = await management.PreviewAsync(selection, principal.Id, default);
+        Assert.IsTrue(secondPreview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
+        var secondApplication = await management.ApplyAsync(selection, secondPreview.Digest, principal.Id, default);
+        Assert.AreEqual(BootstrapApplicationStatus.Succeeded, secondApplication.Definition.Status);
+        Assert.IsTrue(secondApplication.Definition.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
+
+        var inactive = Directory.CreateDirectory(Path.Combine(directory.Path, "inactive-flow"));
+        await File.WriteAllTextAsync(Path.Combine(inactive.FullName, "profile.yaml"), Profile("inactive-flow", "workspace"));
+        await File.WriteAllTextAsync(Path.Combine(inactive.FullName, "10-flow.yaml"), InactiveFlow());
+        await File.WriteAllTextAsync(Path.Combine(inactive.FullName, "20-entry.yaml"), InactiveFlowEntry());
+        var invalidPreview = await management.PreviewAsync(
+            new(["inactive-flow"], selection.Target),
+            principal.Id,
+            default);
+        Assert.AreEqual(BootstrapResourceDisposition.Create, invalidPreview.Resources[0].Disposition);
+        Assert.AreEqual(BootstrapResourceDisposition.Invalid, invalidPreview.Resources[1].Disposition);
+        StringAssert.Contains(invalidPreview.Resources[1].Message, "no active published version");
     }
 
     [TestMethod]
@@ -335,10 +688,16 @@ public sealed class DeclarativeBootstrapTests
         IEnumerable<KeyValuePair<string, string?>>? values)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
-        return new(configuration, new TestHostEnvironment(contentRoot), [handler], NullLogger<DeclarativeBootstrapService>.Instance);
+        var environment = new TestHostEnvironment(contentRoot);
+        var catalog = new BootstrapProfileCatalog(configuration, environment);
+        return new(configuration, catalog, [handler], NullLogger<DeclarativeBootstrapService>.Instance);
     }
 
-    private static WebApplicationFactory<Program> Factory(string path, string? password) =>
+    private static WebApplicationFactory<Program> Factory(
+        string path,
+        string? password,
+        Action<IServiceCollection>? configureServices = null,
+        bool configureOllamaExtension = false) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -346,7 +705,10 @@ public sealed class DeclarativeBootstrapTests
             builder.UseSetting("Agentstration:Bootstrap:Path", Directory.GetParent(path)!.FullName);
             builder.UseSetting("Agentstration:Bootstrap:InitialBootstrapEnabled", "true");
             builder.UseSetting("Agentstration:Bootstrap:InitialProfiles:0", Path.GetFileName(path));
+            if (configureOllamaExtension)
+                builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint", "http://127.0.0.1:1");
             if (password is not null) builder.UseSetting("Agentstration:Bootstrap:Secrets:AdminPassword", password);
+            if (configureServices is not null) builder.ConfigureServices(configureServices);
         });
 
     private static string PlatformAdministrator() => $$"""
@@ -403,15 +765,241 @@ public sealed class DeclarativeBootstrapTests
         definition: {}
         """;
 
-    private sealed class RecordingHandler : IBootstrapResourceHandler
+    private static string Profile(string name, string targetScope) => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: BootstrapProfile
+        metadata:
+          name: {{name}}
+        definition:
+          displayName: {{name}}
+          targetScope: {{targetScope}}
+        """;
+
+    private static string ProfileWithBinding(string name, bool includeDefault = false, string defaultTargetName = "reasoning-default") => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: BootstrapProfile
+        metadata:
+          name: {{name}}
+        definition:
+          displayName: {{name}}
+          targetScope: workspace
+          bindings:
+            - name: agent-model
+              targetKind: modelProfile
+              displayName: Agent model
+              required: true
+        {{(includeDefault ? $"      defaultTarget:\n        name: {defaultTargetName}\n        namespace: default" : string.Empty)}}
+        """;
+
+    private static string ModelProvider() => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: ModelProvider
+        metadata:
+          name: bootstrap-provider
+        definition:
+          displayName: Bootstrap provider
+          extension:
+            name: ollama-extension
+          contributionId: ollama
+        """;
+
+    private static string RuntimeProfile() => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: RuntimeProfile
+        metadata:
+          name: bootstrap-runtime
+        definition:
+          displayName: Bootstrap runtime
+          runtimeType: microsoft-agent-framework
+          execution:
+            sessionMode: transient
+            toolInvocation: automatic
+            streaming: automatic
+        """;
+
+    private static string ModelProfile() => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: ModelProfile
+        metadata:
+          name: bootstrap-model
+        definition:
+          displayName: Bootstrap model
+          provider:
+            name: bootstrap-provider
+          model:
+            name: qwen3:1.7b
+          generation:
+            temperature: 0.2
+        """;
+
+    private static string Agent() => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: Agent
+        metadata:
+          name: bootstrap-agent
+        definition:
+          displayName: Bootstrap agent
+          instructions: Answer concisely.
+          modelProfile:
+            binding: agent-model
+          runtimeProfile:
+            name: bootstrap-runtime
+          tools: []
+        """;
+
+    private static string Flow() => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: Flow
+        metadata:
+          name: bootstrap-flow
+        definition:
+          displayName: Bootstrap flow
+          version: 1.0.0
+          enabled: true
+          spec:
+            flowKind: direct
+            target:
+              kind: agent
+              id: bootstrap-agent
+          publish: true
+          activate: true
+        """;
+
+    private static string Entry() => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: Entry
+        metadata:
+          name: bootstrap-entry
+        definition:
+          displayName: Bootstrap entry
+          presentation:
+            kind: prompt
+            placeholder: Ask something
+            allowAttachments: false
+            allowVoiceInput: false
+            fields:
+              - name: request
+                type: prompt
+                label: Request
+                required: true
+                order: 0
+                role: primaryInput
+          binding:
+            kind: flow
+            resourceId: bootstrap-flow
+          behavior:
+            taskCreationMode: automatic
+            allowConversation: true
+            streamResponse: true
+          publish: true
+        """;
+
+    private static string InactiveFlow() => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: Flow
+        metadata:
+          name: inactive-flow
+        definition:
+          displayName: Inactive flow
+          version: 1.0.0
+          enabled: true
+          spec:
+            flowKind: direct
+            target:
+              kind: agent
+              id: bootstrap-agent
+          publish: false
+          activate: false
+        """;
+
+    private static string InactiveFlowEntry() => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: Entry
+        metadata:
+          name: inactive-flow-entry
+        definition:
+          displayName: Inactive flow entry
+          presentation:
+            kind: prompt
+            placeholder: Ask something
+            allowAttachments: false
+            allowVoiceInput: false
+            fields:
+              - name: request
+                type: prompt
+                label: Request
+                required: true
+                order: 0
+                role: primaryInput
+          binding:
+            kind: flow
+            resourceId: inactive-flow
+          behavior:
+            taskCreationMode: automatic
+          publish: true
+        """;
+
+    private sealed class RecordingHandler(BootstrapProfileScope scope = BootstrapProfileScope.Instance) : IBootstrapResourceHandler
     {
         public string Kind => "Recording";
+        public BootstrapProfileScope Scope { get; } = scope;
         public List<string> Names { get; } = [];
+
+        public Task<BootstrapResourcePlanResult> PlanAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            BootstrapPlanningContext planning,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new BootstrapResourcePlanResult(BootstrapResourceDisposition.Create));
+
         public Task<BootstrapResourceApplyResult> ApplyAsync(
             BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
             CancellationToken cancellationToken)
         {
             Names.Add(resource.Metadata.Name);
+            return Task.FromResult(BootstrapResourceApplyResult.Created);
+        }
+    }
+
+    private sealed class InterruptingHandler : IBootstrapResourceHandler
+    {
+        public string Kind => "Interrupting";
+        public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
+
+        public Task<BootstrapResourcePlanResult> PlanAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            BootstrapPlanningContext planning,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new BootstrapResourcePlanResult(BootstrapResourceDisposition.Create));
+
+        public Task<BootstrapResourceApplyResult> ApplyAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            CancellationToken cancellationToken) =>
+            throw new OperationCanceledException(cancellationToken);
+    }
+
+    private sealed class BindingCaptureHandler : IBootstrapResourceHandler
+    {
+        public string Kind => "Recording";
+        public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+        public BootstrapResourceDocument Applied { get; private set; } = new();
+
+        public Task<BootstrapResourcePlanResult> PlanAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            BootstrapPlanningContext planning,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new BootstrapResourcePlanResult(BootstrapResourceDisposition.Create));
+
+        public Task<BootstrapResourceApplyResult> ApplyAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            CancellationToken cancellationToken)
+        {
+            Applied = resource;
             return Task.FromResult(BootstrapResourceApplyResult.Created);
         }
     }
@@ -422,6 +1010,14 @@ public sealed class DeclarativeBootstrapTests
         public string ApplicationName { get; set; } = "Agentstration.Management.Tests";
         public string ContentRootPath { get; set; } = contentRoot;
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Agentstration.slnx")))
+            directory = directory.Parent;
+        return directory?.FullName ?? throw new InvalidOperationException("The Agentstration repository root could not be located.");
     }
 
     private sealed class TemporaryDirectory : IDisposable

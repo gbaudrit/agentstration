@@ -27,21 +27,36 @@ public sealed class PlatformAdministratorBootstrapHandler(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public string Kind => BootstrapResourceKinds.PlatformAdministrator;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
+
+    public async Task<BootstrapResourcePlanResult> PlanAsync(
+        BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
+        BootstrapPlanningContext planning,
+        CancellationToken cancellationToken)
+    {
+        var (userName, definition) = Read(resource);
+        var existing = await users.FindByNameAsync(userName);
+        if (existing is not null)
+        {
+            var principal = await principalResolver.ResolveLocalAsync(existing.Id, cancellationToken);
+            return principal is not null && await authorization.IsPlatformAdministratorAsync(principal.Id, cancellationToken)
+                ? new(BootstrapResourceDisposition.Skip)
+                : new(BootstrapResourceDisposition.Conflict);
+        }
+        if (string.IsNullOrWhiteSpace(configuration[definition.PasswordFrom.Configuration]))
+            throw new InvalidOperationException(
+                $"Configuration value '{definition.PasswordFrom.Configuration}' referenced by PlatformAdministrator '{userName}' is missing.");
+        planning.Register(Kind, userName);
+        return new(BootstrapResourceDisposition.Create);
+    }
 
     public async Task<BootstrapResourceApplyResult> ApplyAsync(
         BootstrapResourceDocument resource,
+        BootstrapResourceOperationContext operation,
         CancellationToken cancellationToken)
     {
-        var userName = resource.Metadata.Name.Trim();
-        if (userName.Length is < 3 or > 64)
-            throw new InvalidOperationException("PlatformAdministrator metadata.name must contain between 3 and 64 characters.");
-
-        var definition = resource.Definition.Deserialize<PlatformAdministratorBootstrapDefinition>(JsonOptions)
-            ?? throw new InvalidOperationException("PlatformAdministrator definition is required.");
-        if (string.IsNullOrWhiteSpace(definition.DisplayName) || definition.DisplayName.Trim().Length is < 2 or > 120)
-            throw new InvalidOperationException("PlatformAdministrator definition.displayName must contain between 2 and 120 characters.");
-        if (string.IsNullOrWhiteSpace(definition.PasswordFrom.Configuration))
-            throw new InvalidOperationException("PlatformAdministrator definition.passwordFrom.configuration is required.");
+        var (userName, definition) = Read(resource);
 
         var existing = await users.FindByNameAsync(userName);
         if (existing is not null)
@@ -66,5 +81,20 @@ public sealed class PlatformAdministratorBootstrapHandler(
             throw new InvalidOperationException(
                 $"PlatformAdministrator '{userName}' could not be created: {string.Join("; ", result.Errors)}");
         return BootstrapResourceApplyResult.Created;
+    }
+
+    private static (string UserName, PlatformAdministratorBootstrapDefinition Definition) Read(
+        BootstrapResourceDocument resource)
+    {
+        var userName = resource.Metadata.Name.Trim();
+        if (userName.Length is < 3 or > 64)
+            throw new InvalidOperationException("PlatformAdministrator metadata.name must contain between 3 and 64 characters.");
+        var definition = resource.Definition.Deserialize<PlatformAdministratorBootstrapDefinition>(JsonOptions)
+            ?? throw new InvalidOperationException("PlatformAdministrator definition is required.");
+        if (string.IsNullOrWhiteSpace(definition.DisplayName) || definition.DisplayName.Trim().Length is < 2 or > 120)
+            throw new InvalidOperationException("PlatformAdministrator definition.displayName must contain between 2 and 120 characters.");
+        if (string.IsNullOrWhiteSpace(definition.PasswordFrom.Configuration))
+            throw new InvalidOperationException("PlatformAdministrator definition.passwordFrom.configuration is required.");
+        return (userName, definition);
     }
 }

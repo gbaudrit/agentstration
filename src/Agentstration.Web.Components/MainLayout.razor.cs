@@ -23,7 +23,7 @@ public partial class MainLayout
         new("Group.Operate", [new("Nav.Triggers", "/triggers", "clock", "work"), new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.Tasks", "/tasks", "tasks", "work")]),
         new("Group.Runs", [new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
         new("Group.Configure", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work"), new("Nav.Packs", "/packs", "package"), new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key")]),
-        new("Group.System", [new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Profile", "/settings/profile", "user-circle"), new("Nav.Settings", "/settings", "settings")])
+        new("Group.System", [new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "upload-cloud"), new("Nav.Profile", "/settings/profile", "user-circle"), new("Nav.Settings", "/settings", "settings")])
     ];
 
     private static readonly CommandDefinition[] CommandDefinitions =
@@ -59,6 +59,7 @@ public partial class MainLayout
         new("Command.ProfileSettings", "/settings/profile", "○", "Group.System", "appearance theme personal preferences apparence thème préférences"),
         new("Nav.Extensions", "/extensions", "⬢", "Group.System", "AEP option contracts compatibility extensions"),
         new("Nav.Organization", "/settings/organization", "♙", "Group.System", "tenant organization organisation"),
+        new("Nav.Bootstrap", "/settings/bootstrap", "⇧", "Group.System", "bootstrap profiles configuration profils configuration"),
         new("Command.OrganizationWorkspaces", "/settings/organization/workspaces", "▦", "Group.System", "tenant workspaces espaces"),
         new("Command.OrganizationMembers", "/settings/organization/members", "♙", "Group.System", "users memberships roles membres rôles")
     ];
