@@ -6,7 +6,10 @@
 @inject IManagementApiClient Management
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowOrchestrationEditorStrings> Localizer
-<PageTitle>@(model?.Name ?? T("Orchestration")) · Agentstration</PageTitle>
+@if (!Embedded)
+{
+    <PageTitle>@(model?.Name ?? T("Orchestration")) · Agentstration</PageTitle>
+}
 
 @if (loading)
 {
@@ -18,9 +21,12 @@ else if (model is null)
 }
 else
 {
-    <PageHeader Title="@model.Name" Description="@(IsReadOnly ? T("ReadOnlyDescription") : T("EditDescription"))">
-        <Actions><a class="button-secondary" href="@DetailsUrl">@T("FlowDetails")</a></Actions>
-    </PageHeader>
+    @if (!Embedded)
+    {
+        <PageHeader Title="@model.Name" Description="@(IsReadOnly ? T("ReadOnlyDescription") : T("EditDescription"))">
+            <Actions><a class="button-secondary" href="@DetailsUrl">@T("FlowDetails")</a></Actions>
+        </PageHeader>
+    }
     @if (IsReadOnly)
     {
         <p class="muted"><span class="read-only-badge">@T("ReadOnly")</span> @T("Namespace") <code>@FlowResourceNamespace.Value</code> · @T("PublishedVersion") <strong>@publishedVersion</strong></p>
@@ -49,6 +55,7 @@ else
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
+    [Parameter] public bool Embedded { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private readonly CancellationTokenSource cancellation = new();
     private OrchestrationEditorModel? model;

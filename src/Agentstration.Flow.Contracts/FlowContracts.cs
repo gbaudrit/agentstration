@@ -7,16 +7,22 @@ namespace Agentstration.Flow.Contracts;
 public sealed record CreateFlowRequest(string Name, string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public string? DisplayName { get; init; }
 }
-public sealed record UpdateFlowRequest(string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null);
+public sealed record UpdateFlowRequest(string? Description, string Version, bool Enabled, FlowDefinition Definition, IReadOnlyDictionary<string, string>? Metadata = null)
+{
+    public string? DisplayName { get; init; }
+}
 public sealed record CreateFlowVersionRequest(string Version, bool Activate = true);
 public sealed record FlowResponse(string Id, string Name, string? Description, string Version, bool Enabled, string? ActiveVersion, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, FlowGraphDefinition? Graph = null)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public string? DisplayName { get; init; }
 }
 public sealed record FlowSummaryResponse(string Id, string Name, string? Description, FlowKind FlowKind, string Version, bool Enabled, string? ActiveVersion, DateTimeOffset UpdatedAt)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public string? DisplayName { get; init; }
 }
 public sealed record FlowVersionResponse(string FlowId, string Version, string? Description, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset PublishedAt, FlowGraphDefinition? Graph = null, string? DefinitionHash = null, string? ReleaseNotes = null)
 {

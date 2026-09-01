@@ -48,12 +48,16 @@ public sealed partial class FlowTests
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
         var request = new CreateFlowRequest("direct-sql", "Direct SQL work", "1.0.0", true,
-            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "sql-expert")));
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "sql-expert")))
+        {
+            DisplayName = "Direct SQL review"
+        };
         using var createdResponse = await client.PostAsJsonAsync("/api/flows", request, JsonOptions);
         Assert.AreEqual(HttpStatusCode.Created, createdResponse.StatusCode);
         Assert.IsNotNull(createdResponse.Headers.ETag);
         var created = await createdResponse.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
         Assert.IsInstanceOfType<DirectFlowDefinition>(created!.Definition);
+        Assert.AreEqual("Direct SQL review", created.DisplayName);
 
         using var versionResponse = await client.PostAsJsonAsync("/api/flows/direct-sql/versions", new CreateFlowVersionRequest("1.0.0"));
         Assert.AreEqual(HttpStatusCode.Created, versionResponse.StatusCode);

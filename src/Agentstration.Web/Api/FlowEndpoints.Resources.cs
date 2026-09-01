@@ -13,7 +13,7 @@ public static partial class FlowEndpoints
 {
     private static Task<IResult> CreateAsync(CreateFlowRequest body, HttpResponse response, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        var stored = await service.CreateAsync(CurrentWorkspace(requestContext), new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata), body.Namespace, token);
+        var stored = await service.CreateAsync(CurrentWorkspace(requestContext), new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), body.Namespace, token);
         response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/flows/{stored.Value.Id}";
         return Results.Json(ToResponse(stored.Value), statusCode: StatusCodes.Status201Created);
@@ -23,7 +23,7 @@ public static partial class FlowEndpoints
     {
         var parsed = ResourceNamespace.Parse(@namespace);
         if (body.Namespace != parsed) throw new FlowValidationException("route_namespace_mismatch", "The Flow namespace must match the route namespace.");
-        var stored = await service.CreateAsync(CurrentWorkspace(requestContext), new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata), parsed, token);
+        var stored = await service.CreateAsync(CurrentWorkspace(requestContext), new CreateFlowCommand(body.Name, body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), parsed, token);
         response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/namespaces/{parsed.Value}/flows/{stored.Value.Id.Value}";
         return Results.Json(ToResponse(stored.Value), statusCode: StatusCodes.Status201Created);
@@ -42,7 +42,7 @@ public static partial class FlowEndpoints
         var flowId = new FlowId(id, ResourceNamespace.Parse(@namespace));
         var workspaceId = CurrentWorkspace(requestContext);
         var current = await service.GetAsync(workspaceId, flowId, token) ?? throw new FlowNotFoundException(flowId);
-        var stored = await service.UpdateAsync(workspaceId, flowId, new UpdateFlowCommand(body.Description, body.Version, body.Enabled, body.Definition, body.Metadata), request.Headers.IfMatch.FirstOrDefault() ?? current.ETag, token);
+        var stored = await service.UpdateAsync(workspaceId, flowId, new UpdateFlowCommand(body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), request.Headers.IfMatch.FirstOrDefault() ?? current.ETag, token);
         response.Headers.ETag = stored.ETag;
         return Results.Ok(ToResponse(stored.Value));
     });
@@ -96,7 +96,7 @@ public static partial class FlowEndpoints
         var workspaceId = CurrentWorkspace(requestContext);
         var current = await RequiredAsync(workspaceId, id, service, token);
         var etag = request.Headers.IfMatch.FirstOrDefault() ?? current.ETag;
-        var stored = await service.UpdateAsync(workspaceId, new FlowId(id), new UpdateFlowCommand(body.Description, body.Version, body.Enabled, body.Definition, body.Metadata), etag, token);
+        var stored = await service.UpdateAsync(workspaceId, new FlowId(id), new UpdateFlowCommand(body.Description, body.Version, body.Enabled, body.Definition, body.Metadata, DisplayName: body.DisplayName), etag, token);
         response.Headers.ETag = stored.ETag;
         return Results.Ok(ToResponse(stored.Value));
     });

@@ -68,6 +68,27 @@ public sealed class FlowDetailsDesignerTests
     }
 
     [TestMethod]
+    public void OrchestrationDefinitionTabEmbedsTheEditableEditorWithoutAnIntermediateLink()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(orchestration: true));
+        context.Services.AddSingleton<IManagementApiClient>(new ManagementClientStub());
+        var detailsStrings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
+        var editorStrings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowOrchestrationEditorStrings>>();
+
+        var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "review"));
+        Assert.HasCount(1, rendered.FindAll(".flow-overview-preview .topology-shell"));
+        StringAssert.Contains(rendered.Find(".flow-overview-preview").TextContent, detailsStrings["ExecutionPreview"].Value);
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == detailsStrings["Tab.Definition"].Value).Click();
+
+        Assert.HasCount(1, rendered.FindAll("fieldset.orchestration-configuration"));
+        Assert.IsFalse(rendered.FindAll("a, button").Any(element => element.TextContent.Contains(detailsStrings["OpenOrchestrationEditor"].Value, StringComparison.Ordinal)));
+        Assert.IsTrue(rendered.FindAll("button").Any(button => button.TextContent.Contains(editorStrings["Save"].Value, StringComparison.Ordinal)));
+        Assert.IsTrue(rendered.FindAll("button").Any(button => button.TextContent.Contains(editorStrings["PublishAndActivate"].Value, StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public void MissingFlowRunRendersNotFoundStateInsteadOfThrowing()
     {
         using var context = new BunitContext();
@@ -103,8 +124,10 @@ public sealed class FlowDetailsDesignerTests
             Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new FlowVersionResponse(flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now, Graph) { Namespace = @namespace }]);
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowRun>>([]);
         public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowSummary>>([]);
-        public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>
+            GetFlowAsync(ResourceNamespace.Default, flowId, cancellationToken);
+        public async Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken) =>
+            new(await GetFlowAsync(ResourceNamespace.Default, flowId, cancellationToken), "\"etag-1\"");
         public Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowResourceSnapshot> UpdateFlowAsync(string flowId, UpdateFlowRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();

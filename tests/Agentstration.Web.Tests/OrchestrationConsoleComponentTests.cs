@@ -29,6 +29,8 @@ public sealed class OrchestrationConsoleComponentTests
         StringAssert.Contains(rendered.Markup, "manager");
         StringAssert.Contains(rendered.Markup, "researcher");
         StringAssert.Contains(rendered.Markup, "reviewer");
+        Assert.IsTrue(rendered.Find(".topology-canvas").ClassList.Contains("fit"));
+        Assert.IsFalse(rendered.Find(".orchestration-preview-layout").ClassList.Contains("has-details"));
         Assert.IsFalse(rendered.Markup.Contains("Microsoft.Agents", StringComparison.Ordinal));
     }
 
@@ -77,6 +79,7 @@ public sealed class OrchestrationConsoleComponentTests
         rendered.FindAll(".topology-node").Single(node => node.GetAttribute("aria-label")!.StartsWith("agent-a", StringComparison.Ordinal)).Click();
 
         var details = rendered.Find(".orchestration-node-details");
+        Assert.IsTrue(rendered.Find(".orchestration-preview-layout").ClassList.Contains("has-details"));
         StringAssert.Contains(details.TextContent, strings["InitialParticipant"].Value);
         StringAssert.Contains(details.TextContent, "default");
         StringAssert.Contains(details.TextContent, "calendar");
@@ -108,6 +111,39 @@ public sealed class OrchestrationConsoleComponentTests
         Assert.IsTrue(configuration.HasAttribute("disabled"));
         Assert.IsTrue(configuration.QuerySelectorAll("input, select, button").All(element => element.HasAttribute("disabled") || element.Closest("fieldset[disabled]") is not null));
         StringAssert.Contains(rendered.Markup, strings["ExecutionPreview"].Value);
+    }
+
+    [TestMethod]
+    public void ParticipantPickerHighlightsSelectionAndUsesDisplayNameInExecutionOrder()
+    {
+        using var context = CreateContext();
+        var strings = context.Services.GetRequiredService<IStringLocalizer<Agentstration.Web.Components.Pages.FlowOrchestrationEditorStrings>>();
+        var model = new OrchestrationEditorModel { Strategy = FlowOrchestrationStrategy.Sequential };
+        model.ParticipantIds.Add("agent-a");
+        var agents = new[]
+        {
+            new AgentSummary("agent-a", "Agent Alpha", "assistant", "1", "Ready", [], "local", DateTimeOffset.MinValue, "default"),
+            new AgentSummary("agent-b", "Agent Beta", "assistant", "1", "Ready", [], "local", DateTimeOffset.MinValue, "default")
+        };
+
+        var rendered = context.Render<OrchestrationDefinitionEditor>(parameters => parameters
+            .Add(component => component.Model, model)
+            .Add(component => component.Agents, agents));
+
+        var configurationSections = rendered.FindAll(".orchestration-control-column > section");
+        Assert.IsTrue(configurationSections[0].ClassList.Contains("orchestration-participants-panel"));
+        Assert.IsTrue(configurationSections[1].ClassList.Contains("orchestration-strategy-panel"));
+        Assert.HasCount(1, rendered.FindAll(".agent-option.is-selected"));
+        Assert.AreEqual("Agent Alpha", rendered.Find(".participant-order .order-copy strong").TextContent);
+        Assert.AreEqual(strings["SearchAgents"].Value, rendered.Find(".agent-search input").GetAttribute("placeholder"));
+        Assert.AreEqual("search", rendered.Find(".agent-search input").GetAttribute("type"));
+        Assert.IsFalse(rendered.Markup.Contains(strings["LivePreviewEyebrow"].Value, StringComparison.Ordinal));
+
+        rendered.Find(".agent-search input").Input("Beta");
+
+        var filteredAgent = rendered.FindAll(".agent-option");
+        Assert.HasCount(1, filteredAgent);
+        StringAssert.Contains(filteredAgent[0].TextContent, "Agent Beta");
     }
 
     private static BunitContext CreateContext()
