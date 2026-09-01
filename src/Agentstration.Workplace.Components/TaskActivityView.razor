@@ -1,9 +1,11 @@
 <article class="timeline-activity activity-@Activity.Type.ToString().ToLowerInvariant()">
     <span class="activity-marker"><UiIcon Name="@Icon" /></span>
     <div>
-        <strong>@Title</strong>
+        <div class="activity-heading">
+            <strong>@Title</strong>
+            <time datetime="@Activity.CreatedAt.ToString("O")">@Activity.CreatedAt.ToLocalTime().ToString("HH:mm")</time>
+        </div>
         @if (!string.IsNullOrWhiteSpace(Activity.Description)) { <p>@Activity.Description</p> }
-        <time datetime="@Activity.CreatedAt.ToString("O")">@Activity.CreatedAt.ToLocalTime().ToString("HH:mm")</time>
     </div>
 </article>
 
