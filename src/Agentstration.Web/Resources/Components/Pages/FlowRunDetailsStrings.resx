@@ -84,6 +84,7 @@
   <data name="ObservedPath"><value>Observed path</value></data>
   <data name="HandoffCount.One"><value>{0} handoff</value></data>
   <data name="HandoffCount.Many"><value>{0} handoffs</value></data>
+  <data name="HandoffNumber"><value>Handoff {0}</value></data>
   <data name="NoHandoffs"><value>No handoff has been observed yet.</value></data>
   <data name="RawEvents"><value>Raw events</value></data>
   <data name="InputOutputTab"><value>Input / output</value></data>

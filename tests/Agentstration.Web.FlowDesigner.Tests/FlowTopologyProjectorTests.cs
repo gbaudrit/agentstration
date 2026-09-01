@@ -79,6 +79,8 @@ public sealed class FlowTopologyProjectorTests
 
         Assert.IsTrue(topology.FindBySelection("researcher")!.IsInitial);
         Assert.AreEqual(FlowTopologyEdgeState.Observed,
+            topology.Edges.Single(edge => edge.Id == "handoff-entry").State);
+        Assert.AreEqual(FlowTopologyEdgeState.Observed,
             topology.Edges.Single(edge => edge.From == "participant:researcher" && edge.To == "participant:reviewer").State);
         Assert.Contains("#1", topology.Edges.Single(edge => edge.From == "participant:researcher" && edge.To == "participant:reviewer").Label!, StringComparison.Ordinal);
         Assert.AreEqual(FlowTopologyEdgeState.Declared,
@@ -108,6 +110,59 @@ public sealed class FlowTopologyProjectorTests
             topology.Edges.Single(edge => edge.From == "participant:researcher" && edge.To == "participant:reviewer").Label);
         Assert.AreEqual("handoff · #2",
             topology.Edges.Single(edge => edge.From == "participant:reviewer" && edge.To == "participant:researcher").Label);
+    }
+
+    [TestMethod]
+    public void SucceededHandoffProjectionHighlightsObservedTerminalRoute()
+    {
+        var definition = Orchestration(new HandoffOrchestrationPattern(
+            "researcher",
+            [new FlowHandoff("researcher", "reviewer")],
+            Autonomous: true));
+        var run = Run(definition) with { Status = FlowRunStatus.Succeeded };
+
+        var topology = FlowTopologyProjector.Project(run, [Event(1, "researcher"), Event(2, "reviewer")]);
+
+        Assert.AreEqual(FlowTopologyEdgeState.Declared,
+            topology.Edges.Single(edge => edge.Id == "terminal:researcher").State);
+        Assert.AreEqual(FlowTopologyEdgeState.Observed,
+            topology.Edges.Single(edge => edge.Id == "terminal:reviewer").State);
+    }
+
+    [TestMethod]
+    public void HandoffProjectionRanksParticipantsFromInitialRouteAndLeavesRoomBetweenLanes()
+    {
+        var definition = new OrchestrationFlowDefinition(
+            [
+                new(FlowTargetKind.Agent, "welcome"),
+                new(FlowTargetKind.Agent, "solution-advisor"),
+                new(FlowTargetKind.Agent, "technical-expert"),
+                new(FlowTargetKind.Agent, "integration-expert")
+            ],
+            new HandoffOrchestrationPattern(
+                "welcome",
+                [
+                    new("welcome", "solution-advisor"),
+                    new("welcome", "technical-expert"),
+                    new("solution-advisor", "integration-expert"),
+                    new("technical-expert", "integration-expert"),
+                    new("integration-expert", "welcome")
+                ]));
+
+        var topology = FlowTopologyProjector.Project(definition);
+
+        Assert.AreEqual(FlowTopologyEdgeState.Declared,
+            topology.Edges.Single(edge => edge.Id == "handoff-entry").State);
+        var welcome = topology.FindBySelection("welcome")!;
+        var advisor = topology.FindBySelection("solution-advisor")!;
+        var technical = topology.FindBySelection("technical-expert")!;
+        var integration = topology.FindBySelection("integration-expert")!;
+        var output = topology.Nodes.Single(node => node.Id == "system:output");
+        Assert.IsTrue(advisor.X - welcome.X >= 300);
+        Assert.AreEqual(advisor.X, technical.X);
+        Assert.IsTrue(Math.Abs(advisor.Y - technical.Y) >= 170);
+        Assert.IsTrue(integration.X - advisor.X >= 300);
+        Assert.IsTrue(output.X - integration.X >= 300);
     }
 
     [TestMethod]
