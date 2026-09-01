@@ -91,6 +91,29 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task VersionedSolutionDiscoveryProfileDeclaresSixResourcesAndItsModelBinding()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var profilesPath = Path.Combine(repositoryRoot, "deploy", "bootstrap", "profiles");
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agentstration:Bootstrap:Path"] = profilesPath
+        }).Build();
+        var catalog = new BootstrapProfileCatalog(configuration, new TestHostEnvironment(repositoryRoot));
+
+        var snapshot = await catalog.GetSnapshotAsync(default);
+        var profile = snapshot.Profiles.Single(value => value.Name == "solution-discovery");
+
+        Assert.IsTrue(profile.Valid, profile.Error);
+        Assert.AreEqual(BootstrapProfileScope.Workspace, profile.Scope);
+        Assert.AreEqual(6, profile.ResourceCount);
+        var binding = profile.Bindings.Single();
+        Assert.AreEqual("agent-model", binding.Name);
+        Assert.AreEqual(BootstrapBindingTargetKind.ModelProfile, binding.TargetKind);
+        Assert.IsTrue(binding.Required);
+    }
+
+    [TestMethod]
     public async Task InvalidYamlUnknownKindAndUnsupportedApiVersionFailClearly()
     {
         using var directory = new TemporaryDirectory();
@@ -971,6 +994,14 @@ public sealed class DeclarativeBootstrapTests
         public string ApplicationName { get; set; } = "Agentstration.Management.Tests";
         public string ContentRootPath { get; set; } = contentRoot;
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Agentstration.slnx")))
+            directory = directory.Parent;
+        return directory?.FullName ?? throw new InvalidOperationException("The Agentstration repository root could not be located.");
     }
 
     private sealed class TemporaryDirectory : IDisposable

@@ -1,0 +1,39 @@
+apiVersion: agentstration.io/v1
+kind: Entry
+metadata:
+  name: solution-discovery
+definition:
+  displayName: Découvrir Agentstration
+  description: Échangez avec une équipe d'agents spécialisés pour découvrir la solution et poser vos questions.
+  presentation:
+    kind: prompt
+    placeholder: Que souhaitez-vous savoir sur Agentstration ?
+    icon: briefcase
+    allowAttachments: false
+    allowVoiceInput: false
+    suggestions:
+      - label: Plusieurs agents
+        value: Nous cherchons une solution pour faire collaborer plusieurs agents spécialisés. Est-ce qu'Agentstration peut répondre à ce besoin ?
+      - label: Exécution locale
+        value: Certaines de nos données doivent rester entièrement sur notre infrastructure. Peut-on utiliser des modèles locaux ?
+      - label: Outils internes
+        value: Comment nos agents peuvent-ils utiliser nos outils internes ou appeler nos propres services ?
+    fields:
+      - name: request
+        type: prompt
+        label: Votre question
+        description: Décrivez votre besoin ou posez une question sur la solution.
+        placeholder: Que souhaitez-vous savoir sur Agentstration ?
+        required: true
+        order: 0
+        role: primaryInput
+  binding:
+    kind: flow
+    resourceId: solution-discovery
+  behavior:
+    taskCreationMode: automatic
+    allowConversation: true
+    streamResponse: true
+    conversation:
+      enabled: true
+  publish: true
