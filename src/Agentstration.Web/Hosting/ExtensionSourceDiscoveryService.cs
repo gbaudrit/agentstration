@@ -8,8 +8,24 @@ namespace Agentstration.Web.Hosting;
 
 public sealed class ExtensionSourceDiscoveryService(
     IConfiguration configuration,
-    ExtensionRegistrationManagementService registrations)
+    ExtensionRegistrationManagementService registrations,
+    IIdentityStore identities,
+    IRequestContextScopeFactory requestScopes)
 {
+    public async Task DiscoverForActiveWorkspacesAsync(CancellationToken cancellationToken)
+    {
+        foreach (var tenant in (await identities.ListTenantsAsync(cancellationToken))
+            .Where(value => value.Status == TenantStatus.Active))
+        {
+            foreach (var workspace in (await identities.ListWorkspacesAsync(tenant.Id, cancellationToken))
+                .Where(value => value.Status == WorkspaceStatus.Active))
+            {
+                using var scope = requestScopes.Push(new RequestContext(Guid.Empty, tenant.Id, workspace.Id));
+                _ = await DiscoverAsync(cancellationToken);
+            }
+        }
+    }
+
     public async Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken)
     {
         var sources = ReadSources();

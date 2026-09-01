@@ -30,13 +30,17 @@ public sealed partial class WorkplaceService
             IsContinuation: false, Search: search, HasPendingAction: hasPendingAction, OperationalTasks: true,
             UpdatedFrom: updatedFrom, UpdatedTo: updatedTo);
         var anchors = await workItems.QueryAsync(query, cancellationToken);
+        var continuations = await workItems.ListLatestContinuationsAsync(
+            workspaceId,
+            anchors.Items.Select(value => WorkTaskId.FromWorkItem(value.Value.Id)).ToArray(),
+            cancellationToken);
         var tasks = new List<WorkTask>(anchors.Items.Count);
         foreach (var stored in anchors.Items)
         {
             var anchor = stored.Value; var taskId = WorkTaskId.FromWorkItem(anchor.Id);
             RequireWorkspace(anchor, workspaceId);
-            var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
-            tasks.Add(ProjectTask(anchor, LatestExecution(anchor, continuations.Items.Select(value => value.Value).ToArray()), taskId));
+            var latest = continuations.TryGetValue(taskId, out var continuation) ? LatestExecution(anchor, [continuation.Value]) : anchor;
+            tasks.Add(ProjectTask(anchor, latest, taskId));
         }
         return new OperationalWorkTaskPage(tasks, Math.Max(0, anchors.TotalCount));
     }
@@ -44,12 +48,16 @@ public sealed partial class WorkplaceService
     public async Task<IReadOnlyList<WorkTask>> ListTasksAsync(WorkspaceId workspaceId, WorkTaskStatus? status, CancellationToken cancellationToken)
     {
         var anchors = await ListRootWorkItemsAsync(workspaceId, cancellationToken);
+        var continuations = await workItems.ListLatestContinuationsAsync(
+            workspaceId,
+            anchors.Select(value => WorkTaskId.FromWorkItem(value.Id)).ToArray(),
+            cancellationToken);
         var tasks = new List<WorkTask>(anchors.Count);
         foreach (var anchor in anchors)
         {
             var taskId = WorkTaskId.FromWorkItem(anchor.Id);
-            var continuations = await workItems.QueryAsync(new WorkItemQuery(workspaceId, Take: 1, AnchorTaskId: taskId.ToString(), SortBy: WorkItemSortField.CreatedAt), cancellationToken);
-            var task = ProjectTask(anchor, LatestExecution(anchor, continuations.Items.Select(value => value.Value).ToArray()), taskId);
+            var latest = continuations.TryGetValue(taskId, out var continuation) ? LatestExecution(anchor, [continuation.Value]) : anchor;
+            var task = ProjectTask(anchor, latest, taskId);
             if (status is null || task.Status == status) tasks.Add(task);
         }
         return tasks.OrderByDescending(value => value.UpdatedAt).ThenBy(value => value.Id.Value).ToArray();

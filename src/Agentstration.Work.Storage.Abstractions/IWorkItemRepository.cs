@@ -38,6 +38,10 @@ public interface IWorkItemRepository
     Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken);
     Task<StoredWorkItem> SaveAsync(WorkItem workItem, long expectedVersion, CancellationToken cancellationToken);
     Task<WorkItemPage> QueryAsync(WorkItemQuery query, CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<WorkTaskId, StoredWorkItem>> ListLatestContinuationsAsync(
+        WorkspaceId workspaceId,
+        IReadOnlyCollection<WorkTaskId> taskIds,
+        CancellationToken cancellationToken);
 }
 
 public sealed class WorkItemConcurrencyException(string message) : Exception(message);
