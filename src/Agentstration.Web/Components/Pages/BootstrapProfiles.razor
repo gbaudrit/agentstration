@@ -80,8 +80,29 @@ else
         </section>
     }
 
+    @if (SelectedBindings.Count > 0)
+    {
+        <section class="panel">
+            <div class="panel-header"><div><p class="eyebrow">Step 3</p><h2>Resolve bindings</h2><p class="muted">Bindings select concrete resources in the target Workspace without changing the reusable profile manifests.</p></div></div>
+            <div class="bootstrap-binding-grid">
+                @foreach (var item in SelectedBindings)
+                {
+                    var key = BindingKey(item.Profile, item.Binding.Name);
+                    var input = bindingTargets[key];
+                    <fieldset class="bootstrap-binding">
+                        <legend>@item.Binding.DisplayName</legend>
+                        <p><code>@item.Profile/@item.Binding.Name</code> · @item.Binding.TargetKind@if (item.Binding.Required) { <span> · required</span> }</p>
+                        @if (item.Binding.Description is not null) { <p class="muted">@item.Binding.Description</p> }
+                        <label><span>Resource name</span><input value="@input.Name" placeholder="Resource name" @oninput="args => UpdateBindingName(key, args)" /></label>
+                        <label><span>Namespace</span><input value="@input.Namespace" placeholder="default" @oninput="args => UpdateBindingNamespace(key, args)" /></label>
+                    </fieldset>
+                }
+            </div>
+        </section>
+    }
+
     <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">Step @(SelectedScope is BootstrapProfileScope.Instance ? "2" : "3")</p><h2>Preview</h2><p class="muted">Validation is side-effect free. Pack contents appear as Pack-managed details.</p></div><button class="button-primary" disabled="@(!CanPreview || busy)" @onclick="PreviewAsync">@(previewing ? "Previewing…" : "Preview application")</button></div>
+        <div class="panel-header"><div><p class="eyebrow">Step @PreviewStep</p><h2>Preview</h2><p class="muted">Validation is side-effect free. Pack contents appear as Pack-managed details.</p></div><button class="button-primary" disabled="@(!CanPreview || busy)" @onclick="PreviewAsync">@(previewing ? "Previewing…" : "Preview application")</button></div>
         @if (preview is not null)
         {
             <div class="bootstrap-preview-summary"><StatusBadge Text="@(preview.CanApply ? "Ready" : "Invalid")" Status="@(preview.CanApply ? UiStatus.Success : UiStatus.Danger)" /><span><code>@preview.Digest[..12]</code></span><span>@preview.Resources.Count resource(s)</span></div>
@@ -122,6 +143,7 @@ else
                 <dt>Source</dt><dd>@selectedApplication.Definition.Source</dd>
                 <dt>Target</dt><dd>@TargetLabel(selectedApplication.Definition.Target)</dd>
                 <dt>Profiles</dt><dd>@string.Join(" → ", selectedApplication.Definition.Profiles)</dd>
+                <dt>Bindings</dt><dd>@(selectedApplication.Definition.Bindings.Count == 0 ? "None" : string.Join(", ", selectedApplication.Definition.Bindings.Select(BindingLabel)))</dd>
                 <dt>Digest</dt><dd><code>@selectedApplication.Definition.Digest</code></dd>
                 <dt>Started</dt><dd>@selectedApplication.Definition.StartedAt.ToLocalTime().ToString("G")</dd>
                 <dt>Completed</dt><dd>@(selectedApplication.Definition.CompletedAt?.ToLocalTime().ToString("G") ?? "Not completed")</dd>
@@ -161,6 +183,7 @@ else
     private BootstrapApplicationResource? lastApplication;
     private BootstrapApplicationResource? selectedApplication;
     private readonly List<string> selectedProfiles = [];
+    private readonly Dictionary<string, BindingInput> bindingTargets = new(StringComparer.Ordinal);
     private Guid? selectedTenantId;
     private Guid? selectedWorkspaceId;
     private string? error;
@@ -171,7 +194,12 @@ else
     private bool confirmApply;
 
     private BootstrapProfileScope? SelectedScope => selectedProfiles.Count == 0 ? null : view?.Catalog.Profiles.First(profile => profile.Name == selectedProfiles[0]).Scope;
-    private bool CanPreview => selectedProfiles.Count > 0 && SelectedScope switch { BootstrapProfileScope.Tenant => selectedTenantId is not null, BootstrapProfileScope.Workspace => selectedWorkspaceId is not null, _ => true };
+    private IReadOnlyList<(string Profile, BootstrapProfileBinding Binding)> SelectedBindings => view is null ? [] : selectedProfiles
+        .SelectMany(profile => view.Catalog.Profiles.First(value => value.Name == profile).Bindings.Select(binding => (profile, binding))).ToArray();
+    private bool CanPreview => selectedProfiles.Count > 0
+        && (SelectedScope switch { BootstrapProfileScope.Tenant => selectedTenantId is not null, BootstrapProfileScope.Workspace => selectedWorkspaceId is not null, _ => true })
+        && SelectedBindings.All(item => !item.Binding.Required || !string.IsNullOrWhiteSpace(bindingTargets[BindingKey(item.Profile, item.Binding.Name)].Name));
+    private int PreviewStep => 2 + (SelectedScope is BootstrapProfileScope.Tenant or BootstrapProfileScope.Workspace ? 1 : 0) + (SelectedBindings.Count > 0 ? 1 : 0);
     private string InitialProfilesLabel => view is null || view.Catalog.InitialProfiles.Count == 0 ? "None" : string.Join(" → ", view.Catalog.InitialProfiles);
     private string CurrentTargetLabel => SelectedScope switch { BootstrapProfileScope.Instance => "Instance", BootstrapProfileScope.Tenant => view?.Tenants.FirstOrDefault(value => value.Id == selectedTenantId)?.DisplayName ?? "Tenant not selected", BootstrapProfileScope.Workspace => view?.Workspaces.FirstOrDefault(value => value.WorkspaceId == selectedWorkspaceId) is { } workspace ? $"{workspace.TenantDisplayName} / {workspace.WorkspaceDisplayName}" : "Workspace not selected", _ => "No target" };
 
@@ -190,7 +218,7 @@ else
     private void ToggleProfile(BootstrapProfileSummary profile, ChangeEventArgs args)
     {
         if (args.Value is true) selectedProfiles.Add(profile.Name); else selectedProfiles.Remove(profile.Name);
-        preview = null; lastApplication = null; selectedTenantId = null; selectedWorkspaceId = null;
+        SyncBindings(); preview = null; lastApplication = null; selectedTenantId = null; selectedWorkspaceId = null;
     }
     private void Move(int index, int offset) { var item = selectedProfiles[index]; selectedProfiles.RemoveAt(index); selectedProfiles.Insert(index + offset, item); preview = null; }
     private void SelectTenant(ChangeEventArgs args) { selectedTenantId = Guid.TryParse(args.Value?.ToString(), out var id) ? id : null; preview = null; }
@@ -201,12 +229,19 @@ else
         preview = null;
     }
     private BootstrapApplicationTarget? Target() => SelectedScope switch { BootstrapProfileScope.Tenant => new(selectedTenantId), BootstrapProfileScope.Workspace => new(selectedTenantId, selectedWorkspaceId), _ => null };
+    private IReadOnlyList<BootstrapBindingSelection> Bindings() => SelectedBindings
+        .Where(item => !string.IsNullOrWhiteSpace(bindingTargets[BindingKey(item.Profile, item.Binding.Name)].Name))
+        .Select(item =>
+        {
+            var input = bindingTargets[BindingKey(item.Profile, item.Binding.Name)];
+            return new BootstrapBindingSelection(item.Profile, item.Binding.Name, new(input.Name.Trim(), @namespace: new(string.IsNullOrWhiteSpace(input.Namespace) ? "default" : input.Namespace.Trim())));
+        }).ToArray();
 
     private async Task PreviewAsync()
     {
         if (!CanPreview) return;
         busy = previewing = true; error = null; lastApplication = null;
-        try { preview = await Service.PreviewAsync(new(selectedProfiles.ToArray(), Target()), RequestContext.Current.PrincipalId, lifetime.Token); }
+        try { preview = await Service.PreviewAsync(new(selectedProfiles.ToArray(), Target(), Bindings()), RequestContext.Current.PrincipalId, lifetime.Token); }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
         finally { busy = previewing = false; }
     }
@@ -217,7 +252,7 @@ else
         busy = applying = true; error = null;
         try
         {
-            lastApplication = await Service.ApplyAsync(new(selectedProfiles.ToArray(), Target()), preview.Digest, RequestContext.Current.PrincipalId, lifetime.Token);
+            lastApplication = await Service.ApplyAsync(new(selectedProfiles.ToArray(), Target(), Bindings()), preview.Digest, RequestContext.Current.PrincipalId, lifetime.Token);
             selectedApplication = lastApplication;
             confirmApply = false; preview = null;
             view = await Service.GetAsync(RequestContext.Current.PrincipalId, lifetime.Token);
@@ -243,5 +278,21 @@ else
     private static int Count(BootstrapApplicationResource application, BootstrapResourceDisposition disposition) => application.Definition.Resources.Count(value => value.Disposition == disposition);
     private static UiStatus DispositionTone(BootstrapResourceDisposition disposition) => disposition switch { BootstrapResourceDisposition.Create => UiStatus.Success, BootstrapResourceDisposition.Skip => UiStatus.Neutral, BootstrapResourceDisposition.Conflict => UiStatus.Warning, _ => UiStatus.Danger };
     private static UiStatus ApplicationTone(BootstrapApplicationStatus status) => status switch { BootstrapApplicationStatus.Succeeded => UiStatus.Success, BootstrapApplicationStatus.PartiallyApplied or BootstrapApplicationStatus.Interrupted => UiStatus.Warning, BootstrapApplicationStatus.Running => UiStatus.Info, _ => UiStatus.Danger };
+    private void SyncBindings()
+    {
+        var active = SelectedBindings.Select(item => BindingKey(item.Profile, item.Binding.Name)).ToHashSet(StringComparer.Ordinal);
+        foreach (var key in bindingTargets.Keys.Where(key => !active.Contains(key)).ToArray()) bindingTargets.Remove(key);
+        foreach (var item in SelectedBindings)
+        {
+            var key = BindingKey(item.Profile, item.Binding.Name);
+            if (!bindingTargets.ContainsKey(key))
+                bindingTargets[key] = new(item.Binding.DefaultTarget?.Name ?? string.Empty, item.Binding.DefaultTarget?.Namespace?.Value ?? "default");
+        }
+    }
+    private void UpdateBindingName(string key, ChangeEventArgs args) { bindingTargets[key].Name = args.Value?.ToString() ?? string.Empty; preview = null; }
+    private void UpdateBindingNamespace(string key, ChangeEventArgs args) { bindingTargets[key].Namespace = args.Value?.ToString() ?? string.Empty; preview = null; }
+    private static string BindingKey(string profile, string name) => $"{profile}\n{name}";
+    private static string BindingLabel(BootstrapBindingSelection binding) => $"{binding.Profile}/{binding.Name} → {binding.Target.Namespace?.Value ?? "default"}/{binding.Target.Name}";
+    private sealed class BindingInput(string name, string @namespace) { public string Name { get; set; } = name; public string Namespace { get; set; } = @namespace; }
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
 }

@@ -48,6 +48,21 @@ public enum BootstrapResourceDisposition
 
 public sealed record BootstrapApplicationTarget(Guid? TenantId = null, Guid? WorkspaceId = null);
 
+public sealed record BootstrapBindingSelection(
+    string Profile,
+    string Name,
+    ResourceReference Target);
+
+[JsonConverter(typeof(JsonStringEnumConverter<BootstrapBindingTargetKind>))]
+public enum BootstrapBindingTargetKind
+{
+    [JsonStringEnumMemberName("modelProfile")] ModelProfile,
+    [JsonStringEnumMemberName("modelProvider")] ModelProvider,
+    [JsonStringEnumMemberName("runtimeProfile")] RuntimeProfile,
+    [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
+    [JsonStringEnumMemberName("secret")] Secret
+}
+
 public sealed record BootstrapResourceOperationContext(
     string ProfileName,
     string ProfilePath,
@@ -122,6 +137,7 @@ public sealed record BootstrapApplicationProperties
     public IReadOnlyList<string> Profiles { get; init; } = [];
     public BootstrapProfileScope Scope { get; init; }
     public BootstrapApplicationTarget? Target { get; init; }
+    public IReadOnlyList<BootstrapBindingSelection> Bindings { get; init; } = [];
     public string Digest { get; init; } = string.Empty;
     public DateTimeOffset StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }

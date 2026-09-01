@@ -14,8 +14,17 @@ public sealed record BootstrapProfileSummary(
     int FileCount,
     int ResourceCount,
     string Digest,
+    IReadOnlyList<BootstrapProfileBinding> Bindings,
     bool Valid = true,
     string? Error = null);
+
+public sealed record BootstrapProfileBinding(
+    string Name,
+    BootstrapBindingTargetKind TargetKind,
+    string DisplayName,
+    string? Description,
+    bool Required,
+    ResourceReference? DefaultTarget = null);
 
 public sealed record BootstrapCatalogSnapshot(
     string? Path,
@@ -33,11 +42,22 @@ internal sealed record LoadedBootstrapProfile(
     string DirectoryPath,
     IReadOnlyList<BootstrapResourceSource> Resources);
 
+internal sealed record BootstrapProfileBindingDefinition
+{
+    public string Name { get; init; } = string.Empty;
+    public BootstrapBindingTargetKind? TargetKind { get; init; }
+    public string? DisplayName { get; init; }
+    public string? Description { get; init; }
+    public bool Required { get; init; } = true;
+    public ResourceReference? DefaultTarget { get; init; }
+}
+
 internal sealed record BootstrapProfileDefinition
 {
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
     public string TargetScope { get; init; } = "instance";
+    public IReadOnlyList<BootstrapProfileBindingDefinition> Bindings { get; init; } = [];
 }
 
 public sealed class BootstrapProfileCatalog(
@@ -52,6 +72,7 @@ public sealed class BootstrapProfileCatalog(
     private const int MaximumFilesPerProfile = 256;
     private const int MaximumResourceFilesPerProfile = 128;
     private const int MaximumDocumentsPerProfile = 512;
+    private const int MaximumBindingsPerProfile = 64;
     private const int MaximumManifestBytes = 1024 * 1024;
     private const long MaximumProfileBytes = 32L * 1024 * 1024;
 
@@ -91,7 +112,7 @@ public sealed class BootstrapProfileCatalog(
             try { profiles.Add((await LoadProfileAsync(rootPath, name, cancellationToken)).Summary); }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                profiles.Add(new(name, name, null, BootstrapProfileScope.Instance, 0, 0, string.Empty, false, exception.Message));
+                profiles.Add(new(name, name, null, BootstrapProfileScope.Instance, 0, 0, string.Empty, [], false, exception.Message));
             }
         }
         return new(rootPath, options.InitialBootstrapEnabled, options.InitialProfiles, profiles);
@@ -151,6 +172,7 @@ public sealed class BootstrapProfileCatalog(
         var displayName = profile;
         string? description = null;
         var scope = BootstrapProfileScope.Instance;
+        IReadOnlyList<BootstrapProfileBinding> bindings = [];
         var descriptorPath = Path.Combine(profilePath, DescriptorFileName);
         if (File.Exists(descriptorPath))
         {
@@ -169,6 +191,7 @@ public sealed class BootstrapProfileCatalog(
                 throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' uses unsupported targetScope '{definition.TargetScope}'.");
             displayName = string.IsNullOrWhiteSpace(definition.DisplayName) ? profile : definition.DisplayName.Trim();
             description = string.IsNullOrWhiteSpace(definition.Description) ? null : definition.Description.Trim();
+            bindings = ValidateBindings(profile, scope, definition.Bindings);
         }
 
         var resourceFiles = Directory.EnumerateFiles(profilePath, "*", SearchOption.TopDirectoryOnly)
@@ -194,7 +217,7 @@ public sealed class BootstrapProfileCatalog(
 
         var hash = Convert.ToHexString(digest.GetHashAndReset()).ToLowerInvariant();
         return new(
-            new(profile, displayName, description, scope, resourceFiles.Length, resources.Count, hash),
+            new(profile, displayName, description, scope, resourceFiles.Length, resources.Count, hash, bindings),
             profilePath,
             resources);
     }
@@ -257,6 +280,39 @@ public sealed class BootstrapProfileCatalog(
             throw new DeclarativeBootstrapException($"Bootstrap resource '{location}' is missing metadata.name.");
         if (resource.Definition.ValueKind != JsonValueKind.Object)
             throw new DeclarativeBootstrapException($"Bootstrap resource '{location}' requires an object definition.");
+    }
+
+    private static IReadOnlyList<BootstrapProfileBinding> ValidateBindings(
+        string profile,
+        BootstrapProfileScope scope,
+        IReadOnlyList<BootstrapProfileBindingDefinition> definitions)
+    {
+        if (definitions.Count == 0) return [];
+        if (scope != BootstrapProfileScope.Workspace)
+            throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' can declare bindings only with Workspace scope.");
+        if (definitions.Count > MaximumBindingsPerProfile)
+            throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' declares more than {MaximumBindingsPerProfile} bindings.");
+        var result = new List<BootstrapProfileBinding>(definitions.Count);
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var binding in definitions)
+        {
+            if (string.IsNullOrWhiteSpace(binding.Name) || !string.Equals(binding.Name, binding.Name.Trim(), StringComparison.Ordinal))
+                throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' contains a binding with an invalid name.");
+            if (!names.Add(binding.Name))
+                throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' declares binding '{binding.Name}' more than once.");
+            if (binding.TargetKind is null)
+                throw new DeclarativeBootstrapException($"Bootstrap profile binding '{profile}/{binding.Name}' requires targetKind.");
+            if (binding.DefaultTarget?.WorkspaceRef is not null)
+                throw new DeclarativeBootstrapException($"Bootstrap profile binding '{profile}/{binding.Name}' cannot target another Workspace.");
+            result.Add(new(
+                binding.Name,
+                binding.TargetKind.Value,
+                string.IsNullOrWhiteSpace(binding.DisplayName) ? binding.Name : binding.DisplayName.Trim(),
+                string.IsNullOrWhiteSpace(binding.Description) ? null : binding.Description.Trim(),
+                binding.Required,
+                binding.DefaultTarget));
+        }
+        return result;
     }
 
     private static bool IsManifest(string path) =>

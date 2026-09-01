@@ -174,6 +174,75 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task WorkspaceProfileBindingsResolveStructuredReferencesAndParticipateInTheDigest()
+    {
+        using var directory = new TemporaryDirectory();
+        var profile = Directory.CreateDirectory(Path.Combine(directory.Path, "bound-agents"));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "profile.yaml"), ProfileWithBinding("bound-agents"));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "10-resource.yaml"), $$"""
+            apiVersion: {{ManagementApiVersions.CoreV1}}
+            kind: Recording
+            metadata:
+              name: bound-resource
+            definition:
+              modelProfile:
+                binding: agent-model
+            """);
+        var handler = new BindingCaptureHandler();
+        var service = ServiceForProfiles(directory.Path, handler, ["bound-agents"], enabled: false);
+        var target = new BootstrapApplicationTarget(Guid.NewGuid(), Guid.NewGuid());
+
+        var missing = await Assert.ThrowsAsync<DeclarativeBootstrapException>(
+            () => service.PreviewAsync(new(["bound-agents"], target), default));
+        StringAssert.Contains(missing.Message, "bound-agents/agent-model");
+
+        var selection = new BootstrapProfileSelection(
+            ["bound-agents"],
+            target,
+            [new("bound-agents", "agent-model", new("reasoning-default", @namespace: ResourceNamespace.Default))]);
+        var preview = await service.PreviewAsync(selection, default);
+        var changed = await service.PreviewAsync(selection with
+        {
+            Bindings = [new("bound-agents", "agent-model", new("reasoning-fast", @namespace: ResourceNamespace.Default))]
+        }, default);
+        var execution = await service.ExecuteAsync(selection, default);
+
+        Assert.IsTrue(preview.CanApply);
+        Assert.AreNotEqual(preview.Digest, changed.Digest);
+        Assert.AreEqual("reasoning-default", handler.Applied.Definition.GetProperty("modelProfile").GetProperty("name").GetString());
+        Assert.AreEqual("default", handler.Applied.Definition.GetProperty("modelProfile").GetProperty("namespace").GetString());
+        Assert.IsNull(execution.Error);
+    }
+
+    [TestMethod]
+    public async Task ProfileBindingDefaultTargetIsUsedAndUnknownSelectionsAreRejected()
+    {
+        using var directory = new TemporaryDirectory();
+        var profile = Directory.CreateDirectory(Path.Combine(directory.Path, "default-binding"));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "profile.yaml"), ProfileWithBinding("default-binding", includeDefault: true));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "10-resource.yaml"), $$"""
+            apiVersion: {{ManagementApiVersions.CoreV1}}
+            kind: Recording
+            metadata:
+              name: bound-resource
+            definition:
+              modelProfile:
+                binding: agent-model
+            """);
+        var handler = new BindingCaptureHandler();
+        var service = ServiceForProfiles(directory.Path, handler, ["default-binding"], enabled: false);
+        var target = new BootstrapApplicationTarget(Guid.NewGuid(), Guid.NewGuid());
+
+        var preview = await service.PreviewAsync(new(["default-binding"], target), default);
+        Assert.AreEqual("reasoning-default", preview.Bindings.Single().Target.Name);
+
+        var exception = await Assert.ThrowsAsync<DeclarativeBootstrapException>(() => service.PreviewAsync(
+            new(["default-binding"], target, [new("default-binding", "unknown", new("anything"))]),
+            default));
+        StringAssert.Contains(exception.Message, "is not declared");
+    }
+
+    [TestMethod]
     public async Task PlatformAdministratorIsCreatedOnceAndBootstrapDoesNotResetChangedPassword()
     {
         using var directory = new TemporaryDirectory();
@@ -379,7 +448,7 @@ public sealed class DeclarativeBootstrapTests
         await File.WriteAllTextAsync(Path.Combine(initial.FullName, "10-tenant.yaml"), Tenant("dev", "Development"));
         await File.WriteAllTextAsync(Path.Combine(initial.FullName, "20-workspace.yaml"), Workspace("default", "Default workspace", "dev"));
         await File.WriteAllTextAsync(Path.Combine(initial.FullName, "30-default-context.yaml"), DefaultContext("bootstrap-admin", "dev", "default"));
-        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "profile.yaml"), Profile("workspace-resources", "workspace"));
+        await File.WriteAllTextAsync(Path.Combine(resources.FullName, "profile.yaml"), ProfileWithBinding("workspace-resources", includeDefault: true, defaultTargetName: "bootstrap-model"));
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "10-model-provider.yaml"), ModelProvider());
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "20-runtime-profile.yaml"), RuntimeProfile());
         await File.WriteAllTextAsync(Path.Combine(resources.FullName, "30-model-profile.yaml"), ModelProfile());
@@ -422,6 +491,7 @@ public sealed class DeclarativeBootstrapTests
         Assert.IsTrue(preview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
         var application = await management.ApplyAsync(selection, preview.Digest, principal.Id, default);
         Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Definition.Status);
+        Assert.AreEqual("bootstrap-model", application.Definition.Bindings.Single().Target.Name);
         Assert.HasCount(6, application.Definition.Resources);
         Assert.IsTrue(application.Definition.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create));
 
@@ -666,6 +736,22 @@ public sealed class DeclarativeBootstrapTests
           targetScope: {{targetScope}}
         """;
 
+    private static string ProfileWithBinding(string name, bool includeDefault = false, string defaultTargetName = "reasoning-default") => $$"""
+        apiVersion: {{ManagementApiVersions.CoreV1}}
+        kind: BootstrapProfile
+        metadata:
+          name: {{name}}
+        definition:
+          displayName: {{name}}
+          targetScope: workspace
+          bindings:
+            - name: agent-model
+              targetKind: modelProfile
+              displayName: Agent model
+              required: true
+        {{(includeDefault ? $"      defaultTarget:\n        name: {defaultTargetName}\n        namespace: default" : string.Empty)}}
+        """;
+
     private static string ModelProvider() => $$"""
         apiVersion: {{ManagementApiVersions.CoreV1}}
         kind: ModelProvider
@@ -716,7 +802,7 @@ public sealed class DeclarativeBootstrapTests
           displayName: Bootstrap agent
           instructions: Answer concisely.
           modelProfile:
-            name: bootstrap-model
+            binding: agent-model
           runtimeProfile:
             name: bootstrap-runtime
           tools: []
@@ -854,6 +940,29 @@ public sealed class DeclarativeBootstrapTests
             BootstrapResourceOperationContext operation,
             CancellationToken cancellationToken) =>
             throw new OperationCanceledException(cancellationToken);
+    }
+
+    private sealed class BindingCaptureHandler : IBootstrapResourceHandler
+    {
+        public string Kind => "Recording";
+        public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+        public BootstrapResourceDocument Applied { get; private set; } = new();
+
+        public Task<BootstrapResourcePlanResult> PlanAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            BootstrapPlanningContext planning,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new BootstrapResourcePlanResult(BootstrapResourceDisposition.Create));
+
+        public Task<BootstrapResourceApplyResult> ApplyAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            CancellationToken cancellationToken)
+        {
+            Applied = resource;
+            return Task.FromResult(BootstrapResourceApplyResult.Created);
+        }
     }
 
     private sealed class TestHostEnvironment(string contentRoot) : IHostEnvironment

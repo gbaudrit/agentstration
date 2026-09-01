@@ -9,6 +9,11 @@
 .bootstrap-order { display: grid; gap: .4rem; margin-top: 1rem; }
 .bootstrap-order li { display: flex; justify-content: space-between; align-items: center; }
 .bootstrap-target { display: grid; gap: .4rem; max-width: 42rem; }
+.bootstrap-binding-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: .75rem; }
+.bootstrap-binding { display: grid; gap: .6rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: .75rem; }
+.bootstrap-binding legend { padding: 0 .25rem; font-weight: 600; }
+.bootstrap-binding p { margin: 0; }
+.bootstrap-binding label { display: grid; gap: .3rem; }
 .bootstrap-preview-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: .75rem 0; }
 .bootstrap-detail-list { display: grid; gap: .25rem; margin: .25rem 0 0; padding: 0; list-style: none; }
 .bootstrap-detail-list li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }

@@ -93,7 +93,28 @@ definition:
   displayName: Workspace tools
   description: Reusable tools and agents for one Workspace
   targetScope: workspace
+  bindings:
+    - name: agent-model
+      targetKind: modelProfile
+      displayName: Agent model
+      description: Model Profile selected for the reusable agents
+      required: true
 ```
+
+Workspace profiles can declare typed bindings so their ordinary editable resources do not embed environment-specific names. The Console asks for each target before preview; API callers provide the same profile-qualified selections. A binding may define `defaultTarget` for non-interactive use. Only a structured reference object is substituted, never arbitrary YAML text:
+
+```yaml
+definition:
+  displayName: Support agent
+  instructions: Answer support questions concisely.
+  modelProfile:
+    binding: agent-model
+  runtimeProfile:
+    name: maf-builtin
+    namespace: default
+```
+
+Selections are included in the preview digest and retained as resource references in application history. They may target an existing resource or one planned earlier in the same composition. Secret bindings retain only the Secret reference; secret values are never copied into the profile, preview, or history.
 
 A Workspace profile can install an existing local Pack while preserving Pack ownership and immutability. The archive path is relative to the profile directory; HTTP sources and replacement of an installed Pack are intentionally rejected:
 

@@ -6,12 +6,14 @@ namespace Agentstration.Web;
 
 public sealed record BootstrapProfilePreviewRequest(
     IReadOnlyList<string> Profiles,
-    BootstrapApplicationTarget? Target = null);
+    BootstrapApplicationTarget? Target = null,
+    IReadOnlyList<BootstrapBindingSelection>? Bindings = null);
 
 public sealed record ApplyBootstrapProfilesRequest(
     IReadOnlyList<string> Profiles,
     string ExpectedDigest,
-    BootstrapApplicationTarget? Target = null);
+    BootstrapApplicationTarget? Target = null,
+    IReadOnlyList<BootstrapBindingSelection>? Bindings = null);
 
 public static class BootstrapProfileEndpoints
 {
@@ -37,7 +39,7 @@ public static class BootstrapProfileEndpoints
         ICurrentRequestContext requestContext,
         CancellationToken cancellationToken) =>
         await ExecuteAsync(async () => Results.Ok(await service.PreviewAsync(
-            new(request.Profiles ?? [], request.Target),
+            new(request.Profiles ?? [], request.Target, request.Bindings),
             requestContext.Current.PrincipalId,
             cancellationToken)));
 
@@ -59,7 +61,7 @@ public static class BootstrapProfileEndpoints
         await ExecuteAsync(async () =>
         {
             var result = await service.ApplyAsync(
-                new(request.Profiles ?? [], request.Target),
+                new(request.Profiles ?? [], request.Target, request.Bindings),
                 request.ExpectedDigest,
                 requestContext.Current.PrincipalId,
                 cancellationToken);

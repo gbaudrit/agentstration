@@ -177,6 +177,7 @@ public sealed class BootstrapProfileManagementService(
                 Profiles = preview.Profiles.Select(profile => profile.Name).ToArray(),
                 Scope = preview.Scope,
                 Target = preview.Target,
+                Bindings = preview.Bindings,
                 Digest = preview.Digest,
                 StartedAt = timeProvider.GetUtcNow()
             }

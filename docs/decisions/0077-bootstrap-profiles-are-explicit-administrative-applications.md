@@ -20,12 +20,15 @@ Each manual attempt is persisted as a `BootstrapApplication` Management resource
 
 Workspace profiles may alternatively contain the canonical manifests for `ModelProvider`, `RuntimeProfile`, `ModelProfile`, `Agent`, `Flow`, and `Entry`. These handlers delegate validation and creation to the same module services used by HTTP and Console surfaces. They are create-only and idempotent: an existing address is skipped without mutation. Directly created resources receive no Pack provenance and remain ordinary editable Workspace resources. Manifest order is dependency order; a reference may resolve to existing state or to a compatible resource planned earlier in the composed profiles. Model Providers reference Extension Registrations already present in the target Workspace. A published Entry targeting a Flow requires an existing active version or a Flow planned earlier with publication and activation enabled.
 
+A Workspace profile may declare typed logical bindings in its descriptor. Direct resource manifests reference one through an object containing only `{ binding: name }`; before planning and application, that object is replaced with the selected concrete `ResourceReference`. The Console and API collect profile-qualified selections, while `defaultTarget` supports deterministic non-interactive selection. Bindings may resolve to existing resources or compatible resources planned earlier in the composition. Their resolved references participate in the preview digest and application history. Cross-Workspace references and generic text templating are rejected, and Secret bindings never copy or retain secret values.
+
 Catalog traversal, profile count, selected-profile count, file counts, manifest sizes, total profile size, archive size, and reparse points are bounded. Pack sources are local profile files only; remote URLs and paths outside the profile are rejected.
 
 ## Consequences
 
 - Initial startup and later manual application share the same catalog, parsing, planning, and resource handlers.
 - Profiles are reusable across Tenants and Workspaces without embedding installation-specific identifiers in YAML.
+- Typed profile bindings make direct editable resources portable without giving them Pack ownership or introducing unbounded manifest templating.
 - One application has one unambiguous target and scope; cross-scope workflows use separate applications.
 - Ordinary resources created by bootstrap can later be edited through their normal surfaces. Pack contents remain immutable through those surfaces because their owner is the installed Pack.
 - The same YAML resource shape can be chosen as an editable direct import or wrapped in a Pack when lifecycle ownership and immutability are desired.
