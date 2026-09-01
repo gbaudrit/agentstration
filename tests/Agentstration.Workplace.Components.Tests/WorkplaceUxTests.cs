@@ -260,8 +260,8 @@ public sealed class WorkplaceUxTests
             .Add(value => value.Presentation, new EntryPresentation { Progress = new(EntryProgressVisibility.Detailed) })
             .Add(value => value.Activities, [started, completed])
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
-        Assert.IsTrue(hidden.Markup.Contains("Preparing a response", StringComparison.Ordinal));
-        Assert.IsTrue(hidden.Markup.Contains("Response prepared", StringComparison.Ordinal));
+        Assert.IsTrue(hidden.Markup.Contains(Localizer(context)["PreparingResponse"], StringComparison.Ordinal));
+        Assert.IsTrue(hidden.Markup.Contains(Localizer(context)["ResponsePrepared"], StringComparison.Ordinal));
         Assert.IsFalse(hidden.Markup.Contains("Alice Player", StringComparison.Ordinal));
 
         var visible = context.Render<InteractionView>(parameters => parameters
@@ -410,6 +410,23 @@ public sealed class WorkplaceUxTests
             StringAssert.Contains(notifications.Markup, "Votre résultat est prêt.");
             StringAssert.Contains(notifications.Markup, "Marquer comme lu");
             Assert.IsFalse(notifications.Markup.Contains("Task completed", StringComparison.Ordinal));
+
+            var preparing = new WorkTaskActivity(
+                WorkTaskActivityId.New(),
+                workspaceId,
+                taskId,
+                WorkTaskActivityType.ProgressStarted,
+                "Preparing a response",
+                null,
+                now,
+                WorkActorKind.Agentstration);
+            var activity = context.Render<TaskActivityView>(parameters => parameters.Add(value => value.Activity, preparing));
+            var progress = context.Render<TaskProgressTimeline>(parameters => parameters
+                .Add(value => value.Activities, [preparing])
+                .Add(value => value.Status, WorkTaskStatus.Running));
+            StringAssert.Contains(activity.Markup, "Préparation d’une réponse");
+            StringAssert.Contains(progress.Markup, "Préparation d’une réponse");
+            Assert.IsFalse(activity.Markup.Contains("Preparing a response", StringComparison.Ordinal));
         }
         finally
         {
@@ -433,15 +450,15 @@ public sealed class WorkplaceUxTests
             .Add(value => value.Activities, [started])
             .Add(value => value.Status, WorkTaskStatus.Running));
         Assert.AreEqual(1, active.FindAll(".progress-step.current").Count);
-        Assert.IsTrue(active.Find(".progress-step.current").TextContent.Contains("Preparing a response", StringComparison.Ordinal));
+        Assert.IsTrue(active.Find(".progress-step.current").TextContent.Contains(Localizer(context)["PreparingResponse"], StringComparison.Ordinal));
         Assert.IsFalse(active.Markup.Contains(">In progress<", StringComparison.Ordinal));
 
         var advanced = context.Render<TaskProgressTimeline>(parameters => parameters
             .Add(value => value.Activities, [started, completed])
             .Add(value => value.Status, WorkTaskStatus.Running));
-        Assert.IsFalse(advanced.Markup.Contains("Preparing a response", StringComparison.Ordinal));
+        Assert.IsFalse(advanced.Markup.Contains(Localizer(context)["PreparingResponse"], StringComparison.Ordinal));
         Assert.AreEqual(1, advanced.FindAll(".progress-step.completed").Count);
-        Assert.IsTrue(advanced.Markup.Contains("Response prepared", StringComparison.Ordinal));
+        Assert.IsTrue(advanced.Markup.Contains(Localizer(context)["ResponsePrepared"], StringComparison.Ordinal));
         Assert.AreEqual(1, advanced.FindAll(".progress-step.current").Count);
         Assert.IsTrue(advanced.Find(".progress-step.current").TextContent.Contains(Localizer(context)["InProgress"], StringComparison.Ordinal));
     }
