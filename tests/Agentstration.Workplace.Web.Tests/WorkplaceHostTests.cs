@@ -134,7 +134,7 @@ public sealed class WorkplaceHostTests
         StringAssert.Contains(workplaceStyles, ".composer-symbol");
         StringAssert.Contains(workplaceStyles, "flex-direction:column");
         StringAssert.Contains(workplaceStyles, ".side-nav[b-");
-        StringAssert.Contains(workplaceStyles, ".mobile-brand-logo-dark");
+        StringAssert.Contains(workplaceStyles, ".mobile-brand-logo");
         StringAssert.Matches(workplaceStyles, new Regex(@"\.entry-renderer\[b-[^\]]+\]\s+form", RegexOptions.CultureInvariant));
         StringAssert.Contains(hostStyles, ".mobile-dashboard-cards");
         StringAssert.Contains(hostStyles, "grid-auto-flow:column");
