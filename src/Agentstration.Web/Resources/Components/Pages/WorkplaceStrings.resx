@@ -18,4 +18,12 @@
 <data name="EntryDraftSaved"><value>Draft revision {0} saved. Workplace is unchanged.</value></data><data name="EntryValid"><value>Entry is valid and ready to publish.</value></data><data name="ValidationFoundErrors"><value>Validation found errors.</value></data><data name="ResolveValidationErrors"><value>Resolve validation errors before publication.</value></data><data name="EntryPublished"><value>Published Entry v{0} with pinned Flow {1}.</value></data>
 <data name="Flow"><value>Flow</value></data>
 <data name="PackEntryDefinition"><value>Pack Entry definition</value></data><data name="ReadOnly"><value>Read-only</value></data><data name="Icon"><value>Icon</value></data><data name="IconExample"><value>For example: sparkles</value></data><data name="AllowVoiceInput"><value>Allow voice input</value></data><data name="NewField"><value>New field</value></data><data name="Suggestion"><value>Suggestion</value></data><data name="RawResource"><value>Raw resource</value></data><data name="EntryYaml"><value>Entry YAML</value></data><data name="EntryYamlReadOnlyHelp"><value>This Pack Entry source is read-only.</value></data><data name="EntryYamlEditableHelp"><value>Edit the complete Entry resource as YAML.</value></data><data name="ResourceManifest"><value>Resource manifest</value></data><data name="ApplyToForm"><value>Apply to form</value></data><data name="Saving"><value>Saving…</value></data><data name="SaveYamlDraft"><value>Save YAML draft</value></data><data name="YamlApplied"><value>YAML applied to the form.</value></data><data name="ApiVersionRequired"><value>apiVersion is required.</value></data><data name="KindRequired"><value>kind is required.</value></data><data name="EntryNameImmutable"><value>The Entry name cannot be changed.</value></data><data name="Tab.Yaml"><value>YAML</value></data>
+<data name="SelectedIcon"><value>Selected icon</value></data>
+<data name="NoIcon"><value>No icon</value></data>
+<data name="ClearIcon"><value>Clear</value></data>
+<data name="SearchIcons"><value>Icon</value></data>
+<data name="SearchIconsPlaceholder"><value>Search 5,000+ icons</value></data>
+<data name="IconChoices"><value>Available icons</value></data>
+<data name="NoIconsFound"><value>No icon matches this search.</value></data>
+<data name="MoreIconsAvailable"><value>Refine the search to see more icons.</value></data>
 </root>

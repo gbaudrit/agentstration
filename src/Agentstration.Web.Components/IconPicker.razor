@@ -1,0 +1,57 @@
+<div class="icon-picker" data-testid="icon-picker">
+    <div class="icon-picker-selection">
+        <span class="icon-picker-preview" aria-hidden="true"><TablerIcon Name="@Value" /></span>
+        <span class="icon-picker-selection-copy"><small>@SelectedLabel</small><strong>@SelectedName</strong></span>
+        <button type="button" class="text-button" disabled="@(Disabled || string.IsNullOrEmpty(Value))" @onclick="ClearAsync">@ClearLabel</button>
+    </div>
+    <label class="icon-picker-search">
+        <span>@SearchLabel</span>
+        <input type="search" value="@query" placeholder="@SearchPlaceholder" disabled="@Disabled" autocomplete="off" @oninput="Search" />
+    </label>
+    @if (results.Names.Count == 0)
+    {
+        <p class="icon-picker-empty" role="status">@NoResultsLabel</p>
+    }
+    else
+    {
+        <div class="icon-picker-grid" role="listbox" aria-label="@ChoicesLabel">
+            @foreach (var name in results.Names)
+            {
+                <button type="button" role="option" aria-selected="@string.Equals(Value, name, StringComparison.Ordinal)" class="@(string.Equals(Value, name, StringComparison.Ordinal) ? "selected" : null)" title="@name" disabled="@Disabled" @onclick="() => SelectAsync(name)">
+                    <TablerIcon Name="@name" />
+                    <span>@name</span>
+                </button>
+            }
+        </div>
+        @if (results.HasMore)
+        {
+            <p class="icon-picker-more" role="status">@MoreResultsLabel</p>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter, EditorRequired] public required string SelectedLabel { get; set; }
+    [Parameter, EditorRequired] public required string NoneLabel { get; set; }
+    [Parameter, EditorRequired] public required string ClearLabel { get; set; }
+    [Parameter, EditorRequired] public required string SearchLabel { get; set; }
+    [Parameter, EditorRequired] public required string SearchPlaceholder { get; set; }
+    [Parameter, EditorRequired] public required string ChoicesLabel { get; set; }
+    [Parameter, EditorRequired] public required string NoResultsLabel { get; set; }
+    [Parameter, EditorRequired] public required string MoreResultsLabel { get; set; }
+    private string query = string.Empty;
+    private IconSearchResult results = TablerIconCatalog.Search(null);
+    private string SelectedName => TablerIconCatalog.TryNormalize(Value, out var name) ? name : NoneLabel;
+
+    private void Search(ChangeEventArgs args)
+    {
+        query = args.Value?.ToString() ?? string.Empty;
+        results = TablerIconCatalog.Search(query);
+    }
+
+    private Task SelectAsync(string name) => ValueChanged.InvokeAsync(name);
+    private Task ClearAsync() => ValueChanged.InvokeAsync(string.Empty);
+}

@@ -119,7 +119,14 @@
             <path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z"/>
             break;
         default:
-            <circle cx="12" cy="12" r="8"/>
+            if (TablerIconCatalog.TryNormalize(Name, out var tablerIconName))
+            {
+                <use href="@TablerIconCatalog.SpriteHref(tablerIconName)"></use>
+            }
+            else
+            {
+                <circle cx="12" cy="12" r="8"/>
+            }
             break;
     }
 </svg>

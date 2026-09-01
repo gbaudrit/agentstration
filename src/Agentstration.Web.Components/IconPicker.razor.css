@@ -1,0 +1,110 @@
+.icon-picker {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+}
+
+.icon-picker-selection {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 58px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+}
+
+.icon-picker-preview {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border-radius: 9px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-size: 1.35rem;
+}
+
+.icon-picker-selection-copy {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+}
+
+.icon-picker-selection-copy small,
+.icon-picker-more,
+.icon-picker-empty {
+    color: var(--muted);
+    font-size: .75rem;
+}
+
+.icon-picker-selection-copy strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.icon-picker-search {
+    display: grid;
+    gap: 6px;
+}
+
+.icon-picker-search > span {
+    font-size: .78rem;
+    font-weight: 650;
+}
+
+.icon-picker-search input {
+    width: 100%;
+}
+
+.icon-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
+    gap: 6px;
+    max-height: 280px;
+    padding: 4px;
+    overflow: auto;
+}
+
+.icon-picker-grid button {
+    display: grid;
+    min-width: 0;
+    min-height: 72px;
+    place-items: center;
+    gap: 6px;
+    padding: 8px 5px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.icon-picker-grid button:hover,
+.icon-picker-grid button:focus-visible,
+.icon-picker-grid button.selected {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+    outline: none;
+}
+
+.icon-picker-grid button ::deep .tabler-icon {
+    font-size: 1.35rem;
+}
+
+.icon-picker-grid button span {
+    width: 100%;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: .68rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.icon-picker-more,
+.icon-picker-empty {
+    margin: 0;
+}

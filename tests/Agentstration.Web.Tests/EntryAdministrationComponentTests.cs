@@ -83,6 +83,8 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual("true", rendered.Find("[data-testid='entry-tab-overview']").GetAttribute("aria-selected"));
         await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("Direct Agent Flow", StringComparison.Ordinal));
+        await rendered.Find("[data-testid='icon-picker'] input[type='search']").InputAsync(new ChangeEventArgs { Value = "sparkles" });
+        await rendered.Find("[data-testid='icon-picker'] [role='option'][title='sparkles']").ClickAsync(new());
         Assert.AreEqual(EntryBindingKind.Agent, client.RequestedKinds.Single());
         await rendered.Find("[data-testid='target-kind']").ChangeAsync(new ChangeEventArgs { Value = "Flow" });
         Assert.AreEqual(EntryBindingKind.Flow, client.RequestedKinds.Last());
@@ -105,6 +107,7 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual(EntryParticipantVisibility.Visible, client.SavedEntry.Presentation.Participants.Visibility);
         Assert.AreEqual(EntryProgressVisibility.Detailed, client.SavedEntry.Presentation.Progress.Visibility);
         Assert.AreEqual(EntryTaskDisplay.Visible, client.SavedEntry.Presentation.Task.Display);
+        Assert.AreEqual("sparkles", client.SavedEntry.Presentation.Icon);
         Assert.HasCount(2, client.SavedEntry.Presentation.Fields);
         Assert.AreEqual("field2", client.SavedEntry.Presentation.Fields.Single(value => value.Role == EntryFieldRole.PrimaryInput).Name);
         Assert.IsTrue(rendered.Markup.Contains("Published Entry v1 with pinned Flow 1.0.0", StringComparison.Ordinal));

@@ -1,5 +1,6 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
     <ProjectReference Include="../../src/Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
+    <PackageReference Include="bunit" />
   </ItemGroup>
 </Project>
