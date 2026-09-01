@@ -1,18 +1,18 @@
 <section class="panel">
     <div class="panel-header">
         <div>
-            <p class="eyebrow">Activity</p>
-            <h2>Notifications</h2>
+            <p class="eyebrow">@Localizer["Activity"]</p>
+            <h2>@Localizer["Notifications"]</h2>
         </div>
         @if (Notifications.Any(value => value.ReadAt is null))
         {
-            <button class="text-button" @onclick="OnMarkAllRead">Mark all read</button>
+            <button class="text-button" @onclick="OnMarkAllRead">@Localizer["MarkAllRead"]</button>
         }
     </div>
 
     @if (Notifications.Count == 0)
     {
-        <div class="compact-empty"><EmptyState Title="All quiet" Message="Task updates will appear here." /></div>
+        <div class="compact-empty"><EmptyState Title="@Localizer["AllQuiet"]" Message="@Localizer["TaskUpdatesAppearHere"]" /></div>
     }
     else
     {
@@ -20,13 +20,13 @@
         {
             <article class="notification-row @(item.ReadAt is null ? "unread" : null)">
                 <div>
-                    <strong>@item.Title</strong>
-                    <p>@item.Message</p>
+                    <strong>@NotificationTitle(item)</strong>
+                    <p>@NotificationMessage(item)</p>
                     <time>@item.CreatedAt.LocalDateTime.ToString("g")</time>
                 </div>
                 @if (item.ReadAt is null)
                 {
-                    <button class="text-button" @onclick="() => OnMarkRead.InvokeAsync(item.Id)">Mark read</button>
+                    <button class="text-button" @onclick="() => OnMarkRead.InvokeAsync(item.Id)">@Localizer["MarkRead"]</button>
                 }
             </article>
         }
@@ -42,4 +42,15 @@
 
     [Parameter]
     public EventCallback OnMarkAllRead { get; set; }
+
+    private string NotificationTitle(WorkNotification notification) => notification.Kind switch
+    {
+        WorkNotificationKind.TaskCompleted => Localizer["TaskCompletedNotification"],
+        WorkNotificationKind.TaskFailed => Localizer["TaskFailedNotification"],
+        _ => notification.Title
+    };
+
+    private string NotificationMessage(WorkNotification notification) => notification.Kind == WorkNotificationKind.TaskCompleted
+        ? Localizer["ResultReadyNotification"]
+        : notification.Message;
 }

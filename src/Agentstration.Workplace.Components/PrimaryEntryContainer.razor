@@ -9,11 +9,11 @@
     <div class="primary-entry-copy">
         <span class="primary-entry-mark"><UiIcon Name="sparkle" /></span>
         <div>
-            <p class="eyebrow">Start here</p>
-            <h2 id="primary-entry-heading"><span class="primary-title-desktop">@Title</span><span class="primary-title-mobile">@MobileTitle</span></h2>
-            @if (!string.IsNullOrWhiteSpace(Description))
+            <p class="eyebrow">@Localizer["StartHere"]</p>
+            <h2 id="primary-entry-heading"><span class="primary-title-desktop">@EffectiveTitle</span><span class="primary-title-mobile">@EffectiveMobileTitle</span></h2>
+            @if (!string.IsNullOrWhiteSpace(EffectiveDescription))
             {
-                <p>@Description</p>
+                <p>@EffectiveDescription</p>
             }
         </div>
     </div>
@@ -21,9 +21,12 @@
 </section>
 
 @code {
-    [Parameter] public string Title { get; set; } = "What would you like to accomplish?";
-    [Parameter] public string MobileTitle { get; set; } = "What would you like to do?";
-    [Parameter] public string? Description { get; set; } = "Describe the outcome. Agentstration will ask only for the details it needs.";
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? MobileTitle { get; set; }
+    [Parameter] public string? Description { get; set; }
     [Parameter] public bool Busy { get; set; }
     [Parameter, EditorRequired] public required RenderFragment ChildContent { get; set; }
+    private string EffectiveTitle => Title ?? Localizer["PrimaryTitle"];
+    private string EffectiveMobileTitle => MobileTitle ?? Localizer["PrimaryMobileTitle"];
+    private string EffectiveDescription => Description ?? Localizer["PrimaryDescription"];
 }

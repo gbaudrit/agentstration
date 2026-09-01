@@ -1,2 +1,2 @@
-<span class="realtime-status @(Connected ? "connected" : "disconnected")" role="status"><span class="status-dot"></span>@(Connected ? "Live" : "Reconnecting…")</span>
+<span class="realtime-status @(Connected ? "connected" : "disconnected")" role="status"><span class="status-dot"></span>@(Connected ? Localizer["Live"] : Localizer["Reconnecting"])</span>
 @code { [Parameter] public bool Connected { get; set; } }

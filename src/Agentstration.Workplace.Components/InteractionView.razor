@@ -1,7 +1,7 @@
 <section class="interaction-view" aria-labelledby="interaction-title">
     <header class="interaction-header">
-        <div><p class="eyebrow">Current request</p><h2 id="interaction-title">Conversation</h2><p class="interaction-context">@(Task?.Title ?? "Your current request")</p></div>
-        <div class="interaction-actions"><RealtimeStatus Connected="RealtimeConnected" /><button class="button-secondary" type="button" @onclick="OnNewRequest"><UiIcon Name="plus" /> New request</button></div>
+        <div><p class="eyebrow">@Localizer["CurrentRequest"]</p><h2 id="interaction-title">@Localizer["Conversation"]</h2><p class="interaction-context">@(Task?.Title ?? Localizer["YourCurrentRequest"].Value)</p></div>
+        <div class="interaction-actions"><RealtimeStatus Connected="RealtimeConnected" /><button class="button-secondary" type="button" @onclick="OnNewRequest"><UiIcon Name="plus" /> @Localizer["NewRequest"]</button></div>
     </header>
 
     <div class="conversation-thread" aria-live="polite">
@@ -26,7 +26,7 @@
                     break;
                 case ResultDiagnosticsItem:
                     <div class="result-diagnostics">
-                        <button class="result-diagnostics-toggle" type="button" aria-expanded="@diagnosticsExpanded.ToString().ToLowerInvariant()" @onclick="ToggleDiagnostics"><UiIcon Name="document" /> Execution details <small>Development</small></button>
+                        <button class="result-diagnostics-toggle" type="button" aria-expanded="@diagnosticsExpanded.ToString().ToLowerInvariant()" @onclick="ToggleDiagnostics"><UiIcon Name="document" /> @Localizer["ExecutionDetails"] <small>@Localizer["Development"]</small></button>
                         @if (diagnosticsExpanded)
                         {
                             <div class="result-diagnostics-content">
@@ -42,7 +42,7 @@
                     <ArtifactCard Artifact="artifact" ContentUrl="@ArtifactContentUrl(artifact)" />
                     break;
                 case ProcessingItem:
-                    <div class="processing-feedback" role="status"><span></span>Agentstration is working on your request…</div>
+                    <div class="processing-feedback" role="status"><span></span>@Localizer["ProcessingRequest"]</div>
                     break;
                 case AssistantResponseItem response:
                     <article class="assistant-response"><span><UiIcon Name="sparkle" /></span><div><strong>Agentstration</strong><p>@response.Content</p></div></article>

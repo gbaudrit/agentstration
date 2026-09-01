@@ -5,7 +5,6 @@
 @inject UserPreferencesState Preferences
 @inject WorkplaceContextState WorkplaceContext
 @inject IJSRuntime JS
-@inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceLayoutStrings> Localizer
 <div class="app-shell @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light") workplace-shell">
     <aside class="sidebar" aria-label="@T("WorkplaceNavigation")">
         <a class="brand-lockup workplace-brand-lockup" href="@HomeUrl" aria-label="@T("WorkplaceHome")">

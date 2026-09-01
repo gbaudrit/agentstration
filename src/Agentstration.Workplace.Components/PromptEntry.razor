@@ -8,13 +8,13 @@
     <div class="prompt-composer">
         <span class="composer-core" aria-hidden="true"><svg class="composer-symbol" viewBox="0 0 100 100" focusable="false"><defs><linearGradient id="composer-a-gradient" x1="14" y1="12" x2="84" y2="90" gradientUnits="userSpaceOnUse"><stop stop-color="#39d7ff"/><stop offset=".52" stop-color="#4f63ff"/><stop offset="1" stop-color="#a54cff"/></linearGradient></defs><path fill="url(#composer-a-gradient)" d="M50 8 89 78c3 6-1 11-7 11H70L50 51 30 89H18c-6 0-10-5-7-11L50 8Z"/><path fill="url(#composer-a-gradient)" d="M24 94c10-12 18-20 26-26 8 6 16 14 26 26-12-6-20-11-26-16-6 5-14 10-26 16Z"/></svg></span>
         <textarea @bind="request" @bind:event="oninput" @onkeydown="HandleKeyDown" placeholder="@Definition.Presentation.Placeholder" aria-label="@Definition.DisplayName" aria-describedby="prompt-help prompt-error" disabled="@(Disabled || Busy || submitting)"></textarea>
-        <button class="prompt-submit" type="submit" aria-label="Send request" disabled="@(Disabled || Busy || submitting || string.IsNullOrWhiteSpace(request))">
-            <UiIcon Name="send" /><span>@(Busy || submitting ? "Sending…" : "Send request")</span>
+        <button class="prompt-submit" type="submit" aria-label="@Localizer["SendRequest"]" disabled="@(Disabled || Busy || submitting || string.IsNullOrWhiteSpace(request))">
+            <UiIcon Name="send" /><span>@(Busy || submitting ? Localizer["Sending"] : Localizer["SendRequest"])</span>
         </button>
     </div>
     @if (Definition.Presentation.Suggestions.Count > 0)
     {
-        <div class="entry-suggestions" aria-label="Suggestions">
+        <div class="entry-suggestions" aria-label="@Localizer["Suggestions"]">
             @foreach (var suggestion in Definition.Presentation.Suggestions)
             {
                 <button type="button" disabled="@(Disabled || Busy || submitting)" @onclick="() => request = suggestion.Value"><span class="suggestion-icon"><UiIcon Name="sparkle" /></span><span>@suggestion.Label</span></button>
@@ -22,7 +22,7 @@
         </div>
     }
     <div class="prompt-meta">
-        <small id="prompt-help">Ctrl + Enter to send</small>
+        <small id="prompt-help">@Localizer["PromptHelp"]</small>
         @if (error is not null) { <small id="prompt-error" class="entry-error" role="alert">@error</small> }
     </div>
 </form>
@@ -46,7 +46,7 @@
         if (Disabled || Busy || submitting) return;
         var field = Definition.Presentation.Fields.FirstOrDefault(value => value.Name == "request");
         var minimum = field?.Validation?.MinimumLength ?? 1;
-        if (request.Trim().Length < minimum) { error = $"Enter at least {minimum} characters."; return; }
+        if (request.Trim().Length < minimum) { error = Localizer["MinimumCharacters", minimum]; return; }
         error = null;
         submitting = true;
         try { await OnSubmit.InvokeAsync(new Dictionary<string, JsonElement> { ["request"] = JsonSerializer.SerializeToElement(request.Trim()) }); }
