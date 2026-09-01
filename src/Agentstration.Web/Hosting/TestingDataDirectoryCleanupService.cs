@@ -10,7 +10,7 @@ internal sealed class TestingDataDirectoryCleanupService(string directory, bool 
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        SqliteConnection.ClearAllPools();
+        ClearPoolsInDirectory(DirectoryPath);
         if (!deleteOnShutdown) return;
 
         for (var attempt = 0; ; attempt++)
@@ -28,6 +28,17 @@ internal sealed class TestingDataDirectoryCleanupService(string directory, bool 
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
             }
+        }
+    }
+
+    private static void ClearPoolsInDirectory(string directory)
+    {
+        if (!Directory.Exists(directory)) return;
+
+        foreach (var databasePath in Directory.EnumerateFiles(directory, "*.db", SearchOption.AllDirectories))
+        {
+            using var connection = new SqliteConnection($"Data Source={databasePath}");
+            SqliteConnection.ClearPool(connection);
         }
     }
 }

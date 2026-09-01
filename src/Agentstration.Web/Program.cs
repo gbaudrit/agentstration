@@ -43,7 +43,9 @@ var isTesting = builder.Environment.IsEnvironment("Testing");
 var configuredTestingDataDirectory = builder.Configuration["Data:TestingDirectory"];
 var ownsTestingDataDirectory = isTesting && string.IsNullOrWhiteSpace(configuredTestingDataDirectory);
 var dataDirectory = isTesting
-    ? configuredTestingDataDirectory ?? Path.Combine(Path.GetTempPath(), $"agentstration-web-tests-{Guid.NewGuid():N}")
+    ? string.IsNullOrWhiteSpace(configuredTestingDataDirectory)
+        ? Path.Combine(Path.GetTempPath(), $"agentstration-web-tests-{Guid.NewGuid():N}")
+        : configuredTestingDataDirectory
     : builder.Configuration["Data:Directory"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration");
 Directory.CreateDirectory(dataDirectory);
 var identityConnectionString = builder.Configuration.GetConnectionString("Identity")
@@ -61,22 +63,22 @@ if (!Uri.TryCreate(aiEndpoint.EndsWith('/') ? aiEndpoint : aiEndpoint + '/', Uri
 var aiOptions = new AiProviderOptions(aiProvider, parsedAiEndpoint, builder.Configuration["AI:Model"] ?? "phi4-mini", builder.Configuration["AI:ApiKey"]);
 var controlPlanePath = isTesting
     ? Path.Combine(dataDirectory, "control-plane.db")
-    : builder.Configuration["Data:ControlPlanePath"] ?? Path.Combine(dataDirectory, "control-plane.db");
+    : builder.Configuration["Data:ControlPlanePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "control-plane.db");
 var controlPlaneDirectory = Path.GetDirectoryName(controlPlanePath);
 if (!string.IsNullOrWhiteSpace(controlPlaneDirectory)) Directory.CreateDirectory(controlPlaneDirectory);
 var workPlanePath = isTesting
     ? Path.Combine(dataDirectory, "work-plane.db")
-    : builder.Configuration["Data:WorkPlanePath"] ?? Path.Combine(dataDirectory, "work-plane.db");
+    : builder.Configuration["Data:WorkPlanePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "work-plane.db");
 var workPlaneDirectory = Path.GetDirectoryName(workPlanePath);
 if (!string.IsNullOrWhiteSpace(workPlaneDirectory)) Directory.CreateDirectory(workPlaneDirectory);
 var flowPath = isTesting
     ? Path.Combine(dataDirectory, "flow-plane.db")
-    : builder.Configuration["Data:FlowPath"] ?? Path.Combine(dataDirectory, "flow-plane.db");
+    : builder.Configuration["Data:FlowPath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "flow-plane.db");
 var flowDirectory = Path.GetDirectoryName(flowPath);
 if (!string.IsNullOrWhiteSpace(flowDirectory)) Directory.CreateDirectory(flowDirectory);
 var runtimePath = isTesting
     ? Path.Combine(dataDirectory, "runtime-plane.db")
-    : builder.Configuration["Data:RuntimePath"] ?? Path.Combine(dataDirectory, "runtime-plane.db");
+    : builder.Configuration["Data:RuntimePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "runtime-plane.db");
 var runtimeDirectory = Path.GetDirectoryName(runtimePath);
 if (!string.IsNullOrWhiteSpace(runtimeDirectory)) Directory.CreateDirectory(runtimeDirectory);
 if (isTesting)

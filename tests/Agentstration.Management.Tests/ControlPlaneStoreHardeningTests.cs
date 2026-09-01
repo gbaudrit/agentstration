@@ -3,7 +3,6 @@ using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -261,7 +260,7 @@ public sealed class ControlPlaneStoreHardeningTests
         public async ValueTask DisposeAsync()
         {
             await Provider.DisposeAsync();
-            SqliteConnection.ClearAllPools();
+            SqliteTestCleanup.ClearPoolsInDirectory(directory);
             Directory.Delete(directory, true);
         }
 

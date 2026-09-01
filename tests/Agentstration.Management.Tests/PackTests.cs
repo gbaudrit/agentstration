@@ -15,7 +15,6 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -880,7 +879,7 @@ public sealed class PackTests
         }
         public async ValueTask DisposeAsync()
         {
-            await provider.DisposeAsync(); SqliteConnection.ClearAllPools(); if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            await provider.DisposeAsync(); SqliteTestCleanup.ClearPoolsInDirectory(directory); if (Directory.Exists(directory)) Directory.Delete(directory, true);
         }
     }
 }

@@ -10,12 +10,16 @@ namespace Agentstration.Web.Tests;
 public sealed class QuartzHostLifecycleTests
 {
     [TestMethod]
-    public async Task UnconfiguredTestingHostDeletesItsOwnedDataDirectoryAfterShutdown()
+    [DataRow(null)]
+    [DataRow("")]
+    [DataRow("   ")]
+    public async Task MissingOrWhitespaceTestingDirectoryUsesAndDeletesOwnedDirectory(string? configuredDirectory)
     {
         string directory;
         await using (var factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
+            if (configuredDirectory is not null) builder.UseSetting("Data:TestingDirectory", configuredDirectory);
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
         }))
         {

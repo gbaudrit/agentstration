@@ -1,6 +1,5 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Storage.Sqlite;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -45,7 +44,7 @@ public sealed class SecurityAuditPersistenceTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            SqliteTestCleanup.ClearPoolsInDirectory(directory);
             if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
         }
     }

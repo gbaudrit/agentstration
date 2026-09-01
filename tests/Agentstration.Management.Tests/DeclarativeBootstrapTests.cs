@@ -4,7 +4,6 @@ using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -437,7 +436,7 @@ public sealed class DeclarativeBootstrapTests
         public string Path { get; }
         public void Dispose()
         {
-            SqliteConnection.ClearAllPools();
+            SqliteTestCleanup.ClearPoolsInDirectory(Path);
             Directory.Delete(Path, recursive: true);
         }
     }

@@ -1,7 +1,6 @@
 using Agentstration.Security.AspNetCoreIdentity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -145,7 +144,7 @@ public sealed class LocalIdentityPersistenceTests
 
     private static void DeleteTemporaryDirectory(string path)
     {
-        SqliteConnection.ClearAllPools();
+        SqliteTestCleanup.ClearPoolsInDirectory(path);
         if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
     }
 }
