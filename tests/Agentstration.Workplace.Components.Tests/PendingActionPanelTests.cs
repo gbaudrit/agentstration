@@ -16,7 +16,7 @@ public sealed class PendingActionPanelTests
     [TestMethod]
     public async Task ChoiceActionRendersInlineWithAdaptiveOptions()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         PendingActionAnswer? answer = null;
         var action = new RequestChoiceAction(
             "Choose detail",
@@ -29,10 +29,10 @@ public sealed class PendingActionPanelTests
             .Add(value => value.Action, action)
             .Add(value => value.OnSubmit, EventCallback.Factory.Create<PendingActionAnswer>(this, value => answer = value)));
 
-        Assert.IsTrue(rendered.Markup.Contains("Action required", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains(Localizer(context)["ActionRequired"], StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Compact", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Detailed", StringComparison.Ordinal));
-        Assert.IsFalse(rendered.FindAll("button").Any(value => value.TextContent == "Continue"), "A simple choice must not require a second submit action.");
+        Assert.IsFalse(rendered.FindAll("button").Any(value => value.TextContent == Localizer(context)["Continue"]), "A simple choice must not require a second submit action.");
         await rendered.FindAll("button").Single(value => value.TextContent == "Detailed").ClickAsync(new());
         Assert.AreEqual("detailed", answer?.Values["detailLevel"].GetString());
     }
@@ -40,14 +40,14 @@ public sealed class PendingActionPanelTests
     [TestMethod]
     public async Task ConfirmationActionSubmitsStructuredAnswer()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         PendingActionAnswer? answer = null;
         var action = new RequestConfirmationAction("Generate?", null, PendingActionId.New(), "opaque-token");
         var rendered = context.Render<PendingActionPanel>(parameters => parameters
             .Add(value => value.Action, action)
             .Add(value => value.OnSubmit, EventCallback.Factory.Create<PendingActionAnswer>(this, value => answer = value)));
 
-        await rendered.FindAll("button").Single(value => value.TextContent == "Confirm").ClickAsync(new());
+        await rendered.FindAll("button").Single(value => value.TextContent == Localizer(context)["Confirm"]).ClickAsync(new());
 
         Assert.IsNotNull(answer);
         Assert.AreEqual(action.PendingActionId, answer.PendingActionId);
@@ -57,7 +57,7 @@ public sealed class PendingActionPanelTests
     [TestMethod]
     public async Task ConversationModeRendersInputAsAnAssistantTurn()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         PendingActionAnswer? answer = null;
         var action = new RequestInputAction(
             "What should the report focus on?",
@@ -72,19 +72,19 @@ public sealed class PendingActionPanelTests
 
         Assert.AreEqual(1, rendered.FindAll(".pending-author-avatar").Count);
         Assert.IsTrue(rendered.Markup.Contains("Agentstration", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Markup.Contains("Response needed", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains(Localizer(context)["ResponseNeeded"], StringComparison.Ordinal));
         Assert.AreEqual(0, rendered.FindAll(".panel-header").Count);
-        Assert.IsFalse(rendered.Markup.Contains("Action required", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Markup.Contains(Localizer(context)["ActionRequired"], StringComparison.Ordinal));
 
         await rendered.Find("textarea").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "Revenue trends" });
-        await rendered.FindAll("button").Single(value => value.TextContent == "Continue").ClickAsync(new());
+        await rendered.FindAll("button").Single(value => value.TextContent == Localizer(context)["Continue"]).ClickAsync(new());
         Assert.AreEqual("Revenue trends", answer?.Values["focus"].GetString());
     }
 
     [TestMethod]
     public void WorkplaceLayoutUsesTheConsoleDesignSystemShell()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddAgentstrationWebComponents();
         var localizer = context.Services.GetRequiredService<IStringLocalizer<WorkplaceLayoutStrings>>();
@@ -109,7 +109,7 @@ public sealed class PendingActionPanelTests
     [TestMethod]
     public void WorkplaceLayoutDisablesWorkspaceNavigationBeforeInitialization()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddAgentstrationWebComponents();
 
@@ -134,7 +134,7 @@ public sealed class PendingActionPanelTests
         {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
-            using var context = new BunitContext();
+            using var context = CreateContext();
             context.JSInterop.Mode = JSRuntimeMode.Loose;
             context.Services.AddAgentstrationWebComponents();
 
@@ -154,7 +154,7 @@ public sealed class PendingActionPanelTests
     [TestMethod]
     public void WorkplaceLayoutUsesTheWorkspaceDisplayNameOutsideUrls()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddAgentstrationWebComponents();
         var localizer = context.Services.GetRequiredService<IStringLocalizer<WorkplaceLayoutStrings>>();
@@ -172,4 +172,13 @@ public sealed class PendingActionPanelTests
         Assert.AreEqual("/w/personal", rendered.Find(".breadcrumb a").GetAttribute("href"));
         Assert.AreEqual(0, rendered.FindAll(".environment-chip").Count);
     }
+    private static BunitContext CreateContext()
+    {
+        var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        return context;
+    }
+
+    private static IStringLocalizer<WorkplaceLayoutStrings> Localizer(BunitContext context) =>
+        context.Services.GetRequiredService<IStringLocalizer<WorkplaceLayoutStrings>>();
 }

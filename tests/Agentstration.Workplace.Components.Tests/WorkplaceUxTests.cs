@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
@@ -5,6 +6,8 @@ using Agentstration.Work.Contracts;
 using Agentstration.Workplace.Components;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Workplace.Components.Tests;
 
@@ -14,7 +17,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public async Task PromptSuggestionFillsComposerAndSubmissionStaysStructured()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         IReadOnlyDictionary<string, JsonElement>? submitted = null;
         var rendered = context.Render<PromptEntry>(parameters => parameters
             .Add(value => value.Definition, PromptDefinition())
@@ -31,7 +34,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void PrimaryContainerAddsEmphasisWithoutChangingTheGenericRenderer()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var primary = context.Render<PrimaryEntryContainer>(parameters => parameters.AddChildContent<EntryRenderer>(entry => entry
             .Add(value => value.Definition, PromptDefinition())
             .Add(value => value.Role, DashboardItemRole.Primary)
@@ -41,7 +44,7 @@ public sealed class WorkplaceUxTests
             .Add(value => value.Role, DashboardItemRole.Standard)
             .Add(value => value.OnSubmit, _ => Task.CompletedTask));
 
-        Assert.IsTrue(primary.Markup.Contains("What would you like to accomplish?", StringComparison.Ordinal));
+        Assert.IsTrue(primary.Markup.Contains(Localizer(context)["PrimaryTitle"], StringComparison.Ordinal));
         Assert.AreEqual(1, primary.FindAll("h2#primary-entry-heading").Count);
         Assert.AreEqual(0, primary.FindAll("h1").Count);
         Assert.AreEqual(1, primary.FindAll(".prompt-composer").Count);
@@ -54,21 +57,21 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void PendingActionIsRenderedInsideTheConversationFlow()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var action = new RequestConfirmationAction("Generate the report?", "A task will be created.", PendingActionId.New(), "browser-only-token");
         var rendered = context.Render<InteractionView>(parameters => parameters
             .Add(value => value.Action, action)
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
 
         Assert.AreEqual(1, rendered.FindAll(".conversation-thread .pending-conversation").Count);
-        Assert.IsTrue(rendered.Markup.Contains("Response needed", StringComparison.Ordinal));
-        Assert.IsFalse(rendered.Markup.Contains("Action required", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains(Localizer(context)["ResponseNeeded"], StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Markup.Contains(Localizer(context)["ActionRequired"], StringComparison.Ordinal));
     }
 
     [TestMethod]
     public void ComposerRemainsVisibleWhenConversationIsIdleAfterWorkCompletes()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var rendered = context.Render<InteractionView>(parameters => parameters
             .Add(value => value.Status, InteractionStatus.Idle)
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
@@ -80,7 +83,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void BlockingQuestionExplainsWhyPermanentComposerIsDisabled()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var action = new RequestChoiceAction("Which style?", null, [new("concise", "Concise")], PendingActionId.New(), "token", "style");
         var rendered = context.Render<InteractionView>(parameters => parameters
             .Add(value => value.Status, InteractionStatus.WaitingForUser)
@@ -94,7 +97,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void ResolvedPendingAnswerAndSuccessiveOutputsRemainReadableInTheThread()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var interactionId = InteractionId.New();
         var taskId = new WorkTaskId(Guid.NewGuid());
@@ -126,7 +129,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void CompactDefaultsHideParticipantMechanicsAndTechnicalResults()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var interactionId = InteractionId.New();
         var taskId = new WorkTaskId(Guid.NewGuid());
@@ -154,7 +157,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void DevelopmentDiagnosticsRevealAutomaticResultsOnlyOnDemand()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var taskId = new WorkTaskId(Guid.NewGuid());
         var result = new WorkTaskResult(WorkTaskResultId.New(), workspaceId, taskId, "run-1", WorkTaskResultKind.Structured, "Execution result", JsonSerializer.SerializeToElement(new { finalOutput = "Answer", participants = new[] { "alice", "bob" } }), DateTimeOffset.UtcNow);
@@ -177,7 +180,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void CompactProgressKeepsCurrentWorkButDoesNotRepeatCompletionBesideTheAnswer()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var now = new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero);
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var interactionId = InteractionId.New();
@@ -208,7 +211,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void VisibleParticipantsAreAttributedInsideTheUnifiedTimeline()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var message = new ConversationMessage(Guid.NewGuid(), workspaceId, InteractionId.New(), null, ConversationRole.Agentstration, "Is it a real person?", DateTimeOffset.UtcNow, "alice-agent", Metadata: new Dictionary<string, string> { ["participantId"] = "alice-player" });
         var rendered = context.Render<InteractionView>(parameters => parameters
@@ -223,7 +226,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void DefaultConversationUsesAlignmentInsteadOfRedundantSpeakerChrome()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var interactionId = InteractionId.New();
         var now = DateTimeOffset.UtcNow;
@@ -238,14 +241,14 @@ public sealed class WorkplaceUxTests
 
         Assert.AreEqual(0, rendered.FindAll(".message-avatar").Count);
         Assert.AreEqual(0, rendered.FindAll(".conversation-message header strong").Count);
-        Assert.AreEqual("You", rendered.Find(".message-user").GetAttribute("aria-label"));
+        Assert.AreEqual(Localizer(context)["You"].Value, rendered.Find(".message-user").GetAttribute("aria-label"));
         Assert.AreEqual("Agentstration", rendered.Find(".message-assistant").GetAttribute("aria-label"));
     }
 
     [TestMethod]
     public void ParticipantProgressUsesEntryVisibilityWithoutExposingFlowTopology()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var now = new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero);
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var taskId = new WorkTaskId(Guid.NewGuid());
@@ -269,15 +272,15 @@ public sealed class WorkplaceUxTests
             })
             .Add(value => value.Activities, [started, completed])
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
-        Assert.IsTrue(visible.Markup.Contains("Alice Player is preparing a response", StringComparison.Ordinal));
-        Assert.IsTrue(visible.Markup.Contains("Alice Player responded", StringComparison.Ordinal));
+        Assert.IsTrue(visible.Markup.Contains(Localizer(context)["ParticipantPreparing", "Alice Player"], StringComparison.Ordinal));
+        Assert.IsTrue(visible.Markup.Contains(Localizer(context)["ParticipantResponded", "Alice Player"], StringComparison.Ordinal));
         Assert.IsFalse(visible.Markup.Contains("StepRun", StringComparison.Ordinal));
     }
 
     [TestMethod]
     public void AutoTaskDisplayMaterializesOnlyDurableOrSubstantialWork()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var now = new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero);
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var taskId = new WorkTaskId(Guid.NewGuid());
@@ -341,7 +344,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void RunningTaskWithoutActivityUsesTransientWaitingFeedback()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var now = new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero);
         var taskId = new WorkTaskId(Guid.NewGuid());
         var rendered = context.Render<InteractionView>(parameters => parameters
@@ -349,14 +352,76 @@ public sealed class WorkplaceUxTests
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
 
         Assert.AreEqual(1, rendered.FindAll(".processing-feedback").Count);
-        Assert.IsTrue(rendered.Markup.Contains("Agentstration is working on your request", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Markup.Contains(Localizer(context)["ProcessingRequest"], StringComparison.Ordinal));
         Assert.IsFalse(rendered.Markup.Contains("I’ve started the work", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [DoNotParallelize]
+    public void WorkplaceConversationAndNotificationsUseTheSelectedCulture()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
+            using var context = CreateContext();
+            var now = new DateTimeOffset(2026, 9, 1, 14, 34, 0, TimeSpan.Zero);
+            var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+            var taskId = new WorkTaskId(Guid.NewGuid());
+            var result = new WorkTaskResult(
+                WorkTaskResultId.New(),
+                workspaceId,
+                taskId,
+                "run-1",
+                WorkTaskResultKind.Text,
+                "Result",
+                JsonSerializer.SerializeToElement("Ready"),
+                now);
+            var conversation = context.Render<InteractionView>(parameters => parameters
+                .Add(value => value.Presentation, new EntryPresentation { Task = new(EntryTaskDisplay.Visible) })
+                .Add(value => value.Task, TaskResponse(taskId, now.AddMinutes(-1), now, WorkTaskStatus.Completed))
+                .Add(value => value.Results, [result])
+                .Add(value => value.DiagnosticsEnabled, true)
+                .Add(value => value.RealtimeConnected, true)
+                .Add(value => value.ArtifactContentUrl, _ => "/content"));
+
+            StringAssert.Contains(conversation.Markup, "Demande actuelle");
+            StringAssert.Contains(conversation.Markup, "Nouvelle demande");
+            StringAssert.Contains(conversation.Markup, "En direct");
+            StringAssert.Contains(conversation.Markup, "Tâche");
+            StringAssert.Contains(conversation.Markup, "Terminée");
+            StringAssert.Contains(conversation.Markup, "Détails d’exécution");
+            Assert.AreEqual("Demandez une modification ou poursuivez la conversation…", conversation.Find("#conversation-message").GetAttribute("placeholder"));
+
+            var notification = new WorkNotification
+            {
+                Id = WorkNotificationId.New(),
+                WorkspaceId = workspaceId,
+                Kind = WorkNotificationKind.TaskCompleted,
+                Title = "Task completed",
+                Message = "Result is ready.",
+                CreatedAt = now
+            };
+            var notifications = context.Render<NotificationCenter>(parameters => parameters.Add(value => value.Notifications, [notification]));
+            StringAssert.Contains(notifications.Markup, "Tout marquer comme lu");
+            StringAssert.Contains(notifications.Markup, "Tâche terminée");
+            StringAssert.Contains(notifications.Markup, "Votre résultat est prêt.");
+            StringAssert.Contains(notifications.Markup, "Marquer comme lu");
+            Assert.IsFalse(notifications.Markup.Contains("Task completed", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 
     [TestMethod]
     public void TaskProgressCollapsesCompletedTurnsAndKeepsOnlyUnresolvedWorkCurrent()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var now = new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero);
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var taskId = new WorkTaskId(Guid.NewGuid());
@@ -378,13 +443,13 @@ public sealed class WorkplaceUxTests
         Assert.AreEqual(1, advanced.FindAll(".progress-step.completed").Count);
         Assert.IsTrue(advanced.Markup.Contains("Response prepared", StringComparison.Ordinal));
         Assert.AreEqual(1, advanced.FindAll(".progress-step.current").Count);
-        Assert.IsTrue(advanced.Find(".progress-step.current").TextContent.Contains("In progress", StringComparison.Ordinal));
+        Assert.IsTrue(advanced.Find(".progress-step.current").TextContent.Contains(Localizer(context)["InProgress"], StringComparison.Ordinal));
     }
 
     [TestMethod]
     public void MessagesActivitiesResultsAndArtifactsAreOrderedAsOneTimeline()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var now = new DateTimeOffset(2026, 8, 18, 10, 0, 0, TimeSpan.Zero);
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var interactionId = InteractionId.New();
@@ -410,7 +475,7 @@ public sealed class WorkplaceUxTests
     [TestMethod]
     public void ProgressAndArtifactsExposeFunctionalInformationWithoutStorageDetails()
     {
-        using var context = new BunitContext();
+        using var context = CreateContext();
         var workspaceId = new WorkspaceId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var taskId = new WorkTaskId(Guid.NewGuid());
         var activity = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.TaskStarted, "Generating report", "Building the requested content.", DateTimeOffset.UtcNow, WorkActorKind.System);
@@ -423,6 +488,16 @@ public sealed class WorkplaceUxTests
         Assert.IsTrue(card.Markup.Contains("2 KB", StringComparison.Ordinal));
         Assert.IsFalse(card.Markup.Contains("private/storage/key", StringComparison.Ordinal));
     }
+
+    private static BunitContext CreateContext()
+    {
+        var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        return context;
+    }
+
+    private static IStringLocalizer<WorkplaceLayoutStrings> Localizer(BunitContext context) =>
+        context.Services.GetRequiredService<IStringLocalizer<WorkplaceLayoutStrings>>();
 
     private static EntryResource PromptDefinition() => new()
     {

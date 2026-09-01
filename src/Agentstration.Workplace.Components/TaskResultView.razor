@@ -2,8 +2,8 @@
 
 <section class="task-result" aria-labelledby="@HeadingId">
     <div class="result-heading">
-        <div><p class="eyebrow">Result · Version @Result.Sequence</p><h2 id="@HeadingId">@Result.Title</h2></div>
-        <button class="button-secondary result-copy" type="button" @onclick="CopyAsync"><UiIcon Name="copy" /> @(copied ? "Copied" : "Copy")</button>
+        <div><p class="eyebrow">@Localizer["ResultVersion", Result.Sequence]</p><h2 id="@HeadingId">@Result.Title</h2></div>
+        <button class="button-secondary result-copy" type="button" @onclick="CopyAsync"><UiIcon Name="copy" /> @(copied ? Localizer["Copied"] : Localizer["Copy"])</button>
     </div>
     <div class="result-content">@FormattedContent</div>
 </section>

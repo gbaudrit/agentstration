@@ -1,6 +1,6 @@
-<a class="inline-task-card task-@Task.Status.ToString().ToLowerInvariant()" href="@DetailsUrl" aria-label="@($"View task details: {Task.Title}")">
+<a class="inline-task-card task-@Task.Status.ToString().ToLowerInvariant()" href="@DetailsUrl" aria-label="@Localizer["ViewTaskDetails", Task.Title]">
     <span class="task-card-icon"><UiIcon Name="tasks" /></span>
-    <span class="task-card-label"><small>Task</small><strong>@Task.Title</strong></span>
+    <span class="task-card-label"><small>@Localizer["Task"]</small><strong>@Task.Title</strong></span>
     <span class="task-status">@StatusLabel</span>
     <span class="task-card-arrow" aria-hidden="true">→</span>
 </a>
@@ -8,5 +8,5 @@
 @code {
     [Parameter, EditorRequired] public required WorkTaskResponse Task { get; set; }
     [Parameter, EditorRequired] public required string DetailsUrl { get; set; }
-    private string StatusLabel => Task.Status switch { WorkTaskStatus.ActionRequired => "Needs input", WorkTaskStatus.Completed => "Completed", WorkTaskStatus.Failed => "Failed", WorkTaskStatus.Cancelled => "Cancelled", WorkTaskStatus.Running => "In progress", _ => Task.Status.ToString() };
+    private string StatusLabel => Localizer[$"TaskStatus.{Task.Status}"];
 }

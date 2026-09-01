@@ -14,8 +14,8 @@
         && Activity.Metadata?.GetValueOrDefault("participantId") is { Length: > 0 } participant
             ? Activity.Type switch
             {
-                WorkTaskActivityType.ProgressStarted => $"{Humanize(participant)} is preparing a response",
-                WorkTaskActivityType.ProgressCompleted => $"{Humanize(participant)} responded",
+                WorkTaskActivityType.ProgressStarted => Localizer["ParticipantPreparing", Humanize(participant)],
+                WorkTaskActivityType.ProgressCompleted => Localizer["ParticipantResponded", Humanize(participant)],
                 _ => Activity.Title
             }
             : Activity.Title;
