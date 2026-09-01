@@ -10,6 +10,10 @@ Do not commit API keys. HTTP payload capture is disabled by default, and sensiti
 
 `Agentstration:Bootstrap:Path` optionally points to a directory of initial-state YAML declarations. The setting has no default and an absent directory is a no-op. Tenant, Workspace, Platform administrator, and default context are explicit resources rather than hidden initial-topology settings. Referenced secrets use ordinary configuration keys, so `Agentstration:Bootstrap:Secrets:AdminPassword` can be supplied as `Agentstration__Bootstrap__Secrets__AdminPassword` without placing it in YAML. See [Declarative bootstrap](declarative-bootstrap.md).
 
+## Extension discovery
+
+`Agentstration:Extensions:DiscoverOnStartup` defaults to `true`. It synchronizes extension endpoints declared below `Agentstration:Extensions` and Aspire `*-extension` connection strings into every active Workspace after persistence initialization and before declarative bootstrap. A second idempotent pass covers the initial Workspace when bootstrap creates it. Set the option to `false` (or `Agentstration__Extensions__DiscoverOnStartup=false`) to keep discovery manual through the Console or `POST /api/extensions/discover`.
+
 ## Authentication
 
 `Agentstration:Authentication:Mode` is `Local`, `Oidc`, `Hybrid`, `Development`, or `Disabled`. `Local` is the offline default. `Development` and `Disabled` are rejected outside Development and Testing.

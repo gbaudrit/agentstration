@@ -621,6 +621,66 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task ExtensionSourcesAreDiscoveredBeforeDeclarativeBootstrap()
+    {
+        using var directory = new TemporaryDirectory();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "profile.yaml"), Profile(Path.GetFileName(directory.Path), "instance"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "00-extension-presence.yaml"), Resource("ExtensionPresence", "startup-order"));
+        await using var factory = FactoryWithExtensionPresenceHandler(directory.Path, discoverOnStartup: true);
+
+        using var client = factory.CreateClient();
+        using var health = await client.GetAsync("/health");
+        health.EnsureSuccessStatusCode();
+
+        Assert.IsTrue(factory.Services.GetRequiredService<ExtensionPresenceBootstrapHandler>().Found);
+    }
+
+    [TestMethod]
+    public async Task StartupExtensionDiscoveryCanBeDisabled()
+    {
+        using var directory = new TemporaryDirectory();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "profile.yaml"), Profile(Path.GetFileName(directory.Path), "instance"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "00-extension-presence.yaml"), Resource("ExtensionPresence", "startup-order"));
+        await using var factory = FactoryWithExtensionPresenceHandler(directory.Path, discoverOnStartup: false);
+
+        using var client = factory.CreateClient();
+        using var health = await client.GetAsync("/health");
+        health.EnsureSuccessStatusCode();
+
+        Assert.IsFalse(factory.Services.GetRequiredService<ExtensionPresenceBootstrapHandler>().Found);
+    }
+
+    [TestMethod]
+    public async Task WorkspaceCreatedByBootstrapReceivesDiscoveredExtensions()
+    {
+        using var directory = new TemporaryDirectory();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "profile.yaml"), Profile(Path.GetFileName(directory.Path), "instance"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "00-platform-admin.yaml"), PlatformAdministrator());
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "10-tenant.yaml"), Tenant("startup", "Startup"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "20-workspace.yaml"), Workspace("startup", "Startup", "startup"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "30-context.yaml"), DefaultContext("bootstrap-admin", "startup", "startup"));
+        await using var factory = Factory(directory.Path, InitialPassword).WithWebHostBuilder(builder =>
+            builder.UseSetting("Agentstration:Extensions:Startup.Order:Endpoint", "http://localhost:5399/"));
+
+        using var client = factory.CreateClient();
+        using var health = await client.GetAsync("/health");
+        health.EnsureSuccessStatusCode();
+
+        var identities = factory.Services.GetRequiredService<IIdentityStore>();
+        var tenant = (await identities.ListTenantsAsync(default)).Single();
+        var workspace = (await identities.ListWorkspacesAsync(tenant.Id, default)).Single();
+        var localIdentity = (await identities.ListLocalIdentitiesAsync(default)).Single();
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        using var workspaceScope = scopes.Push(new RequestContext(localIdentity.PrincipalId, tenant.Id, workspace.Id));
+        var registration = await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>()
+            .GetAsync(ResourceNamespace.Default, "startup-order", default);
+
+        Assert.IsNotNull(registration);
+        Assert.AreEqual(tenant.Id, registration.Value.TenantId);
+        Assert.AreEqual(workspace.Id, registration.Value.WorkspaceId);
+    }
+
+    [TestMethod]
     public void DevelopmentIdentityPolicyAcceptsThePublicBootstrapCredentialOnlyWhenRequested()
     {
         using var directory = new TemporaryDirectory();
@@ -709,6 +769,24 @@ public sealed class DeclarativeBootstrapTests
                 builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.Ollama:Endpoint", "http://127.0.0.1:1");
             if (password is not null) builder.UseSetting("Agentstration:Bootstrap:Secrets:AdminPassword", password);
             if (configureServices is not null) builder.ConfigureServices(configureServices);
+        });
+
+    private static WebApplicationFactory<Program> FactoryWithExtensionPresenceHandler(string path, bool discoverOnStartup) =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Authentication:Mode", "Development");
+            builder.UseSetting("Agentstration:Bootstrap:Path", Directory.GetParent(path)!.FullName);
+            builder.UseSetting("Agentstration:Bootstrap:InitialBootstrapEnabled", "true");
+            builder.UseSetting("Agentstration:Bootstrap:InitialProfiles:0", Path.GetFileName(path));
+            builder.UseSetting("Agentstration:Extensions:DiscoverOnStartup", discoverOnStartup.ToString());
+            builder.UseSetting("Agentstration:Extensions:Startup.Order:Endpoint", "http://localhost:5399/");
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<ExtensionPresenceBootstrapHandler>();
+                services.AddSingleton<IBootstrapResourceHandler>(provider =>
+                    provider.GetRequiredService<ExtensionPresenceBootstrapHandler>());
+            });
         });
 
     private static string PlatformAdministrator() => $$"""
@@ -1001,6 +1079,29 @@ public sealed class DeclarativeBootstrapTests
         {
             Applied = resource;
             return Task.FromResult(BootstrapResourceApplyResult.Created);
+        }
+    }
+
+    private sealed class ExtensionPresenceBootstrapHandler(ExtensionRegistrationManagementService registrations) : IBootstrapResourceHandler
+    {
+        public string Kind => "ExtensionPresence";
+        public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
+        public bool Found { get; private set; }
+
+        public Task<BootstrapResourcePlanResult> PlanAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            BootstrapPlanningContext planning,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new BootstrapResourcePlanResult(BootstrapResourceDisposition.Create));
+
+        public async Task<BootstrapResourceApplyResult> ApplyAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            CancellationToken cancellationToken)
+        {
+            Found = await registrations.GetAsync(ResourceNamespace.Default, "startup-order", cancellationToken) is not null;
+            return BootstrapResourceApplyResult.Created;
         }
     }
 

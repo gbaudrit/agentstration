@@ -2,7 +2,7 @@
 
 Agentstration treats `Agentstration:Bootstrap:Path` as the root of a profile catalog. Each immediate child directory is one independently selectable profile. Startup applies the ordered `Agentstration:Bootstrap:InitialProfiles` list only when `Agentstration:Bootstrap:InitialBootstrapEnabled` is `true`. Initial bootstrap is disabled by default.
 
-Profiles use configuration order; files inside each profile use ordinal lexical filename order. Use profile order for dependencies across profiles and numeric filename prefixes for dependencies inside one profile. A file may contain one YAML resource or several YAML documents separated by `---`. Bootstrap runs during every enabled process startup after persistence initialization, but handlers only create absent resources and never reconcile existing ones.
+Profiles use configuration order; files inside each profile use ordinal lexical filename order. Use profile order for dependencies across profiles and numeric filename prefixes for dependencies inside one profile. A file may contain one YAML resource or several YAML documents separated by `---`. Bootstrap runs during every enabled process startup after persistence initialization and the first automatic extension-discovery pass. Handlers only create absent resources and never reconcile existing ones. A second idempotent discovery pass covers Workspaces created by the initial instance profiles. Set `Agentstration:Extensions:DiscoverOnStartup` to `false` to disable both automatic passes and keep discovery manual.
 
 For example:
 
