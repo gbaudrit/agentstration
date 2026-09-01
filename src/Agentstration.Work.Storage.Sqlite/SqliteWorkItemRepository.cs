@@ -104,6 +104,27 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         return new WorkItemPage(page.Take(take).Select(FromDocument).ToArray(), page.Length > take, totalCount);
     }
 
+    public async Task<IReadOnlyDictionary<WorkTaskId, StoredWorkItem>> ListLatestContinuationsAsync(
+        WorkspaceId workspaceId,
+        IReadOnlyCollection<WorkTaskId> taskIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(taskIds);
+        if (taskIds.Count == 0) return new Dictionary<WorkTaskId, StoredWorkItem>();
+
+        var workspaceKey = workspaceId.ToString();
+        var taskKeys = taskIds.Select(value => value.ToString()).Distinct(StringComparer.Ordinal).ToArray();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await context.WorkItems.AsNoTracking()
+            .Where(value => value.WorkspaceId == workspaceKey && value.AnchorTaskId != null && taskKeys.Contains(value.AnchorTaskId))
+            .GroupBy(value => value.AnchorTaskId)
+            .Select(group => group.OrderByDescending(value => value.CreatedAt).ThenBy(value => value.Id).First())
+            .ToArrayAsync(cancellationToken);
+        return documents.ToDictionary(
+            value => new WorkTaskId(Guid.Parse(value.AnchorTaskId!)),
+            FromDocument);
+    }
+
     private static IQueryable<WorkItemDocument> Order(IQueryable<WorkItemDocument> query, WorkItemSortField field, WorkItemSortDirection direction) => (field, direction) switch
     {
         (WorkItemSortField.UpdatedAt, WorkItemSortDirection.Ascending) => query.OrderBy(value => value.UpdatedAt).ThenBy(value => value.Id),
