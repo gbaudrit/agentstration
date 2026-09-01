@@ -203,7 +203,7 @@ public sealed class FlowRunTimelineTests
         var summaryTab = rendered.FindAll("[role=tab]").Single(tab => tab.TextContent.Trim() == strings["Summary"].Value);
         Assert.AreEqual("true", summaryTab.GetAttribute("aria-selected"));
         Assert.HasCount(5, rendered.FindAll(".flow-summary-metrics>div"));
-        Assert.AreEqual("researcher→reviewer", rendered.Find(".flow-participant-path ol").TextContent.Replace(" ", string.Empty, StringComparison.Ordinal));
+        CollectionAssert.AreEqual(new[] { "researcher", "reviewer" }, rendered.FindAll(".flow-participant-name").Select(value => value.TextContent).ToArray());
         Assert.AreEqual("/namespaces/sample/agents/researcher", rendered.Find(".flow-participant-path a").GetAttribute("href"));
         Assert.Contains("2 s", rendered.Markup, StringComparison.Ordinal);
     }

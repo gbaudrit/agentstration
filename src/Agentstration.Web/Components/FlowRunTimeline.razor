@@ -47,14 +47,21 @@
                         @for (var index = 0; index < ParticipantPath.Count; index++)
                         {
                             <li>
-                                @if (index > 0) { <b aria-hidden="true">→</b> }
+                                @if (index > 0) { <b class="flow-participant-arrow" aria-hidden="true">→</b> }
                                 @if (ParticipantUrls.TryGetValue(ParticipantPath[index], out var participantUrl))
                                 {
-                                    <a href="@participantUrl">@ParticipantPath[index]</a>
+                                    <a class="flow-participant-chip" href="@participantUrl">
+                                        <span class="flow-participant-avatar" aria-hidden="true">◎</span>
+                                        <span class="flow-participant-name">@ParticipantPath[index]</span>
+                                        <span class="flow-participant-open" aria-hidden="true">↗</span>
+                                    </a>
                                 }
                                 else
                                 {
-                                    <span>@ParticipantPath[index]</span>
+                                    <span class="flow-participant-chip">
+                                        <span class="flow-participant-avatar" aria-hidden="true">◎</span>
+                                        <span class="flow-participant-name">@ParticipantPath[index]</span>
+                                    </span>
                                 }
                             </li>
                         }
