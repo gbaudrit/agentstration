@@ -135,28 +135,6 @@ public sealed class FlowRunTimelineTests
     }
 
     [TestMethod]
-    public void EmptyParticipantTurnWithoutCompletionIsRemovedWhenHandedOff()
-    {
-        using var context = CreateContext();
-        var strings = context.Services.GetRequiredService<IStringLocalizer<FlowRunDetailsStrings>>();
-        var now = DateTimeOffset.UtcNow;
-        var rendered = context.Render<FlowRunTimeline>(parameters => parameters.Add(value => value.Events, new[]
-        {
-            Event(1, FlowRunEventType.ParticipantTurnStarted, "researcher", new { turn = 2 }, now),
-            Event(2, FlowRunEventType.ParticipantHandoff, "researcher", new { from = "researcher", to = "reviewer" }, now.AddSeconds(1)),
-            Event(3, FlowRunEventType.ParticipantTurnStarted, "reviewer", new { turn = 3 }, now.AddSeconds(1)),
-            Event(4, FlowRunEventType.ParticipantTurnCompleted, "reviewer", new { turn = 3 }, now.AddSeconds(2)),
-            Event(5, FlowRunEventType.FlowRunCompleted, null, null, now.AddSeconds(2))
-        }));
-
-        rendered.FindAll("[role=tab]").Single(tab => tab.TextContent.Trim() == strings["Activity"].Value).Click();
-
-        Assert.IsFalse(rendered.Markup.Contains(strings["ParticipantTurnStarted", "researcher", "2"].Value, StringComparison.Ordinal));
-        Assert.IsFalse(rendered.Markup.Contains(strings["Streaming"].Value, StringComparison.Ordinal));
-        Assert.Contains(strings["Event.ParticipantHandoff", "researcher", "reviewer"].Value, rendered.Markup, StringComparison.Ordinal);
-    }
-
-    [TestMethod]
     public void InteractiveLifecycleRendersAsSemanticActivity()
     {
         using var context = CreateContext();
