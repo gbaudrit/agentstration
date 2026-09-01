@@ -204,7 +204,11 @@ using (startupScopes.PushSystem())
     await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
     await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
     await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+    if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
+        await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
     await app.Services.ApplyDeclarativeBootstrapAsync(app.Lifetime.ApplicationStopping);
+    if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
+        await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
 }
 if (bootstrapContext is not null)
     await WorkspaceStartupData.InitializeAsync(
