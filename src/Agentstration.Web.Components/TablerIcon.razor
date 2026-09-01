@@ -1,0 +1,17 @@
+@if (TablerIconCatalog.TryNormalize(Name, out var iconName))
+{
+    <svg class="tabler-icon @Class" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <use href="@TablerIconCatalog.SpriteHref(iconName)"></use>
+    </svg>
+}
+else
+{
+    <svg class="tabler-icon @Class" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="8"></circle>
+    </svg>
+}
+
+@code {
+    [Parameter, EditorRequired] public required string Name { get; set; }
+    [Parameter] public string? Class { get; set; }
+}
