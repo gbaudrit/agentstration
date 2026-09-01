@@ -15,6 +15,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -41,13 +43,22 @@ public sealed partial class FlowTests
         public FlowService Service => _provider.GetRequiredService<FlowService>();
         public IFlowRepository Repository => _provider.GetRequiredService<IFlowRepository>();
         private FlowFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
-        public static async Task<FlowFixture> CreateAsync()
+        public static async Task<FlowFixture> CreateAsync(DbCommandInterceptor? commandInterceptor = null, TimeProvider? timeProvider = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
             var services = new ServiceCollection();
-            services.AddSingleton(TimeProvider.System);
-            services.AddSqliteFlowStorage($"Data Source={Path.Combine(directory, "flow.db")};Pooling=False");
+            services.AddSingleton(timeProvider ?? TimeProvider.System);
+            var connectionString = $"Data Source={Path.Combine(directory, "flow.db")};Pooling=False";
+            if (commandInterceptor is null)
+            {
+                services.AddSqliteFlowStorage(connectionString);
+            }
+            else
+            {
+                services.AddDbContextFactory<FlowDbContext>(options => options.UseSqlite(connectionString).AddInterceptors(commandInterceptor));
+                services.AddSingleton<IFlowRepository, SqliteFlowRepository>();
+            }
             services.AddSingleton<FlowService>();
             var provider = services.BuildServiceProvider();
             var fixture = new FlowFixture(directory, provider);
