@@ -21,19 +21,13 @@
                 {
                     WorkTaskActivityType.ProgressStarted => Localizer["ParticipantPreparing", Humanize(participant)],
                     WorkTaskActivityType.ProgressCompleted => Localizer["ParticipantResponded", Humanize(participant)],
-                    _ => LocalizedDefaultTitle
+                    _ => WorkplaceActivityTitles.Get(Localizer, Activity)
                 };
             }
 
-            return LocalizedDefaultTitle;
+            return WorkplaceActivityTitles.Get(Localizer, Activity);
         }
     }
-    private string LocalizedDefaultTitle => (Activity.Type, Activity.Title) switch
-    {
-        (WorkTaskActivityType.ProgressStarted, "Preparing a response") => Localizer["PreparingResponse"],
-        (WorkTaskActivityType.ProgressCompleted, "Response prepared") => Localizer["ResponsePrepared"],
-        _ => Activity.Title
-    };
     private string Icon => Activity.Type switch
     {
         WorkTaskActivityType.TaskFailed => "warning",

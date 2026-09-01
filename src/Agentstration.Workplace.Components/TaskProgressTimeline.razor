@@ -8,7 +8,7 @@ else
         @foreach (var activity in TimelineActivities)
         {
             var state = State(activity);
-            <li class="progress-step @state" aria-current="@(state == "current" ? "step" : null)"><span class="progress-marker">@if (state == "completed") { <UiIcon Name="check" /> }</span><div><strong>@ActivityTitle(activity)</strong>@if (!string.IsNullOrWhiteSpace(activity.Description)){<p>@activity.Description</p>}<time datetime="@activity.CreatedAt.ToString("O")">@activity.CreatedAt.ToLocalTime().ToString("HH:mm")</time></div></li>
+            <li class="progress-step @state" aria-current="@(state == "current" ? "step" : null)"><span class="progress-marker">@if (state == "completed") { <UiIcon Name="check" /> }</span><div><strong>@WorkplaceActivityTitles.Get(Localizer, activity)</strong>@if (!string.IsNullOrWhiteSpace(activity.Description)){<p>@activity.Description</p>}<time datetime="@activity.CreatedAt.ToString("O")">@activity.CreatedAt.ToLocalTime().ToString("HH:mm")</time></div></li>
         }
         @if ((Status is WorkTaskStatus.Running or WorkTaskStatus.Pending) && !TimelineActivities.Any(IsCurrent))
         {
@@ -60,13 +60,6 @@ else
     private string State(WorkTaskActivity activity) => IsCurrent(activity) ? "current"
         : activity.Type is WorkTaskActivityType.TaskFailed or WorkTaskActivityType.TaskCancelled ? "terminal"
         : "completed";
-
-    private string ActivityTitle(WorkTaskActivity activity) => (activity.Type, activity.Title) switch
-    {
-        (WorkTaskActivityType.ProgressStarted, "Preparing a response") => Localizer["PreparingResponse"],
-        (WorkTaskActivityType.ProgressCompleted, "Response prepared") => Localizer["ResponsePrepared"],
-        _ => activity.Title
-    };
 
     private static string ProgressKey(WorkTaskActivity activity) => string.Concat(
         activity.FlowRunId,

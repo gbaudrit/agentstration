@@ -198,14 +198,14 @@ public sealed class WorkplaceUxTests
             .Add(value => value.Messages, [answer])
             .Add(value => value.Activities, [started, completed])
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
-        Assert.IsFalse(compact.Markup.Contains("Task completed", StringComparison.Ordinal));
+        Assert.IsFalse(compact.Markup.Contains(Localizer(context)["ActivityTaskCompleted"], StringComparison.Ordinal));
 
         var detailed = context.Render<InteractionView>(parameters => parameters
             .Add(value => value.Presentation, new EntryPresentation { Progress = new(EntryProgressVisibility.Detailed) })
             .Add(value => value.Messages, [answer])
             .Add(value => value.Activities, [started, completed])
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
-        Assert.IsTrue(detailed.Markup.Contains("Task completed", StringComparison.Ordinal));
+        Assert.IsTrue(detailed.Markup.Contains(Localizer(context)["ActivityTaskCompleted"], StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -411,22 +411,46 @@ public sealed class WorkplaceUxTests
             StringAssert.Contains(notifications.Markup, "Marquer comme lu");
             Assert.IsFalse(notifications.Markup.Contains("Task completed", StringComparison.Ordinal));
 
-            var preparing = new WorkTaskActivity(
-                WorkTaskActivityId.New(),
-                workspaceId,
-                taskId,
-                WorkTaskActivityType.ProgressStarted,
-                "Preparing a response",
-                null,
-                now,
-                WorkActorKind.Agentstration);
-            var activity = context.Render<TaskActivityView>(parameters => parameters.Add(value => value.Activity, preparing));
+            var systemActivities = new (WorkTaskActivityType Type, string Source, string Translation)[]
+            {
+                (WorkTaskActivityType.TaskCreated, "Task created", "Tâche créée"),
+                (WorkTaskActivityType.TaskStarted, "Work started", "Travail démarré"),
+                (WorkTaskActivityType.ProgressStarted, "Preparing a response", "Préparation d’une réponse"),
+                (WorkTaskActivityType.ProgressCompleted, "Response prepared", "Réponse préparée"),
+                (WorkTaskActivityType.TaskPaused, "Task paused", "Tâche mise en pause"),
+                (WorkTaskActivityType.TaskResumed, "Task resumed", "Tâche reprise"),
+                (WorkTaskActivityType.TaskCancelled, "Task cancelled", "Tâche annulée"),
+                (WorkTaskActivityType.ActionRequired, "Action required", "Action requise"),
+                (WorkTaskActivityType.TaskCompleted, "Task completed", "Tâche terminée"),
+                (WorkTaskActivityType.TaskCompleted, "New version generated", "Nouvelle version générée"),
+                (WorkTaskActivityType.TaskFailed, "Task failed", "Échec de la tâche")
+            };
+            foreach (var systemActivity in systemActivities)
+            {
+                var value = new WorkTaskActivity(
+                    WorkTaskActivityId.New(),
+                    workspaceId,
+                    taskId,
+                    systemActivity.Type,
+                    systemActivity.Source,
+                    null,
+                    now,
+                    WorkActorKind.Agentstration);
+                var renderedActivity = context.Render<TaskActivityView>(parameters => parameters.Add(item => item.Activity, value));
+                StringAssert.Contains(renderedActivity.Markup, systemActivity.Translation);
+                Assert.IsFalse(renderedActivity.Markup.Contains(systemActivity.Source, StringComparison.Ordinal));
+            }
+
+            var customActivity = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.TaskStarted, "Analyzing your request", null, now, WorkActorKind.Agentstration);
+            var custom = context.Render<TaskActivityView>(parameters => parameters.Add(value => value.Activity, customActivity));
+            StringAssert.Contains(custom.Markup, "Analyzing your request");
+
+            var workStarted = new WorkTaskActivity(WorkTaskActivityId.New(), workspaceId, taskId, WorkTaskActivityType.TaskStarted, "Work started", null, now, WorkActorKind.Agentstration);
             var progress = context.Render<TaskProgressTimeline>(parameters => parameters
-                .Add(value => value.Activities, [preparing])
+                .Add(value => value.Activities, [workStarted])
                 .Add(value => value.Status, WorkTaskStatus.Running));
-            StringAssert.Contains(activity.Markup, "Préparation d’une réponse");
-            StringAssert.Contains(progress.Markup, "Préparation d’une réponse");
-            Assert.IsFalse(activity.Markup.Contains("Preparing a response", StringComparison.Ordinal));
+            StringAssert.Contains(progress.Markup, "Travail démarré");
+            Assert.IsFalse(progress.Markup.Contains("Work started", StringComparison.Ordinal));
         }
         finally
         {
