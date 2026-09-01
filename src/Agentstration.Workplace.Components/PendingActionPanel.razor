@@ -3,7 +3,7 @@
     {
         <span class="pending-author-avatar" aria-hidden="true"><UiIcon Name="sparkle" /></span>
         <div class="pending-prompt">
-            <div><strong>Agentstration</strong><span>Response needed</span></div>
+            <div><strong>Agentstration</strong><span>@Localizer["ResponseNeeded"]</span></div>
             <p>@Title</p>
         </div>
     }
@@ -11,10 +11,10 @@
     {
         <div class="panel-header">
             <div>
-                <p class="eyebrow">Action required</p>
+                <p class="eyebrow">@Localizer["ActionRequired"]</p>
                 <h2>@Title</h2>
             </div>
-            <StatusBadge Text="Required" Status="Agentstration.Web.Components.Models.UiStatus.Warning" />
+            <StatusBadge Text="@Localizer["Required"]" Status="Agentstration.Web.Components.Models.UiStatus.Warning" />
         </div>
     }
     @if (Description is not null)
@@ -34,15 +34,15 @@
     else if (Action is RequestConfirmationAction confirmation)
     {
         <div class="confirmation-actions">
-            <button class="button-secondary" disabled="@(Busy || submitting)" @onclick="() => SubmitConfirmation(confirmation, false)">Cancel</button>
-            <button class="button-primary" disabled="@(Busy || submitting)" @onclick="() => SubmitConfirmation(confirmation, true)">Confirm</button>
+            <button class="button-secondary" disabled="@(Busy || submitting)" @onclick="() => SubmitConfirmation(confirmation, false)">@Localizer["Cancel"]</button>
+            <button class="button-primary" disabled="@(Busy || submitting)" @onclick="() => SubmitConfirmation(confirmation, true)">@Localizer["Confirm"]</button>
         </div>
     }
     else if (Action is RequestInputAction input)
     {
         <div class="input-response">
-            <textarea @bind="text" placeholder="Your response" aria-label="Your response" disabled="@(Busy || submitting)"></textarea>
-            <button class="button-primary action-button" disabled="@(string.IsNullOrWhiteSpace(text) || Busy || submitting)" @onclick="() => SubmitInput(input)">@(submitting ? "Continuing…" : "Continue")</button>
+            <textarea @bind="text" placeholder="@Localizer["YourResponse"]" aria-label="@Localizer["YourResponse"]" disabled="@(Busy || submitting)"></textarea>
+            <button class="button-primary action-button" disabled="@(string.IsNullOrWhiteSpace(text) || Busy || submitting)" @onclick="() => SubmitInput(input)">@(submitting ? Localizer["Continuing"] : Localizer["Continue"])</button>
         </div>
     }
 </section>
@@ -71,7 +71,7 @@
         ShowResultAction value => value.Title,
         ShowErrorAction value => value.Title,
         CreateTaskAction value => value.Title,
-        _ => "Continue"
+        _ => Localizer["Continue"]
     };
     private string? Description => Action switch
     {

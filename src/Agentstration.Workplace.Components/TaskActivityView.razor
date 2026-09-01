@@ -10,15 +10,24 @@
 @code {
     [Parameter, EditorRequired] public required WorkTaskActivity Activity { get; set; }
     [Parameter] public EntryParticipantVisibility ParticipantVisibility { get; set; } = EntryParticipantVisibility.Hidden;
-    private string Title => ParticipantVisibility == EntryParticipantVisibility.Visible
-        && Activity.Metadata?.GetValueOrDefault("participantId") is { Length: > 0 } participant
-            ? Activity.Type switch
+    private string Title
+    {
+        get
+        {
+            if (ParticipantVisibility == EntryParticipantVisibility.Visible
+                && Activity.Metadata?.GetValueOrDefault("participantId") is { Length: > 0 } participant)
             {
-                WorkTaskActivityType.ProgressStarted => $"{Humanize(participant)} is preparing a response",
-                WorkTaskActivityType.ProgressCompleted => $"{Humanize(participant)} responded",
-                _ => Activity.Title
+                return Activity.Type switch
+                {
+                    WorkTaskActivityType.ProgressStarted => Localizer["ParticipantPreparing", Humanize(participant)],
+                    WorkTaskActivityType.ProgressCompleted => Localizer["ParticipantResponded", Humanize(participant)],
+                    _ => WorkplaceActivityTitles.Get(Localizer, Activity)
+                };
             }
-            : Activity.Title;
+
+            return WorkplaceActivityTitles.Get(Localizer, Activity);
+        }
+    }
     private string Icon => Activity.Type switch
     {
         WorkTaskActivityType.TaskFailed => "warning",

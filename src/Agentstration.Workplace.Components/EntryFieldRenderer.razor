@@ -1,12 +1,12 @@
 <label class="entry-field">
-    <span>@(Definition.Label ?? Definition.Name)@if (Definition.Required) { <em>Required</em> }</span>
+    <span>@(Definition.Label ?? Definition.Name)@if (Definition.Required) { <em>@Localizer["Required"]</em> }</span>
     @if (Definition.Type is EntryFieldType.Textarea or EntryFieldType.Prompt)
     {
         <textarea value="@StringValue" @oninput="ChangeString" placeholder="@Definition.Placeholder" disabled="@Disabled"></textarea>
     }
     else if (Definition.Type == EntryFieldType.Choice)
     {
-        <select value="@StringValue" @onchange="ChangeString" disabled="@Disabled"><option value="">Select…</option>@foreach (var option in Definition.Options) { <option value="@option.Value">@option.Label</option> }</select>
+        <select value="@StringValue" @onchange="ChangeString" disabled="@Disabled"><option value="">@Localizer["SelectOption"]</option>@foreach (var option in Definition.Options) { <option value="@option.Value">@option.Label</option> }</select>
     }
     else if (Definition.Type == EntryFieldType.Boolean)
     {

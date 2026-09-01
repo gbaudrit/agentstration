@@ -6,7 +6,7 @@
             <EntryFieldRenderer Definition="field" Value="GetValue(field)" ValueChanged="value => values[field.Name] = value" Disabled="@(Disabled || Busy || submitting)" />
         }
     </div>
-    <button class="entry-submit" type="submit" disabled="@(Disabled || Busy || submitting)"><UiIcon Name="send" /> @(Busy || submitting ? "Sending…" : "Continue")</button>
+    <button class="entry-submit" type="submit" disabled="@(Disabled || Busy || submitting)"><UiIcon Name="send" /> @(Busy || submitting ? Localizer["Sending"] : Localizer["Continue"])</button>
     @if (error is not null) { <p class="entry-error" role="alert">@error</p> }
 </form>
 
@@ -23,7 +23,7 @@
     {
         if (Disabled || Busy || submitting) return;
         var missing = Definition.Presentation.Fields.FirstOrDefault(field => field.Required && (!values.TryGetValue(field.Name, out var value) || value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null || value.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(value.GetString())));
-        if (missing is not null) { error = $"{missing.Label ?? missing.Name} is required."; return; }
+        if (missing is not null) { error = Localizer["FieldRequired", missing.Label ?? missing.Name]; return; }
         error = null;
         submitting = true;
         try { await OnSubmit.InvokeAsync(values); }

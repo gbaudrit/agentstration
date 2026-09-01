@@ -1,12 +1,12 @@
 <article class="artifact-card">
     <span class="artifact-icon"><UiIcon Name="document" /></span>
-    <div><strong>@Artifact.Name</strong><small>Version @Artifact.Sequence · @Artifact.CreatedAt.LocalDateTime.ToString("g") · @FormatType(Artifact.ContentType) · @FormatSize(Artifact.Length)</small></div>
-    <a class="artifact-download" href="@ContentUrl" download aria-label="Download @Artifact.Name"><UiIcon Name="download" /><span>Download</span></a>
+    <div><strong>@Artifact.Name</strong><small>@Localizer["Version", Artifact.Sequence] · @Artifact.CreatedAt.LocalDateTime.ToString("g") · @FormatType(Artifact.ContentType) · @FormatSize(Artifact.Length)</small></div>
+    <a class="artifact-download" href="@ContentUrl" download aria-label="@Localizer["DownloadArtifact", Artifact.Name]"><UiIcon Name="download" /><span>@Localizer["Download"]</span></a>
 </article>
 
 @code {
     [Parameter, EditorRequired] public required WorkTaskArtifact Artifact { get; set; }
     [Parameter, EditorRequired] public required string ContentUrl { get; set; }
-    private static string FormatType(string value) => value switch { "text/markdown" => "Markdown", "application/pdf" => "PDF", "text/plain" => "Text", _ => value };
+    private string FormatType(string value) => value switch { "text/markdown" => "Markdown", "application/pdf" => "PDF", "text/plain" => Localizer["Text"], _ => value };
     private static string FormatSize(long bytes) => bytes < 1024 ? $"{bytes} B" : bytes < 1024 * 1024 ? $"{bytes / 1024d:0.#} KB" : $"{bytes / 1024d / 1024d:0.#} MB";
 }

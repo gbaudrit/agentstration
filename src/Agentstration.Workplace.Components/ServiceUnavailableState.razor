@@ -6,7 +6,6 @@
     </form>
 </section>
 @code {
-    [Inject] private Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceLayoutStrings> Localizer { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
     [Parameter] public string? Message { get; set; }
     private string EffectiveMessage => Message ?? T("WorkApiCheck");

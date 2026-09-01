@@ -11,7 +11,7 @@
 @code {
     [Parameter, EditorRequired] public required ConversationMessage Message { get; set; }
     private string RoleClass => Message.Role == ConversationRole.User ? "message-user" : Message.Role == ConversationRole.System ? "message-system" : "message-assistant";
-    private string RoleLabel => Message.Role == ConversationRole.User ? "You" : Message.Role == ConversationRole.System ? "Update" : ParticipantLabel ?? "Agentstration";
+    private string RoleLabel => Message.Role == ConversationRole.User ? Localizer["You"] : Message.Role == ConversationRole.System ? Localizer["Update"] : ParticipantLabel ?? "Agentstration";
     private bool ShowRoleLabel => Message.Role == ConversationRole.System || ParticipantLabel is not null;
     private string? ParticipantLabel => Message.Metadata?.GetValueOrDefault("participantId") is { Length: > 0 } participant ? Humanize(participant) : null;
     private static string Humanize(string value) => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('-', ' ').Replace('_', ' '));
