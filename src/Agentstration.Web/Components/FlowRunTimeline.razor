@@ -205,6 +205,7 @@
         {
             if (runEvent.Type == FlowRunEventType.ParticipantTurnStarted && runEvent.StepId is not null)
             {
+                if (activeTurns.Remove(runEvent.StepId, out var staleTurn)) CloseTurn(activity, staleTurn, runEvent.Sequence);
                 if (inferHandoffs
                     && lastParticipant is not null
                     && !string.Equals(lastParticipant, runEvent.StepId, StringComparison.Ordinal))
@@ -238,25 +239,33 @@
                 completedTurn.Complete(runEvent.Sequence);
                 continue;
             }
+            if (runEvent.Type == FlowRunEventType.ParticipantHandoff)
+            {
+                var sourceParticipant = PayloadString(runEvent.Payload, "from") ?? runEvent.StepId;
+                if (sourceParticipant is not null && activeTurns.Remove(sourceParticipant, out var handedOffTurn))
+                    CloseTurn(activity, handedOffTurn, runEvent.Sequence);
+            }
             if (runEvent.Type == FlowRunEventType.StepRunCompleted
                 && runEvent.StepId is not null
                 && activeTurns.Remove(runEvent.StepId, out var finalTurn))
             {
-                if (finalTurn.DeltaCount == 0) activity.Remove(finalTurn);
-                else finalTurn.Complete(runEvent.Sequence);
+                CloseTurn(activity, finalTurn, runEvent.Sequence);
             }
             if (runEvent.Type == FlowRunEventType.FlowRunCompleted && activeTurns.Count > 0)
             {
                 foreach (var activeTurn in activeTurns.Values)
-                {
-                    if (activeTurn.DeltaCount == 0) activity.Remove(activeTurn);
-                    else activeTurn.Complete(runEvent.Sequence);
-                }
+                    CloseTurn(activity, activeTurn, runEvent.Sequence);
                 activeTurns.Clear();
             }
             activity.Add(TimelineItem.Event(runEvent, runEvent.Type == FlowRunEventType.ParticipantHandoff ? string.Empty : Payload(runEvent.Payload)));
         }
         return activity;
+    }
+
+    private static void CloseTurn(List<TimelineItem> activity, TimelineItem turn, long sequence)
+    {
+        if (turn.DeltaCount == 0) activity.Remove(turn);
+        else turn.Complete(sequence);
     }
 
     private string Title(TimelineItem item)

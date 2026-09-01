@@ -114,8 +114,7 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine
                             var previousTurn = previousState.CompleteActive();
                             if (!string.IsNullOrEmpty(previousTurn.Delta))
                                 yield return new FlowParticipantDelta(previousState.Participant.Id, previousTurn.Delta);
-                            if (previousTurn.Include)
-                                yield return new FlowParticipantTurnCompleted(previousState.Participant.Id, previousTurn.Turn.Turn);
+                            yield return new FlowParticipantTurnCompleted(previousState.Participant.Id, previousTurn.Turn.Turn);
                         }
                     }
                     var state = states[actor.Id];
@@ -151,8 +150,7 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine
                         var completed = state.CompleteActive();
                         if (!string.IsNullOrEmpty(completed.Delta))
                             yield return new FlowParticipantDelta(actor.Id, completed.Delta);
-                        if (completed.Include)
-                            yield return new FlowParticipantTurnCompleted(actor.Id, completed.Turn.Turn);
+                        yield return new FlowParticipantTurnCompleted(actor.Id, completed.Turn.Turn);
                     }
                     break;
 
@@ -166,8 +164,7 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine
                             var previousTurn = previousState.CompleteActive();
                             if (!string.IsNullOrEmpty(previousTurn.Delta))
                                 yield return new FlowParticipantDelta(previousState.Participant.Id, previousTurn.Delta);
-                            if (previousTurn.Include)
-                                yield return new FlowParticipantTurnCompleted(previousState.Participant.Id, previousTurn.Turn.Turn);
+                            yield return new FlowParticipantTurnCompleted(previousState.Participant.Id, previousTurn.Turn.Turn);
                         }
                     }
                     state = states[actor.Id];
@@ -202,8 +199,7 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine
                     var responseTurn = state.CompleteActive();
                     if (!string.IsNullOrEmpty(responseTurn.Delta))
                         yield return new FlowParticipantDelta(actor.Id, responseTurn.Delta);
-                    if (responseTurn.Include)
-                        yield return new FlowParticipantTurnCompleted(actor.Id, responseTurn.Turn.Turn);
+                    yield return new FlowParticipantTurnCompleted(actor.Id, responseTurn.Turn.Turn);
                     break;
 
                 case WorkflowOutputEvent completed when !completed.IsIntermediate() && completed.Is<List<ChatMessage>>():
@@ -220,8 +216,7 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine
             var completed = state.CompleteActive();
             if (!string.IsNullOrEmpty(completed.Delta))
                 yield return new FlowParticipantDelta(state.Participant.Id, completed.Delta);
-            if (completed.Include)
-                yield return new FlowParticipantTurnCompleted(state.Participant.Id, completed.Turn.Turn);
+            yield return new FlowParticipantTurnCompleted(state.Participant.Id, completed.Turn.Turn);
         }
 
         var participantResults = request.Definition.Participants

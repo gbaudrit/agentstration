@@ -112,7 +112,7 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine(
                 && Turns.LastOrDefault()?.Content.Length == 0;
             var include = !duplicateEmptyTurn && !completed.IsTerminationMarkerOnly;
             if (include) Turns.Add(completed);
-            return new(completed, delta, include);
+            return new(completed, delta);
         }
 
         public FlowParticipantResult ToResult()
@@ -138,7 +138,7 @@ public sealed partial class AgentFrameworkFlowOrchestrationEngine(
         private static int ToInt32(long value) => value > int.MaxValue ? int.MaxValue : checked((int)value);
     }
 
-    private sealed record CompletedTurn(MutableTurn Turn, string Delta, bool Include);
+    private sealed record CompletedTurn(MutableTurn Turn, string Delta);
 
     private sealed class MutableTurn(int turn, string responseId, string? terminationPhrase)
     {
