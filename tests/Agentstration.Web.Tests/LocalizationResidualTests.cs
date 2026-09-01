@@ -51,6 +51,9 @@ public sealed class LocalizationResidualTests
             Assert.AreEqual("Intervention requise", L<HomeStrings>(services)["Status.Attention required"].Value);
             Assert.AreEqual("Administrateur de la plateforme", L<OrganizationStrings>(services)["PlatformAdministrator"].Value);
             Assert.AreEqual("UID", L<TriggerStrings>(services)["Uid"].Value);
+            Assert.AreEqual("Profils de bootstrap", L<BootstrapProfilesStrings>(services)["Title"].Value);
+            Assert.AreEqual("Sélectionner une ressource compatible", L<BootstrapProfilesStrings>(services)["SelectCompatibleResource"].Value);
+            Assert.AreEqual("Profil de modèle", L<BootstrapProfilesStrings>(services)["BindingTargetKind.ModelProfile"].Value);
         }
         finally { CultureInfo.CurrentCulture = originalCulture; CultureInfo.CurrentUICulture = originalUiCulture; }
     }

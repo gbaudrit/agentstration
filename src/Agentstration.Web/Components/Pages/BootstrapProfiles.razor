@@ -2,44 +2,45 @@
 @implements IDisposable
 @inject BootstrapProfileManagementService Service
 @inject ICurrentRequestContext RequestContext
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
 
-<PageTitle>Bootstrap profiles · Agentstration</PageTitle>
-<PageHeader Title="Bootstrap profiles" Description="Preview and apply create-only configuration profiles. Existing resources are never overwritten.">
-    <Actions><button class="button-secondary" disabled="@busy" @onclick="LoadAsync">Refresh catalog</button></Actions>
+<PageTitle>@T("PageTitle")</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")">
+    <Actions><button class="button-secondary" disabled="@busy" @onclick="LoadAsync">@T("RefreshCatalog")</button></Actions>
 </PageHeader>
 
 @if (denied)
 {
-    <ErrorState Title="Platform administrator required" Message="Only Platform administrators can inspect or apply bootstrap profiles." />
+    <ErrorState Title="@T("PlatformAdministratorRequired")" Message="@T("PlatformAdministratorRequiredMessage")" />
 }
 else if (error is not null)
 {
-    <ErrorState Message="@error"><button class="button-secondary" @onclick="LoadAsync">Retry</button></ErrorState>
+    <ErrorState Message="@error"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
 }
 else if (view is null)
 {
-    <LoadingState Message="Loading bootstrap catalog…" />
+    <LoadingState Message="@T("LoadingCatalog")" />
 }
 else
 {
-    <section class="metric-grid bootstrap-metrics" aria-label="Bootstrap catalog status">
-        <MetricCard Label="Profiles" Value="@view.Catalog.Profiles.Count.ToString()" Detail="Catalog directories" Status="UiStatus.Info" />
-        <MetricCard Label="Initial bootstrap" Value="@(view.Catalog.InitialBootstrapEnabled ? "Enabled" : "Disabled")" Detail="Startup application only" Status="@(view.Catalog.InitialBootstrapEnabled ? UiStatus.Success : UiStatus.Neutral)" />
-        <MetricCard Label="Initial profiles" Value="@view.Catalog.InitialProfiles.Count.ToString()" Detail="@InitialProfilesLabel" Status="UiStatus.Info" />
-        <MetricCard Label="Applications" Value="@view.Applications.Count.ToString()" Detail="Latest retained runs" Status="@(view.Applications.Any(item => item.Definition.Status is BootstrapApplicationStatus.Failed or BootstrapApplicationStatus.PartiallyApplied or BootstrapApplicationStatus.Interrupted) ? UiStatus.Warning : UiStatus.Success)" />
+    <section class="metric-grid bootstrap-metrics" aria-label="@T("CatalogStatus")">
+        <MetricCard Label="@T("Profiles")" Value="@view.Catalog.Profiles.Count.ToString()" Detail="@T("CatalogDirectories")" Status="UiStatus.Info" />
+        <MetricCard Label="@T("InitialBootstrap")" Value="@(view.Catalog.InitialBootstrapEnabled ? T("Enabled") : T("Disabled"))" Detail="@T("StartupApplicationOnly")" Status="@(view.Catalog.InitialBootstrapEnabled ? UiStatus.Success : UiStatus.Neutral)" />
+        <MetricCard Label="@T("InitialProfiles")" Value="@view.Catalog.InitialProfiles.Count.ToString()" Detail="@InitialProfilesLabel" Status="UiStatus.Info" />
+        <MetricCard Label="@T("Applications")" Value="@view.Applications.Count.ToString()" Detail="@T("LatestRetainedRuns")" Status="@(view.Applications.Any(item => item.Definition.Status is BootstrapApplicationStatus.Failed or BootstrapApplicationStatus.PartiallyApplied or BootstrapApplicationStatus.Interrupted) ? UiStatus.Warning : UiStatus.Success)" />
     </section>
 
     <section class="panel bootstrap-config">
-        <div class="panel-header"><div><p class="eyebrow">Server catalog</p><h2>Configuration</h2></div></div>
-        <dl class="resource-details"><dt>Path</dt><dd><code>@(view.Catalog.Path ?? "Not configured")</code></dd><dt>Startup</dt><dd>@(view.Catalog.InitialBootstrapEnabled ? "Enabled" : "Disabled")</dd><dt>Initial order</dt><dd>@InitialProfilesLabel</dd></dl>
+        <div class="panel-header"><div><p class="eyebrow">@T("ServerCatalog")</p><h2>@T("Configuration")</h2></div></div>
+        <dl class="resource-details"><dt>@T("Path")</dt><dd><code>@(view.Catalog.Path ?? T("NotConfigured"))</code></dd><dt>@T("Startup")</dt><dd>@(view.Catalog.InitialBootstrapEnabled ? T("Enabled") : T("Disabled"))</dd><dt>@T("InitialOrder")</dt><dd>@InitialProfilesLabel</dd></dl>
         @if (view.Catalog.Error is not null) { <p class="error-panel">@view.Catalog.Error</p> }
     </section>
 
     <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">Step 1</p><h2>Select profiles</h2><p class="muted">Profiles in one application must share the same scope. Selection order controls execution order.</p></div></div>
+        <div class="panel-header"><div><p class="eyebrow">@T("Step", 1)</p><h2>@T("SelectProfiles")</h2><p class="muted">@T("SelectProfilesDescription")</p></div></div>
         @if (view.Catalog.Profiles.Count == 0)
         {
-            <EmptyState Title="No bootstrap profile" Message="Add a profile directory beneath the configured catalog path, then refresh." />
+            <EmptyState Title="@T("NoBootstrapProfile")" Message="@T("NoBootstrapProfileMessage")" />
         }
         else
         {
@@ -48,7 +49,7 @@ else
                 {
                     <label class="bootstrap-profile-card @(selectedProfiles.Contains(profile.Name) ? "selected" : null) @(profile.Valid ? null : "invalid")">
                         <input type="checkbox" checked="@selectedProfiles.Contains(profile.Name)" disabled="@(!CanSelect(profile))" @onchange="args => ToggleProfile(profile, args)" />
-                        <span><strong>@profile.DisplayName</strong><small><code>@profile.Name</code> · @profile.Scope · @profile.ResourceCount resource(s)</small>@if (profile.Description is not null) { <span>@profile.Description</span> }@if (!profile.Valid) { <span class="inline-warning">@profile.Error</span> }</span>
+                        <span><strong>@profile.DisplayName</strong><small><code>@profile.Name</code> · @ScopeLabel(profile.Scope) · @T("ResourceCount", profile.ResourceCount)</small>@if (profile.Description is not null) { <span>@profile.Description</span> }@if (!profile.Valid) { <span class="inline-warning">@profile.Error</span> }</span>
                     </label>
                 }
             </div>
@@ -59,7 +60,7 @@ else
                 @for (var index = 0; index < selectedProfiles.Count; index++)
                 {
                     var selectedIndex = index;
-                    <li><code>@selectedProfiles[index]</code><span><button class="text-button" disabled="@(index == 0)" @onclick="() => Move(selectedIndex, -1)">Up</button><button class="text-button" disabled="@(index == selectedProfiles.Count - 1)" @onclick="() => Move(selectedIndex, 1)">Down</button></span></li>
+                    <li><code>@selectedProfiles[index]</code><span><button class="text-button" disabled="@(index == 0)" @onclick="() => Move(selectedIndex, -1)">@T("Up")</button><button class="text-button" disabled="@(index == selectedProfiles.Count - 1)" @onclick="() => Move(selectedIndex, 1)">@T("Down")</button></span></li>
                 }
             </ol>
         }
@@ -68,14 +69,14 @@ else
     @if (SelectedScope is BootstrapProfileScope.Tenant or BootstrapProfileScope.Workspace)
     {
         <section class="panel">
-            <div class="panel-header"><div><p class="eyebrow">Step 2</p><h2>Choose target</h2></div></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("Step", 2)</p><h2>@T("ChooseTarget")</h2></div></div>
             @if (SelectedScope == BootstrapProfileScope.Tenant)
             {
-                <label class="bootstrap-target"><span>Tenant</span><select value="@selectedTenantId" @onchange="SelectTenant"><option value="">Select a Tenant</option>@foreach (var tenant in view.Tenants) { <option value="@tenant.Id">@tenant.DisplayName — @tenant.Name</option> }</select></label>
+                <label class="bootstrap-target"><span>@T("Tenant")</span><select value="@selectedTenantId" @onchange="SelectTenant"><option value="">@T("SelectTenant")</option>@foreach (var tenant in view.Tenants) { <option value="@tenant.Id">@tenant.DisplayName — @tenant.Name</option> }</select></label>
             }
             else
             {
-                <label class="bootstrap-target"><span>Workspace</span><select value="@selectedWorkspaceId" @onchange="SelectWorkspace"><option value="">Select a Workspace</option>@foreach (var workspace in view.Workspaces) { <option value="@workspace.WorkspaceId">@workspace.TenantDisplayName / @workspace.WorkspaceDisplayName — @workspace.TenantName/@workspace.WorkspaceName</option> }</select></label>
+                <label class="bootstrap-target"><span>@T("Workspace")</span><select value="@selectedWorkspaceId" @onchange="SelectWorkspace"><option value="">@T("SelectWorkspace")</option>@foreach (var workspace in view.Workspaces) { <option value="@workspace.WorkspaceId">@workspace.TenantDisplayName / @workspace.WorkspaceDisplayName — @workspace.TenantName/@workspace.WorkspaceName</option> }</select></label>
             }
         </section>
     }
@@ -83,7 +84,7 @@ else
     @if (SelectedBindings.Count > 0)
     {
         <section class="panel">
-            <div class="panel-header"><div><p class="eyebrow">Step 3</p><h2>Resolve bindings</h2><p class="muted">Bindings select concrete resources in the target Workspace without changing the reusable profile manifests.</p></div></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("Step", 3)</p><h2>@T("ResolveBindings")</h2><p class="muted">@T("ResolveBindingsDescription")</p></div></div>
             <div class="bootstrap-binding-grid">
                 @foreach (var item in SelectedBindings)
                 {
@@ -92,10 +93,10 @@ else
                     var options = bindingOptions.GetValueOrDefault(item.Binding.TargetKind) ?? [];
                     <fieldset class="bootstrap-binding">
                         <legend>@item.Binding.DisplayName</legend>
-                        <p><code>@item.Profile/@item.Binding.Name</code> · @item.Binding.TargetKind@if (item.Binding.Required) { <span> · required</span> }</p>
+                        <p><code>@item.Profile/@item.Binding.Name</code> · @BindingTargetKindLabel(item.Binding.TargetKind)@if (item.Binding.Required) { <span> · @T("Required")</span> }</p>
                         @if (item.Binding.Description is not null) { <p class="muted">@item.Binding.Description</p> }
-                        <label><span>Resource</span><select value="@BindingTargetValue(input)" disabled="@(selectedWorkspaceId is null || busy)" @onchange="args => UpdateBindingTarget(key, args)"><option value="">Select a compatible resource</option>@foreach (var option in options) { <option value="@BindingTargetValue(option)">@option.DisplayName — @option.Namespace/@option.Name@(option.Planned ? " (planned)" : null)</option> }</select></label>
-                        @if (selectedWorkspaceId is not null && options.Count == 0) { <p class="inline-warning">No compatible @item.Binding.TargetKind resource exists or is planned in this composition.</p> }
+                        <label><span>@T("Resource")</span><select value="@BindingTargetValue(input)" disabled="@(selectedWorkspaceId is null || busy)" @onchange="args => UpdateBindingTarget(key, args)"><option value="">@T("SelectCompatibleResource")</option>@foreach (var option in options) { <option value="@BindingTargetValue(option)">@option.DisplayName — @option.Namespace/@option.Name@(option.Planned ? $" ({T("Planned")})" : null)</option> }</select></label>
+                        @if (selectedWorkspaceId is not null && options.Count == 0) { <p class="inline-warning">@T("NoCompatibleResource", BindingTargetKindLabel(item.Binding.TargetKind))</p> }
                     </fieldset>
                 }
             </div>
@@ -103,34 +104,34 @@ else
     }
 
     <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">Step @PreviewStep</p><h2>Preview</h2><p class="muted">Validation is side-effect free. Pack contents appear as Pack-managed details.</p></div><button class="button-primary" disabled="@(!CanPreview || busy)" @onclick="PreviewAsync">@(previewing ? "Previewing…" : "Preview application")</button></div>
+        <div class="panel-header"><div><p class="eyebrow">@T("Step", PreviewStep)</p><h2>@T("Preview")</h2><p class="muted">@T("PreviewDescription")</p></div><button class="button-primary" disabled="@(!CanPreview || busy)" @onclick="PreviewAsync">@(previewing ? T("Previewing") : T("PreviewApplication"))</button></div>
         @if (preview is not null)
         {
-            <div class="bootstrap-preview-summary"><StatusBadge Text="@(preview.CanApply ? "Ready" : "Invalid")" Status="@(preview.CanApply ? UiStatus.Success : UiStatus.Danger)" /><span><code>@preview.Digest[..12]</code></span><span>@preview.Resources.Count resource(s)</span></div>
+            <div class="bootstrap-preview-summary"><StatusBadge Text="@(preview.CanApply ? T("Ready") : T("Invalid"))" Status="@(preview.CanApply ? UiStatus.Success : UiStatus.Danger)" /><span><code>@preview.Digest[..12]</code></span><span>@T("ResourceCount", preview.Resources.Count)</span></div>
             <DataGrid TItem="BootstrapResourcePreview" Items="preview.Resources">
-                <Header><tr><th>Profile</th><th>Resource</th><th>Expected action</th><th>Details</th></tr></Header>
-                <Row Context="item"><tr><td><code>@item.Profile</code></td><td><strong>@item.Kind/@item.Name</strong><br /><small>@item.Location</small></td><td><StatusBadge Text="@item.Disposition.ToString()" Status="@DispositionTone(item.Disposition)" /></td><td>@if (item.Message is not null) { <span class="inline-warning">@item.Message</span> }@if (item.Details is { Count: > 0 }) { <ul class="bootstrap-detail-list">@foreach (var detail in item.Details) { <li><span>@detail.Kind/@detail.Name</span><StatusBadge Text="@detail.Disposition.ToString()" Status="@DispositionTone(detail.Disposition)" /><small>@detail.Description</small></li> }</ul> }</td></tr></Row>
+                <Header><tr><th>@T("Profile")</th><th>@T("Resource")</th><th>@T("ExpectedAction")</th><th>@T("Details")</th></tr></Header>
+                <Row Context="item"><tr><td><code>@item.Profile</code></td><td><strong>@item.Kind/@item.Name</strong><br /><small>@item.Location</small></td><td><StatusBadge Text="@DispositionLabel(item.Disposition)" Status="@DispositionTone(item.Disposition)" /></td><td>@if (item.Message is not null) { <span class="inline-warning">@item.Message</span> }@if (item.Details is { Count: > 0 }) { <ul class="bootstrap-detail-list">@foreach (var detail in item.Details) { <li><span>@detail.Kind/@detail.Name</span><StatusBadge Text="@DispositionLabel(detail.Disposition)" Status="@DispositionTone(detail.Disposition)" /><small>@detail.Description</small></li> }</ul> }</td></tr></Row>
             </DataGrid>
-            <div class="bootstrap-apply"><p>Application is progressive and retry-safe. A technical failure can leave already-created resources in place.</p><button class="button-primary" disabled="@(!preview.CanApply || busy)" @onclick="() => confirmApply = true">Apply preview</button></div>
+            <div class="bootstrap-apply"><p>@T("ApplyDescription")</p><button class="button-primary" disabled="@(!preview.CanApply || busy)" @onclick="() => confirmApply = true">@T("ApplyPreview")</button></div>
         }
     </section>
 
     @if (lastApplication is not null)
     {
         <section class="panel">
-            <div class="panel-header"><div><p class="eyebrow">Latest result</p><h2>@lastApplication.Definition.Status</h2></div><StatusBadge Text="@lastApplication.Definition.Status.ToString()" Status="@ApplicationTone(lastApplication.Definition.Status)" /></div>
-            <div class="bootstrap-preview-summary"><span>@Count(lastApplication, BootstrapResourceDisposition.Create) created</span><span>@Count(lastApplication, BootstrapResourceDisposition.Skip) skipped</span><span>@Count(lastApplication, BootstrapResourceDisposition.Conflict) conflicts</span><span>@Count(lastApplication, BootstrapResourceDisposition.Failed) failed</span></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("LatestResult")</p><h2>@ApplicationStatusLabel(lastApplication.Definition.Status)</h2></div><StatusBadge Text="@ApplicationStatusLabel(lastApplication.Definition.Status)" Status="@ApplicationTone(lastApplication.Definition.Status)" /></div>
+            <div class="bootstrap-preview-summary"><span>@T("CreatedCount", Count(lastApplication, BootstrapResourceDisposition.Create))</span><span>@T("SkippedCount", Count(lastApplication, BootstrapResourceDisposition.Skip))</span><span>@T("ConflictsCount", Count(lastApplication, BootstrapResourceDisposition.Conflict))</span><span>@T("FailedCount", Count(lastApplication, BootstrapResourceDisposition.Failed))</span></div>
         </section>
     }
 
     <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">Audit trail</p><h2>Application history</h2></div></div>
-        @if (view.Applications.Count == 0) { <EmptyState Title="No manual application" Message="Completed profile applications will appear here." /> }
+        <div class="panel-header"><div><p class="eyebrow">@T("AuditTrail")</p><h2>@T("ApplicationHistory")</h2></div></div>
+        @if (view.Applications.Count == 0) { <EmptyState Title="@T("NoManualApplication")" Message="@T("NoManualApplicationMessage")" /> }
         else
         {
             <DataGrid TItem="BootstrapApplicationResource" Items="view.Applications">
-                <Header><tr><th>Started</th><th>Profiles</th><th>Target</th><th>Status</th><th>Results</th><th></th></tr></Header>
-                <Row Context="application"><tr><td>@application.Definition.StartedAt.ToLocalTime().ToString("g")</td><td>@string.Join(" → ", application.Definition.Profiles)</td><td>@TargetLabel(application.Definition.Target)</td><td><StatusBadge Text="@application.Definition.Status.ToString()" Status="@ApplicationTone(application.Definition.Status)" /></td><td>@application.Definition.Resources.Count</td><td><button class="text-button" disabled="@busy" @onclick="() => ShowApplicationAsync(application.Metadata.Name)">View</button></td></tr></Row>
+                <Header><tr><th>@T("Started")</th><th>@T("Profiles")</th><th>@T("Target")</th><th>@T("Status")</th><th>@T("Results")</th><th></th></tr></Header>
+                <Row Context="application"><tr><td>@application.Definition.StartedAt.ToLocalTime().ToString("g")</td><td>@string.Join(" → ", application.Definition.Profiles)</td><td>@TargetLabel(application.Definition.Target)</td><td><StatusBadge Text="@ApplicationStatusLabel(application.Definition.Status)" Status="@ApplicationTone(application.Definition.Status)" /></td><td>@application.Definition.Resources.Count</td><td><button class="text-button" disabled="@busy" @onclick="() => ShowApplicationAsync(application.Metadata.Name)">@T("View")</button></td></tr></Row>
             </DataGrid>
         }
     </section>
@@ -138,27 +139,27 @@ else
     @if (selectedApplication is not null)
     {
         <section class="panel" id="bootstrap-application-detail">
-            <div class="panel-header"><div><p class="eyebrow">Application detail</p><h2>@selectedApplication.Metadata.Name</h2></div><StatusBadge Text="@selectedApplication.Definition.Status.ToString()" Status="@ApplicationTone(selectedApplication.Definition.Status)" /></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("ApplicationDetail")</p><h2>@selectedApplication.Metadata.Name</h2></div><StatusBadge Text="@ApplicationStatusLabel(selectedApplication.Definition.Status)" Status="@ApplicationTone(selectedApplication.Definition.Status)" /></div>
             <dl class="resource-details">
-                <dt>Actor</dt><dd><code>@selectedApplication.Definition.ActorPrincipalId</code></dd>
-                <dt>Source</dt><dd>@selectedApplication.Definition.Source</dd>
-                <dt>Target</dt><dd>@TargetLabel(selectedApplication.Definition.Target)</dd>
-                <dt>Profiles</dt><dd>@string.Join(" → ", selectedApplication.Definition.Profiles)</dd>
-                <dt>Bindings</dt><dd>@(selectedApplication.Definition.Bindings.Count == 0 ? "None" : string.Join(", ", selectedApplication.Definition.Bindings.Select(BindingLabel)))</dd>
-                <dt>Digest</dt><dd><code>@selectedApplication.Definition.Digest</code></dd>
-                <dt>Started</dt><dd>@selectedApplication.Definition.StartedAt.ToLocalTime().ToString("G")</dd>
-                <dt>Completed</dt><dd>@(selectedApplication.Definition.CompletedAt?.ToLocalTime().ToString("G") ?? "Not completed")</dd>
+                <dt>@T("Actor")</dt><dd><code>@selectedApplication.Definition.ActorPrincipalId</code></dd>
+                <dt>@T("Source")</dt><dd>@selectedApplication.Definition.Source</dd>
+                <dt>@T("Target")</dt><dd>@TargetLabel(selectedApplication.Definition.Target)</dd>
+                <dt>@T("Profiles")</dt><dd>@string.Join(" → ", selectedApplication.Definition.Profiles)</dd>
+                <dt>@T("Bindings")</dt><dd>@(selectedApplication.Definition.Bindings.Count == 0 ? T("None") : string.Join(", ", selectedApplication.Definition.Bindings.Select(BindingLabel)))</dd>
+                <dt>@T("Digest")</dt><dd><code>@selectedApplication.Definition.Digest</code></dd>
+                <dt>@T("Started")</dt><dd>@selectedApplication.Definition.StartedAt.ToLocalTime().ToString("G")</dd>
+                <dt>@T("Completed")</dt><dd>@(selectedApplication.Definition.CompletedAt?.ToLocalTime().ToString("G") ?? T("NotCompleted"))</dd>
             </dl>
             @if (selectedApplication.Definition.Error is not null) { <p class="error-panel">@selectedApplication.Definition.Error</p> }
             @if (selectedApplication.Definition.Resources.Count == 0)
             {
-                <EmptyState Title="No resource outcome" Message="The application ended before a resource outcome was recorded." />
+                <EmptyState Title="@T("NoResourceOutcome")" Message="@T("NoResourceOutcomeMessage")" />
             }
             else
             {
                 <DataGrid TItem="BootstrapAppliedResource" Items="selectedApplication.Definition.Resources">
-                    <Header><tr><th>Profile</th><th>Resource</th><th>Outcome</th><th>Message</th></tr></Header>
-                    <Row Context="item"><tr><td><code>@item.Profile</code></td><td><strong>@item.Kind/@item.Name</strong><br /><small>@item.Location</small></td><td><StatusBadge Text="@item.Disposition.ToString()" Status="@DispositionTone(item.Disposition)" /></td><td>@item.Message</td></tr></Row>
+                    <Header><tr><th>@T("Profile")</th><th>@T("Resource")</th><th>@T("Outcome")</th><th>@T("Message")</th></tr></Header>
+                    <Row Context="item"><tr><td><code>@item.Profile</code></td><td><strong>@item.Kind/@item.Name</strong><br /><small>@item.Location</small></td><td><StatusBadge Text="@DispositionLabel(item.Disposition)" Status="@DispositionTone(item.Disposition)" /></td><td>@item.Message</td></tr></Row>
                 </DataGrid>
             }
         </section>
@@ -169,10 +170,10 @@ else
 {
     <div class="dialog-backdrop" role="presentation">
         <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="bootstrap-confirm-title">
-            <h2 id="bootstrap-confirm-title">Apply bootstrap profiles?</h2>
-            <p>Existing resources will not be overwritten. Conflicts are preserved and unexpected failures stop the application without rolling back prior creations.</p>
+            <h2 id="bootstrap-confirm-title">@T("ApplyBootstrapProfiles")</h2>
+            <p>@T("ApplyConfirmation")</p>
             <p><strong>@string.Join(" → ", selectedProfiles)</strong><br />@CurrentTargetLabel</p>
-            <div class="dialog-actions"><button class="button-secondary" disabled="@applying" @onclick="() => confirmApply = false">Cancel</button><button class="button-primary" disabled="@applying" @onclick="ApplyAsync">@(applying ? "Applying…" : "Apply profiles")</button></div>
+            <div class="dialog-actions"><button class="button-secondary" disabled="@applying" @onclick="() => confirmApply = false">@T("Cancel")</button><button class="button-primary" disabled="@applying" @onclick="ApplyAsync">@(applying ? T("Applying") : T("ApplyProfiles"))</button></div>
         </section>
     </div>
 }
@@ -202,8 +203,8 @@ else
         && (SelectedScope switch { BootstrapProfileScope.Tenant => selectedTenantId is not null, BootstrapProfileScope.Workspace => selectedWorkspaceId is not null, _ => true })
         && SelectedBindings.All(item => !item.Binding.Required || !string.IsNullOrWhiteSpace(bindingTargets[BindingKey(item.Profile, item.Binding.Name)].Name));
     private int PreviewStep => 2 + (SelectedScope is BootstrapProfileScope.Tenant or BootstrapProfileScope.Workspace ? 1 : 0) + (SelectedBindings.Count > 0 ? 1 : 0);
-    private string InitialProfilesLabel => view is null || view.Catalog.InitialProfiles.Count == 0 ? "None" : string.Join(" → ", view.Catalog.InitialProfiles);
-    private string CurrentTargetLabel => SelectedScope switch { BootstrapProfileScope.Instance => "Instance", BootstrapProfileScope.Tenant => view?.Tenants.FirstOrDefault(value => value.Id == selectedTenantId)?.DisplayName ?? "Tenant not selected", BootstrapProfileScope.Workspace => view?.Workspaces.FirstOrDefault(value => value.WorkspaceId == selectedWorkspaceId) is { } workspace ? $"{workspace.TenantDisplayName} / {workspace.WorkspaceDisplayName}" : "Workspace not selected", _ => "No target" };
+    private string InitialProfilesLabel => view is null || view.Catalog.InitialProfiles.Count == 0 ? T("None") : string.Join(" → ", view.Catalog.InitialProfiles);
+    private string CurrentTargetLabel => SelectedScope switch { BootstrapProfileScope.Instance => T("Instance"), BootstrapProfileScope.Tenant => view?.Tenants.FirstOrDefault(value => value.Id == selectedTenantId)?.DisplayName ?? T("TenantNotSelected"), BootstrapProfileScope.Workspace => view?.Workspaces.FirstOrDefault(value => value.WorkspaceId == selectedWorkspaceId) is { } workspace ? $"{workspace.TenantDisplayName} / {workspace.WorkspaceDisplayName}" : T("WorkspaceNotSelected"), _ => T("NoTarget") };
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -298,8 +299,13 @@ else
     {
         if (target?.WorkspaceId is { } workspaceId && view?.Workspaces.FirstOrDefault(value => value.WorkspaceId == workspaceId) is { } workspace) return $"{workspace.TenantDisplayName} / {workspace.WorkspaceDisplayName}";
         if (target?.TenantId is { } tenantId && view?.Tenants.FirstOrDefault(value => value.Id == tenantId) is { } tenant) return tenant.DisplayName;
-        return "Instance";
+        return T("Instance");
     }
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private string ScopeLabel(BootstrapProfileScope scope) => T($"Scope.{scope}");
+    private string BindingTargetKindLabel(BootstrapBindingTargetKind kind) => T($"BindingTargetKind.{kind}");
+    private string DispositionLabel(BootstrapResourceDisposition disposition) => T($"Disposition.{disposition}");
+    private string ApplicationStatusLabel(BootstrapApplicationStatus status) => T($"ApplicationStatus.{status}");
     private static int Count(BootstrapApplicationResource application, BootstrapResourceDisposition disposition) => application.Definition.Resources.Count(value => value.Disposition == disposition);
     private static UiStatus DispositionTone(BootstrapResourceDisposition disposition) => disposition switch { BootstrapResourceDisposition.Create => UiStatus.Success, BootstrapResourceDisposition.Skip => UiStatus.Neutral, BootstrapResourceDisposition.Conflict => UiStatus.Warning, _ => UiStatus.Danger };
     private static UiStatus ApplicationTone(BootstrapApplicationStatus status) => status switch { BootstrapApplicationStatus.Succeeded => UiStatus.Success, BootstrapApplicationStatus.PartiallyApplied or BootstrapApplicationStatus.Interrupted => UiStatus.Warning, BootstrapApplicationStatus.Running => UiStatus.Info, _ => UiStatus.Danger };
