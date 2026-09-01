@@ -3,17 +3,18 @@
 @inject IManagementApiClient Client
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DeploymentStrings> DeploymentLocalizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
 <PageHeader Eyebrow="@T("Eyebrow")" Title="@T("Agents")" Description="@T("Description")">
-    <Metadata><span>@F("AgentCount", Filtered.Count)</span><span>@F("PublishedCount", PublishedCount)</span><span>@F("AttentionCount", FailedCount)</span></Metadata>
+    <Metadata><span>@F("AgentCount", Filtered.Count)</span><span>@F("DeployedCount", DeployedCount)</span><span>@F("AttentionCount", FailedCount)</span></Metadata>
     <Actions><a class="button-primary" href="/agents/new">@T("CreateAgent")</a></Actions>
 </PageHeader>
 
 <ResourceToolbar Label="@T("AgentFilters")">
     <ChildContent>
         <SearchBox Value="search" ValueChanged="value => search = value" Placeholder="@T("SearchAgentsPlaceholder")" Label="@T("SearchAgents")" />
-        <select @bind="status" aria-label="@T("FilterAgentStatus")"><option value="">@T("StatusAll")</option><option value="Accepted">@T("StatusValid")</option><option value="Succeeded">@T("StatusPublished")</option><option value="Failed">@T("StatusFailed")</option></select>
+        <select @bind="status" aria-label="@T("FilterAgentStatus")"><option value="">@T("StatusAll")</option><option value="Accepted">@T("StatusValid")</option><option value="Deployed">@T("StatusDeployed")</option><option value="Failed">@T("StatusFailed")</option></select>
     </ChildContent>
     <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@(loading ? T("Refreshing") : T("Refresh"))</button></Actions>
 </ResourceToolbar>
@@ -33,15 +34,16 @@ else if (Filtered.Count == 0)
 else
 {
     <DataGrid TItem="AgentSummary" Items="Filtered">
-        <Header><tr><th>Agent</th><th>@T("Namespace")</th><th>@T("Definition")</th><th>@T("ModelProfile")</th><th>@T("Deployment")</th><th>@T("LastActivity")</th><th>@T("Status")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
-        <Row Context="item"><tr>
+        <Header><tr><th>Agent</th><th>@T("Namespace")</th><th>@T("Definition")</th><th>@T("GenerationHeader")</th><th>@T("ModelProfile")</th><th>@T("Deployment")</th><th>@T("LastActivity")</th><th>@T("Status")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
+        <Row Context="item"><tr class="agent-row">
             <td><a class="resource-name-link" href="@EditUrl(item)">@item.Name</a><span class="resource-secondary"><code>@TechnicalName(item)</code></span></td>
             <td><code>@item.Namespace.Value</code></td>
-            <td><strong>@ResourceName(item.Type)</strong><span class="resource-secondary">@F("Generation", item.Version)</span></td>
+            <td><strong>@ResourceName(item.Type)</strong></td>
+            <td class="agent-generation"><code>@item.Version</code></td>
             <td><a class="text-button" href="@ModelProfileUrl(item)">@ResourceName(item.ModelProfile)</a></td>
-            <td><span>@item.Runtime</span><span class="resource-secondary">@F("DesiredGeneration", item.Version)</span></td>
+            <td>@if (item.DeploymentUrl is not null) { <span class="agent-deployment-line"><a class="text-button" href="@item.DeploymentUrl">@item.DeploymentId</a><StatusBadge Text="@DeploymentStatusLabel(item.Runtime)" Status="@PlatformDashboardService.ToStatus(item.Runtime)" /></span> } else { <span>@DeploymentStatusLabel(item.Runtime)</span> }</td>
             <td>@LastActivity(item.LastActivity)</td>
-            <td><StatusIndicator Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" /></td>
+            <td><span class="agent-state">@StatusLabel(item.Status)</span></td>
             <td><div class="table-actions">@if(item.Namespace.IsDefault){<a class="text-button" href="@RunUrl(item)">@T("Run")</a>}<details class="row-actions-menu"><summary aria-label="@F("MoreActions", item.Name)">•••</summary><div><a href="@EditUrl(item)">@T("Open")</a>@if(item.Namespace.IsDefault){<a href="@RunUrl(item)">@T("Run")</a><a href="@EditUrl(item)#definition">@T("EditDefinition")</a><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">@T("Delete")</button>}<button type="button" @onclick="() => selected = item">@T("QuickInspect")</button></div></details></div></td>
         </tr></Row>
     </DataGrid>
@@ -51,7 +53,7 @@ else
 {
     <aside class="quick-inspector" aria-label="@T("QuickInspector")">
         <header><div><p class="eyebrow">Agent</p><h2>@selected.Name</h2><StatusIndicator Text="@StatusLabel(selected.Status)" Status="@StatusPresentation.Tone(selected.Status)" /></div><button class="icon-button" @onclick="() => selected = null" aria-label="@T("CloseInspector")">×</button></header>
-        <dl class="resource-details resource-section"><dt>@T("Namespace")</dt><dd><code>@selected.Namespace.Value</code></dd><dt>@T("Definition")</dt><dd>@ResourceName(selected.Type) · @F("Generation", selected.Version)</dd><dt>@T("ModelProfile")</dt><dd>@ResourceName(selected.ModelProfile)</dd><dt>@T("Deployment")</dt><dd>@selected.Runtime</dd><dt>@T("ResourceId")</dt><dd><code>@selected.Id</code></dd></dl>
+        <dl class="resource-details resource-section"><dt>@T("Namespace")</dt><dd><code>@selected.Namespace.Value</code></dd><dt>@T("Definition")</dt><dd>@ResourceName(selected.Type) · @F("Generation", selected.Version)</dd><dt>@T("ModelProfile")</dt><dd>@ResourceName(selected.ModelProfile)</dd><dt>@T("Deployment")</dt><dd>@if (selected.DeploymentUrl is not null) { <a class="text-button" href="@selected.DeploymentUrl">@selected.DeploymentId</a><span class="resource-secondary"><StatusBadge Text="@DeploymentStatusLabel(selected.Runtime)" Status="@PlatformDashboardService.ToStatus(selected.Runtime)" /></span> } else { @DeploymentStatusLabel(selected.Runtime) }</dd><dt>@T("ResourceId")</dt><dd><code>@selected.Id</code></dd></dl>
         <div class="quick-inspector-actions">@if(selected.Namespace.IsDefault){<a class="button-primary" href="@RunUrl(selected)">@T("RunAgent")</a>}<a class="button-secondary" href="@EditUrl(selected)">@T("OpenDetails")</a></div>
     </aside>
 }
@@ -75,8 +77,10 @@ else
             || item.Namespace.Value.Contains(search, StringComparison.OrdinalIgnoreCase)
             || item.ModelProfile.Contains(search, StringComparison.OrdinalIgnoreCase)
             || item.Capabilities.Any(capability => capability.Contains(search, StringComparison.OrdinalIgnoreCase)))
-        && (string.IsNullOrWhiteSpace(status) || string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase))).ToArray() ?? [];
-    private int PublishedCount => items?.Count(item => string.Equals(item.Status, "Succeeded", StringComparison.OrdinalIgnoreCase)) ?? 0;
+        && (string.IsNullOrWhiteSpace(status)
+            || string.Equals(status, "Deployed", StringComparison.OrdinalIgnoreCase) && item.DeploymentId is not null
+            || string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase))).ToArray() ?? [];
+    private int DeployedCount => items?.Count(item => item.DeploymentId is not null) ?? 0;
     private int FailedCount => items?.Count(item => string.Equals(item.Status, "Failed", StringComparison.OrdinalIgnoreCase)) ?? 0;
     private string DeleteMessage => pendingDelete is null ? string.Empty : F("DeleteMessage", pendingDelete.Name);
 
@@ -120,6 +124,9 @@ else
     private static string ResourceName(string resourceId) => resourceId;
     private string LastActivity(DateTimeOffset value) => value == DateTimeOffset.MinValue ? T("NoActivityReported") : value.LocalDateTime.ToString("g");
     private string StatusLabel(string value) => value switch { "Accepted" => T("StatusValid"), "Succeeded" => T("StatusPublished"), "Failed" => T("StatusFailed"), _ => value };
+    private string DeploymentStatusLabel(string value) => string.Equals(value, "Not deployed", StringComparison.OrdinalIgnoreCase)
+        ? DeploymentLocalizer["Status.NotDeployed"]
+        : DeploymentLocalizer[$"Status.{value}"];
     private string T(string key) => Localizer[key];
     private string F(string key, params object[] arguments) => Localizer[key, arguments];
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }

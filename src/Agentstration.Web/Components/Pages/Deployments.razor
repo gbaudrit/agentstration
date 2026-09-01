@@ -17,7 +17,7 @@ else
 {
     <DataGrid TItem="DeploymentSummary" Items="items">
         <Header><tr><th>@T("Deployment")</th><th>@T("Agent")</th><th>@T("Status")</th><th>@T("Hosting")</th><th>@T("RuntimeProfile")</th><th>@T("Revision")</th><th>@T("Updated")</th><th>@T("Error")</th></tr></Header>
-        <Row Context="item"><tr><td><code>@item.Id</code><br /><small>@item.Namespace</small></td><td>@item.Agent</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /><br /><small>@T("DesiredState", StateText(item.DesiredState))</small></td><td>@HostingText(item.HostingMode)<br /><small>@item.Environment</small></td><td>@item.RuntimeProfile</td><td><code>@(item.ObservedRevision ?? item.Revision)</code></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td>@(item.Error ?? "—")</td></tr></Row>
+        <Row Context="item"><tr id="@DeploymentAnchor(item)"><td><code>@item.Id</code><br /><small>@item.Namespace</small></td><td>@item.Agent</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /><br /><small>@T("DesiredState", StateText(item.DesiredState))</small></td><td>@HostingText(item.HostingMode)<br /><small>@item.Environment</small></td><td>@item.RuntimeProfile</td><td><code>@(item.ObservedRevision ?? item.Revision)</code></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td>@(item.Error ?? "—")</td></tr></Row>
     </DataGrid>
 }
 
@@ -28,6 +28,7 @@ else
     private string StatusText(string status) => T($"Status.{status}");
     private string StateText(string state) => T($"State.{state}");
     private string HostingText(string mode) => T($"Hosting.{mode}");
+    private static string DeploymentAnchor(DeploymentSummary item) => $"deployment-{Uri.EscapeDataString(item.Namespace)}-{Uri.EscapeDataString(item.Id)}";
     protected override async Task OnInitializedAsync() => items = await Client.GetDeploymentsAsync(cancellation.Token);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

@@ -1,0 +1,17 @@
+.agent-row > td {
+    vertical-align: top;
+}
+
+.agent-deployment-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.agent-generation code {
+    font-variant-numeric: tabular-nums;
+}
+
+.agent-state {
+    font-weight: 650;
+}

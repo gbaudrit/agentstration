@@ -9,7 +9,9 @@ public sealed record AgentSummary(string Id, string Name, string Type, string Ve
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
+    public string? DeploymentId { get; init; }
     public ResourceAddress ModelProfileAddress => ResourceAddress.Create(ModelProfileNamespace, Agentstration.Management.Abstractions.ResourceKinds.ModelProfile, ModelProfile);
+    public string? DeploymentUrl => DeploymentId is null ? null : ConsoleResourceUrls.Deployment(Namespace, DeploymentId);
     public string DetailsUrl => Namespace.IsDefault
         ? $"/agents/{Uri.EscapeDataString(Id)}"
         : $"/namespaces/{Uri.EscapeDataString(Namespace.Value)}/agents/{Uri.EscapeDataString(Id)}";
@@ -37,6 +39,9 @@ public sealed record FlowSummary(string Id, string Name, string Kind, string Ver
 
 public static class ConsoleResourceUrls
 {
+    public static string Deployment(ResourceNamespace @namespace, string name) =>
+        $"/deployments#deployment-{Uri.EscapeDataString(@namespace.Value)}-{Uri.EscapeDataString(name)}";
+
     public static string Flow(FlowId id) => id.Namespace.IsDefault
         ? $"/flows/{Uri.EscapeDataString(id.Value)}"
         : $"/namespaces/{Uri.EscapeDataString(id.Namespace.Value)}/flows/{Uri.EscapeDataString(id.Value)}";
