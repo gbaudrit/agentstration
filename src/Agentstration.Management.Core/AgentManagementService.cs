@@ -40,6 +40,15 @@ public sealed class AgentManagementService(
 {
     public Task InitializeAsync(CancellationToken cancellationToken) => store.InitializeAsync(cancellationToken);
 
+    public async Task ValidateForCreateAsync(AgentResource resource, CancellationToken cancellationToken)
+    {
+        ValidateResource(resource, ResourceKinds.Agent);
+        ValidateDefinition(resource.Definition);
+        await modelProfiles.ValidateAsync(resource.Definition.ModelProfile, cancellationToken);
+        var runtimeProfile = resource.Definition.RuntimeProfile.Resolve(resource.Namespace, ResourceKinds.RuntimeProfile);
+        await ValidateRuntimeProfileAsync(runtimeProfile.Namespace, runtimeProfile.Name, cancellationToken);
+    }
+
     public async Task<StoredResource<AgentResource>> PutAgentAsync(AgentResource resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken)
     {
         ValidateResource(resource, ResourceKinds.Agent);

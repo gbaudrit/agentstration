@@ -82,6 +82,51 @@ Use `--launch-profile http-NoBootstrap` or `--launch-profile https-NoBootstrap` 
 
 When `Agentstration.AppHost` is the Visual Studio startup project, select its `https` profile for the default bootstrap or `https-NoBootstrap` to disable it for the orchestrated Console resource.
 
+After initialization, a Platform administrator can open **System > Bootstrap profiles** to compose profiles in a defined order, preview every create, skip, conflict, or validation error, select an explicit Tenant or Workspace target when required, and confirm the application. Manual applications are retained in durable history. A profile declares its scope in a reserved `profile.yaml`:
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: workspace-tools
+definition:
+  displayName: Workspace tools
+  description: Reusable tools and agents for one Workspace
+  targetScope: workspace
+```
+
+A Workspace profile can install an existing local Pack while preserving Pack ownership and immutability. The archive path is relative to the profile directory; HTTP sources and replacement of an installed Pack are intentionally rejected:
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: PackInstallation
+metadata:
+  name: standard-tools
+definition:
+  source:
+    path: artifacts/standard-tools.zip
+  bindings: []
+```
+
+A Workspace profile may also create ordinary `ModelProvider`, `RuntimeProfile`, `ModelProfile`, `Agent`, `Flow`, and `Entry` resources directly from their normal YAML manifests. Unlike resources installed from a Pack, these resources have no Pack provenance and remain editable through their usual Console and API surfaces. Files and YAML documents are evaluated in lexical order, so dependencies must precede their consumers: provider and runtime profile, then model profile, agent, flow, and entry. A Model Provider must reference an Extension Registration already available in the target Workspace. A published Entry targeting a Flow requires that Flow to already have, or create earlier in the same application, an active published version.
+
+For example, this creates an editable Agent using resources declared earlier in the same profile:
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: support-agent
+definition:
+  displayName: Support agent
+  instructions: Answer support questions concisely.
+  modelProfile:
+    name: support-model
+  runtimeProfile:
+    name: local-runtime
+  tools: []
+```
+
 In the Development environment, the complete interactive HTTP API reference is available at [http://localhost:5100/swagger](http://localhost:5100/swagger), backed by the OpenAPI document at [http://localhost:5100/openapi/v1.json](http://localhost:5100/openapi/v1.json). Swagger supports the current Console session cookie and JWT bearer tokens; SignalR and MCP remain separate transports.
 
 `Managed` is the normal execution mode. Configure an Ollama, llama.cpp or LocalAI provider and bind a Model Profile to run real agents entirely on your machine. The provider endpoint and selected model are resolved from Agentstration's persisted resources.

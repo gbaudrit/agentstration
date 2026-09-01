@@ -20,6 +20,15 @@ public sealed partial class PackManagementService
         return prepared.Preview;
     }
 
+    public async Task<PackInstallationPreview> PreviewAsync(
+        PackArchive archive,
+        IReadOnlyList<PackBindingSelection> bindings,
+        CancellationToken cancellationToken)
+    {
+        var prepared = await PrepareAsync(archive, bindings, cancellationToken);
+        return prepared.Preview;
+    }
+
     public async Task<StoredResource<InstalledPackResource>> InstallAsync(PackArchive archive, CancellationToken cancellationToken)
         => await InstallAsync(archive, false, [], cancellationToken);
 

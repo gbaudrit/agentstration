@@ -13,6 +13,12 @@ public sealed class ModelProfileManagementService(
     IEnumerable<IModelProviderCapabilitiesResolver> capabilityResolvers) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
 {
     public static string ProfileId(string name) => name;
+    public async Task ValidateForCreateAsync(ModelProfileResource resource, CancellationToken cancellationToken)
+    {
+        ValidateIdentity(resource);
+        await ValidateDefinitionAsync(resource.Namespace, resource.Definition, cancellationToken);
+    }
+
     public async Task<StoredResource<ModelProfileResource>> CreateAsync(ModelProfileResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);

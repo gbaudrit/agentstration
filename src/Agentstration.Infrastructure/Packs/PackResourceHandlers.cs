@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
+using Agentstration.Infrastructure.Declarative;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
@@ -123,27 +124,6 @@ public sealed class AgentPackResourceHandler(AgentManagementService service) : I
     private static ManagedPackResource Managed(PackResourceDocument resource, ResourceNamespace @namespace, string token) => new() { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = token };
 }
 
-public sealed record PackFlowDefinition
-{
-    public string? DisplayName { get; init; }
-    public string? Description { get; init; }
-    public string Version { get; init; } = string.Empty;
-    public bool Enabled { get; init; } = true;
-    public FlowDefinition Spec { get; init; } = null!;
-    public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
-    public FlowGraphDefinition? Graph { get; init; }
-    public bool Publish { get; init; } = true;
-    public bool Activate { get; init; } = true;
-}
-
-public sealed record PackResourceEnvelope<T>
-{
-    public required string ApiVersion { get; init; }
-    public required string Kind { get; init; }
-    public ResourceMetadata Metadata { get; init; } = new();
-    public T Definition { get; init; } = default!;
-}
-
 public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinitionValidator graphValidator, TimeProvider timeProvider, ICurrentRequestContext requestContext) : IPackResourceHandler
 {
     public string Kind => ResourceKinds.Flow;
@@ -183,17 +163,7 @@ public sealed class FlowPackResourceHandler(FlowService service, IFlowDefinition
     public async Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => (await service.GetAsync(CurrentWorkspaceId(), new(name, @namespace), cancellationToken))?.ETag;
     public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) => service.DeleteAsync(CurrentWorkspaceId(), new(resource.Name, resource.Namespace), resource.VersionToken, cancellationToken);
     private WorkspaceId CurrentWorkspaceId() => new(requestContext.Current.WorkspaceId);
-    private static PackResourceEnvelope<PackFlowDefinition> Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<PackResourceEnvelope<PackFlowDefinition>>(resource.Manifest.GetRawText());
-}
-
-public sealed record PackEntryDefinition
-{
-    public string? DisplayName { get; init; }
-    public string? Description { get; init; }
-    public EntryPresentation Presentation { get; init; } = null!;
-    public EntryBinding Binding { get; init; } = null!;
-    public EntryBehavior Behavior { get; init; } = new();
-    public bool Publish { get; init; } = true;
+    private static DeclarativeResourceEnvelope<DeclarativeFlowDefinition> Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<DeclarativeResourceEnvelope<DeclarativeFlowDefinition>>(resource.Manifest.GetRawText());
 }
 
 public sealed class EntryPackResourceHandler(EntryAdministrationService service, IWorkplaceRepository repository, TimeProvider timeProvider, ICurrentRequestContext requestContext) : IPackResourceHandler
@@ -223,7 +193,7 @@ public sealed class EntryPackResourceHandler(EntryAdministrationService service,
         var published = await repository.GetEntryAsync(workspaceId, id, cancellationToken); return $"{draft.Revision}:{published?.Version ?? 0}";
     }
     public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) => service.DeleteAsync(CurrentWorkspaceId(), new(resource.Name, resource.Namespace), options.RemoveDashboardReferences, options.CloseInteractions, cancellationToken);
-    private static PackResourceEnvelope<PackEntryDefinition> Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<PackResourceEnvelope<PackEntryDefinition>>(resource.Manifest.GetRawText());
+    private static DeclarativeResourceEnvelope<DeclarativeEntryDefinition> Parse(PackResourceDocument resource) => ResourceManifestSerializer.FromJson<DeclarativeResourceEnvelope<DeclarativeEntryDefinition>>(resource.Manifest.GetRawText());
     private WorkspaceId CurrentWorkspaceId() => new(requestContext.Current.WorkspaceId);
-    private static EntryDraft ToDraft(WorkspaceId workspaceId, string name, ResourceNamespace @namespace, PackEntryDefinition definition, DateTimeOffset now) => new() { WorkspaceId = workspaceId, Id = new(name, @namespace), Name = name, DisplayName = definition.DisplayName ?? name, Description = definition.Description, Presentation = definition.Presentation, Binding = definition.Binding, Behavior = definition.Behavior, UpdatedAt = now };
+    private static EntryDraft ToDraft(WorkspaceId workspaceId, string name, ResourceNamespace @namespace, DeclarativeEntryDefinition definition, DateTimeOffset now) => new() { WorkspaceId = workspaceId, Id = new(name, @namespace), Name = name, DisplayName = definition.DisplayName ?? name, Description = definition.Description, Presentation = definition.Presentation, Binding = definition.Binding, Behavior = definition.Behavior, UpdatedAt = now };
 }

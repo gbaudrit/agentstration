@@ -27,6 +27,7 @@ public static class SecurityAuditActions
     public const string PersonalAccessTokenCreated = "personal-access-token.created";
     public const string PersonalAccessTokenRevoked = "personal-access-token.revoked";
     public const string PersonalAccessTokensRevoked = "personal-access-token.revoked-all";
+    public const string BootstrapProfileApplied = "bootstrap-profile.applied";
 }
 
 public sealed record SecurityAuditEvent(
