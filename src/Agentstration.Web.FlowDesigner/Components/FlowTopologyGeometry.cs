@@ -13,9 +13,8 @@ internal sealed record FlowTopologyGeometry(
 
     private const double OuterPadding = 72;
     private const double PortGap = 14;
-    private const double OppositeRouteCurve = 42;
-    private const double HorizontalBypassCurve = 118;
-    private const double VerticalBypassCurve = 148;
+    private const double BypassLaneGap = 16;
+    private const double BypassLaneDistance = 52;
 
     public static FlowTopologyGeometry Calculate(FlowTopologyGraph graph)
     {
@@ -30,8 +29,10 @@ internal sealed record FlowTopologyGeometry(
             .Select(node => new FlowTopologyPositionedNode(node, node.X - minimumX + OuterPadding, node.Y - minimumY + OuterPadding))
             .ToArray();
         var byId = nodes.ToDictionary(node => node.Node.Id, StringComparer.Ordinal);
+        var bypasses = validEdges
+            .ToDictionary(edge => edge.Id, edge => Bypass(edge, byId), StringComparer.Ordinal);
         var endpointSides = validEdges
-            .Select(edge => Sides(edge, byId[edge.From], byId[edge.To]))
+            .Select(edge => Sides(edge, byId[edge.From], byId[edge.To], bypasses[edge.Id]))
             .ToDictionary(item => item.Edge.Id, StringComparer.Ordinal);
         var portOffsets = PortOffsets(validEdges, byId, endpointSides);
         var edges = validEdges.Select(edge =>
@@ -40,8 +41,7 @@ internal sealed record FlowTopologyGeometry(
             var start = Anchor(byId[edge.From], sides.Start, portOffsets[new EdgeEndpoint(edge.Id, true)]);
             var end = Anchor(byId[edge.To], sides.End, portOffsets[new EdgeEndpoint(edge.Id, false)]);
             var hasReverse = validEdges.Any(candidate => candidate.From == edge.To && candidate.To == edge.From);
-            var requiresBypass = RequiresBypass(edge, byId);
-            return Route(edge, start, end, sides.Start, sides.End, hasReverse, requiresBypass);
+            return Route(edge, start, end, sides.Start, sides.End, hasReverse, bypasses[edge.Id]);
         }).ToArray();
 
         var canvasWidth = Math.Max(600, nodes.Max(node => node.X) + NodeWidth + OuterPadding);
@@ -49,7 +49,7 @@ internal sealed record FlowTopologyGeometry(
         return new(nodes, edges, canvasWidth, canvasHeight);
     }
 
-    private static bool RequiresBypass(
+    private static BypassDirection Bypass(
         FlowTopologyEdge edge,
         IReadOnlyDictionary<string, FlowTopologyPositionedNode> nodes)
     {
@@ -60,7 +60,7 @@ internal sealed record FlowTopologyGeometry(
         var toX = CenterX(to);
         var toY = CenterY(to);
         var horizontal = Math.Abs(toX - fromX) >= Math.Abs(toY - fromY);
-        return nodes.Values.Any(node =>
+        var obstructed = nodes.Values.Any(node =>
         {
             if (node.Node.Id == edge.From || node.Node.Id == edge.To) return false;
             var nodeX = CenterX(node);
@@ -78,11 +78,19 @@ internal sealed record FlowTopologyGeometry(
             var pathX = fromX + ((toX - fromX) * verticalProgress);
             return Math.Abs(nodeX - pathX) < NodeWidth;
         });
+        if (!obstructed) return BypassDirection.None;
+        return horizontal ? BypassDirection.Below : BypassDirection.Right;
     }
 
-    private static EdgeSides Sides(FlowTopologyEdge edge, FlowTopologyPositionedNode from, FlowTopologyPositionedNode to)
+    private static EdgeSides Sides(
+        FlowTopologyEdge edge,
+        FlowTopologyPositionedNode from,
+        FlowTopologyPositionedNode to,
+        BypassDirection bypass)
     {
         if (edge.From == edge.To) return new(edge, PortSide.Right, PortSide.Top);
+        if (bypass == BypassDirection.Right) return new(edge, PortSide.Right, PortSide.Right);
+        if (bypass == BypassDirection.Below) return new(edge, PortSide.Bottom, PortSide.Bottom);
 
         var differenceX = CenterX(to) - CenterX(from);
         var differenceY = CenterY(to) - CenterY(from);
@@ -156,7 +164,7 @@ internal sealed record FlowTopologyGeometry(
         PortSide startSide,
         PortSide endSide,
         bool hasReverse,
-        bool requiresBypass)
+        BypassDirection bypass)
     {
         if (edge.From == edge.To)
         {
@@ -167,34 +175,33 @@ internal sealed record FlowTopologyGeometry(
                 loopX, loopY - 12, LabelWidth(edge.Label));
         }
 
-        var differenceX = end.X - start.X;
-        var differenceY = end.Y - start.Y;
-        var distance = Math.Sqrt((differenceX * differenceX) + (differenceY * differenceY));
-        if (distance == 0) return new(edge, Svg($"M {start.X} {start.Y}"), start.X, start.Y, LabelWidth(edge.Label));
+        if (start == end) return new(edge, Svg($"M {start.X} {start.Y}"), start.X, start.Y, LabelWidth(edge.Label));
 
-        var horizontal = startSide is PortSide.Left or PortSide.Right && endSide is PortSide.Left or PortSide.Right;
-        var curve = requiresBypass
-            ? horizontal ? HorizontalBypassCurve : VerticalBypassCurve
-            : hasReverse ? OppositeRouteCurve
-            : 0;
-        if (curve == 0)
+        var laneOffset = hasReverse && string.CompareOrdinal(edge.From, edge.To) > 0 ? BypassLaneGap : 0;
+        if (bypass == BypassDirection.Right)
         {
-            var controlX = horizontal ? (start.X + end.X) / 2 : start.X;
-            var controlY = horizontal ? start.Y : (start.Y + end.Y) / 2;
-            var secondControlX = horizontal ? controlX : end.X;
-            var secondControlY = horizontal ? end.Y : controlY;
+            var laneX = Math.Max(start.X, end.X) + BypassLaneDistance + laneOffset;
             return new(edge,
-                Svg($"M {start.X} {start.Y} C {controlX} {controlY}, {secondControlX} {secondControlY}, {end.X} {end.Y}"),
-                (start.X + end.X) / 2, ((start.Y + end.Y) / 2) - 12, LabelWidth(edge.Label));
+                Svg($"M {start.X} {start.Y} C {laneX} {start.Y}, {laneX} {end.Y}, {end.X} {end.Y}"),
+                laneX, ((start.Y + end.Y) / 2) - 12, LabelWidth(edge.Label));
         }
 
-        var controlPointX = ((start.X + end.X) / 2) - ((differenceY / distance) * curve);
-        var controlPointY = ((start.Y + end.Y) / 2) + ((differenceX / distance) * curve);
-        var labelX = (start.X + (2 * controlPointX) + end.X) / 4;
-        var labelY = ((start.Y + (2 * controlPointY) + end.Y) / 4) - 12;
+        if (bypass == BypassDirection.Below)
+        {
+            var laneY = Math.Max(start.Y, end.Y) + BypassLaneDistance + laneOffset;
+            return new(edge,
+                Svg($"M {start.X} {start.Y} C {start.X} {laneY}, {end.X} {laneY}, {end.X} {end.Y}"),
+                (start.X + end.X) / 2, laneY - 12, LabelWidth(edge.Label));
+        }
+
+        var horizontal = startSide is PortSide.Left or PortSide.Right && endSide is PortSide.Left or PortSide.Right;
+        var controlX = horizontal ? (start.X + end.X) / 2 : start.X;
+        var controlY = horizontal ? start.Y : (start.Y + end.Y) / 2;
+        var secondControlX = horizontal ? controlX : end.X;
+        var secondControlY = horizontal ? end.Y : controlY;
         return new(edge,
-            Svg($"M {start.X} {start.Y} Q {controlPointX} {controlPointY}, {end.X} {end.Y}"),
-            labelX, labelY, LabelWidth(edge.Label));
+            Svg($"M {start.X} {start.Y} C {controlX} {controlY}, {secondControlX} {secondControlY}, {end.X} {end.Y}"),
+            (start.X + end.X) / 2, ((start.Y + end.Y) / 2) - 12, LabelWidth(edge.Label));
     }
 
     private static double LabelWidth(string? label) => label is null ? 0 : Math.Clamp(30 + (label.Length * 5.5), 84, 184);
@@ -211,6 +218,13 @@ internal sealed record FlowTopologyGeometry(
         Right,
         Top,
         Bottom
+    }
+
+    private enum BypassDirection
+    {
+        None,
+        Right,
+        Below
     }
 
     private readonly record struct EdgeEndpoint(string EdgeId, bool IsStart);

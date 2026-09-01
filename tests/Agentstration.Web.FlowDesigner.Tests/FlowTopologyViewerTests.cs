@@ -112,7 +112,7 @@ public sealed class FlowTopologyViewerTests
     }
 
     [TestMethod]
-    public void ViewerSeparatesOppositeHandoffsAndUsesIntrinsicCanvasWidth()
+    public void ViewerRoutesOppositeHandoffsInParallelAndUsesIntrinsicCanvasWidth()
     {
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -137,10 +137,40 @@ public sealed class FlowTopologyViewerTests
         var forward = rendered.Find("path[data-edge-id='forward']").GetAttribute("d");
         var backward = rendered.Find("path[data-edge-id='backward']").GetAttribute("d");
         Assert.AreNotEqual(forward, backward);
-        Assert.Contains(" Q ", forward!, StringComparison.Ordinal);
-        Assert.Contains(" Q ", backward!, StringComparison.Ordinal);
+        Assert.Contains(" C ", forward!, StringComparison.Ordinal);
+        Assert.Contains(" C ", backward!, StringComparison.Ordinal);
+        Assert.DoesNotContain(" Q ", forward!, StringComparison.Ordinal);
+        Assert.DoesNotContain(" Q ", backward!, StringComparison.Ordinal);
         Assert.HasCount(2, rendered.FindAll(".edge-label-wrap"));
         Assert.IsFalse(rendered.Find("svg").ClassList.Contains("fit"));
         Assert.Contains("px", rendered.Find("svg").GetAttribute("style")!, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void ViewerRoutesNonAdjacentVerticalHandoffsThroughSeparateSideLanes()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var graph = new FlowTopologyGraph(
+            [
+                new("participant:top", "top", "Top", "agent", 300, 0),
+                new("participant:middle", "middle", "Middle", "agent", 300, 170),
+                new("participant:bottom", "bottom", "Bottom", "agent", 300, 340)
+            ],
+            [
+                new("top-bottom", "participant:top", "participant:bottom", Kind: FlowTopologyEdgeKind.Conditional),
+                new("bottom-top", "participant:bottom", "participant:top", Kind: FlowTopologyEdgeKind.Conditional)
+            ],
+            "directed",
+            "Vertical handoffs");
+
+        var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph));
+
+        var downward = rendered.Find("path[data-edge-id='top-bottom']").GetAttribute("d");
+        var upward = rendered.Find("path[data-edge-id='bottom-top']").GetAttribute("d");
+        Assert.AreNotEqual(downward, upward);
+        Assert.Contains("C 312", downward!, StringComparison.Ordinal);
+        Assert.Contains("C 296", upward!, StringComparison.Ordinal);
     }
 }

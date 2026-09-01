@@ -246,6 +246,9 @@ public static class FlowTopologyProjector
         var observedOrders = observedTransfers
             .GroupBy(transfer => (transfer.From, transfer.To))
             .ToDictionary(group => group.Key, group => group.Select(transfer => transfer.Order).ToArray());
+        var terminalParticipant = run?.Status == FlowRunStatus.Succeeded
+            ? LastObservedParticipant(events, observedTransfers)
+            : null;
         var edges = new List<FlowTopologyEdge>
         {
             new("handoff-entry", "system:input", $"participant:{pattern.InitialParticipant}", "initial")
@@ -263,7 +266,8 @@ public static class FlowTopologyProjector
         }));
         edges.AddRange(definition.Participants.Select(participant => new FlowTopologyEdge(
             $"terminal:{participant.Id}", $"participant:{participant.Id}", "system:output", "terminal",
-            FlowTopologyEdgeKind.Dynamic)));
+            FlowTopologyEdgeKind.Dynamic,
+            participant.Id == terminalParticipant ? FlowTopologyEdgeState.Observed : FlowTopologyEdgeState.Declared)));
         return new(nodes, edges, "directed", "Handoff orchestration with declared routes")
         {
             Transfers = observedTransfers
@@ -469,6 +473,16 @@ public static class FlowTopologyProjector
             .Select((pair, index) => new FlowTopologyTransfer(index + 1, pair.from.Participant, pair.to.Participant, pair.to.Sequence))
             .ToArray();
     }
+
+    private static string? LastObservedParticipant(
+        IReadOnlyList<FlowRunEvent> events,
+        IReadOnlyList<FlowTopologyTransfer> transfers) =>
+        events
+            .Where(item => item.Type == FlowRunEventType.ParticipantTurnStarted && item.StepId is not null)
+            .OrderByDescending(item => item.Sequence)
+            .Select(item => item.StepId)
+            .FirstOrDefault()
+        ?? transfers.LastOrDefault()?.To;
 
     private static string? PayloadString(System.Text.Json.JsonElement? payload, string propertyName) =>
         payload is { ValueKind: System.Text.Json.JsonValueKind.Object }

@@ -111,6 +111,23 @@ public sealed class FlowTopologyProjectorTests
     }
 
     [TestMethod]
+    public void SucceededHandoffProjectionHighlightsObservedTerminalRoute()
+    {
+        var definition = Orchestration(new HandoffOrchestrationPattern(
+            "researcher",
+            [new FlowHandoff("researcher", "reviewer")],
+            Autonomous: true));
+        var run = Run(definition) with { Status = FlowRunStatus.Succeeded };
+
+        var topology = FlowTopologyProjector.Project(run, [Event(1, "researcher"), Event(2, "reviewer")]);
+
+        Assert.AreEqual(FlowTopologyEdgeState.Declared,
+            topology.Edges.Single(edge => edge.Id == "terminal:researcher").State);
+        Assert.AreEqual(FlowTopologyEdgeState.Observed,
+            topology.Edges.Single(edge => edge.Id == "terminal:reviewer").State);
+    }
+
+    [TestMethod]
     public void HandoffProjectionRanksParticipantsFromInitialRouteAndLeavesRoomBetweenLanes()
     {
         var definition = new OrchestrationFlowDefinition(
