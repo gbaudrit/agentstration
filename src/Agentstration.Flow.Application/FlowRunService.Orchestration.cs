@@ -89,6 +89,10 @@ public sealed partial class FlowRunService
                     await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.ParticipantTurnCompleted, turn.ParticipantId,
                         JsonSerializer.SerializeToElement(new { turn = turn.Turn }), runToken);
                     break;
+                case FlowParticipantHandoff handoff:
+                    await EmitAsync(stored.Value.WorkspaceId, stored.Value.Id, FlowRunEventType.ParticipantHandoff, handoff.FromParticipantId,
+                        JsonSerializer.SerializeToElement(new { from = handoff.FromParticipantId, to = handoff.ToParticipantId }), runToken);
+                    break;
                 case FlowParticipantCompleted completed:
                     if (started.Add(completed.Result.ParticipantId))
                         stored = await StartStepAsync(stored, completed.Result.ParticipantId, runToken);

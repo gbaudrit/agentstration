@@ -41,12 +41,16 @@ public sealed record FlowTopologyEdge(
     FlowTopologyEdgeState State = FlowTopologyEdgeState.Declared,
     bool Bidirectional = false);
 
+public sealed record FlowTopologyTransfer(int Order, string From, string To, long Sequence);
+
 public sealed record FlowTopologyGraph(
     IReadOnlyList<FlowTopologyNode> Nodes,
     IReadOnlyList<FlowTopologyEdge> Edges,
     string Layout,
     string Description)
 {
+    public IReadOnlyList<FlowTopologyTransfer> Transfers { get; init; } = [];
+
     public FlowTopologyNode? FindBySelection(string? selectionKey) =>
         selectionKey is null ? null : Nodes.FirstOrDefault(node => node.SelectionKey == selectionKey);
 }
@@ -221,19 +225,32 @@ public static class FlowTopologyProjector
         var outputY = Math.Max(0, ((definition.Participants.Count - 1) / 2) * VerticalGap / 2);
         nodes.Add(SystemNode("output", "Output", "output", HorizontalGap * 3, outputY, run));
 
-        var observedPairs = ObservedParticipantPairs(events);
+        var observedTransfers = ObservedParticipantTransfers(events);
+        var observedOrders = observedTransfers
+            .GroupBy(transfer => (transfer.From, transfer.To))
+            .ToDictionary(group => group.Key, group => group.Select(transfer => transfer.Order).ToArray());
         var edges = new List<FlowTopologyEdge>
         {
             new("handoff-entry", "system:input", $"participant:{pattern.InitialParticipant}", "initial")
         };
-        edges.AddRange(pattern.Handoffs.Select((route, index) => new FlowTopologyEdge(
-            $"handoff:{index}", $"participant:{route.From}", $"participant:{route.To}", "handoff",
-            FlowTopologyEdgeKind.Conditional,
-            observedPairs.Contains((route.From, route.To)) ? FlowTopologyEdgeState.Observed : FlowTopologyEdgeState.Declared)));
+        edges.AddRange(pattern.Handoffs.Select((route, index) =>
+        {
+            var observed = observedOrders.TryGetValue((route.From, route.To), out var orders);
+            var label = observed
+                ? $"handoff · {string.Join(", ", orders!.Select(order => $"#{order}"))}"
+                : "handoff";
+            return new FlowTopologyEdge(
+                $"handoff:{index}", $"participant:{route.From}", $"participant:{route.To}", label,
+                FlowTopologyEdgeKind.Conditional,
+                observed ? FlowTopologyEdgeState.Observed : FlowTopologyEdgeState.Declared);
+        }));
         edges.AddRange(definition.Participants.Select(participant => new FlowTopologyEdge(
             $"terminal:{participant.Id}", $"participant:{participant.Id}", "system:output", "terminal",
             FlowTopologyEdgeKind.Dynamic)));
-        return new(nodes, edges, "directed", "Handoff orchestration with declared routes");
+        return new(nodes, edges, "directed", "Handoff orchestration with declared routes")
+        {
+            Transfers = observedTransfers
+        };
     }
 
     private static FlowTopologyGraph ProjectGroupChat(
@@ -367,13 +384,44 @@ public static class FlowTopologyProjector
 
     private static HashSet<(string From, string To)> ObservedParticipantPairs(IReadOnlyList<FlowRunEvent> events)
     {
-        var sequence = events
-            .Where(item => item.Type == FlowRunEventType.ParticipantTurnStarted && item.StepId is not null)
-            .OrderBy(item => item.Sequence)
-            .Select(item => item.StepId!)
-            .ToArray();
-        return sequence.Zip(sequence.Skip(1), (from, to) => (From: from, To: to))
-            .Where(pair => pair.From != pair.To)
+        return ObservedParticipantTransfers(events)
+            .Select(transfer => (transfer.From, transfer.To))
             .ToHashSet();
     }
+
+    private static IReadOnlyList<FlowTopologyTransfer> ObservedParticipantTransfers(IReadOnlyList<FlowRunEvent> events)
+    {
+        var explicitTransfers = events
+            .Where(item => item.Type == FlowRunEventType.ParticipantHandoff)
+            .OrderBy(item => item.Sequence)
+            .Select(item => new
+            {
+                From = PayloadString(item.Payload, "from") ?? item.StepId,
+                To = PayloadString(item.Payload, "to"),
+                item.Sequence
+            })
+            .Where(item => item.From is not null && item.To is not null)
+            .Select((item, index) => new FlowTopologyTransfer(index + 1, item.From!, item.To!, item.Sequence))
+            .ToArray();
+        if (explicitTransfers.Length > 0) return explicitTransfers;
+
+        var turns = events
+            .Where(item => item.Type == FlowRunEventType.ParticipantTurnStarted && item.StepId is not null)
+            .OrderBy(item => item.Sequence)
+            .Select(item => (Participant: item.StepId!, item.Sequence))
+            .ToArray();
+        var sequence = turns
+            .Where((turn, index) => index == 0 || turn.Participant != turns[index - 1].Participant)
+            .ToArray();
+        return sequence.Zip(sequence.Skip(1), (from, to) => (from, to))
+            .Select((pair, index) => new FlowTopologyTransfer(index + 1, pair.from.Participant, pair.to.Participant, pair.to.Sequence))
+            .ToArray();
+    }
+
+    private static string? PayloadString(System.Text.Json.JsonElement? payload, string propertyName) =>
+        payload is { ValueKind: System.Text.Json.JsonValueKind.Object }
+        && payload.Value.TryGetProperty(propertyName, out var value)
+        && value.ValueKind == System.Text.Json.JsonValueKind.String
+            ? value.GetString()
+            : null;
 }

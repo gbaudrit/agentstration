@@ -57,4 +57,54 @@ public sealed class FlowTopologyViewerTests
 
         Assert.AreEqual("condition", selected);
     }
+
+    [TestMethod]
+    public void ObservedHandoffsRemainVisibleOnGraphWithoutAPathOverlay()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var graph = new FlowTopologyGraph(
+            [
+                new("participant:welcome", "welcome", "Welcome", "agent", 0, 0),
+                new("participant:advisor", "advisor", "Advisor", "agent", 220, 0)
+            ],
+            [new("handoff:welcome:advisor", "participant:welcome", "participant:advisor", "handoff · #1", State: FlowTopologyEdgeState.Observed)],
+            "orchestration",
+            "Handoff orchestration")
+        {
+            Transfers = [new(1, "welcome", "advisor", 7)]
+        };
+
+        var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph));
+
+        Assert.IsEmpty(rendered.FindAll(".topology-path-panel"));
+        Assert.IsEmpty(rendered.FindAll("button.path-toggle"));
+        Assert.HasCount(1, rendered.FindAll(".topology-edge.observed"));
+        Assert.Contains("#1", rendered.Markup, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void ViewerSupportsExpandedModeAndInspectorToggle()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        bool? inspectorVisible = null;
+        var graph = new FlowTopologyGraph(
+            [new("step:input", "input", "Input", "input", 0, 0)],
+            [],
+            "graph",
+            "Read-only topology");
+        var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph)
+            .Add(component => component.ShowInspectorControl, true)
+            .Add(component => component.InspectorVisible, true)
+            .Add(component => component.InspectorVisibleChanged, value => inspectorVisible = value));
+
+        rendered.Find("button.expand-toggle").Click();
+        Assert.IsTrue(rendered.Find(".topology-shell").ClassList.Contains("expanded"));
+
+        rendered.Find("button.inspector-toggle").Click();
+        Assert.AreEqual(false, inspectorVisible);
+    }
 }

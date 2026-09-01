@@ -1,26 +1,36 @@
 @using Microsoft.AspNetCore.Components.Web
 @inject IStringLocalizer<FlowDesignerStrings> Localizer
 
-<div class="topology-shell" data-layout="@Graph.Layout">
+<div class="topology-shell @(expanded ? "expanded" : null)" data-layout="@Graph.Layout">
     <div class="topology-toolbar">
-        <span>@Graph.Description</span>
+        <span class="topology-description">@Graph.Description</span>
         <div class="topology-toolbar-actions">
             <span class="topology-legend"><i class="declared"></i>@Localizer["Declared"] <i class="observed"></i>@Localizer["Observed"] <i class="inactive"></i>@Localizer["NotSelected"]</span>
+            @if (ShowInspectorControl)
+            {
+                <button class="topology-tool-button inspector-toggle" type="button" aria-pressed="@InspectorVisible" @onclick="ToggleInspectorAsync">
+                    <span aria-hidden="true">▥</span> @Localizer[InspectorVisible ? "HideInfo" : "ShowInfo"]
+                </button>
+            }
             <div class="topology-zoom-controls" role="group" aria-label="@Localizer["TopologyZoomControls"]">
                 <button type="button" @onclick="ZoomOut" aria-label="@Localizer["ZoomOut"]">−</button>
                 <span aria-live="polite">@ZoomPercent%</span>
                 <button type="button" @onclick="ZoomIn" aria-label="@Localizer["ZoomIn"]">+</button>
                 <button type="button" @onclick="Fit">@Localizer["Fit"]</button>
             </div>
+            <button class="topology-tool-button expand-toggle" type="button" aria-pressed="@expanded" @onclick="ToggleExpanded">
+                <span aria-hidden="true">@(expanded ? "↙" : "↗")</span> @Localizer[expanded ? "ReduceTopology" : "ExpandTopology"]
+            </button>
         </div>
     </div>
-    @if (Graph.Nodes.Count == 0)
-    {
-        <div class="topology-empty">@Localizer["NoTopology"]</div>
-    }
-    else
-    {
-        <div class="topology-viewport">
+    <div class="topology-stage">
+        @if (Graph.Nodes.Count == 0)
+        {
+            <div class="topology-empty">@Localizer["NoTopology"]</div>
+        }
+        else
+        {
+            <div class="topology-viewport">
             <svg class="topology-canvas" style="width: @ZoomPercent%; min-width: @(600 * Zoom)px" viewBox="0 0 @CanvasWidth @CanvasHeight" role="img" aria-label="@Graph.Description">
                 <defs>
                     <marker id="@DeclaredMarker" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,4 L0,8 z" /></marker>
@@ -60,8 +70,9 @@
                     }
                 </g>
             </svg>
-        </div>
-    }
+            </div>
+        }
+    </div>
 </div>
 
 @code {
@@ -74,11 +85,15 @@
     private double CanvasWidth { get; set; } = 600;
     private double CanvasHeight { get; set; } = 260;
     private double Zoom { get; set; } = 1;
+    private bool expanded;
     private int ZoomPercent => (int)Math.Round(Zoom * 100);
 
     [Parameter, EditorRequired] public FlowTopologyGraph Graph { get; set; } = new([], [], "horizontal", "Flow topology");
     [Parameter] public string? SelectedKey { get; set; }
     [Parameter] public EventCallback<string> SelectedKeyChanged { get; set; }
+    [Parameter] public bool ShowInspectorControl { get; set; }
+    [Parameter] public bool InspectorVisible { get; set; }
+    [Parameter] public EventCallback<bool> InspectorVisibleChanged { get; set; }
 
     private string DeclaredMarker => $"{markerPrefix}-declared";
     private string ObservedMarker => $"{markerPrefix}-observed";
@@ -135,6 +150,10 @@
     private void ZoomOut() => Zoom = Math.Max(0.5, Zoom - 0.15);
 
     private void Fit() => Zoom = 1;
+
+    private void ToggleExpanded() => expanded = !expanded;
+
+    private Task ToggleInspectorAsync() => InspectorVisibleChanged.InvokeAsync(!InspectorVisible);
 
     private Task OnNodeKeyDownAsync(KeyboardEventArgs eventArgs, string key) =>
         eventArgs.Key is "Enter" or " " ? SelectAsync(key) : Task.CompletedTask;

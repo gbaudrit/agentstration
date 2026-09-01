@@ -44,7 +44,8 @@ public enum FlowRunEventType
     ToolCallStarted,
     ToolCallGovernanceEvaluated,
     ToolCallCompleted,
-    ToolCallFailed
+    ToolCallFailed,
+    ParticipantHandoff
 }
 
 public enum InputRequestType { Text, Choice, Confirmation }

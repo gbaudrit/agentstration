@@ -136,6 +136,7 @@ public sealed class HttpAgentstrationEventStream(
             FlowRunEventType.StepRunFailed => $"{subject} failed",
             FlowRunEventType.ParticipantTurnStarted => $"{subject} started a turn",
             FlowRunEventType.ParticipantTurnCompleted => $"{subject} completed a turn",
+            FlowRunEventType.ParticipantHandoff => $"{subject} handed off the conversation",
             FlowRunEventType.InputRequested => $"{subject} requested input",
             FlowRunEventType.InputReceived => $"{subject} received input",
             FlowRunEventType.InputExpired => $"{subject} input request expired",

@@ -47,7 +47,10 @@ public sealed partial class FlowTests
                     new FlowTargetReference(FlowTargetKind.Agent, "researcher"),
                     new FlowTargetReference(FlowTargetKind.Agent, "reviewer")
                 ],
-                new SequentialOrchestrationPattern())), new ResourceNamespace("daily-life-assistant"), default);
+                new HandoffOrchestrationPattern(
+                    "researcher",
+                    [new FlowHandoff("researcher", "reviewer")],
+                    Autonomous: true))), new ResourceNamespace("daily-life-assistant"), default);
         await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, created.Value.Id, "1.0.0", true, default);
         var queue = new TestFlowRunQueue();
         var expressions = new FlowExpressionParser();
@@ -79,6 +82,9 @@ public sealed partial class FlowTests
         Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.StepOutputDelta));
         Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.ParticipantTurnStarted));
         Assert.AreEqual(2, events.Count(item => item.Type == FlowRunEventType.ParticipantTurnCompleted));
+        var handoff = events.Single(item => item.Type == FlowRunEventType.ParticipantHandoff);
+        Assert.AreEqual("researcher", handoff.Payload!.Value.GetProperty("from").GetString());
+        Assert.AreEqual("reviewer", handoff.Payload.Value.GetProperty("to").GetString());
     }
 
     [TestMethod]

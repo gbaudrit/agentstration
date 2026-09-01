@@ -40,4 +40,5 @@
   <data name="TopologyZoomControls"><value>Contrôles de zoom de la topologie</value></data><data name="NoTopology"><value>Aucune topologie n’est disponible pour ce Flow.</value></data>
   <data name="TurnCount.One"><value>{0} tour</value></data><data name="TurnCount.Many"><value>{0} tours</value></data><data name="InitialParticipant"><value>participant initial</value></data>
   <data name="EdgeDescription"><value>{0} vers {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>déclaré</value></data><data name="EdgeState.Observed"><value>observé</value></data><data name="EdgeState.Inactive"><value>non sélectionné</value></data>
+  <data name="ExpandTopology"><value>Agrandir</value></data><data name="ReduceTopology"><value>Réduire</value></data><data name="ShowInfo"><value>Infos</value></data><data name="HideInfo"><value>Masquer les infos</value></data>
 </root>
