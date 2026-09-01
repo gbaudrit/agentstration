@@ -21,11 +21,14 @@ public sealed class FlowDbContext(DbContextOptions<FlowDbContext> options) : DbC
         document.Property(value => value.FlowId).HasMaxLength(128);
         document.Property(value => value.Namespace).HasMaxLength(128);
         document.Property(value => value.Version).HasMaxLength(128);
+        document.Property(value => value.Status);
         document.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
         document.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         document.HasIndex(value => new { value.WorkspaceId, value.Namespace, value.Kind, value.FlowId, value.Version });
         document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.TenantId, value.PrincipalId, value.UpdatedAt, value.Key });
+        document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.TenantId, value.PrincipalId, value.Status, value.UpdatedAt, value.Key });
         document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.TenantId, value.PrincipalId, value.Namespace, value.FlowId, value.UpdatedAt, value.Key });
+        document.HasIndex(value => new { value.WorkspaceId, value.Kind, value.TenantId, value.PrincipalId, value.Namespace, value.FlowId, value.Status, value.UpdatedAt, value.Key });
     }
 }
 
@@ -39,6 +42,7 @@ internal sealed class FlowDocument
     public string? Version { get; set; }
     public Guid TenantId { get; set; }
     public Guid PrincipalId { get; set; }
+    public FlowRunStatus? Status { get; set; }
     public required string Payload { get; set; }
     public required string ETag { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
@@ -164,6 +168,7 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         var document = Document(run.WorkspaceId, RunKey(run.WorkspaceId, run.Id), RunKind, run.FlowId, run.FlowVersion, run, now);
         document.TenantId = run.Scope.TenantId;
         document.PrincipalId = run.Scope.PrincipalId;
+        document.Status = run.Status;
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
         return new StoredFlowRun(run, document.ETag, now);
@@ -203,11 +208,10 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
             var namespaceValue = flowId.Value.Namespace.Value;
             query = query.Where(value => value.Namespace == namespaceValue && value.FlowId == flowId.Value.Value);
         }
-        var documents = await query.OrderByDescending(value => value.UpdatedAt).ThenByDescending(value => value.Key).ToArrayAsync(cancellationToken);
-        var runs = documents.Select(ToRun);
-        if (status is not null) runs = runs.Where(value => value.Value.Status == status);
-        var page = runs.Skip(skip).Take(take + 1).ToArray();
-        return new FlowRunPage(page.Take(take).ToArray(), page.Length > take);
+        if (status is not null) query = query.Where(value => value.Status == status);
+        var documents = await query.OrderByDescending(value => value.UpdatedAt).ThenByDescending(value => value.Key)
+            .Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
+        return new FlowRunPage(documents.Take(take).Select(ToRun).ToArray(), documents.Length > take);
     }
 
     public async Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(int skip, int take, CancellationToken cancellationToken)
@@ -244,6 +248,7 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         document.Payload = JsonSerializer.Serialize(run, JsonOptions);
         document.TenantId = run.Scope.TenantId;
         document.PrincipalId = run.Scope.PrincipalId;
+        document.Status = run.Status;
         document.ETag = NewETag();
         document.UpdatedAt = now;
         await SaveUpdateAsync(context, cancellationToken);

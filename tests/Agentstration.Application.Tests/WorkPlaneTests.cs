@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Data.Common;
 using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Application.Work;
@@ -11,6 +13,8 @@ using Agentstration.Work.Storage.Sqlite;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -322,7 +326,8 @@ public sealed class WorkPlaneTests
     [TestMethod]
     public async Task WorkplaceListsEveryRootTaskBeyondRepositoryPageLimitAndProjectsLatestContinuation()
     {
-        await using var fixture = await WorkFixture.CreateAsync();
+        var commands = new CountingCommandInterceptor();
+        await using var fixture = await WorkFixture.CreateAsync(commandInterceptor: commands);
         var anchors = new List<WorkItem>();
         for (var index = 0; index < 205; index++)
         {
@@ -359,12 +364,28 @@ public sealed class WorkPlaneTests
         latest.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddHours(1).AddSeconds(1));
         latest.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, latest.Id, executionId, Now.AddHours(1).AddSeconds(2), "agent"));
         await fixture.Repository.CreateAsync(latest, default);
+        var secondTaskId = WorkTaskId.FromWorkItem(anchors[1].Id);
+        var olderContinuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", "Older continuation", Now,
+            metadata: new Dictionary<string, string>
+            {
+                ["origin"] = "trigger",
+                ["workplace.workspaceId"] = WorkplaceId.ToString(),
+                ["workplace.taskId"] = secondTaskId.ToString()
+            });
+        var olderExecutionId = WorkExecutionId.New();
+        olderContinuation.MarkQueued(olderExecutionId, "agent", Guid.NewGuid(), Now);
+        olderContinuation.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, olderContinuation.Id, olderExecutionId, Now, "agent"));
+        await fixture.Repository.CreateAsync(olderContinuation, default);
         var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
 
+        commands.Reset();
         var tasks = await workplace.ListTasksAsync(WorkplaceId, null, default);
 
         Assert.HasCount(205, tasks);
         Assert.AreEqual(WorkTaskStatus.Running, tasks.Single(value => value.Id == firstTaskId).Status);
+        Assert.AreEqual(WorkTaskStatus.Pending, tasks.Single(value => value.Id == secondTaskId).Status);
+        Assert.HasCount(1, commands.CommandTexts.Where(value => value.Contains("ROW_NUMBER()", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(commands.CommandTexts.Any(value => value.Contains("\"AnchorTaskId\" = @", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -741,14 +762,24 @@ public sealed class WorkPlaneTests
 
         private WorkFixture(string directory, ServiceProvider provider) { _directory = directory; _provider = provider; }
 
-        public static async Task<WorkFixture> CreateAsync(bool withExecutionScope = true)
+        public static async Task<WorkFixture> CreateAsync(bool withExecutionScope = true, DbCommandInterceptor? commandInterceptor = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), $"agentstration-work-tests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddSingleton(TimeProvider.System);
-            services.AddSqliteWorkPlane($"Data Source={Path.Combine(directory, "work.db")};Pooling=False");
+            var connectionString = $"Data Source={Path.Combine(directory, "work.db")};Pooling=False";
+            if (commandInterceptor is null)
+            {
+                services.AddSqliteWorkPlane(connectionString);
+            }
+            else
+            {
+                services.AddDbContextFactory<WorkDbContext>(options => options.UseSqlite(connectionString).AddInterceptors(commandInterceptor));
+                services.AddSingleton<IWorkItemRepository, SqliteWorkItemRepository>();
+                services.AddSingleton<IWorkplaceRepository, SqliteWorkplaceRepository>();
+            }
             services.AddSingleton<FakeGateway>();
             services.AddSingleton<IWorkExecutionGateway>(provider => provider.GetRequiredService<FakeGateway>());
             if (withExecutionScope) services.AddSingleton<IWorkExecutionScopeAccessor, TestWorkExecutionScopeAccessor>();
@@ -763,6 +794,30 @@ public sealed class WorkPlaneTests
         {
             await _provider.DisposeAsync();
             if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
+        }
+    }
+
+    private sealed class CountingCommandInterceptor : DbCommandInterceptor
+    {
+        private int _count;
+        private readonly ConcurrentQueue<string> _commandTexts = new();
+        public int Count => Volatile.Read(ref _count);
+        public IReadOnlyList<string> CommandTexts => _commandTexts.ToArray();
+        public void Reset()
+        {
+            Interlocked.Exchange(ref _count, 0);
+            _commandTexts.Clear();
+        }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _count);
+            _commandTexts.Enqueue(command.CommandText);
+            return ValueTask.FromResult(result);
         }
     }
 }
