@@ -151,7 +151,9 @@ public sealed class WorkplaceHostTests
             var conversation = rendered.Find(".conversation-list-card");
             Assert.AreEqual("/w/personal/d/home/conversations/11111111-1111-1111-1111-111111111111", conversation.GetAttribute("href"));
             StringAssert.Contains(conversation.TextContent, "Prepare the quarterly review");
-            StringAssert.Contains(conversation.TextContent, "Reprendre");
+            var expectedResumeLabel = context.Services
+                .GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<WorkplacePageStrings>>()["Resume"];
+            StringAssert.Contains(conversation.TextContent, expectedResumeLabel);
         });
 
         rendered.Find("#tasks-tab").Click();
