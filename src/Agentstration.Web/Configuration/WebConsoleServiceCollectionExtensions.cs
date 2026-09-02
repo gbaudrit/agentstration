@@ -36,6 +36,11 @@ public static class WebConsoleServiceCollectionExtensions
 
         var configured = configuration.GetSection(AgentstrationWebOptions.SectionName).Get<AgentstrationWebOptions>() ?? new();
         AddClient<RuntimeApiClient, IRuntimeApiClient>(services, configured.RuntimeApi);
+        AddClient(services, CleanupApiClient.RuntimeClient, configured.RuntimeApi);
+        AddClient(services, CleanupApiClient.FlowClient, configured.FlowApi);
+        AddClient(services, CleanupApiClient.ManagementClient, configured.ManagementApi);
+        AddClient(services, CleanupApiClient.WorkClient, configured.WorkApi);
+        services.AddScoped<ICleanupApiClient, CleanupApiClient>();
         services.AddScoped<IAgentstrationEventStream, HttpAgentstrationEventStream>();
 
         // Tasks are always real Work API resources, even when unrelated Console

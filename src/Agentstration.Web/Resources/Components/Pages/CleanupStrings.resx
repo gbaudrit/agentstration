@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="PageTitle" xml:space="preserve"><value>Workspace cleanup · Agentstration</value></data>
+  <data name="Eyebrow" xml:space="preserve"><value>System</value></data>
+  <data name="Title" xml:space="preserve"><value>Workspace cleanup</value></data>
+  <data name="Description" xml:space="preserve"><value>Select terminal Runs and resources to permanently remove from the current Workspace.</value></data>
+  <data name="WorkspaceScope" xml:space="preserve"><value>Current Workspace only</value></data>
+  <data name="AvailableCount" xml:space="preserve"><value>{0} removable items</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Refresh inventory</value></data>
+  <data name="Loading" xml:space="preserve"><value>Loading cleanup inventory…</value></data>
+  <data name="AccessDenied" xml:space="preserve"><value>Workspace cleanup requires both resource deletion and Run deletion permissions.</value></data>
+  <data name="Retry" xml:space="preserve"><value>Retry</value></data>
+  <data name="WarningTitle" xml:space="preserve"><value>Deletion is permanent</value></data>
+  <data name="WarningMessage" xml:space="preserve"><value>Each item is deleted through its canonical API. Successful deletions are not rolled back when another selected item fails.</value></data>
+  <data name="InventorySummary" xml:space="preserve"><value>Cleanup inventory summary</value></data>
+  <data name="Kind.Runs" xml:space="preserve"><value>Terminal Runs</value></data>
+  <data name="Kind.Entries" xml:space="preserve"><value>Entries</value></data>
+  <data name="Kind.Flows" xml:space="preserve"><value>Flows</value></data>
+  <data name="Kind.Agents" xml:space="preserve"><value>Agents</value></data>
+  <data name="Kind.RuntimeRun" xml:space="preserve"><value>Agent Run</value></data>
+  <data name="Kind.FlowRun" xml:space="preserve"><value>Flow Run</value></data>
+  <data name="Kind.Entry" xml:space="preserve"><value>Entry</value></data>
+  <data name="Kind.Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="Kind.Agent" xml:space="preserve"><value>Agent</value></data>
+  <data name="SearchPlaceholder" xml:space="preserve"><value>Search by name, ID or namespace…</value></data>
+  <data name="SearchLabel" xml:space="preserve"><value>Search cleanup inventory</value></data>
+  <data name="ClearSelection" xml:space="preserve"><value>Clear selection</value></data>
+  <data name="EntryOptionsTitle" xml:space="preserve"><value>Entry dependency options</value></data>
+  <data name="EntryOptionsDescription" xml:space="preserve"><value>These options apply only to selected Entries. Active Interactions always block deletion.</value></data>
+  <data name="RemoveDashboardReferences" xml:space="preserve"><value>Remove Dashboard references</value></data>
+  <data name="CloseInteractions" xml:space="preserve"><value>Close eligible durable Interactions</value></data>
+  <data name="GroupTitle.Runs" xml:space="preserve"><value>{0} terminal Runs</value></data>
+  <data name="GroupTitle.Entries" xml:space="preserve"><value>{0} Entries</value></data>
+  <data name="GroupTitle.Flows" xml:space="preserve"><value>{0} Flows</value></data>
+  <data name="GroupTitle.Agents" xml:space="preserve"><value>{0} Agents</value></data>
+  <data name="GroupDescription.Runs" xml:space="preserve"><value>Only succeeded, failed, cancelled or timed-out Runs are eligible.</value></data>
+  <data name="GroupDescription.Entries" xml:space="preserve"><value>Entry safeguards are evaluated individually when deletion starts.</value></data>
+  <data name="GroupDescription.Flows" xml:space="preserve"><value>Flows still referenced by retained Entries cannot be deleted.</value></data>
+  <data name="GroupDescription.Agents" xml:space="preserve"><value>Agents still referenced by retained Flows cannot be deleted.</value></data>
+  <data name="SelectAll" xml:space="preserve"><value>Select visible</value></data>
+  <data name="Empty.Runs" xml:space="preserve"><value>No terminal Runs are available.</value></data>
+  <data name="Empty.Entries" xml:space="preserve"><value>No Entries are available.</value></data>
+  <data name="Empty.Flows" xml:space="preserve"><value>No Flows are available.</value></data>
+  <data name="Empty.Agents" xml:space="preserve"><value>No Agents are available.</value></data>
+  <data name="NoSearchResults" xml:space="preserve"><value>No item matches the current search.</value></data>
+  <data name="FailuresTitle" xml:space="preserve"><value>{0} deletions need attention</value></data>
+  <data name="FailuresDescription" xml:space="preserve"><value>Failed items remain selected. Resolve their dependencies or permissions, then retry.</value></data>
+  <data name="SelectedCount" xml:space="preserve"><value>{0} items selected</value></data>
+  <data name="Progress" xml:space="preserve"><value>Deleting {0} of {1}…</value></data>
+  <data name="ExecutionOrder" xml:space="preserve"><value>Deletion order: Runs, Entries, Flows, then Agents</value></data>
+  <data name="DeleteSelected" xml:space="preserve"><value>Delete selected</value></data>
+  <data name="Irreversible" xml:space="preserve"><value>Irreversible action</value></data>
+  <data name="ConfirmationTitle" xml:space="preserve"><value>Delete {0} selected items?</value></data>
+  <data name="ConfirmationMessage" xml:space="preserve"><value>The selected items and their module-owned history will be permanently removed where applicable.</value></data>
+  <data name="Acknowledge" xml:space="preserve"><value>I understand that successful deletions cannot be undone.</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="ConfirmDelete" xml:space="preserve"><value>Delete permanently</value></data>
+  <data name="NotificationComplete" xml:space="preserve"><value>Cleanup completed</value></data>
+  <data name="NotificationPartial" xml:space="preserve"><value>Cleanup partially completed</value></data>
+  <data name="NotificationResult" xml:space="preserve"><value>{0} deleted, {1} failed.</value></data>
+  <data name="UnknownDate" xml:space="preserve"><value>Date unavailable</value></data>
+  <data name="Status.Succeeded" xml:space="preserve"><value>Succeeded</value></data>
+  <data name="Status.Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Status.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="Status.TimedOut" xml:space="preserve"><value>Timed out</value></data>
+  <data name="Status.Draft" xml:space="preserve"><value>Draft</value></data>
+  <data name="Status.Published" xml:space="preserve"><value>Published</value></data>
+  <data name="Status.Active" xml:space="preserve"><value>Active</value></data>
+  <data name="Status.Disabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="Status.Accepted" xml:space="preserve"><value>Accepted</value></data>
+  <data name="Status.Validating" xml:space="preserve"><value>Validating</value></data>
+  <data name="Status.Creating" xml:space="preserve"><value>Creating</value></data>
+  <data name="Status.Updating" xml:space="preserve"><value>Updating</value></data>
+  <data name="Status.Deleting" xml:space="preserve"><value>Deleting</value></data>
+  <data name="Status.Canceled" xml:space="preserve"><value>Cancelled</value></data>
+</root>
