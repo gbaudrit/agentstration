@@ -1,0 +1,16 @@
+.git
+.github
+.vs
+.vscode
+.idea
+**/bin
+**/obj
+artifacts
+docs
+tests
+dev
+scripts
+aep/cli
+aep/inspector
+aep/samples
+aep/tests
