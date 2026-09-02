@@ -38,7 +38,7 @@
   --radius-lg: 12px;
   --shadow-sm: 0 2px 8px rgb(26 42 67 / 6%);
   --shadow-md: 0 14px 36px rgb(28 45 77 / 9%);
-  --sidebar-width: 252px;
+  --sidebar-width: 280px;
   --sidebar-width-collapsed: 72px;
   --topbar-height: 64px;
   --transition-fast: 140ms ease;
@@ -152,10 +152,12 @@
 .navigation-group { display: grid; gap: 3px; margin-bottom: var(--space-4); }
 .navigation-group h2 { margin: var(--space-2) var(--space-3) var(--space-1); color: #607795; font-size: .64rem; letter-spacing: .14em; text-transform: uppercase; }
 .side-nav { flex: 1 1 auto; min-height: 0; gap: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
-.side-nav { scrollbar-width: thin; scrollbar-color: #344861 transparent; }
+.side-nav { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.side-nav:hover,.side-nav:focus-within { scrollbar-color: #344861 transparent; }
 .side-nav::-webkit-scrollbar { width: 6px; }
 .side-nav::-webkit-scrollbar-track { background: transparent; }
-.side-nav::-webkit-scrollbar-thumb { border-radius: 999px; background: #344861; }
+.side-nav::-webkit-scrollbar-thumb { border-radius: 999px; background: transparent; }
+.side-nav:hover::-webkit-scrollbar-thumb,.side-nav:focus-within::-webkit-scrollbar-thumb { background: #344861; }
 .side-nav a { position: relative; min-height: 38px; padding: 8px 12px; border-radius: var(--radius-sm); }
 .side-nav a.active { background: #192942; box-shadow: inset 3px 0 var(--nav-accent,var(--color-action-primary)); }
 .side-nav a.domain-agent { --nav-accent: var(--color-agent); }

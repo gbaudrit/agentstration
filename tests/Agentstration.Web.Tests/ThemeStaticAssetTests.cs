@@ -22,4 +22,14 @@ public sealed class ThemeStaticAssetTests
         Assert.IsGreaterThan(darkThemeStart, darkThemeEnd);
         StringAssert.Contains(css[darkThemeStart..darkThemeEnd], "color-scheme: dark;");
     }
+
+    [TestMethod]
+    public async Task SidebarAccommodatesLocalizedLabelsWithoutPersistentScrollbarChrome()
+    {
+        var css = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "TestAssets", "design-tokens.css"));
+
+        StringAssert.Contains(css, "--sidebar-width: 280px;");
+        StringAssert.Contains(css, ".side-nav { scrollbar-width: thin; scrollbar-color: transparent transparent; }");
+        StringAssert.Contains(css, ".side-nav:hover,.side-nav:focus-within { scrollbar-color: #344861 transparent; }");
+    }
 }
