@@ -138,7 +138,20 @@ public sealed class AgentManagementService(
         var resolved = compiler.Compile(agent.Value, spec);
         var number = agent.Value.Generation;
         var revisionName = $"{agentName}--{number:000000}";
-        return await store.CreateImmutableAsync(new AgentRevision
+        var existing = await store.GetAsync<AgentRevision>(new(ResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken);
+        if (existing is not null)
+        {
+            if (Matches(existing.Value, agent.Value, resolved)) return existing;
+            revisionName = $"{revisionName}--{agent.Value.Uid:N}";
+            existing = await store.GetAsync<AgentRevision>(new(ResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken);
+            if (existing is not null)
+            {
+                if (Matches(existing.Value, agent.Value, resolved)) return existing;
+                throw new ControlPlaneConcurrencyException($"Agent revision '{revisionName}' already belongs to a different Agent definition.");
+            }
+        }
+
+        var revision = new AgentRevision
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.AgentRevision,
@@ -157,8 +170,23 @@ public sealed class AgentManagementService(
             DefinitionHash = resolved.DefinitionHash,
             CreatedAt = timeProvider.GetUtcNow(),
             ProvisioningState = ProvisioningState.Succeeded
-        }, cancellationToken);
+        };
+        try
+        {
+            return await store.CreateImmutableAsync(revision, cancellationToken);
+        }
+        catch (ControlPlaneConcurrencyException)
+        {
+            existing = await store.GetAsync<AgentRevision>(new(ResourceKinds.AgentRevision, revisionName, @namespace), cancellationToken);
+            if (existing is not null && Matches(existing.Value, agent.Value, resolved)) return existing;
+            throw;
+        }
     }
+
+    private static bool Matches(AgentRevision revision, AgentResource agent, ResolvedAgentDefinition definition) =>
+        revision.AgentUid == agent.Uid
+        && revision.AgentVersion == agent.Generation
+        && string.Equals(revision.DefinitionHash, definition.DefinitionHash, StringComparison.Ordinal);
 
     public async Task<AgentRevisionPurgeImpact> GetRevisionPurgeImpactAsync(
         ResourceNamespace @namespace,
