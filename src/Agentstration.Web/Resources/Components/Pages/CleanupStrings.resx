@@ -12,7 +12,7 @@
   <data name="AccessDenied" xml:space="preserve"><value>Workspace cleanup requires both resource deletion and Run deletion permissions.</value></data>
   <data name="Retry" xml:space="preserve"><value>Retry</value></data>
   <data name="WarningTitle" xml:space="preserve"><value>Deletion is permanent</value></data>
-  <data name="WarningMessage" xml:space="preserve"><value>Each item is deleted through its canonical API. Successful deletions are not rolled back when another selected item fails.</value></data>
+  <data name="WarningMessage" xml:space="preserve"><value>Successful deletions are not rolled back when another selected item fails.</value></data>
   <data name="InventorySummary" xml:space="preserve"><value>Cleanup inventory summary</value></data>
   <data name="Kind.Runs" xml:space="preserve"><value>Terminal Runs</value></data>
   <data name="Kind.Entries" xml:space="preserve"><value>Entries</value></data>
@@ -26,6 +26,7 @@
   <data name="SearchPlaceholder" xml:space="preserve"><value>Search by name, ID or namespace…</value></data>
   <data name="SearchLabel" xml:space="preserve"><value>Search cleanup inventory</value></data>
   <data name="ClearSelection" xml:space="preserve"><value>Clear selection</value></data>
+  <data name="SelectEverything" xml:space="preserve"><value>Select all elements and options</value></data>
   <data name="EntryOptionsTitle" xml:space="preserve"><value>Entry dependency options</value></data>
   <data name="EntryOptionsDescription" xml:space="preserve"><value>These options apply only to selected Entries. Closing Interactions also cancels their current work and pending actions.</value></data>
   <data name="RemoveDashboardReferences" xml:space="preserve"><value>Remove Dashboard references</value></data>
