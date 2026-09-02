@@ -185,7 +185,7 @@ Anonymous password reset, email confirmation, MFA, passkeys, recovery codes, acc
 | Role | Permissions |
 | --- | --- |
 | `Owner` | every currently defined permission |
-| `Admin` | Tenant read; Workspace read/write; resource read/write/delete; Run read/execute; authorization read/write |
+| `Admin` | Tenant read; Workspace read/write; resource read/write/delete; Run read/execute/delete; authorization read/write |
 | `Member` | Workspace read; resource read; Run read/execute |
 | `Viewer` | Workspace read; resource read; Run read |
 
@@ -197,6 +197,7 @@ workspaces/read              workspaces/write
 workspaces/delete            resources/read
 resources/write              resources/delete
 runs/read                    runs/execute
+runs/delete
 authorization/read           authorization/write
 ```
 
@@ -220,6 +221,7 @@ Membership administration supports list, assignment/change, and removal. It crea
 | `agentstration:resources:delete` | `resources/delete` in the current context |
 | `agentstration:runs:read` | `runs/read` in the current context |
 | `agentstration:runs:execute` | `runs/execute` in the current context |
+| `agentstration:runs:delete` | `runs/delete` in the current context |
 
 `WorkspacePermissionHandler` evaluates contextual requests. `WorkspaceResourcePermissionHandler` additionally verifies that a loaded Workspace resource matches the Principal, Tenant, and selected Workspace. Endpoints declare policies; they do not inspect provider claims or implement role rules.
 
@@ -229,7 +231,7 @@ The protected business verticals cover Management resources, Flow, Runtime, Work
 
 PATs are delegated credentials for scripts and CLI clients. They are bound to one active human Principal and exactly one Workspace. Their effective authorization is always the intersection of the live authorization result and the token allow-list; a token can reduce access but never increase it. Ordinary Principals must retain active Workspace membership, while a global Platform administrator may use a Workspace-scoped PAT without materializing one.
 
-Supported permissions are `workspaces/read`, `resources/read`, `resources/write`, `resources/delete`, `runs/read`, and `runs/execute`. Expiration is mandatory and limited to 365 days. The complete `agt_pat_…` Bearer value is returned once. Only its SHA-256 digest and a non-secret prefix are persisted. A revoked or expired token and a disabled Principal or Workspace fail authentication immediately; inactive membership also fails for a non-Platform administrator.
+Supported permissions are `workspaces/read`, `resources/read`, `resources/write`, `resources/delete`, `runs/read`, `runs/execute`, and `runs/delete`. Expiration is mandatory and limited to 365 days. The complete `agt_pat_…` Bearer value is returned once. Only its SHA-256 digest and a non-secret prefix are persisted. A revoked or expired token and a disabled Principal or Workspace fail authentication immediately; inactive membership also fails for a non-Platform administrator.
 
 PAT administration is deliberately interactive: a PAT cannot create, list, revoke, or use Platform administration. The owner can revoke one or all tokens; a Platform administrator can list metadata and revoke one or all tokens of another Principal. Revocation affects the next request and does not interrupt already-running work.
 

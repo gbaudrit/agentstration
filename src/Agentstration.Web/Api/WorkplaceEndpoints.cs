@@ -30,10 +30,12 @@ public static partial class WorkplaceEndpoints
         endpoints.MapPut("/api/management/entries/{entryName}", PutEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         endpoints.MapPost("/api/management/entries/{entryName}/validate", ValidateEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         endpoints.MapPost("/api/management/entries/{entryName}/publish", PublishEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        endpoints.MapDelete("/api/management/entries/{entryName}", DeleteEntryAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
         endpoints.MapGet("/api/namespaces/{namespace}/entries/{entryName}", GetNamespacedEntryAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}", GetNamespacedEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         endpoints.MapPut("/api/namespaces/{namespace}/management/entries/{entryName}", PutNamespacedEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         endpoints.MapPost("/api/namespaces/{namespace}/management/entries/{entryName}/publish", PublishNamespacedEntryDraftAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        endpoints.MapDelete("/api/namespaces/{namespace}/management/entries/{entryName}", DeleteNamespacedEntryAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
         endpoints.MapGet("/api/management/entries/{entryName}/dependencies", GetEntryDependenciesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         endpoints.MapGet("/api/namespaces/{namespace}/management/entries/{entryName}/dependencies", GetNamespacedEntryDependenciesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         endpoints.MapGet("/api/resources", ListResourcesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);

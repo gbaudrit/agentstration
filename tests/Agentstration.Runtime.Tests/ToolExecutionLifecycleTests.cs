@@ -751,6 +751,7 @@ public sealed class ToolExecutionLifecycleTests
             Task.FromResult<StoredRuntimeRun?>(workspaceId == Current.Value.WorkspaceId && runId == Current.Value.Id ? Current : null);
         public Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(WorkspaceId workspaceId, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<RuntimeRunKey>> ListRecoverableAsync(int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<StoredRuntimeRun> UpdateAsync(RuntimeRun value, string expectedETag, CancellationToken cancellationToken)
         {
             if (expectedETag != Current.ETag) throw new RuntimeRunConcurrencyException("ETag mismatch.");

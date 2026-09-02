@@ -68,6 +68,18 @@ public static partial class WorkplaceEndpoints
     private static Task<IResult> PublishNamespacedEntryDraftAsync(string @namespace, string entryName, EntryAdministrationService service, CancellationToken token) =>
         ExecuteAsync(async () => Results.Ok(await service.PublishAsync(NamespacedEntryId(@namespace, entryName), token)));
 
+    private static Task<IResult> DeleteEntryAsync(string entryName, bool? removeDashboardReferences, bool? closeInteractions, EntryAdministrationService service, CancellationToken token) =>
+        DeleteEntryCoreAsync(EntryResourceId(entryName), removeDashboardReferences, closeInteractions, service, token);
+
+    private static Task<IResult> DeleteNamespacedEntryAsync(string @namespace, string entryName, bool? removeDashboardReferences, bool? closeInteractions, EntryAdministrationService service, CancellationToken token) =>
+        DeleteEntryCoreAsync(NamespacedEntryId(@namespace, entryName), removeDashboardReferences, closeInteractions, service, token);
+
+    private static Task<IResult> DeleteEntryCoreAsync(EntryId entryId, bool? removeDashboardReferences, bool? closeInteractions, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        await service.DeleteAsync(entryId, removeDashboardReferences == true, closeInteractions == true, token);
+        return Results.NoContent();
+    });
+
     private static Task<IResult> GetEntryDependenciesAsync(string entryName, EntryAdministrationService service, CancellationToken token) => ExecuteAsync(async () =>
         Results.Ok((await service.GetDependenciesAsync(EntryResourceId(entryName), token)).Select(value => new EntryDependencyResponse(value.ResourceId, value.ResourceType, value.Relationship))));
 

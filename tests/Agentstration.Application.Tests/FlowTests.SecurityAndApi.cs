@@ -165,6 +165,8 @@ public sealed partial class FlowTests
         await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.GetInputAsync(otherPrincipal.Value.Id, otherPrincipalRequest.Value.Id, TestScope, default));
         await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.ListEventsAsync(TestScope, otherPrincipal.Value.Id, 0, default));
         await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.CancelAsync(otherPrincipal.Value.Id, TestScope, default));
+        await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => runs.DeleteAsync(otherPrincipal.Value.Id, otherPrincipal.ETag, TestScope, default));
+        Assert.IsNotNull(await fixture.Repository.GetRunAsync(otherPrincipalScope, otherPrincipal.Value.Id, default));
         await using var observation = runs.ObserveAsync(otherPrincipal.Value.Id, TestScope, default).GetAsyncEnumerator();
         await Assert.ThrowsExactlyAsync<FlowRunNotFoundException>(() => observation.MoveNextAsync().AsTask());
 
@@ -278,6 +280,49 @@ public sealed partial class FlowTests
             .ToArray();
         Assert.Contains("/api/flowRuns/{runId}", routes);
         Assert.DoesNotContain("/flowRuns/{runId}", routes);
+    }
+
+    [TestMethod]
+    public async Task FlowRunDeleteApiRequiresTerminalStatusAndCurrentETag()
+    {
+        var queue = new TestFlowRunQueue();
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IFlowRunQueue>();
+                services.AddSingleton<IFlowRunQueue>(queue);
+            });
+        });
+        using var client = factory.CreateClient();
+        var definition = new CreateFlowRequest("delete-api-flow", "Delete API flow", "1.0.0", true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "sql-expert")));
+        Assert.AreEqual(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/flows", definition, JsonOptions)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/flows/delete-api-flow/versions", new CreateFlowVersionRequest("1.0.0"), JsonOptions)).StatusCode);
+        using var input = JsonDocument.Parse("""{"prompt":"delete me"}""");
+        using var createdResponse = await client.PostAsJsonAsync("/api/flows/delete-api-flow/runs", new CreateFlowRunRequest(input.RootElement.Clone()), JsonOptions);
+        var created = await createdResponse.Content.ReadFromJsonAsync<FlowRun>(JsonOptions);
+        Assert.IsNotNull(created);
+        var createdETag = createdResponse.Headers.ETag?.Tag;
+        Assert.IsNotNull(createdETag);
+
+        Assert.AreEqual(HttpStatusCode.BadRequest, (await client.DeleteAsync($"/api/flowRuns/{created.Id}")).StatusCode);
+        using var pendingDelete = new HttpRequestMessage(HttpMethod.Delete, $"/api/flowRuns/{created.Id}");
+        pendingDelete.Headers.TryAddWithoutValidation("If-Match", createdETag);
+        Assert.AreEqual(HttpStatusCode.Conflict, (await client.SendAsync(pendingDelete)).StatusCode);
+
+        Assert.AreEqual(HttpStatusCode.OK, (await client.PostAsync($"/api/flowRuns/{created.Id}/cancel", null)).StatusCode);
+        using var currentResponse = await client.GetAsync($"/api/flowRuns/{created.Id}");
+        var currentETag = currentResponse.Headers.ETag?.Tag;
+        Assert.IsNotNull(currentETag);
+        using var staleDelete = new HttpRequestMessage(HttpMethod.Delete, $"/api/flowRuns/{created.Id}");
+        staleDelete.Headers.TryAddWithoutValidation("If-Match", createdETag);
+        Assert.AreEqual(HttpStatusCode.PreconditionFailed, (await client.SendAsync(staleDelete)).StatusCode);
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, $"/api/flowRuns/{created.Id}");
+        delete.Headers.TryAddWithoutValidation("If-Match", currentETag);
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.SendAsync(delete)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync($"/api/flowRuns/{created.Id}")).StatusCode);
     }
 
     [TestMethod]

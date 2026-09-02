@@ -109,6 +109,9 @@ public sealed class EntryAdministrationService(
     public Task DeleteAsync(WorkspaceId workspaceId, EntryId id, CancellationToken cancellationToken) =>
         DeleteAsync(workspaceId, id, removeDashboardReferences: false, closeInteractions: false, cancellationToken);
 
+    public Task DeleteAsync(EntryId id, bool removeDashboardReferences, bool closeInteractions, CancellationToken cancellationToken) =>
+        DeleteAsync(context.WorkspaceId, id, removeDashboardReferences, closeInteractions, cancellationToken);
+
     public async Task DeleteAsync(
         WorkspaceId workspaceId,
         EntryId id,

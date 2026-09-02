@@ -166,6 +166,20 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
         return new StoredRuntimeRun(versioned, etag, now);
     }
 
+    public async Task DeleteAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var run = await context.Runs.SingleOrDefaultAsync(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId, cancellationToken)
+            ?? throw new RuntimeRunNotFoundException(runId);
+        if (!string.Equals(run.ETag, expectedETag, StringComparison.Ordinal))
+            throw new RuntimeRunConcurrencyException("The supplied ETag does not match the current Runtime Run version.");
+        context.Events.RemoveRange(await context.Events.Where(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId).ToArrayAsync(cancellationToken));
+        context.ExecutionStates.RemoveRange(await context.ExecutionStates.Where(value => value.WorkspaceId == workspaceId.Value && value.RunId == runId).ToArrayAsync(cancellationToken));
+        context.Runs.Remove(run);
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateConcurrencyException exception) { throw new RuntimeRunConcurrencyException(exception.Message); }
+    }
+
     public async Task<RuntimeRunEvent> AppendEventAsync(RuntimeRunEvent runEvent, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);

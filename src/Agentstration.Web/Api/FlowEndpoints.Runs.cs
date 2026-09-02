@@ -71,6 +71,14 @@ public static partial class FlowEndpoints
         return Results.Ok(stored.Value);
     });
 
+    private static Task<IResult> DeleteRunAsync(string runId, HttpRequest request, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var expectedETag = request.Headers.IfMatch.FirstOrDefault()
+            ?? throw new FlowValidationException("if_match_required", "Deleting a Flow Run requires an If-Match ETag.");
+        await service.DeleteAsync(runId, expectedETag, CurrentScope(requestContext), token);
+        return Results.NoContent();
+    });
+
     private static Task<IResult> CancelFlowRunAsync(string id, string runId, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         var scope = CurrentScope(requestContext);

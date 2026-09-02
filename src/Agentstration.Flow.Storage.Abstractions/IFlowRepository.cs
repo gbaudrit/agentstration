@@ -34,6 +34,7 @@ public interface IFlowRepository
     Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(int skip, int take, CancellationToken cancellationToken);
     Task<StoredFlowRun> UpdateRunAsync(FlowRun run, string expectedETag, CancellationToken cancellationToken);
+    Task DeleteRunAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken);
     Task<StoredFlowDraft> CreateDraftAsync(FlowDraft draft, CancellationToken cancellationToken);
     Task<StoredFlowDraft?> GetDraftAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken);
     Task<StoredFlowDraft> UpdateDraftAsync(FlowDraft draft, string expectedETag, CancellationToken cancellationToken);
@@ -48,3 +49,5 @@ public interface IFlowRepository
 public sealed class FlowConcurrencyException(string message) : Exception(message);
 public sealed class FlowNotFoundException(FlowId id) : KeyNotFoundException($"Flow '{id}' was not found.");
 public sealed class FlowRunNotFoundException(string id) : KeyNotFoundException($"Flow run '{id}' was not found.");
+public sealed class FlowRunNotTerminalException(string id, FlowRunStatus status)
+    : Exception($"Flow run '{id}' is '{status}' and cannot be deleted until it reaches a terminal status.");

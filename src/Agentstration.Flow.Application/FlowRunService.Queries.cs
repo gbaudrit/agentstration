@@ -23,6 +23,13 @@ public sealed partial class FlowRunService
     public Task<FlowRunPage> ListAsync(FlowId? flowId, FlowRunStatus? status, int skip, int take, FlowRunScope scope, CancellationToken cancellationToken) =>
         repository.ListRunsAsync(scope, flowId, status, skip, take, cancellationToken);
 
+    public async Task DeleteAsync(string runId, string expectedETag, FlowRunScope scope, CancellationToken cancellationToken)
+    {
+        var stored = await RequiredAsync(runId, scope, cancellationToken);
+        if (!stored.Value.Status.IsTerminal()) throw new FlowRunNotTerminalException(runId, stored.Value.Status);
+        await repository.DeleteRunAsync(scope.WorkspaceId, runId, expectedETag, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<StoredInputRequest>> ListInputsAsync(
         string runId,
         InputRequestStatus? status,

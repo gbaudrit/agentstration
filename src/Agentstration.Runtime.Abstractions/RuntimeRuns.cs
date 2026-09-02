@@ -138,6 +138,7 @@ public interface IRuntimeRunStore
     Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(WorkspaceId workspaceId, string? agentResourceId, int skip, int take, CancellationToken cancellationToken);
     Task<IReadOnlyList<RuntimeRunKey>> ListRecoverableAsync(int skip, int take, CancellationToken cancellationToken);
     Task<StoredRuntimeRun> UpdateAsync(RuntimeRun run, string expectedETag, CancellationToken cancellationToken);
+    Task DeleteAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken);
     Task<RuntimeRunEvent> AppendEventAsync(RuntimeRunEvent runEvent, CancellationToken cancellationToken);
     Task<IReadOnlyList<RuntimeRunEvent>> ListEventsAsync(WorkspaceId workspaceId, string runId, long afterSequence, CancellationToken cancellationToken);
 }
@@ -181,6 +182,8 @@ public interface IRuntimeRunCancellationRegistry
 public sealed class RuntimeRunNotFoundException(string runId) : Exception($"Runtime run '{runId}' was not found.");
 public sealed class RuntimeRunConcurrencyException(string message) : Exception(message);
 public sealed class RuntimeRunValidationException(string code, string message) : Exception(message) { public string Code { get; } = code; }
+public sealed class RuntimeRunNotTerminalException(string runId, RuntimeRunState state)
+    : Exception($"Runtime run '{runId}' is '{state}' and cannot be deleted until it reaches a terminal state.");
 
 public static class RuntimeRunStateExtensions
 {
