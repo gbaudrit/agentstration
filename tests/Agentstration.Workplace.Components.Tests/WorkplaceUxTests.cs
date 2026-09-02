@@ -51,6 +51,8 @@ public sealed class WorkplaceUxTests
         Assert.AreEqual("true", primary.Find(".primary-entry-visual").GetAttribute("aria-hidden"));
         Assert.AreEqual(string.Empty, primary.Find(".primary-entry-visual img").GetAttribute("alt"));
         Assert.AreEqual("true", primary.Find(".composer-core").GetAttribute("aria-hidden"));
+        Assert.IsTrue(primary.Find(".composer-core img").GetAttribute("src")?.EndsWith("agentstration-mark.png", StringComparison.Ordinal));
+        Assert.AreEqual(0, primary.FindAll(".composer-symbol").Count);
         Assert.AreEqual(1, standard.FindAll(".prompt-composer").Count);
     }
 
@@ -78,6 +80,20 @@ public sealed class WorkplaceUxTests
 
         Assert.AreEqual(1, rendered.FindAll(".conversation-composer").Count);
         Assert.IsFalse(rendered.Find("#conversation-message").HasAttribute("disabled"));
+    }
+
+    [TestMethod]
+    public void NewConversationActionHasAnExplicitAccessibleName()
+    {
+        using var context = CreateContext();
+        var rendered = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+
+        var action = rendered.Find(".interaction-actions button");
+        var expected = Localizer(context)["NewRequest"].Value;
+        Assert.AreEqual(expected, action.GetAttribute("aria-label"));
+        Assert.AreEqual(expected, action.GetAttribute("title"));
+        StringAssert.EndsWith(action.QuerySelector("use")?.GetAttribute("href"), "#tabler-message-plus");
     }
 
     [TestMethod]
@@ -388,7 +404,7 @@ public sealed class WorkplaceUxTests
                 .Add(value => value.ArtifactContentUrl, _ => "/content"));
 
             StringAssert.Contains(conversation.Markup, "Demande actuelle");
-            StringAssert.Contains(conversation.Markup, "Nouvelle demande");
+            StringAssert.Contains(conversation.Markup, "Nouvelle conversation");
             StringAssert.Contains(conversation.Markup, "En direct");
             StringAssert.Contains(conversation.Markup, "Tâche");
             StringAssert.Contains(conversation.Markup, "Terminée");
@@ -534,6 +550,9 @@ public sealed class WorkplaceUxTests
     {
         var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var autoScroll = context.JSInterop.SetupModule("./_content/Agentstration.Workplace.Components/conversation-auto-scroll.js");
+        autoScroll.SetupVoid("initialize", _ => true);
+        autoScroll.SetupVoid("dispose", _ => true);
         return context;
     }
 

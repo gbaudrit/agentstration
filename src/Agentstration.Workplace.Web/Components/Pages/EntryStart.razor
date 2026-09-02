@@ -1,0 +1,96 @@
+@page "/w/{WorkspaceName}/d/{DashboardName}/start/{EntryNamespace}/{EntryName}"
+@attribute [StreamRendering]
+@implements IDisposable
+@inject IWorkplaceApiClient Api
+@inject NavigationManager Navigation
+@inject WorkplaceContextState WorkplaceContext
+@inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplacePageStrings> Localizer
+
+<PageTitle>@(entry?.DisplayName ?? T("StartEntry")) · Workplace</PageTitle>
+
+@if (loading)
+{
+    <LoadingState />
+}
+else if (loadError is not null)
+{
+    <ServiceUnavailableState Message="@loadError" />
+}
+else if (entry is not null)
+{
+    <section class="entry-start-page" aria-labelledby="entry-start-heading">
+        <a class="entry-start-back" href="@DashboardUrl"><UiIcon Name="arrow-left" /> <span>@T("BackToDashboard")</span></a>
+        <header class="entry-start-header">
+            <span class="entry-start-icon" aria-hidden="true"><UiIcon Name="@(entry.Presentation.Icon ?? "sparkle")" /></span>
+            <div>
+                <p class="eyebrow">@T("StartEntry")</p>
+                <h1 id="entry-start-heading">@entry.DisplayName</h1>
+                @if (!string.IsNullOrWhiteSpace(entry.Description)) { <p>@entry.Description</p> }
+            </div>
+        </header>
+        <div class="entry-start-form">
+            <EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Standard" OnSubmit="SubmitAsync" Disabled="busy" Busy="busy" />
+        </div>
+        @if (submitError is not null) { <p class="entry-start-error" role="alert">@submitError</p> }
+    </section>
+}
+
+@code {
+    private EntryResponse? entry;
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true;
+    private bool busy;
+    private string? loadError;
+    private string? submitError;
+
+    [Parameter, EditorRequired] public required string WorkspaceName { get; set; }
+    [Parameter, EditorRequired] public required string DashboardName { get; set; }
+    [Parameter, EditorRequired] public required string EntryNamespace { get; set; }
+    [Parameter, EditorRequired] public required string EntryName { get; set; }
+
+    private string DashboardUrl => $"/w/{Uri.EscapeDataString(WorkspaceName)}/d/{Uri.EscapeDataString(DashboardName)}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        loadError = null;
+        try
+        {
+            var workspace = await Api.GetWorkspaceAsync(WorkspaceName, lifetime.Token);
+            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName);
+            entry = await Api.GetEntryAsync(new EntryId(EntryName, Agentstration.Resources.ResourceNamespace.Parse(EntryNamespace)), lifetime.Token);
+        }
+        catch when (!lifetime.IsCancellationRequested)
+        {
+            loadError = T("EntryLoadError");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task SubmitAsync(IReadOnlyDictionary<string, JsonElement> values)
+    {
+        if (entry is null || busy) return;
+        busy = true;
+        submitError = null;
+        try
+        {
+            var submission = await Api.SubmitAsync(WorkspaceName, new EntryId(entry.Id, entry.Namespace), values, lifetime.Token);
+            Navigation.NavigateTo($"{DashboardUrl}/conversations/{submission.Interaction.Id}");
+        }
+        catch when (!lifetime.IsCancellationRequested)
+        {
+            submitError = T("RequestSendError");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private string T(string key) => Localizer[key];
+    private static EntryResource ToDefinition(EntryResponse value) => new() { WorkspaceId = new(value.WorkspaceId), Id = new(value.Id, value.Namespace), Name = value.Name, DisplayName = value.DisplayName, Description = value.Description, Presentation = value.Presentation, ResolvedTarget = value.ResolvedTarget, Behavior = value.Behavior, ApiVersion = value.ApiVersion, Type = value.Type, Version = value.Version, PublishedAt = value.PublishedAt };
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); GC.SuppressFinalize(this); }
+}

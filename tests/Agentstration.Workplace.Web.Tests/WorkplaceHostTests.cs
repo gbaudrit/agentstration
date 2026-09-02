@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
+using Agentstration.Resources;
 using Agentstration.Web.Components.State;
+using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Web.Components.Pages;
@@ -115,6 +118,105 @@ public sealed class WorkplaceHostTests
     }
 
     [TestMethod]
+    public async Task ConversationRouteIsHandledAsADedicatedWorkplacePage()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Agentstration:ApiBaseUrl", "http://127.0.0.1:1/");
+            builder.UseSetting("Agentstration:WorkplaceHubUrl", "http://127.0.0.1:1/hubs/workplace");
+        });
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/w/personal/d/home/conversations/11111111-1111-1111-1111-111111111111");
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.IsFalse(html.Contains("Page not found", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void ActivityListsConversationsWithLinksToTheirDedicatedPage()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        using var httpClient = new HttpClient(new ActivityHandler()) { BaseAddress = new Uri("http://localhost/") };
+        context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
+        context.Services.AddSingleton<WorkplaceContextState>();
+
+        var rendered = context.Render<Tasks>(parameters => parameters.Add(value => value.WorkspaceName, "personal"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(2, rendered.FindAll("[role='tab']").Count);
+            var conversation = rendered.Find(".conversation-list-card");
+            Assert.AreEqual("/w/personal/d/home/conversations/11111111-1111-1111-1111-111111111111", conversation.GetAttribute("href"));
+            StringAssert.Contains(conversation.TextContent, "Prepare the quarterly review");
+            var expectedResumeLabel = context.Services
+                .GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<WorkplacePageStrings>>()["Resume"];
+            StringAssert.Contains(conversation.TextContent, expectedResumeLabel);
+        });
+
+        rendered.Find("#tasks-tab").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("true", rendered.Find("#tasks-tab").GetAttribute("aria-selected"));
+            Assert.AreEqual(1, rendered.FindAll("#tasks-panel").Count);
+            Assert.AreEqual(0, rendered.FindAll("#conversations-panel").Count);
+        });
+    }
+
+    [TestMethod]
+    public void HomeLinksCompactAlternativeEntriesToADedicatedStartPage()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        using var httpClient = new HttpClient(new HomeEntriesHandler()) { BaseAddress = new Uri("http://localhost/") };
+        context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
+        context.Services.AddSingleton(new WorkplaceRealtimeClient(new Uri("http://127.0.0.1:1/hubs/workplace"), null));
+        context.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        context.Services.AddSingleton<IHostEnvironment>(new TestHostEnvironment());
+        context.Services.AddSingleton<WorkplaceContextState>();
+
+        var rendered = context.Render<Home>(parameters => parameters
+            .Add(value => value.WorkspaceName, "personal")
+            .Add(value => value.DashboardName, "home"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("Start here", rendered.Find(".primary-entry-container textarea").GetAttribute("placeholder"));
+            Assert.AreEqual(1, rendered.FindAll(".mobile-entry-options a").Count);
+            Assert.AreEqual(0, rendered.FindAll(".mobile-tools-toggle").Count);
+            var alternative = rendered.Find(".mobile-entry-options a");
+            StringAssert.Contains(alternative.TextContent, "Quick question");
+            Assert.AreEqual("/w/personal/d/home/start/default/quick", alternative.GetAttribute("href"));
+        }, TimeSpan.FromSeconds(10));
+    }
+
+    [TestMethod]
+    public void DedicatedStartPageLoadsTheSelectedEntryWithoutTheDashboardCatalog()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        using var httpClient = new HttpClient(new HomeEntriesHandler()) { BaseAddress = new Uri("http://localhost/") };
+        context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
+        context.Services.AddSingleton<WorkplaceContextState>();
+
+        var rendered = context.Render<EntryStart>(parameters => parameters
+            .Add(value => value.WorkspaceName, "personal")
+            .Add(value => value.DashboardName, "home")
+            .Add(value => value.EntryNamespace, "default")
+            .Add(value => value.EntryName, "quick"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Find(".entry-start-header").TextContent, "Quick question");
+            Assert.AreEqual("Ask quickly", rendered.Find(".entry-start-form textarea").GetAttribute("placeholder"));
+            Assert.AreEqual("/w/personal/d/home", rendered.Find(".entry-start-back").GetAttribute("href"));
+            Assert.AreEqual(0, rendered.FindAll(".mobile-entry-options").Count);
+        });
+    }
+
+    [TestMethod]
     public async Task ComponentStyleBundlesAreServedByTheWorkplaceHost()
     {
         await using var factory = new WebApplicationFactory<Program>();
@@ -123,6 +225,8 @@ public sealed class WorkplaceHostTests
         var sharedStyles = await client.GetStringAsync("/_content/Agentstration.Web.Components/Agentstration.Web.Components.bundle.scp.css");
         var workplaceStyles = await client.GetStringAsync("/_content/Agentstration.Workplace.Components/Agentstration.Workplace.Components.bundle.scp.css");
         var hostStyles = await client.GetStringAsync("/Agentstration.Workplace.Web.styles.css");
+        var appStyles = await client.GetStringAsync("/app.css");
+        var autoScroll = await client.GetStringAsync("/_content/Agentstration.Workplace.Components/conversation-auto-scroll.js");
         var darkLogo = await client.GetByteArrayAsync("/_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-dark.png");
 
         StringAssert.Contains(sharedStyles, ".ui-icon");
@@ -131,14 +235,28 @@ public sealed class WorkplaceHostTests
         StringAssert.Contains(workplaceStyles, ".navigation-group h2");
         StringAssert.Contains(workplaceStyles, "grid-template-columns:repeat(3,minmax(0,1fr))");
         StringAssert.Contains(workplaceStyles, ".mobile-profile");
-        StringAssert.Contains(workplaceStyles, ".composer-symbol");
+        StringAssert.Contains(workplaceStyles, ".composer-core");
+        StringAssert.Contains(workplaceStyles, "composer-orbit");
+        StringAssert.Contains(workplaceStyles, "object-fit:contain");
         StringAssert.Contains(workplaceStyles, "flex-direction:column");
+        StringAssert.Contains(workplaceStyles, "bottom:calc(88px + env(safe-area-inset-bottom))");
+        StringAssert.Contains(workplaceStyles, "align-content:start");
+        StringAssert.Contains(workplaceStyles, "align-items:center;gap:.35rem");
+        StringAssert.Contains(workplaceStyles, "padding:1rem 1rem 2rem");
+        StringAssert.Contains(workplaceStyles, "overflow-wrap:anywhere");
         StringAssert.Contains(workplaceStyles, ".side-nav[b-");
         StringAssert.Contains(workplaceStyles, ".mobile-brand-logo");
         StringAssert.Matches(workplaceStyles, new Regex(@"\.entry-renderer\[b-[^\]]+\]\s+form", RegexOptions.CultureInvariant));
         StringAssert.Contains(hostStyles, ".mobile-dashboard-cards");
         StringAssert.Contains(hostStyles, "grid-auto-flow:column");
         StringAssert.Contains(hostStyles, "grid-auto-columns:4.85rem");
+        StringAssert.Contains(hostStyles, ".mobile-entry-options");
+        StringAssert.Contains(hostStyles, ".entry-start-page");
+        StringAssert.Contains(hostStyles, "align-content:start");
+        Assert.IsFalse(appStyles.Contains(".workplace-shell>.sidebar{display:none}", StringComparison.Ordinal));
+        StringAssert.Contains(autoScroll, "currentScrollTop < state.lastScrollTop");
+        StringAssert.Contains(autoScroll, "distanceFromBottom(state.target) <= bottomThreshold");
+        StringAssert.Contains(autoScroll, "MutationObserver");
         Assert.IsTrue(darkLogo.Length > 10_000);
     }
 
@@ -193,6 +311,80 @@ public sealed class WorkplaceHostTests
 
         private static WorkplaceDashboardResponse Dashboard(string name, string displayName, bool isDefault) =>
             new(name, WorkspaceId, name, "Dashboard", "v1", displayName, null, isDefault, [], 1, DateTimeOffset.UnixEpoch);
+    }
+
+    private sealed class ActivityHandler : HttpMessageHandler
+    {
+        private static readonly Guid WorkspaceId = Guid.Parse("525118a7-00e9-49ae-aa6c-d42c382f1a8b");
+        private static readonly Guid ConversationId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var now = new DateTimeOffset(2026, 9, 2, 9, 30, 0, TimeSpan.Zero);
+            var message = new ConversationMessage(
+                Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                new WorkspaceId(WorkspaceId),
+                new InteractionId(ConversationId),
+                null,
+                ConversationRole.User,
+                "Prepare the quarterly review",
+                now);
+            object payload = request.RequestUri?.PathAndQuery switch
+            {
+                "/api/workspaces/personal" => new WorkplaceWorkspaceResponse(WorkspaceId, "personal", "Personal"),
+                "/api/workspaces/personal/dashboard" => new WorkplaceDashboardResponse("home", WorkspaceId, "home", "Dashboard", "v1", "Home", null, true, [], 1, now),
+                "/api/workspaces/personal/interactions?take=50" => new InteractionPageResponse([
+                    new InteractionResponse(ConversationId, WorkspaceId, "discover", InteractionStatus.Idle, now, now, new Dictionary<string, JsonElement>(), [], [message], null, null, null, 1)
+                ]),
+                "/api/workspaces/personal/tasks" => new WorkTaskPageResponse([]),
+                _ => throw new InvalidOperationException($"Unexpected request: {request.RequestUri}")
+            };
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(payload) });
+        }
+    }
+
+    private sealed class HomeEntriesHandler : HttpMessageHandler
+    {
+        private static readonly Guid WorkspaceId = Guid.Parse("525118a7-00e9-49ae-aa6c-d42c382f1a8b");
+        private static readonly DateTimeOffset Now = new(2026, 9, 2, 9, 30, 0, TimeSpan.Zero);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            object payload = request.RequestUri?.AbsolutePath switch
+            {
+                "/api/workspaces/personal" => new WorkplaceWorkspaceResponse(WorkspaceId, "personal", "Personal"),
+                "/api/workspaces/personal/dashboards" => new[]
+                {
+                    new WorkplaceDashboardResponse("home", WorkspaceId, "home", "Dashboard", "v1", "Home", null, true,
+                    [
+                        new DashboardEntryReferenceResponse("main", DashboardItemRole.Primary, 0),
+                        new DashboardEntryReferenceResponse("quick", DashboardItemRole.Standard, 10)
+                    ], 1, Now)
+                },
+                "/api/entries/main" => Entry("main", "Main request", "Start here"),
+                "/api/entries/quick" => Entry("quick", "Quick question", "Ask quickly"),
+                "/api/workspaces/personal/tasks" => new WorkTaskPageResponse([]),
+                "/api/workspaces/personal/notifications/unread-count" => new UnreadNotificationCountResponse(0),
+                _ => throw new InvalidOperationException($"Unexpected request: {request.RequestUri}")
+            };
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(payload) });
+        }
+
+        private static EntryResponse Entry(string id, string displayName, string placeholder) => new(
+            WorkspaceId,
+            id,
+            id,
+            WorkResourceTypes.Entries,
+            WorkplaceApiVersions.CoreV1,
+            displayName,
+            $"Description for {displayName}",
+            new EntryPresentation { Placeholder = placeholder, Icon = "sparkle" },
+            new EntryResolvedTarget($"{id}-flow", "v1"),
+            new EntryBehavior(),
+            1,
+            Now);
     }
 
     private sealed class TestHostEnvironment : IHostEnvironment

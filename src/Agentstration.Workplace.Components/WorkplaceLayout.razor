@@ -4,6 +4,7 @@
 @inject NavigationManager Navigation
 @inject UserPreferencesState Preferences
 @inject WorkplaceContextState WorkplaceContext
+@inject IRecentConversationNavigationProvider RecentConversationNavigation
 @inject IJSRuntime JS
 <div class="app-shell @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light") workplace-shell">
     <aside class="sidebar" aria-label="@T("WorkplaceNavigation")">
@@ -30,6 +31,16 @@
                         <span class="nav-icon nav-icon-desktop" aria-hidden="true"><UiIcon Name="tasks" /></span><span class="nav-icon nav-icon-mobile" aria-hidden="true"><UiIcon Name="activity" /></span><span class="nav-label">@T("Activity")</span>
                     </NavLink>
                 }
+                @if (recentConversations.Count > 0)
+                {
+                    <div class="recent-conversation-navigation">
+                        <h3>@T("RecentConversations")</h3>
+                        @foreach (var conversation in recentConversations)
+                        {
+                            <NavLink href="@conversation.Url"><span aria-hidden="true"><UiIcon Name="message" /></span><span>@conversation.Title</span></NavLink>
+                        }
+                    </div>
+                }
             </section>
             <span class="mobile-profile" aria-label="@F("ProfileFor", UserDisplayName)" title="@UserDisplayName"><span aria-hidden="true">@UserInitials</span></span>
         </nav>
@@ -38,7 +49,7 @@
     <div class="workspace">
         <header class="mobile-appbar">
             <a class="mobile-brand" href="@HomeUrl" aria-label="@T("WorkplaceHome")">
-                <img class="mobile-brand-logo" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-dark.png" alt="" />
+                <img class="mobile-brand-logo" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-white-transparent.png" alt="" />
             </a>
             <a class="mobile-notifications" href="@NotificationsUrl" aria-label="@T("OpenNotifications")"><UiIcon Name="notifications" /></a>
         </header>
@@ -49,12 +60,15 @@
 @code {
     private readonly CancellationTokenSource lifetimeCancellation = new();
     private IJSObjectReference? themeModule;
+    private IReadOnlyList<RecentConversationNavigationItem> recentConversations = [];
 
     protected override async Task OnInitializedAsync()
     {
         Preferences.Changed += OnPreferencesChanged;
         WorkplaceContext.Changed += OnWorkplaceContextChanged;
+        Navigation.LocationChanged += OnLocationChanged;
         await Preferences.LoadAsync(lifetimeCancellation.Token);
+        await LoadRecentConversationsAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -68,6 +82,32 @@
     private Task ToggleThemeAsync() => Preferences.ToggleThemeAsync(lifetimeCancellation.Token);
     private void OnPreferencesChanged() => _ = InvokeAsync(StateHasChanged);
     private void OnWorkplaceContextChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) =>
+        _ = InvokeAsync(LoadRecentConversationsAsync);
+
+    private async Task LoadRecentConversationsAsync()
+    {
+        var workspaceName = CurrentWorkspace;
+        if (workspaceName is null)
+        {
+            recentConversations = [];
+            return;
+        }
+
+        try
+        {
+            recentConversations = await RecentConversationNavigation.ListAsync(
+                workspaceName,
+                CurrentDashboard,
+                lifetimeCancellation.Token);
+        }
+        catch when (!lifetimeCancellation.IsCancellationRequested)
+        {
+            recentConversations = [];
+        }
+
+        StateHasChanged();
+    }
 
     private string? CurrentWorkspace
     {
@@ -80,6 +120,16 @@
         }
     }
     private string HomeUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}";
+    private string? CurrentDashboard
+    {
+        get
+        {
+            var segments = Navigation.ToBaseRelativePath(Navigation.Uri).Split('/', StringSplitOptions.RemoveEmptyEntries);
+            return segments.Length >= 4 && string.Equals(segments[2], "d", StringComparison.Ordinal)
+                ? Uri.UnescapeDataString(segments[3])
+                : null;
+        }
+    }
     private string TasksUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}/tasks";
     private string NotificationsUrl => CurrentWorkspace is null ? "/" : $"/w/{Uri.EscapeDataString(CurrentWorkspace)}/notifications";
     private string T(string key) => Localizer[key];
@@ -114,6 +164,7 @@
     {
         Preferences.Changed -= OnPreferencesChanged;
         WorkplaceContext.Changed -= OnWorkplaceContextChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
         lifetimeCancellation.Cancel();
         lifetimeCancellation.Dispose();
         if (themeModule is not null)

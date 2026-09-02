@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<WorkplaceContextState>();
         services.TryAddScoped<IConsoleContextProvider, EmptyConsoleContextProvider>();
         services.TryAddScoped<IResourceSearchProvider, EmptyResourceSearchProvider>();
+        services.TryAddScoped<IRecentConversationNavigationProvider, EmptyRecentConversationNavigationProvider>();
         services.TryAddScoped<IUserPreferencesClient, EmptyUserPreferencesClient>();
         return services;
     }
