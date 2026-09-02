@@ -7,6 +7,7 @@ Agentstration uses trunk-based development: short-lived branches are merged thro
 The repository keeps reviewable governance files in Git:
 
 - `.github/workflows/ci.yml` restores, builds, tests, verifies formatting on changed .NET files, and builds the container on Linux;
+- `.github/workflows/pull-request-metadata.yml` validates pull request titles and descriptions whenever their content or source revision changes;
 - `.github/workflows/codeql.yml` scans C# on pull requests, `main`, and a weekly schedule;
 - `.github/workflows/dependency-review.yml` blocks pull requests that introduce known vulnerabilities of moderate severity or higher;
 - `.github/workflows/release.yml` validates version tags, rebuilds and retests the product, packages the server and Workplace, and creates GitHub prereleases;
@@ -22,16 +23,19 @@ Pull requests to `main` run these workflows:
 
 | Check | Purpose | Required by the prepared ruleset |
 |---|---|---|
+| `pull-request-metadata` | Require a Conventional Commit title and the ordered Summary, Changes, Validation, and Breaking changes sections | Yes |
 | `build-and-test` | Restore, Release build, tests, and changed-file formatting for Agentstration and the complete AEP solution | Yes |
 | `container` | Validate the production Docker build after code validation | No |
 | `CodeQL / C#` | Static security analysis | No; review after initial successful scans |
 | `dependency-review` | Reject vulnerable dependency additions | No; recommended after repository feature availability is confirmed |
 
-The stable required-check context is exactly `build-and-test`. Do not rename that job without updating the ruleset and reconfiguring GitHub.
+The stable required-check contexts are `build-and-test` and `pull-request-metadata`. Do not rename either job without updating the ruleset and reconfiguring GitHub.
 
 Format verification is deliberately incremental: the current codebase has pre-existing `dotnet format` debt, so CI verifies every changed C# or Razor file without forcing an unrelated repository-wide rewrite. A separate cleanup can establish a clean full-repository baseline later.
 
-The ruleset requires pull requests, resolved review conversations, linear history, squash merges, an up-to-date branch, and the `build-and-test` check. It prevents branch deletion and force pushes. Because the project currently has one principal maintainer, it requests no mandatory approval and does not require a CODEOWNER approval; reviews remain strongly encouraged.
+Pull request titles use the same Conventional Commit form as commits: `type(scope): description`, with optional scope and optional `!` for a breaking change. Descriptions use the repository template in this order: `Summary`, `Changes`, `Validation`, then `Breaking changes`. Keep the summary outcome-focused and the changes concise. Validation must report only checks actually completed, with test totals and optional skips when known; UI changes also report desktop and mobile smoke testing against the local executable. Backward-compatible changes state `None.` under `Breaking changes`, while incompatible changes describe both impact and migration. The `pull-request-metadata` check enforces the title, exact section order, non-empty content, and bullet lists for Changes and Validation.
+
+The ruleset requires pull requests, resolved review conversations, linear history, squash merges, an up-to-date branch, and the `build-and-test` and `pull-request-metadata` checks. It prevents branch deletion and force pushes. Because the project currently has one principal maintainer, it requests no mandatory approval and does not require a CODEOWNER approval; reviews remain strongly encouraged.
 
 ## Bootstrap and apply the ruleset
 

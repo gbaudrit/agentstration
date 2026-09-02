@@ -203,6 +203,19 @@ Use `--launch-profile http-NoBootstrap` instead when the test must preserve or e
 5. Add an ADR under `docs/decisions/` for a significant architectural choice; do not rewrite an accepted ADR to hide a new decision.
 6. Build and test after meaningful increments, and report any validation that could not be run.
 
+## Pull Request Description
+
+When creating, updating, or handing off a pull request, use `.github/pull_request_template.md` and keep these top-level sections in this order:
+
+1. `Summary`: one short outcome-focused paragraph, with related issue or pull request links where useful.
+2. `Changes`: concise bullets describing the delivered behavior, including relevant tests and documentation.
+3. `Validation`: concise bullets stating the checks actually completed and their results. Include test totals and skipped optional integrations when known. For UI changes, report desktop and mobile smoke testing against the local executable.
+4. `Breaking changes`: write `None.` when there are none; otherwise describe the impact and required migration.
+
+Use Conventional Commit form for the pull request title: `type(scope): description`, with an optional scope and optional `!` before the colon for a breaking change. Allowed types are `feat`, `fix`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, and `perf`.
+
+Do not claim that a build, test suite, documentation update, or smoke test succeeded unless it was completed. State any omitted or failed validation explicitly. Do not add unrelated top-level sections or leave template instructions in the final pull request description.
+
 ## Scope Discipline
 
 The current repository is a foundation, not a production multi-tenant release. Durable management operations, manifest import, connection providers, traffic splitting, non-local hosting, Foundry bindings, runtime session storage, workload identities, and model-backed evaluation remain planned unless a task explicitly implements them. The SQLite/in-process/deterministic standalone path and default test suite must remain offline.
