@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="PageTitle" xml:space="preserve"><value>Nettoyage de l’espace de travail · Agentstration</value></data>
+  <data name="Eyebrow" xml:space="preserve"><value>Système</value></data>
+  <data name="Title" xml:space="preserve"><value>Nettoyage de l’espace de travail</value></data>
+  <data name="Description" xml:space="preserve"><value>Sélectionnez les exécutions terminales et les ressources à supprimer définitivement de l’espace de travail actuel.</value></data>
+  <data name="WorkspaceScope" xml:space="preserve"><value>Espace de travail actuel uniquement</value></data>
+  <data name="AvailableCount" xml:space="preserve"><value>{0} éléments supprimables</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Actualiser l’inventaire</value></data>
+  <data name="Loading" xml:space="preserve"><value>Chargement de l’inventaire de nettoyage…</value></data>
+  <data name="AccessDenied" xml:space="preserve"><value>Le nettoyage exige les droits de suppression des ressources et des exécutions.</value></data>
+  <data name="Retry" xml:space="preserve"><value>Réessayer</value></data>
+  <data name="WarningTitle" xml:space="preserve"><value>La suppression est définitive</value></data>
+  <data name="WarningMessage" xml:space="preserve"><value>Chaque élément est supprimé par son API canonique. Les suppressions réussies ne sont pas annulées si un autre élément sélectionné échoue.</value></data>
+  <data name="InventorySummary" xml:space="preserve"><value>Résumé de l’inventaire de nettoyage</value></data>
+  <data name="Kind.Runs" xml:space="preserve"><value>Exécutions terminales</value></data>
+  <data name="Kind.Entries" xml:space="preserve"><value>Entrées</value></data>
+  <data name="Kind.Flows" xml:space="preserve"><value>Flows</value></data>
+  <data name="Kind.Agents" xml:space="preserve"><value>Agents</value></data>
+  <data name="Kind.RuntimeRun" xml:space="preserve"><value>Exécution d’agent</value></data>
+  <data name="Kind.FlowRun" xml:space="preserve"><value>Exécution de Flow</value></data>
+  <data name="Kind.Entry" xml:space="preserve"><value>Entrée</value></data>
+  <data name="Kind.Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="Kind.Agent" xml:space="preserve"><value>Agent</value></data>
+  <data name="SearchPlaceholder" xml:space="preserve"><value>Rechercher par nom, identifiant ou namespace…</value></data>
+  <data name="SearchLabel" xml:space="preserve"><value>Rechercher dans l’inventaire de nettoyage</value></data>
+  <data name="ClearSelection" xml:space="preserve"><value>Effacer la sélection</value></data>
+  <data name="EntryOptionsTitle" xml:space="preserve"><value>Options de dépendances des entrées</value></data>
+  <data name="EntryOptionsDescription" xml:space="preserve"><value>Ces options concernent uniquement les entrées sélectionnées. Les interactions actives bloquent toujours la suppression.</value></data>
+  <data name="RemoveDashboardReferences" xml:space="preserve"><value>Retirer les références des tableaux de bord</value></data>
+  <data name="CloseInteractions" xml:space="preserve"><value>Fermer les interactions durables éligibles</value></data>
+  <data name="GroupTitle.Runs" xml:space="preserve"><value>{0} exécutions terminales</value></data>
+  <data name="GroupTitle.Entries" xml:space="preserve"><value>{0} entrées</value></data>
+  <data name="GroupTitle.Flows" xml:space="preserve"><value>{0} Flows</value></data>
+  <data name="GroupTitle.Agents" xml:space="preserve"><value>{0} agents</value></data>
+  <data name="GroupDescription.Runs" xml:space="preserve"><value>Seules les exécutions réussies, échouées, annulées ou expirées sont éligibles.</value></data>
+  <data name="GroupDescription.Entries" xml:space="preserve"><value>Les protections de chaque entrée sont évaluées au démarrage de sa suppression.</value></data>
+  <data name="GroupDescription.Flows" xml:space="preserve"><value>Les Flows encore référencés par des entrées conservées ne peuvent pas être supprimés.</value></data>
+  <data name="GroupDescription.Agents" xml:space="preserve"><value>Les agents encore référencés par des Flows conservés ne peuvent pas être supprimés.</value></data>
+  <data name="SelectAll" xml:space="preserve"><value>Sélectionner les éléments visibles</value></data>
+  <data name="Empty.Runs" xml:space="preserve"><value>Aucune exécution terminale n’est disponible.</value></data>
+  <data name="Empty.Entries" xml:space="preserve"><value>Aucune entrée n’est disponible.</value></data>
+  <data name="Empty.Flows" xml:space="preserve"><value>Aucun Flow n’est disponible.</value></data>
+  <data name="Empty.Agents" xml:space="preserve"><value>Aucun agent n’est disponible.</value></data>
+  <data name="NoSearchResults" xml:space="preserve"><value>Aucun élément ne correspond à la recherche actuelle.</value></data>
+  <data name="FailuresTitle" xml:space="preserve"><value>{0} suppressions nécessitent une intervention</value></data>
+  <data name="FailuresDescription" xml:space="preserve"><value>Les éléments en échec restent sélectionnés. Corrigez leurs dépendances ou leurs droits, puis réessayez.</value></data>
+  <data name="SelectedCount" xml:space="preserve"><value>{0} éléments sélectionnés</value></data>
+  <data name="Progress" xml:space="preserve"><value>Suppression de {0} sur {1}…</value></data>
+  <data name="ExecutionOrder" xml:space="preserve"><value>Ordre de suppression : exécutions, entrées, Flows, puis agents</value></data>
+  <data name="DeleteSelected" xml:space="preserve"><value>Supprimer la sélection</value></data>
+  <data name="Irreversible" xml:space="preserve"><value>Action irréversible</value></data>
+  <data name="ConfirmationTitle" xml:space="preserve"><value>Supprimer les {0} éléments sélectionnés ?</value></data>
+  <data name="ConfirmationMessage" xml:space="preserve"><value>Les éléments sélectionnés et, le cas échéant, leur historique détenu par le module seront définitivement supprimés.</value></data>
+  <data name="Acknowledge" xml:space="preserve"><value>Je comprends que les suppressions réussies sont irréversibles.</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="ConfirmDelete" xml:space="preserve"><value>Supprimer définitivement</value></data>
+  <data name="NotificationComplete" xml:space="preserve"><value>Nettoyage terminé</value></data>
+  <data name="NotificationPartial" xml:space="preserve"><value>Nettoyage partiellement terminé</value></data>
+  <data name="NotificationResult" xml:space="preserve"><value>{0} supprimés, {1} en échec.</value></data>
+  <data name="UnknownDate" xml:space="preserve"><value>Date indisponible</value></data>
+  <data name="Status.Succeeded" xml:space="preserve"><value>Réussie</value></data>
+  <data name="Status.Failed" xml:space="preserve"><value>Échouée</value></data>
+  <data name="Status.Cancelled" xml:space="preserve"><value>Annulée</value></data>
+  <data name="Status.TimedOut" xml:space="preserve"><value>Expirée</value></data>
+  <data name="Status.Draft" xml:space="preserve"><value>Brouillon</value></data>
+  <data name="Status.Published" xml:space="preserve"><value>Publiée</value></data>
+  <data name="Status.Active" xml:space="preserve"><value>Actif</value></data>
+  <data name="Status.Disabled" xml:space="preserve"><value>Désactivé</value></data>
+  <data name="Status.Accepted" xml:space="preserve"><value>Accepté</value></data>
+  <data name="Status.Validating" xml:space="preserve"><value>Validation</value></data>
+  <data name="Status.Creating" xml:space="preserve"><value>Création</value></data>
+  <data name="Status.Updating" xml:space="preserve"><value>Mise à jour</value></data>
+  <data name="Status.Deleting" xml:space="preserve"><value>Suppression</value></data>
+  <data name="Status.Canceled" xml:space="preserve"><value>Annulé</value></data>
+</root>

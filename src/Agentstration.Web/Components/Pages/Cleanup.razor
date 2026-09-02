@@ -1,0 +1,233 @@
+@page "/cleanup"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ICleanupApiClient Client
+@inject ConsoleContextState ContextState
+@inject NotificationState Notifications
+@inject TimeProvider TimeProvider
+@inject Microsoft.Extensions.Localization.IStringLocalizer<CleanupStrings> Localizer
+
+<PageTitle>@T("PageTitle")</PageTitle>
+<PageHeader Eyebrow="@T("Eyebrow")" Title="@T("Title")" Description="@T("Description")">
+    <Metadata><span>@T("WorkspaceScope")</span>@if (inventory is not null) { <span>@T("AvailableCount", inventory.All.Count)</span> }</Metadata>
+    <Actions><button class="button-secondary" type="button" @onclick="() => LoadAsync(true)" disabled="@(loading || deleting)">@T("Refresh")</button></Actions>
+</PageHeader>
+
+@if (ContextState.IsLoading || loading && inventory is null)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (!HasAccess)
+{
+    <ErrorState Message="@T("AccessDenied")" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" type="button" @onclick="() => LoadAsync(true)">@T("Retry")</button></ErrorState>
+}
+else if (inventory is not null)
+{
+    <section class="cleanup-warning" role="note">
+        <UiIcon Name="alert-triangle" />
+        <div><strong>@T("WarningTitle")</strong><p>@T("WarningMessage")</p></div>
+    </section>
+
+    <section class="cleanup-metrics" aria-label="@T("InventorySummary")">
+        <article class="cleanup-metric"><UiIcon Name="play-circle" /><span><strong>@inventory.Runs.Count</strong><small>@T("Kind.Runs")</small></span></article>
+        <article class="cleanup-metric"><UiIcon Name="entry" /><span><strong>@inventory.Entries.Count</strong><small>@T("Kind.Entries")</small></span></article>
+        <article class="cleanup-metric"><UiIcon Name="workflow" /><span><strong>@inventory.Flows.Count</strong><small>@T("Kind.Flows")</small></span></article>
+        <article class="cleanup-metric"><UiIcon Name="agent" /><span><strong>@inventory.Agents.Count</strong><small>@T("Kind.Agents")</small></span></article>
+    </section>
+
+    <div class="cleanup-toolbar">
+        <SearchBox Value="@search" ValueChanged="value => search = value" Placeholder="@T("SearchPlaceholder")" Label="@T("SearchLabel")" />
+        <button class="text-button" type="button" @onclick="ClearSelection" disabled="@(SelectedCount == 0 || deleting)">@T("ClearSelection")</button>
+    </div>
+
+    @foreach (var group in Groups)
+    {
+        var visible = Filter(group.Candidates);
+        <section class="panel cleanup-group" data-kind="@group.Kind">
+            <header>
+                <div><p class="eyebrow">@T($"Kind.{group.Kind}")</p><h2>@T($"GroupTitle.{group.Kind}", visible.Count)</h2><p>@T($"GroupDescription.{group.Kind}")</p></div>
+                <label class="cleanup-select-all"><input type="checkbox" checked="@IsGroupSelected(visible)" @onchange="args => SelectGroup(visible, args.Value is true)" disabled="@(visible.Count == 0 || deleting)" /> <span>@T("SelectAll")</span></label>
+            </header>
+            @if (group.Kind == "Entries")
+            {
+                <div class="cleanup-entry-options">
+                    <div><strong>@T("EntryOptionsTitle")</strong><p>@T("EntryOptionsDescription")</p></div>
+                    <label><input type="checkbox" @bind="removeDashboardReferences" disabled="@deleting" /> <span>@T("RemoveDashboardReferences")</span></label>
+                    <label><input type="checkbox" @bind="closeInteractions" disabled="@deleting" /> <span>@T("CloseInteractions")</span></label>
+                </div>
+            }
+            @if (visible.Count == 0)
+            {
+                <p class="cleanup-group-empty">@T(string.IsNullOrWhiteSpace(search) ? $"Empty.{group.Kind}" : "NoSearchResults")</p>
+            }
+            else
+            {
+                <div class="cleanup-list">
+                    @foreach (var candidate in visible)
+                    {
+                        <label class="cleanup-row @(selected.Contains(candidate.Key) ? "selected" : null)">
+                            <input type="checkbox" checked="@selected.Contains(candidate.Key)" @onchange="args => Select(candidate, args.Value is true)" disabled="@deleting" />
+                            <span class="cleanup-row-kind"><UiIcon Name="@Icon(candidate.Kind)" /></span>
+                            <span class="cleanup-row-main"><strong>@candidate.DisplayName</strong><code>@CandidateAddress(candidate)</code></span>
+                            <span class="cleanup-row-detail">@KindLabel(candidate.Kind)@if (!string.IsNullOrWhiteSpace(candidate.Detail)) { <small>@candidate.Detail</small> }</span>
+                            <StatusBadge Text="@StatusLabel(candidate.Status)" Status="@PlatformDashboardService.ToStatus(candidate.Status)" />
+                            <time datetime="@candidate.UpdatedAt.ToString("O")">@FormatDate(candidate.UpdatedAt)</time>
+                        </label>
+                    }
+                </div>
+            }
+        </section>
+    }
+
+    @if (failures.Count > 0)
+    {
+        <section class="panel cleanup-failures" aria-live="polite">
+            <div class="panel-header"><h2>@T("FailuresTitle", failures.Count)</h2></div>
+            <p>@T("FailuresDescription")</p>
+            <ul>@foreach (var failure in failures) { <li><strong>@failure.Candidate.DisplayName</strong><span>@failure.Message</span><code>@failure.ErrorId</code></li> }</ul>
+        </section>
+    }
+
+    <footer class="cleanup-action-bar">
+        <div>
+            <strong>@T("SelectedCount", SelectedCount)</strong>
+            @if (deleting) { <span>@T("Progress", processedCount, deletionTotal)</span> }
+            else { <span>@T("ExecutionOrder")</span> }
+        </div>
+        <button class="button-danger" type="button" data-testid="open-cleanup-confirmation" @onclick="OpenConfirmation" disabled="@(SelectedCount == 0 || deleting)">@T("DeleteSelected")</button>
+    </footer>
+}
+
+@if (confirming)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CloseConfirmation">
+        <section class="dialog cleanup-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="cleanup-confirmation-title" @onclick:stopPropagation>
+            <p class="eyebrow">@T("Irreversible")</p>
+            <h2 id="cleanup-confirmation-title">@T("ConfirmationTitle", SelectedCount)</h2>
+            <p>@T("ConfirmationMessage")</p>
+            <dl>
+                @foreach (var summary in SelectedSummary)
+                {
+                    <div><dt>@T($"Kind.{summary.Kind}")</dt><dd>@summary.Count</dd></div>
+                }
+            </dl>
+            <label class="cleanup-acknowledgement"><input type="checkbox" @bind="acknowledged" /> <span>@T("Acknowledge")</span></label>
+            <div class="dialog-actions"><button class="button-secondary" type="button" @onclick="CloseConfirmation">@T("Cancel")</button><button class="button-danger" type="button" data-testid="confirm-cleanup" @onclick="DeleteSelectedAsync" disabled="@(!acknowledged)">@T("ConfirmDelete")</button></div>
+        </section>
+    </div>
+}
+
+@code {
+    private sealed record CleanupFailure(CleanupCandidate Candidate, string Message, string ErrorId);
+    private sealed record CleanupSummary(string Kind, int Count);
+    private sealed record CleanupGroupView(string Kind, IReadOnlyList<CleanupCandidate> Candidates);
+
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly HashSet<string> selected = new(StringComparer.Ordinal);
+    private CleanupInventory? inventory;
+    private AgentstrationApiException? error;
+    private IReadOnlyList<CleanupFailure> failures = [];
+    private string search = string.Empty;
+    private bool loading;
+    private bool deleting;
+    private bool confirming;
+    private bool acknowledged;
+    private bool removeDashboardReferences;
+    private bool closeInteractions;
+    private int processedCount;
+    private int deletionTotal;
+
+    private bool HasAccess => ContextState.HasPermission(AuthorizationPermissions.ResourcesDelete)
+        && ContextState.HasPermission(AuthorizationPermissions.RunsDelete);
+    private int SelectedCount => selected.Count;
+    private IReadOnlyList<CleanupGroupView> Groups => inventory is null ? [] :
+        [new("Runs", inventory.Runs), new("Entries", inventory.Entries), new("Flows", inventory.Flows), new("Agents", inventory.Agents)];
+    private IReadOnlyList<CleanupSummary> SelectedSummary => SelectedCandidates
+        .GroupBy(candidate => Category(candidate.Kind))
+        .Select(group => new CleanupSummary(group.Key, group.Count()))
+        .ToArray();
+    private IReadOnlyList<CleanupCandidate> SelectedCandidates => inventory?.All.Where(candidate => selected.Contains(candidate.Key)).ToArray() ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ContextState.Current is null) await ContextState.LoadAsync(cancellation.Token);
+        if (HasAccess) await LoadAsync(false);
+    }
+
+    private async Task LoadAsync(bool preserveSelection)
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            inventory = await Client.GetInventoryAsync(cancellation.Token);
+            if (preserveSelection) selected.IntersectWith(inventory.All.Select(candidate => candidate.Key));
+            else selected.Clear();
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+
+    private IReadOnlyList<CleanupCandidate> Filter(IReadOnlyList<CleanupCandidate> candidates) => candidates
+        .Where(candidate => string.IsNullOrWhiteSpace(search)
+            || candidate.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || candidate.Id.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || candidate.Namespace.Value.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || (candidate.Detail?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+        .ToArray();
+    private bool IsGroupSelected(IReadOnlyList<CleanupCandidate> candidates) => candidates.Count > 0 && candidates.All(candidate => selected.Contains(candidate.Key));
+    private void Select(CleanupCandidate candidate, bool value) { if (value) selected.Add(candidate.Key); else selected.Remove(candidate.Key); }
+    private void SelectGroup(IReadOnlyList<CleanupCandidate> candidates, bool value) { foreach (var candidate in candidates) Select(candidate, value); }
+    private void ClearSelection() => selected.Clear();
+    private void OpenConfirmation() { if (SelectedCount == 0) return; acknowledged = false; confirming = true; }
+    private void CloseConfirmation() { confirming = false; acknowledged = false; }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (!acknowledged || SelectedCount == 0 || deleting) return;
+        confirming = false;
+        deleting = true;
+        failures = [];
+        var pending = SelectedCandidates.OrderBy(candidate => DeletePriority(candidate.Kind)).ThenBy(candidate => candidate.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        deletionTotal = pending.Length;
+        processedCount = 0;
+        var failed = new List<CleanupFailure>();
+        var options = new CleanupEntryOptions(removeDashboardReferences, closeInteractions);
+        foreach (var candidate in pending)
+        {
+            try
+            {
+                await Client.DeleteAsync(candidate, options, cancellation.Token);
+                selected.Remove(candidate.Key);
+            }
+            catch (AgentstrationApiException exception)
+            {
+                failed.Add(new(candidate, exception.Message, exception.ErrorId));
+            }
+            finally
+            {
+                processedCount++;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        failures = failed;
+        deleting = false;
+        await LoadAsync(true);
+        var deletedCount = deletionTotal - failed.Count;
+        Notifications.Add(new(Guid.NewGuid(), failed.Count == 0 ? T("NotificationComplete") : T("NotificationPartial"), T("NotificationResult", deletedCount, failed.Count), TimeProvider.GetLocalNow(), failed.Count == 0 ? UiStatus.Success : UiStatus.Warning));
+    }
+
+    private static int DeletePriority(CleanupResourceKind kind) => kind switch { CleanupResourceKind.RuntimeRun or CleanupResourceKind.FlowRun => 0, CleanupResourceKind.Entry => 1, CleanupResourceKind.Flow => 2, CleanupResourceKind.Agent => 3, _ => 4 };
+    private static string Category(CleanupResourceKind kind) => kind switch { CleanupResourceKind.RuntimeRun or CleanupResourceKind.FlowRun => "Runs", CleanupResourceKind.Entry => "Entries", CleanupResourceKind.Flow => "Flows", CleanupResourceKind.Agent => "Agents", _ => throw new ArgumentOutOfRangeException(nameof(kind)) };
+    private static string Icon(CleanupResourceKind kind) => kind switch { CleanupResourceKind.RuntimeRun => "play-circle", CleanupResourceKind.FlowRun => "flow-run", CleanupResourceKind.Entry => "entry", CleanupResourceKind.Flow => "workflow", _ => "agent" };
+    private string KindLabel(CleanupResourceKind kind) => T($"Kind.{kind}");
+    private string StatusLabel(string status) { var value = Localizer[$"Status.{status}"]; return value.ResourceNotFound ? status : value.Value; }
+    private string FormatDate(DateTimeOffset value) => value == DateTimeOffset.MinValue ? T("UnknownDate") : value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.CurrentCulture);
+    private static string CandidateAddress(CleanupCandidate candidate) => candidate.Namespace.IsDefault ? candidate.Id : $"{candidate.Namespace.Value}/{candidate.Id}";
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

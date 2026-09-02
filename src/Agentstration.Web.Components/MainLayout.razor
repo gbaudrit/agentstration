@@ -24,9 +24,12 @@
                     @if (!string.IsNullOrWhiteSpace(group.LabelKey)) { <h2>@T(group.LabelKey)</h2> }
                     @foreach (var item in group.Items)
                     {
-                        <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@T(item.LabelKey)" title="@T(item.LabelKey)" class="@($"domain-{item.Domain}")">
-                            <span class="nav-icon" aria-hidden="true"><UiIcon Name="@item.Icon" /></span><span class="nav-label">@T(item.LabelKey)</span>
-                        </NavLink>
+                        @if (CanNavigate(item.RequiredPermissions))
+                        {
+                            <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@T(item.LabelKey)" title="@T(item.LabelKey)" class="@($"domain-{item.Domain}")">
+                                <span class="nav-icon" aria-hidden="true"><UiIcon Name="@item.Icon" /></span><span class="nav-label">@T(item.LabelKey)</span>
+                            </NavLink>
+                        }
                     }
                 </section>
             }
