@@ -9,5 +9,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="../../src/Agentstration.Web.Components/wwwroot/design-tokens.css" Link="TestAssets/design-tokens.css" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/Agentstration.Web.Components/MainLayout.razor" Link="TestAssets/MainLayout.razor" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/Agentstration.Web/Pages/Shared/_AuthenticationLayout.cshtml" Link="TestAssets/_AuthenticationLayout.cshtml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/Agentstration.Web/wwwroot/auth.css" Link="TestAssets/auth.css" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

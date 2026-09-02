@@ -227,6 +227,7 @@ public sealed class WorkplaceHostTests
         var hostStyles = await client.GetStringAsync("/Agentstration.Workplace.Web.styles.css");
         var appStyles = await client.GetStringAsync("/app.css");
         var autoScroll = await client.GetStringAsync("/_content/Agentstration.Workplace.Components/conversation-auto-scroll.js");
+        var lightLogo = await client.GetByteArrayAsync("/_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-light.png");
         var darkLogo = await client.GetByteArrayAsync("/_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-dark.png");
 
         StringAssert.Contains(sharedStyles, ".ui-icon");
@@ -257,6 +258,7 @@ public sealed class WorkplaceHostTests
         StringAssert.Contains(autoScroll, "currentScrollTop < state.lastScrollTop");
         StringAssert.Contains(autoScroll, "distanceFromBottom(state.target) <= bottomThreshold");
         StringAssert.Contains(autoScroll, "MutationObserver");
+        Assert.IsTrue(lightLogo.Length > 10_000);
         Assert.IsTrue(darkLogo.Length > 10_000);
     }
 
