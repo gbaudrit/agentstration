@@ -244,6 +244,9 @@ public sealed class WorkplaceHostTests
         StringAssert.Contains(hostStyles, ".mobile-dashboard-cards");
         StringAssert.Contains(hostStyles, "grid-auto-flow:column");
         StringAssert.Contains(hostStyles, "grid-auto-columns:4.85rem");
+        StringAssert.Contains(hostStyles, ".mobile-entry-options");
+        StringAssert.Contains(hostStyles, ".entry-start-page");
+        StringAssert.Contains(hostStyles, "align-content:start");
         Assert.IsFalse(appStyles.Contains(".workplace-shell>.sidebar{display:none}", StringComparison.Ordinal));
         Assert.IsTrue(darkLogo.Length > 10_000);
     }
