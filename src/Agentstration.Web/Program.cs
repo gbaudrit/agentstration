@@ -40,7 +40,18 @@ genAiObservability.Validate(builder.Environment.IsDevelopment());
 var toolExecutionCapture = builder.Configuration.GetSection("Agentstration:ToolExecution").Get<ToolExecutionCaptureOptions>() ?? new();
 toolExecutionCapture.Validate();
 builder.Services.AddSingleton(toolExecutionCapture);
-var dataDirectory = builder.Configuration["Data:Directory"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration");
+var isTesting = builder.Environment.IsEnvironment("Testing");
+var configuredDataDirectory = builder.Configuration["Data:Directory"];
+var ownsTestingDataDirectory = isTesting
+    && (string.IsNullOrWhiteSpace(configuredDataDirectory)
+        || string.Equals(configuredDataDirectory, ".agentstration", StringComparison.Ordinal));
+var testingStorageDirectory = isTesting
+    ? Path.Combine(Path.GetTempPath(), "agentstration-web-tests", Guid.NewGuid().ToString("N"))
+    : null;
+var dataDirectory = ownsTestingDataDirectory
+    ? testingStorageDirectory!
+    : configuredDataDirectory ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration");
+if (ownsTestingDataDirectory) builder.Configuration["Data:Directory"] = dataDirectory;
 Directory.CreateDirectory(dataDirectory);
 var storageOptions = (builder.Configuration.GetSection(AgentstrationStorageOptions.SectionName).Get<AgentstrationStorageOptions>() ?? new()) with
 {
@@ -50,15 +61,11 @@ var storageProvider = storageOptions.GetProvider();
 var identityConnectionString = storageProvider == AgentstrationStorageProvider.PostgreSql
     ? storageOptions.ConnectionString!
     : builder.Configuration.GetConnectionString("Identity")
-        ?? (builder.Environment.IsEnvironment("Testing")
-            ? $"Data Source={Path.Combine(Path.GetTempPath(), $"agentstration-identity-tests-{Guid.NewGuid():N}.db")}"
-            : $"Data Source={Path.Combine(dataDirectory, "identity.db")}");
+        ?? $"Data Source={Path.Combine(testingStorageDirectory ?? dataDirectory, "identity.db")}";
 var dataProtectionKeysPath = configuredAuthentication.DataProtectionKeysPath;
 if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 {
-    dataProtectionKeysPath = builder.Environment.IsEnvironment("Testing")
-        ? Path.Combine(Path.GetTempPath(), $"agentstration-data-protection-tests-{Guid.NewGuid():N}")
-        : Path.Combine(dataDirectory, "data-protection-keys");
+    dataProtectionKeysPath = Path.Combine(testingStorageDirectory ?? dataDirectory, "data-protection-keys");
 }
 var aiProvider = builder.Configuration["AI:Provider"] ?? "Managed";
 var useManagedProfileResolver = string.Equals(aiProvider, "Managed", StringComparison.OrdinalIgnoreCase);
@@ -66,11 +73,11 @@ const string defaultAiEndpoint = "http://localhost:11434/v1/";
 var aiEndpoint = builder.Configuration["AI:Endpoint"] ?? defaultAiEndpoint;
 if (!Uri.TryCreate(aiEndpoint.EndsWith('/') ? aiEndpoint : aiEndpoint + '/', UriKind.Absolute, out var parsedAiEndpoint)) throw new InvalidOperationException("AI:Endpoint must be an absolute URL.");
 var aiOptions = new AiProviderOptions(aiProvider, parsedAiEndpoint, builder.Configuration["AI:Model"] ?? "phi4-mini", builder.Configuration["AI:ApiKey"]);
-string? SqliteConnection(string setting, string fileName, string testPrefix)
+string? SqliteConnection(string setting, string fileName)
 {
     if (storageProvider == AgentstrationStorageProvider.PostgreSql) return null;
-    var path = builder.Environment.IsEnvironment("Testing")
-        ? Path.Combine(Path.GetTempPath(), $"{testPrefix}-{Guid.NewGuid():N}.db")
+    var path = isTesting
+        ? Path.Combine(testingStorageDirectory!, fileName)
         : builder.Configuration[setting] ?? Path.Combine(dataDirectory, fileName);
     var directory = Path.GetDirectoryName(path);
     if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
@@ -79,10 +86,10 @@ string? SqliteConnection(string setting, string fileName, string testPrefix)
 builder.Services.AddAgentstration(
     dataDirectory,
     aiOptions,
-    SqliteConnection("Data:ControlPlanePath", "control-plane.db", "agentstration-tests"),
-    SqliteConnection("Data:WorkPlanePath", "work-plane.db", "agentstration-work-tests"),
-    SqliteConnection("Data:FlowPath", "flow-plane.db", "agentstration-flow-tests"),
-    SqliteConnection("Data:RuntimePath", "runtime-plane.db", "agentstration-runtime-tests"),
+    SqliteConnection("Data:ControlPlanePath", "control-plane.db"),
+    SqliteConnection("Data:WorkPlanePath", "work-plane.db"),
+    SqliteConnection("Data:FlowPath", "flow-plane.db"),
+    SqliteConnection("Data:RuntimePath", "runtime-plane.db"),
     storageOptions);
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
@@ -125,6 +132,19 @@ builder.Services.AddHostedService<LocalWorkExecutionWorker>();
 builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
 builder.Services.AddHostedService<FlowRunExecutionWorker>();
 builder.Services.AddHostedService<FlowRunRecoveryWorker>();
+if (testingStorageDirectory is not null)
+{
+    builder.Services.AddSingleton(provider => new TestingDataDirectoryCleanup(
+        testingStorageDirectory,
+        [
+            identityConnectionString,
+            $"Data Source={controlPlanePath}",
+            $"Data Source={workPlanePath}",
+            $"Data Source={flowPath}",
+            $"Data Source={runtimePath}"
+        ],
+        provider.GetRequiredService<ILogger<TestingDataDirectoryCleanup>>()));
+}
 
 var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 builder.Logging.AddOpenTelemetry(logging =>
@@ -164,6 +184,9 @@ builder.Services.AddOpenTelemetry()
     });
 
 var app = builder.Build();
+var testingDataDirectoryCleanup = testingStorageDirectory is not null
+    ? app.Services.GetRequiredService<TestingDataDirectoryCleanup>()
+    : null;
 if (genAiObservability.HttpPayloadCapture.Enabled)
 {
     app.Logger.LogWarning(
@@ -205,32 +228,40 @@ app.MapStaticAssets().AllowAnonymous();
 app.MapRazorPages();
 app.MapRazorComponents<App>().AddAdditionalAssemblies(typeof(MainLayout).Assembly).AddInteractiveServerRenderMode()
     .RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.Authenticated);
-RequestContext? bootstrapContext = null;
-var startupScopes = app.Services.GetRequiredService<IRequestContextScopeFactory>();
-using (startupScopes.PushSystem())
+try
 {
-    await app.Services.GetRequiredService<IAgentstrationStorageInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
-    await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-    await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
-    if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
-        bootstrapContext = await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
-    await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-    await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-    await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-    await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-    await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-    if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
-        await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
-    await app.Services.ApplyDeclarativeBootstrapAsync(app.Lifetime.ApplicationStopping);
-    if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
-        await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
+    RequestContext? bootstrapContext = null;
+    var startupScopes = app.Services.GetRequiredService<IRequestContextScopeFactory>();
+    using (startupScopes.PushSystem())
+    {
+        await app.Services.GetRequiredService<IAgentstrationStorageInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
+        await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+        await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
+        if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
+            bootstrapContext = await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
+        await app.Services.GetRequiredService<WorkItemService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+        await app.Services.GetRequiredService<WorkplaceService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+        await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+        await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+        await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
+            await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
+        await app.Services.ApplyDeclarativeBootstrapAsync(app.Lifetime.ApplicationStopping);
+        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
+            await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
+    }
+    if (bootstrapContext is not null)
+        await WorkspaceStartupData.InitializeAsync(
+            app.Services,
+            bootstrapContext,
+            includeInteractiveDemo: !app.Environment.IsEnvironment("Testing"),
+            app.Lifetime.ApplicationStopping);
 }
-if (bootstrapContext is not null)
-    await WorkspaceStartupData.InitializeAsync(
-        app.Services,
-        bootstrapContext,
-        includeInteractiveDemo: !app.Environment.IsEnvironment("Testing"),
-        app.Lifetime.ApplicationStopping);
+catch
+{
+    testingDataDirectoryCleanup?.Dispose();
+    throw;
+}
 await app.RunAsync();
 
 public partial class Program;

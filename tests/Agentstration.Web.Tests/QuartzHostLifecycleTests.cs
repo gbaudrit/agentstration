@@ -1,12 +1,42 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
 
 [TestClass]
 public sealed class QuartzHostLifecycleTests
 {
+    [TestMethod]
+    public async Task DefaultTestingDataDirectoryIsRemovedAfterHostShutdown()
+    {
+        var factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+
+        using (var client = factory.CreateClient())
+        {
+            Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
+        }
+
+        var directory = factory.Services.GetRequiredService<IConfiguration>()["Data:Directory"];
+        Assert.IsNotNull(directory);
+        Assert.IsTrue(Directory.Exists(directory));
+
+        await factory.DisposeAsync();
+
+        for (var attempt = 0; attempt < 50 && Directory.Exists(directory); attempt++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+        }
+
+        Assert.IsFalse(Directory.Exists(directory));
+    }
+
     [TestMethod]
     public async Task SchedulerDatabaseIsReleasedAfterEveryHostShutdown()
     {
