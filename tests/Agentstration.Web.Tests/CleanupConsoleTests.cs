@@ -48,9 +48,9 @@ public sealed class CleanupConsoleTests
         Assert.AreEqual(string.Empty, rendered.Find("input[type='search']").GetAttribute("value") ?? string.Empty);
         var entriesPanel = rendered.Find("section[data-kind='Entries']");
         Assert.HasCount(1, entriesPanel.QuerySelectorAll(".cleanup-entry-options"));
-        foreach (var kind in new[] { "Runs", "Entries", "Flows", "Agents" })
-            await rendered.Find($"section[data-kind='{kind}'] .cleanup-select-all input").ChangeAsync(new() { Value = true });
-        await entriesPanel.QuerySelector(".cleanup-entry-options input[type='checkbox']")!.ChangeAsync(new() { Value = true });
+        await rendered.Find(".cleanup-select-everything input").ChangeAsync(new() { Value = true });
+        Assert.IsTrue(rendered.Find(".cleanup-select-everything input").HasAttribute("checked"));
+        Assert.IsTrue(entriesPanel.QuerySelectorAll(".cleanup-entry-options input[type='checkbox']").All(input => input.HasAttribute("checked")));
         await rendered.Find("[data-testid='open-cleanup-confirmation']").ClickAsync(new());
 
         var confirm = rendered.Find("[data-testid='confirm-cleanup']");
@@ -62,6 +62,7 @@ public sealed class CleanupConsoleTests
             new[] { CleanupResourceKind.RuntimeRun, CleanupResourceKind.FlowRun, CleanupResourceKind.Entry, CleanupResourceKind.Flow, CleanupResourceKind.Agent },
             client.Deleted.Select(candidate => candidate.Kind).ToArray());
         Assert.IsTrue(client.EntryOptions.Single().RemoveDashboardReferences);
+        Assert.IsTrue(client.EntryOptions.Single().CloseInteractions);
         Assert.AreEqual(0, rendered.FindAll(".cleanup-row").Count);
         StringAssert.Contains(rendered.Markup, "0 items selected");
     }

@@ -41,6 +41,7 @@ else if (inventory is not null)
 
     <div class="cleanup-toolbar">
         <SearchBox Value="@search" ValueChanged="value => search = value" Placeholder="@T("SearchPlaceholder")" Label="@T("SearchLabel")" />
+        <label class="cleanup-select-all cleanup-select-everything"><input type="checkbox" checked="@IsEverythingSelected" @onchange="args => SelectEverything(args.Value is true)" disabled="@(inventory.All.Count == 0 || deleting)" /> <span>@T("SelectEverything")</span></label>
         <button class="text-button" type="button" @onclick="ClearSelection" disabled="@(SelectedCount == 0 || deleting)">@T("ClearSelection")</button>
     </div>
 
@@ -144,6 +145,11 @@ else if (inventory is not null)
     private bool HasAccess => ContextState.HasPermission(AuthorizationPermissions.ResourcesDelete)
         && ContextState.HasPermission(AuthorizationPermissions.RunsDelete);
     private int SelectedCount => selected.Count;
+    private bool IsEverythingSelected => inventory is not null
+        && inventory.All.Count > 0
+        && inventory.All.All(candidate => selected.Contains(candidate.Key))
+        && removeDashboardReferences
+        && closeInteractions;
     private IReadOnlyList<CleanupGroupView> Groups => inventory is null ? [] :
         [new("Runs", inventory.Runs), new("Entries", inventory.Entries), new("Flows", inventory.Flows), new("Agents", inventory.Agents)];
     private IReadOnlyList<CleanupSummary> SelectedSummary => SelectedCandidates
@@ -182,7 +188,14 @@ else if (inventory is not null)
     private bool IsGroupSelected(IReadOnlyList<CleanupCandidate> candidates) => candidates.Count > 0 && candidates.All(candidate => selected.Contains(candidate.Key));
     private void Select(CleanupCandidate candidate, bool value) { if (value) selected.Add(candidate.Key); else selected.Remove(candidate.Key); }
     private void SelectGroup(IReadOnlyList<CleanupCandidate> candidates, bool value) { foreach (var candidate in candidates) Select(candidate, value); }
-    private void ClearSelection() => selected.Clear();
+    private void SelectEverything(bool value)
+    {
+        selected.Clear();
+        if (value && inventory is not null) selected.UnionWith(inventory.All.Select(candidate => candidate.Key));
+        removeDashboardReferences = value;
+        closeInteractions = value;
+    }
+    private void ClearSelection() => SelectEverything(false);
     private void OpenConfirmation() { if (SelectedCount == 0) return; acknowledged = false; confirming = true; }
     private void CloseConfirmation() { confirming = false; acknowledged = false; }
 
