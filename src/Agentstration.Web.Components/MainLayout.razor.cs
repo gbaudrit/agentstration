@@ -11,9 +11,9 @@ namespace Agentstration.Web.Components;
 public partial class MainLayout
 {
 
-    private sealed record NavigationItem(string LabelKey, string Url, string Icon, string Domain = "neutral");
+    private sealed record NavigationItem(string LabelKey, string Url, string Icon, string Domain = "neutral", IReadOnlyList<string>? RequiredPermissions = null);
     private sealed record NavigationGroup(string LabelKey, IReadOnlyList<NavigationItem> Items);
-    private sealed record CommandDefinition(string LabelKey, string Url, string Icon, string CategoryKey, string Keywords = "");
+    private sealed record CommandDefinition(string LabelKey, string Url, string Icon, string CategoryKey, string Keywords = "", IReadOnlyList<string>? RequiredPermissions = null);
     private sealed record CommandItem(string Label, string Url, string Icon, string Category, string Keywords = "", string? Detail = null);
 
     private static readonly NavigationGroup[] NavigationGroups =
@@ -23,7 +23,7 @@ public partial class MainLayout
         new("Group.Operate", [new("Nav.Triggers", "/triggers", "clock", "work"), new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.Tasks", "/tasks", "tasks", "work")]),
         new("Group.Runs", [new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
         new("Group.Configure", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work"), new("Nav.Packs", "/packs", "package"), new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key")]),
-        new("Group.System", [new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "upload-cloud"), new("Nav.Profile", "/settings/profile", "user-circle"), new("Nav.Settings", "/settings", "settings")])
+        new("Group.System", [new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "upload-cloud"), new("Nav.Profile", "/settings/profile", "user-circle"), new("Nav.Settings", "/settings", "settings")])
     ];
 
     private static readonly CommandDefinition[] CommandDefinitions =
@@ -58,6 +58,7 @@ public partial class MainLayout
         new("Nav.Settings", "/settings", "⚙", "Group.System", "configuration paramètres"),
         new("Command.ProfileSettings", "/settings/profile", "○", "Group.System", "appearance theme personal preferences apparence thème préférences"),
         new("Nav.Extensions", "/extensions", "⬢", "Group.System", "AEP option contracts compatibility extensions"),
+        new("Nav.Cleanup", "/cleanup", "⌫", "Group.System", "cleanup clean delete purge nettoyage suppression", ["resources/delete", "runs/delete"]),
         new("Nav.Organization", "/settings/organization", "♙", "Group.System", "tenant organization organisation"),
         new("Nav.Bootstrap", "/settings/bootstrap", "⇧", "Group.System", "bootstrap profiles configuration profils configuration"),
         new("Command.OrganizationWorkspaces", "/settings/organization/workspaces", "▦", "Group.System", "tenant workspaces espaces"),
@@ -78,7 +79,7 @@ public partial class MainLayout
     private IReadOnlyList<CommandItem> resourceCommands = [];
     private CancellationTokenSource? resourceSearchCancellation;
     private readonly CancellationTokenSource lifetimeCancellation = new();
-    private IReadOnlyList<CommandItem> Commands => CommandDefinitions.Select(command => new CommandItem(
+    private IReadOnlyList<CommandItem> Commands => CommandDefinitions.Where(command => CanNavigate(command.RequiredPermissions)).Select(command => new CommandItem(
         T(command.LabelKey), command.Url, command.Icon, T(command.CategoryKey), command.Keywords)).ToArray();
     private IReadOnlyList<CommandItem> FilteredCommands => Commands
         .Where(command => string.IsNullOrWhiteSpace(commandQuery)
@@ -222,6 +223,7 @@ public partial class MainLayout
     }
 
     private static string ShortIdentifier(string value) => value.Length <= 48 ? value : $"…{value[^47..]}";
+    private bool CanNavigate(IReadOnlyList<string>? permissions) => permissions is null || permissions.All(ContextState.HasPermission);
     private string T(string key) => string.IsNullOrEmpty(key) ? string.Empty : Localizer[key];
     private string F(string key, params object[] arguments) => Localizer[key, arguments];
     private static string WorkspaceLabel(ConsoleContextSnapshot context, ConsoleWorkspaceOption workspace) =>

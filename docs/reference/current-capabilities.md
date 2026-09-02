@@ -176,6 +176,8 @@ The Console Tasks section at `/tasks` supervises the real WorkTasks exposed by W
 
 The same process now hosts the Blazor operations console in Interactive Server mode. Agent and model management always use the canonical persisted HTTP APIs; unrelated dashboard projections remain simulated by default so every operational section is immediately explorable. See the [Web console guide](https://github.com/gbaudrit/agentstration/blob/main/src/Agentstration.Web/README.md) for API client, authentication, rendering, and UI component configuration.
 
+Workspace administrators with both `resources/delete` and `runs/delete` can use the Console cleanup screen at `/cleanup` to review and select terminal Runtime/Flow Runs, Entries, Flows, and Agents. Cleanup deliberately composes the canonical unitary DELETE APIs in dependency order (Runs, Entries, Flows, then Agents), retains failed selections, and reports partial completion without rolling successful deletions back. Entry cleanup can also remove Dashboard references and close active interactions when those explicit options are selected.
+
 Local ASP.NET Core Identity accounts, OIDC/JWT authentication, stable Principals, Workspace-scoped RBAC, Platform administrator lifecycle, external identity links, durable security audit, and the corresponding administration Console are implemented. See the [identity and authorization reference](identity-and-authorization.md) for exact modes, routes, policies, persistence, tests, and deferred surfaces.
 
 For the Aspire dashboard and orchestration experience:

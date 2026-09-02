@@ -542,8 +542,8 @@ public sealed class WorkplaceApiTests
             Assert.AreEqual(completedTask.Id, (await resultAdded.Task.WaitAsync(TimeSpan.FromSeconds(5))).Result.WorkTaskId.Value);
             Assert.IsNull(typeof(WorkTaskArtifactEventContract).GetProperty("StorageKey"));
 
-            var notifications = await client.GetFromJsonAsync<WorkNotificationPageResponse>("/api/workspaces/default/notifications?unreadOnly=true");
-            Assert.IsTrue(notifications!.Value.Count >= 2);
+            var notifications = await WaitForUnreadNotificationsAsync(client, 2);
+            Assert.IsTrue(notifications.Value.Count >= 2);
             var unreadBefore = await client.GetFromJsonAsync<UnreadNotificationCountResponse>("/api/workspaces/default/notifications/unread-count");
             using var markRead = await client.PostAsync($"/api/workspaces/default/notifications/{notifications.Value[0].Id.Value}/read", null);
             markRead.EnsureSuccessStatusCode();
@@ -574,6 +574,19 @@ public sealed class WorkplaceApiTests
             await Task.Delay(25);
         }
         return (results, artifacts);
+    }
+
+    private static async Task<WorkNotificationPageResponse> WaitForUnreadNotificationsAsync(HttpClient client, int count)
+    {
+        WorkNotificationPageResponse? notifications = null;
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            notifications = await client.GetFromJsonAsync<WorkNotificationPageResponse>("/api/workspaces/default/notifications?unreadOnly=true");
+            if (notifications is not null && notifications.Value.Count >= count) return notifications;
+            await Task.Delay(25);
+        }
+
+        return notifications ?? throw new InvalidOperationException("The notification API returned an empty response.");
     }
 
     private static async Task<InteractionResponse?> WaitForInteractionStatusAsync(
