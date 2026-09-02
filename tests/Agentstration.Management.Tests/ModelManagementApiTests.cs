@@ -24,6 +24,16 @@ public sealed partial class ModelManagementApiTests
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:ollama-extension", "Endpoint=http://127.0.0.1:1");
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IModelProviderDiscovery>();
+                services.RemoveAll<IModelProviderCapabilitiesResolver>();
+                services.RemoveAll<IExtensionInspector>();
+                services.AddSingleton<UnavailableModelProviderAdapter>();
+                services.AddSingleton<IModelProviderDiscovery>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
+                services.AddSingleton<IModelProviderCapabilitiesResolver>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
+                services.AddSingleton<IExtensionInspector>(provider => provider.GetRequiredService<UnavailableModelProviderAdapter>());
+            });
         });
 
     private static WebApplicationFactory<Program> DiagnosticFactory() => Factory().WithWebHostBuilder(builder =>
@@ -68,6 +78,49 @@ public sealed partial class ModelManagementApiTests
             StructuredOutput = new(structuredOutput ? CapabilitySupport.Native : CapabilitySupport.Unsupported),
             Reasoning = new ReasoningCapability { Support = reasoning ? CapabilitySupport.Native : CapabilitySupport.Unsupported }
         };
+    }
+
+    private sealed class UnavailableModelProviderAdapter : IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector
+    {
+        private const string UnavailableDetails = "The test extension is intentionally unavailable.";
+
+        public string ProviderType => AepModelProvider.AdapterType;
+        public bool CanHandle(string providerType) => true;
+        public bool CanInspectEndpoint(Uri endpoint) => true;
+
+        public ValueTask<ModelProviderHealth> GetHealthAsync(
+            ModelProviderConfiguration provider,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ModelProviderHealth("unavailable", UnavailableDetails));
+
+        public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(
+            ModelProviderConfiguration provider,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult<IReadOnlyList<DiscoveredModel>>([]);
+
+        public ValueTask<ResolvedModelProviderCapabilities> ResolveCapabilitiesAsync(
+            ModelProviderConfiguration provider,
+            ModelDeploymentConfiguration deployment,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ResolvedModelProviderCapabilities(new(), new(), new()));
+
+        public ValueTask<ExtensionInspection> InspectAsync(
+            ModelProviderConfiguration provider,
+            CancellationToken cancellationToken = default) =>
+            InspectAsync(provider.Name, provider.Endpoint, cancellationToken);
+
+        public ValueTask<ExtensionInspection> InspectAsync(
+            string registrationName,
+            Uri endpoint,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ExtensionInspection(
+                registrationName,
+                endpoint,
+                "unavailable",
+                null,
+                [],
+                [],
+                UnavailableDetails));
     }
 
     private sealed class ConfiguredEndpointInspector : IExtensionInspector
