@@ -26,6 +26,14 @@ public sealed class ThemeStaticAssetTests
     }
 
     [TestMethod]
+    public async Task ProgrammaticallyFocusedPageTitlesDoNotShowAVisualOutline()
+    {
+        var css = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "TestAssets", "design-tokens.css"));
+
+        StringAssert.Contains(css, ".content h1:focus { outline: none; }");
+    }
+
+    [TestMethod]
     public async Task FormTokensResolveInsideTheSelectedTheme()
     {
         var css = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "TestAssets", "design-tokens.css"));
