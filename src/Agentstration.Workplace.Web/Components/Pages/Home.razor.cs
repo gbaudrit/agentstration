@@ -254,6 +254,7 @@ public partial class Home
     private void DashboardChanged(ChangeEventArgs args) { var name = args.Value?.ToString(); if (!string.IsNullOrWhiteSpace(name)) Navigation.NavigateTo(DashboardUrl(name)); }
     private static string DashboardIcon(WorkplaceDashboardResponse value)
     {
+        if (!string.IsNullOrWhiteSpace(value.Icon)) return value.Icon;
         var key = $"{value.Name} {value.DisplayName}".ToLowerInvariant();
         if (key.Contains("home", StringComparison.Ordinal) || key.Contains("maison", StringComparison.Ordinal)) return "home";
         if (key.Contains("travel", StringComparison.Ordinal) || key.Contains("voyage", StringComparison.Ordinal) || key.Contains("trip", StringComparison.Ordinal)) return "plane";

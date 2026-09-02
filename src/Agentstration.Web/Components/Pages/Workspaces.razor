@@ -15,43 +15,107 @@ else if (workspaces.Count == 0)
 }
 else
 {
-    <section class="panel workspace-overview">
-        <div class="workspace-picker"><label>@T("Workspace")</label><select value="@workspaceName" @onchange="WorkspaceChanged">@foreach (var item in workspaces) { <option value="@item.Id.ToString("D")">@item.DisplayName</option> }</select></div>
-        <div class="workspace-picker"><label>@T("Dashboard")</label><select value="@dashboardName" @onchange="DashboardChanged">@foreach (var item in dashboards) { <option value="@item.Value.Name">@item.Value.DisplayName@(item.Value.IsDefault ? T("DefaultSuffix") : "")</option> }</select></div>
-        <button class="button-secondary" type="button" @onclick="NewDashboard">@T("NewDashboard")</button>
+    <section class="panel workspace-overview" aria-labelledby="workspace-context-title">
+        <div class="workspace-overview-copy">
+            <span class="workspace-overview-icon"><UiIcon Name="layout-grid" /></span>
+            <div><p class="eyebrow">@T("ConfigurationScope")</p><h2 id="workspace-context-title">@T("ChooseDashboard")</h2><p>@T("DashboardContextHelp")</p></div>
+        </div>
+        <div class="workspace-overview-controls">
+            <label class="workspace-picker"><span>@T("Workspace")</span><select data-testid="workspace-picker" value="@workspaceId" @onchange="WorkspaceChanged">@foreach (var item in workspaces) { <option value="@item.Id.ToString("D")">@item.DisplayName</option> }</select></label>
+            <label class="workspace-picker"><span>@T("Dashboard")</span><select value="@dashboardName" @onchange="DashboardChanged" disabled="@(dashboards.Count == 0)">@if (dashboards.Count == 0) { <option value="">@T("NewDashboard")</option> } else { @foreach (var item in dashboards) { <option value="@item.Value.Name">@item.Value.DisplayName@(item.Value.IsDefault ? T("DefaultSuffix") : "")</option> } }</select></label>
+            <button class="button-secondary workspace-new-button" type="button" @onclick="NewDashboard"><UiIcon Name="plus" />@T("NewDashboard")</button>
+        </div>
     </section>
 
     @if (selected is null) { <EmptyState Title="@T("NoDashboard")" Message="@T("NoDashboardMessage")" /> }
     else
     {
-        <section class="panel form-section">
-            <div class="form-grid">
-                <label><span>@T("Name")</span><input @bind="name" disabled="@(!creating)" /></label>
-                <label><span>@T("DisplayName")</span><input @bind="displayName" /></label>
-                <label class="form-span-2"><span>@T("Description")</span><textarea @bind="description" rows="2"></textarea></label>
-                <label class="entry-toggle"><input type="checkbox" @bind="isDefault" /><span>@T("DefaultDashboard")</span></label>
-            </div>
-        </section>
-        <section class="panel workspace-composition">
-            <div class="panel-header"><div><p class="eyebrow">@T("Entries")</p><h2>@T("DashboardComposition")</h2></div></div>
-            <div class="workspace-entry-list">
-                @foreach (var entry in entries)
+        <div class="workspace-editor-grid">
+            <section class="panel form-section workspace-settings" aria-labelledby="dashboard-settings-title">
+                <div class="panel-header">
+                    <div><p class="eyebrow">@T("Details")</p><h2 id="dashboard-settings-title">@T("DashboardSettings")</h2><p>@T("DashboardSettingsHelp")</p></div>
+                    <span class="workspace-state-badge @(selected.Published is null ? "is-draft" : "is-published")">@(selected.Published is null ? T("Draft") : T("Published"))</span>
+                </div>
+                <div class="form-grid workspace-settings-fields">
+                    <label><span>@T("Name")</span><input @bind="name" disabled="@(!creating)" autocomplete="off" /><small>@T("DashboardNameHelp")</small></label>
+                    <label><span>@T("DisplayName")</span><input @bind="displayName" autocomplete="off" /><small>@T("DashboardDisplayNameHelp")</small></label>
+                    <div class="dashboard-icon-field">
+                        <strong>@T("DashboardIcon")</strong>
+                        <small>@T("DashboardIconHelp")</small>
+                        <IconPicker @bind-Value="icon"
+                                    SelectedLabel="@T("SelectedIcon")"
+                                    NoneLabel="@T("NoIcon")"
+                                    ClearLabel="@T("ClearIcon")"
+                                    SearchLabel="@T("SearchIcons")"
+                                    SearchPlaceholder="@T("SearchIconsPlaceholder")"
+                                    ChoicesLabel="@T("IconChoices")"
+                                    NoResultsLabel="@T("NoIconsFound")"
+                                    MoreResultsLabel="@T("MoreIconsAvailable")" />
+                    </div>
+                    <label><span>@T("Description")</span><textarea @bind="description" rows="4" placeholder="@T("DashboardDescriptionPlaceholder")"></textarea></label>
+                    <label class="dashboard-default-toggle"><input type="checkbox" @bind="isDefault" /><span><strong>@T("DefaultDashboard")</strong><small>@T("DefaultDashboardHelp")</small></span></label>
+                </div>
+            </section>
+            <section class="panel workspace-composition" aria-labelledby="dashboard-composition-title">
+                <div class="panel-header">
+                    <div><p class="eyebrow">@T("Entries")</p><h2 id="dashboard-composition-title">@T("DashboardComposition")</h2><p>@T("DashboardCompositionHelp")</p></div>
+                    <span class="workspace-entry-count">@T("SelectedCount", composition.Count)</span>
+                </div>
+                @if (entries.Count == 0)
                 {
-                    var configured = composition.FirstOrDefault(value => value.EntryResourceId == EntryId(entry));
-                    <article class="workspace-entry-row @(configured is null ? "excluded" : null)">
-                        <label class="workspace-entry-toggle"><input type="checkbox" checked="@(configured is not null)" @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
-                        @if (configured is not null)
-                        {
-                            <div class="workspace-entry-config">
-                                <label><span>@T("Role")</span><select data-testid="dashboard-entry-role" value="@configured.Role" @onchange="args => ChangeRole(entry, args)"><option value="Primary">@T("Role.Primary")</option><option value="Featured">@T("Role.Featured")</option><option value="Standard">@T("Role.Standard")</option></select></label>
-                                <label><span>@T("Order")</span><input type="number" min="0" step="10" value="@configured.Order" @onchange="args => ChangeOrder(entry, args)" /></label>
-                            </div>
-                        }
-                    </article>
+                    <div class="workspace-empty-entries"><UiIcon Name="entry" /><strong>@T("NoPublishedEntries")</strong><p>@T("NoPublishedEntriesHelp")</p><a class="button-secondary" href="/entries">@T("ViewEntries")</a></div>
                 }
-            </div>
-            <div class="form-actions workspace-actions"><button class="button-secondary" @onclick="SaveAsync" disabled="@busy">@T("SaveDraft")</button><button class="button-primary" @onclick="PublishAsync" disabled="@busy">@T("PublishDashboard")</button>@if (!creating && !isDefault) { <button class="text-button" @onclick="DeleteAsync" disabled="@busy">@T("Delete")</button> }</div>
-            @if (!string.IsNullOrWhiteSpace(message)) { <p class="@(error ? "inline-warning" : "resource-hint")">@message</p> }
+                else
+                {
+                    <div class="workspace-entry-list">
+                        @foreach (var role in OrderedRoles)
+                        {
+                            var roleEntries = EntriesForRole(role);
+                            if (roleEntries.Count > 0)
+                            {
+                                <section class="workspace-entry-group role-@role.ToString().ToLowerInvariant()" data-testid="dashboard-entry-group-@role.ToString().ToLowerInvariant()">
+                                    <div class="workspace-entry-group-header"><div><strong>@T($"Role.{role}")</strong><small>@T($"DashboardRole.{role}.Help")</small></div>@if (role != DashboardItemRole.Primary) { <span>@roleEntries.Count</span> }</div>
+                                    @foreach (var entry in roleEntries)
+                                    {
+                                        var configured = composition.Single(value => value.EntryResourceId == EntryId(entry));
+                                        <article class="workspace-entry-row included">
+                                            <label class="workspace-entry-toggle"><input type="checkbox" checked @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
+                                            <div class="workspace-entry-config @(role == DashboardItemRole.Primary ? "without-order" : null)">
+                                                <label><span>@T("Role")</span><select data-testid="dashboard-entry-role" value="@configured.Role" @onchange="args => ChangeRole(entry, args)" title="@T("OnlyOnePrimaryEntry")"><option value="Primary">@T("Role.Primary")</option><option value="Featured">@T("Role.Featured")</option><option value="Standard">@T("Role.Standard")</option></select></label>
+                                                @if (role != DashboardItemRole.Primary)
+                                                {
+                                                    <div class="workspace-entry-order-actions" aria-label="@T("DashboardEntryOrderActions", entry.DisplayName)">
+                                                        <button type="button" data-testid="dashboard-entry-move-up" disabled="@(!CanMoveEntry(entry, -1))" title="@T("MoveUp")" aria-label="@T("MoveDashboardEntryUp", entry.DisplayName)" @onclick="() => MoveEntry(entry, -1)">↑</button>
+                                                        <button type="button" data-testid="dashboard-entry-move-down" disabled="@(!CanMoveEntry(entry, 1))" title="@T("MoveDown")" aria-label="@T("MoveDashboardEntryDown", entry.DisplayName)" @onclick="() => MoveEntry(entry, 1)">↓</button>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </article>
+                                    }
+                                </section>
+                            }
+                        }
+                        @if (ExcludedEntries.Count > 0)
+                        {
+                            <section class="workspace-entry-group role-excluded" data-testid="dashboard-entry-group-excluded">
+                                <div class="workspace-entry-group-header"><div><strong>@T("NotShown")</strong><small>@T("DashboardRole.Excluded.Help")</small></div><span>@ExcludedEntries.Count</span></div>
+                                @foreach (var entry in ExcludedEntries)
+                                {
+                                    <article class="workspace-entry-row excluded">
+                                        <label class="workspace-entry-toggle"><input type="checkbox" checked="false" @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
+                                        <span class="workspace-entry-excluded">@T("NotShown")</span>
+                                    </article>
+                                }
+                            </section>
+                        }
+                    </div>
+                }
+            </section>
+        </div>
+        <section class="workspace-action-bar" aria-label="@T("DashboardActions")">
+            <div class="workspace-action-feedback">@if (!string.IsNullOrWhiteSpace(message)) { <p role="@(error ? "alert" : "status")" class="@(error ? "inline-warning" : "resource-hint")">@message</p> } else { <p class="resource-hint">@T("DashboardActionHelp")</p> }</div>
+            @if (!creating && !isDefault) { <button class="workspace-delete-button" type="button" @onclick="DeleteAsync" disabled="@busy">@T("DeleteDashboard")</button> }
+            <div class="workspace-primary-actions"><button class="button-secondary" type="button" @onclick="SaveAsync" disabled="@busy">@T("SaveDraft")</button><button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy"><UiIcon Name="send" />@T("PublishDashboard")</button></div>
         </section>
     }
 }
@@ -60,19 +124,21 @@ else
     [SupplyParameterFromQuery(Name = "entry")] public string? RequestedEntryName { get; set; }
     [SupplyParameterFromQuery(Name = "entryNamespace")] public string? RequestedEntryNamespace { get; set; }
     private bool loading = true, busy, error, creating, isDefault;
-    private string workspaceName = "", dashboardName = "", name = "", displayName = "", description = "", message = "";
+    private string workspaceId = "", dashboardName = "", name = "", displayName = "", description = "", icon = DashboardIconDefaults.Grid, message = "";
     private IReadOnlyList<WorkplaceWorkspaceResponse> workspaces = [];
     private IReadOnlyList<WorkplaceDashboardDraftResponse> dashboards = [];
     private IReadOnlyList<EntryResponse> entries = [];
     private WorkplaceDashboardDraftResponse? selected;
     private List<DashboardEntryReference> composition = [];
+    private static IReadOnlyList<DashboardItemRole> OrderedRoles { get; } = [DashboardItemRole.Primary, DashboardItemRole.Featured, DashboardItemRole.Standard];
+    private IReadOnlyList<EntryResponse> ExcludedEntries => entries.Where(entry => composition.All(value => value.EntryResourceId != EntryId(entry))).OrderBy(entry => entry.DisplayName, StringComparer.CurrentCulture).ToArray();
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
 
     protected override async Task OnInitializedAsync()
     {
         workspaces = await Client.GetWorkspacesAsync(default);
         entries = await Client.GetPublishedEntriesAsync(default);
-        workspaceName = workspaces.FirstOrDefault()?.Id.ToString("D") ?? "";
+        workspaceId = workspaces.FirstOrDefault()?.Id.ToString("D") ?? "";
         if (workspaces.Count > 0) { await LoadDashboardsAsync(); PreselectRequestedEntry(); }
         loading = false;
     }
@@ -81,7 +147,7 @@ else
         var requestedName = args.Value?.ToString();
         var workspace = workspaces.FirstOrDefault(value => string.Equals(value.Id.ToString("D"), requestedName, StringComparison.OrdinalIgnoreCase));
         if (workspace is null) { ShowWorkspaceSelectionError(); return; }
-        workspaceName = workspace.Name;
+        workspaceId = workspace.Id.ToString("D");
         await LoadDashboardsAsync();
     }
     private void DashboardChanged(ChangeEventArgs args)
@@ -94,31 +160,50 @@ else
     {
         var workspace = SelectedWorkspace();
         if (workspace is null) { ShowWorkspaceSelectionError(); return; }
-        workspaceName = workspace.Name;
         dashboards = await Client.GetDashboardsAsync(workspaceName, default);
         selected = dashboards.FirstOrDefault(value => value.Value.IsDefault) ?? dashboards.FirstOrDefault();
         if (selected is not null) Select(selected); else NewDashboard();
     }
-    private void Select(WorkplaceDashboardDraftResponse value) { selected = value; creating = false; dashboardName = name = value.Value.Name; displayName = value.Value.DisplayName; description = value.Value.Description ?? ""; isDefault = value.Value.IsDefault; composition = value.Value.Entries.ToList(); }
+    private void Select(WorkplaceDashboardDraftResponse value) { selected = value; creating = false; dashboardName = name = value.Value.Name; displayName = value.Value.DisplayName; description = value.Value.Description ?? ""; icon = value.Value.Icon ?? ""; isDefault = value.Value.IsDefault; composition = value.Value.Entries.ToList(); }
     private void NewDashboard()
     {
         var workspace = SelectedWorkspace();
         if (workspace is null) { ShowWorkspaceSelectionError(); return; }
-        workspaceName = workspace.Name;
-        creating = true; dashboardName = name = ""; displayName = ""; description = ""; isDefault = dashboards.Count == 0; composition = [];
-        selected = new(new WorkplaceDashboardDraft { Id = new("new"), WorkspaceId = new(workspace.Id), Name = "new", DisplayName = T("NewDashboard"), IsDefault = isDefault }, null);
+        creating = true; dashboardName = name = ""; displayName = ""; description = ""; isDefault = dashboards.Count == 0; icon = isDefault ? DashboardIconDefaults.Home : DashboardIconDefaults.Grid; composition = [];
+        selected = new(new WorkplaceDashboardDraft { Id = new("new"), WorkspaceId = new(workspace.Id), Name = "new", DisplayName = T("NewDashboard"), Icon = icon, IsDefault = isDefault }, null);
     }
-    private void ToggleEntry(EntryResponse entry, ChangeEventArgs args) { var id = EntryId(entry); if (args.Value is true && composition.All(value => value.EntryResourceId != id)) composition.Add(new DashboardEntryReference { EntryResourceId = id, Role = DashboardItemRole.Standard, Order = composition.Count * 10 }); else if (args.Value is not true) composition.RemoveAll(value => value.EntryResourceId == id); }
-    private void ChangeRole(EntryResponse entry, ChangeEventArgs args) { var role = Enum.Parse<DashboardItemRole>(args.Value?.ToString() ?? "Standard"); if (role == DashboardItemRole.Primary) for (var i = 0; i < composition.Count; i++) if (composition[i].Role == DashboardItemRole.Primary) composition[i] = composition[i] with { Role = DashboardItemRole.Standard }; Replace(EntryId(entry), value => value with { Role = role }); }
-    private void ChangeOrder(EntryResponse entry, ChangeEventArgs args) { _ = int.TryParse(args.Value?.ToString(), out var order); Replace(EntryId(entry), value => value with { Order = order }); }
+    private void ToggleEntry(EntryResponse entry, ChangeEventArgs args) { var id = EntryId(entry); if (args.Value is true && composition.All(value => value.EntryResourceId != id)) composition.Add(new DashboardEntryReference { EntryResourceId = id, Role = DashboardItemRole.Standard, Order = composition.Count(value => value.Role == DashboardItemRole.Standard) * 10 }); else if (args.Value is not true) composition.RemoveAll(value => value.EntryResourceId == id); NormalizeOrdersByRole(); }
+    private void ChangeRole(EntryResponse entry, ChangeEventArgs args) { var role = Enum.Parse<DashboardItemRole>(args.Value?.ToString() ?? "Standard"); if (role == DashboardItemRole.Primary) for (var i = 0; i < composition.Count; i++) if (composition[i].Role == DashboardItemRole.Primary) composition[i] = composition[i] with { Role = DashboardItemRole.Standard }; Replace(EntryId(entry), value => value with { Role = role, Order = composition.Count(item => item.Role == role) * 10 }); NormalizeOrdersByRole(); }
+    private bool CanMoveEntry(EntryResponse entry, int offset)
+    {
+        var configured = composition.FirstOrDefault(value => value.EntryResourceId == EntryId(entry));
+        if (configured is null || configured.Role == DashboardItemRole.Primary) return false;
+        var ordered = composition.Where(value => value.Role == configured.Role).OrderBy(value => value.Order).ToArray();
+        var index = Array.FindIndex(ordered, value => value.EntryResourceId == EntryId(entry));
+        return index >= 0 && index + offset >= 0 && index + offset < ordered.Length;
+    }
+    private void MoveEntry(EntryResponse entry, int offset)
+    {
+        var configured = composition.FirstOrDefault(value => value.EntryResourceId == EntryId(entry));
+        if (configured is null || configured.Role == DashboardItemRole.Primary) return;
+        var ordered = composition.Where(value => value.Role == configured.Role).OrderBy(value => value.Order).ToList();
+        var index = ordered.FindIndex(value => value.EntryResourceId == EntryId(entry));
+        var target = index + offset;
+        if (index < 0 || target < 0 || target >= ordered.Count) return;
+        (ordered[index], ordered[target]) = (ordered[target], ordered[index]);
+        for (var position = 0; position < ordered.Count; position++) Replace(ordered[position].EntryResourceId, value => value with { Order = position * 10 });
+    }
+    private IReadOnlyList<EntryResponse> EntriesForRole(DashboardItemRole role) => composition.Where(value => value.Role == role).OrderBy(value => value.Order).Select(reference => entries.FirstOrDefault(entry => EntryId(entry) == reference.EntryResourceId)).Where(entry => entry is not null).Select(entry => entry!).ToArray();
+    private void NormalizeOrdersByRole() { foreach (var role in OrderedRoles) { var ordered = composition.Where(value => value.Role == role).OrderBy(value => value.Order).ToArray(); for (var position = 0; position < ordered.Length; position++) Replace(ordered[position].EntryResourceId, value => value with { Order = position * 10 }); } }
     private void Replace(EntryId id, Func<DashboardEntryReference, DashboardEntryReference> update) { var index = composition.FindIndex(value => value.EntryResourceId == id); if (index >= 0) composition[index] = update(composition[index]); }
     private void PreselectRequestedEntry() { if (selected is null || string.IsNullOrWhiteSpace(RequestedEntryName)) return; var ns = string.IsNullOrWhiteSpace(RequestedEntryNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(RequestedEntryNamespace); var entry = entries.FirstOrDefault(value => value.Id == RequestedEntryName && value.Namespace == ns); if (entry is not null && composition.All(value => value.EntryResourceId != EntryId(entry))) composition.Add(new DashboardEntryReference { EntryResourceId = EntryId(entry), Role = DashboardItemRole.Standard, Order = composition.Count * 10 }); }
-    private WorkplaceDashboardDraft Draft() { var value = selected!.Value; var normalized = name.Trim(); return value with { Id = creating ? new DashboardId(normalized) : value.Id, Name = normalized, DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), IsDefault = isDefault, Entries = composition.OrderBy(value => value.Order).ToArray() }; }
+    private WorkplaceDashboardDraft Draft() { var value = selected!.Value; var normalized = name.Trim(); return value with { Id = creating ? new DashboardId(normalized) : value.Id, Name = normalized, DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Icon = string.IsNullOrWhiteSpace(icon) ? null : icon.Trim(), IsDefault = isDefault, Entries = OrderedRoles.SelectMany(role => composition.Where(item => item.Role == role).OrderBy(item => item.Order)).ToArray() }; }
     private async Task SaveAsync() => await ExecuteAsync(async () => { var saved = await Client.SaveDashboardAsync(Draft(), default); dashboards = await Client.GetDashboardsAsync(workspaceName, default); Select(dashboards.FirstOrDefault(value => value.Value.Name == saved.Name) ?? new(saved, null)); message = T("DashboardSaved", saved.Revision); });
     private async Task PublishAsync() => await ExecuteAsync(async () => { var saved = await Client.SaveDashboardAsync(Draft(), default); var published = await Client.PublishDashboardAsync(workspaceName, saved.Name, default); dashboards = await Client.GetDashboardsAsync(workspaceName, default); Select(dashboards.FirstOrDefault(value => value.Value.Name == saved.Name) ?? new(saved, published)); message = T("DashboardPublished", published.Version, published.Entries.Count); });
     private async Task DeleteAsync() => await ExecuteAsync(async () => { await Client.DeleteDashboardAsync(workspaceName, name, default); await LoadDashboardsAsync(); message = T("DashboardDeleted"); });
     private async Task ExecuteAsync(Func<Task> action) { busy = true; error = false; message = ""; try { await action(); } catch (Exception exception) { error = true; message = exception.Message; } finally { busy = false; } }
-    private WorkplaceWorkspaceResponse? SelectedWorkspace() => workspaces.FirstOrDefault(value => string.Equals(value.Id.ToString("D"), workspaceName, StringComparison.OrdinalIgnoreCase)) ?? workspaces.FirstOrDefault();
+    private string workspaceName => SelectedWorkspace()?.Name ?? "";
+    private WorkplaceWorkspaceResponse? SelectedWorkspace() => workspaces.FirstOrDefault(value => string.Equals(value.Id.ToString("D"), workspaceId, StringComparison.OrdinalIgnoreCase));
     private void ShowWorkspaceSelectionError() { dashboards = []; selected = null; error = true; message = T("NoWorkspaceAvailable"); }
     private static EntryId EntryId(EntryResponse entry) => new(entry.Id, entry.Namespace);
     private string EntryScope(EntryResponse entry) => entry.Namespace.IsDefault ? T("LocalEntry") : T("PackScope", entry.Namespace.Value);

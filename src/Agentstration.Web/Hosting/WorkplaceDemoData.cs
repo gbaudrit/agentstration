@@ -129,6 +129,7 @@ public static class WorkplaceDemoData
             WorkspaceId = workspaceId,
             Name = "home",
             DisplayName = "Home",
+            Icon = DashboardIconDefaults.Home,
             Description = "Your default Workplace dashboard.",
             IsDefault = true,
             Entries =
