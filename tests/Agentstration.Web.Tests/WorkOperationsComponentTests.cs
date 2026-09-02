@@ -141,6 +141,9 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("2 sélectionnés", flowOrchestrationEditor["SelectedCount.Many", 2].Value);
         Assert.AreEqual("Nouveau Flow", newFlow["Title"].Value);
         Assert.AreEqual("Routage d’agents", newFlow["Template.AgentRouting"].Value);
+        Assert.AreEqual("Choisir le modèle de départ", newFlow["Next.Workflow.Title"].Value);
+        Assert.AreEqual("Configurer l’équipe d’agents", newFlow["Next.Orchestration.Title"].Value);
+        Assert.AreEqual("Configurer l’équipe", newFlow["Next.Orchestration.Action"].Value);
         Assert.AreEqual("Créer un profil de modèle", modelProfileEditor["CreateModelProfile"].Value);
         Assert.AreEqual("Fournisseur et modèle", modelProfileEditor["ProviderAndModel"].Value);
         Assert.AreEqual("La modification de ce profil affectera 1 agent.", modelProfileEditor["ChangingProfileAffects", modelProfileEditor["AgentCount.One", 1].Value].Value);

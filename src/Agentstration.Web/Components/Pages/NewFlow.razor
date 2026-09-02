@@ -7,35 +7,110 @@
 <PageTitle>@T("Title") · Agentstration</PageTitle>
 <PageHeader Title="@T("Title")" Description="@T("Description")" />
 
-<EditForm Model="model" OnValidSubmit="CreateAsync">
+<EditForm Model="model" OnValidSubmit="CreateAsync" class="flow-create-shell">
     <DataAnnotationsValidator />
-    <article class="panel flow-create-form">
-        <div class="form-columns">
-            <label>@T("TechnicalName")<InputText @bind-Value="model.Name" /></label>
-            <label>@T("FlowKind")<InputSelect @bind-Value="model.Kind"><option value="Workflow">@T("Kind.Workflow")</option><option value="Orchestration">@T("Kind.Orchestration")</option></InputSelect></label>
-        </div>
-        @if (model.Kind == "Workflow")
-        {
-            <label>@T("DisplayName")<InputText @bind-Value="model.DisplayName" /></label>
-        }
-        <label>@T("Field.Description")<InputTextArea @bind-Value="model.Description" /></label>
-        @if (model.Kind == "Workflow")
-        {
-            <label>@T("StartingTemplate")<InputSelect @bind-Value="model.Template"><option value="EmptyFlow">@T("Template.EmptyFlow")</option><option value="AgentRouting">@T("Template.AgentRouting")</option><option value="SequentialProcessing">@T("Template.SequentialProcessing")</option><option value="ConditionalFlow">@T("Template.ConditionalFlow")</option></InputSelect></label>
-        }
-        else
-        {
-            <div class="form-columns"><label>@T("InitialVersion")<InputText @bind-Value="orchestration.Version" /></label><label class="check-option"><InputCheckbox @bind-Value="orchestration.Enabled" /> @T("Enabled")</label></div>
-        }
-    </article>
+    <div class="flow-create-progress" aria-label="@T("ProgressLabel")">
+        <span class="flow-create-step @(currentStep == 1 ? "is-active" : "is-complete")"><strong>1</strong>@T("Step.Define")</span>
+        <span class="flow-create-progress-line"></span>
+        <span class="flow-create-step @(currentStep == 2 ? "is-active" : null)"><strong>2</strong>@T("Step.Configure")</span>
+    </div>
 
-    @if (model.Kind == "Orchestration")
+    @if (currentStep == 1)
     {
-        <OrchestrationDefinitionEditor Model="orchestration" Agents="agents" />
+        <div class="flow-create-step-content">
+            <section class="panel flow-create-form form-section">
+                <div class="panel-header flow-create-section-header">
+                    <div><p class="eyebrow">@T("IdentityEyebrow")</p><h2>@T("IdentityTitle")</h2><p>@T("IdentityHelp")</p></div>
+                    <span class="flow-create-section-number">01</span>
+                </div>
+                <div class="form-grid flow-identity-grid">
+                    <label><span>@T("TechnicalName")</span><InputText @bind-Value="model.Name" /><small>@T("TechnicalNameHelp")</small><ValidationMessage For="@(() => model.Name)" /></label>
+                    <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><small>@T("DisplayNameHelp")</small><ValidationMessage For="@(() => model.DisplayName)" /></label>
+                    <label><span>@T("InitialVersion")</span><InputText @bind-Value="orchestration.Version" /><small>@T("InitialVersionHelp")</small></label>
+                    <label class="flow-form-span-all"><span>@T("Field.Description")</span><InputTextArea @bind-Value="model.Description" rows="3" /><small>@T("DescriptionHelp")</small></label>
+                </div>
+            </section>
+
+            <section class="panel flow-create-form form-section">
+                <div class="panel-header flow-create-section-header">
+                    <div><p class="eyebrow">@T("ModelEyebrow")</p><h2>@T("FlowKind")</h2><p>@T("FlowKindHelp")</p></div>
+                    <span class="flow-create-section-number">02</span>
+                </div>
+                <div class="flow-kind-grid">
+                    <InputRadioGroup @bind-Value="model.Kind">
+                        <label class="flow-kind-card @(model.Kind == "Workflow" ? "is-selected" : null)">
+                            <InputRadio Value="@("Workflow")" />
+                            <span class="flow-kind-icon"><UiIcon Name="workflow" /></span>
+                            <span class="flow-kind-copy"><strong>@T("Kind.Workflow")</strong><small>@T("Kind.WorkflowHelp")</small></span>
+                            <span class="flow-kind-check"><UiIcon Name="check" /></span>
+                        </label>
+                        <label class="flow-kind-card @(model.Kind == "Orchestration" ? "is-selected" : null)">
+                            <InputRadio Value="@("Orchestration")" />
+                            <span class="flow-kind-icon"><UiIcon Name="agent" /></span>
+                            <span class="flow-kind-copy"><strong>@T("Kind.Orchestration")</strong><small>@T("Kind.OrchestrationHelp")</small></span>
+                            <span class="flow-kind-check"><UiIcon Name="check" /></span>
+                        </label>
+                    </InputRadioGroup>
+                </div>
+            </section>
+        </div>
+    }
+    else if (model.Kind == "Workflow")
+    {
+        <section class="panel flow-create-form form-section">
+            <div class="panel-header flow-create-section-header">
+                <div><p class="eyebrow">@T("ConfigurationEyebrow")</p><h2>@T("StartingTemplate")</h2><p>@T("StartingTemplateHelp")</p></div>
+                <span class="flow-create-section-number">02</span>
+            </div>
+            <InputRadioGroup @bind-Value="model.Template" class="flow-template-grid">
+                @foreach (var template in Templates)
+                {
+                    <label class="flow-template-card @(model.Template == template.Value ? "is-selected" : null)">
+                        <InputRadio Value="@template.Value" />
+                        <span class="flow-template-icon"><UiIcon Name="@template.Icon" /></span>
+                        <span><strong>@T($"Template.{template.Value}")</strong><small>@T($"Template.{template.Value}Help")</small></span>
+                    </label>
+                }
+            </InputRadioGroup>
+        </section>
+    }
+    else
+    {
+        <div class="flow-create-step-content">
+            <section class="flow-orchestration-toolbar">
+                <div class="flow-orchestration-copy">
+                    <p class="eyebrow">@T("ConfigurationEyebrow")</p>
+                    <h2>@T("ConfigurationTitle")</h2>
+                    <p>@T("ConfigurationHelp")</p>
+                </div>
+                <label class="flow-enabled-option">
+                    <span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span>
+                    <InputCheckbox @bind-Value="orchestration.Enabled" />
+                </label>
+            </section>
+            <OrchestrationDefinitionEditor Model="orchestration" Agents="agents" />
+        </div>
     }
 
     @if (error is not null) { <p class="error-panel">@error</p> }
-    <div class="dialog-actions flow-create-actions"><a class="button-secondary" href="/flows">@T("Cancel")</a><button class="button-primary" disabled="@submitting">@(submitting ? T("Creating") : model.Kind == "Workflow" ? T("CreateDraft") : T("CreateOrchestration"))</button></div>
+    <div class="flow-create-actions">
+        <span>
+            <strong>@(currentStep == 1 ? T($"Next.{model.Kind}.Title") : T("ReadyTitle"))</strong>
+            <small>@(currentStep == 1 ? T($"Next.{model.Kind}.Help") : model.Kind == "Workflow" ? T("Ready.Workflow") : T("Ready.Orchestration"))</small>
+        </span>
+        <div>
+            @if (currentStep == 1)
+            {
+                <a class="button-secondary" href="/flows">@T("Cancel")</a>
+                <button type="button" class="button-primary" @onclick="Continue">@T($"Next.{model.Kind}.Action")</button>
+            }
+            else
+            {
+                <button type="button" class="button-secondary" @onclick="Back">@T("Back")</button>
+                <button type="submit" class="button-primary" disabled="@submitting">@(submitting ? T("Creating") : model.Kind == "Workflow" ? T("CreateDraft") : T("CreateOrchestration"))</button>
+            }
+        </div>
+    </div>
 </EditForm>
 
 @code {
@@ -43,14 +118,34 @@
     private readonly NewFlowModel model = new();
     private readonly OrchestrationEditorModel orchestration = new();
     private IReadOnlyList<AgentSummary> agents = [];
+    private int currentStep = 1;
     private bool submitting;
     private string? error;
+    private static readonly (string Value, string Icon)[] Templates =
+    [
+        ("EmptyFlow", "plus"),
+        ("AgentRouting", "workflow"),
+        ("SequentialProcessing", "layers"),
+        ("ConditionalFlow", "flow-run")
+    ];
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
 
     protected override async Task OnInitializedAsync()
     {
         try { agents = await Management.GetAgentsAsync(cancellation.Token); }
         catch (Exception exception) { error = exception.Message; }
+    }
+
+    private void Continue()
+    {
+        error = null;
+        currentStep = 2;
+    }
+
+    private void Back()
+    {
+        error = null;
+        currentStep = 1;
     }
 
     private async Task CreateAsync()
@@ -72,8 +167,8 @@
                 model.Description,
                 orchestration.Version,
                 orchestration.Enabled,
-                orchestration.CreateDefinition()), cancellation.Token);
-            Navigation.NavigateTo($"/flows/{created.Value.Id}/orchestration");
+                orchestration.CreateDefinition()) { DisplayName = model.DisplayName }, cancellation.Token);
+            Navigation.NavigateTo($"/flows/{created.Value.Id}?view=definition");
         }
         catch (Exception exception) { error = exception.Message; }
         finally { submitting = false; }

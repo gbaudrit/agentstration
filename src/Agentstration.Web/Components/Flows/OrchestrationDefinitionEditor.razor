@@ -1,80 +1,102 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.FlowOrchestrationEditorStrings> Localizer
 <div class="orchestration-editor-grid">
-    <fieldset class="panel orchestration-configuration" disabled="@IsReadOnly">
-        <div class="panel-header"><h2>@T("Participants")</h2><span>@SelectedCount(Model.ParticipantIds.Count)</span></div>
-        @if (Agents.Count == 0)
-        {
-            <p class="muted">@T("NoAgents")</p>
-        }
-        else
-        {
-            <div class="agent-picker">
-                @foreach (var agent in Agents)
+    <fieldset class="orchestration-configuration" disabled="@IsReadOnly">
+        <div class="orchestration-control-column">
+            <section class="panel orchestration-participants-panel">
+                <div class="panel-header orchestration-section-header"><div><p class="eyebrow">@T("TeamEyebrow")</p><h2>@T("Participants")</h2><p>@T("ParticipantsHelp")</p></div><span class="selection-count">@SelectedCount(Model.ParticipantIds.Count)</span></div>
+                @if (Agents.Count == 0)
                 {
-                    var selected = Model.ParticipantIds.Contains(agent.Id, StringComparer.Ordinal);
-                    <label class="agent-option">
-                        <input type="checkbox" checked="@selected" @onchange="eventArgs => ToggleParticipant(agent.Id, eventArgs)" />
-                        <span><strong>@agent.Name</strong><small><code>@agent.Id</code> · @agent.ModelProfile · @agent.Status</small></span>
-                    </label>
+                    <div class="orchestration-empty"><span><UiIcon Name="agent" /></span><strong>@T("NoAgents")</strong><small>@T("NoAgentsHelp")</small></div>
                 }
-            </div>
-        }
-
-        @if (Model.ParticipantIds.Count > 0)
-        {
-            <h3>@T("ExecutionOrder")</h3>
-            <ol class="participant-order">
-                @foreach (var participant in Model.ParticipantIds.ToArray())
+                else
                 {
-                    var index = Model.ParticipantIds.IndexOf(participant);
-                    <li><code>@participant</code><span><button type="button" disabled="@(index == 0)" @onclick="() => Move(participant, -1)" aria-label="@T("MoveUp", participant)">↑</button><button type="button" disabled="@(index == Model.ParticipantIds.Count - 1)" @onclick="() => Move(participant, 1)" aria-label="@T("MoveDown", participant)">↓</button></span></li>
-                }
-            </ol>
-        }
-
-        <label>@T("Strategy")
-            <InputSelect @bind-Value="Model.Strategy" @bind-Value:after="StrategyChanged">
-                @foreach (var strategy in Enum.GetValues<FlowOrchestrationStrategy>()) { <option value="@strategy">@Label(strategy)</option> }
-            </InputSelect>
-        </label>
-
-        @switch (Model.Strategy)
-        {
-            case FlowOrchestrationStrategy.Sequential:
-                <label class="check-option"><InputCheckbox @bind-Value="Model.IncludeFullHistory" /> @T("IncludeFullHistory")</label>
-                break;
-            case FlowOrchestrationStrategy.Concurrent:
-                <p class="muted">@T("ConcurrentHelp")</p>
-                break;
-            case FlowOrchestrationStrategy.Handoff:
-                <label>@T("InitialParticipant")<InputSelect @bind-Value="Model.InitialParticipant">@foreach (var id in Model.ParticipantIds) { <option value="@id">@id</option> }</InputSelect></label>
-                <div class="panel-header"><h3>@T("HandoffRoutes")</h3><button type="button" class="button-secondary" disabled="@(Model.ParticipantIds.Count < 2)" @onclick="AddRoute">@T("AddRoute")</button></div>
-                @foreach (var route in Model.Handoffs.ToArray())
-                {
-                    <div class="handoff-route">
-                        <InputSelect @bind-Value="route.From">@foreach (var id in Model.ParticipantIds) { <option value="@id">@id</option> }</InputSelect>
-                        <span>→</span>
-                        <InputSelect @bind-Value="route.To">@foreach (var id in Model.ParticipantIds) { <option value="@id">@id</option> }</InputSelect>
-                        <button type="button" class="button-danger" @onclick="() => Model.Handoffs.Remove(route)" aria-label="@T("DeleteRoute")">×</button>
+                    <label class="agent-search"><UiIcon Name="search" /><span class="sr-only">@T("SearchAgents")</span><input type="search" @bind="agentSearch" @bind:event="oninput" placeholder="@T("SearchAgents")" /></label>
+                    <div class="agent-picker">
+                        @foreach (var agent in FilteredAgents)
+                        {
+                            var selected = Model.ParticipantIds.Contains(agent.Id, StringComparer.Ordinal);
+                            <label class="agent-option @(selected ? "is-selected" : null)">
+                                <span class="agent-avatar">@Initial(agent.Name)</span>
+                                <span class="agent-copy"><strong>@agent.Name</strong><small><code>@agent.Id</code><span>@agent.ModelProfile</span></small></span>
+                                <span class="agent-status">@agent.Status</span>
+                                <input type="checkbox" checked="@selected" @onchange="eventArgs => ToggleParticipant(agent.Id, eventArgs)" aria-label="@agent.Name" />
+                            </label>
+                        }
+                        @if (!FilteredAgents.Any())
+                        {
+                            <p class="muted agent-no-results">@T("NoMatchingAgents")</p>
+                        }
                     </div>
                 }
-                <label class="check-option"><InputCheckbox @bind-Value="Model.Autonomous" /> @T("AutonomousHandoffs")</label>
-                <label>@T("MaximumTurns")<InputNumber @bind-Value="Model.MaximumTurnsPerParticipant" /></label>
-                <label>@T("TerminationPhrase")<InputText @bind-Value="Model.TerminationPhrase" /></label>
-                break;
-            case FlowOrchestrationStrategy.GroupChat:
-                <label>@T("MaximumIterations")<InputNumber @bind-Value="Model.MaximumIterations" /></label>
-                break;
-            case FlowOrchestrationStrategy.Magentic:
-                <label>@T("Manager")
-                    <InputSelect @bind-Value="Model.ManagerId"><option value="">@T("SelectAgent")</option>@foreach (var agent in AvailableManagers) { <option value="@agent.Id">@agent.Name (@agent.Id)</option> }</InputSelect>
+
+                @if (Model.ParticipantIds.Count > 0)
+                {
+                    <div class="participant-order-heading"><div><h3>@T("ExecutionOrder")</h3><p>@T("ExecutionOrderHelp")</p></div></div>
+                    <ol class="participant-order">
+                        @foreach (var participant in Model.ParticipantIds.ToArray())
+                        {
+                            var index = Model.ParticipantIds.IndexOf(participant);
+                            <li>
+                                <span class="order-index">@(index + 1)</span>
+                                <span class="order-copy"><strong>@AgentName(participant)</strong><code>@participant</code></span>
+                                <span class="order-actions"><button type="button" disabled="@(index == 0)" @onclick="() => Move(participant, -1)" aria-label="@T("MoveUp", participant)">↑</button><button type="button" disabled="@(index == Model.ParticipantIds.Count - 1)" @onclick="() => Move(participant, 1)" aria-label="@T("MoveDown", participant)">↓</button></span>
+                            </li>
+                        }
+                    </ol>
+                }
+            </section>
+
+            <section class="panel orchestration-strategy-panel">
+                <div class="panel-header orchestration-section-header"><div><p class="eyebrow">@T("BehaviorEyebrow")</p><h2>@T("Strategy")</h2><p>@T("StrategyHelp")</p></div></div>
+                <label class="strategy-picker"><span>@T("StrategyMode")</span>
+                    <InputSelect @bind-Value="Model.Strategy" @bind-Value:after="StrategyChanged">
+                        @foreach (var strategy in Enum.GetValues<FlowOrchestrationStrategy>()) { <option value="@strategy">@Label(strategy)</option> }
+                    </InputSelect>
+                    <small>@T($"StrategyHelp.{Model.Strategy}")</small>
                 </label>
-                <div class="form-columns"><label>@T("MaximumRounds")<InputNumber @bind-Value="Model.MaximumRounds" /></label><label>@T("MaximumStalls")<InputNumber @bind-Value="Model.MaximumStalls" /></label><label>@T("MaximumResets")<InputNumber @bind-Value="Model.MaximumResets" /></label></div>
-                break;
-        }
+
+                <div class="strategy-options">
+                    @switch (Model.Strategy)
+                    {
+                        case FlowOrchestrationStrategy.Sequential:
+                            <label class="check-option"><InputCheckbox @bind-Value="Model.IncludeFullHistory" /><span><strong>@T("IncludeFullHistory")</strong><small>@T("IncludeFullHistoryHelp")</small></span></label>
+                            break;
+                        case FlowOrchestrationStrategy.Concurrent:
+                            <p class="strategy-note"><UiIcon Name="activity" />@T("ConcurrentHelp")</p>
+                            break;
+                        case FlowOrchestrationStrategy.Handoff:
+                            <label>@T("InitialParticipant")<InputSelect @bind-Value="Model.InitialParticipant">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect></label>
+                            <div class="panel-header handoff-heading"><div><h3>@T("HandoffRoutes")</h3><p>@T("HandoffRoutesHelp")</p></div><button type="button" class="button-secondary" disabled="@(Model.ParticipantIds.Count < 2)" @onclick="AddRoute">@T("AddRoute")</button></div>
+                            @foreach (var route in Model.Handoffs.ToArray())
+                            {
+                                <div class="handoff-route">
+                                    <InputSelect @bind-Value="route.From">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect>
+                                    <span>→</span>
+                                    <InputSelect @bind-Value="route.To">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect>
+                                    <button type="button" class="button-danger" @onclick="() => Model.Handoffs.Remove(route)" aria-label="@T("DeleteRoute")">×</button>
+                                </div>
+                            }
+                            <label class="check-option"><InputCheckbox @bind-Value="Model.Autonomous" /><span><strong>@T("AutonomousHandoffs")</strong></span></label>
+                            <label>@T("MaximumTurns")<InputNumber @bind-Value="Model.MaximumTurnsPerParticipant" /></label>
+                            <label>@T("TerminationPhrase")<InputText @bind-Value="Model.TerminationPhrase" /></label>
+                            break;
+                        case FlowOrchestrationStrategy.GroupChat:
+                            <label>@T("MaximumIterations")<InputNumber @bind-Value="Model.MaximumIterations" /></label>
+                            break;
+                        case FlowOrchestrationStrategy.Magentic:
+                            <label>@T("Manager")
+                                <InputSelect @bind-Value="Model.ManagerId"><option value="">@T("SelectAgent")</option>@foreach (var agent in AvailableManagers) { <option value="@agent.Id">@agent.Name (@agent.Id)</option> }</InputSelect>
+                            </label>
+                            <div class="form-columns"><label>@T("MaximumRounds")<InputNumber @bind-Value="Model.MaximumRounds" /></label><label>@T("MaximumStalls")<InputNumber @bind-Value="Model.MaximumStalls" /></label><label>@T("MaximumResets")<InputNumber @bind-Value="Model.MaximumResets" /></label></div>
+                            break;
+                    }
+                </div>
+            </section>
+
+        </div>
     </fieldset>
     <section class="panel orchestration-preview-panel">
-        <div class="panel-header"><h2>@T("ExecutionPreview")</h2><StatusBadge Text="@Label(Model.Strategy)" Status="UiStatus.Info" /></div>
+        <div class="panel-header orchestration-preview-header"><div><h2>@T("ExecutionPreview")</h2><p>@T("ExecutionPreviewHelp")</p></div><StatusBadge Text="@Label(Model.Strategy)" Status="UiStatus.Info" /></div>
         <OrchestrationPreview Model="Model" Agents="Agents" />
     </section>
 </div>
@@ -85,7 +107,13 @@
     private string SelectedCount(int count) => T(count == 1 ? "SelectedCount.One" : "SelectedCount.Many", count);
     [Parameter] public IReadOnlyList<AgentSummary> Agents { get; set; } = [];
     [Parameter] public bool IsReadOnly { get; set; }
+    private string agentSearch = string.Empty;
+    private IEnumerable<AgentSummary> FilteredAgents => string.IsNullOrWhiteSpace(agentSearch)
+        ? Agents
+        : Agents.Where(agent => agent.Name.Contains(agentSearch, StringComparison.OrdinalIgnoreCase) || agent.Id.Contains(agentSearch, StringComparison.OrdinalIgnoreCase));
     private IEnumerable<AgentSummary> AvailableManagers => Agents.Where(agent => !Model.ParticipantIds.Contains(agent.Id, StringComparer.Ordinal));
+    private string AgentName(string id) => Agents.FirstOrDefault(agent => agent.Id == id)?.Name ?? id;
+    private static string Initial(string name) => string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[..1].ToUpperInvariant();
 
     private void ToggleParticipant(string id, ChangeEventArgs eventArgs)
     {
