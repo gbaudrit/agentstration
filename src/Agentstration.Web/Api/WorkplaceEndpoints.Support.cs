@@ -12,7 +12,7 @@ namespace Agentstration.Web;
 
 public static partial class WorkplaceEndpoints
 {
-    private static WorkplaceDashboardResponse ToResponse(WorkplaceDashboard value) => new(value.Id.Value, value.WorkspaceId.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.IsDefault, value.Entries.Select(reference => new DashboardEntryReferenceResponse(reference.EntryResourceId.Value, reference.Role, reference.Order) { Namespace = reference.EntryResourceId.Namespace }).ToArray(), value.Version, value.PublishedAt);
+    private static WorkplaceDashboardResponse ToResponse(WorkplaceDashboard value) => new(value.Id.Value, value.WorkspaceId.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.IsDefault, value.Entries.Select(reference => new DashboardEntryReferenceResponse(reference.EntryResourceId.Value, reference.Role, reference.Order) { Namespace = reference.EntryResourceId.Namespace }).ToArray(), value.Version, value.PublishedAt, value.Icon);
 
     private static EntryResponse ToResponse(EntryResource value) => new(value.WorkspaceId.Value, value.Id.Value, value.Name, value.Type, value.ApiVersion, value.DisplayName, value.Description, value.Presentation, value.ResolvedTarget, value.Behavior, value.Version, value.PublishedAt) { Namespace = value.Id.Namespace };
 

@@ -1,7 +1,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.FlowOrchestrationEditorStrings> Localizer
-<div class="orchestration-preview-layout">
+<div class="orchestration-preview-layout @(SelectedNode is not null ? "has-details" : null)">
     <div>
-        <FlowTopologyViewer Graph="Topology" SelectedKey="selectedKey" SelectedKeyChanged="SelectNode" />
+        <FlowTopologyViewer Graph="Topology" SelectedKey="selectedKey" SelectedKeyChanged="SelectNode" InitiallyFit="true" />
         @if (SelectedNode is null)
         {
             <p class="muted orchestration-preview-hint">@T("SelectNodePreview")</p>

@@ -69,13 +69,15 @@ public sealed partial class ApiClientTests
                 ModelProfile = new ResourceReference("reasoning-shared", @namespace: new ResourceNamespace("shared.models"))
             }
         };
-        string? requestPathAndQuery = null;
+        var requestedPaths = new List<string>();
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
-            requestPathAndQuery = request.RequestUri?.PathAndQuery;
+            requestedPaths.Add(request.RequestUri!.PathAndQuery);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = JsonContent.Create(new PagedResponse<AgentResource>([resource], null))
+                Content = request.RequestUri.AbsolutePath == "/api/agents"
+                    ? JsonContent.Create(new PagedResponse<AgentResource>([resource], null))
+                    : JsonContent.Create(new PagedResponse<AgentDeployment>([], null))
             };
         }))
         { BaseAddress = new Uri("http://localhost/") };
@@ -83,12 +85,56 @@ public sealed partial class ApiClientTests
 
         var agents = await client.GetAgentsAsync(CancellationToken.None);
 
-        Assert.AreEqual("/api/agents?allNamespaces=true&top=1000", requestPathAndQuery);
+        CollectionAssert.Contains(requestedPaths, "/api/agents?allNamespaces=true&top=1000");
+        CollectionAssert.Contains(requestedPaths, "/api/deployments?top=1000");
         Assert.HasCount(1, agents);
         Assert.AreEqual(@namespace, agents[0].Namespace);
         Assert.AreEqual(new ResourceNamespace("shared.models"), agents[0].ModelProfileNamespace);
         Assert.AreEqual("/modelprofiles/reasoning-shared?namespace=shared.models", ConsoleResourceUrls.ModelProfile(agents[0].ModelProfileAddress));
         Assert.AreEqual("/namespaces/agentstration.who-am-i/agents/web-agent", agents[0].DetailsUrl);
+    }
+
+    [TestMethod]
+    public async Task ManagementClientReportsTheCurrentAgentDeployment()
+    {
+        var updatedAt = new DateTimeOffset(2026, 8, 31, 15, 20, 0, TimeSpan.Zero);
+        var agent = CreateAgentResource("web-agent") with
+        {
+            Generation = 4,
+            Metadata = CreateAgentResource("web-agent").Metadata with { Namespace = new ResourceNamespace("engineering") }
+        };
+        var deployment = new AgentDeployment
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.AgentDeployment,
+            Metadata = new ResourceMetadata { Name = "web-agent--g000004", Namespace = agent.Namespace },
+            AgentNamespace = agent.Namespace,
+            RevisionName = "web-agent--000004",
+            AgentName = agent.Metadata.Name,
+            Environment = "local",
+            RuntimeProfileName = "maf-builtin",
+            HostingMode = AgentHostingMode.InProcess,
+            DesiredState = DesiredAgentState.Running,
+            ProvisioningState = ProvisioningState.Succeeded,
+            OperationalState = OperationalState.Ready,
+            ObservedRevisionName = "web-agent--000004",
+            UpdatedAt = updatedAt
+        };
+        using var httpClient = new HttpClient(new StubHandler(request => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = request.RequestUri!.AbsolutePath == "/api/agents"
+                ? JsonContent.Create(new PagedResponse<AgentResource>([agent], null))
+                : JsonContent.Create(new PagedResponse<AgentDeployment>([deployment], null))
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+
+        var agents = await new ManagementApiClient(httpClient).GetAgentsAsync(default);
+
+        Assert.HasCount(1, agents);
+        Assert.AreEqual("Ready", agents[0].Runtime);
+        Assert.AreEqual("web-agent--g000004", agents[0].DeploymentId);
+        Assert.AreEqual("/deployments#deployment-engineering-web-agent--g000004", agents[0].DeploymentUrl);
+        Assert.AreEqual(updatedAt, agents[0].LastActivity);
     }
 
     [TestMethod]

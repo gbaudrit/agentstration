@@ -94,6 +94,9 @@
         case "refresh":
             <path d="M20 6v5h-5M4 18v-5h5"/><path d="M6.1 8a7 7 0 0 1 11.8-1.8L20 11M4 13l2.1 4.8A7 7 0 0 0 17.9 16"/>
             break;
+        case "search":
+            <circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/>
+            break;
         case "plus":
             <path d="M12 5v14M5 12h14"/>
             break;
@@ -119,7 +122,14 @@
             <path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z"/>
             break;
         default:
-            <circle cx="12" cy="12" r="8"/>
+            if (TablerIconCatalog.TryNormalize(Name, out var tablerIconName))
+            {
+                <use href="@TablerIconCatalog.SpriteHref(tablerIconName)"></use>
+            }
+            else
+            {
+                <circle cx="12" cy="12" r="8"/>
+            }
             break;
     }
 </svg>

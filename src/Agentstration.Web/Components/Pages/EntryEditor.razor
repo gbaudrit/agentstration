@@ -127,7 +127,17 @@ else
                 <div class="form-grid">
                 <label><span>@T("Presentation")</span><select data-testid="presentation-kind" @bind="presentationKind"><option value="Prompt">@T("Presentation.Prompt")</option><option value="Form">@T("Presentation.Form")</option></select></label>
                 <label><span>@T("Placeholder")</span><input @bind="placeholder" /></label>
-                <label><span>@T("Icon")</span><input @bind="icon" placeholder="@T("IconExample")" /></label>
+                <div class="form-span-2">
+                    <IconPicker @bind-Value="icon"
+                                SelectedLabel="@T("SelectedIcon")"
+                                NoneLabel="@T("NoIcon")"
+                                ClearLabel="@T("ClearIcon")"
+                                SearchLabel="@T("SearchIcons")"
+                                SearchPlaceholder="@T("SearchIconsPlaceholder")"
+                                ChoicesLabel="@T("IconChoices")"
+                                NoResultsLabel="@T("NoIconsFound")"
+                                MoreResultsLabel="@T("MoreIconsAvailable")" />
+                </div>
                 <label class="entry-toggle"><input type="checkbox" @bind="allowAttachments" /><span>@T("AllowAttachments")</span></label>
                 <label class="entry-toggle"><input type="checkbox" @bind="allowVoiceInput" /><span>@T("AllowVoiceInput")</span></label>
                 </div>

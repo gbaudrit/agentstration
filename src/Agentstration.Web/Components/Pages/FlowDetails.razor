@@ -18,7 +18,11 @@ else
     @if (activeTab == "Overview")
     {
         <section class="metric-grid flow-metrics"><MetricCard Label="@T("CurrentVersion")" Value="@flow.Version" Detail="@(flow.ActiveVersion is null ? T("NotPublished") : T("ActiveVersion", flow.ActiveVersion))" Status="UiStatus.Info" /><MetricCard Label="@T("Status")" Value="@StatusLabel" Detail="@T("ImmutableVersions")" Status="@(flow.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="@(IsOrchestration ? T("Participants") : T("Steps"))" Value="@TopologyNodeCount.ToString()" Detail="@(IsOrchestration ? StrategyLabel(Orchestration!.Strategy) : Topology.Layout)" Status="UiStatus.Neutral" /><MetricCard Label="@T("RecentRuns")" Value="@runs.Count.ToString()" Detail="@SucceededRunCount(runs.Count(x => x.Status == FlowRunStatus.Succeeded))" Status="UiStatus.Success" /></section>
-        <article class="panel definition-grid"><div><span class="field-label">@T("DisplayName")</span><strong>@flow.Name</strong></div><div><span class="field-label">@T("ResourceName")</span><code>@flow.Id</code></div><div><span class="field-label">@T("Namespace")</span><code>@FlowResourceNamespace.Value</code></div><div><span class="field-label">@T("Kind")</span><strong>@flow.Definition.Kind</strong></div>@if(IsOrchestration){<div><span class="field-label">@T("Strategy")</span><strong>@StrategyLabel(Orchestration!.Strategy)</strong></div><div><span class="field-label">@T("Participants")</span><strong>@string.Join(", ", Orchestration.Participants.Select(x => x.Id))</strong></div>}<div><span class="field-label">@T("ExecutionProfile")</span><strong>local</strong></div><div><span class="field-label">@T("LastPublication")</span><strong>@(versions.FirstOrDefault()?.PublishedAt.LocalDateTime.ToString("g") ?? "—")</strong></div></article>
+        <article class="panel definition-grid"><div><span class="field-label">@T("DisplayName")</span><strong>@(flow.DisplayName ?? flow.Name)</strong></div><div><span class="field-label">@T("ResourceName")</span><code>@flow.Id</code></div><div><span class="field-label">@T("Namespace")</span><code>@FlowResourceNamespace.Value</code></div><div><span class="field-label">@T("Kind")</span><strong>@flow.Definition.Kind</strong></div>@if(IsOrchestration){<div><span class="field-label">@T("Strategy")</span><strong>@StrategyLabel(Orchestration!.Strategy)</strong></div><div><span class="field-label">@T("Participants")</span><strong>@string.Join(", ", Orchestration.Participants.Select(x => x.Id))</strong></div>}<div><span class="field-label">@T("ExecutionProfile")</span><strong>local</strong></div><div><span class="field-label">@T("LastPublication")</span><strong>@(versions.FirstOrDefault()?.PublishedAt.LocalDateTime.ToString("g") ?? "—")</strong></div></article>
+        <section class="panel flow-overview-preview">
+            <div class="panel-header"><div><h2>@T("ExecutionPreview")</h2><p>@T("ExecutionPreviewHelp")</p></div>@if (IsOrchestration) { <StatusBadge Text="@StrategyLabel(Orchestration!.Strategy)" Status="UiStatus.Info" /> }</div>
+            <FlowTopologyViewer Graph="Topology" InitiallyFit="true" />
+        </section>
         @if (!FlowResourceNamespace.IsDefault)
         {
             <p class="muted">
@@ -31,22 +35,29 @@ else
     }
     else if (activeTab == "Definition")
     {
-        <div class="toolbar"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@EditorLabel</a></div>
-        <section class="designer-layout">
-            <FlowTopologyViewer Graph="Topology" SelectedKey="selectedNode" SelectedKeyChanged="SelectNode" />
-            <article class="panel inspector">
-                <div class="panel-header"><h2>@(IsOrchestration ? T("OrchestrationTopology") : T("StepProperties"))</h2></div>
-                @if (SelectedTopologyNode is null)
-                {
-                    <p class="muted">@T("SelectNode")</p>
-                }
-                else
-                {
-                    <dl class="details-list"><dt>@T("Name")</dt><dd>@SelectedTopologyNode.Label</dd><dt>@T("Type")</dt><dd>@SelectedTopologyNode.Type</dd>@if(SelectedTopologyNode.Subtitle is not null){<dt>@T("RoleOrTarget")</dt><dd>@SelectedTopologyNode.Subtitle</dd>}@if(SelectedTopologyNode.IsInitial){<dt>@T("Entry")</dt><dd>@T("InitialParticipant")</dd>}</dl>
-                    <p class="muted">@T("OpenEditorHelp")</p>
-                }
-            </article>
-        </section>
+        @if (IsOrchestration)
+        {
+            <FlowOrchestrationEditor FlowId="@FlowId" FlowNamespace="@FlowNamespace" Embedded="true" />
+        }
+        else
+        {
+            <div class="toolbar"><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@EditorLabel</a></div>
+            <section class="designer-layout">
+                <FlowTopologyViewer Graph="Topology" SelectedKey="selectedNode" SelectedKeyChanged="SelectNode" />
+                <article class="panel inspector">
+                    <div class="panel-header"><h2>@T("StepProperties")</h2></div>
+                    @if (SelectedTopologyNode is null)
+                    {
+                        <p class="muted">@T("SelectNode")</p>
+                    }
+                    else
+                    {
+                        <dl class="details-list"><dt>@T("Name")</dt><dd>@SelectedTopologyNode.Label</dd><dt>@T("Type")</dt><dd>@SelectedTopologyNode.Type</dd>@if(SelectedTopologyNode.Subtitle is not null){<dt>@T("RoleOrTarget")</dt><dd>@SelectedTopologyNode.Subtitle</dd>}@if(SelectedTopologyNode.IsInitial){<dt>@T("Entry")</dt><dd>@T("InitialParticipant")</dd>}</dl>
+                        <p class="muted">@T("OpenEditorHelp")</p>
+                    }
+                </article>
+            </section>
+        }
     }
     else if (activeTab == "Runs")
     {

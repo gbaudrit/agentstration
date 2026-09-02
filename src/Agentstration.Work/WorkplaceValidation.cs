@@ -10,13 +10,13 @@ public static class WorkplaceValidation
     public static void Validate(WorkplaceDashboard dashboard)
     {
         ArgumentNullException.ThrowIfNull(dashboard);
-        ValidateDashboard(dashboard.Id, dashboard.WorkspaceId, dashboard.Name, dashboard.DisplayName, dashboard.Entries);
+        ValidateDashboard(dashboard.Id, dashboard.WorkspaceId, dashboard.Name, dashboard.DisplayName, dashboard.Icon, dashboard.Entries);
     }
 
     public static void Validate(WorkplaceDashboardDraft dashboard)
     {
         ArgumentNullException.ThrowIfNull(dashboard);
-        ValidateDashboard(dashboard.Id, dashboard.WorkspaceId, dashboard.Name, dashboard.DisplayName, dashboard.Entries);
+        ValidateDashboard(dashboard.Id, dashboard.WorkspaceId, dashboard.Name, dashboard.DisplayName, dashboard.Icon, dashboard.Entries);
     }
 
     public static void Validate(EntryResource entry)
@@ -89,6 +89,7 @@ public static class WorkplaceValidation
         WorkspaceId workspaceId,
         string name,
         string displayName,
+        string? icon,
         IReadOnlyList<DashboardEntryReference> entries)
     {
         if (workspaceId.Value == Guid.Empty)
@@ -98,6 +99,8 @@ public static class WorkplaceValidation
             throw new WorkValidationException("dashboard_identity_mismatch", "Dashboard id and name must match.");
         if (string.IsNullOrWhiteSpace(displayName))
             throw new WorkValidationException("dashboard_display_name_required", "A Dashboard display name is required.");
+        if (icon is not null && (icon.Length is 0 or > 128 || icon.Any(character => !char.IsAsciiLetterLower(character) && !char.IsDigit(character) && character != '-')))
+            throw new WorkValidationException("dashboard_icon_invalid", $"Dashboard icon '{icon}' is not supported.");
         if (entries.Count(reference => reference.Role == DashboardItemRole.Primary) > 1)
             throw new WorkValidationException("dashboard_primary_entry_conflict", "A Dashboard can expose at most one Primary Entry.");
         if (entries.Select(value => value.EntryResourceId).Distinct().Count() != entries.Count)
