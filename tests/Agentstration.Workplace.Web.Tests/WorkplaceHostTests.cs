@@ -147,10 +147,19 @@ public sealed class WorkplaceHostTests
 
         rendered.WaitForAssertion(() =>
         {
+            Assert.AreEqual(2, rendered.FindAll("[role='tab']").Count);
             var conversation = rendered.Find(".conversation-list-card");
             Assert.AreEqual("/w/personal/d/home/conversations/11111111-1111-1111-1111-111111111111", conversation.GetAttribute("href"));
             StringAssert.Contains(conversation.TextContent, "Prepare the quarterly review");
             StringAssert.Contains(conversation.TextContent, "Reprendre");
+        });
+
+        rendered.Find("#tasks-tab").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("true", rendered.Find("#tasks-tab").GetAttribute("aria-selected"));
+            Assert.AreEqual(1, rendered.FindAll("#tasks-panel").Count);
+            Assert.AreEqual(0, rendered.FindAll("#conversations-panel").Count);
         });
     }
 

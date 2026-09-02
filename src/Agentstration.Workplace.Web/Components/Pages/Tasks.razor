@@ -16,81 +16,85 @@ else if (error is not null)
 }
 else
 {
-    <section class="activity-section conversations-section" aria-labelledby="conversation-heading">
-        <div class="activity-section-heading">
-            <div>
-                <p class="eyebrow">@T("History")</p>
-                <h2 id="conversation-heading">@T("Conversations")</h2>
-            </div>
-            <span class="activity-count">@conversations.Count</span>
-        </div>
+    <div class="activity-tabs" role="tablist" aria-label="@T("Activity")">
+        <button id="conversations-tab" type="button" role="tab" class="@(activeTab == ActivityTab.Conversations ? "is-active" : null)" aria-selected="@(activeTab == ActivityTab.Conversations ? "true" : "false")" aria-controls="conversations-panel" @onclick="() => activeTab = ActivityTab.Conversations">
+            <span>@T("Conversations")</span><span class="tab-count">@conversations.Count</span>
+        </button>
+        <button id="tasks-tab" type="button" role="tab" class="@(activeTab == ActivityTab.Tasks ? "is-active" : null)" aria-selected="@(activeTab == ActivityTab.Tasks ? "true" : "false")" aria-controls="tasks-panel" @onclick="() => activeTab = ActivityTab.Tasks">
+            <span>@T("Tasks")</span><span class="tab-count">@tasks.Count</span>
+        </button>
+    </div>
 
-        @if (conversations.Count == 0)
+    <div class="activity-tab-content" @ontouchstart="StartSwipe" @ontouchend="EndSwipe">
+        @if (activeTab == ActivityTab.Conversations)
         {
-            <div class="activity-empty">
-                <strong>@T("NoConversationsYet")</strong>
-                <span>@T("NoConversationsYetHelp")</span>
-            </div>
+            <section id="conversations-panel" class="activity-panel conversations-section" role="tabpanel" aria-labelledby="conversations-tab">
+                @if (conversations.Count == 0)
+                {
+                    <div class="activity-empty">
+                        <strong>@T("NoConversationsYet")</strong>
+                        <span>@T("NoConversationsYetHelp")</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="conversation-cards">
+                        @foreach (var conversation in conversations)
+                        {
+                            <a class="conversation-list-card" href="@ConversationUrl(conversation.Id)">
+                                <span class="conversation-icon" aria-hidden="true"><UiIcon Name="message-chatbot" /></span>
+                                <span class="conversation-copy">
+                                    <strong>@ConversationTitle(conversation)</strong>
+                                    <small>@T("Updated") @conversation.LastActivityAt.LocalDateTime.ToString("g")</small>
+                                </span>
+                                <span class="conversation-meta">
+                                    <span class="conversation-status">@ConversationStatus(conversation.Status)</span>
+                                    <span class="resume-label">@T("Resume") <span aria-hidden="true">→</span></span>
+                                </span>
+                            </a>
+                        }
+                    </div>
+                }
+            </section>
         }
         else
         {
-            <div class="conversation-cards">
-                @foreach (var conversation in conversations)
-                {
-                    <a class="conversation-list-card" href="@ConversationUrl(conversation.Id)">
-                        <span class="conversation-icon" aria-hidden="true"><UiIcon Name="message-chatbot" /></span>
-                        <span class="conversation-copy">
-                            <strong>@ConversationTitle(conversation)</strong>
-                            <small>@T("Updated") @conversation.LastActivityAt.LocalDateTime.ToString("g")</small>
-                        </span>
-                        <span class="conversation-meta">
-                            <span class="conversation-status">@ConversationStatus(conversation.Status)</span>
-                            <span class="resume-label">@T("Resume") <span aria-hidden="true">→</span></span>
-                        </span>
-                    </a>
-                }
-            </div>
-        }
-    </section>
+            <section id="tasks-panel" class="activity-panel tasks-section" role="tabpanel" aria-labelledby="tasks-tab">
+                <div class="tasks-toolbar">
+                    <FilterBar>
+                        <label class="sr-only" for="task-status">@T("FilterByStatus")</label>
+                        <select id="task-status" @bind="filter">
+                            <option value="">@T("AllStatuses")</option>
+                            @foreach (var value in Enum.GetValues<WorkTaskStatus>())
+                            {
+                                <option value="@value">@TaskStatusLabel(value)</option>
+                            }
+                        </select>
+                    </FilterBar>
+                </div>
 
-    <section class="activity-section tasks-section" aria-labelledby="tasks-heading">
-        <div class="activity-section-heading tasks-heading">
-            <div>
-                <p class="eyebrow">@T("Work")</p>
-                <h2 id="tasks-heading">@T("Tasks")</h2>
-            </div>
-            <FilterBar>
-                <label class="sr-only" for="task-status">@T("FilterByStatus")</label>
-                <select id="task-status" @bind="filter">
-                    <option value="">@T("AllStatuses")</option>
-                    @foreach (var value in Enum.GetValues<WorkTaskStatus>())
-                    {
-                        <option value="@value">@TaskStatusLabel(value)</option>
-                    }
-                </select>
-            </FilterBar>
-        </div>
-
-        @if (!FilteredTasks.Any())
-        {
-            <div class="activity-empty">
-                <strong>@T("NoMatchingTasks")</strong>
-                <span>@T("NoMatchingTasksHelp")</span>
-            </div>
-        }
-        else
-        {
-            <div class="task-cards">
-                @foreach (var task in FilteredTasks)
+                @if (!FilteredTasks.Any())
                 {
-                    <a class="task-list-card" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")">
-                        <div><TaskStatusBadge Value="task.Status" /><h3>@task.Title</h3></div>
-                        <small>@T("Updated") @task.UpdatedAt.LocalDateTime.ToString("g")</small>
-                    </a>
+                    <div class="activity-empty">
+                        <strong>@T("NoMatchingTasks")</strong>
+                        <span>@T("NoMatchingTasksHelp")</span>
+                    </div>
                 }
-            </div>
+                else
+                {
+                    <div class="task-cards">
+                        @foreach (var task in FilteredTasks)
+                        {
+                            <a class="task-list-card" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")">
+                                <div><TaskStatusBadge Value="task.Status" /><h3>@task.Title</h3></div>
+                                <small>@T("Updated") @task.UpdatedAt.LocalDateTime.ToString("g")</small>
+                            </a>
+                        }
+                    </div>
+                }
+            </section>
         }
-    </section>
+    </div>
 }
 
 @code {
@@ -100,6 +104,9 @@ else
     private IReadOnlyList<WorkTaskResponse> tasks = [];
     private string dashboardName = string.Empty;
     private string filter = string.Empty;
+    private ActivityTab activeTab = ActivityTab.Conversations;
+    private double? swipeStartX;
+    private double? swipeStartY;
     private bool loading = true;
     private string? error;
 
@@ -163,5 +170,31 @@ else
         _ => T($"TaskStatus.{value}")
     };
 
+    private void StartSwipe(TouchEventArgs args)
+    {
+        var touch = args.Touches.FirstOrDefault();
+        swipeStartX = touch?.ClientX;
+        swipeStartY = touch?.ClientY;
+    }
+
+    private void EndSwipe(TouchEventArgs args)
+    {
+        var touch = args.ChangedTouches.FirstOrDefault();
+        if (touch is null || swipeStartX is null || swipeStartY is null)
+            return;
+
+        var horizontalDistance = touch.ClientX - swipeStartX.Value;
+        var verticalDistance = touch.ClientY - swipeStartY.Value;
+        swipeStartX = null;
+        swipeStartY = null;
+
+        if (Math.Abs(horizontalDistance) < 60 || Math.Abs(horizontalDistance) <= Math.Abs(verticalDistance) * 1.25)
+            return;
+
+        activeTab = horizontalDistance < 0 ? ActivityTab.Tasks : ActivityTab.Conversations;
+    }
+
     private string T(string key) => Localizer[key];
+
+    private enum ActivityTab { Conversations, Tasks }
 }
