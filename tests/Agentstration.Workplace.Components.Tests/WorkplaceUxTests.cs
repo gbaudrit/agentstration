@@ -550,6 +550,9 @@ public sealed class WorkplaceUxTests
     {
         var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var autoScroll = context.JSInterop.SetupModule("./_content/Agentstration.Workplace.Components/conversation-auto-scroll.js");
+        autoScroll.SetupVoid("initialize", _ => true);
+        autoScroll.SetupVoid("dispose", _ => true);
         return context;
     }
 
