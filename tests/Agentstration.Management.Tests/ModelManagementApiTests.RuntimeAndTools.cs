@@ -120,6 +120,50 @@ public sealed partial class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task RecreatedAgentUsesDistinctRevisionIdentityAndCanStartAgain()
+    {
+        await using var factory = Factory();
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        const string agentName = "recreated-agent";
+        var spec = new AgentDeploymentSpec
+        {
+            Environment = "local",
+            RuntimeProfileName = "maf-builtin",
+            HostingMode = AgentHostingMode.InProcess
+        };
+
+        var firstAgent = await agents.PutAgentAsync(Agent(agentName), null, true, default);
+        var firstRevision = await agents.CreateRevisionAsync(agentName, spec, default);
+        await agents.DeleteAgentAsync(agentName, firstAgent.ETag, default);
+
+        var secondAgent = await agents.PutAgentAsync(Agent(agentName), null, true, default);
+        var secondRevision = await agents.CreateRevisionAsync(agentName, spec, default);
+        var repeated = await agents.CreateRevisionAsync(agentName, spec, default);
+        var prepared = await agents.PrepareLocalRuntimeAsync(agentName, secondAgent.Value.Generation, default);
+
+        Assert.AreNotEqual(firstAgent.Value.Uid, secondAgent.Value.Uid);
+        Assert.AreNotEqual(firstRevision.Value.Metadata.Name, secondRevision.Value.Metadata.Name);
+        Assert.AreEqual(secondAgent.Value.Uid, secondRevision.Value.AgentUid);
+        Assert.AreEqual(secondRevision.Value.Metadata.Name, repeated.Value.Metadata.Name);
+        Assert.AreEqual(OperationalState.Ready, prepared.Value.OperationalState);
+
+        static AgentResource Agent(string name) => new()
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.Agent,
+            Metadata = new ResourceMetadata { Name = name },
+            Definition = new AgentProperties
+            {
+                DisplayName = "Recreated agent",
+                Instructions = "Verify retained revision identity.",
+                ModelProfile = new ResourceReference("reasoning-default")
+            }
+        };
+    }
+
+    [TestMethod]
     public async Task DeletingRuntimeProfileCleansUpDeploymentOrphanedByEarlierAgentDeletion()
     {
         await using var factory = Factory();

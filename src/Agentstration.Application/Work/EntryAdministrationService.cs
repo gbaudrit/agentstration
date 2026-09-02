@@ -25,6 +25,7 @@ public sealed record EntryValidationIssue(string Code, string Message);
 public sealed class EntryAdministrationService(
     IWorkplaceRepository repository,
     IEntryTargetResolver targetResolver,
+    WorkplaceService workplace,
     TimeProvider timeProvider,
     IWorkplaceContext context)
 {
@@ -132,9 +133,9 @@ public sealed class EntryAdministrationService(
         if ((exposedBy.Count > 0 || draftedBy.Count > 0) && !removeDashboardReferences)
             throw new WorkValidationException("entry_in_use", $"Entry '{id}' is referenced by a Workplace Dashboard.");
         var interactions = await repository.ListEntryInteractionsAsync(workspaceId, id, cancellationToken);
-        var active = interactions.Where(value => value.Status is InteractionStatus.Active or InteractionStatus.Processing or InteractionStatus.WaitingForUser).ToArray();
-        if (active.Length > 0)
-            throw new WorkValidationException("entry_interactions_active", $"Entry '{id}' has {active.Length} active interaction(s) and cannot be deleted.");
+        var busy = interactions.Where(value => value.Status is InteractionStatus.Processing or InteractionStatus.WaitingForUser).ToArray();
+        if (busy.Length > 0 && !closeInteractions)
+            throw new WorkValidationException("entry_interactions_active", $"Entry '{id}' has {busy.Length} active interaction(s) and cannot be deleted.");
         if (interactions.Any(value => value.Status != InteractionStatus.Closed) && !closeInteractions)
             throw new WorkValidationException("entry_in_use", $"Entry '{id}' has durable interactions and cannot be deleted without closing them.");
         if (removeDashboardReferences)
@@ -154,7 +155,46 @@ public sealed class EntryAdministrationService(
         if (closeInteractions)
         {
             foreach (var interaction in interactions.Where(value => value.Status != InteractionStatus.Closed))
-                await repository.SaveInteractionAsync(interaction with { Status = InteractionStatus.Closed, ClosedReason = "entry_uninstalled", LastActivityAt = timeProvider.GetUtcNow(), Version = checked(interaction.Version + 1) }, interaction.Version, cancellationToken);
+            {
+                if (interaction.Status == InteractionStatus.Processing && interaction.TaskId is not null)
+                {
+                    try
+                    {
+                        await workplace.CancelTaskAsync(workspaceId, interaction.TaskId.Value, cancellationToken);
+                    }
+                    catch (WorkTransitionException exception) when (exception.Code == "cancel_not_allowed")
+                    {
+                        // The task became terminal concurrently; closing its retained interaction is still safe.
+                    }
+                    catch (KeyNotFoundException)
+                    {
+                        // A legacy or partially cleaned interaction can outlive its task.
+                    }
+                }
+
+                var now = timeProvider.GetUtcNow();
+                foreach (var action in (await repository.ListPendingActionsAsync(workspaceId, interaction.Id, cancellationToken))
+                             .Where(value => value.Status == PendingActionStatus.Pending))
+                {
+                    await repository.SavePendingActionAsync(action with
+                    {
+                        Status = PendingActionStatus.Cancelled,
+                        ResolvedAt = now,
+                        Version = checked(action.Version + 1)
+                    }, action.Version, cancellationToken);
+                }
+
+                var current = await repository.GetInteractionAsync(workspaceId, interaction.Id, cancellationToken);
+                if (current is null || current.Status == InteractionStatus.Closed) continue;
+                await repository.SaveInteractionAsync(current with
+                {
+                    Status = InteractionStatus.Closed,
+                    PendingActionId = null,
+                    ClosedReason = "entry_uninstalled",
+                    LastActivityAt = now,
+                    Version = checked(current.Version + 1)
+                }, current.Version, cancellationToken);
+            }
         }
         await repository.DeleteEntryAsync(workspaceId, id, cancellationToken);
         await repository.DeleteEntryDraftAsync(workspaceId, id, cancellationToken);
