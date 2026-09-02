@@ -102,7 +102,7 @@ else
                                 @foreach (var entry in ExcludedEntries)
                                 {
                                     <article class="workspace-entry-row excluded">
-                                        <label class="workspace-entry-toggle"><input type="checkbox" checked="false" @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
+                                        <label class="workspace-entry-toggle"><input type="checkbox" @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
                                         <span class="workspace-entry-excluded">@T("NotShown")</span>
                                     </article>
                                 }
