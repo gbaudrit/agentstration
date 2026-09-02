@@ -44,9 +44,9 @@ else
         <div class="workplace-primary">
             @if (interaction is null)
             {
-                @if (primary is not null)
+                @if (SelectedHomeEntry is { } selectedEntry)
                 {
-                    <PrimaryEntryContainer Busy="busy"><EntryRenderer Definition="@ToDefinition(primary)" Role="DashboardItemRole.Primary" OnSubmit="values => SubmitAsync(primary, values)" Disabled="busy" Busy="busy" /></PrimaryEntryContainer>
+                    <PrimaryEntryContainer @key="selectedEntry" Busy="busy"><EntryRenderer Definition="@ToDefinition(selectedEntry)" Role="@EntryRole(selectedEntry)" OnSubmit="values => SubmitAsync(selectedEntry, values)" Disabled="busy" Busy="busy" /></PrimaryEntryContainer>
                 }
                 <section class="mobile-dashboards" aria-label="@T("Dashboards")">
                     <div class="section-heading"><h2>@T("YourSpaces")</h2></div>
@@ -63,14 +63,29 @@ else
                         }
                     </div>
                 </section>
-                @if (featuredEntries.Count > 0)
+                @if (AlternativeEntries.Any())
                 {
-                    <section class="featured-entries"><div class="section-heading"><div><p class="eyebrow">@T("Featured")</p><h2>@T("FeaturedTools")</h2></div></div><div class="standard-entry-grid">@foreach(var entry in featuredEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Featured" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
+                    <section class="mobile-entry-picker" aria-labelledby="mobile-entry-picker-heading">
+                        <div class="section-heading"><h2 id="mobile-entry-picker-heading">@T("OtherWaysToStart")</h2></div>
+                        <div class="mobile-entry-options">
+                            @foreach (var entry in AlternativeEntries)
+                            {
+                                <button type="button" @onclick="() => SelectHomeEntry(entry)" disabled="@busy">
+                                    <span class="mobile-entry-icon" aria-hidden="true"><UiIcon Name="@(entry.Presentation.Icon ?? "sparkle")" /></span>
+                                    <span class="mobile-entry-copy"><strong>@entry.DisplayName</strong>@if (!string.IsNullOrWhiteSpace(entry.Description)) { <small>@entry.Description</small> }</span>
+                                    <span class="mobile-entry-arrow" aria-hidden="true">→</span>
+                                </button>
+                            }
+                        </div>
+                    </section>
                 }
-                @if (standardEntries.Count > 0)
+                @if (VisibleFeaturedEntries.Any())
                 {
-                    <button class="mobile-tools-toggle" type="button" aria-expanded="@showMoreEntries" @onclick="() => showMoreEntries = !showMoreEntries"><UiIcon Name="plus" /> @(showMoreEntries ? T("HideOtherTools") : T("MoreWaysToStart"))</button>
-                    <section class="standard-entries @(showMoreEntries ? "mobile-open" : null)"><div class="section-heading"><div><p class="eyebrow">@T("Shortcuts")</p><h2>@T("OtherWaysToStart")</h2></div></div><div class="standard-entry-grid">@foreach(var entry in standardEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Standard" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
+                    <section class="featured-entries"><div class="section-heading"><div><p class="eyebrow">@T("Featured")</p><h2>@T("FeaturedTools")</h2></div></div><div class="standard-entry-grid">@foreach(var entry in VisibleFeaturedEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Featured" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
+                }
+                @if (VisibleStandardEntries.Any())
+                {
+                    <section class="standard-entries"><div class="section-heading"><div><p class="eyebrow">@T("Shortcuts")</p><h2>@T("OtherWaysToStart")</h2></div></div><div class="standard-entry-grid">@foreach(var entry in VisibleStandardEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Standard" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
                 }
             }
             else

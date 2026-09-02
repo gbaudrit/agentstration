@@ -164,6 +164,39 @@ public sealed class WorkplaceHostTests
     }
 
     [TestMethod]
+    public void HomeUsesCompactAlternativeEntriesToReplaceTheActiveComposer()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        using var httpClient = new HttpClient(new HomeEntriesHandler()) { BaseAddress = new Uri("http://localhost/") };
+        context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
+        context.Services.AddSingleton(new WorkplaceRealtimeClient(new Uri("http://127.0.0.1:1/hubs/workplace"), null));
+        context.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        context.Services.AddSingleton<IHostEnvironment>(new TestHostEnvironment());
+        context.Services.AddSingleton<WorkplaceContextState>();
+
+        var rendered = context.Render<Home>(parameters => parameters
+            .Add(value => value.WorkspaceName, "personal")
+            .Add(value => value.DashboardName, "home"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("Start here", rendered.Find(".primary-entry-container textarea").GetAttribute("placeholder"));
+            Assert.AreEqual(1, rendered.FindAll(".mobile-entry-options button").Count);
+            Assert.AreEqual(0, rendered.FindAll(".mobile-tools-toggle").Count);
+            StringAssert.Contains(rendered.Find(".mobile-entry-options button").TextContent, "Quick question");
+        }, TimeSpan.FromSeconds(10));
+
+        rendered.Find(".mobile-entry-options button").Click();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("Ask quickly", rendered.Find(".primary-entry-container textarea").GetAttribute("placeholder"));
+            StringAssert.Contains(rendered.Find(".mobile-entry-options button").TextContent, "Main request");
+        });
+    }
+
+    [TestMethod]
     public async Task ComponentStyleBundlesAreServedByTheWorkplaceHost()
     {
         await using var factory = new WebApplicationFactory<Program>();
@@ -279,6 +312,49 @@ public sealed class WorkplaceHostTests
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(payload) });
         }
+    }
+
+    private sealed class HomeEntriesHandler : HttpMessageHandler
+    {
+        private static readonly Guid WorkspaceId = Guid.Parse("525118a7-00e9-49ae-aa6c-d42c382f1a8b");
+        private static readonly DateTimeOffset Now = new(2026, 9, 2, 9, 30, 0, TimeSpan.Zero);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            object payload = request.RequestUri?.AbsolutePath switch
+            {
+                "/api/workspaces/personal" => new WorkplaceWorkspaceResponse(WorkspaceId, "personal", "Personal"),
+                "/api/workspaces/personal/dashboards" => new[]
+                {
+                    new WorkplaceDashboardResponse("home", WorkspaceId, "home", "Dashboard", "v1", "Home", null, true,
+                    [
+                        new DashboardEntryReferenceResponse("main", DashboardItemRole.Primary, 0),
+                        new DashboardEntryReferenceResponse("quick", DashboardItemRole.Standard, 10)
+                    ], 1, Now)
+                },
+                "/api/entries/main" => Entry("main", "Main request", "Start here"),
+                "/api/entries/quick" => Entry("quick", "Quick question", "Ask quickly"),
+                "/api/workspaces/personal/tasks" => new WorkTaskPageResponse([]),
+                "/api/workspaces/personal/notifications/unread-count" => new UnreadNotificationCountResponse(0),
+                _ => throw new InvalidOperationException($"Unexpected request: {request.RequestUri}")
+            };
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(payload) });
+        }
+
+        private static EntryResponse Entry(string id, string displayName, string placeholder) => new(
+            WorkspaceId,
+            id,
+            id,
+            WorkResourceTypes.Entries,
+            WorkplaceApiVersions.CoreV1,
+            displayName,
+            $"Description for {displayName}",
+            new EntryPresentation { Placeholder = placeholder, Icon = "sparkle" },
+            new EntryResolvedTarget($"{id}-flow", "v1"),
+            new EntryBehavior(),
+            1,
+            Now);
     }
 
     private sealed class TestHostEnvironment : IHostEnvironment
