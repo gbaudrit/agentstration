@@ -1,7 +1,7 @@
 <section class="interaction-view" aria-labelledby="interaction-title">
     <header class="interaction-header">
         <div><p class="eyebrow">@Localizer["CurrentRequest"]</p><h2 id="interaction-title">@Localizer["Conversation"]</h2><p class="interaction-context">@(Task?.Title ?? Localizer["YourCurrentRequest"].Value)</p></div>
-        <div class="interaction-actions"><RealtimeStatus Connected="RealtimeConnected" /><button class="button-secondary" type="button" @onclick="OnNewRequest"><UiIcon Name="plus" /> @Localizer["NewRequest"]</button></div>
+        <div class="interaction-actions"><RealtimeStatus Connected="RealtimeConnected" /><button class="button-secondary" type="button" aria-label="@Localizer["NewRequest"]" title="@Localizer["NewRequest"]" @onclick="OnNewRequest"><UiIcon Name="message-plus" /> <span>@Localizer["NewRequest"]</span></button></div>
     </header>
 
     <div class="conversation-thread" aria-live="polite">

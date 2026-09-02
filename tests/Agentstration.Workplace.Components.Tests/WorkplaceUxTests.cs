@@ -81,6 +81,20 @@ public sealed class WorkplaceUxTests
     }
 
     [TestMethod]
+    public void NewConversationActionHasAnExplicitAccessibleName()
+    {
+        using var context = CreateContext();
+        var rendered = context.Render<InteractionView>(parameters => parameters
+            .Add(value => value.ArtifactContentUrl, _ => "/content"));
+
+        var action = rendered.Find(".interaction-actions button");
+        var expected = Localizer(context)["NewRequest"].Value;
+        Assert.AreEqual(expected, action.GetAttribute("aria-label"));
+        Assert.AreEqual(expected, action.GetAttribute("title"));
+        StringAssert.EndsWith(action.QuerySelector("use")?.GetAttribute("href"), "#tabler-message-plus");
+    }
+
+    [TestMethod]
     public void BlockingQuestionExplainsWhyPermanentComposerIsDisabled()
     {
         using var context = CreateContext();
@@ -388,7 +402,7 @@ public sealed class WorkplaceUxTests
                 .Add(value => value.ArtifactContentUrl, _ => "/content"));
 
             StringAssert.Contains(conversation.Markup, "Demande actuelle");
-            StringAssert.Contains(conversation.Markup, "Nouvelle demande");
+            StringAssert.Contains(conversation.Markup, "Nouvelle conversation");
             StringAssert.Contains(conversation.Markup, "En direct");
             StringAssert.Contains(conversation.Markup, "Tâche");
             StringAssert.Contains(conversation.Markup, "Terminée");
