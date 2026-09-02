@@ -73,12 +73,12 @@ else
                             var roleEntries = EntriesForRole(role);
                             if (roleEntries.Count > 0)
                             {
-                                <section class="workspace-entry-group role-@role.ToString().ToLowerInvariant()" data-testid="dashboard-entry-group-@role.ToString().ToLowerInvariant()">
+                                <section @key="role" class="workspace-entry-group role-@role.ToString().ToLowerInvariant()" data-testid="dashboard-entry-group-@role.ToString().ToLowerInvariant()">
                                     <div class="workspace-entry-group-header"><div><strong>@T($"Role.{role}")</strong><small>@T($"DashboardRole.{role}.Help")</small></div>@if (role != DashboardItemRole.Primary) { <span>@roleEntries.Count</span> }</div>
                                     @foreach (var entry in roleEntries)
                                     {
                                         var configured = composition.Single(value => value.EntryResourceId == EntryId(entry));
-                                        <article class="workspace-entry-row included">
+                                        <article @key="EntryId(entry)" class="workspace-entry-row included">
                                             <label class="workspace-entry-toggle"><input type="checkbox" checked @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
                                             <div class="workspace-entry-config @(role == DashboardItemRole.Primary ? "without-order" : null)">
                                                 <label><span>@T("Role")</span><select data-testid="dashboard-entry-role" value="@configured.Role" @onchange="args => ChangeRole(entry, args)" title="@T("OnlyOnePrimaryEntry")"><option value="Primary">@T("Role.Primary")</option><option value="Featured">@T("Role.Featured")</option><option value="Standard">@T("Role.Standard")</option></select></label>
@@ -101,8 +101,8 @@ else
                                 <div class="workspace-entry-group-header"><div><strong>@T("NotShown")</strong><small>@T("DashboardRole.Excluded.Help")</small></div><span>@ExcludedEntries.Count</span></div>
                                 @foreach (var entry in ExcludedEntries)
                                 {
-                                    <article class="workspace-entry-row excluded">
-                                        <label class="workspace-entry-toggle"><input type="checkbox" checked="false" @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
+                                    <article @key="EntryId(entry)" class="workspace-entry-row excluded">
+                                        <label class="workspace-entry-toggle"><input type="checkbox" @onchange="args => ToggleEntry(entry, args)" /><span><strong>@entry.DisplayName</strong><small>@EntryScope(entry) · @T("EntryVersion", entry.Version)</small></span></label>
                                         <span class="workspace-entry-excluded">@T("NotShown")</span>
                                     </article>
                                 }

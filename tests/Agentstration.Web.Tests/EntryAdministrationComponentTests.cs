@@ -282,6 +282,43 @@ public sealed class EntryAdministrationComponentTests
     }
 
     [TestMethod]
+    public async Task DashboardEditorLeavesUnconfiguredEntriesUncheckedUntilSelected()
+    {
+        using var context = CreateContext();
+        var client = new FakeEntryAdministrationApiClient();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var rendered = context.Render<Workspaces>();
+
+        var excludedCheckbox = rendered.Find("[data-testid='dashboard-entry-group-excluded'] input[type='checkbox']");
+        Assert.IsFalse(excludedCheckbox.HasAttribute("checked"));
+
+        await excludedCheckbox.ChangeAsync(new ChangeEventArgs { Value = true });
+
+        Assert.HasCount(0, rendered.FindAll("[data-testid='dashboard-entry-group-excluded']"));
+        Assert.HasCount(2, rendered.Find("[data-testid='dashboard-entry-group-standard']").QuerySelectorAll("[data-testid='dashboard-entry-role']"));
+    }
+
+    [TestMethod]
+    public async Task DashboardEditorKeepsRemainingEntrySelectedWhenTheFirstEntryIsRemoved()
+    {
+        using var context = CreateContext();
+        var client = new FakeEntryAdministrationApiClient();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var rendered = context.Render<Workspaces>();
+
+        await rendered.Find("[data-testid='dashboard-entry-group-primary'] [data-testid='dashboard-entry-role']").ChangeAsync(new ChangeEventArgs { Value = "Standard" });
+        var standardCheckboxes = rendered.FindAll("[data-testid='dashboard-entry-group-standard'] input[type='checkbox']");
+        Assert.HasCount(2, standardCheckboxes);
+
+        await standardCheckboxes[0].ChangeAsync(new ChangeEventArgs { Value = false });
+
+        var remainingCheckbox = rendered.Find("[data-testid='dashboard-entry-group-standard'] input[type='checkbox']");
+        Assert.IsTrue(remainingCheckbox.HasAttribute("checked"));
+        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish Dashboard", StringComparison.Ordinal)).ClickAsync(new());
+        Assert.AreEqual("secondary", ResourceName(client.SavedDashboard!.Entries.Single().EntryResourceId.Value));
+    }
+
+    [TestMethod]
     public void DashboardEditorCreatesAnEmptyDraftWhenWorkspaceHasNoDashboard()
     {
         using var context = CreateContext();
