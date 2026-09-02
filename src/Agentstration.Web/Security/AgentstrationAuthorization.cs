@@ -17,6 +17,7 @@ public static class AgentstrationPolicies
     public const string CanDeleteResources = "agentstration:resources:delete";
     public const string CanReadRuns = "agentstration:runs:read";
     public const string CanExecuteRuns = "agentstration:runs:execute";
+    public const string CanDeleteRuns = "agentstration:runs:delete";
     public const string CanReadAgents = CanReadResources;
     public const string CanManageAgents = CanWriteResources;
     public const string CanRunAgents = CanExecuteRuns;

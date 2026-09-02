@@ -561,6 +561,25 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public async Task EntryDeleteApiRemovesDefaultAndNamespacedDrafts()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var workspace = (await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces"))!.Single();
+        var workspaceId = new WorkspaceId(workspace.Id);
+        var defaultDraft = Entry(new EntryId("delete-default")) with { WorkspaceId = workspaceId };
+        var namespacedDraft = Entry(new EntryId("delete-namespaced", new ResourceNamespace("team-a"))) with { WorkspaceId = workspaceId };
+
+        Assert.AreEqual(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/management/entries/delete-default", defaultDraft)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/namespaces/team-a/management/entries/delete-namespaced", namespacedDraft)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/management/entries/delete-default")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/namespaces/team-a/management/entries/delete-namespaced")).StatusCode);
+
+        Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync("/api/management/entries/delete-default")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync("/api/namespaces/team-a/management/entries/delete-namespaced")).StatusCode);
+    }
+
+    [TestMethod]
     public async Task WorkApiValidatesCreatesGetsAndReportsUnavailableResult()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

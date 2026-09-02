@@ -76,6 +76,10 @@ public sealed class OpenApiTests
         var expected = new (string Method, string Route, string Policy)[]
         {
             ("POST", "/api/routing/invoke", AgentstrationPolicies.CanExecuteRuns),
+            ("DELETE", "/api/flowRuns/{runId}", AgentstrationPolicies.CanDeleteRuns),
+            ("DELETE", "/api/runtime/runs/{runId}", AgentstrationPolicies.CanDeleteRuns),
+            ("DELETE", "/api/management/entries/{entryName}", AgentstrationPolicies.CanDeleteResources),
+            ("DELETE", "/api/namespaces/{namespace}/management/entries/{entryName}", AgentstrationPolicies.CanDeleteResources),
             ("POST", "/api/triggers/{name}/run", AgentstrationPolicies.CanExecuteRuns),
             ("GET", "/api/triggers/{name}/occurrences", AgentstrationPolicies.CanReadRuns),
             ("GET", "/api/modelproviders", AgentstrationPolicies.CanReadResources),

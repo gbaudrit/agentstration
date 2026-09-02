@@ -42,7 +42,9 @@ internal static class OpenApiSuccessResponseCatalog
             && !path.StartsWith("/api/namespaces/{namespace}/flows", StringComparison.OrdinalIgnoreCase)
             && !path.StartsWith("/api/flowRuns", StringComparison.OrdinalIgnoreCase)) return null;
 
-        if (method == "DELETE") return NoContent("Delete the Flow", "The Flow was deleted.");
+        if (method == "DELETE") return path.StartsWith("/api/flowRuns", StringComparison.OrdinalIgnoreCase)
+            ? NoContent("Delete a Flow Run", "The Flow Run and its module-owned history were deleted.")
+            : NoContent("Delete the Flow", "The Flow was deleted.");
         if (path.StartsWith("/api/flowRuns", StringComparison.OrdinalIgnoreCase))
         {
             if (path == "/api/flowRuns" && method == "GET") return Json<FlowRunPageResponse>(200, "List Flow Runs");
@@ -85,6 +87,7 @@ internal static class OpenApiSuccessResponseCatalog
     private static OpenApiSuccessResponse? Runtime(string method, string path)
     {
         if (!path.StartsWith("/api/runtime/", StringComparison.OrdinalIgnoreCase)) return null;
+        if (method == "DELETE") return NoContent("Delete a Runtime Run", "The Runtime Run and its module-owned history were deleted.");
         if (path.EndsWith("/events", StringComparison.OrdinalIgnoreCase))
             return new(200, typeof(string), "Stream Runtime Run events", "Server-sent event stream.", "text/event-stream");
         if (path.EndsWith("/eventHistory", StringComparison.OrdinalIgnoreCase)) return Json<IReadOnlyList<RuntimeRunEvent>>(200, "List Runtime Run events");
@@ -174,6 +177,7 @@ internal static class OpenApiSuccessResponseCatalog
 
     private static OpenApiSuccessResponse? Entry(string method, string path)
     {
+        if (method == "DELETE") return NoContent("Delete an Entry", "The Entry draft and published resource were deleted.");
         if (path.EndsWith("/interactions", StringComparison.OrdinalIgnoreCase)) return Json<EntrySubmissionResponse>(201, "Submit an Entry interaction");
         if (path == "/api/entries") return Json<IReadOnlyList<EntryResponse>>(200, "List published Entries");
         if (path == "/api/resources") return Json<IReadOnlyList<ResourcePickerItem>>(200, "List resources available to Entries");

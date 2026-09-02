@@ -255,6 +255,22 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         return new StoredFlowRun(run, document.ETag, now);
     }
 
+    public async Task DeleteRunAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await context.Documents.Where(value =>
+            value.WorkspaceId == workspaceId.Value
+            && (value.Key == RunKey(workspaceId, runId)
+                || (value.FlowId == runId && (value.Kind == RunEventKind || value.Kind == InputRequestKind))))
+            .ToArrayAsync(cancellationToken);
+        var run = documents.SingleOrDefault(value => value.Kind == RunKind)
+            ?? throw new FlowRunNotFoundException(runId);
+        if (!string.Equals(run.ETag, expectedETag, StringComparison.Ordinal))
+            throw new FlowConcurrencyException("The supplied ETag does not match the current Flow Run version.");
+        context.Documents.RemoveRange(documents);
+        await SaveUpdateAsync(context, cancellationToken);
+    }
+
     public async Task<StoredFlowDraft> CreateDraftAsync(FlowDraft draft, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);

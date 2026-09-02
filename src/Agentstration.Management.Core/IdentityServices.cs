@@ -165,7 +165,7 @@ public static class BuiltInIdentityRoles
         new(new Guid("ef263a5e-1f83-4882-bef4-b76847574fe2"), Admin, Admin,
             [AuthorizationPermissions.TenantsRead, AuthorizationPermissions.WorkspacesRead, AuthorizationPermissions.WorkspacesWrite,
              AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesWrite, AuthorizationPermissions.ResourcesDelete,
-             AuthorizationPermissions.RunsRead, AuthorizationPermissions.RunsExecute, AuthorizationPermissions.AuthorizationRead,
+             AuthorizationPermissions.RunsRead, AuthorizationPermissions.RunsExecute, AuthorizationPermissions.RunsDelete, AuthorizationPermissions.AuthorizationRead,
              AuthorizationPermissions.AuthorizationWrite], true),
         new(new Guid("2c0b9724-f78f-43db-b0b6-673c04dc68a4"), Member, Member,
             [AuthorizationPermissions.WorkspacesRead, AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.RunsRead, AuthorizationPermissions.RunsExecute], true),

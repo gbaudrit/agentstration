@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Runtime.Tests;
 
@@ -308,6 +309,35 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
+    public async Task DeleteRequiresTerminalStateAndRemovesRuntimeHistory()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var created = await fixture.CreateRunAsync();
+
+        await Assert.ThrowsExactlyAsync<RuntimeRunNotTerminalException>(() =>
+            fixture.Service.DeleteAsync(TestScope.WorkspaceId, created.Value.Id, created.ETag, default));
+
+        await fixture.Service.ExecuteAsync(new(TestScope, created.Value.Id), default);
+        var completed = await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default);
+        Assert.IsNotNull(completed);
+        await fixture.ExecutionStates.StoreAsync(new(
+            TestScope.WorkspaceId,
+            created.Value.Id,
+            "maf",
+            "checkpoint-1",
+            JsonSerializer.SerializeToElement(new { state = "completed" }),
+            DateTimeOffset.UtcNow), default);
+
+        await Assert.ThrowsExactlyAsync<RuntimeRunConcurrencyException>(() =>
+            fixture.Service.DeleteAsync(TestScope.WorkspaceId, created.Value.Id, created.ETag, default));
+        await fixture.Service.DeleteAsync(TestScope.WorkspaceId, created.Value.Id, completed.ETag, default);
+
+        Assert.IsNull(await fixture.Service.GetAsync(TestScope.WorkspaceId, created.Value.Id, default));
+        Assert.HasCount(0, await fixture.Store.ListEventsAsync(TestScope.WorkspaceId, created.Value.Id, 0, default));
+        Assert.IsNull(await fixture.ExecutionStates.GetAsync(TestScope.WorkspaceId, created.Value.Id, "maf", "checkpoint-1", default));
+    }
+
+    [TestMethod]
     public async Task FreshRuntimeSchemaAllowsTheSameRunIdInDifferentWorkspaces()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"agentstration-runtime-scope-{Guid.NewGuid():N}");
@@ -333,6 +363,14 @@ public sealed class RuntimeRunTests
             Assert.AreEqual("first", (await store.GetAsync(TestScope.WorkspaceId, "shared-run", default))!.Value.Name);
             Assert.AreEqual("second", (await store.GetAsync(otherScope.WorkspaceId, "shared-run", default))!.Value.Name);
             Assert.HasCount(1, await store.ListEventsAsync(TestScope.WorkspaceId, "shared-run", 0, default));
+            Assert.HasCount(1, await store.ListEventsAsync(otherScope.WorkspaceId, "shared-run", 0, default));
+
+            var first = await store.GetAsync(TestScope.WorkspaceId, "shared-run", default);
+            Assert.IsNotNull(first);
+            await store.DeleteAsync(TestScope.WorkspaceId, "shared-run", first.ETag, default);
+            Assert.IsNull(await store.GetAsync(TestScope.WorkspaceId, "shared-run", default));
+            Assert.IsNotNull(await store.GetAsync(otherScope.WorkspaceId, "shared-run", default));
+            Assert.HasCount(0, await store.ListEventsAsync(TestScope.WorkspaceId, "shared-run", 0, default));
             Assert.HasCount(1, await store.ListEventsAsync(otherScope.WorkspaceId, "shared-run", 0, default));
 
             RuntimeRun Run(RuntimeRunScope scope, string name) => new()
@@ -425,6 +463,50 @@ public sealed class RuntimeRunTests
     }
 
     [TestMethod]
+    public async Task RuntimeRunDeleteApiRequiresTerminalStateAndCurrentETag()
+    {
+        var queue = new TestRuntimeRunQueue();
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IRuntimeRunQueue>();
+                services.AddSingleton<IRuntimeRunQueue>(queue);
+            });
+        });
+        using var client = factory.CreateClient();
+        var agent = await client.GetFromJsonAsync<AgentResource>("/api/agents/sql-expert");
+        Assert.IsNotNull(agent);
+        using var createdResponse = await client.PostAsJsonAsync("/api/runtime/runs", new CreateRuntimeRunRequest
+        {
+            Agent = new RuntimeAgentReference(agent.Metadata.Name, agent.Generation),
+            Input = Input("delete me"),
+            Origin = RuntimeRunOrigin.Api
+        });
+        var created = await createdResponse.Content.ReadFromJsonAsync<RuntimeRun>();
+        Assert.IsNotNull(created);
+        var createdETag = createdResponse.Headers.ETag?.Tag;
+        Assert.IsNotNull(createdETag);
+
+        Assert.AreEqual(HttpStatusCode.BadRequest, (await client.DeleteAsync($"/api/runtime/runs/{created.Id}")).StatusCode);
+        using var pendingDelete = new HttpRequestMessage(HttpMethod.Delete, $"/api/runtime/runs/{created.Id}");
+        pendingDelete.Headers.TryAddWithoutValidation("If-Match", createdETag);
+        Assert.AreEqual(HttpStatusCode.Conflict, (await client.SendAsync(pendingDelete)).StatusCode);
+
+        using var cancel = await client.PostAsync($"/api/runtime/runs/{created.Id}/cancel", null);
+        var currentETag = cancel.Headers.ETag?.Tag;
+        Assert.IsNotNull(currentETag);
+        using var staleDelete = new HttpRequestMessage(HttpMethod.Delete, $"/api/runtime/runs/{created.Id}");
+        staleDelete.Headers.TryAddWithoutValidation("If-Match", createdETag);
+        Assert.AreEqual(HttpStatusCode.PreconditionFailed, (await client.SendAsync(staleDelete)).StatusCode);
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, $"/api/runtime/runs/{created.Id}");
+        delete.Headers.TryAddWithoutValidation("If-Match", currentETag);
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.SendAsync(delete)).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync($"/api/runtime/runs/{created.Id}")).StatusCode);
+    }
+
+    [TestMethod]
     public void HttpPayloadCaptureIsRejectedOutsideDevelopment()
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -470,6 +552,7 @@ public sealed class RuntimeRunTests
         private readonly ServiceProvider provider;
         public RuntimeRunService Service { get; }
         public IRuntimeRunStore Store { get; }
+        public IRuntimeExecutionStateStore ExecutionStates => provider.GetRequiredService<IRuntimeExecutionStateStore>();
         public FakeRuntimeRegistry Registry { get; }
         public TestRuntimeRunQueue Queue { get; }
         public string AgentId { get; }
@@ -628,6 +711,7 @@ public sealed class RuntimeRunTests
         public Task<StoredRuntimeRun?> GetAsync(Agentstration.Resources.WorkspaceId workspaceId, string runId, CancellationToken cancellationToken) => Task.FromResult<StoredRuntimeRun?>(Current);
         public Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(Agentstration.Resources.WorkspaceId workspaceId, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<RuntimeRunKey>> ListRecoverableAsync(int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteAsync(Agentstration.Resources.WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<StoredRuntimeRun> UpdateAsync(RuntimeRun value, string expectedETag, CancellationToken cancellationToken)
         {
             UpdateAttempts++;

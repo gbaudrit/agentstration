@@ -189,7 +189,8 @@ public static class WebConsoleServiceCollectionExtensions
             .AddPolicy(AgentstrationPolicies.CanWriteResources, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesWrite))
             .AddPolicy(AgentstrationPolicies.CanDeleteResources, policy => WorkspacePolicy(policy, AuthorizationPermissions.ResourcesDelete))
             .AddPolicy(AgentstrationPolicies.CanReadRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsRead))
-            .AddPolicy(AgentstrationPolicies.CanExecuteRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute));
+            .AddPolicy(AgentstrationPolicies.CanExecuteRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsExecute))
+            .AddPolicy(AgentstrationPolicies.CanDeleteRuns, policy => WorkspacePolicy(policy, AuthorizationPermissions.RunsDelete));
     }
 
     private static void WorkspacePolicy(AuthorizationPolicyBuilder policy, string permission)

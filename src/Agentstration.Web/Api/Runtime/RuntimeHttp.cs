@@ -16,6 +16,7 @@ internal static class RuntimeHttp
     {
         try { return await action(); }
         catch (RuntimeRunNotFoundException exception) { return Results.Problem(statusCode: 404, title: "run_not_found", detail: exception.Message); }
+        catch (RuntimeRunNotTerminalException exception) { return Results.Problem(statusCode: 409, title: "run_not_terminal", detail: exception.Message); }
         catch (RuntimeRunConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
         catch (RuntimeRunValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
         catch (ControlPlaneResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }

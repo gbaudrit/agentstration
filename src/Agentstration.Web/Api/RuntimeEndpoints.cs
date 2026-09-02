@@ -11,6 +11,7 @@ public static class RuntimeEndpoints
         CreateRuntimeRunEndpoint.Map(group);
         ListRuntimeRunsEndpoint.Map(group);
         GetRuntimeRunEndpoint.Map(group);
+        DeleteRuntimeRunEndpoint.Map(group);
         ListRuntimeRunEventsEndpoint.Map(group);
         StreamRuntimeRunEventsEndpoint.Map(group);
         CancelRuntimeRunEndpoint.Map(group);

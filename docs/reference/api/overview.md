@@ -23,3 +23,5 @@ Current API families include:
 - model providers/profiles and runtime profiles under `/api/...`.
 
 Problem Details, ETags/conditional writes, pagination, and `202 Accepted` are used where their implemented boundary requires them. API versioning is explained in [Versioning strategy](../versioning.md).
+
+Individual cleanup operations are exposed through `DELETE /api/flowRuns/{runId}`, `DELETE /api/runtime/runs/{runId}`, and the default or namespaced Entry routes. Run deletion is limited to terminal Runs, requires the current ETag through `If-Match`, and atomically removes the history owned by the corresponding Flow or Runtime module. Entry deletion retains its existing draft and dependency safeguards; callers must explicitly opt in when Dashboard references need to be removed or eligible durable Interactions need to be closed.

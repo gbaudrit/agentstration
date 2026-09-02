@@ -48,6 +48,7 @@ public static partial class FlowEndpoints
         var runs = endpoints.MapGroup("/api/flowRuns").RequireAuthorization(AgentstrationPolicies.Authenticated);
         runs.MapGet("/", ListRunsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         runs.MapGet("/{runId}", GetRunAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        runs.MapDelete("/{runId}", DeleteRunAsync).RequireAuthorization(AgentstrationPolicies.CanDeleteRuns);
         runs.MapGet("/{runId}/events", ObserveRunAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         runs.MapGet("/{runId}/eventHistory", ListRunEventsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         runs.MapGet("/{runId}/inputs", ListInputsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);

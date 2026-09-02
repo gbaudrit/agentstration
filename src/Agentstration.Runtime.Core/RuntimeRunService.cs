@@ -105,6 +105,13 @@ public sealed class RuntimeRunService(
     public Task<IReadOnlyList<StoredRuntimeRun>> ListAsync(WorkspaceId workspaceId, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) =>
         runs.ListAsync(workspaceId, agentResourceId, skip, take, cancellationToken);
 
+    public async Task DeleteAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken)
+    {
+        var stored = await GetRequiredAsync(workspaceId, runId, cancellationToken);
+        if (!stored.Value.Status.State.IsTerminal()) throw new RuntimeRunNotTerminalException(runId, stored.Value.Status.State);
+        await runs.DeleteAsync(workspaceId, runId, expectedETag, cancellationToken);
+    }
+
     public async Task<AgentRuntimeReadiness> GetReadinessAsync(string agentResourceId, long generation, CancellationToken cancellationToken)
         => await GetReadinessAsync(ResourceNamespace.Default, agentResourceId, generation, cancellationToken);
 
