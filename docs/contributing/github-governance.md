@@ -6,7 +6,7 @@ Agentstration uses trunk-based development: short-lived branches are merged thro
 
 The repository keeps reviewable governance files in Git:
 
-- `.github/workflows/ci.yml` restores, builds, tests, verifies formatting on changed .NET files, and builds the container on Linux;
+- `.github/workflows/ci.yml` classifies changed paths, restores, builds, tests, verifies formatting on changed .NET files, checks Windows host lifecycle behavior, and builds the container on Linux;
 - `.github/workflows/pull-request-metadata.yml` validates pull request titles and descriptions whenever their content or source revision changes;
 - `.github/workflows/codeql.yml` scans C# on pull requests, `main`, and a weekly schedule;
 - `.github/workflows/dependency-review.yml` blocks pull requests that introduce known vulnerabilities of moderate severity or higher;
@@ -30,6 +30,8 @@ Pull requests to `main` run these workflows:
 | `dependency-review` | Reject vulnerable dependency additions | No; recommended after repository feature availability is confirmed |
 
 The stable required-check contexts are `build-and-test` and `pull-request-metadata`. Do not rename either job without updating the ruleset and reconfiguring GitHub.
+
+The CI workflow keeps `build-and-test` present for documentation-only pull requests but short-circuits its expensive .NET steps when no product or build input changed. Complete AEP validation runs only when the autonomous subtree or its shared CI inputs change. Container validation is path-aware, runs independently from the required .NET check, and uses the GitHub Actions BuildKit cache. Linux and Windows .NET jobs cache the NuGet global-packages folder while still running restore and NuGet audit on every relevant revision. The C# CodeQL workflow also ignores documentation-only pull requests and pushes; its scheduled and manual scans remain complete.
 
 Format verification is deliberately incremental: the current codebase has pre-existing `dotnet format` debt, so CI verifies every changed C# or Razor file without forcing an unrelated repository-wide rewrite. A separate cleanup can establish a clean full-repository baseline later.
 

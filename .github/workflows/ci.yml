@@ -15,9 +15,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: classify-changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      dotnet: ${{ steps.classify.outputs.dotnet }}
+      aep: ${{ steps.classify.outputs.aep }}
+      container: ${{ steps.classify.outputs.container }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Classify changed paths
+        id: classify
+        shell: pwsh
+        run: |
+          $event = Get-Content -LiteralPath $env:GITHUB_EVENT_PATH -Raw | ConvertFrom-Json
+          $runEverything = '${{ github.event_name }}' -eq 'workflow_dispatch'
+          $baseRevision = if ('${{ github.event_name }}' -eq 'pull_request') {
+            [string]$event.pull_request.base.sha
+          }
+          else {
+            [string]$event.before
+          }
+
+          if (-not $runEverything -and
+              -not [string]::IsNullOrWhiteSpace($baseRevision) -and
+              $baseRevision -notmatch '^0+$') {
+            $changedFiles = @(git diff --name-only --diff-filter=ACDMRT $baseRevision HEAD)
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not determine changed files from '$baseRevision'."
+            }
+          }
+          else {
+            $changedFiles = @()
+            $runEverything = $true
+          }
+
+          $documentationOnlyPattern = '^(docs/|README\.md$|CONTRIBUTING\.md$|CODE_OF_CONDUCT\.md$|SECURITY\.md$|NOTICE$|LICENSE$|\.github/(CODEOWNERS$|ISSUE_TEMPLATE/|pull_request_template\.md$|rulesets/|workflows/(documentation|publish-documentation)\.yml$))'
+          $dotnet = $runEverything -or @($changedFiles | Where-Object { $_ -notmatch $documentationOnlyPattern }).Count -gt 0
+          $aep = $runEverything -or @($changedFiles | Where-Object {
+            $_ -match '^(aep/|global\.json$|\.github/workflows/ci\.yml$|scripts/ci/)'
+          }).Count -gt 0
+          $container = $runEverything -or @($changedFiles | Where-Object {
+            $_ -match '^(src/|aep/src/|deploy/|Dockerfile$|\.dockerignore$|global\.json$|Agentstration\.slnx$|Directory\.(Build|Packages)\.(props|targets)$|\.github/workflows/ci\.yml$)'
+          }).Count -gt 0
+
+          "dotnet=$($dotnet.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "aep=$($aep.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "container=$($container.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Changed files: $($changedFiles.Count)"
+          Write-Host "Run .NET validation: $dotnet"
+          Write-Host "Run complete AEP validation: $aep"
+          Write-Host "Build container: $container"
+
   windows-host-lifecycle:
     name: windows-host-lifecycle
     runs-on: windows-latest
+    needs: changes
+    if: needs.changes.outputs.dotnet == 'true'
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -26,6 +85,13 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
       - name: Restore web tests
         run: dotnet restore tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
       - name: Build web tests
@@ -36,39 +102,70 @@ jobs:
   build-and-test:
     name: build-and-test
     runs-on: ubuntu-latest
+    needs: changes
     timeout-minutes: 30
     steps:
+      - name: Skip .NET validation for documentation-only changes
+        if: needs.changes.outputs.dotnet != 'true'
+        run: echo "No product or build inputs changed; .NET validation is not required."
       - name: Check out repository
+        if: needs.changes.outputs.dotnet == 'true'
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Set up .NET
+        if: needs.changes.outputs.dotnet == 'true'
         uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+      - name: Cache NuGet packages
+        if: needs.changes.outputs.dotnet == 'true'
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Build.props', 'Directory.Packages.props', 'aep/Directory.Build.props', 'aep/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
       - name: Restore Agentstration
+        if: needs.changes.outputs.dotnet == 'true'
         run: dotnet restore Agentstration.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
-      - name: Build Agentstration
-        run: dotnet build Agentstration.slnx --configuration Release --no-restore
-      - name: Test Agentstration
-        run: dotnet test Agentstration.slnx --configuration Release --no-build
       - name: Restore complete AEP SDK
+        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
         run: dotnet restore aep/Aep.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
-      - name: Build complete AEP SDK
-        run: dotnet build aep/Aep.slnx --configuration Release --no-restore
-      - name: Test complete AEP SDK
-        run: dotnet test aep/Aep.slnx --configuration Release --no-build
       - name: Verify formatting of changed .NET files
+        if: needs.changes.outputs.dotnet == 'true'
         shell: pwsh
         run: ./scripts/ci/verify-dotnet-format.ps1 -BaseRevision "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: Build Agentstration
+        if: needs.changes.outputs.dotnet == 'true'
+        run: dotnet build Agentstration.slnx --configuration Release --no-restore
+      - name: Test Agentstration
+        if: needs.changes.outputs.dotnet == 'true'
+        run: dotnet test Agentstration.slnx --configuration Release --no-build
+      - name: Build complete AEP SDK
+        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
+        run: dotnet build aep/Aep.slnx --configuration Release --no-restore
+      - name: Test complete AEP SDK
+        if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
+        run: dotnet test aep/Aep.slnx --configuration Release --no-build
 
   container:
     name: container
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: changes
+    if: needs.changes.outputs.container == 'true'
     timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Build image
-        run: docker build --file Dockerfile --tag agentstration:ci .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          tags: agentstration:ci
+          cache-from: type=gha,scope=ci-container
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=ci-container' || '' }}
