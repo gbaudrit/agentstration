@@ -144,6 +144,8 @@ else
 @code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [SupplyParameterFromQuery(Name = "provider")] public string? SuggestedProvider { get; set; }
+    [SupplyParameterFromQuery(Name = "providerNamespace")] public string? SuggestedProviderNamespace { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
     private readonly CancellationTokenSource cancellation = new();
@@ -171,7 +173,15 @@ else
         {
             providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
             extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
-            if (IsNew) model = new ModelProfileEditorModel { Namespace = SelectedNamespace.Value };
+            if (IsNew)
+            {
+                model = new ModelProfileEditorModel
+                {
+                    Namespace = SelectedNamespace.Value,
+                    ProviderName = SuggestedProvider ?? string.Empty,
+                    ProviderNamespace = SuggestedProviderNamespace ?? SelectedNamespace.Value
+                };
+            }
             else
             {
                 var snapshot = await Client.GetModelProfileAsync(SelectedNamespace, Name!, cancellation.Token);
