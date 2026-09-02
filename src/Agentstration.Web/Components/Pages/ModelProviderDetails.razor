@@ -9,7 +9,7 @@
 
 <PageTitle>@(IsNew ? T("CreateProvider") : $"{Name} · {T("ModelProvider")}") · Agentstration</PageTitle>
 <PageHeader Title="@(IsNew ? T("CreateProvider") : model?.DisplayName ?? Name)" Description="@T("Description")">
-    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button> }<a class="button-secondary" href="/modelproviders">@T("Back")</a></Actions>
+    <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button><a class="button-primary" href="@CreateModelProfileUrl()">@T("CreateModelProfile")</a> }<a class="button-secondary" href="/modelproviders">@T("Back")</a></Actions>
 </PageHeader>
 
 @if (model is null) { <LoadingState Message="@T("Loading")" /> }
@@ -71,6 +71,7 @@ else
     private async Task DeleteAsync() { if (model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteModelProviderAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Navigation.NavigateTo("/modelproviders"); } catch (AgentstrationApiException exception) { error = exception; } }
     private string Metadata(AvailableModelResponse item, string key) => item.Metadata.TryGetValue(key, out var value) ? value : T("NotReported");
     private static string ProfileUrl(ModelProviderUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.Name)}";
+    private string CreateModelProfileUrl() => $"/modelprofiles/new?namespace={Uri.EscapeDataString(SelectedNamespace.Value)}&provider={Uri.EscapeDataString(Name!)}&providerNamespace={Uri.EscapeDataString(SelectedNamespace.Value)}";
     private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/modelproviders/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
     private static string ExtensionKey(ExtensionResponse extension) => $"{extension.RegistrationNamespace}:{extension.RegistrationName}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
