@@ -95,8 +95,9 @@ public sealed class PendingActionPanelTests
         Assert.IsTrue(rendered.Markup.Contains("side-nav", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("images/agentstration-workplace-lockup-dark.png", StringComparison.Ordinal));
         Assert.AreEqual(1, rendered.FindAll(".workplace-brand-lockup .brand-lockup-logo").Count);
+        Assert.AreEqual(1, rendered.FindAll(".mobile-brand-logo").Count);
         Assert.IsTrue(rendered.Find(".workplace-brand-lockup .brand-lockup-logo").GetAttribute("src")?.EndsWith("agentstration-workplace-lockup-dark.png", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Find(".mobile-brand-logo").GetAttribute("src")?.EndsWith("agentstration-workplace-lockup-white-transparent.png", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Find(".mobile-brand-logo").GetAttribute("src")?.EndsWith("agentstration-workplace-lockup-dark.png", StringComparison.Ordinal));
         Assert.AreEqual(2, rendered.FindAll(".navigation-group").Count);
         Assert.AreEqual(localizer["Work"].Value, rendered.Find(".navigation-group h2").TextContent);
         Assert.AreEqual(3, rendered.FindAll(".side-nav .nav-icon").Count);
