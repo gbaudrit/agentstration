@@ -534,17 +534,13 @@ public sealed class WorkPlaneTests
             WorkspaceId = WorkplaceId,
             EntryId = draft.Id,
             EntrySnapshot = published,
-            Status = InteractionStatus.Processing,
+            Status = InteractionStatus.Active,
             StartedAt = Now,
             LastActivityAt = Now
         };
         await fixture.Workplace.CreateInteractionAsync(interaction, default);
-        var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), TimeProvider.System, new WorkplaceContextStub());
-
-        var conflict = await Assert.ThrowsExactlyAsync<WorkValidationException>(() =>
-            service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default));
-        Assert.AreEqual("entry_interactions_active", conflict.Code);
-        await fixture.Workplace.SaveInteractionAsync(interaction with { Status = InteractionStatus.Idle, Version = 2 }, 1, default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+        var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), workplace, TimeProvider.System, new WorkplaceContextStub());
 
         await service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default);
 
@@ -558,6 +554,50 @@ public sealed class WorkPlaneTests
         Assert.AreEqual(published.Id, retained.EntrySnapshot.Id);
         Assert.AreEqual(published.Version, retained.EntrySnapshot.Version);
         Assert.AreEqual(published.ResolvedTarget, retained.EntrySnapshot.ResolvedTarget);
+    }
+
+    [TestMethod]
+    public async Task EntryRemovalCancelsCurrentWorkBeforeClosingProcessingInteraction()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var draft = Entry(new EntryId("busy"));
+        await fixture.Workplace.UpsertEntryDraftAsync(draft, default);
+        var itemId = WorkItemId.New();
+        var taskId = WorkTaskId.FromWorkItem(itemId);
+        var executionId = WorkExecutionId.New();
+        var interactionId = InteractionId.New();
+        var item = WorkItem.Create(itemId, WorkplaceId, "entry", "Work in progress", Now, metadata: new Dictionary<string, string>
+        {
+            ["workplace.workspaceId"] = WorkplaceId.Value.ToString("D"),
+            ["workplace.entryId"] = draft.Id.Value,
+            ["workplace.interactionId"] = interactionId.Value.ToString("D"),
+            ["workplace.taskId"] = taskId.Value.ToString("D")
+        });
+        item.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddMilliseconds(500));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(1), "agent"));
+        await fixture.Repository.CreateAsync(item, default);
+        await fixture.Workplace.CreateInteractionAsync(new WorkplaceInteraction
+        {
+            Id = interactionId,
+            WorkspaceId = WorkplaceId,
+            EntryId = draft.Id,
+            Status = InteractionStatus.Processing,
+            StartedAt = Now,
+            LastActivityAt = Now,
+            TaskId = taskId
+        }, default);
+        var workplace = new WorkplaceService(fixture.Workplace, fixture.Service, TimeProvider.System, [], [], new WorkplaceContextStub());
+        var service = new EntryAdministrationService(fixture.Workplace, new EntryTargetResolverStub(), workplace, TimeProvider.System, new WorkplaceContextStub());
+
+        var conflict = await Assert.ThrowsExactlyAsync<WorkValidationException>(() =>
+            service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: false, default));
+        Assert.AreEqual("entry_interactions_active", conflict.Code);
+
+        await service.DeleteAsync(WorkplaceId, draft.Id, removeDashboardReferences: true, closeInteractions: true, default);
+
+        Assert.AreEqual(WorkItemStatus.Cancelled, (await fixture.Repository.GetAsync(WorkplaceId, itemId, default))!.Value.Status);
+        Assert.AreEqual(InteractionStatus.Closed, (await fixture.Workplace.GetInteractionAsync(WorkplaceId, interactionId, default))!.Status);
+        Assert.IsNull(await fixture.Workplace.GetEntryDraftAsync(WorkplaceId, draft.Id, default));
     }
 
     [TestMethod]
