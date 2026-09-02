@@ -15,7 +15,6 @@ public partial class Home
     private EntryResponse? primary;
     private IReadOnlyList<EntryResponse> featuredEntries = [];
     private IReadOnlyList<EntryResponse> standardEntries = [];
-    private EntryResponse? selectedHomeEntry;
     private InteractionResponse? interaction;
     private EntryResponse? activeEntry;
     private PendingActionContract? pendingAction;
@@ -37,19 +36,7 @@ public partial class Home
     private string CurrentWorkspaceName => WorkspaceName ?? workspace?.Name ?? throw new InvalidOperationException("A Workspace route is required.");
     private string CurrentDashboardName => dashboard?.Name ?? DashboardName ?? throw new InvalidOperationException("A Dashboard route is required.");
     private string UserDisplayName => WorkplaceContext.Current?.UserDisplayName is { Length: > 0 } displayName ? displayName : T("You");
-    private EntryResponse? SelectedHomeEntry => selectedHomeEntry ?? primary;
-    private IEnumerable<EntryResponse> HomeEntries
-    {
-        get
-        {
-            if (primary is not null) yield return primary;
-            foreach (var entry in featuredEntries) yield return entry;
-            foreach (var entry in standardEntries) yield return entry;
-        }
-    }
-    private IEnumerable<EntryResponse> AlternativeEntries => HomeEntries.Where(entry => !SameEntry(entry, SelectedHomeEntry));
-    private IEnumerable<EntryResponse> VisibleFeaturedEntries => featuredEntries.Where(entry => !SameEntry(entry, SelectedHomeEntry));
-    private IEnumerable<EntryResponse> VisibleStandardEntries => standardEntries.Where(entry => !SameEntry(entry, SelectedHomeEntry));
+    private IEnumerable<EntryResponse> AlternativeEntries => featuredEntries.Concat(standardEntries);
     [Parameter] public string? WorkspaceName { get; set; }
     [Parameter] public string? DashboardName { get; set; }
     [Parameter] public Guid? ConversationId { get; set; }
@@ -121,7 +108,6 @@ public partial class Home
             featuredEntries = await Task.WhenAll(featured.Select(value => Api.GetEntryAsync(EntryId(value), lifetime.Token)));
             var standard = dashboard.Entries.Where(value => value.Role == DashboardItemRole.Standard).OrderBy(value => value.Order);
             standardEntries = await Task.WhenAll(standard.Select(value => Api.GetEntryAsync(EntryId(value), lifetime.Token)));
-            selectedHomeEntry = primary ?? featuredEntries.FirstOrDefault() ?? standardEntries.FirstOrDefault();
             await RefreshOverviewAsync();
             if (ConversationId is not null) await LoadInteractionAsync(ConversationId.Value);
             loadedInteractionId = ConversationId;
@@ -263,14 +249,7 @@ public partial class Home
     private string DashboardUrl(string dashboardName) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(dashboardName)}";
     private string InteractionUrl(Guid interactionId) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(CurrentDashboardName)}/conversations/{interactionId}";
     private void DashboardChanged(ChangeEventArgs args) { var name = args.Value?.ToString(); if (!string.IsNullOrWhiteSpace(name)) Navigation.NavigateTo(DashboardUrl(name)); }
-    private void SelectHomeEntry(EntryResponse entry) => selectedHomeEntry = entry;
-    private DashboardItemRole EntryRole(EntryResponse entry)
-    {
-        if (SameEntry(entry, primary)) return DashboardItemRole.Primary;
-        if (featuredEntries.Any(value => SameEntry(value, entry))) return DashboardItemRole.Featured;
-        return DashboardItemRole.Standard;
-    }
-    private static bool SameEntry(EntryResponse? left, EntryResponse? right) => left is not null && right is not null && left.Id == right.Id && left.Namespace == right.Namespace;
+    private string EntryStartUrl(EntryResponse entry) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(CurrentDashboardName)}/start/{Uri.EscapeDataString(entry.Namespace.Value)}/{Uri.EscapeDataString(entry.Id)}";
     private static string DashboardIcon(WorkplaceDashboardResponse value)
     {
         if (!string.IsNullOrWhiteSpace(value.Icon)) return value.Icon;

@@ -164,7 +164,7 @@ public sealed class WorkplaceHostTests
     }
 
     [TestMethod]
-    public void HomeUsesCompactAlternativeEntriesToReplaceTheActiveComposer()
+    public void HomeLinksCompactAlternativeEntriesToADedicatedStartPage()
     {
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -182,17 +182,35 @@ public sealed class WorkplaceHostTests
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual("Start here", rendered.Find(".primary-entry-container textarea").GetAttribute("placeholder"));
-            Assert.AreEqual(1, rendered.FindAll(".mobile-entry-options button").Count);
+            Assert.AreEqual(1, rendered.FindAll(".mobile-entry-options a").Count);
             Assert.AreEqual(0, rendered.FindAll(".mobile-tools-toggle").Count);
-            StringAssert.Contains(rendered.Find(".mobile-entry-options button").TextContent, "Quick question");
+            var alternative = rendered.Find(".mobile-entry-options a");
+            StringAssert.Contains(alternative.TextContent, "Quick question");
+            Assert.AreEqual("/w/personal/d/home/start/default/quick", alternative.GetAttribute("href"));
         }, TimeSpan.FromSeconds(10));
+    }
 
-        rendered.Find(".mobile-entry-options button").Click();
+    [TestMethod]
+    public void DedicatedStartPageLoadsTheSelectedEntryWithoutTheDashboardCatalog()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        using var httpClient = new HttpClient(new HomeEntriesHandler()) { BaseAddress = new Uri("http://localhost/") };
+        context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
+        context.Services.AddSingleton<WorkplaceContextState>();
+
+        var rendered = context.Render<EntryStart>(parameters => parameters
+            .Add(value => value.WorkspaceName, "personal")
+            .Add(value => value.DashboardName, "home")
+            .Add(value => value.EntryNamespace, "default")
+            .Add(value => value.EntryName, "quick"));
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual("Ask quickly", rendered.Find(".primary-entry-container textarea").GetAttribute("placeholder"));
-            StringAssert.Contains(rendered.Find(".mobile-entry-options button").TextContent, "Main request");
+            StringAssert.Contains(rendered.Find(".entry-start-header").TextContent, "Quick question");
+            Assert.AreEqual("Ask quickly", rendered.Find(".entry-start-form textarea").GetAttribute("placeholder"));
+            Assert.AreEqual("/w/personal/d/home", rendered.Find(".entry-start-back").GetAttribute("href"));
+            Assert.AreEqual(0, rendered.FindAll(".mobile-entry-options").Count);
         });
     }
 
