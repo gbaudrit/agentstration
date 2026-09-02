@@ -1,0 +1,62 @@
+name: Pull request metadata
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pull-request-metadata-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: pull-request-metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate title and description
+        shell: pwsh
+        run: |
+          $event = Get-Content -LiteralPath $env:GITHUB_EVENT_PATH -Raw | ConvertFrom-Json
+          $title = [string]$event.pull_request.title
+          $body = [string]$event.pull_request.body
+          $errors = [System.Collections.Generic.List[string]]::new()
+
+          $titlePattern = '^(feat|fix|refactor|docs|test|build|ci|chore|perf)(\([a-z0-9][a-z0-9._/-]*\))?!?: \S.+$'
+          if ($title -cnotmatch $titlePattern) {
+            $errors.Add("Title must use Conventional Commit form, for example: feat(runtime): add retry support")
+          }
+
+          $bodyWithoutComments = [regex]::Replace($body, '<!--.*?-->', '', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+          $requiredHeadings = @('## Summary', '## Changes', '## Validation', '## Breaking changes')
+          $headingMatches = [regex]::Matches($bodyWithoutComments, '(?m)^## [^\r\n]+[ \t]*\r?$')
+          $actualHeadings = @($headingMatches | ForEach-Object { $_.Value.Trim() })
+
+          if (($actualHeadings.Count -ne $requiredHeadings.Count) -or
+              ((Compare-Object -ReferenceObject $requiredHeadings -DifferenceObject $actualHeadings -SyncWindow 0).Count -ne 0)) {
+            $errors.Add("Description must contain exactly these sections in order: $($requiredHeadings -join ', ')")
+          }
+          else {
+            for ($index = 0; $index -lt $headingMatches.Count; $index++) {
+              $contentStart = $headingMatches[$index].Index + $headingMatches[$index].Length
+              $contentEnd = if ($index + 1 -lt $headingMatches.Count) { $headingMatches[$index + 1].Index } else { $bodyWithoutComments.Length }
+              $content = $bodyWithoutComments.Substring($contentStart, $contentEnd - $contentStart).Trim()
+              if ([string]::IsNullOrWhiteSpace($content)) {
+                $errors.Add("Section '$($requiredHeadings[$index])' must not be empty")
+              }
+              elseif ($requiredHeadings[$index] -in @('## Changes', '## Validation') -and $content -notmatch '(?m)^- .+') {
+                $errors.Add("Section '$($requiredHeadings[$index])' must use bullet points")
+              }
+            }
+          }
+
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ -ErrorAction Continue }
+            exit 1
+          }
+
+          Write-Host 'Pull request title and description follow the repository conventions.'

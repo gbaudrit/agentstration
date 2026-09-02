@@ -41,6 +41,9 @@
         "required_status_checks": [
           {
             "context": "build-and-test"
+          },
+          {
+            "context": "pull-request-metadata"
           }
         ],
         "strict_required_status_checks_policy": true

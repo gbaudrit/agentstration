@@ -63,7 +63,11 @@ Keep the subject imperative and describe breaking changes explicitly in the comm
 
 Open a focused pull request into `main`, complete the short template, and keep it current with the target branch. CI must pass, review conversations must be resolved, and the final merge should use squash merge. Delete the source branch after merge.
 
+Use the same Conventional Commit form for the pull request title: `type(scope): description`, with an optional scope and optional `!` for a breaking change. The allowed types are `feat`, `fix`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, and `perf`.
+
 When behavior changes, add or update tests in the same pull request. Update public contracts, OpenAPI-facing behavior, MCP descriptions, UI behavior, and documentation where applicable.
+
+Keep the template headings in order: `Summary`, `Changes`, `Validation`, then `Breaking changes`. The summary should state the outcome, changes should be concise bullets, and validation should report only checks actually completed, including test totals and optional skips when known. UI changes should include desktop and mobile smoke testing against the local executable. Write `None.` under `Breaking changes` when the change is backward compatible; otherwise describe the impact and migration.
 
 ## Architecture and documentation
 
