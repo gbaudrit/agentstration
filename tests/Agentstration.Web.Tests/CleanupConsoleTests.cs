@@ -46,9 +46,11 @@ public sealed class CleanupConsoleTests
         Assert.HasCount(4, rendered.FindAll(".cleanup-metric"));
         Assert.HasCount(5, rendered.FindAll(".cleanup-row"));
         Assert.AreEqual(string.Empty, rendered.Find("input[type='search']").GetAttribute("value") ?? string.Empty);
+        var entriesPanel = rendered.Find("section[data-kind='Entries']");
+        Assert.HasCount(1, entriesPanel.QuerySelectorAll(".cleanup-entry-options"));
         foreach (var kind in new[] { "Runs", "Entries", "Flows", "Agents" })
             await rendered.Find($"section[data-kind='{kind}'] .cleanup-select-all input").ChangeAsync(new() { Value = true });
-        await rendered.Find(".cleanup-entry-options input[type='checkbox']").ChangeAsync(new() { Value = true });
+        await entriesPanel.QuerySelector(".cleanup-entry-options input[type='checkbox']")!.ChangeAsync(new() { Value = true });
         await rendered.Find("[data-testid='open-cleanup-confirmation']").ClickAsync(new());
 
         var confirm = rendered.Find("[data-testid='confirm-cleanup']");

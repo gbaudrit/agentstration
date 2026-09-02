@@ -44,12 +44,6 @@ else if (inventory is not null)
         <button class="text-button" type="button" @onclick="ClearSelection" disabled="@(SelectedCount == 0 || deleting)">@T("ClearSelection")</button>
     </div>
 
-    <section class="panel cleanup-entry-options">
-        <div><strong>@T("EntryOptionsTitle")</strong><p>@T("EntryOptionsDescription")</p></div>
-        <label><input type="checkbox" @bind="removeDashboardReferences" disabled="@deleting" /> <span>@T("RemoveDashboardReferences")</span></label>
-        <label><input type="checkbox" @bind="closeInteractions" disabled="@deleting" /> <span>@T("CloseInteractions")</span></label>
-    </section>
-
     @foreach (var group in Groups)
     {
         var visible = Filter(group.Candidates);
@@ -58,6 +52,14 @@ else if (inventory is not null)
                 <div><p class="eyebrow">@T($"Kind.{group.Kind}")</p><h2>@T($"GroupTitle.{group.Kind}", visible.Count)</h2><p>@T($"GroupDescription.{group.Kind}")</p></div>
                 <label class="cleanup-select-all"><input type="checkbox" checked="@IsGroupSelected(visible)" @onchange="args => SelectGroup(visible, args.Value is true)" disabled="@(visible.Count == 0 || deleting)" /> <span>@T("SelectAll")</span></label>
             </header>
+            @if (group.Kind == "Entries")
+            {
+                <div class="cleanup-entry-options">
+                    <div><strong>@T("EntryOptionsTitle")</strong><p>@T("EntryOptionsDescription")</p></div>
+                    <label><input type="checkbox" @bind="removeDashboardReferences" disabled="@deleting" /> <span>@T("RemoveDashboardReferences")</span></label>
+                    <label><input type="checkbox" @bind="closeInteractions" disabled="@deleting" /> <span>@T("CloseInteractions")</span></label>
+                </div>
+            }
             @if (visible.Count == 0)
             {
                 <p class="cleanup-group-empty">@T(string.IsNullOrWhiteSpace(search) ? $"Empty.{group.Kind}" : "NoSearchResults")</p>
