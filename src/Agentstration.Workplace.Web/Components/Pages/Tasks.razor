@@ -2,19 +2,166 @@
 @inject IWorkplaceApiClient Api
 @inject WorkplaceContextState WorkplaceContext
 @inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplacePageStrings> Localizer
-<PageTitle>@T("Tasks") · Workplace</PageTitle>
-<PageHeader Title="@T("Tasks")" Description="@T("TasksDescription")" Eyebrow="Workplace" />
-<FilterBar><label class="sr-only" for="task-status">@T("FilterByStatus")</label><select id="task-status" @bind="filter"><option value="">@T("AllStatuses")</option>@foreach(var value in Enum.GetValues<WorkTaskStatus>()){<option value="@value">@Label(value)</option>}</select></FilterBar>
-@if (loading) { <LoadingState /> }
-else if (error is not null) { <ServiceUnavailableState Message="@error" /> }
-else if (!Filtered.Any()) { <EmptyState Title="@T("NoMatchingTasks")" Message="@T("NoMatchingTasksHelp")" /> }
-else { <div class="task-cards">@foreach(var task in Filtered){<a class="task-list-card" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")"><div><TaskStatusBadge Value="task.Status" /><h2>@task.Title</h2></div><small>@T("Updated") @task.UpdatedAt.LocalDateTime.ToString("g")</small></a>}</div> }
+
+<PageTitle>@T("Activity") · Workplace</PageTitle>
+<PageHeader Title="@T("Activity")" Description="@T("ActivityDescription")" Eyebrow="Workplace" />
+
+@if (loading)
+{
+    <LoadingState />
+}
+else if (error is not null)
+{
+    <ServiceUnavailableState Message="@error" />
+}
+else
+{
+    <section class="activity-section conversations-section" aria-labelledby="conversation-heading">
+        <div class="activity-section-heading">
+            <div>
+                <p class="eyebrow">@T("History")</p>
+                <h2 id="conversation-heading">@T("Conversations")</h2>
+            </div>
+            <span class="activity-count">@conversations.Count</span>
+        </div>
+
+        @if (conversations.Count == 0)
+        {
+            <div class="activity-empty">
+                <strong>@T("NoConversationsYet")</strong>
+                <span>@T("NoConversationsYetHelp")</span>
+            </div>
+        }
+        else
+        {
+            <div class="conversation-cards">
+                @foreach (var conversation in conversations)
+                {
+                    <a class="conversation-list-card" href="@ConversationUrl(conversation.Id)">
+                        <span class="conversation-icon" aria-hidden="true"><UiIcon Name="message-chatbot" /></span>
+                        <span class="conversation-copy">
+                            <strong>@ConversationTitle(conversation)</strong>
+                            <small>@T("Updated") @conversation.LastActivityAt.LocalDateTime.ToString("g")</small>
+                        </span>
+                        <span class="conversation-meta">
+                            <span class="conversation-status">@ConversationStatus(conversation.Status)</span>
+                            <span class="resume-label">@T("Resume") <span aria-hidden="true">→</span></span>
+                        </span>
+                    </a>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="activity-section tasks-section" aria-labelledby="tasks-heading">
+        <div class="activity-section-heading tasks-heading">
+            <div>
+                <p class="eyebrow">@T("Work")</p>
+                <h2 id="tasks-heading">@T("Tasks")</h2>
+            </div>
+            <FilterBar>
+                <label class="sr-only" for="task-status">@T("FilterByStatus")</label>
+                <select id="task-status" @bind="filter">
+                    <option value="">@T("AllStatuses")</option>
+                    @foreach (var value in Enum.GetValues<WorkTaskStatus>())
+                    {
+                        <option value="@value">@TaskStatusLabel(value)</option>
+                    }
+                </select>
+            </FilterBar>
+        </div>
+
+        @if (!FilteredTasks.Any())
+        {
+            <div class="activity-empty">
+                <strong>@T("NoMatchingTasks")</strong>
+                <span>@T("NoMatchingTasksHelp")</span>
+            </div>
+        }
+        else
+        {
+            <div class="task-cards">
+                @foreach (var task in FilteredTasks)
+                {
+                    <a class="task-list-card" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")">
+                        <div><TaskStatusBadge Value="task.Status" /><h3>@task.Title</h3></div>
+                        <small>@T("Updated") @task.UpdatedAt.LocalDateTime.ToString("g")</small>
+                    </a>
+                }
+            </div>
+        }
+    </section>
+}
+
 @code {
     [Parameter] public string WorkspaceName { get; set; } = string.Empty;
-    private IReadOnlyList<WorkTaskResponse> tasks=[]; private string filter=""; private bool loading=true; private string? error;
-    private IEnumerable<WorkTaskResponse> Filtered=>string.IsNullOrWhiteSpace(filter)?tasks:tasks.Where(value=>value.Status.ToString()==filter);
-    protected override Task OnInitializedAsync()=>LoadAsync();
-    private async Task LoadAsync(){loading=true;error=null;try{var workspace=await Api.GetWorkspaceAsync(WorkspaceName,default);WorkplaceContext.SetWorkspace(workspace.Name,workspace.DisplayName,workspace.OrganizationName,workspace.OrganizationDisplayName,workspace.UserDisplayName);tasks=await Api.ListTasksAsync(WorkspaceName,null,default);}catch{error=T("TasksLoadError");}finally{loading=false;}}
-    private string Label(WorkTaskStatus value)=>value switch{WorkTaskStatus.ActionRequired=>T("NeedsInput"),WorkTaskStatus.Running=>T("InProgress"),_=>T($"TaskStatus.{value}")};
+
+    private IReadOnlyList<InteractionResponse> conversations = [];
+    private IReadOnlyList<WorkTaskResponse> tasks = [];
+    private string dashboardName = string.Empty;
+    private string filter = string.Empty;
+    private bool loading = true;
+    private string? error;
+
+    private IEnumerable<WorkTaskResponse> FilteredTasks => string.IsNullOrWhiteSpace(filter)
+        ? tasks
+        : tasks.Where(value => value.Status.ToString() == filter);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            var workspace = await Api.GetWorkspaceAsync(WorkspaceName, default);
+            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName);
+
+            var dashboardTask = Api.GetDefaultDashboardAsync(WorkspaceName, default);
+            var conversationsTask = Api.ListInteractionsAsync(WorkspaceName, 50, default);
+            var tasksTask = Api.ListTasksAsync(WorkspaceName, null, default);
+            await Task.WhenAll(dashboardTask, conversationsTask, tasksTask);
+
+            dashboardName = dashboardTask.Result.Name;
+            conversations = conversationsTask.Result;
+            tasks = tasksTask.Result;
+        }
+        catch
+        {
+            error = T("ActivityLoadError");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private string ConversationUrl(Guid interactionId) =>
+        $"/w/{Uri.EscapeDataString(WorkspaceName)}/d/{Uri.EscapeDataString(dashboardName)}/conversations/{interactionId}";
+
+    private string ConversationTitle(InteractionResponse interaction) =>
+        interaction.Messages.FirstOrDefault(message => message.Role == ConversationRole.User)?.Content
+        ?? T("Conversation");
+
+    private string ConversationStatus(InteractionStatus status) => status switch
+    {
+        InteractionStatus.WaitingForUser => T("NeedsInput"),
+        InteractionStatus.Active or InteractionStatus.Idle => T("ReadyToContinue"),
+        InteractionStatus.Processing or InteractionStatus.ConvertedToTask => T("InProgress"),
+        InteractionStatus.Closed => T("Closed"),
+        InteractionStatus.Completed => T("TaskStatus.Completed"),
+        InteractionStatus.Cancelled => T("TaskStatus.Cancelled"),
+        InteractionStatus.Failed => T("TaskStatus.Failed"),
+        _ => status.ToString()
+    };
+
+    private string TaskStatusLabel(WorkTaskStatus value) => value switch
+    {
+        WorkTaskStatus.ActionRequired => T("NeedsInput"),
+        WorkTaskStatus.Running => T("InProgress"),
+        _ => T($"TaskStatus.{value}")
+    };
+
     private string T(string key) => Localizer[key];
 }

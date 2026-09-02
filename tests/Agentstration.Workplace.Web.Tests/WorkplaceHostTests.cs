@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
+using Agentstration.Resources;
 using Agentstration.Web.Components.State;
+using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Web.Components.Pages;
@@ -132,6 +135,26 @@ public sealed class WorkplaceHostTests
     }
 
     [TestMethod]
+    public void ActivityListsConversationsWithLinksToTheirDedicatedPage()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        using var httpClient = new HttpClient(new ActivityHandler()) { BaseAddress = new Uri("http://localhost/") };
+        context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
+        context.Services.AddSingleton<WorkplaceContextState>();
+
+        var rendered = context.Render<Tasks>(parameters => parameters.Add(value => value.WorkspaceName, "personal"));
+
+        rendered.WaitForAssertion(() =>
+        {
+            var conversation = rendered.Find(".conversation-list-card");
+            Assert.AreEqual("/w/personal/d/home/conversations/11111111-1111-1111-1111-111111111111", conversation.GetAttribute("href"));
+            StringAssert.Contains(conversation.TextContent, "Prepare the quarterly review");
+            StringAssert.Contains(conversation.TextContent, "Reprendre");
+        });
+    }
+
+    [TestMethod]
     public async Task ComponentStyleBundlesAreServedByTheWorkplaceHost()
     {
         await using var factory = new WebApplicationFactory<Program>();
@@ -214,6 +237,37 @@ public sealed class WorkplaceHostTests
 
         private static WorkplaceDashboardResponse Dashboard(string name, string displayName, bool isDefault) =>
             new(name, WorkspaceId, name, "Dashboard", "v1", displayName, null, isDefault, [], 1, DateTimeOffset.UnixEpoch);
+    }
+
+    private sealed class ActivityHandler : HttpMessageHandler
+    {
+        private static readonly Guid WorkspaceId = Guid.Parse("525118a7-00e9-49ae-aa6c-d42c382f1a8b");
+        private static readonly Guid ConversationId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var now = new DateTimeOffset(2026, 9, 2, 9, 30, 0, TimeSpan.Zero);
+            var message = new ConversationMessage(
+                Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                new WorkspaceId(WorkspaceId),
+                new InteractionId(ConversationId),
+                null,
+                ConversationRole.User,
+                "Prepare the quarterly review",
+                now);
+            object payload = request.RequestUri?.PathAndQuery switch
+            {
+                "/api/workspaces/personal" => new WorkplaceWorkspaceResponse(WorkspaceId, "personal", "Personal"),
+                "/api/workspaces/personal/dashboard" => new WorkplaceDashboardResponse("home", WorkspaceId, "home", "Dashboard", "v1", "Home", null, true, [], 1, now),
+                "/api/workspaces/personal/interactions?take=50" => new InteractionPageResponse([
+                    new InteractionResponse(ConversationId, WorkspaceId, "discover", InteractionStatus.Idle, now, now, new Dictionary<string, JsonElement>(), [], [message], null, null, null, 1)
+                ]),
+                "/api/workspaces/personal/tasks" => new WorkTaskPageResponse([]),
+                _ => throw new InvalidOperationException($"Unexpected request: {request.RequestUri}")
+            };
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(payload) });
+        }
     }
 
     private sealed class TestHostEnvironment : IHostEnvironment
