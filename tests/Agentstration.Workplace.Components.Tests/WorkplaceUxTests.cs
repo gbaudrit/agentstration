@@ -51,6 +51,8 @@ public sealed class WorkplaceUxTests
         Assert.AreEqual("true", primary.Find(".primary-entry-visual").GetAttribute("aria-hidden"));
         Assert.AreEqual(string.Empty, primary.Find(".primary-entry-visual img").GetAttribute("alt"));
         Assert.AreEqual("true", primary.Find(".composer-core").GetAttribute("aria-hidden"));
+        Assert.IsTrue(primary.Find(".composer-core img").GetAttribute("src")?.EndsWith("agentstration-mark.png", StringComparison.Ordinal));
+        Assert.AreEqual(0, primary.FindAll(".composer-symbol").Count);
         Assert.AreEqual(1, standard.FindAll(".prompt-composer").Count);
     }
 

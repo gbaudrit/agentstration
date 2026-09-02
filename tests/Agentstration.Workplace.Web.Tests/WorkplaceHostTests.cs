@@ -181,7 +181,8 @@ public sealed class WorkplaceHostTests
         StringAssert.Contains(workplaceStyles, ".navigation-group h2");
         StringAssert.Contains(workplaceStyles, "grid-template-columns:repeat(3,minmax(0,1fr))");
         StringAssert.Contains(workplaceStyles, ".mobile-profile");
-        StringAssert.Contains(workplaceStyles, ".composer-symbol");
+        StringAssert.Contains(workplaceStyles, ".composer-core");
+        StringAssert.Contains(workplaceStyles, "object-fit:contain");
         StringAssert.Contains(workplaceStyles, "flex-direction:column");
         StringAssert.Contains(workplaceStyles, "bottom:calc(88px + env(safe-area-inset-bottom))");
         StringAssert.Contains(workplaceStyles, "align-content:start");
