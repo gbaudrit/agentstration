@@ -238,6 +238,7 @@ public sealed class WorkplaceHostTests
         StringAssert.Contains(workplaceStyles, "flex-direction:column");
         StringAssert.Contains(workplaceStyles, "bottom:calc(88px + env(safe-area-inset-bottom))");
         StringAssert.Contains(workplaceStyles, "align-content:start");
+        StringAssert.Contains(workplaceStyles, "align-items:center;gap:.35rem");
         StringAssert.Contains(workplaceStyles, ".side-nav[b-");
         StringAssert.Contains(workplaceStyles, ".mobile-brand-logo");
         StringAssert.Matches(workplaceStyles, new Regex(@"\.entry-renderer\[b-[^\]]+\]\s+form", RegexOptions.CultureInvariant));
