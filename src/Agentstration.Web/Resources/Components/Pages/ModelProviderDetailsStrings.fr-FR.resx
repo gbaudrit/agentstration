@@ -6,6 +6,7 @@
   <data name="ModelProvider"><value>Fournisseur de modèles</value></data>
   <data name="Description"><value>Liez une contribution d’extension AEP à une ressource gouvernée de fournisseur de modèles.</value></data>
   <data name="Delete"><value>Supprimer</value></data>
+  <data name="CreateModelProfile"><value>Créer un profil de modèle</value></data>
   <data name="Back"><value>Retour</value></data>
   <data name="Loading"><value>Chargement du fournisseur de modèles…</value></data>
   <data name="ProviderError"><value>Erreur du fournisseur</value></data>

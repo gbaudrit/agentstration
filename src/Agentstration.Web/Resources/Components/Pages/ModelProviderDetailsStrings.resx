@@ -6,6 +6,7 @@
   <data name="ModelProvider"><value>Model provider</value></data>
   <data name="Description"><value>Bind an AEP extension contribution to a governed Model Provider resource.</value></data>
   <data name="Delete"><value>Delete</value></data>
+  <data name="CreateModelProfile"><value>Create model profile</value></data>
   <data name="Back"><value>Back</value></data>
   <data name="Loading"><value>Loading model provider…</value></data>
   <data name="ProviderError"><value>Provider error</value></data>
