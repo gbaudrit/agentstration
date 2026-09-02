@@ -115,6 +115,23 @@ public sealed class WorkplaceHostTests
     }
 
     [TestMethod]
+    public async Task ConversationRouteIsHandledAsADedicatedWorkplacePage()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Agentstration:ApiBaseUrl", "http://127.0.0.1:1/");
+            builder.UseSetting("Agentstration:WorkplaceHubUrl", "http://127.0.0.1:1/hubs/workplace");
+        });
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/w/personal/d/home/conversations/11111111-1111-1111-1111-111111111111");
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.IsFalse(html.Contains("Page not found", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task ComponentStyleBundlesAreServedByTheWorkplaceHost()
     {
         await using var factory = new WebApplicationFactory<Program>();
@@ -123,6 +140,7 @@ public sealed class WorkplaceHostTests
         var sharedStyles = await client.GetStringAsync("/_content/Agentstration.Web.Components/Agentstration.Web.Components.bundle.scp.css");
         var workplaceStyles = await client.GetStringAsync("/_content/Agentstration.Workplace.Components/Agentstration.Workplace.Components.bundle.scp.css");
         var hostStyles = await client.GetStringAsync("/Agentstration.Workplace.Web.styles.css");
+        var appStyles = await client.GetStringAsync("/app.css");
         var darkLogo = await client.GetByteArrayAsync("/_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-dark.png");
 
         StringAssert.Contains(sharedStyles, ".ui-icon");
@@ -133,12 +151,15 @@ public sealed class WorkplaceHostTests
         StringAssert.Contains(workplaceStyles, ".mobile-profile");
         StringAssert.Contains(workplaceStyles, ".composer-symbol");
         StringAssert.Contains(workplaceStyles, "flex-direction:column");
+        StringAssert.Contains(workplaceStyles, "bottom:calc(88px + env(safe-area-inset-bottom))");
+        StringAssert.Contains(workplaceStyles, "align-content:start");
         StringAssert.Contains(workplaceStyles, ".side-nav[b-");
         StringAssert.Contains(workplaceStyles, ".mobile-brand-logo");
         StringAssert.Matches(workplaceStyles, new Regex(@"\.entry-renderer\[b-[^\]]+\]\s+form", RegexOptions.CultureInvariant));
         StringAssert.Contains(hostStyles, ".mobile-dashboard-cards");
         StringAssert.Contains(hostStyles, "grid-auto-flow:column");
         StringAssert.Contains(hostStyles, "grid-auto-columns:4.85rem");
+        Assert.IsFalse(appStyles.Contains(".workplace-shell>.sidebar{display:none}", StringComparison.Ordinal));
         Assert.IsTrue(darkLogo.Length > 10_000);
     }
 

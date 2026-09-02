@@ -16,6 +16,7 @@ hubValue = string.IsNullOrWhiteSpace(hubValue) ? new Uri(apiUrl, "hubs/workplace
 if (!Uri.TryCreate(hubValue, UriKind.Absolute, out var hubUrl) || hubUrl.Scheme is not ("http" or "https")) throw new InvalidOperationException("Agentstration:WorkplaceHubUrl must be an absolute HTTP(S) URL.");
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddAgentstrationWebComponents();
+builder.Services.AddScoped<IRecentConversationNavigationProvider, WorkplaceRecentConversationNavigationProvider>();
 builder.Services.AddAgentstrationLocalization(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient(provider => new WorkplaceApiSessionHandler(

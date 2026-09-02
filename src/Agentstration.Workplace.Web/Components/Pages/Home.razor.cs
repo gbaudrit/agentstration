@@ -25,8 +25,6 @@ public partial class Home
     private IReadOnlyList<WorkTaskResult> results = [];
     private IReadOnlyList<WorkTaskArtifact> artifacts = [];
     private IReadOnlyList<WorkTaskResponse> tasks = [];
-    private IReadOnlyList<InteractionResponse> recentInteractions = [];
-    private IReadOnlyList<WorkNotification> notifications = [];
     private bool loading = true;
     private bool busy;
     private bool showMoreEntries;
@@ -41,7 +39,7 @@ public partial class Home
     private string UserDisplayName => WorkplaceContext.Current?.UserDisplayName is { Length: > 0 } displayName ? displayName : T("You");
     [Parameter] public string? WorkspaceName { get; set; }
     [Parameter] public string? DashboardName { get; set; }
-    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "interaction")] public Guid? RequestedInteractionId { get; set; }
+    [Parameter] public Guid? ConversationId { get; set; }
 
     protected override Task OnInitializedAsync() { Realtime.StateChanged += HandleRealtimeStateChanged; return Task.CompletedTask; }
 
@@ -54,9 +52,9 @@ public partial class Home
             await LoadAsync();
             return;
         }
-        if (workspace is null || loading || RequestedInteractionId == loadedInteractionId) return;
-        loadedInteractionId = RequestedInteractionId;
-        if (RequestedInteractionId is null)
+        if (workspace is null || loading || ConversationId == loadedInteractionId) return;
+        loadedInteractionId = ConversationId;
+        if (ConversationId is null)
         {
             ResetInteractionState();
             return;
@@ -65,7 +63,7 @@ public partial class Home
         try
         {
             interactionError = null;
-            await LoadInteractionAsync(RequestedInteractionId.Value);
+            await LoadInteractionAsync(ConversationId.Value);
         }
         catch when (!lifetime.IsCancellationRequested)
         {
@@ -111,8 +109,8 @@ public partial class Home
             var standard = dashboard.Entries.Where(value => value.Role == DashboardItemRole.Standard).OrderBy(value => value.Order);
             standardEntries = await Task.WhenAll(standard.Select(value => Api.GetEntryAsync(EntryId(value), lifetime.Token)));
             await RefreshOverviewAsync();
-            if (RequestedInteractionId is not null) await LoadInteractionAsync(RequestedInteractionId.Value);
-            loadedInteractionId = RequestedInteractionId;
+            if (ConversationId is not null) await LoadInteractionAsync(ConversationId.Value);
+            loadedInteractionId = ConversationId;
             realtimeSubscription ??= Realtime.OnWorkspaceChanged(HandleRealtimeEvent);
             try { await Realtime.StartAsync(workspace.Id.ToString("D"), 0, lifetime.Token); } catch when (!lifetime.IsCancellationRequested) { }
         }
@@ -131,6 +129,7 @@ public partial class Home
             pendingAction = await CurrentPendingActionAsync(submission.Interaction);
             if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id);
             await RefreshOverviewAsync();
+            Navigation.NavigateTo(InteractionUrl(submission.Interaction.Id));
         }
         catch when (!lifetime.IsCancellationRequested) { interactionError = T("RequestSendError"); }
         finally { busy = false; }
@@ -201,7 +200,7 @@ public partial class Home
                 if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id); break;
             case FlowRunCompletedEvent completed when completed.InteractionId == interaction?.Id:
                 if (activeTask is not null) await RefreshActiveTaskAsync(activeTask.Id); break;
-            case NotificationCreatedEvent or NotificationUpdatedEvent or UnreadNotificationCountChangedEvent: await RefreshNotificationsAsync(); break;
+            case NotificationCreatedEvent or NotificationUpdatedEvent or UnreadNotificationCountChangedEvent: await RefreshUnreadCountAsync(); break;
         }
         StateHasChanged();
     });
@@ -226,7 +225,7 @@ public partial class Home
     });
 
     private async Task RefreshActiveTaskAsync(Guid taskId) { activeTask = await Api.GetTaskAsync(CurrentWorkspaceName, taskId, lifetime.Token); activities = await Api.ListActivitiesAsync(CurrentWorkspaceName, taskId, lifetime.Token); results = await Api.ListResultsAsync(CurrentWorkspaceName, taskId, lifetime.Token); artifacts = await Api.ListArtifactsAsync(CurrentWorkspaceName, taskId, lifetime.Token); }
-    private async Task RefreshOverviewAsync() { tasks = await Api.ListTasksAsync(CurrentWorkspaceName, null, lifetime.Token); recentInteractions = await Api.ListInteractionsAsync(CurrentWorkspaceName, 20, lifetime.Token); await RefreshNotificationsAsync(); }
+    private async Task RefreshOverviewAsync() { tasks = await Api.ListTasksAsync(CurrentWorkspaceName, null, lifetime.Token); await RefreshUnreadCountAsync(); }
     private async Task LoadInteractionAsync(Guid interactionId)
     {
         interaction = await Api.GetInteractionAsync(CurrentWorkspaceName, interactionId, lifetime.Token);
@@ -244,13 +243,11 @@ public partial class Home
         return (await Api.ListPendingActionsAsync(CurrentWorkspaceName, value.Id, lifetime.Token))
             .SingleOrDefault(action => action.Id == value.PendingActionId && action.Status == PendingActionStatus.Pending);
     }
-    private async Task RefreshNotificationsAsync() { notifications = await Api.ListNotificationsAsync(CurrentWorkspaceName, false, lifetime.Token); unread = await Api.GetUnreadCountAsync(CurrentWorkspaceName, lifetime.Token); }
-    private async Task MarkReadAsync(WorkNotificationId id) { await Api.MarkNotificationReadAsync(CurrentWorkspaceName, id.Value, lifetime.Token); await RefreshNotificationsAsync(); }
-    private async Task MarkAllReadAsync() { await Api.MarkAllNotificationsReadAsync(CurrentWorkspaceName, lifetime.Token); await RefreshNotificationsAsync(); }
+    private async Task RefreshUnreadCountAsync() { unread = await Api.GetUnreadCountAsync(CurrentWorkspaceName, lifetime.Token); }
     private string ArtifactUrl(WorkTaskArtifact artifact) => Api.GetArtifactContentUri(CurrentWorkspaceName, artifact.WorkTaskId.Value, artifact.Id.Value).ToString();
     private string TaskUrl(WorkTaskResponse task) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/tasks/{task.Id}";
-    private string DashboardUrl(string dashboardName) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(dashboardName)}{(RequestedInteractionId is null ? string.Empty : $"?interaction={RequestedInteractionId}")}";
-    private string InteractionUrl(Guid interactionId) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(CurrentDashboardName)}?interaction={interactionId}";
+    private string DashboardUrl(string dashboardName) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(dashboardName)}";
+    private string InteractionUrl(Guid interactionId) => $"/w/{Uri.EscapeDataString(CurrentWorkspaceName)}/d/{Uri.EscapeDataString(CurrentDashboardName)}/conversations/{interactionId}";
     private void DashboardChanged(ChangeEventArgs args) { var name = args.Value?.ToString(); if (!string.IsNullOrWhiteSpace(name)) Navigation.NavigateTo(DashboardUrl(name)); }
     private static string DashboardIcon(WorkplaceDashboardResponse value)
     {
@@ -264,8 +261,6 @@ public partial class Home
         return "layout-grid";
     }
     private static EntryId EntryId(DashboardEntryReferenceResponse reference) => new(reference.EntryResourceId, reference.Namespace);
-    private string ConversationTitle(InteractionResponse value) => value.Messages.FirstOrDefault(message => message.Role == ConversationRole.User)?.Content ?? T("Conversation");
-    private string ConversationStatus(InteractionStatus value) => value switch { InteractionStatus.Idle => T("ReadyToContinue"), InteractionStatus.Processing => T("InProgress"), InteractionStatus.WaitingForUser => T("NeedsInput"), InteractionStatus.Closed => T("Closed"), _ => value.ToString() };
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private static EntryResource ToDefinition(EntryResponse value) => new() { WorkspaceId = new(value.WorkspaceId), Id = new(value.Id, value.Namespace), Name = value.Name, DisplayName = value.DisplayName, Description = value.Description, Presentation = value.Presentation, ResolvedTarget = value.ResolvedTarget, Behavior = value.Behavior, ApiVersion = value.ApiVersion, Type = value.Type, Version = value.Version, PublishedAt = value.PublishedAt };
     public void Dispose() { Realtime.StateChanged -= HandleRealtimeStateChanged; realtimeSubscription?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); GC.SuppressFinalize(this); }
