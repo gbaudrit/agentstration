@@ -11,7 +11,7 @@ public sealed record WorkplaceWorkspaceResponse(
     string? OrganizationName = null,
     string? OrganizationDisplayName = null,
     string? UserDisplayName = null);
-public sealed record WorkplaceDashboardResponse(string Id, Guid WorkspaceId, string Name, string Type, string ApiVersion, string DisplayName, string? Description, bool IsDefault, IReadOnlyList<DashboardEntryReferenceResponse> Entries, int Version, DateTimeOffset PublishedAt, string? ImageUrl = null);
+public sealed record WorkplaceDashboardResponse(string Id, Guid WorkspaceId, string Name, string Type, string ApiVersion, string DisplayName, string? Description, bool IsDefault, IReadOnlyList<DashboardEntryReferenceResponse> Entries, int Version, DateTimeOffset PublishedAt, string? Icon = null, string? ImageUrl = null);
 public sealed record WorkplaceDashboardDraftResponse(WorkplaceDashboardDraft Value, WorkplaceDashboard? Published);
 public sealed record DashboardEntryReferenceResponse(string EntryResourceId, DashboardItemRole Role, int Order)
 {

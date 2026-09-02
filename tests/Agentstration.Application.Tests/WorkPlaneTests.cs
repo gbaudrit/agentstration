@@ -145,6 +145,8 @@ public sealed class WorkPlaneTests
         };
 
         WorkplaceValidation.Validate(dashboard);
+        var iconError = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(dashboard with { Icon = "Unsupported icon!" }));
+        Assert.AreEqual("dashboard_icon_invalid", iconError.Code);
         var error = Assert.Throws<WorkValidationException>(() => WorkplaceValidation.Validate(dashboard with
         {
             Entries = [dashboard.Entries[0], dashboard.Entries[0] with { Order = 20 }]
@@ -175,6 +177,7 @@ public sealed class WorkPlaneTests
             WorkspaceId = workspaceId,
             Name = "home",
             DisplayName = "Home",
+            Icon = DashboardIconDefaults.Home,
             IsDefault = true,
             Entries = [new() { EntryResourceId = entry.Id, Role = DashboardItemRole.Primary }]
         }, default);
@@ -193,6 +196,7 @@ public sealed class WorkPlaneTests
         var published = await fixture.Workplace.ListDashboardsAsync(workspaceId, default);
         Assert.HasCount(2, published);
         Assert.AreEqual("travel", published.Single(value => value.IsDefault).Name);
+        Assert.AreEqual(DashboardIconDefaults.Home, published.Single(value => value.Name == "home").Icon);
         Assert.IsTrue(published.All(value => value.Entries.Single().EntryResourceId == entry.Id));
         var drafts = await fixture.Workplace.ListDashboardDraftsAsync(workspaceId, default);
         Assert.AreEqual("travel", drafts.Single(value => value.IsDefault).Name);
@@ -641,6 +645,7 @@ public sealed class WorkPlaneTests
         Assert.IsFalse(string.IsNullOrWhiteSpace(workspace.UserDisplayName));
         var workspaceRoute = workspace.Id.ToString("D");
         var dashboard = await client.GetFromJsonAsync<WorkplaceDashboardResponse>($"/api/workspaces/{workspaceRoute}/dashboard");
+        Assert.AreEqual(DashboardIconDefaults.Home, dashboard!.Icon);
         Assert.AreEqual(DashboardItemRole.Primary, dashboard!.Entries.Single(value => value.Role == DashboardItemRole.Primary).Role);
 
         using var submittedResponse = await client.PostAsJsonAsync($"/api/workspaces/{workspaceRoute}/entries/universal-request/interactions", new CreateInteractionRequest(

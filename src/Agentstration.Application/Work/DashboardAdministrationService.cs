@@ -77,6 +77,7 @@ public sealed class DashboardAdministrationService(IWorkplaceRepository reposito
             ApiVersion = draft.ApiVersion,
             DisplayName = draft.DisplayName,
             Description = draft.Description,
+            Icon = draft.Icon,
             IsDefault = draft.IsDefault,
             Entries = draft.Entries,
             Version = previous is null ? 1 : checked(previous.Version + 1),
@@ -123,6 +124,7 @@ public sealed class DashboardAdministrationService(IWorkplaceRepository reposito
                 WorkspaceId = workspaceId,
                 Name = homeId.Value,
                 DisplayName = "Home",
+                Icon = DashboardIconDefaults.Home,
                 IsDefault = true
             };
         if (!draft.IsDefault) draft = draft with { IsDefault = true };

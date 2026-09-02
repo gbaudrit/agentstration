@@ -237,6 +237,51 @@ public sealed class EntryAdministrationComponentTests
     }
 
     [TestMethod]
+    public async Task DashboardEditorUsesSearchableIconPickerWhenPublishing()
+    {
+        using var context = CreateContext();
+        var client = new FakeEntryAdministrationApiClient();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var rendered = context.Render<Workspaces>();
+
+        var picker = rendered.Find("[data-testid='icon-picker']");
+        await picker.QuerySelector("input[type='search']")!.InputAsync(new ChangeEventArgs { Value = "plane" });
+        await picker.QuerySelector("button[title='plane']")!.ClickAsync(new());
+        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish Dashboard", StringComparison.Ordinal)).ClickAsync(new());
+
+        Assert.IsNotNull(client.SavedDashboard);
+        Assert.AreEqual("plane", client.SavedDashboard.Icon);
+    }
+
+    [TestMethod]
+    public async Task DashboardEditorIsolatesPrimaryAndReordersEntriesWithinTheirRole()
+    {
+        using var context = CreateContext();
+        var client = new FakeEntryAdministrationApiClient();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var rendered = context.Render<Workspaces>();
+
+        var primaryGroup = rendered.Find("[data-testid='dashboard-entry-group-primary']");
+        Assert.HasCount(0, primaryGroup.QuerySelectorAll("[data-testid='dashboard-entry-move-up']"));
+        Assert.HasCount(0, primaryGroup.QuerySelectorAll(".workspace-entry-group-header > span"));
+        Assert.HasCount(0, rendered.FindAll(".workspace-entry-config input[type='number']"));
+
+        await primaryGroup.QuerySelector("[data-testid='dashboard-entry-role']")!.ChangeAsync(new ChangeEventArgs { Value = "Standard" });
+        var standardGroup = rendered.Find("[data-testid='dashboard-entry-group-standard']");
+        var moveUpButtons = standardGroup.QuerySelectorAll("[data-testid='dashboard-entry-move-up']");
+        Assert.HasCount(2, moveUpButtons);
+        Assert.IsTrue(moveUpButtons[0].HasAttribute("disabled"));
+        await moveUpButtons[1].ClickAsync(new());
+        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish Dashboard", StringComparison.Ordinal)).ClickAsync(new());
+
+        Assert.IsNotNull(client.SavedDashboard);
+        Assert.AreEqual("secondary", ResourceName(client.SavedDashboard.Entries[0].EntryResourceId.Value));
+        Assert.AreEqual(0, client.SavedDashboard.Entries[0].Order);
+        Assert.AreEqual("primary", ResourceName(client.SavedDashboard.Entries[1].EntryResourceId.Value));
+        Assert.AreEqual(10, client.SavedDashboard.Entries[1].Order);
+    }
+
+    [TestMethod]
     public void DashboardEditorCreatesAnEmptyDraftWhenWorkspaceHasNoDashboard()
     {
         using var context = CreateContext();
@@ -247,6 +292,29 @@ public sealed class EntryAdministrationComponentTests
 
         Assert.IsTrue(rendered.Markup.Contains("New Dashboard", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Find("input[type='checkbox']").HasAttribute("checked"));
+    }
+
+    [TestMethod]
+    public async Task DashboardEditorKeepsWorkspaceIdentifierAndApiNameSeparate()
+    {
+        using var context = CreateContext();
+        var teamWorkspaceId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var client = new FakeEntryAdministrationApiClient
+        {
+            Workspaces =
+            [
+                new(FakeEntryAdministrationApiClient.WorkspaceResourceId, "personal", "Personal"),
+                new(teamWorkspaceId, "team", "Team")
+            ]
+        };
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var rendered = context.Render<Workspaces>();
+
+        var picker = rendered.Find("[data-testid='workspace-picker']");
+        await picker.ChangeAsync(new ChangeEventArgs { Value = teamWorkspaceId.ToString("D") });
+
+        Assert.AreEqual(teamWorkspaceId.ToString("D"), picker.GetAttribute("value"));
+        Assert.AreEqual("team", client.RequestedDashboardWorkspaceNames.Last());
     }
 
     [TestMethod]
@@ -281,7 +349,7 @@ public sealed class EntryAdministrationComponentTests
     {
         internal const string AgentResourceId = "deterministic";
         internal const string FlowResourceId = "router";
-        private static readonly Guid WorkspaceResourceId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        internal static readonly Guid WorkspaceResourceId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         private static readonly DateTimeOffset Now = new(2026, 8, 6, 12, 0, 0, TimeSpan.Zero);
 
         public List<EntryBindingKind> RequestedKinds { get; } = [];
@@ -291,6 +359,8 @@ public sealed class EntryAdministrationComponentTests
         public EntryDraft? SavedEntry { get; private set; }
         public WorkplaceDashboardDraft? SavedDashboard { get; private set; }
         public IReadOnlyList<EntryDraftResponse> EntryDrafts { get; init; } = [];
+        public IReadOnlyList<WorkplaceWorkspaceResponse>? Workspaces { get; init; }
+        public List<string> RequestedDashboardWorkspaceNames { get; } = [];
         public bool HasDashboard { get; init; } = true;
         public bool HasWorkspace { get; set; } = true;
 
@@ -351,19 +421,20 @@ public sealed class EntryAdministrationComponentTests
         public Task<IReadOnlyList<WorkplaceWorkspaceResponse>> GetWorkspacesAsync(CancellationToken cancellationToken)
         {
             if (!HasWorkspace) return Task.FromResult<IReadOnlyList<WorkplaceWorkspaceResponse>>([]);
-            return Task.FromResult<IReadOnlyList<WorkplaceWorkspaceResponse>>([new(WorkspaceResourceId, "personal", "Personal")]);
+            return Task.FromResult(Workspaces ?? [new(WorkspaceResourceId, "personal", "Personal")]);
         }
         public Task<IReadOnlyList<WorkplaceDashboardDraftResponse>> GetDashboardsAsync(string workspaceName, CancellationToken cancellationToken)
         {
+            RequestedDashboardWorkspaceNames.Add(workspaceName);
             if (!HasDashboard) return Task.FromResult<IReadOnlyList<WorkplaceDashboardDraftResponse>>([]);
             var entries = new DashboardEntryReference[] { new() { EntryResourceId = EntryId("primary"), Role = DashboardItemRole.Primary, Order = 0 }, new() { EntryResourceId = EntryId("secondary"), Role = DashboardItemRole.Standard, Order = 10 } };
-            var draft = new WorkplaceDashboardDraft { Id = new("home"), WorkspaceId = new(WorkspaceResourceId), Name = "home", DisplayName = "Personal", IsDefault = true, Entries = entries, UpdatedAt = Now };
-            var published = new WorkplaceDashboard { Id = new("home"), WorkspaceId = new(WorkspaceResourceId), Name = "home", DisplayName = "Personal", IsDefault = true, Entries = entries, PublishedAt = Now };
+            var draft = new WorkplaceDashboardDraft { Id = new("home"), WorkspaceId = new(WorkspaceResourceId), Name = "home", DisplayName = "Personal", Icon = "list-check", IsDefault = true, Entries = entries, UpdatedAt = Now };
+            var published = new WorkplaceDashboard { Id = new("home"), WorkspaceId = new(WorkspaceResourceId), Name = "home", DisplayName = "Personal", Icon = "list-check", IsDefault = true, Entries = entries, PublishedAt = Now };
             return Task.FromResult<IReadOnlyList<WorkplaceDashboardDraftResponse>>([new(draft, published)]);
         }
         public async Task<WorkplaceDashboardDraftResponse> GetDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken) => (await GetDashboardsAsync(workspaceName, cancellationToken)).Single();
         public Task<WorkplaceDashboardDraft> SaveDashboardAsync(WorkplaceDashboardDraft draft, CancellationToken cancellationToken) { SavedDashboard = draft with { Revision = 2, UpdatedAt = Now }; return Task.FromResult(SavedDashboard); }
-        public Task<WorkplaceDashboard> PublishDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken) => Task.FromResult(new WorkplaceDashboard { Id = SavedDashboard!.Id, WorkspaceId = SavedDashboard.WorkspaceId, Name = SavedDashboard.Name, DisplayName = SavedDashboard.DisplayName, IsDefault = SavedDashboard.IsDefault, Entries = SavedDashboard.Entries, PublishedAt = Now });
+        public Task<WorkplaceDashboard> PublishDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken) => Task.FromResult(new WorkplaceDashboard { Id = SavedDashboard!.Id, WorkspaceId = SavedDashboard.WorkspaceId, Name = SavedDashboard.Name, DisplayName = SavedDashboard.DisplayName, Icon = SavedDashboard.Icon, IsDefault = SavedDashboard.IsDefault, Entries = SavedDashboard.Entries, PublishedAt = Now });
         public Task DeleteDashboardAsync(string workspaceName, string dashboardName, CancellationToken cancellationToken) => Task.CompletedTask;
 
         private static EntryId EntryId(string name, Agentstration.Resources.ResourceNamespace @namespace = default) => new(name, @namespace);

@@ -5,6 +5,12 @@ using Agentstration.Resources;
 
 namespace Agentstration.Work;
 
+public static class DashboardIconDefaults
+{
+    public const string Grid = "layout-grid";
+    public const string Home = "home";
+}
+
 public sealed record DashboardEntryReference
 {
     public required EntryId EntryResourceId { get; init; }
@@ -21,6 +27,7 @@ public sealed record WorkplaceDashboard
     public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
+    public string? Icon { get; init; }
     public bool IsDefault { get; init; }
     public IReadOnlyList<DashboardEntryReference> Entries { get; init; } = [];
     public int Version { get; init; } = 1;
@@ -36,6 +43,7 @@ public sealed record WorkplaceDashboardDraft
     public string ApiVersion { get; init; } = WorkplaceApiVersions.CoreV1;
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
+    public string? Icon { get; init; }
     public bool IsDefault { get; init; }
     public IReadOnlyList<DashboardEntryReference> Entries { get; init; } = [];
     public long Revision { get; init; } = 1;
