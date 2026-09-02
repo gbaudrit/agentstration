@@ -41,6 +41,10 @@ var toolExecutionCapture = builder.Configuration.GetSection("Agentstration:ToolE
 toolExecutionCapture.Validate();
 builder.Services.AddSingleton(toolExecutionCapture);
 var isTesting = builder.Environment.IsEnvironment("Testing");
+var hostedServicesEnabled = !isTesting
+    || builder.Configuration.GetValue("Agentstration:Testing:HostedServicesEnabled", false);
+var openTelemetryEnabled = !isTesting
+    || builder.Configuration.GetValue("Agentstration:Testing:OpenTelemetryEnabled", false);
 var configuredDataDirectory = builder.Configuration["Data:Directory"];
 var ownsTestingDataDirectory = isTesting
     && (string.IsNullOrWhiteSpace(configuredDataDirectory)
@@ -90,7 +94,8 @@ builder.Services.AddAgentstration(
     SqliteConnection("Data:WorkPlanePath", "work-plane.db"),
     SqliteConnection("Data:FlowPath", "flow-plane.db"),
     SqliteConnection("Data:RuntimePath", "runtime-plane.db"),
-    storageOptions);
+    storageOptions,
+    enableHostedServices: hostedServicesEnabled);
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
@@ -127,11 +132,14 @@ builder.Services.AddSingleton<IFlowRunEventSink>(provider => new CompositeFlowRu
 builder.Services.AddSingleton<IWorkplaceEventSink, SignalRWorkplaceEventSink>();
 builder.Services.AddAgentstrationWebConsole(builder.Configuration, builder.Environment);
 builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
-builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
-builder.Services.AddHostedService<LocalWorkExecutionWorker>();
-builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
-builder.Services.AddHostedService<FlowRunExecutionWorker>();
-builder.Services.AddHostedService<FlowRunRecoveryWorker>();
+if (hostedServicesEnabled)
+{
+    builder.Services.AddHostedService<AgentDeploymentReconciliationWorker>();
+    builder.Services.AddHostedService<LocalWorkExecutionWorker>();
+    builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
+    builder.Services.AddHostedService<FlowRunExecutionWorker>();
+    builder.Services.AddHostedService<FlowRunRecoveryWorker>();
+}
 if (testingStorageDirectory is not null)
 {
     builder.Services.AddSingleton(provider => new TestingDataDirectoryCleanup(
@@ -146,42 +154,45 @@ if (testingStorageDirectory is not null)
         provider.GetRequiredService<ILogger<TestingDataDirectoryCleanup>>()));
 }
 
-var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-builder.Logging.AddOpenTelemetry(logging =>
+if (openTelemetryEnabled)
 {
-    logging.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("Agentstration.Web"));
-    logging.IncludeScopes = true;
-    logging.IncludeFormattedMessage = true;
-    if (otlpEnabled) logging.AddOtlpExporter();
-});
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("Agentstration.Web"))
-    .WithTracing(tracing =>
+    var otlpEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+    builder.Logging.AddOpenTelemetry(logging =>
     {
-        tracing
-        .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddSource(
-                WorkItemService.ActivitySource.Name,
-                RuntimeRunService.ActivitySource.Name,
-                FlowRunService.ActivitySource.Name,
-                AgentFrameworkRuntimeFactory.TelemetrySourceName,
-                GenAiObservabilityOptions.ChatClientSourceName,
-                GenAiHttpPayloadCaptureHandler.TelemetrySourceName);
-        if (otlpEnabled) tracing.AddOtlpExporter();
-    })
-    .WithMetrics(metrics =>
-    {
-        metrics
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddMeter(
-                WorkItemService.Meter.Name,
-                FlowRunService.Meter.Name,
-                AgentFrameworkRuntimeFactory.TelemetrySourceName,
-                GenAiObservabilityOptions.ChatClientSourceName);
-        if (otlpEnabled) metrics.AddOtlpExporter();
+        logging.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("Agentstration.Web"));
+        logging.IncludeScopes = true;
+        logging.IncludeFormattedMessage = true;
+        if (otlpEnabled) logging.AddOtlpExporter();
     });
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService("Agentstration.Web"))
+        .WithTracing(tracing =>
+        {
+            tracing
+            .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSource(
+                    WorkItemService.ActivitySource.Name,
+                    RuntimeRunService.ActivitySource.Name,
+                    FlowRunService.ActivitySource.Name,
+                    AgentFrameworkRuntimeFactory.TelemetrySourceName,
+                    GenAiObservabilityOptions.ChatClientSourceName,
+                    GenAiHttpPayloadCaptureHandler.TelemetrySourceName);
+            if (otlpEnabled) tracing.AddOtlpExporter();
+        })
+        .WithMetrics(metrics =>
+        {
+            metrics
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddMeter(
+                    WorkItemService.Meter.Name,
+                    FlowRunService.Meter.Name,
+                    AgentFrameworkRuntimeFactory.TelemetrySourceName,
+                    GenAiObservabilityOptions.ChatClientSourceName);
+            if (otlpEnabled) metrics.AddOtlpExporter();
+        });
+}
 
 var app = builder.Build();
 var testingDataDirectoryCleanup = testingStorageDirectory is not null

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Agentstration.Web.Tests;
 
@@ -22,6 +23,14 @@ public sealed class QuartzHostLifecycleTests
         {
             Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
         }
+
+        var hostedServiceNames = factory.Services.GetServices<IHostedService>()
+            .Select(service => service.GetType().Name)
+            .ToArray();
+        Assert.IsFalse(hostedServiceNames.Contains("AgentDeploymentReconciliationWorker", StringComparer.Ordinal));
+        Assert.IsFalse(hostedServiceNames.Contains("FlowRunExecutionWorker", StringComparer.Ordinal));
+        Assert.IsFalse(hostedServiceNames.Contains("QuartzHostedService", StringComparer.Ordinal));
+        Assert.IsFalse(hostedServiceNames.Contains("TelemetryHostedService", StringComparer.Ordinal));
 
         var directory = factory.Services.GetRequiredService<IConfiguration>()["Data:Directory"];
         Assert.IsNotNull(directory);
@@ -62,11 +71,28 @@ public sealed class QuartzHostLifecycleTests
         }
     }
 
+    [TestMethod]
+    public void TestingHostCanExplicitlyEnableOpenTelemetry()
+    {
+        using var factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:OpenTelemetryEnabled", "true");
+        });
+
+        var hostedServiceNames = factory.Services.GetServices<IHostedService>()
+            .Select(service => service.GetType().Name)
+            .ToArray();
+
+        Assert.IsTrue(hostedServiceNames.Contains("TelemetryHostedService", StringComparer.Ordinal));
+    }
+
     private static WebApplicationFactory<global::Program> Factory(string dataDirectory) =>
         new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Data:Directory", dataDirectory);
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
         });
 }

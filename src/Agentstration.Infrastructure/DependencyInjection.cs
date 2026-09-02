@@ -47,7 +47,8 @@ public static class DependencyInjection
         string? workPlaneConnectionString = null,
         string? flowConnectionString = null,
         string? runtimeConnectionString = null,
-        AgentstrationStorageOptions? storageOptions = null)
+        AgentstrationStorageOptions? storageOptions = null,
+        bool enableHostedServices = true)
     {
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton<LocalBootstrapOptions>();
@@ -169,9 +170,6 @@ public static class DependencyInjection
         var schedulerConnectionString = storageProvider == AgentstrationStorageProvider.PostgreSql
             ? storageOptions.ConnectionString!
             : $"Data Source={Path.Combine(dataDirectory, "scheduler.db")};Pooling=False";
-        services.AddSingleton<IHostedService, QuartzLoggingInitializer>();
-        if (storageProvider == AgentstrationStorageProvider.Sqlite)
-            services.AddSingleton<IHostedService>(_ => new QuartzSqliteSchemaInitializer(schedulerConnectionString));
         services.AddQuartz(configuration =>
         {
             configuration.SchedulerId = "AUTO";
@@ -192,8 +190,14 @@ public static class DependencyInjection
                 options.UseSystemTextJsonSerializer();
             });
         });
-        services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
-        services.AddHostedService<TriggerSchedulerReconciler>();
+        if (enableHostedServices)
+        {
+            services.AddSingleton<IHostedService, QuartzLoggingInitializer>();
+            if (storageProvider == AgentstrationStorageProvider.Sqlite)
+                services.AddSingleton<IHostedService>(_ => new QuartzSqliteSchemaInitializer(schedulerConnectionString));
+            services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
+            services.AddHostedService<TriggerSchedulerReconciler>();
+        }
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddPostgreSqlRuntimeRuns(storageOptions.ConnectionString!);
         else

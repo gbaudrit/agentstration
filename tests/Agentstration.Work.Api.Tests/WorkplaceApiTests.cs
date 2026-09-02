@@ -37,6 +37,7 @@ public sealed class WorkplaceApiTests
             {
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
+                builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
             });
             using var client = factory.CreateClient();
 
@@ -343,6 +344,7 @@ public sealed class WorkplaceApiTests
             {
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
+                builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
             });
             using var client = factory.CreateClient();
             using var submittedResponse = await client.PostAsJsonAsync(
@@ -441,6 +443,7 @@ public sealed class WorkplaceApiTests
             {
                 builder.UseEnvironment("Testing");
                 builder.UseSetting("Data:Directory", dataDirectory);
+                builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
             });
             using var client = factory.CreateClient();
             var taskCreated = new TaskCompletionSource<TaskCreatedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);

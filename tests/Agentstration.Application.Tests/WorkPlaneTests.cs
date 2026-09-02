@@ -669,7 +669,11 @@ public sealed class WorkPlaneTests
     [TestMethod]
     public async Task LocalRuntimeCompletesWorkAndExposesResultThroughCanonicalApi()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+        });
         using var client = factory.CreateClient();
         using var response = await client.PostAsJsonAsync("/api/work/workitems", new CreateWorkItemRequest("question", "How can I optimize a SQL query?"));
         response.EnsureSuccessStatusCode();
@@ -695,7 +699,11 @@ public sealed class WorkPlaneTests
     [TestMethod]
     public async Task WorkplaceApiRunsPrimaryEntryThroughFlowAndReturnsWorkspaceScopedTask()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+        });
         using var client = factory.CreateClient();
         var workspaces = await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces");
         var workspace = workspaces!.Single(value => value.Name == "default");
