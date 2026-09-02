@@ -155,6 +155,7 @@ public sealed class WorkOperationsComponentTests
         Assert.AreEqual("Ce profil de modèle est encore référencé par 2 agents.", modelProfiles["DeleteConflictMessage", modelProfiles["AgentCount.Many", 2].Value].Value);
         Assert.AreEqual("Fournisseurs de modèles", modelProviders["Title"].Value);
         Assert.AreEqual("2 modèles", modelProviders["ModelCount.Many", 2].Value);
+        Assert.AreEqual("Créer un profil de modèle", modelProviderDetails["CreateModelProfile"].Value);
         Assert.AreEqual("Point de terminaison détenu par l’extension", modelProviderDetails["ExtensionOwnedEndpoint"].Value);
         Assert.AreEqual("Ce fournisseur est référencé par 1 profil de modèle.", modelProviderDetails["ProviderReferencedBy", modelProviderDetails["ProfileCount.One", 1].Value].Value);
         Assert.AreEqual("Profils d’exécution", runtimeProfiles["Title"].Value);
