@@ -213,6 +213,7 @@
 .environment-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); }
 
 .page-header { align-items: center; }
+.content h1:focus { outline: none; }
 .page-header-copy { min-width: 0; }
 .page-title-row,.resource-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .page-header-metadata,.resource-metadata { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin-top: var(--space-3); color: var(--muted); font-size: var(--font-size-sm); }
