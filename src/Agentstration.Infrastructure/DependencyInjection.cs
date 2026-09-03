@@ -169,6 +169,7 @@ public static class DependencyInjection
         var schedulerConnectionString = storageProvider == AgentstrationStorageProvider.PostgreSql
             ? storageOptions.ConnectionString!
             : $"Data Source={Path.Combine(dataDirectory, "scheduler.db")};Pooling=False";
+        services.AddSingleton<IHostedService, QuartzLoggingInitializer>();
         if (storageProvider == AgentstrationStorageProvider.Sqlite)
             services.AddSingleton<IHostedService>(_ => new QuartzSqliteSchemaInitializer(schedulerConnectionString));
         services.AddQuartz(configuration =>
