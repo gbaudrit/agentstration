@@ -72,10 +72,19 @@ function Get-AgentstrationWorktreeInfo {
                     "(detached at $shortCommit)"
                 }
                 $slotSource = if ($current.ContainsKey('branch')) { $branch } else { "detached-$shortCommit" }
+                $worktreePath = [System.IO.Path]::GetFullPath($current['worktree'])
+                $instanceIdentityPath = Join-Path $worktreePath '.agentstration\instance-id'
+                $instanceId = if (Test-Path -LiteralPath $instanceIdentityPath -PathType Leaf) {
+                    (Get-Content -LiteralPath $instanceIdentityPath -Raw).Trim()
+                }
+                else {
+                    '-'
+                }
                 $records.Add([pscustomobject]@{
                     SLOT = Get-AgentstrationSlotId -Name $slotSource
+                    INSTANCE = $instanceId
                     BRANCH = $branch
-                    WORKTREE = [System.IO.Path]::GetFullPath($current['worktree'])
+                    WORKTREE = $worktreePath
                 })
             }
             $current = @{}
