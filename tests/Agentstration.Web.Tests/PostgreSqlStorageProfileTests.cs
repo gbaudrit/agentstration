@@ -12,6 +12,7 @@ namespace Agentstration.Web.Tests;
 public sealed class PostgreSqlStorageProfileTests
 {
     [TestMethod]
+    [TestCategory("PostgreSql")]
     public async Task EmptyDatabaseMigratesAndRemainsReadyAfterRestart()
     {
         var connectionString = Environment.GetEnvironmentVariable("AGENTSTRATION_TEST_POSTGRES");

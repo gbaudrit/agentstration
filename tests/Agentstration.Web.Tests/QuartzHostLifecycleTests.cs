@@ -47,6 +47,7 @@ public sealed class QuartzHostLifecycleTests
     }
 
     [TestMethod]
+    [TestCategory("Sqlite")]
     public async Task SchedulerDatabaseIsReleasedAfterEveryHostShutdown()
     {
         for (var iteration = 0; iteration < 3; iteration++)
