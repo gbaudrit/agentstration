@@ -77,7 +77,7 @@ const string defaultAiEndpoint = "http://localhost:11434/v1/";
 var aiEndpoint = builder.Configuration["AI:Endpoint"] ?? defaultAiEndpoint;
 if (!Uri.TryCreate(aiEndpoint.EndsWith('/') ? aiEndpoint : aiEndpoint + '/', UriKind.Absolute, out var parsedAiEndpoint)) throw new InvalidOperationException("AI:Endpoint must be an absolute URL.");
 var aiOptions = new AiProviderOptions(aiProvider, parsedAiEndpoint, builder.Configuration["AI:Model"] ?? "phi4-mini", builder.Configuration["AI:ApiKey"]);
-string? SqliteConnection(string setting, string fileName)
+string? BuildSqliteConnectionString(string setting, string fileName)
 {
     if (storageProvider == AgentstrationStorageProvider.PostgreSql) return null;
     var path = isTesting
@@ -87,13 +87,17 @@ string? SqliteConnection(string setting, string fileName)
     if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
     return $"Data Source={path}";
 }
+var controlPlaneConnectionString = BuildSqliteConnectionString("Data:ControlPlanePath", "control-plane.db");
+var workPlaneConnectionString = BuildSqliteConnectionString("Data:WorkPlanePath", "work-plane.db");
+var flowConnectionString = BuildSqliteConnectionString("Data:FlowPath", "flow-plane.db");
+var runtimeConnectionString = BuildSqliteConnectionString("Data:RuntimePath", "runtime-plane.db");
 builder.Services.AddAgentstration(
     dataDirectory,
     aiOptions,
-    SqliteConnection("Data:ControlPlanePath", "control-plane.db"),
-    SqliteConnection("Data:WorkPlanePath", "work-plane.db"),
-    SqliteConnection("Data:FlowPath", "flow-plane.db"),
-    SqliteConnection("Data:RuntimePath", "runtime-plane.db"),
+    controlPlaneConnectionString,
+    workPlaneConnectionString,
+    flowConnectionString,
+    runtimeConnectionString,
     storageOptions,
     enableHostedServices: hostedServicesEnabled);
 builder.Services.AddAgentstrationModelProviders(
@@ -142,15 +146,19 @@ if (hostedServicesEnabled)
 }
 if (testingStorageDirectory is not null)
 {
+    var sqliteConnectionStrings = storageProvider == AgentstrationStorageProvider.Sqlite
+        ? new[]
+        {
+            identityConnectionString,
+            controlPlaneConnectionString!,
+            workPlaneConnectionString!,
+            flowConnectionString!,
+            runtimeConnectionString!
+        }
+        : [];
     builder.Services.AddSingleton(provider => new TestingDataDirectoryCleanup(
         testingStorageDirectory,
-        [
-            identityConnectionString,
-            $"Data Source={controlPlanePath}",
-            $"Data Source={workPlanePath}",
-            $"Data Source={flowPath}",
-            $"Data Source={runtimePath}"
-        ],
+        sqliteConnectionStrings,
         provider.GetRequiredService<ILogger<TestingDataDirectoryCleanup>>()));
 }
 
