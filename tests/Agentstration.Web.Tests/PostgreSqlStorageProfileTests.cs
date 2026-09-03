@@ -85,7 +85,7 @@ public sealed class PostgreSqlStorageProfileTests
     private static async Task AssertPrincipalPreferencesRoundTripAsync(IServiceProvider services)
     {
         var store = services.GetRequiredService<IIdentityStore>();
-        var now = DateTimeOffset.UtcNow;
+        var now = new DateTimeOffset(2026, 9, 3, 12, 0, 0, TimeSpan.Zero);
         var principal = new Principal(Guid.NewGuid(), PrincipalKind.Human, "PostgreSQL preferences", null, PrincipalStatus.Active, now);
         var expected = new PrincipalPreferences(
             principal.Id,
