@@ -12,7 +12,7 @@ File-backed secrets, Data Protection keys, Pack archives, and Work artifacts rem
 
 Startup validates the provider and connection, obtains a bounded PostgreSQL advisory lock, creates the schemas, applies migrations in deterministic order, initializes Quartz, and only then allows bootstrap and workers to proceed. Readiness stays unhealthy until this completes.
 
-Aspire uses a slot-scoped native Docker volume rather than a worktree bind mount because PostgreSQL initialization requires Unix ownership and permission changes. The generated database password is persisted through the AppHost user-secrets store. A slot volume and its persisted password are one operational credential set.
+Aspire uses a native Docker volume rather than a worktree bind mount because PostgreSQL initialization requires Unix ownership and permission changes. Its name combines the logical slot with a random identity persisted in the worktree's ignored `.agentstration/instance-id` file, preventing direct AppHost launches from different worktrees from sharing the default `main` volume. The generated database password is persisted through an identity-specific AppHost user-secrets parameter. The worktree identity, its volumes, and its persisted password are one operational credential set.
 
 ## Consequences
 

@@ -12,6 +12,7 @@ The main verified settings are:
 | `LocalAI:ApiKey` | unset | Optional LocalAI Bearer key. Supply it through environment or secret-backed host configuration; never commit it. |
 | `Data:Directory` | `.agentstration` | Base directory for module-owned SQLite databases, key material, Pack archives and Work artifacts. |
 | `Agentstration:Storage:Provider` | `Sqlite` | Relational storage profile: `Sqlite` or `PostgreSql` (case-insensitive). |
+| `Agentstration:InstanceId` | persisted `.agentstration/instance-id` value | Optional explicit AppHost worktree identity used to isolate PostgreSQL volumes and persisted passwords. |
 | `ConnectionStrings:Agentstration` | unset | Required main PostgreSQL connection when the storage provider is `PostgreSql`. |
 | `Data:ControlPlanePath` | `.agentstration/control-plane.db` | Management Plane SQLite database. |
 | `Data:WorkPlanePath` | `.agentstration/work-plane.db` | Work Plane SQLite database. |
@@ -29,28 +30,32 @@ Provider-specific options and persisted model resources are described in [Model 
 
 PostgreSQL uses the `management`, `work`, `flow`, `runtime`, `identity`, and `scheduler` schemas in one database. It does not move file-backed secrets, Data Protection keys, Pack archives, or Work artifacts. Switching from SQLite does not migrate existing data; retain the SQLite files and use a future supported export/import path. PostgreSQL is currently single-instance only because queues and Quartz are not clustered.
 
-For Compose, copy `.env.postgresql.example` to an uncommitted `.env`, replace its disposable password, then run `docker compose -f docker-compose.yml -f docker-compose.postgresql.yml up --build`. The ordinary `docker compose up --build` command remains SQLite. For Aspire, set `Agentstration:Storage:Provider=PostgreSql`; PostgreSQL data is stored in a slot-scoped Docker volume named `agentstration-<slot>-postgresql` and SQLite remains the default.
+For Compose, copy `.env.postgresql.example` to an uncommitted `.env`, replace its disposable password, then run `docker compose -f docker-compose.yml -f docker-compose.postgresql.yml up --build`. The ordinary `docker compose up --build` command remains SQLite. For Aspire, set `Agentstration:Storage:Provider=PostgreSql`; PostgreSQL data is stored in a worktree-isolated Docker volume named `agentstration-<slot>-<instance-id>-postgresql` and SQLite remains the default.
 
 ### Aspire persistence and development slots
 
-Aspire mounts the slot-scoped Docker volume at `/var/lib/postgresql/data`. PostgreSQL requires Unix ownership and permission changes during `initdb`, so its data directory cannot be a bind mount into the Windows worktree when Docker runs in Linux or WSL. The volume is stored by the Docker daemon, normally below `/var/lib/docker/volumes/agentstration-<slot>-postgresql/_data`, rather than inside `.agentstration/slots/<slot>`.
+Aspire mounts the worktree-isolated Docker volume at `/var/lib/postgresql/data`. PostgreSQL requires Unix ownership and permission changes during `initdb`, so its data directory cannot be a bind mount into the Windows worktree when Docker runs in Linux or WSL. The volume is stored by the Docker daemon, normally below `/var/lib/docker/volumes/agentstration-<slot>-<instance-id>-postgresql/_data`, rather than inside `.agentstration/slots/<slot>`.
 
-The AppHost generates the `postgres-password` parameter on first use, marks it secret, and persists it in the AppHost user-secrets store. The persisted password and the volume form one credential set: do not remove or change one while retaining the other. Never commit the generated password or copy it into `appsettings.json`.
+On first use, the AppHost atomically creates a random 12-character identifier in the ignored `.agentstration/instance-id` file. This identifier is independent of the slot, so separate worktrees remain isolated even when direct launches make each one use `main`. It remains stable across restarts and branch changes and follows the worktree when its complete directory is moved. Deleting `.agentstration`, or recreating the worktree without it, creates a new identity. Set `Agentstration:InstanceId` to the previous value when an existing volume must be recovered explicitly.
+
+The AppHost generates the `postgres-password-<instance-id>` parameter on first use, marks it secret, and persists it in the AppHost user-secrets store. The persisted identity, password, and volumes form one credential set: do not remove or change one while retaining the others. Never commit the generated password or copy it into `appsettings.json`.
 
 To inspect a development volume without changing it:
 
 ```powershell
-docker volume inspect agentstration-<slot>-postgresql
+$instanceId = (Get-Content .agentstration/instance-id -Raw).Trim()
+docker volume inspect "agentstration-<slot>-$instanceId-postgresql"
 ```
 
 To reset disposable PostgreSQL data, first stop the corresponding AppHost and verify the exact slot name. The following operation permanently removes that slot's PostgreSQL database:
 
 ```powershell
-docker volume rm agentstration-<slot>-postgresql
-dotnet user-secrets remove "Parameters:postgres-password" --project src/Agentstration.AppHost
+$instanceId = (Get-Content .agentstration/instance-id -Raw).Trim()
+docker volume rm "agentstration-<slot>-$instanceId-postgresql"
+dotnet user-secrets remove "Parameters:postgres-password-$instanceId" --project src/Agentstration.AppHost
 ```
 
-Remove both only for a full reset. Removing only the user-secret produces repeated `password authentication failed` errors against the retained volume. Back up non-disposable data before removing a volume.
+Remove the matching volume and secret only for a full reset. Keep `.agentstration/instance-id` to reuse the same worktree identity with a newly initialized volume, or remove it only after every associated slot volume and secret has been handled. Removing only the user-secret produces repeated `password authentication failed` errors against retained volumes. Back up non-disposable data before removing a volume.
 
 ### Startup and readiness
 

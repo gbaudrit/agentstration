@@ -7,4 +7,4 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = Get-AgentstrationRepositoryRoot -StartPath $PSScriptRoot
 Get-AgentstrationWorktreeInfo -RepositoryRoot $repositoryRoot |
-    Format-Table -Property SLOT, BRANCH, WORKTREE -AutoSize -Wrap
+    Format-Table -Property SLOT, INSTANCE, BRANCH, WORKTREE -AutoSize -Wrap
