@@ -61,6 +61,8 @@
   <data name="Applying"><value>Applying…</value></data>
   <data name="SaveAndApply"><value>Save and apply</value></data>
   <data name="NotDeployed"><value>Not deployed</value></data>
+  <data name="AgentVersionNotFound"><value>Agent generation {0} does not exist.</value></data>
+  <data name="AgentDeploymentNotFound"><value>No deployment exists for this agent.</value></data>
   <data name="GenerationReady"><value>Generation {0} is ready.</value></data>
   <data name="SaveOrApplyModified"><value>Save or apply the modified desired definition.</value></data>
   <data name="CurrentGenerationNotActive"><value>The current generation is not active.</value></data>

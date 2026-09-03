@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="DesiredAndActiveStateComparison" xml:space="preserve"><value>Comparaison entre l’état souhaité et l’état actif</value></data>
+  <data name="DesiredStateMatchesActiveGeneration" xml:space="preserve"><value>L’état souhaité correspond à la génération active</value></data>
+  <data name="DesiredStateDiffersFromActiveDeployment" xml:space="preserve"><value>L’état souhaité diffère du déploiement actif</value></data>
+  <data name="DesiredState" xml:space="preserve"><value>État souhaité</value></data>
+  <data name="ActiveDeployment" xml:space="preserve"><value>Déploiement actif</value></data>
+  <data name="Generation" xml:space="preserve"><value>Génération {0}</value></data>
+  <data name="NoActiveGeneration" xml:space="preserve"><value>Aucune génération active</value></data>
+</root>
