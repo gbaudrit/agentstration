@@ -47,6 +47,7 @@ public sealed class LocalizationResidualTests
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR"); CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
             using var services = new ServiceCollection().AddLogging().AddLocalization(options => options.ResourcesPath = "Resources").BuildServiceProvider();
             Assert.AreEqual("Fournisseur indisponible", L<AgentEditorStrings>(services)["Status.ProviderUnavailable"].Value);
+            Assert.AreEqual("La génération 3 de l’agent n’existe pas.", L<AgentEditorStrings>(services)["AgentVersionNotFound", 3].Value);
             Assert.AreEqual("Actif", L<FlowsStrings>(services)["Status.Active"].Value);
             Assert.AreEqual("Intervention requise", L<HomeStrings>(services)["Status.Attention required"].Value);
             Assert.AreEqual("Administrateur de la plateforme", L<OrganizationStrings>(services)["PlatformAdministrator"].Value);

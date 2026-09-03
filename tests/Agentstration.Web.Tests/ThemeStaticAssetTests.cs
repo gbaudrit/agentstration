@@ -62,4 +62,15 @@ public sealed class ThemeStaticAssetTests
         StringAssert.Contains(css, ".side-nav { scrollbar-width: thin; scrollbar-color: transparent transparent; }");
         StringAssert.Contains(css, ".side-nav:hover,.side-nav:focus-within { scrollbar-color: #344861 transparent; }");
     }
+
+    [TestMethod]
+    public async Task AgentYamlEditorUsesTheAvailablePanelWidth()
+    {
+        var css = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "TestAssets", "AgentEditor.razor.css"));
+
+        StringAssert.Contains(css, ".agent-yaml-field {");
+        StringAssert.Contains(css, "display: grid;");
+        StringAssert.Contains(css, "width: 100%;");
+        StringAssert.Contains(css, "white-space: pre;");
+    }
 }

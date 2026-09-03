@@ -61,6 +61,8 @@
   <data name="Applying"><value>Application…</value></data>
   <data name="SaveAndApply"><value>Enregistrer et appliquer</value></data>
   <data name="NotDeployed"><value>Non déployée</value></data>
+  <data name="AgentVersionNotFound"><value>La génération {0} de l’agent n’existe pas.</value></data>
+  <data name="AgentDeploymentNotFound"><value>Aucun déploiement n’existe pour cet agent.</value></data>
   <data name="GenerationReady"><value>La génération {0} est prête.</value></data>
   <data name="SaveOrApplyModified"><value>Enregistrez ou appliquez la définition souhaitée modifiée.</value></data>
   <data name="CurrentGenerationNotActive"><value>La génération actuelle n’est pas active.</value></data>

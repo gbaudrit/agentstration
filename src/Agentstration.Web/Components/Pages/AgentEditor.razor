@@ -56,7 +56,7 @@ else
         <section class="panel form-section" data-testid="agent-yaml-editor">
             <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("AgentYaml")</h2><p>@T("AgentYamlHelp")</p></div></div>
             @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
-            <label><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput"></textarea></label>
+            <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput"></textarea></label>
             <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></div>
         </section>
     }
@@ -159,7 +159,15 @@ else
     private string RunUrl => $"{OverviewUrl}/run";
     private bool IsStateSynchronized => !isDirty && readiness?.Ready == true && readiness.Generation == generation;
     private long? ActiveGeneration => readiness?.Ready == true ? readiness.Generation : null;
-    private string ActiveStatus => readiness?.Ready == true ? StatusPresentation.Label(readiness.State) : readiness?.Error ?? readiness?.State ?? T("NotDeployed");
+    private string ActiveStatus => readiness switch
+    {
+        { Ready: true } => T("Ready"),
+        { State: "agent_version_not_found" } => T("AgentVersionNotFound", generation),
+        { State: "agent_deployment_not_found" } => T("AgentDeploymentNotFound"),
+        { Error: { Length: > 0 } error } => error,
+        { State: { Length: > 0 } state } => StatusPresentation.Label(state),
+        _ => T("NotDeployed")
+    };
     private string? ActiveRuntime => readiness?.RuntimeProfileId is null ? readiness?.DeploymentId : ResourceName(readiness.RuntimeProfileId);
     private string StateSummary => IsStateSynchronized ? T("GenerationReady", generation) : isDirty ? T("SaveOrApplyModified") : T("CurrentGenerationNotActive");
     private string HeaderStatus => readiness?.Ready == true ? T("Ready") : StatusPresentation.Label(provisioningStatus);
