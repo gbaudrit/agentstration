@@ -30,4 +30,6 @@
 <data name="DashboardIcon"><value>Icon</value></data><data name="DashboardIconHelp"><value>Choose how this dashboard appears in Workplace.</value></data>
 <data name="DashboardEntryOrderActions"><value>Order controls for {0}</value></data><data name="MoveDashboardEntryUp"><value>Move {0} up</value></data><data name="MoveDashboardEntryDown"><value>Move {0} down</value></data>
 <data name="DashboardRole.Primary.Help"><value>Unique entry shown as the dashboard’s main experience.</value></data><data name="DashboardRole.Featured.Help"><value>Featured entries, ordered within this group.</value></data><data name="DashboardRole.Standard.Help"><value>Standard entries, ordered within this group.</value></data><data name="DashboardRole.Excluded.Help"><value>Published entries that are not shown on this dashboard.</value></data>
+<data name="AgentIdentities"><value>Agent identities</value></data>
+<data name="ParticipantVisibilityHelp"><value>Hidden presents one Agentstration assistant and keeps handoff participants private.</value></data>
 </root>

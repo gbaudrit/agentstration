@@ -30,4 +30,6 @@
 <data name="DashboardIcon"><value>Icône</value></data><data name="DashboardIconHelp"><value>Choisissez comment ce tableau de bord apparaît dans Workplace.</value></data>
 <data name="DashboardEntryOrderActions"><value>Commandes d’ordre pour {0}</value></data><data name="MoveDashboardEntryUp"><value>Monter {0}</value></data><data name="MoveDashboardEntryDown"><value>Descendre {0}</value></data>
 <data name="DashboardRole.Primary.Help"><value>Entrée unique affichée comme expérience principale du tableau de bord.</value></data><data name="DashboardRole.Featured.Help"><value>Entrées mises en avant, ordonnées au sein de ce groupe.</value></data><data name="DashboardRole.Standard.Help"><value>Entrées standard, ordonnées au sein de ce groupe.</value></data><data name="DashboardRole.Excluded.Help"><value>Entrées publiées qui ne sont pas affichées dans ce tableau de bord.</value></data>
+<data name="AgentIdentities"><value>Identité des agents</value></data>
+<data name="ParticipantVisibilityHelp"><value>Masqués présente un seul assistant Agentstration et garde les participants du handoff privés.</value></data>
 </root>

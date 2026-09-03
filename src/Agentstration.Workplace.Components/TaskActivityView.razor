@@ -1,5 +1,5 @@
 <article class="timeline-activity activity-@Activity.Type.ToString().ToLowerInvariant()">
-    <span class="activity-marker"><UiIcon Name="@Icon" /></span>
+    @if (ShowMarker) { <span class="activity-marker"><UiIcon Name="@Icon" /></span> }
     <div>
         <div class="activity-heading">
             <strong>@Title</strong>
@@ -12,6 +12,7 @@
 @code {
     [Parameter, EditorRequired] public required WorkTaskActivity Activity { get; set; }
     [Parameter] public EntryParticipantVisibility ParticipantVisibility { get; set; } = EntryParticipantVisibility.Hidden;
+    private bool ShowMarker => Activity.Type is not (WorkTaskActivityType.TaskStarted or WorkTaskActivityType.ProgressStarted);
     private string Title
     {
         get
@@ -34,7 +35,6 @@
     {
         WorkTaskActivityType.TaskFailed => "warning",
         WorkTaskActivityType.ActionRequired => "info",
-        WorkTaskActivityType.TaskStarted or WorkTaskActivityType.ProgressStarted => "sparkle",
         _ => "check"
     };
     private static string Humanize(string value) => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('-', ' ').Replace('_', ' '));

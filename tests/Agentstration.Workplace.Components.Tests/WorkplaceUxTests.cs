@@ -279,6 +279,8 @@ public sealed class WorkplaceUxTests
         Assert.IsTrue(hidden.Markup.Contains(Localizer(context)["PreparingResponse"], StringComparison.Ordinal));
         Assert.IsTrue(hidden.Markup.Contains(Localizer(context)["ResponsePrepared"], StringComparison.Ordinal));
         Assert.IsFalse(hidden.Markup.Contains("Alice Player", StringComparison.Ordinal));
+        Assert.AreEqual(0, hidden.FindAll(".activity-progressstarted .activity-marker").Count);
+        Assert.AreEqual(1, hidden.FindAll(".activity-progresscompleted .activity-marker").Count);
 
         var visible = context.Render<InteractionView>(parameters => parameters
             .Add(value => value.Presentation, new EntryPresentation
