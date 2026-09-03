@@ -39,18 +39,21 @@ genAiObservability.Validate(builder.Environment.IsDevelopment());
 var toolExecutionCapture = builder.Configuration.GetSection("Agentstration:ToolExecution").Get<ToolExecutionCaptureOptions>() ?? new();
 toolExecutionCapture.Validate();
 builder.Services.AddSingleton(toolExecutionCapture);
-var dataDirectory = builder.Configuration["Data:Directory"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration");
+var isTesting = builder.Environment.IsEnvironment("Testing");
+var configuredTestingDataDirectory = builder.Configuration["Data:TestingDirectory"];
+var ownsTestingDataDirectory = isTesting && string.IsNullOrWhiteSpace(configuredTestingDataDirectory);
+var dataDirectory = isTesting
+    ? string.IsNullOrWhiteSpace(configuredTestingDataDirectory)
+        ? Path.Combine(Path.GetTempPath(), $"agentstration-web-tests-{Guid.NewGuid():N}")
+        : configuredTestingDataDirectory
+    : builder.Configuration["Data:Directory"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration");
 Directory.CreateDirectory(dataDirectory);
 var identityConnectionString = builder.Configuration.GetConnectionString("Identity")
-    ?? (builder.Environment.IsEnvironment("Testing")
-        ? $"Data Source={Path.Combine(Path.GetTempPath(), $"agentstration-identity-tests-{Guid.NewGuid():N}.db")}"
-        : $"Data Source={Path.Combine(dataDirectory, "identity.db")}");
+    ?? $"Data Source={Path.Combine(dataDirectory, "identity.db")}";
 var dataProtectionKeysPath = configuredAuthentication.DataProtectionKeysPath;
 if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 {
-    dataProtectionKeysPath = builder.Environment.IsEnvironment("Testing")
-        ? Path.Combine(Path.GetTempPath(), $"agentstration-data-protection-tests-{Guid.NewGuid():N}")
-        : Path.Combine(dataDirectory, "data-protection-keys");
+    dataProtectionKeysPath = Path.Combine(dataDirectory, "data-protection-keys");
 }
 var aiProvider = builder.Configuration["AI:Provider"] ?? "Managed";
 var useManagedProfileResolver = string.Equals(aiProvider, "Managed", StringComparison.OrdinalIgnoreCase);
@@ -58,26 +61,31 @@ const string defaultAiEndpoint = "http://localhost:11434/v1/";
 var aiEndpoint = builder.Configuration["AI:Endpoint"] ?? defaultAiEndpoint;
 if (!Uri.TryCreate(aiEndpoint.EndsWith('/') ? aiEndpoint : aiEndpoint + '/', UriKind.Absolute, out var parsedAiEndpoint)) throw new InvalidOperationException("AI:Endpoint must be an absolute URL.");
 var aiOptions = new AiProviderOptions(aiProvider, parsedAiEndpoint, builder.Configuration["AI:Model"] ?? "phi4-mini", builder.Configuration["AI:ApiKey"]);
-var controlPlanePath = builder.Environment.IsEnvironment("Testing")
-    ? Path.Combine(Path.GetTempPath(), $"agentstration-tests-{Guid.NewGuid():N}.db")
+var controlPlanePath = isTesting
+    ? Path.Combine(dataDirectory, "control-plane.db")
     : builder.Configuration["Data:ControlPlanePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "control-plane.db");
 var controlPlaneDirectory = Path.GetDirectoryName(controlPlanePath);
 if (!string.IsNullOrWhiteSpace(controlPlaneDirectory)) Directory.CreateDirectory(controlPlaneDirectory);
-var workPlanePath = builder.Environment.IsEnvironment("Testing")
-    ? Path.Combine(Path.GetTempPath(), $"agentstration-work-tests-{Guid.NewGuid():N}.db")
+var workPlanePath = isTesting
+    ? Path.Combine(dataDirectory, "work-plane.db")
     : builder.Configuration["Data:WorkPlanePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "work-plane.db");
 var workPlaneDirectory = Path.GetDirectoryName(workPlanePath);
 if (!string.IsNullOrWhiteSpace(workPlaneDirectory)) Directory.CreateDirectory(workPlaneDirectory);
-var flowPath = builder.Environment.IsEnvironment("Testing")
-    ? Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}.db")
+var flowPath = isTesting
+    ? Path.Combine(dataDirectory, "flow-plane.db")
     : builder.Configuration["Data:FlowPath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "flow-plane.db");
 var flowDirectory = Path.GetDirectoryName(flowPath);
 if (!string.IsNullOrWhiteSpace(flowDirectory)) Directory.CreateDirectory(flowDirectory);
-var runtimePath = builder.Environment.IsEnvironment("Testing")
-    ? Path.Combine(Path.GetTempPath(), $"agentstration-runtime-tests-{Guid.NewGuid():N}.db")
+var runtimePath = isTesting
+    ? Path.Combine(dataDirectory, "runtime-plane.db")
     : builder.Configuration["Data:RuntimePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "runtime-plane.db");
 var runtimeDirectory = Path.GetDirectoryName(runtimePath);
 if (!string.IsNullOrWhiteSpace(runtimeDirectory)) Directory.CreateDirectory(runtimeDirectory);
+if (isTesting)
+{
+    builder.Services.AddSingleton(new TestingDataDirectoryCleanupService(dataDirectory, ownsTestingDataDirectory));
+    builder.Services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<TestingDataDirectoryCleanupService>());
+}
 builder.Services.AddAgentstration(dataDirectory, aiOptions, $"Data Source={controlPlanePath}", $"Data Source={workPlanePath}", $"Data Source={flowPath}", $"Data Source={runtimePath}");
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,

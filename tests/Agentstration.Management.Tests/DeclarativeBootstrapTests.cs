@@ -761,6 +761,7 @@ public sealed class DeclarativeBootstrapTests
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
+            builder.UseSetting("Data:TestingDirectory", Path.Combine(path, ".test-data"));
             builder.UseSetting("Agentstration:Authentication:Mode", "Local");
             builder.UseSetting("Agentstration:Bootstrap:Path", Directory.GetParent(path)!.FullName);
             builder.UseSetting("Agentstration:Bootstrap:InitialBootstrapEnabled", "true");
@@ -1130,6 +1131,10 @@ public sealed class DeclarativeBootstrapTests
         }
 
         public string Path { get; }
-        public void Dispose() => Directory.Delete(Path, recursive: true);
+        public void Dispose()
+        {
+            SqliteTestCleanup.ClearPoolsInDirectory(Path);
+            Directory.Delete(Path, recursive: true);
+        }
     }
 }

@@ -403,7 +403,7 @@ public sealed class IdentityFoundationTests
         public async ValueTask DisposeAsync()
         {
             await Services.DisposeAsync();
-            SqliteConnection.ClearAllPools();
+            SqliteTestCleanup.ClearPoolsInDirectory(directory);
             Directory.Delete(directory, recursive: true);
         }
     }

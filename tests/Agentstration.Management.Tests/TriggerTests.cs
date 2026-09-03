@@ -9,7 +9,6 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Resources;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -114,7 +113,7 @@ public sealed class TriggerTests
                 Assert.IsEmpty(await restarted.Store.ListAsync(Guid.NewGuid(), trigger, 10, CancellationToken.None));
             }
         }
-        finally { SqliteConnection.ClearAllPools(); File.Delete(database); }
+        finally { SqliteTestCleanup.ClearPool(database); File.Delete(database); }
     }
 
     [TestMethod]
@@ -299,7 +298,7 @@ public sealed class TriggerTests
         public async ValueTask DisposeAsync()
         {
             await Services.DisposeAsync();
-            SqliteConnection.ClearAllPools();
+            SqliteTestCleanup.ClearPool(Database);
             File.Delete(Database);
         }
     }
