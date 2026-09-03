@@ -1,7 +1,11 @@
 using Agentstration.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
+var worktreeRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", ".."));
 var slot = builder.Configuration["Agentstration:Slot"] ?? "main";
+var instanceId = DevelopmentInstanceIdentity.Resolve(
+    builder.Configuration["Agentstration:InstanceId"],
+    worktreeRoot);
 var storageProvider = builder.Configuration["Agentstration:Storage:Provider"] ?? "Sqlite";
 if (!string.Equals(storageProvider, "Sqlite", StringComparison.OrdinalIgnoreCase)
     && !string.Equals(storageProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
@@ -13,7 +17,7 @@ if (!System.Text.RegularExpressions.Regex.IsMatch(slot, "^[a-z0-9](?:[a-z0-9-]{0
     throw new InvalidOperationException("Agentstration:Slot must contain only lowercase letters, digits, and internal hyphens (maximum 63 characters).");
 }
 
-var defaultSlotDataPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", ".agentstration", "slots", slot));
+var defaultSlotDataPath = Path.Combine(worktreeRoot, ".agentstration", "slots", slot);
 var slotDataPath = Path.GetFullPath(builder.Configuration["Agentstration:SlotDataPath"] ?? defaultSlotDataPath);
 Directory.CreateDirectory(slotDataPath);
 var configuredBootstrapPath = builder.Configuration["Agentstration:Bootstrap:Path"];
@@ -67,6 +71,7 @@ var utilitiesExtension = builder.AddProject<Projects.Agentstration_Extensions_Ut
 
 var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-console")
     .WithEnvironment("Agentstration__Slot", slot)
+    .WithEnvironment("Agentstration__InstanceId", instanceId)
     .WithEnvironment("Agentstration__SlotDataPath", slotDataPath)
     .WithEnvironment("Agentstration__Bootstrap__Path", bootstrapPath)
     .WithEnvironment(
@@ -83,7 +88,7 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithHttpHealthCheck("/health")
     .WaitFor(ollamaExtension);
 if (string.Equals(storageProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
-    console.WithPostgreSqlStorage(builder, slot);
+    console.WithPostgreSqlStorage(builder, slot, instanceId);
 else
     console.WithSqliteStorage(slotDataPath);
 for (var index = 0; index < initialBootstrapProfiles.Length; index++)
@@ -103,6 +108,7 @@ console
 
 var workplace = builder.AddProject<Projects.Agentstration_Workplace_Web>("agentstration-workplace")
     .WithEnvironment("Agentstration__Slot", slot)
+    .WithEnvironment("Agentstration__InstanceId", instanceId)
     .WithEnvironment("Agentstration__ApiBaseUrl", console.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WaitFor(console);

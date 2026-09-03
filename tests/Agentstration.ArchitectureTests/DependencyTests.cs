@@ -388,6 +388,23 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void AspirePostgreSqlStorageUsesThePersistentWorktreeIdentity()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var appHostDirectory = Path.Combine(repositoryRoot, "src", "Agentstration.AppHost");
+        var program = File.ReadAllText(Path.Combine(appHostDirectory, "Program.cs"));
+        var storage = File.ReadAllText(Path.Combine(appHostDirectory, "StorageResourceExtensions.cs"));
+        var identity = File.ReadAllText(Path.Combine(appHostDirectory, "DevelopmentInstanceIdentity.cs"));
+
+        Assert.Contains("DevelopmentInstanceIdentity.Resolve", program, StringComparison.Ordinal);
+        Assert.Contains("Agentstration:InstanceId", program, StringComparison.Ordinal);
+        Assert.Contains("agentstration-{slot}-{instanceId}-postgresql", storage, StringComparison.Ordinal);
+        Assert.Contains("postgres-password-{instanceId}", storage, StringComparison.Ordinal);
+        Assert.Contains("Path.Combine(worktreeRoot, \".agentstration\")", identity, StringComparison.Ordinal);
+        Assert.Contains("File.Move(temporaryPath, identityPath)", identity, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public void ProductionSourcesDoNotReintroduceHierarchicalResourcePaths()
     {
         var repositoryRoot = FindRepositoryRoot();
