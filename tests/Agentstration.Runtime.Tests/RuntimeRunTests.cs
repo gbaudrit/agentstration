@@ -414,7 +414,11 @@ public sealed class RuntimeRunTests
     [TestMethod]
     public async Task RuntimeApiExecutesAndObservesRunWithoutCreatingWorkItem()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+        });
         using var client = factory.CreateClient();
         const string agentPath = "/api/agents/sql-expert";
         var agent = await client.GetFromJsonAsync<AgentResource>(agentPath);

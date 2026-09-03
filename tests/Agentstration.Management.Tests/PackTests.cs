@@ -573,7 +573,11 @@ public sealed class PackTests
     [TestMethod]
     public async Task WhoAmISamplePreviewsAndInstallsFiveRepresentativeResources()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Testing:HostedServicesEnabled", "true");
+        });
         using var client = factory.CreateClient();
         var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
         var sampleDirectory = Path.Combine(repositoryRoot, "samples", "packs", "who-am-i");

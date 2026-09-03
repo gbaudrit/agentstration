@@ -6,10 +6,14 @@ using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Security.AspNetCoreIdentity;
+using Agentstration.Web.Components.State;
+using Agentstration.Web.Console;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 
 namespace Agentstration.Management.Tests;
 
@@ -19,12 +23,35 @@ public sealed partial class SecurityApiTests
     private const string LocalPassword = "A-strong-local-password-42!";
     private const string ChangedLocalPassword = "A-changed-local-password-84!";
 
-    private static WebApplicationFactory<Program> Factory(string mode) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+    private static WebApplicationFactory<Program> Factory(string mode)
+    {
+        WebApplicationFactory<Program>? factory = null;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", mode);
+            builder.ConfigureTestServices(services =>
+            {
+                Func<HttpMessageHandler> handlerFactory = () => factory!.Server.CreateHandler();
+                RouteThroughTestServer<IUserPreferencesClient>(services, handlerFactory);
+                RouteThroughTestServer<IManagementApiClient>(services, handlerFactory);
+                RouteThroughTestServer<IModelProvidersClient>(services, handlerFactory);
+                RouteThroughTestServer<IFlowApiClient>(services, handlerFactory);
+                RouteThroughTestServer<IRuntimeApiClient>(services, handlerFactory);
+                RouteThroughTestServer<IWorkApiClient>(services, handlerFactory);
+            });
         });
+        return factory;
+    }
+
+    private static void RouteThroughTestServer<TClient>(
+        IServiceCollection services,
+        Func<HttpMessageHandler> handlerFactory)
+        where TClient : class =>
+        services.Configure<HttpClientFactoryOptions>(
+            typeof(TClient).Name,
+            options => options.HttpMessageHandlerBuilderActions.Add(
+                builder => builder.PrimaryHandler = handlerFactory()));
 
     private static HttpClient UnredirectedClient(WebApplicationFactory<Program> factory) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions
