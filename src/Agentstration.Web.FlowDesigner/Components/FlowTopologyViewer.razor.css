@@ -13,6 +13,7 @@
 .topology-zoom-controls span{min-width:40px;text-align:center}
 .topology-tool-button{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 9px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;white-space:nowrap}
 .topology-tool-button:hover,.topology-tool-button:focus-visible,.topology-tool-button[aria-expanded=true],.topology-tool-button[aria-pressed=true]{border-color:var(--primary);color:var(--primary)}
+.topology-tool-button:disabled{cursor:default;opacity:.62}.replay-toggle span{font-size:15px;line-height:1}.replay-toggle:disabled span{animation:topology-replay-spin 1s linear infinite}
 .topology-stage{position:relative;min-height:0;flex:1}
 .topology-viewport{min-height:330px;overflow:auto;background-color:var(--surface-2);background-image:linear-gradient(color-mix(in srgb,var(--border) 55%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--border) 55%,transparent) 1px,transparent 1px);background-size:24px 24px}
 .topology-shell.expanded .topology-viewport{height:100%;min-height:0}
@@ -38,6 +39,7 @@ marker.inactive-marker path{fill:var(--muted);opacity:.55}
 .topology-node.status-running rect{stroke:#3981e8;stroke-width:4}
 .topology-node.status-failed rect{stroke:#e45562}
 .topology-node.status-skipped{opacity:.52}
+@media(prefers-reduced-motion:no-preference){.topology-edge.observed{animation:topology-edge-observed .45s ease-out}.topology-node.status-running rect{animation:topology-node-running .8s ease-in-out infinite alternate}@keyframes topology-edge-observed{from{opacity:.15;stroke-dasharray:3 8;stroke-dashoffset:22}to{opacity:1;stroke-dashoffset:0}}@keyframes topology-node-running{to{filter:drop-shadow(0 0 7px rgba(57,129,232,.52))}}@keyframes topology-replay-spin{to{transform:rotate(360deg)}}}
 .node-content{display:grid;grid-template-columns:30px minmax(0,1fr) auto;grid-template-rows:38px 16px;align-items:center;width:156px;height:62px;color:var(--text);font-family:var(--font-sans)}
 .node-icon{display:grid;width:28px;height:28px;place-items:center;border-radius:50%;background:var(--primary-soft);color:var(--primary);font-size:13px;font-weight:800}
 .node-copy{display:grid;min-width:0}.node-copy strong{overflow:hidden;font-size:12px;text-overflow:ellipsis;white-space:nowrap}.node-copy small,.node-subtitle{color:var(--muted);font-size:9px}.node-subtitle{grid-column:1/4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.turn-badge{align-self:start;padding-top:3px;color:var(--primary);font-size:8px;font-weight:700;white-space:nowrap}

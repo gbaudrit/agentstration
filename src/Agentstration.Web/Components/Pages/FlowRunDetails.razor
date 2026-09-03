@@ -83,7 +83,8 @@ else
                                  View="@FlowRunTimeline.TimelineView.Summary" ShowHeader="false" ShowNavigation="false" Embedded="true" ParticipantUrls="@ParticipantUrls" />
                 <section class="designer-layout run-layout flow-run-overview-topology @(inspectorVisible ? null : "inspector-collapsed")">
                     <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
-                                        ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible" />
+                                        ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible"
+                                        ReplayInProgress="replayInProgress" ReplayRequested="ReplaySequenceAsync" />
                     @if (inspectorVisible)
                     {
                     <article class="panel inspector step-inspector">
@@ -141,6 +142,10 @@ else
     private string? inputError;
     private bool submittingInput;
     private bool inspectorVisible;
+    private bool replayInProgress;
+    private long? replaySequence;
+    private IReadOnlyList<FlowRunEvent>? replayEvents;
+    private CancellationTokenSource? replayCancellation;
     private RunTab activeTab;
     private static readonly RunTab[] StandardTabs = [RunTab.Summary, RunTab.Activity, RunTab.InputOutput, RunTab.RawEvents];
     private static readonly RunTab[] HandoffTabs = [RunTab.Summary, RunTab.Activity, RunTab.Handoffs, RunTab.InputOutput, RunTab.RawEvents];
@@ -153,7 +158,12 @@ else
         RunTab.RawEvents => FlowRunTimeline.TimelineView.Raw,
         _ => FlowRunTimeline.TimelineView.Summary
     };
-    private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(run, eventBuffer.Snapshot());
+    private IReadOnlyList<FlowRunEvent> TopologyEvents => replayEvents is null || replaySequence is null
+        ? eventBuffer.Snapshot()
+        : replayEvents.Where(runEvent => runEvent.Sequence <= replaySequence.Value).ToArray();
+    private FlowTopologyGraph Topology => run is null
+        ? new([], [], "horizontal", T("FlowTopology"))
+        : FlowTopologyProjector.Project(replayEvents is null ? run : ReplaySnapshot(run, TopologyEvents), TopologyEvents);
 
     private string TabLabel(RunTab tab) => T(tab switch
     {
@@ -186,6 +196,7 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        replayCancellation?.Cancel();
         notFound = false;
         loadError = null;
         realtimeError = null;
@@ -329,6 +340,90 @@ else
 
     private void SelectStep(string name) => selected = run?.Steps.FirstOrDefault(value => value.StepName == name);
     private void SetInspectorVisible(bool value) => inspectorVisible = value;
+    private async Task ReplaySequenceAsync()
+    {
+        if (replayInProgress) return;
+        var events = eventBuffer.Snapshot().OrderBy(runEvent => runEvent.Sequence).ToArray();
+        var frames = events.Where(IsReplayFrame).Select(runEvent => runEvent.Sequence).Distinct().ToArray();
+        if (frames.Length == 0) return;
+
+        var replaySource = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
+        replayCancellation = replaySource;
+        replayEvents = events;
+        replayInProgress = true;
+        var frameDelay = TimeSpan.FromMilliseconds(Math.Clamp(15000d / frames.Length, 20, 650));
+        try
+        {
+            replaySequence = 0;
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(TimeSpan.FromMilliseconds(300), replaySource.Token);
+            foreach (var frame in frames)
+            {
+                replaySequence = frame;
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(frameDelay, replaySource.Token);
+            }
+        }
+        catch (OperationCanceledException) when (replaySource.IsCancellationRequested) { }
+        finally
+        {
+            if (ReferenceEquals(replayCancellation, replaySource))
+            {
+                replayCancellation = null;
+                replayEvents = null;
+                replaySequence = null;
+                replayInProgress = false;
+                if (!cancellation.IsCancellationRequested) await InvokeAsync(StateHasChanged);
+            }
+            replaySource.Dispose();
+        }
+    }
+
+    private static bool IsReplayFrame(FlowRunEvent runEvent) => runEvent.Type is
+        FlowRunEventType.FlowRunStarted or FlowRunEventType.FlowRunResumed or
+        FlowRunEventType.StepRunStarted or FlowRunEventType.StepRunCompleted or FlowRunEventType.StepRunFailed or
+        FlowRunEventType.ParticipantTurnStarted or FlowRunEventType.ParticipantTurnCompleted or FlowRunEventType.ParticipantHandoff or
+        FlowRunEventType.FlowRunCompleted or FlowRunEventType.FlowRunFailed or FlowRunEventType.FlowRunCancelled or FlowRunEventType.FlowRunTimedOut;
+
+    private static FlowRun ReplaySnapshot(FlowRun source, IReadOnlyList<FlowRunEvent> visibleEvents)
+    {
+        var terminal = visibleEvents.Any(runEvent => runEvent.Type is FlowRunEventType.FlowRunCompleted or FlowRunEventType.FlowRunFailed or FlowRunEventType.FlowRunCancelled or FlowRunEventType.FlowRunTimedOut);
+        var started = visibleEvents.Any(runEvent => runEvent.Type is not FlowRunEventType.FlowRunCreated);
+        return source with
+        {
+            Status = terminal ? source.Status : started ? FlowRunStatus.Running : FlowRunStatus.Pending,
+            Steps = source.Steps.Select(step => ReplayStep(step, visibleEvents, terminal)).ToArray()
+        };
+    }
+
+    private static FlowStepRun ReplayStep(FlowStepRun source, IReadOnlyList<FlowRunEvent> visibleEvents, bool terminal)
+    {
+        if (terminal) return source;
+        var events = visibleEvents
+            .Where(runEvent => string.Equals(runEvent.StepId, source.StepName, StringComparison.Ordinal))
+            .OrderBy(runEvent => runEvent.Sequence)
+            .ToArray();
+        var latest = events.LastOrDefault(runEvent => runEvent.Type is
+            FlowRunEventType.StepRunStarted or FlowRunEventType.StepRunCompleted or FlowRunEventType.StepRunFailed or
+            FlowRunEventType.ParticipantTurnStarted or FlowRunEventType.ParticipantTurnCompleted);
+        var status = latest?.Type switch
+        {
+            FlowRunEventType.StepRunStarted or FlowRunEventType.ParticipantTurnStarted => FlowStepRunStatus.Running,
+            FlowRunEventType.StepRunCompleted or FlowRunEventType.ParticipantTurnCompleted => FlowStepRunStatus.Succeeded,
+            FlowRunEventType.StepRunFailed => FlowStepRunStatus.Failed,
+            _ => FlowStepRunStatus.NotStarted
+        };
+        var startedAt = events.FirstOrDefault(runEvent => runEvent.Type is FlowRunEventType.StepRunStarted or FlowRunEventType.ParticipantTurnStarted)?.Timestamp;
+        var completedAt = events.LastOrDefault(runEvent => runEvent.Type is FlowRunEventType.StepRunCompleted or FlowRunEventType.StepRunFailed or FlowRunEventType.ParticipantTurnCompleted)?.Timestamp;
+        return source with
+        {
+            Status = status,
+            StartedAt = startedAt,
+            CompletedAt = completedAt,
+            SelectedTransition = status is FlowStepRunStatus.Succeeded or FlowStepRunStatus.Failed ? source.SelectedTransition : null
+        };
+    }
+
     private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, cancellation.Token);
     private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private static string Pretty(JsonElement? value) => value is null ? "—" : Pretty(value.Value);
@@ -336,6 +431,7 @@ else
 
     public void Dispose()
     {
+        replayCancellation?.Cancel();
         cancellation.Cancel();
         if (hub is not null) _ = hub.DisposeAsync();
         cancellation.Dispose();

@@ -6,6 +6,12 @@
         <span class="topology-description">@Graph.Description</span>
         <div class="topology-toolbar-actions">
             <span class="topology-legend"><i class="declared"></i>@Localizer["Declared"] <i class="observed"></i>@Localizer["Observed"] <i class="inactive"></i>@Localizer["NotSelected"]</span>
+            @if (ReplayRequested.HasDelegate)
+            {
+                <button class="topology-tool-button replay-toggle" type="button" disabled="@ReplayInProgress" aria-label="@Localizer[ReplayInProgress ? "ReplayInProgress" : "ReplaySequence"]" @onclick="ReplayRequested">
+                    <span aria-hidden="true">@(ReplayInProgress ? "…" : "↻")</span> @Localizer[ReplayInProgress ? "Replaying" : "Replay"]
+                </button>
+            }
             @if (ShowInspectorControl)
             {
                 <button class="topology-tool-button inspector-toggle" type="button" aria-pressed="@InspectorVisible" @onclick="ToggleInspectorAsync">
@@ -106,6 +112,8 @@
     [Parameter] public bool ShowInspectorControl { get; set; }
     [Parameter] public bool InspectorVisible { get; set; }
     [Parameter] public EventCallback<bool> InspectorVisibleChanged { get; set; }
+    [Parameter] public bool ReplayInProgress { get; set; }
+    [Parameter] public EventCallback ReplayRequested { get; set; }
     [Parameter] public bool InitiallyFit { get; set; }
     private bool fitInitialized;
 
