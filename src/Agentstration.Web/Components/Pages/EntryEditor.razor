@@ -146,7 +146,7 @@ else
             <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("ExecutionExperience")</p><h2>@T("InteractionPresentation")</h2><p>@T("InteractionHelp")</p></div></div>
                 <div class="form-grid">
-                    <label><span>@T("Participants")</span><select data-testid="participants-visibility" @bind="participantsVisibility">@foreach (var value in Enum.GetValues<EntryParticipantVisibility>()) { <option value="@value">@EnumLabel("Participants", value)</option> }</select></label>
+                    <label><span>@T("AgentIdentities")</span><select data-testid="participants-visibility" @bind="participantsVisibility">@foreach (var value in Enum.GetValues<EntryParticipantVisibility>()) { <option value="@value">@EnumLabel("Participants", value)</option> }</select><small>@T("ParticipantVisibilityHelp")</small></label>
                     <label><span>@T("Progress")</span><select data-testid="progress-visibility" @bind="progressVisibility">@foreach (var value in Enum.GetValues<EntryProgressVisibility>()) { <option value="@value">@EnumLabel("Progress", value)</option> }</select></label>
                     <label><span>@T("Task")</span><select data-testid="task-display" @bind="taskDisplay">@foreach (var value in Enum.GetValues<EntryTaskDisplay>()) { <option value="@value">@EnumLabel("TaskDisplay", value)</option> }</select></label>
                     <label><span>@T("Results")</span><select data-testid="results-display" @bind="resultDisplay">@foreach (var value in Enum.GetValues<EntryResultDisplay>()) { <option value="@value">@EnumLabel("ResultDisplay", value)</option> }</select></label>

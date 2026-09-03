@@ -12,7 +12,7 @@ definition:
     allowAttachments: false
     allowVoiceInput: false
     participants:
-      visibility: visible
+      visibility: hidden
     progress:
       visibility: hidden
     task:

@@ -11,6 +11,8 @@ definition:
     icon: briefcase
     allowAttachments: false
     allowVoiceInput: false
+    participants:
+      visibility: hidden
     suggestions:
       - label: Plusieurs agents
         value: Nous cherchons une solution pour faire collaborer plusieurs agents spécialisés. Est-ce qu'Agentstration peut répondre à ce besoin ?

@@ -85,6 +85,7 @@ public sealed class EntryAdministrationComponentTests
         Assert.IsTrue(rendered.Markup.Contains("Direct Agent Flow", StringComparison.Ordinal));
         await rendered.Find("[data-testid='icon-picker'] input[type='search']").InputAsync(new ChangeEventArgs { Value = "sparkles" });
         await rendered.Find("[data-testid='icon-picker'] [role='option'][title='sparkles']").ClickAsync(new());
+        Assert.IsTrue(rendered.Markup.Contains("keeps handoff participants private", StringComparison.Ordinal));
         Assert.AreEqual(EntryBindingKind.Agent, client.RequestedKinds.Single());
         await rendered.Find("[data-testid='target-kind']").ChangeAsync(new ChangeEventArgs { Value = "Flow" });
         Assert.AreEqual(EntryBindingKind.Flow, client.RequestedKinds.Last());
