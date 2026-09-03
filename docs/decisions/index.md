@@ -107,3 +107,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 75. [ADR-0075 — Bootstrap files are an ordered profile catalog](0075-bootstrap-files-are-an-ordered-profile-catalog.md)
 76. [ADR-0076 — UI localization uses RESX and Principal culture preferences](0076-ui-localization-uses-resx-and-principal-culture-preferences.md)
 77. [ADR-0077 — Bootstrap profiles are explicit administrative applications](0077-bootstrap-profiles-are-explicit-administrative-applications.md)
+78. [ADR-0078 — PostgreSQL is an optional server storage profile](0078-postgresql-is-an-optional-server-storage-profile.md)

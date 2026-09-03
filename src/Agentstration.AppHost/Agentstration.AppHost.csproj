@@ -11,4 +11,7 @@
     <ProjectReference Include="../Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+  </ItemGroup>
 </Project>

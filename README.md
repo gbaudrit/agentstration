@@ -181,6 +181,14 @@ Or use Compose:
 docker compose up --build
 ```
 
+SQLite remains the standalone default. To start the optional PostgreSQL 17 profile, create an uncommitted `.env` from `.env.postgresql.example`, replace the development password, and run:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.postgresql.yml up --build
+```
+
+PostgreSQL stores relational module data in six schemas but leaves secrets, Data Protection keys, Pack archives, and Work artifacts on the existing file stores. Changing provider does not migrate SQLite data and does not enable multi-instance operation. Readiness is exposed at `/health/ready`; `/health` remains liveness.
+
 Aspire starts Agentstration and its AEP extensions, but does not install inference servers or download models. Follow the [local installation guide](https://docs.agentstration.io/getting-started/local-installation) and [model provider guide](https://docs.agentstration.io/concepts/model-providers) for provider-specific setup.
 
 ## Build and test

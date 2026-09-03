@@ -1,5 +1,11 @@
 var builder = DistributedApplication.CreateBuilder(args);
 var slot = builder.Configuration["Agentstration:Slot"] ?? "main";
+var storageProvider = builder.Configuration["Agentstration:Storage:Provider"] ?? "Sqlite";
+if (!string.Equals(storageProvider, "Sqlite", StringComparison.OrdinalIgnoreCase)
+    && !string.Equals(storageProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException("Agentstration:Storage:Provider must be either 'Sqlite' or 'PostgreSql'.");
+}
 if (!System.Text.RegularExpressions.Regex.IsMatch(slot, "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"))
 {
     throw new InvalidOperationException("Agentstration:Slot must contain only lowercase letters, digits, and internal hyphens (maximum 63 characters).");
@@ -78,6 +84,17 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint", utilitiesExtension.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WaitFor(ollamaExtension);
+if (string.Equals(storageProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
+{
+    var postgres = builder.AddPostgres("postgres")
+        .WithImage("postgres")
+        .WithImageTag("17")
+        .WithDataVolume("agentstration-postgresql");
+    var database = postgres.AddDatabase("agentstration");
+    console.WithEnvironment("Agentstration__Storage__Provider", "PostgreSql")
+        .WithReference(database)
+        .WaitFor(database);
+}
 for (var index = 0; index < initialBootstrapProfiles.Length; index++)
     console.WithEnvironment($"Agentstration__Bootstrap__InitialProfiles__{index}", initialBootstrapProfiles[index]);
 console.WaitFor(llamaCppExtension);

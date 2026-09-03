@@ -1,5 +1,6 @@
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
+using Agentstration.Flow.Storage.PostgreSql;
 using Agentstration.Flow.Storage.Sqlite;
 using Agentstration.Infrastructure.Agents;
 using Agentstration.Infrastructure.Artifacts;
@@ -12,18 +13,21 @@ using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Management.Storage.PostgreSql;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.ModelProviders;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
+using Agentstration.Runtime.Storage.PostgreSql;
 using Agentstration.Runtime.Storage.Sqlite;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Secrets.Local;
 using Agentstration.Tools.Mcp;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
+using Agentstration.Work.Storage.PostgreSql;
 using Agentstration.Work.Storage.Sqlite;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,7 +46,8 @@ public static class DependencyInjection
         string? controlPlaneConnectionString = null,
         string? workPlaneConnectionString = null,
         string? flowConnectionString = null,
-        string? runtimeConnectionString = null)
+        string? runtimeConnectionString = null,
+        AgentstrationStorageOptions? storageOptions = null)
     {
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton<LocalBootstrapOptions>();
@@ -65,8 +70,20 @@ public static class DependencyInjection
                 .AddHttpMessageHandler<GenAiHttpPayloadCaptureHandler>();
             services.AddSingleton<IChatClient>(provider => provider.GetRequiredService<OpenAiCompatibleChatClient>());
         }
-        controlPlaneConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "control-plane.db")}";
-        services.AddSqliteControlPlane(controlPlaneConnectionString);
+        storageOptions ??= new AgentstrationStorageOptions();
+        var storageProvider = storageOptions.GetProvider();
+        services.AddSingleton(storageOptions);
+        if (storageProvider == AgentstrationStorageProvider.PostgreSql)
+            services.AddSingleton<IAgentstrationStorageInitializer, PostgreSqlStorageInitializer>();
+        else
+            services.AddSingleton<IAgentstrationStorageInitializer, SqliteStorageInitializer>();
+        if (storageProvider == AgentstrationStorageProvider.PostgreSql)
+            services.AddPostgreSqlControlPlane(storageOptions.ConnectionString!);
+        else
+        {
+            controlPlaneConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "control-plane.db")}";
+            services.AddSqliteControlPlane(controlPlaneConnectionString);
+        }
         var secretPath = Path.Combine(dataDirectory, "secrets");
         services.AddSingleton(_ => new EnvironmentMasterKeyProvider(Path.Combine(secretPath, "master.key")));
         services.AddSingleton<IMasterKeyProvider>(provider => provider.GetRequiredService<EnvironmentMasterKeyProvider>());
@@ -149,8 +166,11 @@ public static class DependencyInjection
         services.AddSingleton<TriggerFiringService>();
         // Quartz owns a short-lived, local scheduler database. Disabling ADO.NET pooling
         // ensures its file handles are released when the hosted scheduler shuts down.
-        var schedulerConnectionString = $"Data Source={Path.Combine(dataDirectory, "scheduler.db")};Pooling=False";
-        services.AddSingleton<IHostedService>(_ => new QuartzSqliteSchemaInitializer(schedulerConnectionString));
+        var schedulerConnectionString = storageProvider == AgentstrationStorageProvider.PostgreSql
+            ? storageOptions.ConnectionString!
+            : $"Data Source={Path.Combine(dataDirectory, "scheduler.db")};Pooling=False";
+        if (storageProvider == AgentstrationStorageProvider.Sqlite)
+            services.AddSingleton<IHostedService>(_ => new QuartzSqliteSchemaInitializer(schedulerConnectionString));
         services.AddQuartz(configuration =>
         {
             configuration.SchedulerId = "AUTO";
@@ -158,14 +178,28 @@ public static class DependencyInjection
             configuration.UsePersistentStore(options =>
             {
                 options.UseProperties = true;
-                options.UseMicrosoftSQLite(sqlite => sqlite.ConnectionString = schedulerConnectionString);
+                if (storageProvider == AgentstrationStorageProvider.PostgreSql)
+                {
+                    options.UsePostgres(postgres =>
+                    {
+                        postgres.ConnectionString = schedulerConnectionString;
+                        postgres.TablePrefix = "scheduler.qrtz_";
+                    });
+                }
+                else
+                    options.UseMicrosoftSQLite(sqlite => sqlite.ConnectionString = schedulerConnectionString);
                 options.UseSystemTextJsonSerializer();
             });
         });
         services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
         services.AddHostedService<TriggerSchedulerReconciler>();
-        runtimeConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "runtime-plane.db")}";
-        services.AddSqliteRuntimeRuns(runtimeConnectionString);
+        if (storageProvider == AgentstrationStorageProvider.PostgreSql)
+            services.AddPostgreSqlRuntimeRuns(storageOptions.ConnectionString!);
+        else
+        {
+            runtimeConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "runtime-plane.db")}";
+            services.AddSqliteRuntimeRuns(runtimeConnectionString);
+        }
         services.AddSingleton<RuntimeRunStateManager>();
         services.AddSingleton<RuntimeRunService>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());
@@ -175,8 +209,13 @@ public static class DependencyInjection
         services.AddSingleton<IToolGovernanceAuditReader, ToolGovernanceAuditReader>();
         services.AddSingleton<IToolExecutionPipeline, ToolExecutionPipeline>();
         services.AddSingleton<IRuntimeRunExecutionScope, WorkspaceRuntimeRunExecutionScope>();
-        workPlaneConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "work-plane.db")}";
-        services.AddSqliteWorkPlane(workPlaneConnectionString);
+        if (storageProvider == AgentstrationStorageProvider.PostgreSql)
+            services.AddPostgreSqlWorkPlane(storageOptions.ConnectionString!);
+        else
+        {
+            workPlaneConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "work-plane.db")}";
+            services.AddSqliteWorkPlane(workPlaneConnectionString);
+        }
         services.AddSingleton<IArtifactStore>(_ => new FileSystemArtifactStore(Path.Combine(dataDirectory, "artifacts")));
         services.AddSingleton<LocalWorkExecutionGateway>();
         services.AddSingleton<IWorkExecutionGateway>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
@@ -184,8 +223,13 @@ public static class DependencyInjection
         services.AddSingleton<WorkItemService>();
         services.AddSingleton<WorkplaceService>();
         services.AddSingleton<IWorkTaskEventSink, WorkplaceProjectionSink>();
-        flowConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "flow-plane.db")}";
-        services.AddSqliteFlowStorage(flowConnectionString);
+        if (storageProvider == AgentstrationStorageProvider.PostgreSql)
+            services.AddPostgreSqlFlowStorage(storageOptions.ConnectionString!);
+        else
+        {
+            flowConnectionString ??= $"Data Source={Path.Combine(dataDirectory, "flow-plane.db")}";
+            services.AddSqliteFlowStorage(flowConnectionString);
+        }
         services.AddSingleton<FlowService>();
         services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();
         services.AddSingleton<EntryResourceDeletionGuard>();

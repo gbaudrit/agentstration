@@ -3,21 +3,30 @@
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../Agentstration.Flow.Application/Agentstration.Flow.Application.csproj" />
     <ProjectReference Include="../Agentstration.Flow.Storage.Sqlite/Agentstration.Flow.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../Agentstration.Flow.Storage.PostgreSql/Agentstration.Flow.Storage.PostgreSql.csproj" />
     <ProjectReference Include="../Agentstration.Management.Storage.Sqlite/Agentstration.Management.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../Agentstration.Management.Storage.PostgreSql/Agentstration.Management.Storage.PostgreSql.csproj" />
     <ProjectReference Include="../Agentstration.Management.Core/Agentstration.Management.Core.csproj" />
     <ProjectReference Include="../Agentstration.Management.Contracts/Agentstration.Management.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Core/Agentstration.Runtime.Core.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Storage.PostgreSql/Agentstration.Runtime.Storage.PostgreSql.csproj" />
     <ProjectReference Include="../Agentstration.Secrets.Local/Agentstration.Secrets.Local.csproj" />
+    <ProjectReference Include="../Agentstration.Security.AspNetCoreIdentity/Agentstration.Security.AspNetCoreIdentity.csproj" />
     <ProjectReference Include="../Agentstration.Tools.Mcp/Agentstration.Tools.Mcp.csproj" />
     <ProjectReference Include="../Agentstration.Work.Storage.Sqlite/Agentstration.Work.Storage.Sqlite.csproj" />
+    <ProjectReference Include="../Agentstration.Work.Storage.PostgreSql/Agentstration.Work.Storage.PostgreSql.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Quartz.Extensions.Hosting" />
     <PackageReference Include="Quartz.Serialization.SystemTextJson" />
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Triggers/QuartzPostgreSqlSchema.sql" />
   </ItemGroup>
 </Project>
