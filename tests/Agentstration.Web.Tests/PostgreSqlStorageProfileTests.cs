@@ -1,4 +1,5 @@
 using System.Net;
+using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -46,7 +47,10 @@ public sealed class PostgreSqlStorageProfileTests
         using var response = await client.GetAsync("/health/ready");
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         if (exerciseWorkplace)
+        {
             await AssertWorkplaceDefaultReplacementAsync(host.Services);
+            await AssertPrincipalPreferencesRoundTripAsync(host.Services);
+        }
     }
 
     private static async Task AssertWorkplaceDefaultReplacementAsync(IServiceProvider services)
@@ -77,5 +81,24 @@ public sealed class PostgreSqlStorageProfileTests
         var dashboards = await repository.ListDashboardsAsync(workspaceId, default);
         Assert.HasCount(2, dashboards);
         Assert.AreEqual(replacement.Id, dashboards.Single(value => value.IsDefault).Id);
+    }
+
+    private static async Task AssertPrincipalPreferencesRoundTripAsync(IServiceProvider services)
+    {
+        var store = services.GetRequiredService<IIdentityStore>();
+        var now = new DateTimeOffset(2026, 9, 3, 12, 0, 0, TimeSpan.Zero);
+        var principal = new Principal(Guid.NewGuid(), PrincipalKind.Human, "PostgreSQL preferences", null, PrincipalStatus.Active, now);
+        var expected = new PrincipalPreferences(
+            principal.Id,
+            ThemePreference.Dark,
+            now,
+            "fr-FR",
+            Guid.NewGuid(),
+            Guid.NewGuid());
+
+        await store.AddPrincipalAsync(principal, default);
+        await store.UpsertPrincipalPreferencesAsync(expected, default);
+
+        Assert.AreEqual(expected, await store.GetPrincipalPreferencesAsync(principal.Id, default));
     }
 }
