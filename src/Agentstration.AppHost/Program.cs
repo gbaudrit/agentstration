@@ -1,3 +1,5 @@
+using Agentstration.AppHost;
+
 var builder = DistributedApplication.CreateBuilder(args);
 var slot = builder.Configuration["Agentstration:Slot"] ?? "main";
 var storageProvider = builder.Configuration["Agentstration:Storage:Provider"] ?? "Sqlite";
@@ -71,10 +73,6 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
         "Agentstration__Bootstrap__InitialBootstrapEnabled",
         initialBootstrapEnabled ? "true" : "false")
     .WithEnvironment("Data__Directory", slotDataPath)
-    .WithEnvironment("Data__ControlPlanePath", Path.Combine(slotDataPath, "control-plane.db"))
-    .WithEnvironment("Data__WorkPlanePath", Path.Combine(slotDataPath, "work-plane.db"))
-    .WithEnvironment("Data__FlowPath", Path.Combine(slotDataPath, "flow-plane.db"))
-    .WithEnvironment("Data__RuntimePath", Path.Combine(slotDataPath, "runtime-plane.db"))
     .WithEnvironment("ConnectionStrings__ollama-extension", ollamaExtension.GetEndpoint("http"))
     .WithEnvironment("ConnectionStrings__llama-cpp-extension", llamaCppExtension.GetEndpoint("http"))
     .WithEnvironment("ConnectionStrings__localai-extension", localAiExtension.GetEndpoint("http"))
@@ -85,16 +83,9 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithHttpHealthCheck("/health")
     .WaitFor(ollamaExtension);
 if (string.Equals(storageProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
-{
-    var postgres = builder.AddPostgres("postgres")
-        .WithImage("postgres")
-        .WithImageTag("17")
-        .WithDataVolume("agentstration-postgresql");
-    var database = postgres.AddDatabase("agentstration");
-    console.WithEnvironment("Agentstration__Storage__Provider", "PostgreSql")
-        .WithReference(database)
-        .WaitFor(database);
-}
+    console.WithPostgreSqlStorage(builder, slot);
+else
+    console.WithSqliteStorage(slotDataPath);
 for (var index = 0; index < initialBootstrapProfiles.Length; index++)
     console.WithEnvironment($"Agentstration__Bootstrap__InitialProfiles__{index}", initialBootstrapProfiles[index]);
 console.WaitFor(llamaCppExtension);

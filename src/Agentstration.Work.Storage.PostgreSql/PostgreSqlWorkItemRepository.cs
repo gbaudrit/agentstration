@@ -455,25 +455,30 @@ public sealed class PostgreSqlWorkplaceRepository(IDbContextFactory<WorkDbContex
     {
         WorkplaceValidation.Validate(dashboard);
         if (!dashboard.IsDefault) throw new ArgumentException("The replacement Dashboard must be marked as default.", nameof(dashboard));
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-        var workspaceKey = dashboard.WorkspaceId.ToString();
-        var documents = await context.Dashboards.Where(value => value.WorkspaceId == workspaceKey).ToArrayAsync(cancellationToken);
-        foreach (var document in documents)
+        await using var strategyContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var strategy = strategyContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            var current = Deserialize<WorkplaceDashboard>(document.Payload);
-            if (current.Id == dashboard.Id || !current.IsDefault) continue;
-            var demoted = current with
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            var workspaceKey = dashboard.WorkspaceId.ToString();
+            var documents = await context.Dashboards.Where(value => value.WorkspaceId == workspaceKey).ToArrayAsync(cancellationToken);
+            foreach (var document in documents)
             {
-                IsDefault = false,
-                Version = checked(current.Version + 1),
-                PublishedAt = dashboard.PublishedAt
-            };
-            document.Payload = JsonSerializer.Serialize(demoted, JsonOptions);
-        }
-        await UpsertDashboardAsync(context, dashboard, cancellationToken);
-        await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+                var current = Deserialize<WorkplaceDashboard>(document.Payload);
+                if (current.Id == dashboard.Id || !current.IsDefault) continue;
+                var demoted = current with
+                {
+                    IsDefault = false,
+                    Version = checked(current.Version + 1),
+                    PublishedAt = dashboard.PublishedAt
+                };
+                document.Payload = JsonSerializer.Serialize(demoted, JsonOptions);
+            }
+            await UpsertDashboardAsync(context, dashboard, cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
     }
 
     public async Task<IReadOnlyList<WorkplaceDashboard>> ListDashboardsAsync(WorkspaceId workspaceId, CancellationToken cancellationToken)

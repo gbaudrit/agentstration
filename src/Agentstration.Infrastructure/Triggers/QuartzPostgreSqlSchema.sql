@@ -152,14 +152,14 @@ CREATE TABLE IF NOT EXISTS scheduler.qrtz_locks
     PRIMARY KEY (sched_name, lock_name)
 );
 
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_j_req_recovery ON scheduler.qrtz_job_details (requests_recovery);
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_t_next_fire_time ON scheduler.qrtz_triggers (next_fire_time);
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_t_state ON scheduler.qrtz_triggers (trigger_state);
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_t_nft_st ON scheduler.qrtz_triggers (next_fire_time, trigger_state);
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_ft_trig_name ON scheduler.qrtz_fired_triggers (trigger_name);
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_ft_trig_group ON scheduler.qrtz_fired_triggers (trigger_group);
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_ft_trig_nm_gp ON scheduler.qrtz_fired_triggers (sched_name, trigger_name, trigger_group);
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_ft_trig_inst_name ON scheduler.qrtz_fired_triggers (instance_name);
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_ft_job_name ON scheduler.qrtz_fired_triggers (job_name);
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_ft_job_group ON scheduler.qrtz_fired_triggers (job_group);
-CREATE INDEX IF NOT EXISTS scheduler.idx_qrtz_ft_job_req_recovery ON scheduler.qrtz_fired_triggers (requests_recovery);
+CREATE INDEX IF NOT EXISTS idx_qrtz_j_req_recovery ON scheduler.qrtz_job_details (requests_recovery);
+CREATE INDEX IF NOT EXISTS idx_qrtz_t_next_fire_time ON scheduler.qrtz_triggers (next_fire_time);
+CREATE INDEX IF NOT EXISTS idx_qrtz_t_state ON scheduler.qrtz_triggers (trigger_state);
+CREATE INDEX IF NOT EXISTS idx_qrtz_t_nft_st ON scheduler.qrtz_triggers (next_fire_time, trigger_state);
+CREATE INDEX IF NOT EXISTS idx_qrtz_ft_trig_name ON scheduler.qrtz_fired_triggers (trigger_name);
+CREATE INDEX IF NOT EXISTS idx_qrtz_ft_trig_group ON scheduler.qrtz_fired_triggers (trigger_group);
+CREATE INDEX IF NOT EXISTS idx_qrtz_ft_trig_nm_gp ON scheduler.qrtz_fired_triggers (sched_name, trigger_name, trigger_group);
+CREATE INDEX IF NOT EXISTS idx_qrtz_ft_trig_inst_name ON scheduler.qrtz_fired_triggers (instance_name);
+CREATE INDEX IF NOT EXISTS idx_qrtz_ft_job_name ON scheduler.qrtz_fired_triggers (job_name);
+CREATE INDEX IF NOT EXISTS idx_qrtz_ft_job_group ON scheduler.qrtz_fired_triggers (job_group);
+CREATE INDEX IF NOT EXISTS idx_qrtz_ft_job_req_recovery ON scheduler.qrtz_fired_triggers (requests_recovery);

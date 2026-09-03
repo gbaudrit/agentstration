@@ -101,7 +101,7 @@ Canonical Management resources and provider-neutral ports live in `Management.Ab
 | Routing | deterministic stateless decision | rule catalog and LLM router |
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
-| Scheduling | Workspace-scoped Trigger resources, durable occurrences, Quartz.NET persistent SQLite projection, startup reconciliation, explicit misfire/concurrency policy and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
+| Scheduling | Workspace-scoped Trigger resources, durable occurrences, Quartz.NET projection in the selected SQLite or PostgreSQL store, startup reconciliation, explicit misfire/concurrency policy and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
 | Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog, and an Agentstration-owned runtime execution boundary before MCP `tools/call` | richer permissions, credentials, connection policies, and execution hooks |
 | Notifications | Work and Workplace notification records | email, Teams, webhook channels |
 | MCP | generic governed MCP provider/client infrastructure; no built-in legacy platform tools | managed server-side tools and authorization |
@@ -137,7 +137,7 @@ Every workspace-owned record carries `WorkspaceId`. Queries require it alongside
 
 ```text
 TriggerResource (Management desired state)
-  -> Quartz SQLite projection (reconstructible)
+  -> Quartz projection in the selected relational store (reconstructible)
   -> durable TriggerOccurrence (idempotency and pre-Work outcome)
   -> current Principal authorization
   -> exact immutable FlowReference

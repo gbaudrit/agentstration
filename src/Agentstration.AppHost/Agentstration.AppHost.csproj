@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsAspireHost>true</IsAspireHost>
+    <UserSecretsId>Agentstration.AppHost</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Web/Agentstration.Web.csproj" />

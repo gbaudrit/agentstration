@@ -16,7 +16,9 @@ The AppHost receives the slot identifier and a worktree-local data root:
 .agentstration/slots/<slot>/
 ```
 
-This directory contains the JSON content store, Management, Identity, Runtime, Work, Flow and scheduler SQLite databases, data-protection keys, local secrets, Pack artifacts and Work artifacts. `.agentstration/` is ignored by Git. Because the root is inside the worktree, two worktrees do not share these files even if their normalized slot identifiers happen to match.
+With the default SQLite profile, this directory contains the Management, Identity, Runtime, Work, Flow and scheduler databases, data-protection keys, local secrets, Pack artifacts and Work artifacts. `.agentstration/` is ignored by Git. Because the root is inside the worktree, two worktrees do not share these files even if their normalized slot identifiers happen to match.
+
+With the optional PostgreSQL profile, file-backed state remains in this directory but relational data uses the Docker volume `agentstration-<slot>-postgresql`. A native volume is required because PostgreSQL initialization changes Unix ownership and permissions; a bind mount into a Windows worktree fails under the Linux/WSL Docker daemon. Docker volumes are host-global, so explicitly overridden slot names must also be unique across concurrently running worktrees. The AppHost password is generated and persisted in user-secrets; keep that secret and its volume together.
 
 Aspire continues to allocate the Console, Workplace and extension endpoints dynamically. The launch script also obtains available ports for the AppHost dashboard, telemetry receiver and resource service instead of using the fixed development launch profile, so multiple AppHosts can coexist.
 
@@ -30,7 +32,7 @@ To display all worktrees known to Git and their inferred slots:
 ./dev/slots.ps1
 ```
 
-The first version reports `SLOT`, `BRANCH` and `WORKTREE`; it does not track whether a slot is currently running. Stop a slot with `Ctrl+C` in the terminal where it was launched. Slot data is never removed automatically.
+The first version reports `SLOT`, `BRANCH` and `WORKTREE`; it does not track whether a slot is currently running. Stop a slot with `Ctrl+C` in the terminal where it was launched. Slot data and PostgreSQL volumes are never removed automatically. Inspect a PostgreSQL volume with `docker volume inspect agentstration-<slot>-postgresql`; removing it permanently deletes that slot's relational data.
 
 For example:
 
