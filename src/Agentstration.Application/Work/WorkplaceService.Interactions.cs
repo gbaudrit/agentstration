@@ -218,7 +218,11 @@ public sealed partial class WorkplaceService
             Flow: WorkplaceValidation.FlowReferenceFrom(target)), cancellationToken);
         var task = ToTask(stored.Value, interaction.TaskId);
         var responseText = "I’m creating an updated version from the previous result.";
-        var agentResponse = await AddAgentMessageAsync(interaction, responseText, now, cancellationToken);
+        var responseMetadata = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["presentationKey"] = "ContinuationStarted"
+        };
+        var agentResponse = await AddAgentMessageAsync(interaction, responseText, now, cancellationToken, responseMetadata);
         var action = new CreateTaskAction(interaction.TaskId.Value, task.Title, task.Description, $"/tasks/{interaction.TaskId.Value}");
         var processing = interaction with
         {
@@ -277,9 +281,14 @@ public sealed partial class WorkplaceService
             ? Task.FromResult(interaction.EntrySnapshot)
             : GetEntryAsync(interaction.WorkspaceId, interaction.EntryId, cancellationToken);
 
-    private async Task<ConversationMessage> AddAgentMessageAsync(WorkplaceInteraction interaction, string content, DateTimeOffset now, CancellationToken token)
+    private async Task<ConversationMessage> AddAgentMessageAsync(
+        WorkplaceInteraction interaction,
+        string content,
+        DateTimeOffset now,
+        CancellationToken token,
+        IReadOnlyDictionary<string, string>? metadata = null)
     {
-        var message = new ConversationMessage(Guid.NewGuid(), interaction.WorkspaceId, interaction.Id, interaction.TaskId, ConversationRole.Agentstration, content, now);
+        var message = new ConversationMessage(Guid.NewGuid(), interaction.WorkspaceId, interaction.Id, interaction.TaskId, ConversationRole.Agentstration, content, now, Metadata: metadata);
         await repository.AddMessageAsync(message, token);
         await PublishAsync(new MessageAddedEvent(EventId(), interaction.WorkspaceId.Value, Sequence(), now, message), token);
         return message;

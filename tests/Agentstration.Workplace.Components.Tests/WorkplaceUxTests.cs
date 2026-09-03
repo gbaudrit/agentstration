@@ -262,6 +262,34 @@ public sealed class WorkplaceUxTests
     }
 
     [TestMethod]
+    public void ProductOwnedConversationMessagesUseTheSelectedCulture()
+    {
+        var originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
+            using var context = CreateContext();
+            var message = new ConversationMessage(
+                Guid.NewGuid(),
+                new WorkspaceId(Guid.NewGuid()),
+                InteractionId.New(),
+                null,
+                ConversationRole.Agentstration,
+                "I’m creating an updated version from the previous result.",
+                DateTimeOffset.UtcNow);
+
+            var rendered = context.Render<ConversationMessageView>(parameters => parameters.Add(value => value.Message, message));
+
+            Assert.IsTrue(rendered.Markup.Contains("Je crée une nouvelle version à partir du résultat précédent.", StringComparison.Ordinal));
+            Assert.IsFalse(rendered.Markup.Contains(message.Content, StringComparison.Ordinal));
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
+    }
+
+    [TestMethod]
     public void ParticipantProgressUsesEntryVisibilityWithoutExposingFlowTopology()
     {
         using var context = CreateContext();
