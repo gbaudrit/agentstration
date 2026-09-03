@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: agentstration
+      POSTGRES_USER: ${POSTGRES_USER:-agentstration}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment or an uncommitted .env file}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - agentstration-postgresql:/var/lib/postgresql/data
+
+  agentstration:
+    environment:
+      Agentstration__Storage__Provider: PostgreSql
+      ConnectionStrings__Agentstration: Host=postgres;Port=5432;Database=agentstration;Username=${POSTGRES_USER:-agentstration};Password=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  agentstration-postgresql:

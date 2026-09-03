@@ -90,7 +90,7 @@ Canonical Management resources and provider-neutral ports live in `Management.Ab
 |---|---|---|
 | Management plane | canonical declarative agent and model-profile resources, typed references, desired state, generations, provisioning status, lifecycle events, deterministic revisions, deployments, ETag API | operations, policies, connections, identities, manifest import |
 | Pack distribution | local ZIP importer, retained source artifacts, Pack Projects, workspace-resource Composer with dependency closure, deterministic builds, direct current-Workspace installation, logical Model Profile/Model Provider/Runtime Profile/Secret bindings retained by Pack identity, coordinated six-kind lifecycle, differential updates, provenance, compensation, and modification-safe uninstall | broader contained-resource authoring, fully scoped cross-Workspace install, dependency resolution, three-way merge, signatures, Gallery, and publisher verification |
-| Control storage | SQLite JSON resources with indexed metadata and optimistic concurrency | richer relational projections and migrations |
+| Control storage | SQLite by default or optional PostgreSQL in six module-owned schemas, with optimistic concurrency and versioned migrations | richer relational projections and supported export/import |
 | Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, MAF `ChatClientAgent`, in-process/shared-host provisioning, registry, reconciliation | provider-native token/tool streaming, sessions, dedicated hosts, containers, remote and Foundry adapters |
 | Model providers | SQLite-backed extension registrations and provider bindings with ETag CRUD and usage protection, explicit configuration/Aspire refresh, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | additional AEP extensions, cached discovery |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
@@ -101,7 +101,7 @@ Canonical Management resources and provider-neutral ports live in `Management.Ab
 | Routing | deterministic stateless decision | rule catalog and LLM router |
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
-| Scheduling | Workspace-scoped Trigger resources, durable occurrences, Quartz.NET persistent SQLite projection, startup reconciliation, explicit misfire/concurrency policy and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
+| Scheduling | Workspace-scoped Trigger resources, durable occurrences, Quartz.NET projection in the selected SQLite or PostgreSQL store, startup reconciliation, explicit misfire/concurrency policy and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
 | Tools | persisted ToolProvider/Tool resources, AEP contribution resolution, MCP schema catalog, and an Agentstration-owned runtime execution boundary before MCP `tools/call` | richer permissions, credentials, connection policies, and execution hooks |
 | Notifications | Work and Workplace notification records | email, Teams, webhook channels |
 | MCP | generic governed MCP provider/client infrastructure; no built-in legacy platform tools | managed server-side tools and authorization |
@@ -137,7 +137,7 @@ Every workspace-owned record carries `WorkspaceId`. Queries require it alongside
 
 ```text
 TriggerResource (Management desired state)
-  -> Quartz SQLite projection (reconstructible)
+  -> Quartz projection in the selected relational store (reconstructible)
   -> durable TriggerOccurrence (idempotency and pre-Work outcome)
   -> current Principal authorization
   -> exact immutable FlowReference

@@ -1,6 +1,5 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Hosting;
-using Quartz.Logging;
 
 namespace Agentstration.Infrastructure.Triggers;
 
@@ -8,13 +7,7 @@ public sealed class QuartzSqliteSchemaInitializer : IHostedService
 {
     private readonly string connectionString;
 
-    public QuartzSqliteSchemaInitializer(string connectionString)
-    {
-        this.connectionString = connectionString;
-        // Quartz 3 keeps its logging provider in static process state. Reset stale providers
-        // before another in-process host (notably WebApplicationFactory) constructs Quartz.
-        LogProvider.SetCurrentLogProvider(NullQuartzLogProvider.Instance);
-    }
+    public QuartzSqliteSchemaInitializer(string connectionString) => this.connectionString = connectionString;
     private static readonly string[] Statements =
     [
         """CREATE TABLE IF NOT EXISTS QRTZ_JOB_DETAILS (SCHED_NAME NVARCHAR(120) NOT NULL, JOB_NAME NVARCHAR(150) NOT NULL, JOB_GROUP NVARCHAR(150) NOT NULL, DESCRIPTION NVARCHAR(250) NULL, JOB_CLASS_NAME NVARCHAR(250) NOT NULL, IS_DURABLE BIT NOT NULL, IS_NONCONCURRENT BIT NOT NULL, IS_UPDATE_DATA BIT NOT NULL, REQUESTS_RECOVERY BIT NOT NULL, JOB_DATA BLOB NULL, PRIMARY KEY (SCHED_NAME, JOB_NAME, JOB_GROUP))""",
@@ -49,13 +42,4 @@ public sealed class QuartzSqliteSchemaInitializer : IHostedService
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-    private sealed class NullQuartzLogProvider : ILogProvider
-    {
-        public static NullQuartzLogProvider Instance { get; } = new();
-        public Logger GetLogger(string name) => static (level, message, exception, parameters) => false;
-        public IDisposable OpenNestedContext(string message) => EmptyDisposable.Instance;
-        public IDisposable OpenMappedContext(string key, object value, bool destructure = false) => EmptyDisposable.Instance;
-        private sealed class EmptyDisposable : IDisposable { public static EmptyDisposable Instance { get; } = new(); public void Dispose() { } }
-    }
 }

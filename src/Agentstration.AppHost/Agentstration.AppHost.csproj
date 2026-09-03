@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsAspireHost>true</IsAspireHost>
+    <UserSecretsId>Agentstration.AppHost</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Web/Agentstration.Web.csproj" />
@@ -10,5 +11,8 @@
     <ProjectReference Include="../Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
   </ItemGroup>
 </Project>

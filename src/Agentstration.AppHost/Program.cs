@@ -1,5 +1,13 @@
+using Agentstration.AppHost;
+
 var builder = DistributedApplication.CreateBuilder(args);
 var slot = builder.Configuration["Agentstration:Slot"] ?? "main";
+var storageProvider = builder.Configuration["Agentstration:Storage:Provider"] ?? "Sqlite";
+if (!string.Equals(storageProvider, "Sqlite", StringComparison.OrdinalIgnoreCase)
+    && !string.Equals(storageProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException("Agentstration:Storage:Provider must be either 'Sqlite' or 'PostgreSql'.");
+}
 if (!System.Text.RegularExpressions.Regex.IsMatch(slot, "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"))
 {
     throw new InvalidOperationException("Agentstration:Slot must contain only lowercase letters, digits, and internal hyphens (maximum 63 characters).");
@@ -65,10 +73,6 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
         "Agentstration__Bootstrap__InitialBootstrapEnabled",
         initialBootstrapEnabled ? "true" : "false")
     .WithEnvironment("Data__Directory", slotDataPath)
-    .WithEnvironment("Data__ControlPlanePath", Path.Combine(slotDataPath, "control-plane.db"))
-    .WithEnvironment("Data__WorkPlanePath", Path.Combine(slotDataPath, "work-plane.db"))
-    .WithEnvironment("Data__FlowPath", Path.Combine(slotDataPath, "flow-plane.db"))
-    .WithEnvironment("Data__RuntimePath", Path.Combine(slotDataPath, "runtime-plane.db"))
     .WithEnvironment("ConnectionStrings__ollama-extension", ollamaExtension.GetEndpoint("http"))
     .WithEnvironment("ConnectionStrings__llama-cpp-extension", llamaCppExtension.GetEndpoint("http"))
     .WithEnvironment("ConnectionStrings__localai-extension", localAiExtension.GetEndpoint("http"))
@@ -78,6 +82,10 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint", utilitiesExtension.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WaitFor(ollamaExtension);
+if (string.Equals(storageProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
+    console.WithPostgreSqlStorage(builder, slot);
+else
+    console.WithSqliteStorage(slotDataPath);
 for (var index = 0; index < initialBootstrapProfiles.Length; index++)
     console.WithEnvironment($"Agentstration__Bootstrap__InitialProfiles__{index}", initialBootstrapProfiles[index]);
 console.WaitFor(llamaCppExtension);

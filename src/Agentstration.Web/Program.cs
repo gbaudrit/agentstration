@@ -10,6 +10,7 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
+using Agentstration.Security.AspNetCoreIdentity.PostgreSql;
 using Agentstration.Web;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
@@ -41,10 +42,17 @@ toolExecutionCapture.Validate();
 builder.Services.AddSingleton(toolExecutionCapture);
 var dataDirectory = builder.Configuration["Data:Directory"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration");
 Directory.CreateDirectory(dataDirectory);
-var identityConnectionString = builder.Configuration.GetConnectionString("Identity")
-    ?? (builder.Environment.IsEnvironment("Testing")
-        ? $"Data Source={Path.Combine(Path.GetTempPath(), $"agentstration-identity-tests-{Guid.NewGuid():N}.db")}"
-        : $"Data Source={Path.Combine(dataDirectory, "identity.db")}");
+var storageOptions = (builder.Configuration.GetSection(AgentstrationStorageOptions.SectionName).Get<AgentstrationStorageOptions>() ?? new()) with
+{
+    ConnectionString = builder.Configuration.GetConnectionString("Agentstration")
+};
+var storageProvider = storageOptions.GetProvider();
+var identityConnectionString = storageProvider == AgentstrationStorageProvider.PostgreSql
+    ? storageOptions.ConnectionString!
+    : builder.Configuration.GetConnectionString("Identity")
+        ?? (builder.Environment.IsEnvironment("Testing")
+            ? $"Data Source={Path.Combine(Path.GetTempPath(), $"agentstration-identity-tests-{Guid.NewGuid():N}.db")}"
+            : $"Data Source={Path.Combine(dataDirectory, "identity.db")}");
 var dataProtectionKeysPath = configuredAuthentication.DataProtectionKeysPath;
 if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 {
@@ -58,27 +66,24 @@ const string defaultAiEndpoint = "http://localhost:11434/v1/";
 var aiEndpoint = builder.Configuration["AI:Endpoint"] ?? defaultAiEndpoint;
 if (!Uri.TryCreate(aiEndpoint.EndsWith('/') ? aiEndpoint : aiEndpoint + '/', UriKind.Absolute, out var parsedAiEndpoint)) throw new InvalidOperationException("AI:Endpoint must be an absolute URL.");
 var aiOptions = new AiProviderOptions(aiProvider, parsedAiEndpoint, builder.Configuration["AI:Model"] ?? "phi4-mini", builder.Configuration["AI:ApiKey"]);
-var controlPlanePath = builder.Environment.IsEnvironment("Testing")
-    ? Path.Combine(Path.GetTempPath(), $"agentstration-tests-{Guid.NewGuid():N}.db")
-    : builder.Configuration["Data:ControlPlanePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "control-plane.db");
-var controlPlaneDirectory = Path.GetDirectoryName(controlPlanePath);
-if (!string.IsNullOrWhiteSpace(controlPlaneDirectory)) Directory.CreateDirectory(controlPlaneDirectory);
-var workPlanePath = builder.Environment.IsEnvironment("Testing")
-    ? Path.Combine(Path.GetTempPath(), $"agentstration-work-tests-{Guid.NewGuid():N}.db")
-    : builder.Configuration["Data:WorkPlanePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "work-plane.db");
-var workPlaneDirectory = Path.GetDirectoryName(workPlanePath);
-if (!string.IsNullOrWhiteSpace(workPlaneDirectory)) Directory.CreateDirectory(workPlaneDirectory);
-var flowPath = builder.Environment.IsEnvironment("Testing")
-    ? Path.Combine(Path.GetTempPath(), $"agentstration-flow-tests-{Guid.NewGuid():N}.db")
-    : builder.Configuration["Data:FlowPath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "flow-plane.db");
-var flowDirectory = Path.GetDirectoryName(flowPath);
-if (!string.IsNullOrWhiteSpace(flowDirectory)) Directory.CreateDirectory(flowDirectory);
-var runtimePath = builder.Environment.IsEnvironment("Testing")
-    ? Path.Combine(Path.GetTempPath(), $"agentstration-runtime-tests-{Guid.NewGuid():N}.db")
-    : builder.Configuration["Data:RuntimePath"] ?? Path.Combine(builder.Environment.ContentRootPath, ".agentstration", "runtime-plane.db");
-var runtimeDirectory = Path.GetDirectoryName(runtimePath);
-if (!string.IsNullOrWhiteSpace(runtimeDirectory)) Directory.CreateDirectory(runtimeDirectory);
-builder.Services.AddAgentstration(dataDirectory, aiOptions, $"Data Source={controlPlanePath}", $"Data Source={workPlanePath}", $"Data Source={flowPath}", $"Data Source={runtimePath}");
+string? SqliteConnection(string setting, string fileName, string testPrefix)
+{
+    if (storageProvider == AgentstrationStorageProvider.PostgreSql) return null;
+    var path = builder.Environment.IsEnvironment("Testing")
+        ? Path.Combine(Path.GetTempPath(), $"{testPrefix}-{Guid.NewGuid():N}.db")
+        : builder.Configuration[setting] ?? Path.Combine(dataDirectory, fileName);
+    var directory = Path.GetDirectoryName(path);
+    if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+    return $"Data Source={path}";
+}
+builder.Services.AddAgentstration(
+    dataDirectory,
+    aiOptions,
+    SqliteConnection("Data:ControlPlanePath", "control-plane.db", "agentstration-tests"),
+    SqliteConnection("Data:WorkPlanePath", "work-plane.db", "agentstration-work-tests"),
+    SqliteConnection("Data:FlowPath", "flow-plane.db", "agentstration-flow-tests"),
+    SqliteConnection("Data:RuntimePath", "runtime-plane.db", "agentstration-runtime-tests"),
+    storageOptions);
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
@@ -91,10 +96,16 @@ builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddAgentstrationLocalization(builder.Configuration);
 builder.Services.AddSignalR();
-builder.Services.AddAgentstrationLocalIdentity(
-    identityConnectionString,
-    dataProtectionKeysPath,
-    useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
+if (storageProvider == AgentstrationStorageProvider.PostgreSql)
+    builder.Services.AddAgentstrationPostgreSqlIdentity(
+        identityConnectionString,
+        dataProtectionKeysPath,
+        useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
+else
+    builder.Services.AddAgentstrationLocalIdentity(
+        identityConnectionString,
+        dataProtectionKeysPath,
+        useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
 builder.Services.AddScoped<DeclarativeBootstrapService>();
 builder.Services.AddSingleton<BootstrapProfileCatalog>();
 builder.Services.AddSingleton<BootstrapApplicationLock>();
@@ -170,6 +181,9 @@ app.UseAuthorization();
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapAgentstrationOpenApi();
 app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
+app.MapGet("/health/ready", (IAgentstrationStorageInitializer storage) => storage.IsReady
+    ? Results.Ok(new { status = "ready" })
+    : Results.StatusCode(StatusCodes.Status503ServiceUnavailable)).AllowAnonymous();
 app.MapAgentstrationCultureEndpoint().AllowAnonymous();
 app.MapAgentstrationAuthentication();
 app.MapAgentstrationLocalAccountAdministration();
@@ -195,6 +209,7 @@ RequestContext? bootstrapContext = null;
 var startupScopes = app.Services.GetRequiredService<IRequestContextScopeFactory>();
 using (startupScopes.PushSystem())
 {
+    await app.Services.GetRequiredService<IAgentstrationStorageInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
     await app.Services.GetRequiredService<AgentManagementService>().InitializeAsync(app.Lifetime.ApplicationStopping);
     await app.Services.GetRequiredService<LocalIdentityDatabaseInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
     if (string.Equals(configuredAuthentication.Mode, Agentstration.Web.Configuration.AuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))

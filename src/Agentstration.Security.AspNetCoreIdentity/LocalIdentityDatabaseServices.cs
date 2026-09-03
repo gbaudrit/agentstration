@@ -35,6 +35,8 @@ public sealed class LocalIdentityDatabaseInitializer(IServiceScopeFactory scopeF
 
     private static async Task BaselineLegacyDatabaseAsync(LocalIdentityDbContext database, CancellationToken cancellationToken)
     {
+        if (!database.Database.IsSqlite()) return;
+
         await database.Database.OpenConnectionAsync(cancellationToken);
         try
         {
@@ -80,12 +82,25 @@ public static class LocalIdentityServiceCollectionExtensions
         bool useDevelopmentPasswordPolicy = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        return services.AddAgentstrationIdentity(
+            options => options.UseSqlite(connectionString),
+            dataProtectionKeysPath,
+            useDevelopmentPasswordPolicy);
+    }
+
+    public static IServiceCollection AddAgentstrationIdentity(
+        this IServiceCollection services,
+        Action<DbContextOptionsBuilder> configureDatabase,
+        string dataProtectionKeysPath,
+        bool useDevelopmentPasswordPolicy = false)
+    {
+        ArgumentNullException.ThrowIfNull(configureDatabase);
         ArgumentException.ThrowIfNullOrWhiteSpace(dataProtectionKeysPath);
         var keysDirectory = PrepareDataProtectionKeysDirectory(dataProtectionKeysPath);
         services.AddDataProtection()
             .SetApplicationName("Agentstration")
             .PersistKeysToFileSystem(keysDirectory);
-        services.AddDbContext<LocalIdentityDbContext>(options => options.UseSqlite(connectionString));
+        services.AddDbContext<LocalIdentityDbContext>(configureDatabase);
         services.AddIdentityCore<LocalIdentityUser>(options =>
             {
                 options.Password.RequiredLength = useDevelopmentPasswordPolicy ? 5 : 12;

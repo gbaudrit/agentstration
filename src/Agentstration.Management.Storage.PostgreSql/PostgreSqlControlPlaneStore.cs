@@ -1,0 +1,295 @@
+using System.Text.Json;
+using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+namespace Agentstration.Management.Storage.PostgreSql;
+
+public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
+{
+    internal DbSet<ControlPlaneDocument> Documents => Set<ControlPlaneDocument>();
+    internal DbSet<TenantRow> Tenants => Set<TenantRow>();
+    internal DbSet<WorkspaceRow> Workspaces => Set<WorkspaceRow>();
+    internal DbSet<PrincipalRow> Principals => Set<PrincipalRow>();
+    internal DbSet<PrincipalPreferencesRow> PrincipalPreferences => Set<PrincipalPreferencesRow>();
+    internal DbSet<ExternalIdentityRow> ExternalIdentities => Set<ExternalIdentityRow>();
+    internal DbSet<LocalIdentityRow> LocalIdentities => Set<LocalIdentityRow>();
+    internal DbSet<PlatformAdministratorRow> PlatformAdministrators => Set<PlatformAdministratorRow>();
+    internal DbSet<TenantMembershipRow> TenantMemberships => Set<TenantMembershipRow>();
+    internal DbSet<WorkspaceMembershipRow> WorkspaceMemberships => Set<WorkspaceMembershipRow>();
+    internal DbSet<RoleDefinitionRow> RoleDefinitions => Set<RoleDefinitionRow>();
+    internal DbSet<RoleAssignmentRow> RoleAssignments => Set<RoleAssignmentRow>();
+    internal DbSet<SecurityAuditRow> SecurityAuditEvents => Set<SecurityAuditRow>();
+    internal DbSet<PersonalAccessTokenRow> PersonalAccessTokens => Set<PersonalAccessTokenRow>();
+    internal DbSet<TriggerOccurrenceRow> TriggerOccurrences => Set<TriggerOccurrenceRow>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.HasDefaultSchema("management");
+        var document = modelBuilder.Entity<ControlPlaneDocument>();
+        document.ToTable("ControlPlaneResources");
+        document.HasKey(value => value.StorageKey);
+        document.Property(value => value.StorageKey).HasColumnName("ResourceId").HasMaxLength(1024);
+        document.Property(value => value.LegacyResourceType).HasColumnName("ResourceType").HasMaxLength(256);
+        document.Property(value => value.Kind).HasMaxLength(256);
+        document.Property(value => value.Name).HasMaxLength(256);
+        document.Property(value => value.Namespace).HasMaxLength(128);
+        document.Property(value => value.TenantId);
+        document.Property(value => value.WorkspaceId);
+        document.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
+        document.HasIndex(value => new { value.WorkspaceId, value.Namespace, value.Kind, value.Name }).IsUnique();
+        var occurrence = modelBuilder.Entity<TriggerOccurrenceRow>();
+        occurrence.ToTable("TriggerOccurrences");
+        occurrence.HasKey(value => value.Id);
+        occurrence.Property(value => value.TriggerName).HasMaxLength(256);
+        occurrence.Property(value => value.TriggerNamespace).HasMaxLength(128);
+        occurrence.Property(value => value.Kind).HasMaxLength(32);
+        occurrence.Property(value => value.Outcome).HasMaxLength(32);
+        occurrence.Property(value => value.WorkItemId).HasMaxLength(128);
+        occurrence.Property(value => value.ErrorCode).HasMaxLength(128);
+        occurrence.HasIndex(value => new { value.WorkspaceId, value.TriggerUid, value.ScheduledAt });
+        modelBuilder.ConfigureIdentityModel();
+    }
+}
+internal sealed class ControlPlaneDocument
+{
+    public required string StorageKey { get; set; }
+    public required string LegacyResourceType { get; set; }
+    public Guid? Uid { get; set; }
+    public string? Kind { get; set; }
+    public string? Name { get; set; }
+    public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
+    public Guid? TenantId { get; set; }
+    public Guid? WorkspaceId { get; set; }
+    public required string Payload { get; set; }
+    public required string ETag { get; set; }
+    public required DateTimeOffset UpdatedAt { get; set; }
+}
+public sealed class PostgreSqlControlPlaneStore(
+    IDbContextFactory<ControlPlaneDbContext> contextFactory,
+    TimeProvider timeProvider,
+    ICurrentRequestContext requestContext) : IControlPlaneStore, IAgentResourceQueries
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public async Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        if (!await context.Database.CanConnectAsync(cancellationToken))
+            throw new InvalidOperationException("The PostgreSQL Management store is not accessible.");
+    }
+
+    public async Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = Scoped(context.Documents.AsNoTracking());
+        var namespaceValue = key.Namespace.Value;
+        var document = await query.SingleOrDefaultAsync(value => value.Namespace == namespaceValue && value.Kind == key.Kind && value.Name == key.Name, cancellationToken);
+        return document is null ? null : Deserialize<T>(document);
+    }
+
+    public async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 1000);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = Scoped(context.Documents.AsNoTracking()).Where(value => value.Kind == kind);
+        var documents = await query.OrderBy(value => value.Namespace).ThenBy(value => value.Name).Skip(skip).Take(take).ToArrayAsync(cancellationToken);
+        return documents.Select(Deserialize<T>).ToArray();
+    }
+
+    public async Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
+    {
+        if (resource is AgentRevision) throw new InvalidOperationException("Published agent revisions are immutable and must be created through CreateImmutableAsync.");
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var namespaceValue = resource.Namespace.Value;
+        var existing = await Scoped(context.Documents).SingleOrDefaultAsync(
+            value => value.Namespace == namespaceValue && value.Kind == resource.Kind && value.Name == resource.Metadata.Name, cancellationToken);
+        if (existing is null && ifMatch is not null) throw new ControlPlaneConcurrencyException("If-Match cannot update a resource that does not exist.");
+        if (existing is not null && ifNoneMatch) throw new ControlPlaneConcurrencyException("If-None-Match prevented replacement of an existing resource.");
+        if (existing is not null && ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
+            throw new ControlPlaneConcurrencyException("The supplied ETag does not match the current resource version.");
+
+        var etag = NewETag();
+        var now = timeProvider.GetUtcNow();
+        var uid = existing?.Uid ?? Guid.NewGuid();
+        if (existing is not null && resource.Uid != Guid.Empty && resource.Uid != uid)
+            throw new ControlPlaneConcurrencyException("The UID of an existing resource is immutable.");
+        var scope = ResolveScope(resource);
+        var versioned = ApplySystemState(resource, uid, scope.TenantId, scope.WorkspaceId, etag);
+        if (existing is null)
+        {
+            context.Documents.Add(new ControlPlaneDocument
+            {
+                StorageKey = uid.ToString("N"),
+                LegacyResourceType = resource.Kind,
+                Uid = uid,
+                Kind = resource.Kind,
+                Name = resource.Metadata.Name,
+                Namespace = namespaceValue,
+                TenantId = scope.TenantId,
+                WorkspaceId = scope.WorkspaceId,
+                Payload = JsonSerializer.Serialize(versioned, JsonOptions),
+                ETag = etag,
+                UpdatedAt = now
+            });
+        }
+        else
+        {
+            existing.LegacyResourceType = resource.Kind;
+            existing.Kind = resource.Kind;
+            existing.Name = resource.Metadata.Name;
+            existing.Namespace = namespaceValue;
+            existing.TenantId = scope.TenantId;
+            existing.WorkspaceId = scope.WorkspaceId;
+            existing.Payload = JsonSerializer.Serialize(versioned, JsonOptions);
+            existing.ETag = etag;
+            existing.UpdatedAt = now;
+        }
+        await SaveAsync(context, cancellationToken);
+        return new StoredResource<T>(versioned, etag, now);
+    }
+
+    public async Task<StoredResource<T>> CreateImmutableAsync<T>(T resource, CancellationToken cancellationToken) where T : Resource
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var etag = NewETag();
+        var now = timeProvider.GetUtcNow();
+        var uid = Guid.NewGuid();
+        var scope = ResolveScope(resource);
+        var versioned = ApplySystemState(resource, uid, scope.TenantId, scope.WorkspaceId, etag);
+        context.Documents.Add(new ControlPlaneDocument
+        {
+            StorageKey = uid.ToString("N"),
+            LegacyResourceType = resource.Kind,
+            Uid = uid,
+            Kind = resource.Kind,
+            Name = resource.Metadata.Name,
+            Namespace = resource.Namespace.Value,
+            TenantId = scope.TenantId,
+            WorkspaceId = scope.WorkspaceId,
+            Payload = JsonSerializer.Serialize(versioned, JsonOptions),
+            ETag = etag,
+            UpdatedAt = now
+        });
+        try { await SaveAsync(context, cancellationToken); }
+        catch (ControlPlaneConcurrencyException exception) { throw new ControlPlaneConcurrencyException($"Immutable resource '{resource.Kind}/{resource.Metadata.Name}' already exists: {exception.Message}"); }
+        return new StoredResource<T>(versioned, etag, now);
+    }
+
+    public async Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var namespaceValue = key.Namespace.Value;
+        var existing = await Scoped(context.Documents).SingleOrDefaultAsync(value => value.Namespace == namespaceValue && value.Kind == key.Kind && value.Name == key.Name, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(key);
+        if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
+            throw new ControlPlaneConcurrencyException("The supplied ETag does not match the current resource version.");
+        context.Documents.Remove(existing);
+        await SaveAsync(context, cancellationToken);
+    }
+
+    private static StoredResource<T> Deserialize<T>(ControlPlaneDocument document) where T : Resource
+    {
+        var value = JsonSerializer.Deserialize<T>(document.Payload, JsonOptions)
+            ?? throw new InvalidOperationException($"Stored resource '{document.Kind}/{document.Name}' is invalid.");
+        value = ApplySystemState(value, document.Uid ?? value.Uid, document.TenantId ?? Guid.Empty, document.WorkspaceId ?? Guid.Empty, document.ETag);
+        return new StoredResource<T>(value, document.ETag, document.UpdatedAt);
+    }
+
+    public Task<IReadOnlyList<StoredResource<T>>> ListAllAsync<T>(string kind, CancellationToken cancellationToken) where T : Resource =>
+        LoadKindAsync<T>(kind, cancellationToken);
+
+    public async Task<StoredResource<AgentRevision>?> FindRevisionAsync(Guid agentUid, long generation, CancellationToken cancellationToken) =>
+        (await LoadKindAsync<AgentRevision>(ResourceKinds.AgentRevision, cancellationToken)).SingleOrDefault(value => value.Value.AgentUid == agentUid && value.Value.AgentVersion == generation);
+
+    public async Task<StoredResource<AgentRevision>?> FindLatestRevisionAsync(Guid agentUid, CancellationToken cancellationToken) =>
+        (await LoadKindAsync<AgentRevision>(ResourceKinds.AgentRevision, cancellationToken)).Where(value => value.Value.AgentUid == agentUid).OrderByDescending(value => value.Value.AgentVersion).ThenByDescending(value => value.Value.CreatedAt).FirstOrDefault();
+
+    public Task<StoredResource<AgentDeployment>?> FindDeploymentByRevisionAsync(string revisionName, CancellationToken cancellationToken) =>
+        FindDeploymentByRevisionAsync(ResourceNamespace.Default, revisionName, cancellationToken);
+
+    public async Task<StoredResource<AgentDeployment>?> FindDeploymentByRevisionAsync(ResourceNamespace @namespace, string revisionName, CancellationToken cancellationToken) =>
+        (await LoadKindAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken)).Where(value => value.Value.Namespace == @namespace && value.Value.RevisionName == revisionName).OrderByDescending(value => value.Value.UpdatedAt).FirstOrDefault();
+
+    public Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsForAgentAsync(string agentName, CancellationToken cancellationToken) => ListDeploymentsForAgentAsync(ResourceNamespace.Default, agentName, cancellationToken);
+
+    public async Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsForAgentAsync(ResourceNamespace @namespace, string agentName, CancellationToken cancellationToken) =>
+        (await LoadKindAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken)).Where(value => value.Value.Namespace == @namespace && value.Value.AgentName == agentName).OrderByDescending(value => value.Value.UpdatedAt).ToArray();
+
+    public Task<IReadOnlyList<StoredResource<AgentDeployment>>> ListDeploymentsAsync(CancellationToken cancellationToken) =>
+        LoadKindAsync<AgentDeployment>(ResourceKinds.AgentDeployment, cancellationToken);
+
+    private async Task<IReadOnlyList<StoredResource<T>>> LoadKindAsync<T>(string kind, CancellationToken cancellationToken) where T : Resource
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await Scoped(context.Documents.AsNoTracking())
+            .Where(value => value.Kind == kind)
+            .OrderBy(value => value.Namespace).ThenBy(value => value.Name)
+            .ToArrayAsync(cancellationToken);
+        return documents.Select(Deserialize<T>).ToArray();
+    }
+
+    private IQueryable<ControlPlaneDocument> Scoped(IQueryable<ControlPlaneDocument> query)
+    {
+        return requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.System => query,
+            ControlPlaneAccessMode.Workspace => query.Where(value => value.TenantId == requestContext.Current.TenantId
+                && value.WorkspaceId == requestContext.Current.WorkspaceId),
+            _ => throw new InvalidOperationException("Control Plane access requires an explicit workspace or system context.")
+        };
+    }
+
+    private (Guid TenantId, Guid WorkspaceId) ResolveScope(Resource resource)
+    {
+        if (requestContext.AccessMode == ControlPlaneAccessMode.Workspace)
+        {
+            var current = requestContext.Current;
+            if (resource.TenantId != Guid.Empty && resource.TenantId != current.TenantId
+                || resource.WorkspaceId != Guid.Empty && resource.WorkspaceId != current.WorkspaceId)
+                throw new InvalidOperationException("A workspace-scoped operation cannot write a resource into another scope.");
+            return (current.TenantId, current.WorkspaceId);
+        }
+        if (requestContext.AccessMode == ControlPlaneAccessMode.System)
+        {
+            if (resource.TenantId == Guid.Empty || resource.WorkspaceId == Guid.Empty)
+                return (resource.TenantId, resource.WorkspaceId);
+            return (resource.TenantId, resource.WorkspaceId);
+        }
+        throw new InvalidOperationException("Control Plane access requires an explicit workspace or system context.");
+    }
+
+    private static async Task SaveAsync(ControlPlaneDbContext context, CancellationToken cancellationToken)
+    {
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) { throw new ControlPlaneConcurrencyException(exception.InnerException?.Message ?? exception.Message); }
+    }
+
+    private static T ApplySystemState<T>(T resource, Guid uid, Guid tenantId, Guid workspaceId, string etag) where T : Resource =>
+        (T)resource.WithSystemState(uid, tenantId, workspaceId, etag);
+
+    private static string NewETag() => $"\"{Guid.NewGuid():N}\"";
+
+}
+
+public static class PostgreSqlControlPlaneServiceCollectionExtensions
+{
+    public static IServiceCollection AddPostgreSqlControlPlane(this IServiceCollection services, string connectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        services.TryAddSingleton<ICurrentRequestContext, UnavailableRequestContext>();
+        services.AddDbContextFactory<ControlPlaneDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "management").EnableRetryOnFailure()).AddInterceptors(new UtcDateTimeOffsetInterceptor()));
+        services.AddSingleton<IControlPlaneStore, PostgreSqlControlPlaneStore>();
+        services.AddSingleton<IAgentResourceQueries>(provider => (PostgreSqlControlPlaneStore)provider.GetRequiredService<IControlPlaneStore>());
+        services.AddSingleton<ITriggerOccurrenceStore, PostgreSqlTriggerOccurrenceStore>();
+        services.AddSingleton<PostgreSqlIdentityStore>();
+        services.AddSingleton<IIdentityStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
+        services.AddSingleton<ISecurityAuditStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
+        services.AddSingleton<IPersonalAccessTokenStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
+        return services;
+    }
+}

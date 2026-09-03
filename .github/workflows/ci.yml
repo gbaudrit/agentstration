@@ -149,6 +149,49 @@ jobs:
         if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
         run: dotnet test aep/Aep.slnx --configuration Release --no-build
 
+  postgresql-storage:
+    name: postgresql-storage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: agentstration
+          POSTGRES_USER: agentstration
+          POSTGRES_PASSWORD: agentstration-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentstration -d agentstration"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      AGENTSTRATION_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=agentstration;Username=agentstration;Password=agentstration-ci-only
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Restore PostgreSQL integration tests
+        run: dotnet restore tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Build PostgreSQL integration tests
+        run: dotnet build tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --no-restore
+      - name: Run PostgreSQL migration and restart test
+        run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=EmptyDatabaseMigratesAndRemainsReadyAfterRestart" --progress off
+      - name: Run PostgreSQL storage concurrency benchmark
+        env:
+          AGENTSTRATION_STORAGE_BENCHMARK_PROVIDER: PostgreSql
+          AGENTSTRATION_STORAGE_BENCHMARK_OPERATIONS: 40
+          AGENTSTRATION_STORAGE_BENCHMARK_CONCURRENCY: 8
+          AGENTSTRATION_STORAGE_BENCHMARK_REPORT: ${{ runner.temp }}/agentstration-storage-benchmark-postgresql.json
+        run: |
+          dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "Name=ReportsConcurrentRelationalWriteMetrics" --progress off
+          cat "$AGENTSTRATION_STORAGE_BENCHMARK_REPORT"
+
   container:
     name: container
     runs-on: ubuntu-latest
