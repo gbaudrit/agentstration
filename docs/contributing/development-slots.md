@@ -16,13 +16,15 @@ The AppHost receives the slot identifier and a worktree-local data root:
 .agentstration/slots/<slot>/
 ```
 
+The launcher also enables initial bootstrap from `deploy/bootstrap/profiles` and applies the `development` profile. Bootstrap remains idempotent for an already initialized slot.
+
 With the default SQLite profile, this directory contains the Management, Identity, Runtime, Work, Flow and scheduler databases, data-protection keys, local secrets, Pack artifacts and Work artifacts. `.agentstration/` is ignored by Git. Because the root is inside the worktree, two worktrees do not share these files even if their normalized slot identifiers happen to match.
 
 With the optional PostgreSQL profile, file-backed state remains in this directory but relational data uses the Docker volume `agentstration-<slot>-<instance-id>-postgresql`. The AppHost creates the random instance identifier once in `.agentstration/instance-id`, independently of the branch-derived slot. It survives restarts, branch changes, and a move of the complete worktree directory, while a newly created worktree receives a different identity even when it uses the same slot. `Agentstration:InstanceId` may explicitly restore or override the identity. A native volume is required because PostgreSQL initialization changes Unix ownership and permissions; a bind mount into a Windows worktree fails under the Linux/WSL Docker daemon.
 
 Docker volumes are host-global, so the persisted worktree identity is part of the volume name. The AppHost password is generated and persisted under an identity-specific user-secrets parameter. Keep `.agentstration/instance-id`, its matching secret, and its volumes together. Deleting the identity file does not delete existing volumes, but the next launch creates a new identity and no longer discovers them automatically.
 
-Aspire continues to allocate the Console, Workplace and extension endpoints dynamically. The launch script also obtains available ports for the AppHost dashboard, telemetry receiver and resource service instead of using the fixed development launch profile, so multiple AppHosts can coexist.
+The launch script asks Aspire to allocate dynamic host ports for every Console, Workplace and extension endpoint. It also obtains available ports for the AppHost dashboard, telemetry receiver and resource service instead of using the fixed development launch profile, so multiple AppHosts can coexist. Direct AppHost and individual-project launches continue to use their documented launch-profile ports.
 
 Once Aspire prints its authenticated dashboard URL, the script opens it in the default browser. Use `./dev/run.ps1 -NoBrowser` to keep the launch terminal-only.
 
