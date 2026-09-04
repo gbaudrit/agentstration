@@ -47,5 +47,5 @@
   <data name="TurnCount.One"><value>{0} turn</value></data><data name="TurnCount.Many"><value>{0} turns</value></data><data name="InitialParticipant"><value>initial participant</value></data>
   <data name="EdgeDescription"><value>{0} to {1}{2}, {3}</value></data><data name="EdgeState.Declared"><value>declared</value></data><data name="EdgeState.Observed"><value>observed</value></data><data name="EdgeState.Inactive"><value>not selected</value></data>
   <data name="ExpandTopology"><value>Expand</value></data><data name="ReduceTopology"><value>Reduce</value></data><data name="ShowInfo"><value>Details</value></data><data name="HideInfo"><value>Hide details</value></data>
-  <data name="Replay"><value>Replay</value></data><data name="Replaying"><value>Replaying…</value></data><data name="ReplaySequence"><value>Replay the execution sequence</value></data><data name="ReplayInProgress"><value>Execution sequence replay in progress</value></data>
+  <data name="Replay"><value>Replay</value></data><data name="Replaying"><value>Replaying…</value></data><data name="ReplaySequence"><value>Replay the execution sequence</value></data><data name="ReplayInProgress"><value>Execution sequence replay in progress</value></data><data name="ReplayElapsedCounter"><value>Original execution elapsed time</value></data>
 </root>

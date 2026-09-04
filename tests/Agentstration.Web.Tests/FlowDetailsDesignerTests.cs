@@ -95,6 +95,7 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
         context.Services.AddSingleton(new ConsoleRealtimeSession(new HttpContextAccessor(), new UninitializedRequestContext()));
+        context.Services.AddSingleton(TimeProvider.System);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
 
         var rendered = context.Render<FlowRunDetails>(parameters => parameters

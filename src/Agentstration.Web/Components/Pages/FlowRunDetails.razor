@@ -5,6 +5,7 @@
 @inject Agentstration.Web.Security.ConsoleRealtimeSession RealtimeSession
 @inject ILogger<FlowRunDetails> Logger
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
+@inject TimeProvider TimeProvider
 
 <PageTitle>@(run is null ? T("FlowRun") : run.Id) · Agentstration</PageTitle>
 @if (notFound)
@@ -84,7 +85,7 @@ else
                 <section class="designer-layout run-layout flow-run-overview-topology @(inspectorVisible ? null : "inspector-collapsed")">
                     <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
                                         ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible"
-                                        ReplayInProgress="replayInProgress" ReplayRequested="ReplaySequenceAsync" />
+                                        ReplayInProgress="replayInProgress" ReplayElapsed="replayElapsed" ReplayRequested="ReplaySequenceAsync" />
                     @if (inspectorVisible)
                     {
                     <article class="panel inspector step-inspector">
@@ -144,6 +145,7 @@ else
     private bool inspectorVisible;
     private bool replayInProgress;
     private long? replaySequence;
+    private TimeSpan? replayElapsed;
     private IReadOnlyList<FlowRunEvent>? replayEvents;
     private CancellationTokenSource? replayCancellation;
     private RunTab activeTab;
@@ -344,25 +346,35 @@ else
     {
         if (replayInProgress) return;
         var events = eventBuffer.Snapshot().OrderBy(runEvent => runEvent.Sequence).ToArray();
-        var frames = events.Where(IsReplayFrame).Select(runEvent => runEvent.Sequence).Distinct().ToArray();
+        var frames = events.Where(IsReplayFrame).DistinctBy(runEvent => runEvent.Sequence).ToArray();
         if (frames.Length == 0) return;
 
         var replaySource = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         replayCancellation = replaySource;
         replayEvents = events;
         replayInProgress = true;
+        replayElapsed = TimeSpan.Zero;
         var frameDelay = TimeSpan.FromMilliseconds(Math.Clamp(15000d / frames.Length, 20, 650));
+        var startedAt = frames.FirstOrDefault(runEvent => runEvent.Type is FlowRunEventType.FlowRunStarted or FlowRunEventType.FlowRunResumed)?.Timestamp
+            ?? frames[0].Timestamp;
         try
         {
             replaySequence = 0;
             await InvokeAsync(StateHasChanged);
-            await Task.Delay(TimeSpan.FromMilliseconds(300), replaySource.Token);
-            foreach (var frame in frames)
+            await Task.Delay(TimeSpan.FromMilliseconds(300), TimeProvider, replaySource.Token);
+            for (var index = 0; index < frames.Length; index++)
             {
-                replaySequence = frame;
+                var frame = frames[index];
+                replaySequence = frame.Sequence;
+                replayElapsed = ElapsedSince(startedAt, frame.Timestamp);
                 await InvokeAsync(StateHasChanged);
-                await Task.Delay(frameDelay, replaySource.Token);
+                if (index + 1 < frames.Length)
+                {
+                    var nextElapsed = ElapsedSince(startedAt, frames[index + 1].Timestamp);
+                    await AdvanceReplayCounterAsync(replayElapsed.Value, nextElapsed, frameDelay, replaySource.Token);
+                }
             }
+            await Task.Delay(TimeSpan.FromMilliseconds(450), TimeProvider, replaySource.Token);
         }
         catch (OperationCanceledException) when (replaySource.IsCancellationRequested) { }
         finally
@@ -372,12 +384,29 @@ else
                 replayCancellation = null;
                 replayEvents = null;
                 replaySequence = null;
+                replayElapsed = null;
                 replayInProgress = false;
                 if (!cancellation.IsCancellationRequested) await InvokeAsync(StateHasChanged);
             }
             replaySource.Dispose();
         }
     }
+
+    private async Task AdvanceReplayCounterAsync(TimeSpan from, TimeSpan to, TimeSpan duration, CancellationToken cancellationToken)
+    {
+        const double tickMilliseconds = 50;
+        var steps = Math.Max(1, (int)Math.Ceiling(duration.TotalMilliseconds / tickMilliseconds));
+        var delay = TimeSpan.FromMilliseconds(duration.TotalMilliseconds / steps);
+        for (var step = 1; step <= steps; step++)
+        {
+            await Task.Delay(delay, TimeProvider, cancellationToken);
+            replayElapsed = from + ((to - from) * ((double)step / steps));
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static TimeSpan ElapsedSince(DateTimeOffset startedAt, DateTimeOffset timestamp) =>
+        timestamp <= startedAt ? TimeSpan.Zero : timestamp - startedAt;
 
     private static bool IsReplayFrame(FlowRunEvent runEvent) => runEvent.Type is
         FlowRunEventType.FlowRunStarted or FlowRunEventType.FlowRunResumed or

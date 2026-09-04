@@ -14,6 +14,7 @@
 .topology-tool-button{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 9px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;white-space:nowrap}
 .topology-tool-button:hover,.topology-tool-button:focus-visible,.topology-tool-button[aria-expanded=true],.topology-tool-button[aria-pressed=true]{border-color:var(--primary);color:var(--primary)}
 .topology-tool-button:disabled{cursor:default;opacity:.62}.replay-toggle span{font-size:15px;line-height:1}.replay-toggle:disabled span{animation:topology-replay-spin 1s linear infinite}
+.replay-counter{min-width:58px;color:var(--primary);font-family:var(--font-mono);font-size:.75rem;font-variant-numeric:tabular-nums;text-align:right}
 .topology-stage{position:relative;min-height:0;flex:1}
 .topology-viewport{min-height:330px;overflow:auto;background-color:var(--surface-2);background-image:linear-gradient(color-mix(in srgb,var(--border) 55%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--border) 55%,transparent) 1px,transparent 1px);background-size:24px 24px}
 .topology-shell.expanded .topology-viewport{height:100%;min-height:0}

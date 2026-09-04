@@ -142,8 +142,12 @@ public sealed class FlowTopologyViewerTests
         var playing = context.Render<FlowTopologyViewer>(parameters => parameters
             .Add(component => component.Graph, graph)
             .Add(component => component.ReplayRequested, () => replayRequests++)
-            .Add(component => component.ReplayInProgress, true));
+            .Add(component => component.ReplayInProgress, true)
+            .Add(component => component.ReplayElapsed, TimeSpan.FromSeconds(65.4)));
         Assert.IsTrue(playing.Find("button.replay-toggle").HasAttribute("disabled"));
+        var counter = playing.Find("output.replay-counter");
+        Assert.AreEqual("01:05.4", counter.TextContent.Trim());
+        Assert.AreEqual("Temps écoulé de l’exécution originale", counter.GetAttribute("aria-label"));
     }
 
     [TestMethod]
