@@ -30,6 +30,7 @@ public sealed record WorkItemQuery(
 
 public sealed record StoredWorkItem(WorkItem Value, string ETag, DateTimeOffset UpdatedAt);
 public sealed record WorkItemPage(IReadOnlyList<StoredWorkItem> Items, bool HasMore, int TotalCount = -1);
+public sealed record DeletedWorkTask(IReadOnlyList<ArtifactReference> Artifacts);
 
 public interface IWorkItemRepository
 {
@@ -41,6 +42,11 @@ public interface IWorkItemRepository
     Task<IReadOnlyDictionary<WorkTaskId, StoredWorkItem>> ListLatestContinuationsAsync(
         WorkspaceId workspaceId,
         IReadOnlyCollection<WorkTaskId> taskIds,
+        CancellationToken cancellationToken);
+    Task<DeletedWorkTask> DeleteTaskAsync(
+        WorkspaceId workspaceId,
+        WorkTaskId taskId,
+        string expectedETag,
         CancellationToken cancellationToken);
 }
 

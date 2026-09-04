@@ -43,8 +43,8 @@ public sealed class CleanupConsoleTests
         context.Services.AddSingleton<ICleanupApiClient>(client);
         var rendered = context.Render<Cleanup>();
 
-        Assert.HasCount(4, rendered.FindAll(".cleanup-metric"));
-        Assert.HasCount(5, rendered.FindAll(".cleanup-row"));
+        Assert.HasCount(5, rendered.FindAll(".cleanup-metric"));
+        Assert.HasCount(6, rendered.FindAll(".cleanup-row"));
         Assert.AreEqual(string.Empty, rendered.Find("input[type='search']").GetAttribute("value") ?? string.Empty);
         var entriesPanel = rendered.Find("section[data-kind='Entries']");
         var flowsPanel = rendered.Find("section[data-kind='Flows']");
@@ -62,7 +62,7 @@ public sealed class CleanupConsoleTests
         await rendered.Find("[data-testid='confirm-cleanup']").ClickAsync(new());
 
         CollectionAssert.AreEqual(
-            new[] { CleanupResourceKind.RuntimeRun, CleanupResourceKind.FlowRun, CleanupResourceKind.Entry, CleanupResourceKind.Flow, CleanupResourceKind.Agent },
+            new[] { CleanupResourceKind.RuntimeRun, CleanupResourceKind.FlowRun, CleanupResourceKind.Task, CleanupResourceKind.Entry, CleanupResourceKind.Flow, CleanupResourceKind.Agent },
             client.Deleted.Select(candidate => candidate.Kind).ToArray());
         Assert.IsTrue(client.EntryOptions.Single().RemoveDashboardReferences);
         Assert.IsTrue(client.EntryOptions.Single().CloseInteractions);
@@ -106,6 +106,7 @@ public sealed class CleanupConsoleTests
         {
             "/api/runtime/runs/runtime-1",
             "/api/flowRuns/flow-run-1",
+            $"/api/tasks/{TaskId:D}",
             "/api/management/entries/entry-1?removeDashboardReferences=true&closeInteractions=true",
             "/api/namespaces/team-a/flows/flow-1?deleteSystemManaged=true",
             "/api/namespaces/team-a/agents/agent-1"
@@ -133,6 +134,7 @@ public sealed class CleanupConsoleTests
                 new(CleanupResourceKind.RuntimeRun, "runtime-1", "Agent run", ResourceNamespace.Default, "Succeeded", Now, "agent-1"),
                 new(CleanupResourceKind.FlowRun, "flow-run-1", "Flow run", ResourceNamespace.Default, "Failed", Now.AddMinutes(-1), "1.0.0")
             ],
+            [new(CleanupResourceKind.Task, TaskId.ToString("D"), "Task one", ResourceNamespace.Default, "Completed", Now.AddMinutes(-2), "entry-1")],
             [new(CleanupResourceKind.Entry, "entry-1", "Entry one", ResourceNamespace.Default, "Published", Now, "flow-1")],
             [new(CleanupResourceKind.Flow, "flow-1", "Flow one", team, "Active", Now, "1.0.0")],
             [new(CleanupResourceKind.Agent, "agent-1", "Agent one", team, "Accepted", Now, "model-default")]);
@@ -160,6 +162,7 @@ public sealed class CleanupConsoleTests
             LoadCount++;
             return Task.FromResult(new CleanupInventory(
                 remaining.Where(candidate => candidate.Kind is CleanupResourceKind.RuntimeRun or CleanupResourceKind.FlowRun).ToArray(),
+                remaining.Where(candidate => candidate.Kind == CleanupResourceKind.Task).ToArray(),
                 remaining.Where(candidate => candidate.Kind == CleanupResourceKind.Entry).ToArray(),
                 remaining.Where(candidate => candidate.Kind == CleanupResourceKind.Flow).ToArray(),
                 remaining.Where(candidate => candidate.Kind == CleanupResourceKind.Agent).ToArray()));
@@ -174,6 +177,8 @@ public sealed class CleanupConsoleTests
             return Task.CompletedTask;
         }
     }
+
+    private static readonly Guid TaskId = Guid.Parse("11111111-2222-3333-4444-555555555555");
 
     private sealed record RecordedRequest(HttpMethod Method, string Path, string? IfMatch);
 

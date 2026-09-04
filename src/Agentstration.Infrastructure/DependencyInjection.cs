@@ -227,6 +227,7 @@ public static class DependencyInjection
         services.AddSingleton<ILocalWorkExecutionQueue>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<WorkItemService>();
         services.AddSingleton<WorkplaceService>();
+        services.AddSingleton<WorkTaskDeletionService>();
         services.AddSingleton<IWorkTaskEventSink, WorkplaceProjectionSink>();
         if (storageProvider == AgentstrationStorageProvider.PostgreSql)
             services.AddPostgreSqlFlowStorage(storageOptions.ConnectionString!);

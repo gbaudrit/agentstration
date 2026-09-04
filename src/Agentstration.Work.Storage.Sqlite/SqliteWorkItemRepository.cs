@@ -125,6 +125,78 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
             FromDocument);
     }
 
+    public async Task<DeletedWorkTask> DeleteTaskAsync(
+        WorkspaceId workspaceId,
+        WorkTaskId taskId,
+        string expectedETag,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedETag);
+        var workspaceKey = workspaceId.ToString();
+        var taskKey = taskId.ToString();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var workItems = await context.WorkItems
+            .Where(value => value.WorkspaceId == workspaceKey && (value.Id == taskKey || value.AnchorTaskId == taskKey))
+            .ToArrayAsync(cancellationToken);
+        var anchor = workItems.SingleOrDefault(value => value.Id == taskKey && value.AnchorTaskId == null)
+            ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
+        var latest = workItems.OrderByDescending(value => value.CreatedAt).ThenBy(value => value.Id, StringComparer.Ordinal).First();
+        if (!string.Equals(ETag(latest.Version), expectedETag, StringComparison.Ordinal))
+            throw new WorkItemConcurrencyException("The supplied ETag does not match the current Task version.");
+        if (latest.Status is not (WorkItemStatus.Completed or WorkItemStatus.Failed or WorkItemStatus.Cancelled))
+            throw new WorkTransitionException("task_not_terminal", $"Task '{taskId}' is not terminal and cannot be deleted.");
+
+        var artifactDocuments = await context.WorkTaskArtifacts
+            .Where(value => value.WorkspaceId == workspaceKey && value.WorkTaskId == taskKey)
+            .ToArrayAsync(cancellationToken);
+        var artifactReferences = artifactDocuments
+            .Select(value => JsonSerializer.Deserialize<WorkTaskArtifact>(value.Payload, JsonOptions))
+            .OfType<WorkTaskArtifact>()
+            .Select(value => new ArtifactReference(value.StorageKey, value.ContentType, value.Length))
+            .ToArray();
+
+        context.WorkItems.RemoveRange(workItems);
+        context.PendingActions.RemoveRange(await context.PendingActions.Where(value => value.WorkspaceId == workspaceKey && value.WorkTaskId == taskKey).ToArrayAsync(cancellationToken));
+        context.WorkTaskActivities.RemoveRange(await context.WorkTaskActivities.Where(value => value.WorkspaceId == workspaceKey && value.WorkTaskId == taskKey).ToArrayAsync(cancellationToken));
+        context.WorkTaskResults.RemoveRange(await context.WorkTaskResults.Where(value => value.WorkspaceId == workspaceKey && value.WorkTaskId == taskKey).ToArrayAsync(cancellationToken));
+        context.WorkTaskArtifacts.RemoveRange(artifactDocuments);
+
+        var messages = await context.ConversationMessages.Where(value => value.WorkspaceId == workspaceKey && value.WorkTaskId == taskKey).ToArrayAsync(cancellationToken);
+        foreach (var document in messages)
+        {
+            var message = JsonSerializer.Deserialize<ConversationMessage>(document.Payload, JsonOptions)
+                ?? throw new InvalidOperationException($"Stored ConversationMessage document '{document.Id}' is invalid.");
+            document.WorkTaskId = null;
+            document.Payload = JsonSerializer.Serialize(message with { WorkTaskId = null }, JsonOptions);
+        }
+
+        var interactions = await context.Interactions.Where(value => value.WorkspaceId == workspaceKey).ToArrayAsync(cancellationToken);
+        foreach (var document in interactions)
+        {
+            var interaction = JsonSerializer.Deserialize<WorkplaceInteraction>(document.Payload, JsonOptions)
+                ?? throw new InvalidOperationException($"Stored WorkplaceInteraction document '{document.Id}' is invalid.");
+            if (interaction.TaskId != taskId) continue;
+            var updated = interaction with
+            {
+                TaskId = null,
+                PendingActionId = null,
+                LastFlowRunId = null,
+                ImmediateResult = null,
+                Messages = interaction.Messages.Select(value => value.WorkTaskId == taskId ? value with { WorkTaskId = null } : value).ToArray(),
+                Version = interaction.Version + 1
+            };
+            document.Version = updated.Version;
+            document.Payload = JsonSerializer.Serialize(updated, JsonOptions);
+        }
+
+        var notifications = await context.WorkNotifications.Where(value => value.WorkspaceId == workspaceKey).ToArrayAsync(cancellationToken);
+        context.WorkNotifications.RemoveRange(notifications.Where(value =>
+            JsonSerializer.Deserialize<WorkNotification>(value.Payload, JsonOptions)?.WorkTaskId == taskId));
+
+        await context.SaveChangesAsync(cancellationToken);
+        return new DeletedWorkTask(artifactReferences);
+    }
+
     private static IQueryable<WorkItemDocument> Order(IQueryable<WorkItemDocument> query, WorkItemSortField field, WorkItemSortDirection direction) => (field, direction) switch
     {
         (WorkItemSortField.UpdatedAt, WorkItemSortDirection.Ascending) => query.OrderBy(value => value.UpdatedAt).ThenBy(value => value.Id),

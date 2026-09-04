@@ -15,11 +15,13 @@
   <data name="WarningMessage" xml:space="preserve"><value>Successful deletions are not rolled back when another selected item fails.</value></data>
   <data name="InventorySummary" xml:space="preserve"><value>Cleanup inventory summary</value></data>
   <data name="Kind.Runs" xml:space="preserve"><value>Terminal Runs</value></data>
+  <data name="Kind.Tasks" xml:space="preserve"><value>Terminal Tasks</value></data>
   <data name="Kind.Entries" xml:space="preserve"><value>Entries</value></data>
   <data name="Kind.Flows" xml:space="preserve"><value>Flows</value></data>
   <data name="Kind.Agents" xml:space="preserve"><value>Agents</value></data>
   <data name="Kind.RuntimeRun" xml:space="preserve"><value>Agent Run</value></data>
   <data name="Kind.FlowRun" xml:space="preserve"><value>Flow Run</value></data>
+  <data name="Kind.Task" xml:space="preserve"><value>Task</value></data>
   <data name="Kind.Entry" xml:space="preserve"><value>Entry</value></data>
   <data name="Kind.Flow" xml:space="preserve"><value>Flow</value></data>
   <data name="Kind.Agent" xml:space="preserve"><value>Agent</value></data>
@@ -35,15 +37,18 @@
   <data name="FlowOptionsDescription" xml:space="preserve"><value>This option applies only to selected system-managed Direct Agent Flows. Referenced Flows remain protected.</value></data>
   <data name="DeleteSystemManagedFlows" xml:space="preserve"><value>Delete orphaned system Flows</value></data>
   <data name="GroupTitle.Runs" xml:space="preserve"><value>{0} terminal Runs</value></data>
+  <data name="GroupTitle.Tasks" xml:space="preserve"><value>{0} terminal Tasks</value></data>
   <data name="GroupTitle.Entries" xml:space="preserve"><value>{0} Entries</value></data>
   <data name="GroupTitle.Flows" xml:space="preserve"><value>{0} Flows</value></data>
   <data name="GroupTitle.Agents" xml:space="preserve"><value>{0} Agents</value></data>
   <data name="GroupDescription.Runs" xml:space="preserve"><value>Only succeeded, failed, cancelled or timed-out Runs are eligible.</value></data>
+  <data name="GroupDescription.Tasks" xml:space="preserve"><value>Only completed, failed or cancelled Tasks are eligible. Their Work-owned history and artifacts are also removed.</value></data>
   <data name="GroupDescription.Entries" xml:space="preserve"><value>Entry safeguards are evaluated individually when deletion starts.</value></data>
   <data name="GroupDescription.Flows" xml:space="preserve"><value>Flows still referenced by retained Entries cannot be deleted.</value></data>
   <data name="GroupDescription.Agents" xml:space="preserve"><value>Agents still referenced by retained Flows cannot be deleted.</value></data>
   <data name="SelectAll" xml:space="preserve"><value>Select visible</value></data>
   <data name="Empty.Runs" xml:space="preserve"><value>No terminal Runs are available.</value></data>
+  <data name="Empty.Tasks" xml:space="preserve"><value>No terminal Tasks are available.</value></data>
   <data name="Empty.Entries" xml:space="preserve"><value>No Entries are available.</value></data>
   <data name="Empty.Flows" xml:space="preserve"><value>No Flows are available.</value></data>
   <data name="Empty.Agents" xml:space="preserve"><value>No Agents are available.</value></data>
@@ -52,7 +57,8 @@
   <data name="FailuresDescription" xml:space="preserve"><value>Failed items remain selected. Resolve their dependencies or permissions, then retry.</value></data>
   <data name="SelectedCount" xml:space="preserve"><value>{0} items selected</value></data>
   <data name="Progress" xml:space="preserve"><value>Deleting {0} of {1}…</value></data>
-  <data name="ExecutionOrder" xml:space="preserve"><value>Deletion order: Runs, Entries, Flows, then Agents</value></data>
+  <data name="ExecutionOrder" xml:space="preserve"><value>Deletion order: Runs, Tasks, Entries, Flows, then Agents</value></data>
+  <data name="Status.Completed" xml:space="preserve"><value>Completed</value></data>
   <data name="DeleteSelected" xml:space="preserve"><value>Delete selected</value></data>
   <data name="Irreversible" xml:space="preserve"><value>Irreversible action</value></data>
   <data name="ConfirmationTitle" xml:space="preserve"><value>Delete {0} selected items?</value></data>

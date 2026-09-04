@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Infrastructure.Artifacts;
@@ -408,6 +410,83 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public async Task TerminalTaskDeletionRemovesItsWorkHistoryAndDetachesItsInteraction()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var itemId = WorkItemId.New();
+        var taskId = WorkTaskId.FromWorkItem(itemId);
+        var interactionId = InteractionId.New();
+        var item = WorkItem.Create(itemId, WorkplaceId, "entry", "Completed task", Now, metadata: new Dictionary<string, string>
+        {
+            ["origin"] = "trigger",
+            ["workplace.workspaceId"] = WorkplaceId.ToString()
+        });
+        var executionId = WorkExecutionId.New();
+        item.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddSeconds(1));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(2), "agent"));
+        item.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), WorkplaceId, itemId, executionId, Now.AddSeconds(3), Result("Done")));
+        await fixture.Repository.CreateAsync(item, default);
+        var continuation = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry-continuation", "Completed continuation", Now.AddSeconds(4), metadata: new Dictionary<string, string>
+        {
+            ["origin"] = "trigger",
+            ["workplace.workspaceId"] = WorkplaceId.ToString(),
+            ["workplace.taskId"] = taskId.ToString()
+        });
+        var continuationExecutionId = WorkExecutionId.New();
+        continuation.MarkQueued(continuationExecutionId, "agent", Guid.NewGuid(), Now.AddSeconds(5));
+        continuation.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), WorkplaceId, continuation.Id, continuationExecutionId, Now.AddSeconds(6), "agent"));
+        continuation.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), WorkplaceId, continuation.Id, continuationExecutionId, Now.AddSeconds(7), Result("Done again")));
+        var stored = await fixture.Repository.CreateAsync(continuation, default);
+        await fixture.Workplace.CreateInteractionAsync(new WorkplaceInteraction
+        {
+            Id = interactionId,
+            WorkspaceId = WorkplaceId,
+            EntryId = new("entry"),
+            Status = InteractionStatus.Idle,
+            StartedAt = Now,
+            LastActivityAt = Now.AddSeconds(3),
+            TaskId = taskId,
+            LastFlowRunId = "flow-run-1"
+        }, default);
+        await fixture.Workplace.AddActivityAsync(new(WorkTaskActivityId.New(), WorkplaceId, taskId, WorkTaskActivityType.TaskCompleted, "Completed", null, Now.AddSeconds(3), WorkActorKind.Agentstration), default);
+        await fixture.Workplace.AddResultAsync(new(WorkTaskResultId.New(), WorkplaceId, taskId, "flow-run-1", WorkTaskResultKind.Text, "Result", JsonSerializer.SerializeToElement("Done"), Now.AddSeconds(3)), default);
+        await fixture.Workplace.AddArtifactAsync(new(WorkTaskArtifactId.New(), WorkplaceId, taskId, "flow-run-1", "result.txt", "text/plain", 4, "artifact-key", Now.AddSeconds(3)), default);
+
+        var artifactStore = new RecordingArtifactStore();
+        await new WorkTaskDeletionService(fixture.Repository, artifactStore).DeleteAsync(WorkplaceId, taskId, stored.ETag, default);
+
+        Assert.IsNull(await fixture.Repository.GetAsync(WorkplaceId, itemId, default));
+        Assert.IsNull(await fixture.Repository.GetAsync(WorkplaceId, continuation.Id, default));
+        Assert.HasCount(0, await fixture.Workplace.ListActivitiesAsync(WorkplaceId, taskId, default));
+        Assert.HasCount(0, await fixture.Workplace.ListResultsAsync(WorkplaceId, taskId, default));
+        Assert.HasCount(0, await fixture.Workplace.ListArtifactsAsync(WorkplaceId, taskId, default));
+        Assert.AreEqual("artifact-key", artifactStore.Deleted.Single().StorageKey);
+        var interaction = await fixture.Workplace.GetInteractionAsync(WorkplaceId, interactionId, default);
+        Assert.IsNull(interaction!.TaskId);
+        Assert.IsNull(interaction.LastFlowRunId);
+    }
+
+    [TestMethod]
+    public async Task TaskDeletionRejectsNonTerminalAndCrossWorkspaceTasks()
+    {
+        await using var fixture = await WorkFixture.CreateAsync();
+        var item = WorkItem.Create(WorkItemId.New(), WorkplaceId, "entry", "Pending task", Now, metadata: new Dictionary<string, string>
+        {
+            ["origin"] = "trigger",
+            ["workplace.workspaceId"] = WorkplaceId.ToString()
+        });
+        var stored = await fixture.Repository.CreateAsync(item, default);
+        var taskId = WorkTaskId.FromWorkItem(item.Id);
+
+        var conflict = await Assert.ThrowsExactlyAsync<WorkTransitionException>(() =>
+            fixture.Repository.DeleteTaskAsync(WorkplaceId, taskId, stored.ETag, default));
+        Assert.AreEqual("task_not_terminal", conflict.Code);
+        await Assert.ThrowsExactlyAsync<KeyNotFoundException>(() =>
+            fixture.Repository.DeleteTaskAsync(new WorkspaceId(Guid.NewGuid()), taskId, stored.ETag, default));
+        Assert.IsNotNull(await fixture.Repository.GetAsync(WorkplaceId, item.Id, default));
+    }
+
+    [TestMethod]
     public async Task FileSystemArtifactsCannotBeReadFromAnotherWorkspace()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"agentstration-artifacts-{Guid.NewGuid():N}");
@@ -620,6 +699,38 @@ public sealed class WorkPlaneTests
     }
 
     [TestMethod]
+    public async Task TaskDeleteApiRequiresCurrentETagAndRemovesTerminalTask()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var workspace = (await client.GetFromJsonAsync<WorkplaceWorkspaceResponse[]>("/api/workplace/workspaces"))!.Single();
+        var workspaceId = new WorkspaceId(workspace.Id);
+        var repository = factory.Services.GetRequiredService<IWorkItemRepository>();
+        var item = WorkItem.Create(WorkItemId.New(), workspaceId, "trigger", "Task to delete", Now, metadata: new Dictionary<string, string>
+        {
+            ["origin"] = "trigger",
+            ["workplace.workspaceId"] = workspaceId.ToString()
+        });
+        var executionId = WorkExecutionId.New();
+        item.MarkQueued(executionId, "agent", Guid.NewGuid(), Now.AddSeconds(1));
+        item.ApplyRuntimeEvent(new WorkExecutionStarted(Guid.NewGuid(), workspaceId, item.Id, executionId, Now.AddSeconds(2), "agent"));
+        item.ApplyRuntimeEvent(new WorkExecutionCompleted(Guid.NewGuid(), workspaceId, item.Id, executionId, Now.AddSeconds(3), Result("Done")));
+        await repository.CreateAsync(item, default);
+
+        using var current = await client.GetAsync($"/api/tasks/{item.Id}");
+        Assert.AreEqual(HttpStatusCode.OK, current.StatusCode);
+        Assert.IsNotNull(current.Headers.ETag);
+        Assert.AreEqual(HttpStatusCode.BadRequest, (await client.DeleteAsync($"/api/tasks/{item.Id}")).StatusCode);
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/tasks/{item.Id}");
+        request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(current.Headers.ETag.ToString()));
+
+        using var deleted = await client.SendAsync(request);
+
+        Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode);
+        Assert.IsNull(await repository.GetAsync(workspaceId, item.Id, default));
+    }
+
+    [TestMethod]
     public async Task WorkApiValidatesCreatesGetsAndReportsUnavailableResult()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -802,6 +913,18 @@ public sealed class WorkPlaneTests
     private sealed class WorkplaceContextStub : IWorkplaceContext
     {
         public WorkspaceId WorkspaceId => WorkplaceId;
+    }
+
+    private sealed class RecordingArtifactStore : IArtifactStore
+    {
+        public List<ArtifactReference> Deleted { get; } = [];
+        public Task<ArtifactReference> SaveAsync(WorkspaceId workspaceId, ArtifactContent content, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Stream> OpenReadAsync(WorkspaceId workspaceId, ArtifactReference reference, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteAsync(WorkspaceId workspaceId, ArtifactReference reference, CancellationToken cancellationToken)
+        {
+            Deleted.Add(reference);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class EntryTargetResolverStub : IEntryTargetResolver
