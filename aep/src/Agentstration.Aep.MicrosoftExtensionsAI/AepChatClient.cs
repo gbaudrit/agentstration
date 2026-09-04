@@ -57,10 +57,13 @@ public sealed class AepChatClient(
 
     private AepChatRequest MapRequest(IEnumerable<ChatMessage> messages, ChatOptions? options)
     {
-        var mappedMessages = messages.Select(message => new AepMessage(
+        var mappedMessages = new List<AepMessage>();
+        if (!string.IsNullOrWhiteSpace(options?.Instructions))
+            mappedMessages.Add(new AepMessage(AepRole.System, [AepContent.FromText(options.Instructions)]));
+        mappedMessages.AddRange(messages.Select(message => new AepMessage(
             MapRole(message.Role),
             MapContents(message),
-            message.AuthorName)).ToArray();
+            message.AuthorName)));
         var additional = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         if (options?.AdditionalProperties is not null)
             foreach (var value in options.AdditionalProperties)

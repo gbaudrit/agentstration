@@ -404,7 +404,7 @@ For a direct Web launch, set `OTEL_EXPORTER_OTLP_ENDPOINT` to any OTLP-compatibl
 
 Prompt, response, function argument, function result, credential, and authorization-header capture is intentionally unavailable in the default logging pipeline. Runtime inputs and outputs remain inspectable through the Runtime Run API and console rather than being duplicated into operational telemetry.
 
-For local troubleshooting only, Development can capture the final JSON body sent by the legacy OpenAI-compatible HTTP transport. AEP and the out-of-process Ollama extension do not capture prompt or response payloads by default:
+For local troubleshooting only, Development can capture the final JSON body sent by the legacy OpenAI-compatible transport and by the AEP model-provider client. The AEP request capture shows the exact messages, including the system message produced from agent instructions, immediately before the request leaves Agentstration. The out-of-process extension does not capture its provider-native request by default:
 
 ```json
 {
@@ -420,7 +420,7 @@ For local troubleshooting only, Development can capture the final JSON body sent
 }
 ```
 
-The capture creates a correlated `gen_ai.http.payload_capture` span between the GenAI `chat` span and the network `POST`, and also emits structured payload logs. It removes URI query strings, never records HTTP headers, recursively redacts common JSON credential fields, and truncates the captured value. The application refuses to start with this option outside `Development`. Capturing responses is disabled by default because it buffers the complete response and therefore changes streaming behavior. These spans and logs are exported through OTLP when an exporter is configured, so the collector and its retention policy must be treated as containing sensitive data.
+The capture creates a correlated `gen_ai.http.payload_capture` span between the GenAI `chat` span and the network `POST`, and also emits structured payload logs. It removes URI query strings, never records HTTP headers, recursively redacts common JSON credential fields, and truncates the captured value. The application refuses to start with this option outside `Development`. Capturing responses is disabled by default because it buffers the complete response and therefore changes streaming behavior. These spans and logs are exported through OTLP when an exporter is configured, so the collector and its retention policy must be treated as containing sensitive data. In an AEP deployment this proves what Agentstration sent to the extension; inspecting the extension-to-model native payload still requires provider-side diagnostics.
 
 ## Quality gates
 
