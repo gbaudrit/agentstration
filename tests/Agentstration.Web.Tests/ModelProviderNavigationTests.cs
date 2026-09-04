@@ -55,6 +55,27 @@ public sealed class ModelProviderNavigationTests
         });
     }
 
+    [TestMethod]
+    public void ModelProfileGenerationUsesLocalizedExplanatoryTooltips()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = CreateContext(out _);
+        context.Services.AddSingleton<IModelProfilesClient>(new StubModelProfilesClient());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/modelprofiles/new");
+
+        var rendered = context.Render<ModelProfileEditor>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(6, rendered.FindAll(".metric-help").Count);
+            Assert.IsTrue(rendered.FindAll(".metric-help").All(element => element.GetAttribute("tabindex") == "0"));
+            Assert.IsTrue(rendered.FindAll(".metric-tooltip").All(element => element.GetAttribute("role") == "tooltip"));
+            Assert.IsTrue(rendered.FindAll("label > span").Any(element => element.TextContent.StartsWith("Seed", StringComparison.Ordinal)));
+            Assert.IsFalse(rendered.Markup.Contains("Graine", StringComparison.Ordinal));
+            Assert.IsTrue(rendered.FindAll(".metric-tooltip").Any(element => element.TextContent.Contains("variabilité des réponses", StringComparison.Ordinal)));
+        });
+    }
+
     private static BunitContext CreateContext(out StubModelProvidersClient providers)
     {
         var context = new BunitContext();

@@ -1,7 +1,7 @@
 @if (!string.IsNullOrWhiteSpace(Url))
 {
     <a class="metric-card metric-card-link @(!string.IsNullOrWhiteSpace(HelpText) ? "metric-card-help" : null)" href="@Url">
-        <div><span class="metric-label">@Label @if (!string.IsNullOrWhiteSpace(HelpText)) { <span class="metric-help" tabindex="0" aria-label="@($"About {Label}: {HelpText}")">?<span class="metric-tooltip" role="tooltip">@HelpText</span></span> }</span><strong>@Value</strong></div>
+        <div><span class="metric-label">@Label @if (!string.IsNullOrWhiteSpace(HelpText)) { <HelpTooltip Text="@HelpText" /> }</span><strong>@Value</strong></div>
         @if (!string.IsNullOrWhiteSpace(Detail)) { <small>@Detail</small> }
         <span class="metric-card-arrow" aria-hidden="true">→</span>
         <span class="metric-accent metric-@Status.ToString().ToLowerInvariant()" aria-hidden="true"></span>
@@ -10,7 +10,7 @@
 else
 {
     <article class="metric-card @(!string.IsNullOrWhiteSpace(HelpText) ? "metric-card-help" : null)">
-        <div><span class="metric-label">@Label @if (!string.IsNullOrWhiteSpace(HelpText)) { <span class="metric-help" tabindex="0" aria-label="@($"About {Label}: {HelpText}")">?<span class="metric-tooltip" role="tooltip">@HelpText</span></span> }</span><strong>@Value</strong></div>
+        <div><span class="metric-label">@Label @if (!string.IsNullOrWhiteSpace(HelpText)) { <HelpTooltip Text="@HelpText" /> }</span><strong>@Value</strong></div>
         @if (!string.IsNullOrWhiteSpace(Detail)) { <small>@Detail</small> }
         <span class="metric-accent metric-@Status.ToString().ToLowerInvariant()" aria-hidden="true"></span>
     </article>
