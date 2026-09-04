@@ -31,6 +31,9 @@
   <data name="EntryOptionsDescription" xml:space="preserve"><value>These options apply only to selected Entries. Closing Interactions also cancels their current work and pending actions.</value></data>
   <data name="RemoveDashboardReferences" xml:space="preserve"><value>Remove Dashboard references</value></data>
   <data name="CloseInteractions" xml:space="preserve"><value>Close durable Interactions</value></data>
+  <data name="FlowOptionsTitle" xml:space="preserve"><value>System Flow options</value></data>
+  <data name="FlowOptionsDescription" xml:space="preserve"><value>This option applies only to selected system-managed Direct Agent Flows. Referenced Flows remain protected.</value></data>
+  <data name="DeleteSystemManagedFlows" xml:space="preserve"><value>Delete orphaned system Flows</value></data>
   <data name="GroupTitle.Runs" xml:space="preserve"><value>{0} terminal Runs</value></data>
   <data name="GroupTitle.Entries" xml:space="preserve"><value>{0} Entries</value></data>
   <data name="GroupTitle.Flows" xml:space="preserve"><value>{0} Flows</value></data>

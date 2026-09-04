@@ -34,12 +34,12 @@ public sealed record CleanupInventory(
     public IReadOnlyList<CleanupCandidate> All => [.. Runs, .. Entries, .. Flows, .. Agents];
 }
 
-public sealed record CleanupEntryOptions(bool RemoveDashboardReferences, bool CloseInteractions);
+public sealed record CleanupDeletionOptions(bool RemoveDashboardReferences, bool CloseInteractions, bool DeleteSystemManagedFlows);
 
 public interface ICleanupApiClient
 {
     Task<CleanupInventory> GetInventoryAsync(CancellationToken cancellationToken);
-    Task DeleteAsync(CleanupCandidate candidate, CleanupEntryOptions entryOptions, CancellationToken cancellationToken);
+    Task DeleteAsync(CleanupCandidate candidate, CleanupDeletionOptions options, CancellationToken cancellationToken);
 }
 
 public sealed class CleanupApiClient(IHttpClientFactory httpClientFactory) : ICleanupApiClient
@@ -65,13 +65,14 @@ public sealed class CleanupApiClient(IHttpClientFactory httpClientFactory) : ICl
         return new(runs, await entriesTask, await flowsTask, await agentsTask);
     }
 
-    public Task DeleteAsync(CleanupCandidate candidate, CleanupEntryOptions entryOptions, CancellationToken cancellationToken) =>
+    public Task DeleteAsync(CleanupCandidate candidate, CleanupDeletionOptions options, CancellationToken cancellationToken) =>
         candidate.Kind switch
         {
             CleanupResourceKind.RuntimeRun => DeleteWithCurrentETagAsync(RuntimeClient, RuntimeRunPath(candidate.Id), cancellationToken),
             CleanupResourceKind.FlowRun => DeleteWithCurrentETagAsync(FlowClient, FlowRunPath(candidate.Id), cancellationToken),
-            CleanupResourceKind.Entry => DeleteEntryAsync(candidate, entryOptions, cancellationToken),
-            CleanupResourceKind.Flow => DeleteWithCurrentETagAsync(FlowClient, FlowPath(candidate.Namespace, candidate.Id), cancellationToken),
+            CleanupResourceKind.Entry => DeleteEntryAsync(candidate, options, cancellationToken),
+            CleanupResourceKind.Flow => DeleteWithCurrentETagAsync(FlowClient, FlowPath(candidate.Namespace, candidate.Id)
+                + (options.DeleteSystemManagedFlows ? "?deleteSystemManaged=true" : string.Empty), cancellationToken),
             CleanupResourceKind.Agent => DeleteWithCurrentETagAsync(ManagementClient, AgentPath(candidate.Namespace, candidate.Id), cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(candidate))
         };
@@ -181,7 +182,7 @@ public sealed class CleanupApiClient(IHttpClientFactory httpClientFactory) : ICl
             .ToArray();
     }
 
-    private async Task DeleteEntryAsync(CleanupCandidate candidate, CleanupEntryOptions options, CancellationToken cancellationToken)
+    private async Task DeleteEntryAsync(CleanupCandidate candidate, CleanupDeletionOptions options, CancellationToken cancellationToken)
     {
         var query = $"?removeDashboardReferences={options.RemoveDashboardReferences.ToString().ToLowerInvariant()}&closeInteractions={options.CloseInteractions.ToString().ToLowerInvariant()}";
         using var response = await httpClientFactory.CreateClient(WorkClient)

@@ -108,6 +108,8 @@ public sealed class WorkplaceApiTests
                 var flows = dependencyScope.ServiceProvider.GetRequiredService<FlowService>();
                 var systemDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(workspaceId, directFlow.Value.Id, directFlow.ETag, default));
                 Assert.AreEqual("system_flow_managed", systemDelete.Code);
+                var referencedSystemDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(workspaceId, directFlow.Value.Id, directFlow.ETag, allowSystemManaged: true, default));
+                Assert.AreEqual("flow_in_use", referencedSystemDelete.Code);
                 var referencedFlow = await flows.GetAsync(workspaceId, new("universal-router"), default);
                 Assert.IsNotNull(referencedFlow);
                 var referencedDelete = await Assert.ThrowsAsync<Agentstration.Flow.FlowValidationException>(() => flows.DeleteAsync(workspaceId, referencedFlow.Value.Id, referencedFlow.ETag, default));
@@ -189,6 +191,61 @@ public sealed class WorkplaceApiTests
             Assert.IsNotNull(run);
             Assert.AreEqual("system-direct-agent-dotnet-expert", run.Value.FlowId.Value);
             Assert.AreEqual(Agentstration.Flow.FlowRunStatus.Succeeded, run.Value.Status);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (Directory.Exists(dataDirectory)) Directory.Delete(dataDirectory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task ExplicitCleanupDeleteRemovesOrphanedDirectAgentFlow()
+    {
+        var dataDirectory = Path.Combine(Path.GetTempPath(), "agentstration-work-api-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dataDirectory);
+        try
+        {
+            await using var factory = new WebApplicationFactory<WorkApiProgram>().WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.UseSetting("Data:Directory", dataDirectory);
+            });
+            using var client = factory.CreateClient();
+            var entries = await client.GetFromJsonAsync<EntryDraftResponse[]>("/api/management/entries") ?? [];
+            var directEntries = entries.Where(value => value.Published?.ResolvedTarget.FlowResourceId == "system-direct-agent-dotnet-expert").ToArray();
+            Assert.IsNotEmpty(directEntries);
+            Assert.IsTrue(directEntries.All(value => value.Value.Id.Namespace.IsDefault));
+            var flowId = directEntries[0].Published!.ResolvedTarget.FlowResourceId;
+            using var current = await client.GetAsync($"/api/flows/{flowId}?deleteSystemManaged=true");
+            current.EnsureSuccessStatusCode();
+            Assert.IsNotNull(current.Headers.ETag);
+
+            using (var referencedDelete = new HttpRequestMessage(HttpMethod.Delete, $"/api/flows/{flowId}?deleteSystemManaged=true"))
+            {
+                referencedDelete.Headers.IfMatch.Add(current.Headers.ETag);
+                using var response = await client.SendAsync(referencedDelete);
+                var problem = await response.Content.ReadAsStringAsync();
+                Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode, problem);
+                StringAssert.Contains(problem, "flow_in_use");
+            }
+
+            foreach (var directEntry in directEntries)
+            {
+                using var entryDelete = await client.DeleteAsync($"/api/management/entries/{directEntry.Value.Id.Value}?removeDashboardReferences=true&closeInteractions=true");
+                Assert.AreEqual(HttpStatusCode.NoContent, entryDelete.StatusCode);
+            }
+
+            using (var orphanDelete = new HttpRequestMessage(HttpMethod.Delete, $"/api/flows/{flowId}?deleteSystemManaged=true"))
+            {
+                orphanDelete.Headers.IfMatch.Add(current.Headers.ETag);
+                using var response = await client.SendAsync(orphanDelete);
+                var problem = await response.Content.ReadAsStringAsync();
+                Assert.AreEqual(HttpStatusCode.NoContent, response.StatusCode, problem);
+            }
+
+            using var missing = await client.GetAsync($"/api/flows/{flowId}");
+            Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
         }
         finally
         {

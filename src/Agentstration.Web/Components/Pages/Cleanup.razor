@@ -55,10 +55,17 @@ else if (inventory is not null)
             </header>
             @if (group.Kind == "Entries")
             {
-                <div class="cleanup-entry-options">
+                <div class="cleanup-options cleanup-entry-options">
                     <div><strong>@T("EntryOptionsTitle")</strong><p>@T("EntryOptionsDescription")</p></div>
                     <label><input type="checkbox" @bind="removeDashboardReferences" disabled="@deleting" /> <span>@T("RemoveDashboardReferences")</span></label>
                     <label><input type="checkbox" @bind="closeInteractions" disabled="@deleting" /> <span>@T("CloseInteractions")</span></label>
+                </div>
+            }
+            else if (group.Kind == "Flows")
+            {
+                <div class="cleanup-options cleanup-flow-options">
+                    <div><strong>@T("FlowOptionsTitle")</strong><p>@T("FlowOptionsDescription")</p></div>
+                    <label><input type="checkbox" @bind="deleteSystemManagedFlows" disabled="@deleting" /> <span>@T("DeleteSystemManagedFlows")</span></label>
                 </div>
             }
             @if (visible.Count == 0)
@@ -139,6 +146,7 @@ else if (inventory is not null)
     private bool acknowledged;
     private bool removeDashboardReferences;
     private bool closeInteractions;
+    private bool deleteSystemManagedFlows;
     private int processedCount;
     private int deletionTotal;
 
@@ -149,7 +157,8 @@ else if (inventory is not null)
         && inventory.All.Count > 0
         && inventory.All.All(candidate => selected.Contains(candidate.Key))
         && removeDashboardReferences
-        && closeInteractions;
+        && closeInteractions
+        && deleteSystemManagedFlows;
     private IReadOnlyList<CleanupGroupView> Groups => inventory is null ? [] :
         [new("Runs", inventory.Runs), new("Entries", inventory.Entries), new("Flows", inventory.Flows), new("Agents", inventory.Agents)];
     private IReadOnlyList<CleanupSummary> SelectedSummary => SelectedCandidates
@@ -194,6 +203,7 @@ else if (inventory is not null)
         if (value && inventory is not null) selected.UnionWith(inventory.All.Select(candidate => candidate.Key));
         removeDashboardReferences = value;
         closeInteractions = value;
+        deleteSystemManagedFlows = value;
     }
     private void ClearSelection() => SelectEverything(false);
     private void OpenConfirmation() { if (SelectedCount == 0) return; acknowledged = false; confirming = true; }
@@ -209,7 +219,7 @@ else if (inventory is not null)
         deletionTotal = pending.Length;
         processedCount = 0;
         var failed = new List<CleanupFailure>();
-        var options = new CleanupEntryOptions(removeDashboardReferences, closeInteractions);
+        var options = new CleanupDeletionOptions(removeDashboardReferences, closeInteractions, deleteSystemManagedFlows);
         foreach (var candidate in pending)
         {
             try

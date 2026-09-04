@@ -47,10 +47,13 @@ public sealed class CleanupConsoleTests
         Assert.HasCount(5, rendered.FindAll(".cleanup-row"));
         Assert.AreEqual(string.Empty, rendered.Find("input[type='search']").GetAttribute("value") ?? string.Empty);
         var entriesPanel = rendered.Find("section[data-kind='Entries']");
+        var flowsPanel = rendered.Find("section[data-kind='Flows']");
         Assert.HasCount(1, entriesPanel.QuerySelectorAll(".cleanup-entry-options"));
+        Assert.HasCount(1, flowsPanel.QuerySelectorAll(".cleanup-flow-options"));
         await rendered.Find(".cleanup-select-everything input").ChangeAsync(new() { Value = true });
         Assert.IsTrue(rendered.Find(".cleanup-select-everything input").HasAttribute("checked"));
         Assert.IsTrue(entriesPanel.QuerySelectorAll(".cleanup-entry-options input[type='checkbox']").All(input => input.HasAttribute("checked")));
+        Assert.IsTrue(flowsPanel.QuerySelector(".cleanup-flow-options input[type='checkbox']")!.HasAttribute("checked"));
         await rendered.Find("[data-testid='open-cleanup-confirmation']").ClickAsync(new());
 
         var confirm = rendered.Find("[data-testid='confirm-cleanup']");
@@ -63,6 +66,7 @@ public sealed class CleanupConsoleTests
             client.Deleted.Select(candidate => candidate.Kind).ToArray());
         Assert.IsTrue(client.EntryOptions.Single().RemoveDashboardReferences);
         Assert.IsTrue(client.EntryOptions.Single().CloseInteractions);
+        Assert.IsTrue(client.FlowOptions.Single().DeleteSystemManagedFlows);
         Assert.AreEqual(0, rendered.FindAll(".cleanup-row").Count);
         StringAssert.Contains(rendered.Markup, "0 items selected");
     }
@@ -92,7 +96,7 @@ public sealed class CleanupConsoleTests
             [CleanupApiClient.WorkClient] = Client(handler)
         };
         var api = new CleanupApiClient(new TestHttpClientFactory(clients));
-        var options = new CleanupEntryOptions(true, true);
+        var options = new CleanupDeletionOptions(true, true, true);
 
         foreach (var candidate in Inventory().All)
             await api.DeleteAsync(candidate, options, default);
@@ -103,10 +107,14 @@ public sealed class CleanupConsoleTests
             "/api/runtime/runs/runtime-1",
             "/api/flowRuns/flow-run-1",
             "/api/management/entries/entry-1?removeDashboardReferences=true&closeInteractions=true",
-            "/api/namespaces/team-a/flows/flow-1",
+            "/api/namespaces/team-a/flows/flow-1?deleteSystemManaged=true",
             "/api/namespaces/team-a/agents/agent-1"
         }, deletes.Select(request => request.Path).ToArray());
         Assert.IsTrue(deletes.Where(request => !request.Path.Contains("/entries/", StringComparison.Ordinal)).All(request => request.IfMatch == "\"current\""));
+
+        handler.Requests.Clear();
+        await api.DeleteAsync(Inventory().Flows.Single(), new CleanupDeletionOptions(false, false, false), default);
+        Assert.AreEqual("/api/namespaces/team-a/flows/flow-1", handler.Requests.Single(request => request.Method == HttpMethod.Delete).Path);
     }
 
     private static BunitContext CreateContext(params string[] permissions)
@@ -143,7 +151,8 @@ public sealed class CleanupConsoleTests
     {
         private readonly List<CleanupCandidate> remaining = [.. initial.All];
         public List<CleanupCandidate> Deleted { get; } = [];
-        public List<CleanupEntryOptions> EntryOptions { get; } = [];
+        public List<CleanupDeletionOptions> EntryOptions { get; } = [];
+        public List<CleanupDeletionOptions> FlowOptions { get; } = [];
         public int LoadCount { get; private set; }
 
         public Task<CleanupInventory> GetInventoryAsync(CancellationToken cancellationToken)
@@ -156,10 +165,11 @@ public sealed class CleanupConsoleTests
                 remaining.Where(candidate => candidate.Kind == CleanupResourceKind.Agent).ToArray()));
         }
 
-        public Task DeleteAsync(CleanupCandidate candidate, CleanupEntryOptions entryOptions, CancellationToken cancellationToken)
+        public Task DeleteAsync(CleanupCandidate candidate, CleanupDeletionOptions options, CancellationToken cancellationToken)
         {
             Deleted.Add(candidate);
-            if (candidate.Kind == CleanupResourceKind.Entry) EntryOptions.Add(entryOptions);
+            if (candidate.Kind == CleanupResourceKind.Entry) EntryOptions.Add(options);
+            if (candidate.Kind == CleanupResourceKind.Flow) FlowOptions.Add(options);
             remaining.RemoveAll(value => value.Key == candidate.Key);
             return Task.CompletedTask;
         }

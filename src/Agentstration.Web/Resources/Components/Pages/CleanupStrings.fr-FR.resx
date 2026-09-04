@@ -31,6 +31,9 @@
   <data name="EntryOptionsDescription" xml:space="preserve"><value>Ces options concernent uniquement les entrées sélectionnées. Fermer les interactions annule également leur travail en cours et leurs actions en attente.</value></data>
   <data name="RemoveDashboardReferences" xml:space="preserve"><value>Retirer les références des tableaux de bord</value></data>
   <data name="CloseInteractions" xml:space="preserve"><value>Fermer les interactions durables</value></data>
+  <data name="FlowOptionsTitle" xml:space="preserve"><value>Options des Flows système</value></data>
+  <data name="FlowOptionsDescription" xml:space="preserve"><value>Cette option concerne uniquement les Flows directs système sélectionnés. Les Flows encore référencés restent protégés.</value></data>
+  <data name="DeleteSystemManagedFlows" xml:space="preserve"><value>Supprimer les Flows système orphelins</value></data>
   <data name="GroupTitle.Runs" xml:space="preserve"><value>{0} exécutions terminales</value></data>
   <data name="GroupTitle.Entries" xml:space="preserve"><value>{0} entrées</value></data>
   <data name="GroupTitle.Flows" xml:space="preserve"><value>{0} Flows</value></data>
