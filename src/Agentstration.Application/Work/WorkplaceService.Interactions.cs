@@ -217,12 +217,6 @@ public sealed partial class WorkplaceService
             Inputs: [new WorkInput(Structured: JsonSerializer.SerializeToElement(context))],
             Flow: WorkplaceValidation.FlowReferenceFrom(target)), cancellationToken);
         var task = ToTask(stored.Value, interaction.TaskId);
-        var responseText = "I’m creating an updated version from the previous result.";
-        var responseMetadata = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["presentationKey"] = "ContinuationStarted"
-        };
-        var agentResponse = await AddAgentMessageAsync(interaction, responseText, now, cancellationToken, responseMetadata);
         var action = new CreateTaskAction(interaction.TaskId.Value, task.Title, task.Description, $"/tasks/{interaction.TaskId.Value}");
         var processing = interaction with
         {
@@ -230,7 +224,7 @@ public sealed partial class WorkplaceService
             LastActivityAt = now,
             LastTriggerMessageId = message.Id,
             ImmediateResult = action,
-            Messages = [.. interaction.Messages, message, agentResponse],
+            Messages = [.. interaction.Messages, message],
             Version = interaction.Version + 1
         };
         await repository.SaveInteractionAsync(processing, interaction.Version, cancellationToken);
