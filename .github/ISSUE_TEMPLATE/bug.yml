@@ -1,11 +1,28 @@
 name: Bug report
 description: Report reproducible behavior that does not work as expected.
-title: "[Bug]: "
 labels: [bug]
 body:
   - type: markdown
     attributes:
-      value: Thanks for helping improve Agentstration. Remove secrets and sensitive content from examples and logs.
+      value: |
+        Thanks for helping improve Agentstration. Remove secrets and sensitive content from examples, attachments, and logs.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Agentstration is primarily affected?
+      options:
+        - Console
+        - API
+        - Runtime
+        - Workplace
+        - Providers
+        - Deployment
+        - Documentation
+        - Cross-cutting
+        - Unknown
+    validations:
+      required: true
   - type: textarea
     id: description
     attributes:
@@ -39,7 +56,30 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: OS, .NET SDK, Agentstration commit or version, and relevant provider/profile.
+      description: OS, .NET SDK, Agentstration commit or version, storage profile, and relevant provider.
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Observed impact
+      options:
+        - Blocking
+        - Major
+        - Minor
+        - Cosmetic
+        - Unknown
+    validations:
+      required: true
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Regression
+      description: Did this behavior work in an earlier version or commit?
+      options:
+        - "Yes"
+        - "No"
+        - Unknown
     validations:
       required: true
   - type: textarea
@@ -48,3 +88,17 @@ body:
       label: Relevant logs
       description: Optional. Redact prompts, document contents, credentials, tokens, and personal data.
       render: shell
+  - type: upload
+    id: attachments
+    attributes:
+      label: Attachments
+      description: Optional. Add screenshots, recordings, sanitized logs, or a minimal reproduction.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Preliminary checks
+      options:
+        - label: I searched for an existing issue covering this behavior.
+          required: true
+        - label: I removed secrets, credentials, personal data, and sensitive content from this report.
+          required: true
