@@ -1,0 +1,32 @@
+[
+  {
+    "name": "priority:P1",
+    "color": "B60205",
+    "description": "Critical or blocking impact with no safe workaround."
+  },
+  {
+    "name": "priority:P2",
+    "color": "D93F0B",
+    "description": "Important impact with a viable workaround and no immediate critical risk."
+  },
+  {
+    "name": "priority:P3",
+    "color": "FBCA04",
+    "description": "Non-urgent improvement, localized debt, documentation, or low-impact optimization."
+  },
+  {
+    "name": "triage:agent",
+    "color": "5319E7",
+    "description": "Issue triage was performed by an automated or coding agent."
+  },
+  {
+    "name": "triage:pending-review",
+    "color": "1D76DB",
+    "description": "Agent triage is awaiting maintainer review."
+  },
+  {
+    "name": "triage:confirmed",
+    "color": "0E8A16",
+    "description": "A maintainer confirmed the issue triage."
+  }
+]
