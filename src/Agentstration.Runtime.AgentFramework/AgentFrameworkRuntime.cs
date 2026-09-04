@@ -32,6 +32,10 @@ public sealed class AgentFrameworkRuntimeFactory(
             .Select(tool => MapTool(tool, context.ToolExecution, ToolContext(definition, revisionId, generation, executionScope)))
             .ToList();
         var chatClient = await chatClients.ResolveAsync(definition.ModelProfileNamespace, definition.ModelProfileName, cancellationToken);
+        var model = chatClient.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
+        var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, null);
+        chatOptions.Instructions = definition.EffectiveInstructions;
+        chatOptions.Tools = tools;
         AIAgent agent = new ChatClientAgent(
             chatClient,
             new ChatClientAgentOptions
@@ -39,11 +43,7 @@ public sealed class AgentFrameworkRuntimeFactory(
                 Id = definition.AgentId.ToString("N"),
                 Name = definition.AgentKey,
                 Description = definition.Description,
-                ChatOptions = new Microsoft.Extensions.AI.ChatOptions
-                {
-                    Instructions = definition.EffectiveInstructions,
-                    Tools = tools
-                }
+                ChatOptions = chatOptions
             });
         return Observe(agent, observability.Enabled);
     }

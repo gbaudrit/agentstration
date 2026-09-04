@@ -508,6 +508,26 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     {
         using var chatClient = new RecordingChatClient
         {
+            Metadata = new ModelChatClientMetadata(
+                "reasoning-default",
+                "local-reasoning",
+                "ollama",
+                "ollama-local",
+                "qwen3:4b",
+                new ModelGenerationOptions
+                {
+                    Temperature = 0.35,
+                    TopP = 0.75,
+                    TopK = 24,
+                    MaxOutputTokens = 1200,
+                    Seed = 42,
+                    StopSequences = ["STOP"]
+                },
+                new ModelReasoningOptions
+                {
+                    Mode = ReasoningMode.Enabled,
+                    Effort = Agentstration.Management.Abstractions.ReasoningEffort.Medium
+                }),
             ResponseFactory = (call, _, options) =>
             {
                 if (call == 1)
@@ -534,9 +554,23 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 [new FlowHandoff("agent-1", "agent-2")],
                 Autonomous: true,
                 TerminationPhrase: "[[HANDOFF_COMPLETE]]"),
-            chatClient);
+            chatClient,
+            new RecordingAgentResolver(instructions: id => $"Instructions for {id}."));
 
         Assert.HasCount(3, chatClient.Calls);
+        Assert.IsTrue(chatClient.CallOptions[0].Instructions?.Contains("Instructions for agent-1.", StringComparison.Ordinal) == true);
+        Assert.IsTrue(chatClient.CallOptions[1].Instructions?.Contains("Instructions for agent-2.", StringComparison.Ordinal) == true);
+        Assert.IsFalse(chatClient.CallOptions[1].Instructions?.Contains("Instructions for agent-1.", StringComparison.Ordinal) == true);
+        Assert.IsTrue(chatClient.CallOptions[0].Instructions?.Contains("Use a handoff tool", StringComparison.Ordinal) == true);
+        Assert.IsTrue(chatClient.CallOptions.All(options => options.ModelId == "qwen3:4b"));
+        Assert.IsTrue(chatClient.CallOptions.All(options => options.Temperature == 0.35f));
+        Assert.IsTrue(chatClient.CallOptions.All(options => options.TopP == 0.75f));
+        Assert.IsTrue(chatClient.CallOptions.All(options => options.TopK == 24));
+        Assert.IsTrue(chatClient.CallOptions.All(options => options.MaxOutputTokens == 1200));
+        Assert.IsTrue(chatClient.CallOptions.All(options => options.Seed == 42));
+        Assert.IsTrue(chatClient.CallOptions.All(options => options.StopSequences?.SequenceEqual(["STOP"]) == true));
+        Assert.IsTrue(chatClient.CallOptions.All(options => Equals(options.AdditionalProperties?["reasoning_enabled"], true)));
+        Assert.IsTrue(chatClient.CallOptions.All(options => Equals(options.AdditionalProperties?["reasoning_effort"], "medium")));
         Assert.IsTrue(chatClient.Calls[2].Any(message =>
             message.Text.Contains("reply only with [[HANDOFF_COMPLETE]]", StringComparison.Ordinal)));
         CollectionAssert.AreEqual(
@@ -622,13 +656,14 @@ public sealed class AgentFrameworkRuntimeFactoryTests
 
     private static async Task<List<FlowExecutionEvent>> ExecuteOrchestrationAsync(
         FlowOrchestrationPattern pattern,
-        RecordingChatClient chatClient)
+        RecordingChatClient chatClient,
+        RecordingAgentResolver? agentResolver = null)
     {
         var factory = new AgentFrameworkRuntimeFactory(
             new RecordingResolver(chatClient),
             NullLoggerFactory.Instance,
             new GenAiObservabilityOptions { Enabled = true });
-        var engine = new AgentFrameworkFlowOrchestrationEngine(new RecordingAgentResolver(), new EmptyToolCatalog(), factory);
+        var engine = new AgentFrameworkFlowOrchestrationEngine(agentResolver ?? new RecordingAgentResolver(), new EmptyToolCatalog(), factory);
         var definition = new OrchestrationFlowDefinition(
             [
                 new FlowTargetReference(FlowTargetKind.Agent, "agent-1"),
@@ -785,7 +820,9 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         DefinitionHash = "hash"
     };
 
-    private sealed class RecordingAgentResolver(IReadOnlyCollection<string>? effectiveToolNames = null) : IRuntimeAgentResolver
+    private sealed class RecordingAgentResolver(
+        IReadOnlyCollection<string>? effectiveToolNames = null,
+        Func<string, string>? instructions = null) : IRuntimeAgentResolver
     {
         private readonly Dictionary<string, Guid> agentIds = new(StringComparer.Ordinal);
         public List<ResourceNamespace> ResolvedNamespaces { get; } = [];
@@ -804,10 +841,12 @@ public sealed class AgentFrameworkRuntimeFactoryTests
                 agentId = Guid.NewGuid();
                 agentIds.Add(resourceId, agentId);
             }
-            var definition = Definition(resourceId) with
+            var baseDefinition = Definition(resourceId);
+            var definition = baseDefinition with
             {
                 AgentId = agentId,
-                EffectiveToolNames = effectiveToolNames ?? []
+                EffectiveToolNames = effectiveToolNames ?? [],
+                EffectiveInstructions = instructions?.Invoke(resourceId) ?? baseDefinition.EffectiveInstructions
             };
             return Task.FromResult(new ResolvedRuntimeAgent(
                 definition.AgentId,
@@ -963,6 +1002,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     {
         public Func<int, IReadOnlyList<ChatMessage>, ChatOptions?, ChatResponse>? ResponseFactory { get; init; }
         public List<IReadOnlyList<ChatMessage>> Calls { get; } = [];
+        public List<ChatOptions> CallOptions { get; } = [];
         public IReadOnlyList<ChatMessage> Messages { get; private set; } = [];
         public ChatOptions? Options { get; private set; }
         public ModelChatClientMetadata? Metadata { get; init; }
@@ -973,6 +1013,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             Messages = messages.ToArray();
             Calls.Add(Messages);
             Options = options;
+            CallOptions.Add(options ?? new ChatOptions());
             return Task.FromResult(ResponseFactory?.Invoke(Calls.Count, Messages, options)
                 ?? new ChatResponse(new ChatMessage(ChatRole.Assistant, "OK")));
         }
