@@ -145,6 +145,33 @@ public sealed class EntryAdministrationComponentTests
     }
 
     [TestMethod]
+    public async Task EntryEditorDisplaysSuggestionRemovalAsACompactButton()
+    {
+        using var context = CreateContext();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(new FakeEntryAdministrationApiClient());
+        var rendered = context.Render<EntryEditor>(parameters => parameters.Add(value => value.Name, "primary"));
+
+        await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
+
+        var suggestion = rendered.Find(".entry-suggestion-form");
+        Assert.IsTrue(suggestion.ClassList.Contains("form-grid"));
+        Assert.HasCount(2, suggestion.QuerySelectorAll("label"));
+        Assert.IsNotNull(suggestion.QuerySelector(".entry-suggestion-label input"));
+        var value = suggestion.QuerySelector(".entry-suggestion-value textarea")!;
+        Assert.AreEqual("3", value.GetAttribute("rows"));
+        Assert.IsNotNull(suggestion.QuerySelector(".entry-suggestion-actions"));
+        var remove = suggestion.QuerySelector("[data-testid='remove-suggestion']")!;
+        Assert.IsTrue(remove.ClassList.Contains("button-danger"));
+        Assert.IsFalse(remove.ClassList.Contains("text-button"));
+        Assert.IsNotNull(remove.QuerySelector(".ui-icon"));
+
+        await remove.ClickAsync(new());
+
+        Assert.IsEmpty(rendered.FindAll(".entry-suggestion-card"));
+        Assert.IsTrue(rendered.Markup.Contains("No prompt starters configured", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task ExistingEntryExposesRealOverviewUsageAndPublishedVersionAcrossTabs()
     {
         using var context = CreateContext();

@@ -212,7 +212,28 @@ else
                 @if (suggestions.Count == 0) { <p class="entry-empty-copy">@T("NoPromptStarters")</p> }
                 else
                 {
-                    <div class="entry-card-list">@foreach (var suggestion in suggestions) { <article class="entry-suggestion-card" @key="suggestion"><div class="form-grid"><label><span>@T("Label")</span><input @bind="suggestion.Label" /></label><label><span>@T("Value")</span><input @bind="suggestion.Value" /></label><div class="entry-row-actions form-span-2"><button type="button" class="text-button entry-remove" @onclick="() => RemoveSuggestion(suggestion)">@T("Remove")</button></div></div></article> }</div>
+                    <div class="entry-card-list">
+                        @foreach (var suggestion in suggestions)
+                        {
+                            <article class="entry-suggestion-card" @key="suggestion">
+                                <div class="form-grid entry-suggestion-form">
+                                    <label class="entry-suggestion-label"><span>@T("Label")</span><input @bind="suggestion.Label" /></label>
+                                    <label class="entry-suggestion-value"><span>@T("Value")</span><textarea @bind="suggestion.Value" rows="3"></textarea></label>
+                                    <div class="entry-suggestion-actions">
+                                        <button type="button"
+                                                class="button-danger entry-suggestion-remove"
+                                                data-testid="remove-suggestion"
+                                                aria-label="@T("Remove")"
+                                                title="@T("Remove")"
+                                                @onclick="() => RemoveSuggestion(suggestion)">
+                                            <UiIcon Name="trash" />
+                                            <span>@T("Remove")</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        }
+                    </div>
                 }
             </section>
             </fieldset>
