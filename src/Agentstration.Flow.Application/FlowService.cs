@@ -59,10 +59,14 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
         return await repository.UpdateAsync(updated, expectedETag, cancellationToken);
     }
 
-    public async Task DeleteAsync(WorkspaceId workspaceId, FlowId id, string? expectedETag, CancellationToken cancellationToken)
+    public Task DeleteAsync(WorkspaceId workspaceId, FlowId id, string? expectedETag, CancellationToken cancellationToken) =>
+        DeleteAsync(workspaceId, id, expectedETag, allowSystemManaged: false, cancellationToken);
+
+    public async Task DeleteAsync(WorkspaceId workspaceId, FlowId id, string? expectedETag, bool allowSystemManaged, CancellationToken cancellationToken)
     {
         var stored = await repository.GetAsync(workspaceId, id, cancellationToken) ?? throw new FlowNotFoundException(id);
-        if (stored.Value.Metadata.TryGetValue("systemManaged", out var systemManaged) && bool.TryParse(systemManaged, out var isSystemManaged) && isSystemManaged)
+        if (IsSystemManaged(stored.Value.Metadata)
+            && (!allowSystemManaged || !IsDirectAgentFlow(stored.Value.Metadata)))
             throw new FlowValidationException("system_flow_managed", $"Flow '{id}' is managed by Agentstration and cannot be deleted independently.");
         foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(workspaceId, id, cancellationToken);
         await repository.DeleteAsync(workspaceId, id, expectedETag, cancellationToken);
@@ -107,4 +111,10 @@ public sealed class FlowService(IFlowRepository repository, TimeProvider timePro
 
     private static IReadOnlyDictionary<string, string> Copy(IReadOnlyDictionary<string, string>? source) =>
         source is null ? new Dictionary<string, string>() : new Dictionary<string, string>(source, StringComparer.Ordinal);
+
+    private static bool IsSystemManaged(IReadOnlyDictionary<string, string> metadata) =>
+        metadata.TryGetValue("systemManaged", out var value) && bool.TryParse(value, out var parsed) && parsed;
+
+    private static bool IsDirectAgentFlow(IReadOnlyDictionary<string, string> metadata) =>
+        metadata.TryGetValue("systemKind", out var value) && string.Equals(value, "DirectAgentFlow", StringComparison.Ordinal);
 }
