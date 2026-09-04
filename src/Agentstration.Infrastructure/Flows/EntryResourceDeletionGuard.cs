@@ -25,12 +25,9 @@ public sealed class EntryResourceDeletionGuard(IWorkplaceRepository workplace, I
     async Task IFlowDeletionGuard.ValidateDeleteAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken)
     {
         await workplace.InitializeAsync(cancellationToken);
-        var drafts = await workplace.ListEntryDraftsAsync(workspaceId, cancellationToken);
-        var publishedIds = (await workplace.ListEntriesAsync(workspaceId, cancellationToken)).Select(value => value.Id).ToHashSet();
-        var referenced = drafts.Where(value => publishedIds.Contains(value.Id)
-                && value.PublishedBinding?.Kind == Agentstration.Work.EntryBindingKind.Flow
-                && (value.PublishedBinding.Namespace ?? value.Id.Namespace) == flowId.Namespace
-                && string.Equals(ResourceName(value.PublishedBinding.ResourceId), flowId.Value, StringComparison.Ordinal))
+        var referenced = (await workplace.ListEntriesAsync(workspaceId, cancellationToken))
+            .Where(value => value.ResolvedTarget.Namespace == flowId.Namespace
+                && string.Equals(ResourceName(value.ResolvedTarget.FlowResourceId), flowId.Value, StringComparison.Ordinal))
             .Select(value => value.Name).ToArray();
         if (referenced.Length > 0)
             throw new FlowValidationException("flow_in_use", $"Flow '{flowId}' is referenced by Entry: {string.Join(", ", referenced)}.");

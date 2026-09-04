@@ -24,6 +24,10 @@ Only `Pinned` is supported in this increment. Draft saves are isolated in the Wo
 - System Flows consume normal immutable Flow storage but are hidden from user Flow selection.
 - `LatestPublished`, `FollowMajor`, visual Direct Agent Flow editing, manual system Flow deletion, provider-native streaming, and attachment mapping beyond the existing Work/Flow contracts remain outside this MVP.
 
+## Amendment — 2026-09-04
+
+Workspace cleanup may explicitly delete an orphaned system-managed Direct Agent Flow. The ordinary Flow deletion operation still rejects system-managed resources, and the Entry deletion guard evaluates published resolved targets so cleanup cannot remove a Direct Agent Flow while any published Entry references it. This allows stale generated resources to be collected without weakening Entry execution integrity.
+
 ## Rejected alternatives
 
 - Direct Agent execution from Work API: creates a second pipeline and leaks runtime selection into Work.

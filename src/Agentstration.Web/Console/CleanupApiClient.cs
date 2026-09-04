@@ -71,7 +71,7 @@ public sealed class CleanupApiClient(IHttpClientFactory httpClientFactory) : ICl
             CleanupResourceKind.RuntimeRun => DeleteWithCurrentETagAsync(RuntimeClient, RuntimeRunPath(candidate.Id), cancellationToken),
             CleanupResourceKind.FlowRun => DeleteWithCurrentETagAsync(FlowClient, FlowRunPath(candidate.Id), cancellationToken),
             CleanupResourceKind.Entry => DeleteEntryAsync(candidate, entryOptions, cancellationToken),
-            CleanupResourceKind.Flow => DeleteWithCurrentETagAsync(FlowClient, FlowPath(candidate.Namespace, candidate.Id), cancellationToken),
+            CleanupResourceKind.Flow => DeleteWithCurrentETagAsync(FlowClient, $"{FlowPath(candidate.Namespace, candidate.Id)}?deleteSystemManaged=true", cancellationToken),
             CleanupResourceKind.Agent => DeleteWithCurrentETagAsync(ManagementClient, AgentPath(candidate.Namespace, candidate.Id), cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(candidate))
         };

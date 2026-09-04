@@ -109,6 +109,46 @@ public sealed partial class FlowTests
     }
 
     [TestMethod]
+    public async Task ExplicitManagedDeleteRemovesOnlyOrphanedDirectAgentFlows()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var direct = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+            "system-direct-agent-expert",
+            null,
+            "1.0.0",
+            true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "expert")),
+            new Dictionary<string, string>
+            {
+                ["systemManaged"] = bool.TrueString,
+                ["systemKind"] = "DirectAgentFlow"
+            }), default);
+
+        var protectedDelete = await Assert.ThrowsExactlyAsync<FlowValidationException>(() =>
+            fixture.Service.DeleteAsync(TestScope.WorkspaceId, direct.Value.Id, direct.ETag, default));
+        Assert.AreEqual("system_flow_managed", protectedDelete.Code);
+
+        await fixture.Service.DeleteAsync(TestScope.WorkspaceId, direct.Value.Id, direct.ETag, allowSystemManaged: true, default);
+
+        Assert.IsNull(await fixture.Service.GetAsync(TestScope.WorkspaceId, direct.Value.Id, default));
+
+        var otherManaged = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
+            "system-other",
+            null,
+            "1.0.0",
+            true,
+            new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "expert")),
+            new Dictionary<string, string>
+            {
+                ["systemManaged"] = bool.TrueString,
+                ["systemKind"] = "Other"
+            }), default);
+        var unsupportedDelete = await Assert.ThrowsExactlyAsync<FlowValidationException>(() =>
+            fixture.Service.DeleteAsync(TestScope.WorkspaceId, otherManaged.Value.Id, otherManaged.ETag, allowSystemManaged: true, default));
+        Assert.AreEqual("system_flow_managed", unsupportedDelete.Code);
+    }
+
+    [TestMethod]
     public void WorkItemCanReferenceAnExactFlowVersionWithoutEmbeddingDefinition()
     {
         var reference = new FlowReference(new FlowId("technical-router"), "1.0.0", false);

@@ -47,9 +47,9 @@ public static partial class FlowEndpoints
         return Results.Ok(ToResponse(stored.Value));
     });
 
-    private static Task<IResult> DeleteNamespacedAsync(string @namespace, string id, HttpRequest request, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> DeleteNamespacedAsync(string @namespace, string id, bool? deleteSystemManaged, HttpRequest request, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        await service.DeleteAsync(CurrentWorkspace(requestContext), new FlowId(id, ResourceNamespace.Parse(@namespace)), request.Headers.IfMatch.FirstOrDefault(), token);
+        await service.DeleteAsync(CurrentWorkspace(requestContext), new FlowId(id, ResourceNamespace.Parse(@namespace)), request.Headers.IfMatch.FirstOrDefault(), deleteSystemManaged is true, token);
         return Results.NoContent();
     });
 
@@ -101,9 +101,9 @@ public static partial class FlowEndpoints
         return Results.Ok(ToResponse(stored.Value));
     });
 
-    private static Task<IResult> DeleteAsync(string id, HttpRequest request, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> DeleteAsync(string id, bool? deleteSystemManaged, HttpRequest request, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
-        await service.DeleteAsync(CurrentWorkspace(requestContext), new FlowId(id), request.Headers.IfMatch.FirstOrDefault(), token);
+        await service.DeleteAsync(CurrentWorkspace(requestContext), new FlowId(id), request.Headers.IfMatch.FirstOrDefault(), deleteSystemManaged is true, token);
         return Results.NoContent();
     });
 

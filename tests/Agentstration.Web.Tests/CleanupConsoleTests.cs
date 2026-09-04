@@ -103,7 +103,7 @@ public sealed class CleanupConsoleTests
             "/api/runtime/runs/runtime-1",
             "/api/flowRuns/flow-run-1",
             "/api/management/entries/entry-1?removeDashboardReferences=true&closeInteractions=true",
-            "/api/namespaces/team-a/flows/flow-1",
+            "/api/namespaces/team-a/flows/flow-1?deleteSystemManaged=true",
             "/api/namespaces/team-a/agents/agent-1"
         }, deletes.Select(request => request.Path).ToArray());
         Assert.IsTrue(deletes.Where(request => !request.Path.Contains("/entries/", StringComparison.Ordinal)).All(request => request.IfMatch == "\"current\""));
