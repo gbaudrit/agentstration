@@ -44,12 +44,12 @@ else
 
         <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Defaults")</p><h2>@T("Generation")</h2></div><span>@T("Canonical")</span></div>
             <div class="form-grid">
-                <label><span>@T("Temperature")</span><InputNumber @bind-Value="model.Temperature" step="0.1" /><ValidationMessage For="() => model.Temperature" /><small>@T("OptionalZeroToTwo")</small></label>
-                <label><span>@T("TopP")</span><InputNumber @bind-Value="model.TopP" step="0.05" /><ValidationMessage For="() => model.TopP" /><small>@T("OptionalZeroToOne")</small></label>
-                <label><span>@T("TopK")</span><InputNumber @bind-Value="model.TopK" /><ValidationMessage For="() => model.TopK" /></label>
-                <label><span>@T("MaximumOutputTokens")</span><InputNumber @bind-Value="model.MaxOutputTokens" /><ValidationMessage For="() => model.MaxOutputTokens" /></label>
-                <label><span>@T("Seed")</span><InputNumber @bind-Value="model.Seed" /><small>@T("SeedHelp")</small></label>
-                <label class="form-span-2"><span>@T("StopSequences")</span><InputTextArea @bind-Value="model.StopSequences" rows="3" /><small>@T("OneSequencePerLine")</small></label>
+                <label><span>@T("Temperature") <HelpTooltip Text="@T("TemperatureHelp")" /></span><InputNumber @bind-Value="model.Temperature" step="0.1" /><ValidationMessage For="() => model.Temperature" /></label>
+                <label><span>@T("TopP") <HelpTooltip Text="@T("TopPHelp")" /></span><InputNumber @bind-Value="model.TopP" step="0.05" /><ValidationMessage For="() => model.TopP" /></label>
+                <label><span>@T("TopK") <HelpTooltip Text="@T("TopKHelp")" /></span><InputNumber @bind-Value="model.TopK" /><ValidationMessage For="() => model.TopK" /></label>
+                <label><span>@T("MaximumOutputTokens") <HelpTooltip Text="@T("MaximumOutputTokensHelp")" /></span><InputNumber @bind-Value="model.MaxOutputTokens" /><ValidationMessage For="() => model.MaxOutputTokens" /></label>
+                <label><span>@T("Seed") <HelpTooltip Text="@T("SeedHelp")" /></span><InputNumber @bind-Value="model.Seed" /></label>
+                <label class="form-span-2"><span>@T("StopSequences") <HelpTooltip Text="@T("StopSequencesHelp")" /></span><InputTextArea @bind-Value="model.StopSequences" rows="3" /></label>
             </div>
         </section>
 
