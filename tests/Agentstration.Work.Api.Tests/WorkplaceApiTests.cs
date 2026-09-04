@@ -458,7 +458,8 @@ public sealed class WorkplaceApiTests
             var messages = await client.GetFromJsonAsync<ConversationMessage[]>($"/api/workspaces/default/interactions/{submitted.Interaction.Id}/messages");
             var storedMessages = messages ?? [];
             Assert.IsTrue(storedMessages.Any(value => value.Content == "Make it shorter and suitable for executives."));
-            Assert.IsTrue(storedMessages.Any(value => value.Metadata?.GetValueOrDefault("presentationKey") == "ContinuationStarted"));
+            Assert.IsFalse(storedMessages.Any(value => value.Metadata?.GetValueOrDefault("presentationKey") == "ContinuationStarted"));
+            Assert.IsFalse(storedMessages.Any(value => value.Content == "I’m creating an updated version from the previous result."));
             Assert.IsTrue(storedMessages.Any(value => value.Role == ConversationRole.Agentstration && value.Content == outputs.Results[1].Content.GetString()), "The conversation must carry the user-facing result instead of a duplicate readiness message.");
             var history = await client.GetFromJsonAsync<InteractionPageResponse>("/api/workspaces/default/interactions?take=10");
             Assert.IsTrue(history!.Value.Any(value => value.Id == submitted.Interaction.Id));
