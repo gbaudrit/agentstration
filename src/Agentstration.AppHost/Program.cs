@@ -3,6 +3,10 @@ using Agentstration.AppHost;
 var builder = DistributedApplication.CreateBuilder(args);
 var worktreeRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", ".."));
 var slot = builder.Configuration["Agentstration:Slot"] ?? "main";
+var dynamicApplicationPorts = bool.TryParse(
+    builder.Configuration["Agentstration:DynamicApplicationPorts"],
+    out var configuredDynamicApplicationPorts)
+    && configuredDynamicApplicationPorts;
 var instanceId = DevelopmentInstanceIdentity.Resolve(
     builder.Configuration["Agentstration:InstanceId"],
     worktreeRoot);
@@ -56,18 +60,22 @@ if (!Uri.TryCreate(localAiEndpoint, UriKind.Absolute, out var parsedLocalAiEndpo
 var ollamaExtension = builder.AddProject<Projects.Agentstration_Extensions_Ollama>("ollama-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Ollama__Endpoint", parsedOllamaEndpoint.AbsoluteUri)
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health")
+    .WithDynamicHostPorts(dynamicApplicationPorts);
 var llamaCppExtension = builder.AddProject<Projects.Agentstration_Extensions_LlamaCpp>("llama-cpp-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("LlamaCpp__Endpoint", parsedLlamaCppEndpoint.AbsoluteUri)
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health")
+    .WithDynamicHostPorts(dynamicApplicationPorts);
 var localAiExtension = builder.AddProject<Projects.Agentstration_Extensions_LocalAI>("localai-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("LocalAI__Endpoint", parsedLocalAiEndpoint.AbsoluteUri)
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health")
+    .WithDynamicHostPorts(dynamicApplicationPorts);
 var utilitiesExtension = builder.AddProject<Projects.Agentstration_Extensions_Utilities>("utilities-extension")
     .WithEnvironment("Agentstration__Slot", slot)
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health")
+    .WithDynamicHostPorts(dynamicApplicationPorts);
 
 var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-console")
     .WithEnvironment("Agentstration__Slot", slot)
@@ -86,7 +94,8 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.LocalAI__Endpoint", localAiExtension.GetEndpoint("http"))
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint", utilitiesExtension.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
-    .WaitFor(ollamaExtension);
+    .WaitFor(ollamaExtension)
+    .WithDynamicHostPorts(dynamicApplicationPorts);
 if (string.Equals(storageProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
     console.WithPostgreSqlStorage(builder, slot, instanceId);
 else
@@ -111,7 +120,8 @@ var workplace = builder.AddProject<Projects.Agentstration_Workplace_Web>("agents
     .WithEnvironment("Agentstration__InstanceId", instanceId)
     .WithEnvironment("Agentstration__ApiBaseUrl", console.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
-    .WaitFor(console);
+    .WaitFor(console)
+    .WithDynamicHostPorts(dynamicApplicationPorts);
 
 console.WithEnvironment("Agentstration__WorkplaceBaseUrl", workplace.GetEndpoint("http"));
 await builder.Build().RunAsync();

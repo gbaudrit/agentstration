@@ -30,6 +30,7 @@ else {
 
 $slotDataPath = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot ".agentstration\slots\$slot"))
 [System.IO.Directory]::CreateDirectory($slotDataPath) | Out-Null
+$bootstrapPath = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'deploy\bootstrap\profiles'))
 
 Write-Host 'Agentstration development slot'
 Write-Host ''
@@ -37,6 +38,17 @@ Write-Host ("Slot:       {0}" -f $slot)
 Write-Host ("Branch:     {0}" -f $branchDisplay)
 Write-Host ("Worktree:   {0}" -f $repositoryRoot)
 Write-Host ("Data:       {0}" -f $slotDataPath)
+Write-Host 'Bootstrap:  development'
+Write-Host ''
+
+$appHostProject = Join-Path $repositoryRoot 'src\Agentstration.AppHost'
+Write-Host 'Building Agentstration.AppHost...'
+Write-Host ''
+& dotnet build $appHostProject
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+
 Write-Host ''
 Write-Host 'Starting Agentstration.AppHost...'
 Write-Host ''
@@ -45,6 +57,10 @@ $infrastructurePorts = @(Get-AgentstrationFreeTcpPorts -Count 3)
 $environment = @{
     'Agentstration__Slot' = $slot
     'Agentstration__SlotDataPath' = $slotDataPath
+    'Agentstration__DynamicApplicationPorts' = 'true'
+    'Agentstration__Bootstrap__Path' = $bootstrapPath
+    'Agentstration__Bootstrap__InitialBootstrapEnabled' = 'true'
+    'Agentstration__Bootstrap__InitialProfiles__0' = 'development'
     'ASPNETCORE_ENVIRONMENT' = 'Development'
     'DOTNET_ENVIRONMENT' = 'Development'
     'ASPIRE_ALLOW_UNSECURED_TRANSPORT' = 'true'
@@ -62,7 +78,7 @@ try {
     }
 
     $browserOpened = $false
-    & dotnet run --project (Join-Path $repositoryRoot 'src\Agentstration.AppHost') --no-launch-profile |
+    & dotnet run --project $appHostProject --no-build --no-launch-profile |
         ForEach-Object {
             $line = $_.ToString()
             Write-Host $line
