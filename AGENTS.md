@@ -211,10 +211,31 @@ When creating or updating a GitHub issue, treat the forms under `.github/ISSUE_T
 - Write issue titles and bodies in English. Keep titles outcome-focused and do not add type or priority prefixes such as `[Feature]`, `[Bug]`, or `[P1]`.
 - Preserve the form's section names and order. API-created issues must include the same required sections that the selected form would produce.
 - Apply the form's type label explicitly when creating an issue through the API: `bug` for bug reports and `enhancement` for feature requests and technical tasks. Add more specific area or technical labels only when they already exist and are supported by the issue content.
-- Do not assign or infer priority unless the task or maintainer explicitly provides it. Priority is a triage decision and belongs in labels, not the title.
+- Assign priority when the maintainer requests triage or when creating issues from an agent-led review. Do not assign priority when merely transcribing a request unless the maintainer provides it. Priority belongs in labels, not the title.
 - Search open and closed issues for duplicates before creating a new one. Link prerequisites and related issues with exact issue numbers.
 - Make acceptance criteria observable and testable. Include validation expectations for technical tasks and avoid inventing metrics, dependencies, code locations, or architectural constraints.
 - Keep implementation guidance proportional to the evidence. Separate required outcomes from optional suggestions and state exclusions under `Out of scope`.
+
+### Priority triage
+
+Use exactly one priority label when the available evidence supports a decision:
+
+- `priority:P1`: critical or blocking impact with no safe workaround, such as a confirmed high-impact security vulnerability, data loss or corruption, broken workspace isolation, or an essential path that cannot be used.
+- `priority:P2`: important impact on correctness, reliability, performance, maintainability, or the committed roadmap, with a viable workaround and no immediate critical risk.
+- `priority:P3`: non-urgent improvement, localized technical debt, documentation work, cleanup, or low-impact optimization.
+- No priority label: the impact or urgency is not sufficiently evidenced. State what information is missing instead of guessing.
+
+The issue's `Impact` section must justify the selected priority. Effort, implementation size, or being a dependency does not increase priority by itself. Use the lower priority when evidence does not support the higher one, and never invent impact or urgency.
+
+### Agent triage provenance
+
+When an agent independently chooses any issue classification, area, or priority:
+
+- Add `triage:agent` and `triage:pending-review`.
+- Do not add `triage:confirmed`; only apply it after an explicit maintainer confirmation.
+- On confirmation, replace `triage:pending-review` with `triage:confirmed` and preserve `triage:agent` as provenance.
+- Omit the agent-triage labels when the maintainer supplied the complete classification and the agent only applied it.
+- If the labels are unavailable, report that `scripts/github/apply-issue-labels.ps1` must be applied instead of inventing alternatives.
 
 ## Pull Request Description
 
