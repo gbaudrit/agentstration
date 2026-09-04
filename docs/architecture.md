@@ -304,7 +304,7 @@ Activity sources exist for Work, Flow Runs, Runtime Runs, Microsoft Agent Framew
 
 MAF and model-client telemetry follows the OpenTelemetry GenAI conventions and is enabled by `Observability:GenAI:Enabled`, which defaults to `true`. OpenTelemetry sensitive-data capture is explicitly disabled in code: raw documents, prompts, responses, tool arguments, tool results, credentials, and authorization headers are not emitted by the normal telemetry pipeline. Operational logs use scopes carrying the Run and agent identifiers and export through OTLP alongside traces and metrics when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Aspire supplies the local dashboard endpoint.
 
-`Observability:GenAI:HttpPayloadCapture` remains a separate, Development-only diagnostic boundary for the legacy OpenAI-compatible model pipeline. AEP requests and the out-of-process Ollama extension do not enable payload capture by default. Normal AEP `HttpClient` instrumentation records network telemetry without prompts, responses, tool arguments, credentials, or authorization headers.
+`Observability:GenAI:HttpPayloadCapture` remains a separate, Development-only diagnostic boundary for the legacy OpenAI-compatible model pipeline and the AEP model-provider client. When explicitly enabled, the AEP capture records the bounded, redacted protocol request immediately before it leaves Agentstration, including the system message derived from agent instructions. The out-of-process extension does not capture its provider-native request by default. Normal AEP `HttpClient` instrumentation records network telemetry without prompts, responses, tool arguments, credentials, or authorization headers.
 
 ## Identity, tenancy, and local bootstrap
 

@@ -229,7 +229,7 @@ public sealed class AepVerticalTests
         var tool = AIFunctionFactory.Create((string city) => $"sunny in {city}", new AIFunctionFactoryOptions { Name = "weather", Description = "Gets weather" });
         var response = await adapter.GetResponseAsync(
             [new ChatMessage(ChatRole.System, "rules"), new ChatMessage(ChatRole.User, "ping")],
-            new ChatOptions { Temperature = 0.25f, MaxOutputTokens = 42, ResponseFormat = ChatResponseFormat.Json, Tools = [tool] });
+            new ChatOptions { Instructions = "Follow system rules.", Temperature = 0.25f, MaxOutputTokens = 42, ResponseFormat = ChatResponseFormat.Json, Tools = [tool] });
         var updates = new List<ChatResponseUpdate>();
         await foreach (var update in adapter.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "ping")])) updates.Add(update);
         using var cancellation = new CancellationTokenSource();
@@ -415,6 +415,9 @@ public sealed class AepVerticalTests
             Assert.AreEqual("test-model", request.Model);
             if (request.Options?.Temperature == 0.25f)
             {
+                Assert.AreEqual(AepRole.System, request.Messages[0].Role);
+                Assert.AreEqual("Follow system rules.", request.Messages[0].Contents.Single().Text);
+                Assert.AreEqual("rules", request.Messages[1].Contents.Single().Text);
                 Assert.AreEqual("weather", request.Tools?.Single().Name);
                 Assert.AreEqual(JsonValueKind.Object, request.Tools?.Single().Parameters.ValueKind);
                 Assert.AreEqual("json_object", request.Options?.ResponseFormat?.GetProperty("type").GetString());
