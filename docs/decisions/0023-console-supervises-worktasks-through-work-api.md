@@ -20,6 +20,10 @@ The Console always registers the real typed Work API client, even when unrelated
 
 Workplace deep links are generated only from optional configuration. The Console is read-only for Interactions and PendingActions. Pause, resume, and cancel are sent to existing Work API commands; Task creation, conversation, retry, mutation, and deletion are not Console capabilities.
 
+## Amendment — 2026-09-04
+
+Workspace cleanup may delete terminal Tasks through the canonical Work API. The operation requires the Run deletion permission and a current `If-Match` ETag, rejects non-terminal Tasks, and removes the Task family together with its Work-owned activities, pending actions, results, artifact metadata and notifications. Artifact payloads are removed from the workspace artifact store. A retained Interaction is detached from the deleted Task so its conversation remains available without a dangling current-Task reference. Ordinary Task supervision remains non-destructive outside the cleanup surface.
+
 ## Consequences
 
 - Console can run without Workplace and show previously persisted Tasks.

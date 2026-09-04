@@ -78,6 +78,7 @@ public sealed class OpenApiTests
             ("POST", "/api/routing/invoke", AgentstrationPolicies.CanExecuteRuns),
             ("DELETE", "/api/flowRuns/{runId}", AgentstrationPolicies.CanDeleteRuns),
             ("DELETE", "/api/runtime/runs/{runId}", AgentstrationPolicies.CanDeleteRuns),
+            ("DELETE", "/api/tasks/{taskId:guid}", AgentstrationPolicies.CanDeleteRuns),
             ("DELETE", "/api/management/entries/{entryName}", AgentstrationPolicies.CanDeleteResources),
             ("DELETE", "/api/namespaces/{namespace}/management/entries/{entryName}", AgentstrationPolicies.CanDeleteResources),
             ("POST", "/api/triggers/{name}/run", AgentstrationPolicies.CanExecuteRuns),

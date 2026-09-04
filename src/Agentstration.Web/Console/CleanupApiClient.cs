@@ -7,11 +7,12 @@ using Agentstration.Management.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Work;
 using Agentstration.Work.Contracts;
 
 namespace Agentstration.Web.Console;
 
-public enum CleanupResourceKind { RuntimeRun, FlowRun, Entry, Flow, Agent }
+public enum CleanupResourceKind { RuntimeRun, FlowRun, Task, Entry, Flow, Agent }
 
 public sealed record CleanupCandidate(
     CleanupResourceKind Kind,
@@ -27,11 +28,12 @@ public sealed record CleanupCandidate(
 
 public sealed record CleanupInventory(
     IReadOnlyList<CleanupCandidate> Runs,
+    IReadOnlyList<CleanupCandidate> Tasks,
     IReadOnlyList<CleanupCandidate> Entries,
     IReadOnlyList<CleanupCandidate> Flows,
     IReadOnlyList<CleanupCandidate> Agents)
 {
-    public IReadOnlyList<CleanupCandidate> All => [.. Runs, .. Entries, .. Flows, .. Agents];
+    public IReadOnlyList<CleanupCandidate> All => [.. Runs, .. Tasks, .. Entries, .. Flows, .. Agents];
 }
 
 public sealed record CleanupDeletionOptions(bool RemoveDashboardReferences, bool CloseInteractions, bool DeleteSystemManagedFlows);
@@ -53,16 +55,17 @@ public sealed class CleanupApiClient(IHttpClientFactory httpClientFactory) : ICl
     {
         var runtimeRunsTask = GetRuntimeRunsAsync(cancellationToken);
         var flowRunsTask = GetFlowRunsAsync(cancellationToken);
+        var tasksTask = GetTasksAsync(cancellationToken);
         var entriesTask = GetEntriesAsync(cancellationToken);
         var flowsTask = GetFlowsAsync(cancellationToken);
         var agentsTask = GetAgentsAsync(cancellationToken);
-        await Task.WhenAll(runtimeRunsTask, flowRunsTask, entriesTask, flowsTask, agentsTask);
+        await Task.WhenAll(runtimeRunsTask, flowRunsTask, tasksTask, entriesTask, flowsTask, agentsTask);
 
         var runs = (await runtimeRunsTask)
             .Concat(await flowRunsTask)
             .OrderByDescending(candidate => candidate.UpdatedAt)
             .ToArray();
-        return new(runs, await entriesTask, await flowsTask, await agentsTask);
+        return new(runs, await tasksTask, await entriesTask, await flowsTask, await agentsTask);
     }
 
     public Task DeleteAsync(CleanupCandidate candidate, CleanupDeletionOptions options, CancellationToken cancellationToken) =>
@@ -70,6 +73,7 @@ public sealed class CleanupApiClient(IHttpClientFactory httpClientFactory) : ICl
         {
             CleanupResourceKind.RuntimeRun => DeleteWithCurrentETagAsync(RuntimeClient, RuntimeRunPath(candidate.Id), cancellationToken),
             CleanupResourceKind.FlowRun => DeleteWithCurrentETagAsync(FlowClient, FlowRunPath(candidate.Id), cancellationToken),
+            CleanupResourceKind.Task => DeleteWithCurrentETagAsync(WorkClient, TaskPath(candidate.Id), cancellationToken),
             CleanupResourceKind.Entry => DeleteEntryAsync(candidate, options, cancellationToken),
             CleanupResourceKind.Flow => DeleteWithCurrentETagAsync(FlowClient, FlowPath(candidate.Namespace, candidate.Id)
                 + (options.DeleteSystemManagedFlows ? "?deleteSystemManaged=true" : string.Empty), cancellationToken),
@@ -135,6 +139,36 @@ public sealed class CleanupApiClient(IHttpClientFactory httpClientFactory) : ICl
                 entry.Value.UpdatedAt,
                 entry.Value.Binding.ResourceId))
             .OrderBy(candidate => candidate.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+    }
+
+    private async Task<IReadOnlyList<CleanupCandidate>> GetTasksAsync(CancellationToken cancellationToken)
+    {
+        var client = httpClientFactory.CreateClient(WorkClient);
+        const int pageSize = 100;
+        var pageNumber = 1;
+        var values = new List<WorkTaskOperationsSummary>();
+        while (true)
+        {
+            var page = await ApiResponse.ReadAsync<WorkTaskOperationsPageResponse>(
+                client,
+                $"api/tasks?page={pageNumber}&pageSize={pageSize}&sort=updatedAt&direction=desc",
+                cancellationToken);
+            values.AddRange(page.Items);
+            if (pageNumber * page.PageSize >= page.TotalCount || page.Items.Count == 0) break;
+            pageNumber++;
+        }
+
+        return values
+            .Where(task => task.Status is WorkTaskStatus.Completed or WorkTaskStatus.Failed or WorkTaskStatus.Cancelled)
+            .Select(task => new CleanupCandidate(
+                CleanupResourceKind.Task,
+                task.Id.ToString("D"),
+                task.Title,
+                ResourceNamespace.Default,
+                task.Status.ToString(),
+                task.UpdatedAt,
+                task.EntryId))
             .ToArray();
     }
 
@@ -240,6 +274,7 @@ public sealed class CleanupApiClient(IHttpClientFactory httpClientFactory) : ICl
 
     private static string RuntimeRunPath(string id) => $"api/runtime/runs/{Uri.EscapeDataString(id)}";
     private static string FlowRunPath(string id) => $"api/flowRuns/{Uri.EscapeDataString(id)}";
+    private static string TaskPath(string id) => $"api/tasks/{Uri.EscapeDataString(id)}";
     private static string AgentPath(ResourceNamespace @namespace, string id) => @namespace.IsDefault
         ? $"api/agents/{Uri.EscapeDataString(id)}"
         : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(id)}";

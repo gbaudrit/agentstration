@@ -34,6 +34,7 @@ else if (inventory is not null)
 
     <section class="cleanup-metrics" aria-label="@T("InventorySummary")">
         <article class="cleanup-metric"><UiIcon Name="play-circle" /><span><strong>@inventory.Runs.Count</strong><small>@T("Kind.Runs")</small></span></article>
+        <article class="cleanup-metric"><UiIcon Name="list-check" /><span><strong>@inventory.Tasks.Count</strong><small>@T("Kind.Tasks")</small></span></article>
         <article class="cleanup-metric"><UiIcon Name="entry" /><span><strong>@inventory.Entries.Count</strong><small>@T("Kind.Entries")</small></span></article>
         <article class="cleanup-metric"><UiIcon Name="workflow" /><span><strong>@inventory.Flows.Count</strong><small>@T("Kind.Flows")</small></span></article>
         <article class="cleanup-metric"><UiIcon Name="agent" /><span><strong>@inventory.Agents.Count</strong><small>@T("Kind.Agents")</small></span></article>
@@ -160,7 +161,7 @@ else if (inventory is not null)
         && closeInteractions
         && deleteSystemManagedFlows;
     private IReadOnlyList<CleanupGroupView> Groups => inventory is null ? [] :
-        [new("Runs", inventory.Runs), new("Entries", inventory.Entries), new("Flows", inventory.Flows), new("Agents", inventory.Agents)];
+        [new("Runs", inventory.Runs), new("Tasks", inventory.Tasks), new("Entries", inventory.Entries), new("Flows", inventory.Flows), new("Agents", inventory.Agents)];
     private IReadOnlyList<CleanupSummary> SelectedSummary => SelectedCandidates
         .GroupBy(candidate => Category(candidate.Kind))
         .Select(group => new CleanupSummary(group.Key, group.Count()))
@@ -244,9 +245,9 @@ else if (inventory is not null)
         Notifications.Add(new(Guid.NewGuid(), failed.Count == 0 ? T("NotificationComplete") : T("NotificationPartial"), T("NotificationResult", deletedCount, failed.Count), TimeProvider.GetLocalNow(), failed.Count == 0 ? UiStatus.Success : UiStatus.Warning));
     }
 
-    private static int DeletePriority(CleanupResourceKind kind) => kind switch { CleanupResourceKind.RuntimeRun or CleanupResourceKind.FlowRun => 0, CleanupResourceKind.Entry => 1, CleanupResourceKind.Flow => 2, CleanupResourceKind.Agent => 3, _ => 4 };
-    private static string Category(CleanupResourceKind kind) => kind switch { CleanupResourceKind.RuntimeRun or CleanupResourceKind.FlowRun => "Runs", CleanupResourceKind.Entry => "Entries", CleanupResourceKind.Flow => "Flows", CleanupResourceKind.Agent => "Agents", _ => throw new ArgumentOutOfRangeException(nameof(kind)) };
-    private static string Icon(CleanupResourceKind kind) => kind switch { CleanupResourceKind.RuntimeRun => "play-circle", CleanupResourceKind.FlowRun => "flow-run", CleanupResourceKind.Entry => "entry", CleanupResourceKind.Flow => "workflow", _ => "agent" };
+    private static int DeletePriority(CleanupResourceKind kind) => kind switch { CleanupResourceKind.RuntimeRun or CleanupResourceKind.FlowRun => 0, CleanupResourceKind.Task => 1, CleanupResourceKind.Entry => 2, CleanupResourceKind.Flow => 3, CleanupResourceKind.Agent => 4, _ => 5 };
+    private static string Category(CleanupResourceKind kind) => kind switch { CleanupResourceKind.RuntimeRun or CleanupResourceKind.FlowRun => "Runs", CleanupResourceKind.Task => "Tasks", CleanupResourceKind.Entry => "Entries", CleanupResourceKind.Flow => "Flows", CleanupResourceKind.Agent => "Agents", _ => throw new ArgumentOutOfRangeException(nameof(kind)) };
+    private static string Icon(CleanupResourceKind kind) => kind switch { CleanupResourceKind.RuntimeRun => "play-circle", CleanupResourceKind.FlowRun => "flow-run", CleanupResourceKind.Task => "list-check", CleanupResourceKind.Entry => "entry", CleanupResourceKind.Flow => "workflow", _ => "agent" };
     private string KindLabel(CleanupResourceKind kind) => T($"Kind.{kind}");
     private string StatusLabel(string status) { var value = Localizer[$"Status.{status}"]; return value.ResourceNotFound ? status : value.Value; }
     private string FormatDate(DateTimeOffset value) => value == DateTimeOffset.MinValue ? T("UnknownDate") : value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.CurrentCulture);

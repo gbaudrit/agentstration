@@ -28,6 +28,7 @@ public static class WorkOperationsEndpoints
         tasks.MapPost("/{taskId:guid}/pause", PauseAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
         tasks.MapPost("/{taskId:guid}/resume", ResumeAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
         tasks.MapPost("/{taskId:guid}/cancel", CancelAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
+        tasks.MapDelete("/{taskId:guid}", DeleteAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanDeleteRuns);
         return endpoints;
     }
 
@@ -56,10 +57,11 @@ public static class WorkOperationsEndpoints
             await Count(WorkTaskStatus.Failed), await Count(WorkTaskStatus.Completed, timeProvider.GetUtcNow().AddHours(-24))));
     });
 
-    private static Task<IResult> DetailAsync(Guid taskId, WorkplaceService service, FlowRunService flowRuns, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> DetailAsync(Guid taskId, HttpResponse response, WorkplaceService service, FlowRunService flowRuns, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         var scope = CurrentScope(requestContext);
         var operational = await service.GetOperationalTaskAsync(scope.WorkspaceId, new(taskId), token); var task = operational.Task;
+        response.Headers.ETag = $"\"{task.Version}\"";
         var interaction = task.InteractionId is { } interactionId ? await service.GetInteractionAsync(operational.WorkspaceId, interactionId, token) : null;
         var pending = (await service.ListPendingActionsForTaskAsync(operational.WorkspaceId, task.Id, token)).Select(WorkplaceService.ToContract).ToArray();
         var results = await service.ListResultsAsync(operational.WorkspaceId, task.Id, token);
@@ -96,6 +98,19 @@ public static class WorkOperationsEndpoints
     private static Task<IResult> PauseAsync(Guid taskId, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value => Results.Ok(await service.PauseTaskAsync(value.WorkspaceId, value.Task.Id, token)), token);
     private static Task<IResult> ResumeAsync(Guid taskId, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value => Results.Ok(await service.ResumeTaskAsync(value.WorkspaceId, value.Task.Id, token)), token);
     private static Task<IResult> CancelAsync(Guid taskId, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value => Results.Ok(await service.CancelTaskAsync(value.WorkspaceId, value.Task.Id, token)), token);
+
+    private static Task<IResult> DeleteAsync(
+        Guid taskId,
+        HttpRequest request,
+        WorkTaskDeletionService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken token) => ExecuteAsync(async () =>
+    {
+        var expectedETag = request.Headers.IfMatch.FirstOrDefault()
+            ?? throw new WorkValidationException("if_match_required", "Deleting a Task requires an If-Match ETag.");
+        await service.DeleteAsync(CurrentScope(requestContext).WorkspaceId, new(taskId), expectedETag, token);
+        return Results.NoContent();
+    });
 
     private static Task<IResult> WithTaskAsync(Guid id, WorkplaceService service, ICurrentRequestContext requestContext, Func<(WorkspaceId WorkspaceId, WorkTask Task), Task<IResult>> action, CancellationToken token) =>
         ExecuteAsync(async () => await action(await service.GetOperationalTaskAsync(CurrentScope(requestContext).WorkspaceId, new(id), token)));
