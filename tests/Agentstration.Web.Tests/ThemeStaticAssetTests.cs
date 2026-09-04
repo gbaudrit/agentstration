@@ -73,4 +73,21 @@ public sealed class ThemeStaticAssetTests
         StringAssert.Contains(css, "width: 100%;");
         StringAssert.Contains(css, "white-space: pre;");
     }
+
+    [TestMethod]
+    public async Task EntrySuggestionActionsDoNotReserveAnEmptyRow()
+    {
+        var css = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "TestAssets", "EntryEditor.razor.css"));
+
+        StringAssert.Contains(css, ".entry-suggestion-form {");
+        StringAssert.Contains(css, "grid-template-columns: minmax(0, 1fr);");
+        StringAssert.Contains(css, ".entry-suggestion-label {");
+        StringAssert.Contains(css, "grid-column: 1 / -1;");
+        StringAssert.Contains(css, ".entry-suggestion-value textarea {");
+        StringAssert.Contains(css, "resize: vertical;");
+        StringAssert.Contains(css, ".entry-suggestion-actions {");
+        StringAssert.Contains(css, "justify-content: flex-end;");
+        StringAssert.Contains(css, ".entry-suggestion-remove {");
+        StringAssert.Contains(css, "min-height: 42px;");
+    }
 }

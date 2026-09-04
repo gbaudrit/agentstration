@@ -103,6 +103,42 @@
     gap: 12px;
 }
 
+.entry-suggestion-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: end;
+    gap: 12px;
+}
+
+.entry-suggestion-form > label {
+    min-width: 0;
+}
+
+.entry-suggestion-label {
+    grid-column: 1 / -1;
+}
+
+.entry-suggestion-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.entry-suggestion-value textarea {
+    min-height: 84px;
+    resize: vertical;
+}
+
+.entry-suggestion-remove {
+    justify-content: center;
+    min-height: 42px;
+    white-space: nowrap;
+}
+
+.entry-suggestion-remove ::deep .ui-icon {
+    width: 16px;
+    height: 16px;
+}
+
 .entry-field-card,
 .entry-suggestion-card,
 .entry-usage-card,
@@ -303,6 +339,11 @@
     .entry-primary-actions {
         flex-wrap: wrap;
     }
+
+    .entry-suggestion-form {
+        grid-template-columns: 1fr;
+    }
+
 }
 
 @media (max-width: 620px) {
