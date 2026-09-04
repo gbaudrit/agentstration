@@ -118,6 +118,39 @@ public sealed class FlowTopologyViewerTests
     }
 
     [TestMethod]
+    public void ViewerExposesReplayControlAndDisablesItDuringPlayback()
+    {
+        using var culture = new CultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var replayRequests = 0;
+        var graph = new FlowTopologyGraph(
+            [new("step:input", "input", "Input", "input", 0, 0)],
+            [],
+            "graph",
+            "Read-only topology");
+        var rendered = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph)
+            .Add(component => component.ReplayRequested, () => replayRequests++));
+
+        var replay = rendered.Find("button.replay-toggle");
+        Assert.IsFalse(replay.HasAttribute("disabled"));
+        StringAssert.Contains(replay.TextContent, "Revoir");
+        replay.Click();
+        Assert.AreEqual(1, replayRequests);
+
+        var playing = context.Render<FlowTopologyViewer>(parameters => parameters
+            .Add(component => component.Graph, graph)
+            .Add(component => component.ReplayRequested, () => replayRequests++)
+            .Add(component => component.ReplayInProgress, true)
+            .Add(component => component.ReplayElapsed, TimeSpan.FromSeconds(65.4)));
+        Assert.IsTrue(playing.Find("button.replay-toggle").HasAttribute("disabled"));
+        var counter = playing.Find("output.replay-counter");
+        Assert.AreEqual("01:05.4", counter.TextContent.Trim());
+        Assert.AreEqual("Temps écoulé de l’exécution originale", counter.GetAttribute("aria-label"));
+    }
+
+    [TestMethod]
     public void ViewerRoutesOppositeHandoffsInParallelAndUsesIntrinsicCanvasWidth()
     {
         using var context = new BunitContext();
