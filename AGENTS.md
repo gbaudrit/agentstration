@@ -203,6 +203,19 @@ Use `--launch-profile http-NoBootstrap` instead when the test must preserve or e
 5. Add an ADR under `docs/decisions/` for a significant architectural choice; do not rewrite an accepted ADR to hide a new decision.
 6. Build and test after meaningful increments, and report any validation that could not be run.
 
+## Issue Creation
+
+When creating or updating a GitHub issue, treat the forms under `.github/ISSUE_TEMPLATE/` as the canonical structure, including when using the GitHub API:
+
+- Use `bug.yml` for behavior that contradicts an existing expectation, `feature.yml` for a new user-facing or product capability, and `technical-task.yml` for architecture, refactoring, performance, testing, security, technical debt, technical documentation, or developer-experience work.
+- Write issue titles and bodies in English. Keep titles outcome-focused and do not add type or priority prefixes such as `[Feature]`, `[Bug]`, or `[P1]`.
+- Preserve the form's section names and order. API-created issues must include the same required sections that the selected form would produce.
+- Apply the form's type label explicitly when creating an issue through the API: `bug` for bug reports and `enhancement` for feature requests and technical tasks. Add more specific area or technical labels only when they already exist and are supported by the issue content.
+- Do not assign or infer priority unless the task or maintainer explicitly provides it. Priority is a triage decision and belongs in labels, not the title.
+- Search open and closed issues for duplicates before creating a new one. Link prerequisites and related issues with exact issue numbers.
+- Make acceptance criteria observable and testable. Include validation expectations for technical tasks and avoid inventing metrics, dependencies, code locations, or architectural constraints.
+- Keep implementation guidance proportional to the evidence. Separate required outcomes from optional suggestions and state exclusions under `Out of scope`.
+
 ## Pull Request Description
 
 When creating, updating, or handing off a pull request, use `.github/pull_request_template.md` and keep these top-level sections in this order:

@@ -1,0 +1,121 @@
+name: Technical task
+description: Propose architecture, refactoring, performance, testing, or technical-debt work.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for engineering work whose primary motivation is technical. Use the feature form when the primary outcome is a new user-facing or product capability.
+  - type: dropdown
+    id: category
+    attributes:
+      label: Technical category
+      options:
+        - Architecture
+        - Refactoring
+        - Performance
+        - Testing
+        - Security
+        - Technical debt
+        - Technical documentation
+        - Developer experience
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Agentstration is primarily affected?
+      options:
+        - Console
+        - API
+        - Runtime
+        - Workplace
+        - Providers
+        - Deployment
+        - Documentation
+        - Cross-cutting
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the current technical limitation, risk, or maintainability problem.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Explain the concrete consequences if the problem remains unresolved.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Expected outcome
+      description: Describe the observable technical state after completion.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Identify the components and responsibilities included in the change.
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: Optional. Identify related work that is deliberately excluded.
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Optional. Link prerequisite issues, pull requests, ADRs, or external constraints.
+  - type: textarea
+    id: guidance
+    attributes:
+      label: Implementation guidance
+      description: Optional. Record relevant boundaries or constraints without over-prescribing the solution.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Which alternatives were considered, and why are they not preferred?
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: Provide observable, testable conditions for completion.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Tests and validation
+      description: Describe the required automated tests, architecture checks, benchmarks, or manual verification.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Optional. Add measurements, code references, diagrams, ADRs, or related discussions.
+  - type: upload
+    id: attachments
+    attributes:
+      label: Attachments
+      description: Optional. Add diagrams, profiles, sanitized logs, or supporting documents.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Preliminary checks
+      options:
+        - label: I searched for an existing issue covering this work.
+          required: true

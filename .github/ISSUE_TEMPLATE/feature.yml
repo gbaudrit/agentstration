@@ -1,8 +1,38 @@
 name: Feature request
-description: Propose a focused improvement to Agentstration.
-title: "[Feature]: "
+description: Propose a user-facing or product capability for Agentstration.
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the need and expected result before implementation details. Priorities are assigned during triage.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Agentstration is primarily affected?
+      options:
+        - Console
+        - API
+        - Runtime
+        - Workplace
+        - Providers
+        - Deployment
+        - Documentation
+        - Cross-cutting
+    validations:
+      required: true
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: Feature type
+      options:
+        - User-facing capability
+        - API capability
+        - Integration
+        - Developer experience
+    validations:
+      required: true
   - type: textarea
     id: need
     attributes:
@@ -14,7 +44,7 @@ body:
     id: outcome
     attributes:
       label: Expected outcome
-      description: Describe the useful result without prescribing implementation details.
+      description: Describe the useful, observable result without prescribing implementation details.
     validations:
       required: true
   - type: textarea
@@ -23,11 +53,64 @@ body:
       label: Proposed solution
       description: Optional. Include API, UI, or workflow details that clarify the proposal.
   - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What must be included for this feature to deliver its expected outcome?
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: Optional. What is deliberately deferred or excluded?
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Optional. Link prerequisite issues, pull requests, ADRs, or external constraints.
+  - type: textarea
     id: alternatives
     attributes:
       label: Alternatives considered
+      description: Optional. Which alternatives were considered, and why are they not preferred?
+  - type: dropdown
+    id: deployment-impact
+    attributes:
+      label: Deployment impact
+      description: What operational impact is currently expected?
+      options:
+        - None
+        - Configuration change
+        - Data migration
+        - Deployment topology change
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: Provide observable, testable conditions for completion.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
   - type: textarea
     id: context
     attributes:
       label: Additional context
-      description: Relevant examples, constraints, or links.
+      description: Optional. Add relevant examples, constraints, mockups, or links.
+  - type: upload
+    id: attachments
+    attributes:
+      label: Attachments
+      description: Optional. Add screenshots, diagrams, logs, or supporting documents.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Preliminary checks
+      options:
+        - label: I searched for an existing issue covering this request.
+          required: true

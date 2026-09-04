@@ -38,6 +38,16 @@ npm run build
 
 Never commit secrets, personal data, generated data stores, or real document contents used for testing.
 
+## Issues
+
+Use the structured issue forms instead of a blank issue:
+
+- **Bug report** for reproducible behavior that contradicts an existing expectation;
+- **Feature request** for a new user-facing or product capability;
+- **Technical task** for architecture, refactoring, performance, testing, security, technical debt, technical documentation, or developer-experience work.
+
+Write issue titles and bodies in English, search for duplicates, and keep titles outcome-focused without type or priority prefixes. Maintainers assign priority during triage. Feature requests and technical tasks require testable acceptance criteria; technical tasks also require an explicit validation plan. Report vulnerabilities privately through the Security Advisory link in the issue chooser.
+
 ## Branches and commits
 
 Development follows trunk-based development with short-lived branches and pull requests into `main`. Useful prefixes include `feature/`, `fix/`, `docs/`, `refactor/`, and `codex/`. GitFlow and long-lived integration branches are not used.
