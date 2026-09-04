@@ -17,6 +17,22 @@ The repository keeps reviewable governance files in Git:
 
 Documentation validation and publication remain independent in `documentation.yml` and `publish-documentation.yml`. Publication is manual and has the only workflow permissions needed for GitHub Pages.
 
+## Issue intake and triage
+
+Blank issues are disabled. Contributors choose one of the structured forms under `.github/ISSUE_TEMPLATE/`:
+
+| Form | Use when | Default label |
+|---|---|---|
+| Bug report | Existing behavior contradicts an expectation and can be reproduced | `bug` |
+| Feature request | The primary outcome is a new user-facing or product capability | `enhancement` |
+| Technical task | The primary motivation is architecture, refactoring, performance, testing, security, technical debt, technical documentation, or developer experience | `enhancement` |
+
+Issue titles and bodies use English. Titles describe the outcome without `[Bug]`, `[Feature]`, or priority prefixes. The forms collect the affected area and classification as structured fields; maintainers may translate them into more specific labels during triage.
+
+Priority is a maintainer decision. Assign it through repository labels only after impact, urgency, dependencies, and scope have been reviewed. Do not encode priority in the title.
+
+GitHub API clients do not execute issue forms. Automation and coding agents must therefore reproduce the selected form's required sections, labels, and ordering explicitly. Repository-wide instructions for coding agents are maintained in `AGENTS.md`.
+
 ## Checks and pull requests
 
 Pull requests to `main` run these workflows:
