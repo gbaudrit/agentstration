@@ -120,6 +120,7 @@ public sealed class FlowTopologyViewerTests
     [TestMethod]
     public void ViewerExposesReplayControlAndDisablesItDuringPlayback()
     {
+        using var culture = new CultureScope("fr-FR");
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var replayRequests = 0;
@@ -134,6 +135,7 @@ public sealed class FlowTopologyViewerTests
 
         var replay = rendered.Find("button.replay-toggle");
         Assert.IsFalse(replay.HasAttribute("disabled"));
+        StringAssert.Contains(replay.TextContent, "Revoir");
         replay.Click();
         Assert.AreEqual(1, replayRequests);
 
