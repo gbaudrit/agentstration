@@ -16,7 +16,7 @@ Workspace is the functional boundary for Interactions, Tasks, Conversations, Not
 
 Pack installation only makes namespaced published Entries available for explicit Dashboard selection. It does not add them to Home.
 
-Entry dependency inspection exposes both the administration binding and the resolved Flow. Agent and user Flow deletion are rejected while a published Entry references them. A system-managed Direct Agent Flow cannot be deleted through the normal Flow operation; workspace cleanup may explicitly remove it after its last published Entry reference is gone.
+Entry dependency inspection exposes both the administration binding and the resolved Flow. Agent and user Flow deletion are rejected while a published Entry references them. A system-managed Direct Agent Flow cannot be deleted through the normal Flow operation; workspace cleanup may remove it after its last published Entry reference is gone when the operator selects the system Flow deletion option.
 
 ## Iteration 3 UX
 

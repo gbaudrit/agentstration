@@ -26,7 +26,7 @@ Only `Pinned` is supported in this increment. Draft saves are isolated in the Wo
 
 ## Amendment — 2026-09-04
 
-Workspace cleanup may explicitly delete an orphaned system-managed Direct Agent Flow. The ordinary Flow deletion operation still rejects system-managed resources, and the Entry deletion guard evaluates published resolved targets so cleanup cannot remove a Direct Agent Flow while any published Entry references it. This allows stale generated resources to be collected without weakening Entry execution integrity.
+Workspace cleanup may explicitly delete an orphaned system-managed Direct Agent Flow when the operator selects the dedicated option. The ordinary Flow deletion operation still rejects system-managed resources, and the Entry deletion guard evaluates published resolved targets so cleanup cannot remove a Direct Agent Flow while any published Entry references it. This allows stale generated resources to be collected without weakening Entry execution integrity.
 
 ## Rejected alternatives
 
