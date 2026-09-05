@@ -28,8 +28,6 @@ export async function readCapturePlan(file: string): Promise<CapturePlan> {
   for (const capture of plan.captures) {
     if (!capture.checkpoint || !capture.file) throw new Error('Every capture requires checkpoint and file values.');
   }
-  if ((plan.consoleUrl && !plan.workplaceUrl) || (!plan.consoleUrl && plan.workplaceUrl)) {
-    throw new Error('consoleUrl and workplaceUrl must be supplied together.');
-  }
+  if (!plan.consoleUrl && plan.workplaceUrl) throw new Error('workplaceUrl requires consoleUrl.');
   return plan as CapturePlan;
 }

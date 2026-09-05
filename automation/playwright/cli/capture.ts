@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { chromium } from '@playwright/test';
+import { parseCaptureCliOptions, resolveCaptureAddresses } from '../src/capture/capture-cli-options.js';
 import { readCapturePlan } from '../src/capture/capture-plan.js';
 import { createScreenshotRecorder, type CapturedAsset } from '../src/capture/screenshot-recorder.js';
 import { startProductHosts, type ProductHosts } from '../src/fixtures/product-hosts.js';
@@ -11,10 +12,9 @@ import { journeys } from '../src/journeys/registry.js';
 import { ProductPages } from '../src/pages/product.pages.js';
 
 const executeFile = promisify(execFile);
-const argumentsMap = parseArguments(process.argv.slice(2));
-const planFile = required(argumentsMap, 'plan');
-const outputDirectory = path.resolve(required(argumentsMap, 'output'));
-const plan = await readCapturePlan(path.resolve(planFile));
+const options = parseCaptureCliOptions(process.argv.slice(2));
+const outputDirectory = path.resolve(options.outputDirectory);
+const plan = await readCapturePlan(path.resolve(options.planFile));
 const journey = journeys[plan.journey];
 if (!journey) throw new Error(`Unknown journey '${plan.journey}'. Available journeys: ${Object.keys(journeys).join(', ')}`);
 const { stdout: headCommit } = await executeFile('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot });
@@ -27,9 +27,8 @@ if (plan.productRef) {
 }
 
 let product: ProductHosts | undefined;
-const addresses = plan.consoleUrl && plan.workplaceUrl
-  ? { consoleUrl: plan.consoleUrl, workplaceUrl: plan.workplaceUrl }
-  : (product = await startProductHosts());
+const externalAddresses = resolveCaptureAddresses(options, plan);
+const addresses = externalAddresses ?? (product = await startProductHosts());
 
 const browser = await chromium.launch({
   headless: true,
@@ -79,21 +78,4 @@ try {
 } finally {
   await browser.close();
   await product?.stop();
-}
-
-function parseArguments(values: string[]): Map<string, string> {
-  const result = new Map<string, string>();
-  for (let index = 0; index < values.length; index += 2) {
-    const key = values[index];
-    const value = values[index + 1];
-    if (!key?.startsWith('--') || !value) throw new Error('Expected --plan <file> --output <directory>.');
-    result.set(key.slice(2), value);
-  }
-  return result;
-}
-
-function required(values: Map<string, string>, name: string): string {
-  const value = values.get(name);
-  if (!value) throw new Error(`--${name} is required.`);
-  return value;
 }
