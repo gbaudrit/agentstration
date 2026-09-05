@@ -14,7 +14,7 @@ The repository keeps reviewable governance files in Git:
 - `.github/dependabot.yml` checks the root and autonomous AEP NuGet manifests plus GitHub Actions each week;
 - `.github/CODEOWNERS`, the pull request template, and issue forms provide lightweight contribution ownership and prompts;
 - `.github/rulesets/main.json` is the reproducible source definition for `main` protection;
-- `.github/labels.json` is the reproducible catalog for priority and agent-triage labels.
+- `.github/labels.json` is the reproducible catalog for issue classification, priority, and agent-triage labels.
 
 Documentation validation and publication remain independent in `documentation.yml` and `publish-documentation.yml`. Publication is manual and has the only workflow permissions needed for GitHub Pages.
 
@@ -26,7 +26,7 @@ Blank issues are disabled. Contributors choose one of the structured forms under
 |---|---|---|
 | Bug report | Existing behavior contradicts an expectation and can be reproduced | `bug` |
 | Feature request | The primary outcome is a new user-facing or product capability | `enhancement` |
-| Technical task | The primary motivation is architecture, refactoring, performance, testing, security, technical debt, technical documentation, or developer experience | `enhancement` |
+| Technical task | The primary motivation is architecture, refactoring, performance, testing, security, technical debt, technical documentation, or developer experience | `technical-task` |
 
 Issue titles and bodies use English. Titles describe the outcome without `[Bug]`, `[Feature]`, or priority prefixes. The forms collect the affected area and classification as structured fields; maintainers may translate them into more specific labels during triage.
 
@@ -41,6 +41,8 @@ Priority is assigned through labels after impact, urgency, dependencies, and sco
 
 Use exactly one priority label when evidence is sufficient. The issue's impact must justify it. Effort, implementation size, and dependency position do not determine priority by themselves.
 
+For feature requests, reserve `priority:P1` for a missing capability that blocks a committed release or essential product use with no safe workaround. Use `priority:P2` for an important committed-roadmap or core-product capability that is not immediately blocking. Use `priority:P3` for optional, exploratory, incremental, or currently uncommitted capabilities.
+
 Agent-led triage uses an explicit lifecycle:
 
 1. Add `triage:agent` and `triage:pending-review` when an agent independently selects classification, area, or priority.
@@ -54,7 +56,7 @@ GitHub API clients do not execute issue forms. Automation and coding agents must
 
 ## Apply the issue label catalog
 
-GitHub stores labels remotely. Committing `.github/labels.json` documents the intended priority and agent-triage labels but does not create them by itself.
+GitHub stores labels remotely. Committing `.github/labels.json` documents the intended classification, priority, and agent-triage labels but does not create them by itself.
 
 Preview the label catalog without changing GitHub:
 
