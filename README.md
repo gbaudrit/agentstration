@@ -219,7 +219,7 @@ The Markdown and MDX files under `docs/` are the source of truth; `docs/site/` c
 
 Agentstration is a **public alpha** under active `0.x` development. Public APIs, resource contracts and package formats may still change. It is a product foundation, not yet a production multi-tenant release; planned capabilities and current limits are identified explicitly in the documentation.
 
-Semantic Versioning is the intended product-versioning policy, but the repository does not yet publish a product version or release tags.
+Product versions follow Semantic Versioning and are published as immutable `v<version>` tags with matching technical notes under `docs/releases/`.
 
 ## License
 

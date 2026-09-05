@@ -82,6 +82,7 @@ const sidebars = {
       type: 'category',
       label: 'Releases',
       items: [
+        'releases/0.2.0-alpha.1',
         'releases/0.1.0-alpha.1',
       ],
     },
