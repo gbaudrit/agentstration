@@ -15,6 +15,11 @@
     "description": "Non-urgent improvement, localized debt, documentation, or low-impact optimization."
   },
   {
+    "name": "technical-task",
+    "color": "006B75",
+    "description": "Architecture, refactoring, performance, testing, security, or technical-debt work."
+  },
+  {
     "name": "triage:agent",
     "color": "5319E7",
     "description": "Issue triage was performed by an automated or coding agent."

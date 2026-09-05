@@ -210,7 +210,7 @@ When creating or updating a GitHub issue, treat the forms under `.github/ISSUE_T
 - Use `bug.yml` for behavior that contradicts an existing expectation, `feature.yml` for a new user-facing or product capability, and `technical-task.yml` for architecture, refactoring, performance, testing, security, technical debt, technical documentation, or developer-experience work.
 - Write issue titles and bodies in English. Keep titles outcome-focused and do not add type or priority prefixes such as `[Feature]`, `[Bug]`, or `[P1]`.
 - Preserve the form's section names and order. API-created issues must include the same required sections that the selected form would produce.
-- Apply the form's type label explicitly when creating an issue through the API: `bug` for bug reports and `enhancement` for feature requests and technical tasks. Add more specific area or technical labels only when they already exist and are supported by the issue content.
+- Apply the form's type label explicitly when creating an issue through the API: `bug` for bug reports, `enhancement` for feature requests, and `technical-task` for technical tasks. Use exactly one of these type labels. Add more specific area or technical labels only when they already exist and are supported by the issue content.
 - Assign priority when the maintainer requests triage or when creating issues from an agent-led review. Do not assign priority when merely transcribing a request unless the maintainer provides it. Priority belongs in labels, not the title.
 - Search open and closed issues for duplicates before creating a new one. Link prerequisites and related issues with exact issue numbers.
 - Make acceptance criteria observable and testable. Include validation expectations for technical tasks and avoid inventing metrics, dependencies, code locations, or architectural constraints.
@@ -224,6 +224,12 @@ Use exactly one priority label when the available evidence supports a decision:
 - `priority:P2`: important impact on correctness, reliability, performance, maintainability, or the committed roadmap, with a viable workaround and no immediate critical risk.
 - `priority:P3`: non-urgent improvement, localized technical debt, documentation work, cleanup, or low-impact optimization.
 - No priority label: the impact or urgency is not sufficiently evidenced. State what information is missing instead of guessing.
+
+For feature requests, interpret the levels as follows:
+
+- `priority:P1`: the missing capability blocks a committed release or essential product use and has no safe workaround. Exploratory or merely desirable features are never P1.
+- `priority:P2`: the capability is an important part of the committed roadmap or a core product outcome, but its absence is not immediately blocking.
+- `priority:P3`: the capability is optional, exploratory, incremental, or not committed to the current roadmap.
 
 The issue's `Impact` section must justify the selected priority. Effort, implementation size, or being a dependency does not increase priority by itself. Use the lower priority when evidence does not support the higher one, and never invent impact or urgency.
 
