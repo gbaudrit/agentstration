@@ -12,6 +12,7 @@
         }
     </Status>
 </PageHeader>
+<div data-testid="platform-overview" aria-busy="@(snapshot is null && error is null ? "true" : "false")">
 @if (error is not null) { <ErrorState Message="@error" ErrorId="@errorId" /> }
 else if (load is not null)
 {
@@ -35,6 +36,7 @@ else if (load is not null)
         else { <div class="dashboard-source-grid">@foreach (var source in snapshot.Sources) { <a class="dashboard-source-item" href="@source.Url"><HealthIndicator Label="@source.Name" StatusText="@source.Detail" Status="@source.Severity" /><span class="dashboard-source-arrow" aria-hidden="true">→</span></a> }</div> }
     </section>
 }
+</div>
 @code {
     private readonly CancellationTokenSource cancellation = new();
     private PlatformDashboardLoad? load;

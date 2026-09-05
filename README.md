@@ -200,6 +200,8 @@ dotnet build Agentstration.slnx --configuration Release
 dotnet test Agentstration.slnx --configuration Release
 ```
 
+Browser-level UX smoke tests and the reusable capture runner live under `automation/playwright`. They start isolated local Console and Workplace hosts with deterministic AI. See [Browser automation](docs/contributing/browser-automation.md) for setup and commands.
+
 Warnings are treated as errors, .NET analyzers are enabled and NuGet audit findings fail restore. The default tests are designed to remain offline and cost-free; real-provider smoke tests are opt-in.
 
 ## Documentation
