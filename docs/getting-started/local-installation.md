@@ -3,8 +3,8 @@
 Clone the repository, restore the solution, and build it:
 
 ```powershell
-git clone https://github.com/gbaudrit/microsoft-agent-framework.git
-cd microsoft-agent-framework
+git clone https://github.com/gbaudrit/agentstration.git
+cd agentstration
 dotnet restore Agentstration.slnx
 dotnet build Agentstration.slnx --configuration Release --no-restore
 ```

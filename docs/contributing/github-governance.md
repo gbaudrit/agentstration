@@ -162,8 +162,8 @@ For example, after the release change has merged and all required checks have pa
 ```powershell
 git switch main
 git pull --ff-only
-git tag -a v0.1.0-alpha.1 -m "Agentstration 0.1.0-alpha.1"
-git push origin v0.1.0-alpha.1
+git tag -a v0.2.0-alpha.1 -m "Agentstration 0.2.0-alpha.1"
+git push origin v0.2.0-alpha.1
 ```
 
 GitHub Actions then repeats restore, Release build, and tests; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. Alpha releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag. Correct a failed release through a reviewed commit and a new prerelease identifier.
