@@ -62,27 +62,27 @@ else
     }
     else
     {
-    <EditForm Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" FormName="agent-editor" class="resource-form" @oninput="MarkDirty" @onchange="MarkDirty">
+    <EditForm Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" FormName="agent-editor" class="resource-form" data-testid="agent-editor-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirty" @onchange="MarkDirty">
         <DataAnnotationsValidator />
         <ValidationSummary />
 
-        <section class="panel form-section" id="definition">
+        <section class="panel form-section" id="definition" data-testid="agent-identity-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ResourceCoordinates")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("Generation", generation)" Status="UiStatus.Info" /> }</div>
             <div class="form-grid">
-                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
-                <label><span>@T("Handler")</span><InputText @bind-Value="model.Handler" /><ValidationMessage For="() => model.Handler" /></label>
-                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" data-testid="agent-name" /><ValidationMessage For="() => model.Name" /></label>
+                <label><span>@T("Handler")</span><InputText @bind-Value="model.Handler" data-testid="agent-handler" /><ValidationMessage For="() => model.Handler" /></label>
+                <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" data-testid="agent-display-name" /><ValidationMessage For="() => model.DisplayName" /></label>
             </div>
             @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">@T("Uid"): <code>@resourceId</code></p> }
         </section>
 
-        <section class="panel form-section">
+        <section class="panel form-section" data-testid="agent-behavior-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("BehaviorAndModel")</h2></div></div>
             <div class="form-grid">
-                <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
+                <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" rows="3" data-testid="agent-description" /></label>
                 <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" SelectFirstWhenMissing="@IsNew" /><ValidationMessage For="() => model.ModelProfileName" /></div>
-                <label class="form-span-2"><span>@T("RuntimeProfile")</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option> }</select><small>@T("RuntimeProfileHelp")</small></label>
-                <label class="form-span-2"><span>@T("Instructions")</span><InputTextArea @bind-Value="model.Instructions" rows="6" /><ValidationMessage For="() => model.Instructions" /></label>
+                <label class="form-span-2"><span>@T("RuntimeProfile")</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged" data-testid="agent-runtime-profile">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @profile.Namespace/@profile.Name</option> }</select><small>@T("RuntimeProfileHelp")</small></label>
+                <label class="form-span-2"><span>@T("Instructions")</span><InputTextArea @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /><ValidationMessage For="() => model.Instructions" /></label>
             </div>
         </section>
 
@@ -114,7 +114,7 @@ else
 
         @if (IsNew)
         {
-            <div class="form-actions"><a class="button-secondary" href="/agents">@T("Cancel")</a><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Creating") : T("CreateAndDeploy"))</button></div>
+            <div class="form-actions"><a class="button-secondary" href="/agents">@T("Cancel")</a><button class="button-primary" type="submit" data-testid="agent-create-and-deploy" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Creating") : T("CreateAndDeploy"))</button></div>
         }
         else
         {
@@ -153,6 +153,7 @@ else
     private bool isDirty;
     private bool applyRuntimeOnSubmit = true;
     private bool sourceMode;
+    private bool interactive;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Default;
     private string OverviewUrl => $"/agents/{Uri.EscapeDataString(Name ?? string.Empty)}";
@@ -212,6 +213,13 @@ else
             model ??= new AgentEditorModel();
         }
         finally { loading = false; }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        interactive = true;
+        StateHasChanged();
     }
 
     private Task ModelProfileChanged(string value)

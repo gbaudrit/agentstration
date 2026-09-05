@@ -128,6 +128,7 @@ jobs:
         run: |
           dotnet restore src/Agentstration.Web/Agentstration.Web.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
           dotnet restore src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+          dotnet restore src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
       - name: Install browser automation dependencies
         working-directory: automation/playwright
         run: npm ci

@@ -19,7 +19,7 @@ npm --prefix automation/playwright run test:smoke
 
 The default fixture starts the Console and Workplace on available loopback ports. Each worker uses an isolated directory under `automation/playwright/.work`, the Development bootstrap profile, SQLite, and deterministic AI. Ollama, Azure, Docker, and Internet access are not required.
 
-Set `AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true` only after building both Web projects. Failed tests retain Playwright traces, screenshots, and video under `automation/playwright/test-results`.
+Set `AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true` only after building both Web projects and the Ollama extension project. Failed tests retain Playwright traces, screenshots, and video under `automation/playwright/test-results`.
 
 For a local diagnostic when the pinned browser binary cannot be downloaded, an explicitly installed Playwright channel may be selected, for example `$env:AGENTSTRATION_PLAYWRIGHT_CHANNEL = "chrome"`. CI always installs and uses the pinned Chromium revision.
 

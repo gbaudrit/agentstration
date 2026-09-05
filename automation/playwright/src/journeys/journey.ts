@@ -10,6 +10,7 @@ export interface JourneyCheckpoint {
 
 export interface JourneyContext extends ProductAddresses {
   pages: ProductPages;
+  theme?: 'light' | 'dark';
   checkpoint(checkpoint: JourneyCheckpoint): Promise<void>;
 }
 

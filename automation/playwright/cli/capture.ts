@@ -43,9 +43,12 @@ try {
     viewport: plan.viewport ?? { width: 1440, height: 1000 },
   });
   const page = await context.newPage();
+  page.setDefaultTimeout(120_000);
+  page.setDefaultNavigationTimeout(120_000);
   await journey({
     ...addresses,
     pages: new ProductPages(page),
+    theme: plan.theme ?? 'dark',
     checkpoint: createScreenshotRecorder(plan, outputDirectory, assets),
   }, plan.input ?? {});
   await context.close();
