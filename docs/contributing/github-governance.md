@@ -13,7 +13,8 @@ The repository keeps reviewable governance files in Git:
 - `.github/workflows/release.yml` validates version tags, rebuilds and retests the product, packages the server and Workplace, and creates GitHub prereleases;
 - `.github/dependabot.yml` checks the root and autonomous AEP NuGet manifests plus GitHub Actions each week;
 - `.github/CODEOWNERS`, the pull request template, and issue forms provide lightweight contribution ownership and prompts;
-- `.github/rulesets/main.json` is the reproducible source definition for `main` protection.
+- `.github/rulesets/main.json` is the reproducible source definition for `main` protection;
+- `.github/labels.json` is the reproducible catalog for priority and agent-triage labels.
 
 Documentation validation and publication remain independent in `documentation.yml` and `publish-documentation.yml`. Publication is manual and has the only workflow permissions needed for GitHub Pages.
 
@@ -29,9 +30,51 @@ Blank issues are disabled. Contributors choose one of the structured forms under
 
 Issue titles and bodies use English. Titles describe the outcome without `[Bug]`, `[Feature]`, or priority prefixes. The forms collect the affected area and classification as structured fields; maintainers may translate them into more specific labels during triage.
 
-Priority is a maintainer decision. Assign it through repository labels only after impact, urgency, dependencies, and scope have been reviewed. Do not encode priority in the title.
+Priority is assigned through labels after impact, urgency, dependencies, and scope have been reviewed. Do not encode priority in the title.
+
+| Priority | Criteria |
+|---|---|
+| `priority:P1` | Critical or blocking impact with no safe workaround, including confirmed high-impact security, data loss or corruption, broken workspace isolation, or an unusable essential path |
+| `priority:P2` | Important correctness, reliability, performance, maintainability, or committed-roadmap impact, with a viable workaround and no immediate critical risk |
+| `priority:P3` | Non-urgent improvement, localized technical debt, documentation, cleanup, or low-impact optimization |
+| No priority label | Impact or urgency is not sufficiently evidenced |
+
+Use exactly one priority label when evidence is sufficient. The issue's impact must justify it. Effort, implementation size, and dependency position do not determine priority by themselves.
+
+Agent-led triage uses an explicit lifecycle:
+
+1. Add `triage:agent` and `triage:pending-review` when an agent independently selects classification, area, or priority.
+2. A maintainer reviews the issue and either adjusts the triage or confirms it.
+3. On confirmation, replace `triage:pending-review` with `triage:confirmed`.
+4. Preserve `triage:agent` to retain provenance.
+
+When a maintainer supplied the complete classification and the agent only applied it, agent-triage labels are unnecessary.
 
 GitHub API clients do not execute issue forms. Automation and coding agents must therefore reproduce the selected form's required sections, labels, and ordering explicitly. Repository-wide instructions for coding agents are maintained in `AGENTS.md`.
+
+## Apply the issue label catalog
+
+GitHub stores labels remotely. Committing `.github/labels.json` documents the intended priority and agent-triage labels but does not create them by itself.
+
+Preview the label catalog without changing GitHub:
+
+```powershell
+./scripts/github/apply-issue-labels.ps1 -DryRun
+```
+
+Create missing labels and update the color and description of existing labels:
+
+```powershell
+./scripts/github/apply-issue-labels.ps1
+```
+
+To target a repository explicitly:
+
+```powershell
+./scripts/github/apply-issue-labels.ps1 -Repository "gbaudrit/agentstration"
+```
+
+The script requires an authenticated GitHub CLI with permission to manage labels. It is idempotent, updates only labels declared in the catalog, and never deletes unrelated labels.
 
 ## Checks and pull requests
 

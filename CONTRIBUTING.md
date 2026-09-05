@@ -46,7 +46,7 @@ Use the structured issue forms instead of a blank issue:
 - **Feature request** for a new user-facing or product capability;
 - **Technical task** for architecture, refactoring, performance, testing, security, technical debt, technical documentation, or developer-experience work.
 
-Write issue titles and bodies in English, search for duplicates, and keep titles outcome-focused without type or priority prefixes. Maintainers assign priority during triage. Feature requests and technical tasks require testable acceptance criteria; technical tasks also require an explicit validation plan. Report vulnerabilities privately through the Security Advisory link in the issue chooser.
+Write issue titles and bodies in English, search for duplicates, and keep titles outcome-focused without type or priority prefixes. Maintainers assign `priority:P1`, `priority:P2`, or `priority:P3` during triage according to the criteria in the [GitHub governance guide](docs/contributing/github-governance.md). Agent-led triage remains pending until a maintainer confirms it. Feature requests and technical tasks require testable acceptance criteria; technical tasks also require an explicit validation plan. Report vulnerabilities privately through the Security Advisory link in the issue chooser.
 
 ## Branches and commits
 
