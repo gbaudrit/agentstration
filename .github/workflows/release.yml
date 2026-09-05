@@ -34,8 +34,8 @@ jobs:
         shell: pwsh
         run: |
           $version = (dotnet msbuild src/Agentstration.Web/Agentstration.Web.csproj -nologo -getProperty:Version).Trim()
-          if ($version -notmatch '^0\.1\.0-alpha\.\d+$') {
-            throw "Only the 0.1.0 alpha release line is enabled; resolved version was '$version'."
+          if ($version -notmatch '^0\.\d+\.\d+-alpha\.\d+$') {
+            throw "Only 0.x alpha prereleases are enabled; resolved version was '$version'."
           }
           if ($env:GITHUB_REF_NAME -ne "v$version") {
             throw "Tag '$env:GITHUB_REF_NAME' does not match product version 'v$version'."
