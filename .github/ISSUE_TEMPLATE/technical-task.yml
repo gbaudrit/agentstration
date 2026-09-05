@@ -1,6 +1,6 @@
 name: Technical task
 description: Propose architecture, refactoring, performance, testing, or technical-debt work.
-labels: [enhancement]
+labels: [technical-task]
 body:
   - type: markdown
     attributes:
