@@ -1,0 +1,57 @@
+{
+  "journey": "create-entry",
+  "input": {
+    "workspaceName": "capture-handoff",
+    "name": "solution-discovery",
+    "displayName": "Découvrir Agentstration",
+    "description": "Échangez avec une équipe d’agents spécialisés pour découvrir la solution et poser vos questions.",
+    "presentationKind": "Prompt",
+    "placeholder": "Que souhaitez-vous savoir sur Agentstration ?",
+    "icon": "briefcase",
+    "participantsVisibility": "Hidden",
+    "progressVisibility": "Compact",
+    "taskDisplay": "Auto",
+    "resultsDisplay": "Auto",
+    "field": {
+      "name": "request",
+      "label": "Votre question",
+      "description": "Décrivez votre besoin ou posez une question sur la solution.",
+      "placeholder": "Que souhaitez-vous savoir sur Agentstration ?",
+      "type": "Prompt",
+      "required": true,
+      "primary": true
+    },
+    "targetFlow": "solution-discovery",
+    "targetNamespace": "default",
+    "taskCreationMode": "Automatic",
+    "allowConversation": true,
+    "streamResponse": true,
+    "suggestions": [
+      {
+        "label": "Plusieurs agents",
+        "value": "Nous cherchons une solution pour faire collaborer plusieurs agents spécialisés. Est-ce qu’Agentstration peut répondre à ce besoin ?"
+      },
+      {
+        "label": "Exécution locale",
+        "value": "Certaines de nos données doivent rester entièrement sur notre infrastructure. Peut-on utiliser des modèles locaux ?"
+      },
+      {
+        "label": "Outils internes",
+        "value": "Comment nos agents peuvent-ils utiliser nos outils internes ou appeler nos propres services ?"
+      }
+    ]
+  },
+  "locale": "fr-FR",
+  "theme": "dark",
+  "viewport": { "width": 1920, "height": 1080 },
+  "captures": [
+    { "checkpoint": "entry-identity-complete", "file": "01-entry-identity-complete.png", "scope": "target" },
+    { "checkpoint": "entry-appearance-complete", "file": "02-entry-appearance-complete.png", "scope": "target" },
+    { "checkpoint": "entry-interaction-complete", "file": "03-entry-interaction-complete.png", "scope": "target" },
+    { "checkpoint": "entry-field-complete", "file": "04-entry-field-complete.png", "scope": "target" },
+    { "checkpoint": "entry-binding-complete", "file": "05-entry-binding-complete.png", "scope": "target" },
+    { "checkpoint": "entry-suggestions-complete", "file": "06-entry-suggestions-complete.png", "scope": "target" },
+    { "checkpoint": "entry-ready-to-publish", "file": "07-entry-ready-to-publish.png", "scope": "page", "fullPage": false },
+    { "checkpoint": "entry-published", "file": "08-entry-published.png", "scope": "page", "fullPage": false }
+  ]
+}

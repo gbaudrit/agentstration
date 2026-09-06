@@ -64,6 +64,15 @@ npm --prefix automation/playwright run capture -- `
 
 Subsequent plans can select it by adding `"workspaceName": "capture-handoff"` to their journey input. The built-in local capture host is recreated for each command; use one persistent external instance when multiple commands must share campaign state.
 
+The solution-discovery example is intentionally split into dependency-ordered product journeys:
+
+1. Create the campaign Workspace.
+2. Create and deploy the participant Agents.
+3. Run `create-solution-discovery-flow.capture-plan.json` to create, configure, publish, and activate the handoff Flow.
+4. Run `create-solution-discovery-entry.capture-plan.json` to configure and publish the Workplace Entry pinned to that Flow.
+
+Each plan fails when its prerequisites are absent. The Flow journey reports the available Agent technical identifiers when a participant is missing; the Entry journey reports available Flow targets when its binding cannot be resolved. This keeps campaign setup explicit and prevents a capture from silently documenting a different topology.
+
 ## Capture from a plan
 
 The example plan captures the authenticated Console home page:

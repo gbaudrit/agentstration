@@ -9,6 +9,13 @@ export interface ExpectedText {
     technicalName: string;
     currentWorkspace: string;
   };
+  flowEditor: {
+    createOrchestration: string;
+  };
+  entryEditor: {
+    createEntry: string;
+    publishPinnedVersion: string;
+  };
 }
 
 export const ExpectedTextByLocale = {
@@ -20,6 +27,13 @@ export const ExpectedTextByLocale = {
       technicalName: 'Technical name',
       currentWorkspace: 'Current workspace',
     },
+    flowEditor: {
+      createOrchestration: 'Create Orchestration',
+    },
+    entryEditor: {
+      createEntry: 'Create entry',
+      publishPinnedVersion: 'Publish pinned version',
+    },
   },
   'fr-FR': {
     organizationWorkspaces: {
@@ -28,6 +42,13 @@ export const ExpectedTextByLocale = {
       displayName: 'Nom affiché',
       technicalName: 'Nom technique',
       currentWorkspace: 'Espace de travail actuel',
+    },
+    flowEditor: {
+      createOrchestration: 'Créer l’orchestration',
+    },
+    entryEditor: {
+      createEntry: 'Créer une entrée',
+      publishPinnedVersion: 'Publier la version épinglée',
     },
   },
 } as const satisfies Record<SupportedTestLocale, ExpectedText>;

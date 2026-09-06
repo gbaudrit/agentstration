@@ -20,7 +20,7 @@
 }
 else
 {
-    <div class="entry-summary-bar" aria-label="@T("EntryStatus")">
+    <div class="entry-summary-bar" aria-label="@T("EntryStatus")" data-testid="entry-status" data-state="@(published is null ? "draft" : "published")">
         @if (published is null)
         {
             <StatusBadge Text="@T("Draft")" Status="UiStatus.Info" />
@@ -49,7 +49,7 @@ else
 
     @if (!string.IsNullOrWhiteSpace(message))
     {
-        <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")">@message</div>
+        <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")" data-testid="entry-message">@message</div>
     }
 
     <main id="entry-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
@@ -99,9 +99,9 @@ else
                 else
                 {
                     <div class="entry-primary-actions" aria-label="@T("EntryActions")">
-                        <button class="button-secondary" type="button" @onclick="SaveAsync" disabled="@busy">@T("SaveDraft")</button>
-                        <button class="button-secondary" type="button" @onclick="ValidateAsync" disabled="@busy">@T("Validate")</button>
-                        <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy">@T("PublishPinnedVersion")</button>
+                        <button class="button-secondary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="entry-save-draft">@T("SaveDraft")</button>
+                        <button class="button-secondary" type="button" @onclick="ValidateAsync" disabled="@busy" data-testid="entry-validate">@T("Validate")</button>
+                        <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy" data-testid="entry-publish">@T("PublishPinnedVersion")</button>
                     </div>
                 }
             </div>
@@ -111,22 +111,22 @@ else
                 <div class="form-alert form-alert-danger" role="alert"><strong>@T("ValidationIssues")</strong><ul>@foreach (var issue in validation.Issues) { <li><code>@issue.Code</code> — @issue.Message</li> }</ul></div>
             }
 
-            <fieldset class="entry-definition-fields" disabled="@IsPackOwned" data-testid="entry-definition-fields">
+            <fieldset class="entry-definition-fields" disabled="@IsPackOwned" data-testid="entry-definition-fields" data-interactive="@(interactive ? "true" : "false")">
 
-            <section class="panel form-section">
+            <section class="panel form-section" data-testid="entry-identity-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("General")</p><h2>@T("Identity")</h2></div></div>
                 <div class="form-grid">
-                    <label><span>@T("Name")</span><input @bind="resourceName" disabled="@(!IsNew)" /></label>
-                    <label><span>@T("DisplayName")</span><input @bind="displayName" /></label>
-                    <label class="form-span-2"><span>@T("Description")</span><textarea @bind="description" rows="2"></textarea></label>
+                    <label><span>@T("Name")</span><input @bind="resourceName" disabled="@(!IsNew)" data-testid="entry-name" /></label>
+                    <label><span>@T("DisplayName")</span><input @bind="displayName" data-testid="entry-display-name" /></label>
+                    <label class="form-span-2"><span>@T("Description")</span><textarea @bind="description" rows="2" data-testid="entry-description"></textarea></label>
                 </div>
             </section>
 
-            <section class="panel form-section">
+            <section class="panel form-section" data-testid="entry-appearance-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Presentation")</p><h2>@T("WorkplaceAppearance")</h2></div></div>
                 <div class="form-grid">
                 <label><span>@T("Presentation")</span><select data-testid="presentation-kind" @bind="presentationKind"><option value="Prompt">@T("Presentation.Prompt")</option><option value="Form">@T("Presentation.Form")</option></select></label>
-                <label><span>@T("Placeholder")</span><input @bind="placeholder" /></label>
+                <label><span>@T("Placeholder")</span><input @bind="placeholder" data-testid="entry-placeholder" /></label>
                 <div class="form-span-2">
                     <IconPicker @bind-Value="icon"
                                 SelectedLabel="@T("SelectedIcon")"
@@ -143,7 +143,7 @@ else
                 </div>
             </section>
 
-            <section class="panel form-section">
+            <section class="panel form-section" data-testid="entry-interaction-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("ExecutionExperience")</p><h2>@T("InteractionPresentation")</h2><p>@T("InteractionHelp")</p></div></div>
                 <div class="form-grid">
                     <label><span>@T("AgentIdentities")</span><select data-testid="participants-visibility" @bind="participantsVisibility">@foreach (var value in Enum.GetValues<EntryParticipantVisibility>()) { <option value="@value">@EnumLabel("Participants", value)</option> }</select><small>@T("ParticipantVisibilityHelp")</small></label>
@@ -153,24 +153,24 @@ else
                 </div>
             </section>
 
-            <section class="panel form-section">
+            <section class="panel form-section" data-testid="entry-fields-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Fields")</p><h2>@T("InputSchema")</h2></div><button class="button-secondary" data-testid="add-field" type="button" @onclick="AddField">@T("AddField")</button></div>
                 <div class="entry-card-list">
                     @for (var index = 0; index < fields.Count; index++)
                     {
                         var field = fields[index];
-                        <article class="entry-field-card" @key="field">
+                            <article class="entry-field-card" @key="field" data-testid="entry-field-card" data-field-index="@index">
                             <header><div><strong>@FieldTitle(field)</strong><span>@EnumLabel("FieldType", field.Type)</span></div>@if (field.Primary) { <StatusBadge Text="@T("PrimaryInput")" Status="UiStatus.Info" /> }</header>
                             <div class="form-grid">
-                                <label><span>@T("Name")</span><input @bind="field.Name" /></label>
-                                <label><span>@T("Label")</span><input @bind="field.Label" /></label>
-                                <label><span>@T("Description")</span><input @bind="field.Description" /></label>
-                                <label><span>@T("Placeholder")</span><input @bind="field.Placeholder" /></label>
-                                <label><span>@T("Type")</span><select @bind="field.Type">@foreach (var type in Enum.GetValues<EntryFieldType>()) { <option value="@type">@EnumLabel("FieldType", type)</option> }</select></label>
+                                <label><span>@T("Name")</span><input @bind="field.Name" data-testid="entry-field-name" /></label>
+                                <label><span>@T("Label")</span><input @bind="field.Label" data-testid="entry-field-label" /></label>
+                                <label><span>@T("Description")</span><input @bind="field.Description" data-testid="entry-field-description" /></label>
+                                <label><span>@T("Placeholder")</span><input @bind="field.Placeholder" data-testid="entry-field-placeholder" /></label>
+                                <label><span>@T("Type")</span><select @bind="field.Type" data-testid="entry-field-type">@foreach (var type in Enum.GetValues<EntryFieldType>()) { <option value="@type">@EnumLabel("FieldType", type)</option> }</select></label>
                                 @if (field.Type is EntryFieldType.Choice or EntryFieldType.MultiChoice) { <label><span>@T("OptionsValueLabel")</span><input @bind="field.Options" /></label> }
                                 <div class="entry-toggle-group">
-                                    <label class="entry-toggle"><input type="checkbox" @bind="field.Required" /><span>@T("Required")</span></label>
-                                    <label class="entry-toggle"><input type="radio" name="primary-input" checked="@field.Primary" @onclick="() => SetPrimary(field)" /><span>@T("PrimaryInput")</span></label>
+                                    <label class="entry-toggle"><input type="checkbox" @bind="field.Required" data-testid="entry-field-required" /><span>@T("Required")</span></label>
+                                    <label class="entry-toggle"><input type="radio" name="primary-input" checked="@field.Primary" @onclick="() => SetPrimary(field)" data-testid="entry-field-primary" /><span>@T("PrimaryInput")</span></label>
                                 </div>
                                 <div class="entry-row-actions">
                                     <button type="button" class="button-secondary" title="@T("MoveUp")" aria-label="@T("MoveFieldUp")" @onclick="() => MoveField(field, -1)" disabled="@(index == 0)">↑</button>
@@ -183,7 +183,7 @@ else
                 </div>
             </section>
 
-            <section class="panel form-section">
+            <section class="panel form-section" data-testid="entry-binding-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Execution")</p><h2>@T("BindingAndResolvedTarget")</h2></div></div>
                 <div class="form-grid">
                     <label><span>@T("TargetKind")</span><select data-testid="target-kind" value="@bindingKind" @onchange="BindingKindChanged"><option value="Agent">@T("Binding.Agent")</option><option value="Flow">@T("Flow")</option></select></label>
@@ -196,29 +196,29 @@ else
                 </div>
             </section>
 
-            <section class="panel form-section">
+            <section class="panel form-section" data-testid="entry-behavior-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Behavior")</p><h2>@T("ConversationAndExecution")</h2></div></div>
                 <div class="entry-behavior-layout">
-                    <label><span>@T("TaskCreation")</span><select @bind="taskMode"><option value="Automatic">@T("TaskCreation.Automatic")</option><option value="OnDemand">@T("TaskCreation.OnDemand")</option><option value="Never">@T("TaskCreation.Never")</option></select></label>
+                    <label><span>@T("TaskCreation")</span><select @bind="taskMode" data-testid="entry-task-mode"><option value="Automatic">@T("TaskCreation.Automatic")</option><option value="OnDemand">@T("TaskCreation.OnDemand")</option><option value="Never">@T("TaskCreation.Never")</option></select></label>
                     <div class="entry-toggle-list">
-                        <label class="entry-toggle"><input type="checkbox" @bind="allowConversation" /><span><strong>@T("AllowConversation")</strong><small>@T("AllowConversationHelp")</small></span></label>
-                        <label class="entry-toggle"><input type="checkbox" @bind="streamResponse" /><span><strong>@T("StreamResponse")</strong><small>@T("StreamResponseHelp")</small></span></label>
+                        <label class="entry-toggle"><input type="checkbox" @bind="allowConversation" data-testid="entry-allow-conversation" /><span><strong>@T("AllowConversation")</strong><small>@T("AllowConversationHelp")</small></span></label>
+                        <label class="entry-toggle"><input type="checkbox" @bind="streamResponse" data-testid="entry-stream-response" /><span><strong>@T("StreamResponse")</strong><small>@T("StreamResponseHelp")</small></span></label>
                     </div>
                 </div>
             </section>
 
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Suggestions")</p><h2>@T("PromptStarters")</h2></div><button class="button-secondary" type="button" @onclick="AddSuggestion">@T("AddSuggestion")</button></div>
+            <section class="panel form-section" data-testid="entry-suggestions-section">
+                <div class="panel-header"><div><p class="eyebrow">@T("Suggestions")</p><h2>@T("PromptStarters")</h2></div><button class="button-secondary" type="button" @onclick="AddSuggestion" data-testid="entry-add-suggestion">@T("AddSuggestion")</button></div>
                 @if (suggestions.Count == 0) { <p class="entry-empty-copy">@T("NoPromptStarters")</p> }
                 else
                 {
                     <div class="entry-card-list">
                         @foreach (var suggestion in suggestions)
                         {
-                            <article class="entry-suggestion-card" @key="suggestion">
+                            <article class="entry-suggestion-card" @key="suggestion" data-testid="entry-suggestion-card">
                                 <div class="form-grid entry-suggestion-form">
-                                    <label class="entry-suggestion-label"><span>@T("Label")</span><input @bind="suggestion.Label" /></label>
-                                    <label class="entry-suggestion-value"><span>@T("Value")</span><textarea @bind="suggestion.Value" rows="3"></textarea></label>
+                                    <label class="entry-suggestion-label"><span>@T("Label")</span><input @bind="suggestion.Label" data-testid="entry-suggestion-label" /></label>
+                                    <label class="entry-suggestion-value"><span>@T("Value")</span><textarea @bind="suggestion.Value" rows="3" data-testid="entry-suggestion-value"></textarea></label>
                                     <div class="entry-suggestion-actions">
                                         <button type="button"
                                                 class="button-danger entry-suggestion-remove"
@@ -301,6 +301,7 @@ else
     private bool IsPackOwned => !EntryResourceNamespace.IsDefault;
     private IReadOnlyList<EntryTab> AvailableTabs => EntryResourceNamespace.IsDefault ? Tabs : NamespacedTabs;
     private bool loading = true, busy, hasError;
+    private bool interactive;
     private long draftRevision = 1;
     private string resourceName = "", displayName = "", description = "", placeholder = "Ask Agentstration", icon = "", resourceId = "", message = "";
     private string rawYaml = "";
@@ -351,6 +352,13 @@ else
         if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = EntryTab.Definition;
         else if (string.Equals(View, "yaml", StringComparison.OrdinalIgnoreCase)) { PrepareRawYaml(); activeTab = EntryTab.Yaml; }
         loading = false;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        interactive = true;
+        StateHasChanged();
     }
 
     private void SelectTab(EntryTab tab) { if (tab == EntryTab.Yaml) PrepareRawYaml(); activeTab = tab; message = ""; }

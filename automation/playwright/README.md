@@ -26,6 +26,15 @@ Create and select a dedicated campaign workspace with:
 npm run capture -- --plan examples/create-campaign-workspace.capture-plan.json --output .work/campaign-workspace
 ```
 
+The solution-discovery video Flow and Entry are captured with:
+
+```powershell
+npm run capture -- --plan examples/create-solution-discovery-flow.capture-plan.json --output .work/solution-discovery-flow --console-url https://agentstration.example.com
+npm run capture -- --plan examples/create-solution-discovery-entry.capture-plan.json --output .work/solution-discovery-entry --console-url https://agentstration.example.com
+```
+
+Run these commands against the same persistent instance and campaign Workspace. The Flow plan expects the four agent technical names declared in its `participants` input. The Entry plan expects that Flow to have been published and activated first.
+
 To run that plan against an existing Console without starting local product hosts, override its URL from the command line:
 
 ```powershell

@@ -1,16 +1,22 @@
 import type { Locator, Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { AgentEditorPage } from './agent-editor.page.js';
+import { FlowEditorPage } from './flow-editor.page.js';
+import { EntryEditorPage } from './entry-editor.page.js';
 import { LoginPage } from './login.page.js';
 import { OrganizationWorkspacesPage } from './organization-workspaces.page.js';
 
 export class ProductPages {
   public readonly agentEditor: AgentEditorPage;
+  public readonly flowEditor: FlowEditorPage;
+  public readonly entryEditor: EntryEditorPage;
   public readonly login: LoginPage;
   public readonly organizationWorkspaces: OrganizationWorkspacesPage;
 
   public constructor(public readonly page: Page) {
     this.agentEditor = new AgentEditorPage(page);
+    this.flowEditor = new FlowEditorPage(page);
+    this.entryEditor = new EntryEditorPage(page);
     this.login = new LoginPage(page);
     this.organizationWorkspaces = new OrganizationWorkspacesPage(page);
   }
