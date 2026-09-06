@@ -9,6 +9,7 @@ using Agentstration.Infrastructure.Events;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Packs;
 using Agentstration.Infrastructure.Runtime;
+using Agentstration.Infrastructure.Sources;
 using Agentstration.Infrastructure.Triggers;
 using Agentstration.Infrastructure.Work;
 using Agentstration.Management.Abstractions;
@@ -155,6 +156,17 @@ public static class DependencyInjection
         services.AddSingleton<PackManagementService>();
         services.AddSingleton<PackAuthoringService>();
         services.AddSingleton<PackCompositionService>();
+        services.AddSingleton<ISourceManifestReader, Agentstration.Management.Contracts.SourceManifestReader>();
+        services.AddHttpClient<ISourceManifestRetriever, HttpSourceManifestRetriever>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Source-Importer/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 5
+        });
+        services.AddSingleton<SourceManagementService>();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();

@@ -174,7 +174,8 @@ public sealed class SqliteControlPlaneStore(
 
     public async Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
     {
-        if (resource is AgentRevision) throw new InvalidOperationException("Published agent revisions are immutable and must be created through CreateImmutableAsync.");
+        if (resource is AgentRevision or SourceResource or SourceVersionResource)
+            throw new InvalidOperationException($"Resource kind '{resource.Kind}' is immutable and must be created through CreateImmutableAsync.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var namespaceValue = resource.Namespace.Value;
         var existing = await Scoped(context.Documents).SingleOrDefaultAsync(
