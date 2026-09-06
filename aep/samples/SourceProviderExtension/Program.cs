@@ -8,13 +8,15 @@ namespace Aep.Samples.SourceProvider;
 
 public sealed class Program
 {
+    private static readonly string[] RequiredSourceOptions = ["selector"];
+
     public static async Task Main(string[] args)
     {
         var schema = JsonSerializer.SerializeToElement(new
         {
             type = "object",
             properties = new { selector = new { type = "string" } },
-            required = new[] { "selector" },
+            required = RequiredSourceOptions,
             additionalProperties = false
         });
         var version = AepOptionSetVersionDescriptor.Create("1.0", schema);
