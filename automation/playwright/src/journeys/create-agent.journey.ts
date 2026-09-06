@@ -40,7 +40,14 @@ export const createAgent: Journey<CreateAgentInput> = async (context, input) => 
 };
 
 function validate(input: CreateAgentInput): void {
-  for (const property of ['name', 'displayName', 'description', 'instructions', 'modelProfile', 'runtimeProfile'] as const) {
+  for (const property of ['name', 'displayName', 'description', 'instructions'] as const) {
     if (!input[property]?.trim()) throw new Error(`Create agent journey input '${property}' is required.`);
+  }
+  for (const property of ['modelProfile', 'runtimeProfile'] as const) {
+    const value = input[property];
+    const candidates = typeof value === 'string' ? [value] : value;
+    if (!candidates?.length || candidates.some(candidate => !candidate.trim())) {
+      throw new Error(`Create agent journey input '${property}' requires at least one non-empty candidate.`);
+    }
   }
 }

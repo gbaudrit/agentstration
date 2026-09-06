@@ -28,4 +28,6 @@ npm run capture -- --plan examples/create-welcome-agent.capture-plan.json --outp
 
 Command-line URLs take precedence over plan values. `--workplace-url` is optional for Console-only journeys and can be supplied when a journey also uses Workplace.
 
+Profile inputs may be an ordered array when equivalent environments use different resource names. The journey selects the first available candidate and reports the available options immediately when none match.
+
 See [Browser automation](../../docs/contributing/browser-automation.md) and [ADR-0079](../../docs/decisions/0079-product-owned-browser-journeys.md) for ownership, extension, and external-consumption rules.

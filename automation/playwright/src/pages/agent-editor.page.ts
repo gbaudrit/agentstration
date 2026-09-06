@@ -1,12 +1,14 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+
+export type ProfileSelection = string | readonly string[];
 
 export interface AgentDefinition {
   name: string;
   displayName: string;
   description: string;
   instructions: string;
-  modelProfile: string;
-  runtimeProfile: string;
+  modelProfile: ProfileSelection;
+  runtimeProfile: ProfileSelection;
 }
 
 export class AgentEditorPage {
@@ -25,8 +27,8 @@ export class AgentEditorPage {
   }
 
   public async configureBehavior(agent: Pick<AgentDefinition, 'instructions' | 'modelProfile' | 'runtimeProfile'>): Promise<void> {
-    await this.page.getByTestId('model-profile-select').selectOption(agent.modelProfile);
-    await this.page.getByTestId('agent-runtime-profile').selectOption(agent.runtimeProfile);
+    await selectFirstAvailable(this.page.getByTestId('model-profile-select'), agent.modelProfile, 'Model profile');
+    await selectFirstAvailable(this.page.getByTestId('agent-runtime-profile'), agent.runtimeProfile, 'Runtime profile');
     await fillAndCommit(this.page.getByTestId('agent-instructions'), agent.instructions);
   }
 
@@ -43,4 +45,20 @@ export class AgentEditorPage {
 async function fillAndCommit(locator: ReturnType<Page['getByTestId']>, value: string): Promise<void> {
   await locator.fill(value);
   await locator.blur();
+}
+
+async function selectFirstAvailable(locator: Locator, selection: ProfileSelection, label: string): Promise<void> {
+  await locator.waitFor({ state: 'visible' });
+  const candidates = typeof selection === 'string' ? [selection] : [...selection];
+  const options = await locator.locator('option').evaluateAll(elements => elements.map(element => ({
+    value: (element as HTMLOptionElement).value,
+    label: element.textContent?.trim() ?? '',
+    disabled: (element as HTMLOptionElement).disabled,
+  })));
+  const selected = candidates.find(candidate => options.some(option => option.value === candidate && !option.disabled));
+  if (!selected) {
+    const available = options.filter(option => option.value && !option.disabled).map(option => `${option.value} (${option.label})`);
+    throw new Error(`${label} candidates [${candidates.join(', ')}] are unavailable. Available options: ${available.join(', ') || 'none'}.`);
+  }
+  await locator.selectOption(selected);
 }

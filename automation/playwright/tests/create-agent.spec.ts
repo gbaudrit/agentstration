@@ -8,7 +8,7 @@ const agent: CreateAgentInput = {
   displayName: 'Playwright welcome agent',
   description: 'Welcomes users during the browser journey.',
   instructions: 'Welcome the user and answer concisely.',
-  modelProfile: 'default:reasoning-default',
+  modelProfile: ['default:missing-profile', 'default:reasoning-default'],
   runtimeProfile: 'default:maf-builtin',
 };
 
