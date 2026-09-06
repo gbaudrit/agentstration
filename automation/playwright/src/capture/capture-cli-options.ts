@@ -1,4 +1,5 @@
 import type { CapturePlan } from './capture-plan.js';
+import { normalizeProductUrl } from '../fixtures/product-addresses.js';
 
 export interface CaptureCliOptions {
   planFile: string;
@@ -43,24 +44,11 @@ export function resolveCaptureAddresses(options: CaptureCliOptions, plan: Captur
   if (!consoleUrl && workplaceUrl) throw new Error('A Workplace URL requires --console-url or consoleUrl in the plan.');
   if (!consoleUrl) return undefined;
 
-  const normalizedConsoleUrl = normalizeHttpUrl(consoleUrl, 'Console');
+  const normalizedConsoleUrl = normalizeProductUrl(consoleUrl, 'Console');
   return {
     consoleUrl: normalizedConsoleUrl,
-    workplaceUrl: workplaceUrl ? normalizeHttpUrl(workplaceUrl, 'Workplace') : normalizedConsoleUrl,
+    workplaceUrl: workplaceUrl ? normalizeProductUrl(workplaceUrl, 'Workplace') : normalizedConsoleUrl,
   };
-}
-
-function normalizeHttpUrl(value: string, label: string): string {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new Error(`${label} URL '${value}' is not a valid absolute URL.`);
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error(`${label} URL must use http or https.`);
-  }
-  return value.replace(/\/+$/, '');
 }
 
 function required(values: Map<string, string>, name: string): string {

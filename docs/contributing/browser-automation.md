@@ -23,6 +23,19 @@ Set `AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true` only after building both Web projec
 
 For a local diagnostic when the pinned browser binary cannot be downloaded, an explicitly installed Playwright channel may be selected, for example `$env:AGENTSTRATION_PLAYWRIGHT_CHANNEL = "chrome"`. CI always installs and uses the pinned Chromium revision.
 
+### Playwright UI against an existing instance
+
+Set `AGENTSTRATION_CONSOLE_URL` before opening Playwright UI to bypass managed local hosts:
+
+```powershell
+$env:AGENTSTRATION_CONSOLE_URL = "http://localhost:53400"
+$env:AGENTSTRATION_WORKPLACE_URL = "http://localhost:53401"
+Set-Location automation/playwright
+npx playwright test --ui
+```
+
+`AGENTSTRATION_WORKPLACE_URL` is optional for Console-only tests and otherwise falls back to the Console URL. In external mode Playwright neither starts nor stops the product, and it does not isolate or reset its data. Use a disposable instance or a dedicated campaign Workspace, and expect create-only journeys to reject resources left by an earlier run. Remove the environment variables to return to managed isolated hosts.
+
 ## Design rules
 
 - Page objects own selectors for one product surface.
