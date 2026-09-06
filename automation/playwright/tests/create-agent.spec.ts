@@ -1,4 +1,5 @@
 import { ProductPages } from '../src/pages/product.pages.js';
+import { TestIds } from '../src/contracts/test-ids.js';
 import { createAgent, type CreateAgentInput } from '../src/journeys/create-agent.journey.js';
 import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { expect, test } from '../src/fixtures/test.js';
@@ -20,6 +21,6 @@ test('an administrator can create and deploy an agent @smoke', async ({ page, pr
   }, agent);
 
   await expect(page).toHaveURL(new RegExp(`/agents/${agent.name}$`));
-  await expect(page.getByTestId('agent-name')).toHaveValue(agent.name);
-  await expect(page.getByTestId('agent-name')).toBeDisabled();
+  await expect(page.getByTestId(TestIds.agentEditor.name)).toHaveValue(agent.name);
+  await expect(page.getByTestId(TestIds.agentEditor.name)).toBeDisabled();
 });

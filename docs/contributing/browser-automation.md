@@ -33,6 +33,37 @@ For a local diagnostic when the pinned browser binary cannot be downloaded, an e
 - Wait for URL, health, enabled controls, and visible domain state. Do not add arbitrary sleeps to functional journeys.
 - Use typed scenario input. Keep release copy, storyboards, and publication-specific data outside this repository.
 
+## Stable automation contracts
+
+The Playwright workspace keeps its shared vocabulary in three explicit catalogs:
+
+| Contract | Location | Update when |
+| --- | --- | --- |
+| Test IDs | `src/contracts/test-ids.ts` | A cross-locale or ambiguous control needs a stable locator or capture target. Add the matching literal to the Razor markup and consume only the constant from page objects and tests. |
+| Checkpoints | `src/contracts/checkpoints.ts` | A journey exposes a new meaningful user-visible state. Keep existing values stable and update plans that select the new checkpoint. |
+| Expected localized text | `src/locales/expected-text.ts` | A semantic localization assertion is added or intentionally changed. Supply every supported locale independently from the product `.resx` files. |
+
+Use accessible roles and names first. Test IDs are a fallback for cross-locale journeys, ambiguity, capture boundaries, and non-visible readiness state. Page objects own locators; journeys own behavior and checkpoint timing; JSON plans contain neither selectors nor product localization constants.
+
+The scoped [`automation/playwright/AGENTS.md`](../../automation/playwright/AGENTS.md) is the maintenance contract for coding agents changing this area.
+
+## Campaign workspaces
+
+A campaign workspace is the durable data sandbox for a related set of UX tests, screenshots, or video takes. It is not the campaign definition itself: locale, theme, viewport, product revision, scenario data, and output evidence remain explicit plan dimensions.
+
+The `create-workspace` journey creates and selects a new workspace and fails if its technical name already exists. Other journeys may accept `workspaceName` to select a workspace prepared by the caller, but they never silently create, replace, reuse, or delete it. Required resources must be seeded or installed explicitly in that workspace before a dependent journey runs.
+
+For an existing Console instance, a typical campaign begins with:
+
+```powershell
+npm --prefix automation/playwright run capture -- `
+  --plan automation/playwright/examples/create-campaign-workspace.capture-plan.json -- `
+  --output automation/playwright/.work/campaign-workspace -- `
+  --console-url https://agentstration.example.com
+```
+
+Subsequent plans can select it by adding `"workspaceName": "capture-handoff"` to their journey input. The built-in local capture host is recreated for each command; use one persistent external instance when multiple commands must share campaign state.
+
 ## Capture from a plan
 
 The example plan captures the authenticated Console home page:

@@ -20,6 +20,12 @@ The welcome-agent plan replays the first agent created in the handoff demo:
 npm run capture -- --plan examples/create-welcome-agent.capture-plan.json --output .work/welcome-agent
 ```
 
+Create and select a dedicated campaign workspace with:
+
+```powershell
+npm run capture -- --plan examples/create-campaign-workspace.capture-plan.json --output .work/campaign-workspace
+```
+
 To run that plan against an existing Console without starting local product hosts, override its URL from the command line:
 
 ```powershell
@@ -28,6 +34,8 @@ npm run capture -- --plan examples/create-welcome-agent.capture-plan.json --outp
 
 Command-line URLs take precedence over plan values. `--workplace-url` is optional for Console-only journeys and can be supplied when a journey also uses Workplace.
 
+On a persistent external instance, run the workspace plan first and set `workspaceName` in subsequent journey input. The target workspace must be prepared explicitly with every resource required by those journeys, such as model and runtime profiles. Local capture commands start isolated product state, so separate commands do not share a workspace.
+
 Profile inputs may be an ordered array when equivalent environments use different resource names. The journey selects the first available candidate and reports the available options immediately when none match.
 
-See [Browser automation](../../docs/contributing/browser-automation.md) and [ADR-0079](../../docs/decisions/0079-product-owned-browser-journeys.md) for ownership, extension, and external-consumption rules.
+See [Browser automation](../../docs/contributing/browser-automation.md), [ADR-0079](../../docs/decisions/0079-product-owned-browser-journeys.md), and [ADR-0080](../../docs/decisions/0080-browser-campaigns-use-dedicated-workspaces.md) for ownership, extension, and external-consumption rules.

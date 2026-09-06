@@ -109,3 +109,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 77. [ADR-0077 — Bootstrap profiles are explicit administrative applications](0077-bootstrap-profiles-are-explicit-administrative-applications.md)
 78. [ADR-0078 — PostgreSQL is an optional server storage profile](0078-postgresql-is-an-optional-server-storage-profile.md)
 79. [ADR-0079 — Browser journeys are product-owned reusable automation assets](0079-product-owned-browser-journeys.md)
+80. [ADR-0080 — Browser campaigns use dedicated Workspaces](0080-browser-campaigns-use-dedicated-workspaces.md)

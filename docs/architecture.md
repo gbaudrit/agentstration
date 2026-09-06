@@ -406,3 +406,5 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0060: Entry owns Workplace execution presentation
 - ADR-0061: llama.cpp AEP provider and effective capability resolution
 - ADR-0062: immutable versioned extension option contracts
+- ADR-0079: product-owned reusable browser journeys
+- ADR-0080: dedicated Workspaces for browser campaign data isolation
