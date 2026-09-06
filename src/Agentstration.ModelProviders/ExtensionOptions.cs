@@ -7,6 +7,7 @@ namespace Agentstration.ModelProviders;
 public static class ExtensionOptionScopes
 {
     public const string ModelProfile = "model-profile";
+    public const string SourceChannel = "source-channel";
 }
 
 public sealed record ExtensionOptionSetVersion(

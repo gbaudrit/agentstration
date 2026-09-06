@@ -8,7 +8,7 @@ public sealed class ExtensionRegistrationValidationException(string message) : E
 public sealed class ExtensionRegistrationNotFoundException(ResourceAddress address) : Exception($"Extension registration '{address}' was not found.");
 public sealed record ExtensionRegistrationUsage(string Kind, string Name, string DisplayName, string ContributionId);
 public sealed class ExtensionRegistrationInUseException(string name, IReadOnlyList<ExtensionRegistrationUsage> usages)
-    : Exception($"The extension registration '{name}' is used by {usages.Count} model provider(s).")
+    : Exception($"The extension registration '{name}' is used by {usages.Count} provider resource(s).")
 {
     public IReadOnlyList<ExtensionRegistrationUsage> Usages { get; } = usages;
 }
@@ -119,7 +119,19 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
         ResourceNamespace @namespace,
         string name,
         CancellationToken cancellationToken) =>
-        (await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken))
+        [
+            .. (await store.ListAllAsync<ModelProviderResource>(ResourceKinds.ModelProvider, cancellationToken))
+            .Where(value =>
+            {
+                var address = value.Value.Definition.Extension.Resolve(value.Value.Namespace, ResourceKinds.ExtensionRegistration);
+                return address.Namespace == @namespace && string.Equals(address.Name, name, StringComparison.Ordinal);
+            })
+            .Select(value => new ExtensionRegistrationUsage(
+                value.Value.Kind,
+                value.Value.Name,
+                value.Value.Definition.DisplayName,
+                value.Value.Definition.ContributionId)),
+            .. (await store.ListAllAsync<SourceProviderResource>(ResourceKinds.SourceProvider, cancellationToken))
             .Where(value =>
             {
                 var address = value.Value.Definition.Extension.Resolve(value.Value.Namespace, ResourceKinds.ExtensionRegistration);
@@ -130,7 +142,7 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
                 value.Value.Name,
                 value.Value.Definition.DisplayName,
                 value.Value.Definition.ContributionId))
-            .ToArray();
+        ];
 
     private async Task<ExtensionRegistrationProperties> ValidateDefinitionAsync(
         ResourceNamespace @namespace,
