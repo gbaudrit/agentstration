@@ -23,6 +23,7 @@ jobs:
       dotnet: ${{ steps.classify.outputs.dotnet }}
       aep: ${{ steps.classify.outputs.aep }}
       container: ${{ steps.classify.outputs.container }}
+      ux: ${{ steps.classify.outputs.ux }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -62,15 +63,20 @@ jobs:
           $container = $runEverything -or @($changedFiles | Where-Object {
             $_ -match '^(src/|aep/src/|deploy/|Dockerfile$|\.dockerignore$|global\.json$|Agentstration\.slnx$|Directory\.(Build|Packages)\.(props|targets)$|\.github/workflows/ci\.yml$)'
           }).Count -gt 0
+          $ux = $runEverything -or @($changedFiles | Where-Object {
+            $_ -match '^(automation/playwright/|deploy/bootstrap/profiles/|src/Agentstration\.Web/|src/Agentstration\.Web\.Components/|src/Agentstration\.Web\.FlowDesigner/|src/Agentstration\.Workplace\.|global\.json$|Directory\.(Build|Packages)\.(props|targets)$|\.github/workflows/ci\.yml$)'
+          }).Count -gt 0
 
           "dotnet=$($dotnet.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "aep=$($aep.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "container=$($container.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "ux=$($ux.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
           Write-Host "Changed files: $($changedFiles.Count)"
           Write-Host "Run .NET validation: $dotnet"
           Write-Host "Run complete AEP validation: $aep"
           Write-Host "Build container: $container"
+          Write-Host "Run browser UX validation: $ux"
 
   windows-host-lifecycle:
     name: windows-host-lifecycle
@@ -98,6 +104,53 @@ jobs:
         run: dotnet build tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj --configuration Release --no-restore
       - name: Verify Windows host lifecycle
         run: dotnet tests/Agentstration.Web.Tests/bin/Release/net10.0/Agentstration.Web.Tests.dll --filter "FullyQualifiedName~QuartzHostLifecycleTests|FullyQualifiedName~StartupDoesNotCreateLegacyDataJson" --progress off
+
+  browser-ux:
+    name: browser-ux
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.ux == 'true'
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: automation/playwright/package-lock.json
+      - name: Restore browser hosts
+        run: |
+          dotnet restore src/Agentstration.Web/Agentstration.Web.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+          dotnet restore src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+          dotnet restore src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Install browser automation dependencies
+        working-directory: automation/playwright
+        run: npm ci
+      - name: Audit browser automation dependencies
+        working-directory: automation/playwright
+        run: npm audit --audit-level=high
+      - name: Install Chromium
+        working-directory: automation/playwright
+        run: npx playwright install --with-deps chromium
+      - name: Run browser UX smoke tests
+        working-directory: automation/playwright
+        run: npm run test:smoke
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-ux-diagnostics
+          path: |
+            automation/playwright/test-results
+            automation/playwright/playwright-report
+            automation/playwright/.work/*/*.log
+          if-no-files-found: ignore
 
   build-and-test:
     name: build-and-test

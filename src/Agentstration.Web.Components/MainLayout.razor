@@ -11,7 +11,7 @@
 @inject ConsoleContextState ContextState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<MainLayoutStrings> Localizer
 
-<div class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")">
+<div class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")" data-testid="console-shell" data-preferences-ready="@(Preferences.IsLoaded && themeReady ? "true" : "false")">
     <aside class="sidebar" aria-label="@T("MainNavigation")">
         <a class="brand-lockup" href="/" aria-label="@T("ControlPlaneHome")">
             <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
@@ -67,7 +67,7 @@
                     }
                 }
                 <EnvironmentSwitcher />
-                <button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="@T("ToggleColorTheme")" title="@(Preferences.Error ?? F("ThemeValue", Preferences.Theme))"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button>
+                <button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="@T("ToggleColorTheme")" data-testid="theme-toggle" title="@(Preferences.Error ?? F("ThemeValue", Preferences.Theme))"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button>
                 <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="@T("Notifications")"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
                 <a class="icon-button" href="/account/security" aria-label="@T("AccountSecurity")" title="@T("AccountSecurity")"><UiIcon Name="shield-check" /></a>
                 <a class="icon-button" href="/logout" aria-label="@T("SignOut")" title="@T("SignOut")"><UiIcon Name="log-out" /></a>

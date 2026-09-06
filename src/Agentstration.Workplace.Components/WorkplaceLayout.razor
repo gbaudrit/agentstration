@@ -6,7 +6,7 @@
 @inject WorkplaceContextState WorkplaceContext
 @inject IRecentConversationNavigationProvider RecentConversationNavigation
 @inject IJSRuntime JS
-<div class="app-shell @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light") workplace-shell">
+<div class="app-shell @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light") workplace-shell" data-testid="workplace-shell">
     <aside class="sidebar" aria-label="@T("WorkplaceNavigation")">
         <a class="brand-lockup workplace-brand-lockup" href="@HomeUrl" aria-label="@T("WorkplaceHome")">
             <img class="brand-lockup-logo" src="_content/Agentstration.Web.Components/images/agentstration-workplace-lockup-dark.png" alt="" />
