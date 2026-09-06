@@ -28,4 +28,6 @@ npm run capture -- --plan examples/create-welcome-agent.capture-plan.json --outp
 
 Command-line URLs take precedence over plan values. `--workplace-url` is optional for Console-only journeys and can be supplied when a journey also uses Workplace.
 
+During a capture, elements whose computed position is `sticky` are temporarily rendered in normal document flow. This prevents sticky toolbars from covering content in page and target screenshots without changing their behavior in the running product.
+
 See [Browser automation](../../docs/contributing/browser-automation.md) and [ADR-0079](../../docs/decisions/0079-product-owned-browser-journeys.md) for ownership, extension, and external-consumption rules.

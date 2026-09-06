@@ -4,6 +4,9 @@ import path from 'node:path';
 import type { JourneyCheckpoint } from '../journeys/journey.js';
 import type { CapturePlan } from './capture-plan.js';
 
+const captureStickyAttribute = 'data-agentstration-capture-sticky';
+const captureStyle = `[${captureStickyAttribute}] { position: static !important; }`;
+
 export interface CapturedAsset {
   checkpoint: string;
   file: string;
@@ -22,11 +25,19 @@ export function createScreenshotRecorder(plan: CapturePlan, outputDirectory: str
       throw new Error(`Capture file must stay inside the output directory: ${request.file}`);
     }
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    if (request.scope === 'target') {
-      if (!checkpoint.target) throw new Error(`Checkpoint ${checkpoint.name} has no target.`);
-      await checkpoint.target.screenshot({ path: destination });
-    } else {
-      await checkpoint.page.screenshot({ path: destination, fullPage: request.fullPage ?? true });
+    if (request.scope === 'target' && !checkpoint.target) {
+      throw new Error(`Checkpoint ${checkpoint.name} has no target.`);
+    }
+
+    await markStickyElements(checkpoint);
+    try {
+      if (request.scope === 'target') {
+        await checkpoint.target!.screenshot({ path: destination, style: captureStyle });
+      } else {
+        await checkpoint.page.screenshot({ path: destination, fullPage: request.fullPage ?? true, style: captureStyle });
+      }
+    } finally {
+      await restoreStickyElements(checkpoint);
     }
     const bytes = await fs.readFile(destination);
     assets.push({
@@ -36,4 +47,18 @@ export function createScreenshotRecorder(plan: CapturePlan, outputDirectory: str
     });
     pending.delete(checkpoint.name);
   };
+}
+
+async function markStickyElements(checkpoint: JourneyCheckpoint): Promise<void> {
+  await checkpoint.page.locator('*').evaluateAll((elements, attribute) => {
+    for (const element of elements) {
+      if (getComputedStyle(element).position === 'sticky') element.setAttribute(attribute, '');
+    }
+  }, captureStickyAttribute);
+}
+
+async function restoreStickyElements(checkpoint: JourneyCheckpoint): Promise<void> {
+  await checkpoint.page.locator(`[${captureStickyAttribute}]`).evaluateAll((elements, attribute) => {
+    for (const element of elements) element.removeAttribute(attribute);
+  }, captureStickyAttribute);
 }
