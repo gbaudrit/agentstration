@@ -13,11 +13,13 @@ To use Playwright UI against an already-running instance:
 ```powershell
 $env:AGENTSTRATION_CONSOLE_URL = "http://localhost:53400"
 $env:AGENTSTRATION_WORKPLACE_URL = "http://localhost:53401" # Optional for Console-only tests.
+$env:AGENTSTRATION_USERNAME = "admin"
+$env:AGENTSTRATION_PASSWORD = "admin"
 $env:AGENTSTRATION_PLAYWRIGHT_CHANNEL = "chrome"             # Optional local fallback.
 npx playwright test --ui
 ```
 
-When `AGENTSTRATION_CONSOLE_URL` is present, the test fixture does not start or stop product hosts. Without it, tests keep using dynamically allocated local ports and isolated SQLite data. An omitted Workplace URL falls back to the Console URL so Console-only journeys remain usable; set it explicitly before running a Workplace journey. External tests mutate the selected instance, so use a disposable instance or dedicated campaign Workspace.
+When `AGENTSTRATION_CONSOLE_URL` is present, the test fixture does not start or stop product hosts and requires the username/password pair. Journey input can explicitly override both values. Without an external URL, tests keep using dynamically allocated local ports, isolated SQLite data, and the public Development fixture `admin / admin`. An omitted Workplace URL falls back to the Console URL so Console-only journeys remain usable; set it explicitly before running a Workplace journey. External tests mutate the selected instance, so use a disposable instance or dedicated campaign Workspace.
 
 To exercise the capture contract:
 

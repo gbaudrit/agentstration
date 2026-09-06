@@ -30,11 +30,13 @@ Set `AGENTSTRATION_CONSOLE_URL` before opening Playwright UI to bypass managed l
 ```powershell
 $env:AGENTSTRATION_CONSOLE_URL = "http://localhost:53400"
 $env:AGENTSTRATION_WORKPLACE_URL = "http://localhost:53401"
+$env:AGENTSTRATION_USERNAME = "admin"
+$env:AGENTSTRATION_PASSWORD = "admin"
 Set-Location automation/playwright
 npx playwright test --ui
 ```
 
-`AGENTSTRATION_WORKPLACE_URL` is optional for Console-only tests and otherwise falls back to the Console URL. In external mode Playwright neither starts nor stops the product, and it does not isolate or reset its data. Use a disposable instance or a dedicated campaign Workspace, and expect create-only journeys to reject resources left by an earlier run. Remove the environment variables to return to managed isolated hosts.
+`AGENTSTRATION_USERNAME` and `AGENTSTRATION_PASSWORD` are required together when `AGENTSTRATION_CONSOLE_URL` selects external UI-test mode. Explicit `username` and `password` journey input overrides the environment pair. Managed local hosts retain the public Development fixture `admin / admin`; the environment-selected external mode never falls back to it silently. `AGENTSTRATION_WORKPLACE_URL` is optional for Console-only tests and otherwise falls back to the Console URL. In external mode Playwright neither starts nor stops the product, and it does not isolate or reset its data. Use a disposable instance or a dedicated campaign Workspace, and expect create-only journeys to reject resources left by an earlier run. Remove the environment variables to return to managed isolated hosts.
 
 ## Design rules
 
