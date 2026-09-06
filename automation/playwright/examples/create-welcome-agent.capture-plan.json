@@ -27,8 +27,7 @@
     {
       "checkpoint": "agent-identity-complete",
       "file": "02-agent-identity-complete.png",
-      "scope": "page",
-      "fullPage": false
+      "scope": "target"
     },
     {
       "checkpoint": "agent-ready-to-create",
