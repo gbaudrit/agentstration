@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Contracts;
 
@@ -22,7 +23,8 @@ public sealed record ModelProviderResponse(
     string Id,
     string Name,
     ModelProviderPropertiesResponse Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 
 public sealed record AvailableModelResponse(
     string Name,
@@ -112,7 +114,8 @@ public sealed record ModelProfileSummaryResponse(
     string Id,
     string Name,
     ModelProfileSummaryPropertiesResponse Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 
 public sealed record ModelProfileUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
 public sealed record ModelProfileUsagesResponse(IReadOnlyList<ModelProfileUsageResponse> Value, int Count);
@@ -164,7 +167,8 @@ public sealed record RuntimeProfileSummaryResponse(
     string Name,
     RuntimeProfileProperties Properties,
     int UsageCount,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 public sealed record RuntimeProfileUsageResponse(
     string ResourceId,
     string Name,

@@ -692,7 +692,7 @@ public sealed class DeclarativeBootstrapTests
             .GetAsync(ResourceNamespace.Default, "startup-order", default);
 
         Assert.IsNotNull(registration);
-        Assert.AreEqual(ResourceScopeRef.Workspace(workspace.Id), registration.Value.ScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, registration.Value.ScopeRef);
     }
 
     [TestMethod]

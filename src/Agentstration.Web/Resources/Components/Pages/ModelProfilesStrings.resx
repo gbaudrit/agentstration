@@ -37,4 +37,5 @@
   <data name="DeleteDialogConfirm"><value>Delete model profile</value></data>
   <data name="DeleteMessage"><value>Delete model profile '{0}'? This action cannot be undone.</value></data>
   <data name="DeletedNotification"><value>Model profile deleted</value></data>
+  <data name="Scope"><value>Scope</value></data>
 </root>

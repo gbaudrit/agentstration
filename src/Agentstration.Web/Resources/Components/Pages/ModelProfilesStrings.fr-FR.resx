@@ -37,4 +37,5 @@
   <data name="DeleteDialogConfirm"><value>Supprimer le profil de modèle</value></data>
   <data name="DeleteMessage"><value>Supprimer le profil de modèle « {0} » ? Cette action est irréversible.</value></data>
   <data name="DeletedNotification"><value>Profil de modèle supprimé</value></data>
+  <data name="Scope"><value>Périmètre</value></data>
 </root>

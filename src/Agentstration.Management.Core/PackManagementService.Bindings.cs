@@ -27,8 +27,6 @@ public sealed partial class PackManagementService
             ?? new Dictionary<string, ResourceReference>(StringComparer.Ordinal);
         foreach (var selection in requestedBindings)
         {
-            if (!string.IsNullOrWhiteSpace(selection.Target.WorkspaceRef))
-                throw new PackValidationException("pack_binding_cross_workspace_unsupported", $"Pack binding '{selection.Name}' cannot target another workspace.");
             targets[selection.Name] = Normalize(selection.Target);
         }
 
@@ -95,7 +93,7 @@ public sealed partial class PackManagementService
     private static ResourceReference Normalize(ResourceReference target)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(target.Name);
-        return new(target.Name.Trim(), @namespace: target.Namespace ?? ResourceNamespace.Default);
+        return new(target.Name.Trim(), target.ScopeRef, target.Namespace ?? ResourceNamespace.Default);
     }
 
     private static PackResourceDocument ResolveBindings(PackResourceDocument resource, IReadOnlyDictionary<string, ResourceReference?> targets)
@@ -119,7 +117,8 @@ public sealed partial class PackManagementService
             return new JsonObject
             {
                 ["name"] = target.Name,
-                ["namespace"] = (target.Namespace ?? ResourceNamespace.Default).Value
+                ["namespace"] = (target.Namespace ?? ResourceNamespace.Default).Value,
+                ["scopeRef"] = target.ScopeRef?.Value
             };
         }
         if (node is JsonObject objectNode)

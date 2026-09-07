@@ -12,7 +12,7 @@
 <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="vault-editor" class="resource-form"><DataAnnotationsValidator /><ValidationSummary />
     <section class="panel form-section">
         <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("VaultResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusText(status)" Status="@(status == "available" ? UiStatus.Success : UiStatus.Danger)" /> }</div>
-        <div class="form-grid"><label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /></label><label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /></label><label><span>@T("Provider")</span><InputSelect @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="local">@T("Provider.local")</option></InputSelect></label></div>
+        <div class="form-grid"><label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /></label><label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /></label><label><span>@T("Provider")</span><InputSelect @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="local">@T("Provider.local")</option></InputSelect></label>@if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }</div>
     </section>
     <section class="panel form-section">
         <div class="panel-header"><div><p class="eyebrow">@T("Bootstrap")</p><h2>@T("MasterKey")</h2></div>@if (!IsNew && model.ProviderType == "local" && status != "available") { <button type="button" class="button-primary" @onclick="() => confirmInitialize = true" disabled="@busy">@T("InitializeLocalVault")</button> }</div>
@@ -26,17 +26,22 @@
 
 @code {
     [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private VaultEditorModel model = new();
     private string? etag, status, keyFilePath;
+    private ResourceScopeRef? selectedScope;
+    private IReadOnlyList<ResourceScopeTargetResponse> scopeTargets = [];
     private Exception? error;
     private bool busy, confirmDelete, confirmInitialize;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusText(string value) => value.ToLowerInvariant() switch { "available" => T("Status.Available"), "unavailable" => T("Status.Unavailable"), "uninitialized" => T("Status.Uninitialized"), _ => T($"Status.{value}") };
-    protected override async Task OnParametersSetAsync() { if (IsNew) return; try { var snapshot = await Client.GetVaultAsync(Name!, cancellation.Token); model = VaultEditorModel.From(snapshot.Value.Resource); status = snapshot.Value.Status; etag = snapshot.ETag; } catch (Exception ex) { error = ex; } }
-    private async Task SaveAsync() { busy = true; error = null; try { var snapshot = IsNew ? await Client.CreateVaultAsync(new(model.Name, model.Properties()), cancellation.Token) : await Client.UpdateVaultAsync(model.Name, new(model.Properties()), etag!, cancellation.Token); if (IsNew) Navigation.NavigateTo($"/vaults/{Uri.EscapeDataString(snapshot.Value.Name)}"); else etag = snapshot.ETag; } catch (Exception ex) { error = ex; } finally { busy = false; } }
-    private async Task InitializeAsync() { confirmInitialize = false; busy = true; error = null; try { var result = await Client.InitializeVaultAsync(model.Name, cancellation.Token); keyFilePath = result.KeyFilePath; status = "available"; } catch (Exception ex) { error = ex; } finally { busy = false; } }
-    private async Task DeleteAsync() { confirmDelete = false; try { await Client.DeleteVaultAsync(model.Name, etag!, cancellation.Token); Navigation.NavigateTo("/vaults"); } catch (Exception ex) { error = ex; } }
+    protected override async Task OnParametersSetAsync() { try { scopeTargets = await Client.GetScopeTargetsAsync(ResourceKinds.Vault, cancellation.Token); if (IsNew) { selectedScope ??= scopeTargets.FirstOrDefault(value => value.Kind == ResourceScopeKind.Workspace && value.CanWrite)?.ScopeRef ?? scopeTargets.FirstOrDefault(value => value.CanWrite)?.ScopeRef; return; } var requestedScope = ParseScope(); var snapshot = requestedScope is null ? await Client.GetVaultAsync(Name!, cancellation.Token) : await Client.GetVaultAsync(Name!, requestedScope.Value, cancellation.Token); model = VaultEditorModel.From(snapshot.Value.Resource); selectedScope = snapshot.Value.Resource.ScopeRef; status = snapshot.Value.Status; etag = snapshot.ETag; } catch (Exception ex) { error = ex; } }
+    private async Task SaveAsync() { busy = true; error = null; try { var snapshot = IsNew ? await Client.CreateVaultAsync(new(model.Name, model.Properties(), selectedScope), cancellation.Token) : await Client.UpdateVaultAsync(model.Name, selectedScope!.Value, new(model.Properties()), etag!, cancellation.Token); if (IsNew) Navigation.NavigateTo(ResourceUrl(snapshot.Value)); else etag = snapshot.ETag; } catch (Exception ex) { error = ex; } finally { busy = false; } }
+    private async Task InitializeAsync() { confirmInitialize = false; busy = true; error = null; try { var result = await Client.InitializeVaultAsync(model.Name, selectedScope!.Value, cancellation.Token); keyFilePath = result.KeyFilePath; status = "available"; } catch (Exception ex) { error = ex; } finally { busy = false; } }
+    private async Task DeleteAsync() { confirmDelete = false; try { await Client.DeleteVaultAsync(model.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/vaults"); } catch (Exception ex) { error = ex; } }
+    private ResourceScopeRef? ParseScope() => string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
+    private static string ResourceUrl(VaultResource resource) => $"/vaults/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

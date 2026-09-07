@@ -90,7 +90,7 @@ public interface IAgentResourceQueries
 
 public interface IModelProfileReferenceValidator
 {
-    Task ValidateAsync(ResourceReference profileReference, CancellationToken cancellationToken);
+    Task ValidateAsync(ResourceReference profileReference, ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken);
 }
 
 public sealed class ControlPlaneConcurrencyException(string message) : Exception(message);

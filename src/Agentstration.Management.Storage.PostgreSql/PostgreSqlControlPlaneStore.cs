@@ -122,10 +122,16 @@ public sealed class PostgreSqlControlPlaneStore(
 
     public async Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource
     {
-        if (requestContext.AccessMode != ControlPlaneAccessMode.System)
-            return await GetExactAsync<T>(key.AtScope(CurrentScopeRef()), cancellationToken);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var matches = await context.Documents.AsNoTracking().Include(value => value.Scope).Where(value => value.Namespace == key.Namespace.Value && value.Kind == key.Kind && value.Name == key.Name).Take(2).ToArrayAsync(cancellationToken);
+        var query = context.Documents.AsNoTracking().Include(value => value.Scope)
+            .Where(value => value.Namespace == key.Namespace.Value && value.Kind == key.Kind && value.Name == key.Name);
+        if (requestContext.AccessMode != ControlPlaneAccessMode.System)
+        {
+            var target = await RequireScopeAsync(context, CurrentScopeRef(), cancellationToken);
+            var visibleScopeIds = await VisibleScopeIdsAsync(context, target, cancellationToken);
+            query = query.Where(value => visibleScopeIds.Contains(value.ScopeId));
+        }
+        var matches = await query.Take(2).ToArrayAsync(cancellationToken);
         return matches.Length switch
         {
             0 => null,
@@ -338,8 +344,13 @@ public sealed class PostgreSqlControlPlaneStore(
         return requestContext.AccessMode switch
         {
             ControlPlaneAccessMode.System => query,
-            ControlPlaneAccessMode.Tenant => query.Where(value => value.Scope.Ref == ResourceScopeRef.Tenant(requestContext.Current.TenantId).Value),
-            ControlPlaneAccessMode.Workspace => query.Where(value => value.Scope.Ref == ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId).Value),
+            ControlPlaneAccessMode.Tenant => query.Where(value =>
+                value.Scope.Ref == ResourceScopeRef.Tenant(requestContext.Current.TenantId).Value
+                || value.Scope.Ref == ResourceScopeRef.Instance.Value),
+            ControlPlaneAccessMode.Workspace => query.Where(value =>
+                value.Scope.Ref == ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId).Value
+                || value.Scope.Ref == ResourceScopeRef.Tenant(requestContext.Current.TenantId).Value
+                || value.Scope.Ref == ResourceScopeRef.Instance.Value),
             _ => throw new InvalidOperationException("Control Plane access requires an explicit workspace or system context.")
         };
     }

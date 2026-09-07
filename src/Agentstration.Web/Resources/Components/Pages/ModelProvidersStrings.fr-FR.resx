@@ -24,4 +24,5 @@
   <data name="Status.Unavailable"><value>Indisponible</value></data>
   <data name="Status.Failed"><value>Échec</value></data>
   <data name="Status.Unknown"><value>Inconnu</value></data>
+  <data name="Scope"><value>Périmètre</value></data>
 </root>

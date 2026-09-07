@@ -1,0 +1,11 @@
+@namespace Agentstration.Web.Components
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
+
+@if (ScopeRef is { } scope)
+{
+    <span class="resource-scope-badge" title="@scope.Value">@Localizer[$"ResourceScope.{scope.Kind}"].Value</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public ResourceScopeRef? ScopeRef { get; set; }
+}

@@ -30,7 +30,8 @@ internal static class RuntimeProfileEndpoints
                     profile.Value.Name,
                     profile.Value.Definition,
                     usages.Count,
-                    profile.Value.Namespace.Value));
+                    profile.Value.Namespace.Value,
+                    profile.Value.ScopeRef));
             }
             return Results.Ok(new ValueResponse<RuntimeProfileSummaryResponse>(values));
         });

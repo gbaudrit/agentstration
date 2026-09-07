@@ -46,9 +46,10 @@
     else if (registrations?.Count > 0)
     {
         <DataGrid TItem="ExtensionRegistrationResource" Items="registrations">
-            <Header><tr><th>@T("Registration")</th><th>@T("Endpoint")</th><th>@T("Discovery")</th><th>@T("Actions")</th></tr></Header>
+            <Header><tr><th>@T("Registration")</th><th>@T("Scope")</th><th>@T("Endpoint")</th><th>@T("Discovery")</th><th>@T("Actions")</th></tr></Header>
             <Row Context="registration"><tr>
                 <td><strong>@registration.Definition.DisplayName</strong><br /><code>@registration.Namespace/@registration.Name</code></td>
+                <td><ResourceScopeBadge ScopeRef="@registration.ScopeRef" /></td>
                 <td><code>@registration.Definition.Endpoint</code></td>
                 <td><StatusBadge Text="@(registration.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@ModelManagementUi.Status(registration.Definition.Enabled ? "available" : "disabled")" /></td>
                 <td>

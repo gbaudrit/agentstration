@@ -30,6 +30,35 @@ public sealed class PackTests
     }
 
     [TestMethod]
+    public async Task InstalledPackIsOwnedByItsExplicitTenantTarget()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        await using var archive = CreateZip(new Dictionary<string, string>
+        {
+            ["pack.yaml"] = """
+                apiVersion: agentstration.io/v1
+                kind: Pack
+                metadata:
+                  name: tenant-pack
+                  publisher: agentstration
+                  version: 1.0.0
+                definition:
+                  targetScope: tenant
+                  resources: []
+                """
+        });
+        using var content = ArchiveContent(archive.ToArray(), "tenant-pack.zip");
+
+        using var response = await client.PostAsync("/api/packs", content);
+
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
+        var installed = await response.Content.ReadFromJsonAsync<InstalledPackResource>();
+        Assert.IsNotNull(installed);
+        Assert.AreEqual(ResourceScopeKind.Tenant, installed.ScopeRef?.Kind);
+    }
+
+    [TestMethod]
     public async Task ComposerCreatesProjectFromWorkspaceCatalog()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));

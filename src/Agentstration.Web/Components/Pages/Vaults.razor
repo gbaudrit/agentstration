@@ -12,8 +12,8 @@ else if (items.Count == 0) { <EmptyState Title="@T("NoVaults")" Message="@T("NoV
 else
 {
     <DataGrid TItem="VaultResponse" Items="items">
-        <Header><tr><th>@T("Name")</th><th>@T("Provider")</th><th>@T("Status")</th><th>@T("Location")</th><th></th></tr></Header>
-        <Row Context="item"><tr><td><strong>@item.Resource.Definition.DisplayName</strong><br /><code>@item.Resource.Name</code></td><td>@ProviderText(item.Resource.Definition.ProviderType)</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" /></td><td>@T("Local")</td><td><a class="text-button" href="@($"/vaults/{Uri.EscapeDataString(item.Resource.Name)}")">@T("ManageArrow")</a></td></tr></Row>
+        <Header><tr><th>@T("Name")</th><th>@T("Scope")</th><th>@T("Provider")</th><th>@T("Status")</th><th>@T("Location")</th><th></th></tr></Header>
+        <Row Context="item"><tr><td><strong>@item.Resource.Definition.DisplayName</strong><br /><code>@item.Resource.Name</code></td><td><ResourceScopeBadge ScopeRef="@item.Resource.ScopeRef" /></td><td>@ProviderText(item.Resource.Definition.ProviderType)</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" /></td><td>@T("Local")</td><td><a class="text-button" href="@ResourceUrl(item.Resource)">@T("ManageArrow")</a></td></tr></Row>
     </DataGrid>
 }
 
@@ -25,6 +25,7 @@ else
     private string T(string key) => Localizer[key].Value;
     private string StatusText(string status) => status.ToLowerInvariant() switch { "available" => T("Status.Available"), "unavailable" => T("Status.Unavailable"), "uninitialized" => T("Status.Uninitialized"), _ => T($"Status.{status}") };
     private string ProviderText(string provider) => T($"Provider.{provider}");
+    private static string ResourceUrl(VaultResource resource) => $"/vaults/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
     protected override async Task OnInitializedAsync() { try { items = await Client.GetVaultsAsync(cancellation.Token); } catch (Exception ex) { error = ex; } finally { loading = false; } }
     private static UiStatus Tone(string value) => value.Equals("available", StringComparison.OrdinalIgnoreCase) ? UiStatus.Success : UiStatus.Danger;
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }

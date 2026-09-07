@@ -25,7 +25,7 @@ else if (packs is null)
 else
 {
     <section class="metric-grid pack-metrics" aria-label="@T("PackMetrics")">
-        <MetricCard Label="@T("InstalledPacks")" Value="@packs.Count.ToString()" Detail="@T("CurrentWorkspace")" Status="UiStatus.Info" />
+        <MetricCard Label="@T("InstalledPacks")" Value="@packs.Count.ToString()" Detail="@T("VisibleScopes")" Status="UiStatus.Info" />
         <MetricCard Label="@T("ManagedResources")" Value="@packs.Sum(pack => pack.Definition.ManagedResources.Count).ToString()" Detail="@T("CreatedFromPacks")" Status="UiStatus.Success" />
         <MetricCard Label="@T("RequiresAttention")" Value="@AttentionCount.ToString()" Detail="@T("FailedOrDegraded")" Status="@(AttentionCount == 0 ? UiStatus.Neutral : UiStatus.Warning)" />
         <MetricCard Label="@T("PackProjects")" Value="@(projects?.Count.ToString() ?? "—")" Detail="@T("LocalAuthoring")" Status="UiStatus.Info" />
@@ -40,9 +40,10 @@ else
     else
     {
         <DataGrid TItem="InstalledPackResource" Items="packs">
-            <Header><tr><th>@T("Pack")</th><th>@T("Purpose")</th><th>@T("Audience")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Resources")</th><th>@T("Installed")</th><th></th></tr></Header>
+            <Header><tr><th>@T("Pack")</th><th>@T("Scope")</th><th>@T("Purpose")</th><th>@T("Audience")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Resources")</th><th>@T("Installed")</th><th></th></tr></Header>
             <Row Context="pack"><tr class="@(IsSelected(pack) ? "selected-pack" : null)">
                 <td><strong>@DisplayName(pack)</strong><br /><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></td>
+                <td><ResourceScopeBadge ScopeRef="pack.ScopeRef" /></td>
                 <td><span class="pack-kind">@PurposeLabel(pack.Definition.Purpose)</span></td>
                 <td>@AudienceLabel(pack.Definition.Audience)</td>
                 <td><code>@pack.Definition.Version</code></td>
@@ -64,6 +65,7 @@ else
             @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.Description)) { <p>@selected.Value.Definition.Description</p> }
             <dl class="resource-details pack-facts">
                 <dt>@T("Identity")</dt><dd><code>@selected.Value.Definition.Publisher/@selected.Value.Definition.PackName</code></dd>
+                <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="selected.Value.ScopeRef" /></dd>
                 <dt>@T("Namespace")</dt><dd><code>@selected.Value.Definition.Namespace</code></dd>
                 <dt>@T("Version")</dt><dd>@selected.Value.Definition.Version</dd>
                 <dt>@T("Purpose")</dt><dd><span class="pack-kind">@PurposeLabel(selected.Value.Definition.Purpose)</span></dd>

@@ -23,9 +23,10 @@ else if (providers?.Count == 0)
 else
 {
     <DataGrid TItem="ModelProviderResponse" Items="providers ?? []">
-        <Header><tr><th>@T("Provider")</th><th>@T("Namespace")</th><th>@T("Type")</th><th>@T("Management")</th><th>@T("Status")</th><th>@T("Models")</th><th></th></tr></Header>
+        <Header><tr><th>@T("Provider")</th><th>@T("Scope")</th><th>@T("Namespace")</th><th>@T("Type")</th><th>@T("Management")</th><th>@T("Status")</th><th>@T("Models")</th><th></th></tr></Header>
         <Row Context="provider"><tr>
             <td><strong>@provider.Properties.DisplayName</strong><br /><code>@provider.Name</code></td>
+            <td><ResourceScopeBadge ScopeRef="@provider.ScopeRef" /></td>
             <td><code>@provider.Namespace</code></td>
             <td>@provider.Properties.ContributionId</td><td>@provider.Properties.RegistrationSource</td>
             <td><StatusBadge Text="@StatusLabel(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></td>

@@ -132,5 +132,6 @@ internal static class ModelProviderMappings
             provider.Models.Count,
             includeEndpoint ? provider.Configuration.Endpoint : null,
             provider.CheckedAt),
-        provider.Configuration.Namespace.Value);
+        provider.Configuration.Namespace.Value,
+        provider.Configuration.ScopeRef);
 }
