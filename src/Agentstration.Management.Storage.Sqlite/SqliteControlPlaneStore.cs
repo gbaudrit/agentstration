@@ -158,6 +158,35 @@ public sealed class SqliteControlPlaneStore(
     public Task<IReadOnlyList<StoredResource<T>>> ListVisibleAsync<T>(ResourceScopeRef targetScopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
         ListScopedAsync<T>(targetScopeRef, kind, skip, take, visible: true, cancellationToken);
 
+    public async Task<IReadOnlyList<ResourceInventoryEntry>> ListExactInventoryAsync(
+        ResourceScopeRef scopeRef,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 1000);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var scope = await RequireScopeAsync(context, scopeRef, cancellationToken);
+        await EnsureCanReadAsync(context, scope, cancellationToken);
+        var documents = await context.Documents.AsNoTracking()
+            .Where(value => value.ScopeId == scope.Id)
+            .OrderBy(value => value.Kind)
+            .ThenBy(value => value.Namespace)
+            .ThenBy(value => value.Name)
+            .Skip(skip)
+            .Take(take)
+            .ToArrayAsync(cancellationToken);
+        return documents.Select(value => new ResourceInventoryEntry(
+            value.Uid,
+            scopeRef,
+            ResourceNamespace.Parse(value.Namespace),
+            value.Kind,
+            value.Name,
+            value.UpdatedAt)).ToArray();
+    }
+
     public async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);

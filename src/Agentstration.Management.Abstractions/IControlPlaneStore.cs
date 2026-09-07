@@ -27,6 +27,13 @@ public interface IAgentRevisionRunRetention
 }
 
 public sealed record StoredResource<T>(T Value, string ETag, DateTimeOffset UpdatedAt) where T : Resource;
+public sealed record ResourceInventoryEntry(
+    Guid Uid,
+    ResourceScopeRef ScopeRef,
+    ResourceNamespace Namespace,
+    string Kind,
+    string Name,
+    DateTimeOffset UpdatedAt);
 
 public interface IControlPlaneStore
 {
@@ -40,6 +47,8 @@ public interface IControlPlaneStore
         throw new NotSupportedException("This store does not support exact-scope enumeration.");
     Task<IReadOnlyList<StoredResource<T>>> ListVisibleAsync<T>(ResourceScopeRef targetScopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
         throw new NotSupportedException("This store does not support descendant-visible enumeration.");
+    Task<IReadOnlyList<ResourceInventoryEntry>> ListExactInventoryAsync(ResourceScopeRef scopeRef, int skip, int take, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This store does not support exact-scope inventory enumeration.");
     Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource;
     async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(ResourceNamespace @namespace, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource
     {

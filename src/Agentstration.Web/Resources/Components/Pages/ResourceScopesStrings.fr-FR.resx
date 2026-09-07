@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="PageTitle" xml:space="preserve"><value>Scopes de ressources · Agentstration</value></data>
+  <data name="Title" xml:space="preserve"><value>Scopes de ressources</value></data>
+  <data name="Description" xml:space="preserve"><value>Explorez la hiérarchie de propriété et les ressources Management stockées directement dans chaque scope accessible.</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="Retry" xml:space="preserve"><value>Réessayer</value></data>
+  <data name="UnableToLoad" xml:space="preserve"><value>Impossible de charger les scopes de ressources</value></data>
+  <data name="Loading" xml:space="preserve"><value>Chargement des scopes de ressources…</value></data>
+  <data name="Metrics" xml:space="preserve"><value>Indicateurs des scopes de ressources</value></data>
+  <data name="Scopes" xml:space="preserve"><value>Scopes accessibles</value></data>
+  <data name="Resources" xml:space="preserve"><value>Ressources possédées</value></data>
+  <data name="SelectedScopeResources" xml:space="preserve"><value>Scope sélectionné</value></data>
+  <data name="Hierarchy" xml:space="preserve"><value>Hiérarchie</value></data>
+  <data name="OwnershipScopes" xml:space="preserve"><value>Scopes de propriété</value></data>
+  <data name="InstanceName" xml:space="preserve"><value>Instance Agentstration</value></data>
+  <data name="Current" xml:space="preserve"><value>Actuel</value></data>
+  <data name="Search" xml:space="preserve"><value>Rechercher</value></data>
+  <data name="SearchPlaceholder" xml:space="preserve"><value>Nom, type ou espace de noms</value></data>
+  <data name="Kind" xml:space="preserve"><value>Type</value></data>
+  <data name="AllKinds" xml:space="preserve"><value>Tous les types</value></data>
+  <data name="Resource" xml:space="preserve"><value>Ressource</value></data>
+  <data name="Namespace" xml:space="preserve"><value>Espace de noms</value></data>
+  <data name="Updated" xml:space="preserve"><value>Mise à jour</value></data>
+  <data name="NoResources" xml:space="preserve"><value>Aucune ressource correspondante</value></data>
+  <data name="NoResourcesMessage" xml:space="preserve"><value>Ce scope ne possède aucune ressource correspondant aux filtres actuels.</value></data>
+  <data name="ResourceCount" xml:space="preserve"><value>Ressources : {0}</value></data>
+  <data name="ScopeKind.Instance" xml:space="preserve"><value>Instance</value></data>
+  <data name="ScopeKind.Tenant" xml:space="preserve"><value>Tenant</value></data>
+  <data name="ScopeKind.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="Visibility.Instance" xml:space="preserve"><value>Les ressources possédées ici peuvent être visibles depuis chaque tenant et workspace, sous réserve des autorisations.</value></data>
+  <data name="Visibility.Tenant" xml:space="preserve"><value>Les ressources possédées ici peuvent être visibles depuis ce tenant et ses workspaces.</value></data>
+  <data name="Visibility.Workspace" xml:space="preserve"><value>Les ressources possédées ici sont visibles uniquement depuis ce workspace et ses futurs scopes descendants.</value></data>
+</root>

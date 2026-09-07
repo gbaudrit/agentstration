@@ -1,0 +1,16 @@
+.scope-explorer { display: grid; grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.scope-tree { display: grid; gap: .35rem; position: sticky; top: 1rem; }
+.scope-tree ::deep .scope-tree-node { --scope-depth: 0; appearance: none; border: 1px solid transparent; border-radius: .65rem; background: transparent; color: inherit; display: grid; grid-template-columns: .8rem minmax(0, 1fr) .65rem; gap: .6rem; align-items: center; padding: .65rem .75rem .65rem calc(.75rem + var(--scope-depth) * 1.15rem); text-align: left; width: 100%; cursor: pointer; }
+.scope-tree ::deep .scope-tree-node:hover { background: var(--surface-subtle); }
+.scope-tree ::deep .scope-tree-node.selected { border-color: var(--border-strong); background: var(--surface-subtle); }
+.scope-tree ::deep .scope-tree-node strong, .scope-tree ::deep .scope-tree-node small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scope-tree ::deep .scope-tree-node small { color: var(--text-muted); margin-top: .15rem; }
+.scope-tree ::deep .scope-tree-marker { width: .65rem; height: .65rem; border-radius: 999px; background: var(--accent); box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--accent) 15%, transparent); }
+.scope-tree ::deep .scope-current-dot { width: .55rem; height: .55rem; border-radius: 999px; background: var(--status-info, var(--accent)); }
+.scope-detail { min-width: 0; }
+.scope-detail-badges { display: flex; gap: .5rem; align-items: center; }
+.scope-reference { display: block; width: fit-content; margin: -.35rem 0 1rem; overflow-wrap: anywhere; }
+.scope-visibility { color: var(--text-muted); }
+.scope-filters { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(10rem, .45fr); gap: .75rem; margin: 1.25rem 0; }
+.scope-filters label { display: grid; gap: .35rem; }
+@media (max-width: 760px) { .scope-explorer { grid-template-columns: 1fr; } .scope-tree { position: static; } .scope-filters { grid-template-columns: 1fr; } }

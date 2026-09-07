@@ -71,4 +71,39 @@ public sealed partial class ModelManagementApiTests
         var resource = await created.Content.ReadFromJsonAsync<SecretResource>();
         Assert.AreEqual(workspace.ScopeRef, resource?.ScopeRef);
     }
+
+    [TestMethod]
+    public async Task ResourceScopeInventoryExposesTheAccessibleHierarchyAndExactOwnership()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var targets = await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
+            $"/api/resource-scopes/targets?kind={ResourceKinds.Vault}");
+        Assert.IsNotNull(targets);
+        var tenant = targets.Single(value => value.Kind == ResourceScopeKind.Tenant);
+        var workspace = targets.Single(value => value.Kind == ResourceScopeKind.Workspace);
+
+        using var created = await client.PostAsJsonAsync(
+            "/api/vaults",
+            new CreateVaultRequest("inventory-vault", new VaultProperties
+            {
+                DisplayName = "Inventory Vault",
+                ProviderType = "local"
+            }, tenant.ScopeRef));
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
+
+        var inventory = await client.GetFromJsonAsync<ResourceScopeInventoryResponse>("/api/resource-scopes");
+        Assert.IsNotNull(inventory);
+        var instanceNode = inventory.Scopes.Single(value => value.Kind == ResourceScopeKind.Instance);
+        var tenantNode = inventory.Scopes.Single(value => value.ScopeRef == tenant.ScopeRef);
+        var workspaceNode = inventory.Scopes.Single(value => value.ScopeRef == workspace.ScopeRef);
+        Assert.IsNull(instanceNode.ParentScopeRef);
+        Assert.AreEqual(instanceNode.ScopeRef, tenantNode.ParentScopeRef);
+        Assert.AreEqual(tenantNode.ScopeRef, workspaceNode.ParentScopeRef);
+        Assert.IsFalse(tenantNode.IsCurrent);
+        Assert.IsTrue(workspaceNode.IsCurrent);
+        Assert.IsTrue(tenantNode.Resources.Any(value =>
+            value.Kind == ResourceKinds.Vault && value.Name == "inventory-vault"));
+        Assert.IsFalse(workspaceNode.Resources.Any(value => value.Name == "inventory-vault"));
+    }
 }

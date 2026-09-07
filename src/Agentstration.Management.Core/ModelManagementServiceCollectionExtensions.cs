@@ -20,6 +20,7 @@ public static class ModelManagementServiceCollectionExtensions
         services.AddSingleton<ExtensionRegistrationManagementService>();
         services.AddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
         services.AddSingleton<ResourceScopeOperationService>();
+        services.AddSingleton<ResourceScopeInventoryService>();
         services.AddSingleton<ExtensionManagementService>();
         return services;
     }
