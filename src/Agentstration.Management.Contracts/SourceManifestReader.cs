@@ -27,9 +27,11 @@ public sealed class SourceManifestReader : ISourceManifestReader
             var document = documents[0];
             if (document.ValueKind != JsonValueKind.Object)
                 throw new SourceValidationException("source_manifest_invalid", "A Source Version manifest must be a YAML object.");
-            var unexpected = document.EnumerateObject().FirstOrDefault(property => !EnvelopeProperties.Contains(property.Name));
-            if (unexpected.Name is not null)
-                throw new SourceValidationException("source_manifest_envelope_invalid", $"Top-level property '{unexpected.Name}' is not part of the Agentstration resource envelope; functional fields belong under definition.");
+            foreach (var property in document.EnumerateObject())
+            {
+                if (!EnvelopeProperties.Contains(property.Name))
+                    throw new SourceValidationException("source_manifest_envelope_invalid", $"Top-level property '{property.Name}' is not part of the Agentstration resource envelope; functional fields belong under definition.");
+            }
             if (!document.TryGetProperty("definition", out var definition) || definition.ValueKind != JsonValueKind.Object)
                 throw new SourceValidationException("source_definition_missing", "A Source Version manifest requires an object definition.");
 

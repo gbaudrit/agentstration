@@ -149,6 +149,11 @@ public sealed class SourceTests
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         using var client = factory.CreateClient();
+        var context = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
+        Assert.IsNotNull(context);
+        await factory.Services.GetRequiredService<IIdentityStore>().AddPlatformAdministratorAsync(
+            new PlatformAdministrator(context.Context.PrincipalId, DateTimeOffset.UtcNow),
+            default);
         var name = $"source-{Guid.NewGuid():N}"[..30];
         var manifest = Manifest("1", "Published name", false).Replace("official-samples", name, StringComparison.Ordinal);
         var response = await client.PostAsJsonAsync("/api/sources/imports/yaml", new ImportSourceYamlRequest(manifest));
