@@ -61,7 +61,7 @@ The Playwright workspace keeps its shared vocabulary in three explicit catalogs:
 
 Use accessible roles and names first. Test IDs are a fallback for cross-locale journeys, ambiguity, capture boundaries, and non-visible readiness state. Page objects own locators; journeys own behavior and checkpoint timing; JSON plans contain neither selectors nor product localization constants.
 
-The scoped [`automation/playwright/AGENTS.md`](../../automation/playwright/AGENTS.md) is the maintenance contract for coding agents changing this area.
+The scoped `automation/playwright/AGENTS.md` file is the maintenance contract for coding agents changing this area.
 
 ## Campaign workspaces
 
