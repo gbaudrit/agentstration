@@ -38,8 +38,10 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
         document.Property(value => value.Namespace).HasMaxLength(128);
         document.Property(value => value.TenantId);
         document.Property(value => value.WorkspaceId);
+        document.Property(value => value.ScopeType).HasMaxLength(16);
+        document.Property(value => value.ScopeKey).HasMaxLength(64);
         document.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
-        document.HasIndex(value => new { value.WorkspaceId, value.Namespace, value.Kind, value.Name }).IsUnique();
+        document.HasIndex(value => new { value.ScopeKey, value.Namespace, value.Kind, value.Name }).IsUnique();
         var occurrence = modelBuilder.Entity<TriggerOccurrenceRow>();
         occurrence.ToTable("TriggerOccurrences");
         occurrence.HasKey(value => value.Id);
@@ -63,6 +65,8 @@ internal sealed class ControlPlaneDocument
     public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
     public Guid? TenantId { get; set; }
     public Guid? WorkspaceId { get; set; }
+    public string ScopeType { get; set; } = "workspace";
+    public string ScopeKey { get; set; } = string.Empty;
     public required string Payload { get; set; }
     public required string ETag { get; set; }
     public required DateTimeOffset UpdatedAt { get; set; }
@@ -83,12 +87,32 @@ public sealed class PostgreSqlControlPlaneStore(
 
     public async Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource
     {
+        return await GetExactAsync<T>(key.AtScope(LegacyExactScope()), cancellationToken);
+    }
+
+    public async Task<StoredResource<T>?> GetByUidAsync<T>(Guid uid, CancellationToken cancellationToken) where T : Resource
+    {
+        if (uid == Guid.Empty) throw new ArgumentException("A resource UID cannot be empty.", nameof(uid));
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var query = Scoped(context.Documents.AsNoTracking());
-        var namespaceValue = key.Namespace.Value;
-        var document = await query.SingleOrDefaultAsync(value => value.Namespace == namespaceValue && value.Kind == key.Kind && value.Name == key.Name, cancellationToken);
+        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Uid == uid, cancellationToken);
+        if (document is null || !CanRead(ScopeOf(document))) return null;
+        return Deserialize<T>(document);
+    }
+
+    public async Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource
+    {
+        EnsureCanRead(address.Scope);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.ScopeKey == address.Scope.Key
+            && value.Namespace == address.Namespace.Value && value.Kind == address.Kind && value.Name == address.Name, cancellationToken);
         return document is null ? null : Deserialize<T>(document);
     }
+
+    public Task<IReadOnlyList<StoredResource<T>>> ListExactAsync<T>(ResourceScope scope, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
+        ListScopedAsync<T>(scope, kind, skip, take, visible: false, cancellationToken);
+
+    public Task<IReadOnlyList<StoredResource<T>>> ListVisibleAsync<T>(ResourceScope target, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
+        ListScopedAsync<T>(target, kind, skip, take, visible: true, cancellationToken);
 
     public async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource
     {
@@ -102,12 +126,21 @@ public sealed class PostgreSqlControlPlaneStore(
     }
 
     public async Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
+        => await PutExactAsync(ResolveWriteScope(resource), resource, ifMatch, ifNoneMatch, cancellationToken);
+
+    public async Task<StoredResource<T>> PutExactAsync<T>(ResourceScope scope, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
     {
         if (resource is AgentRevision) throw new InvalidOperationException("Published agent revisions are immutable and must be created through CreateImmutableAsync.");
+        EnsureCanWrite(scope);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var namespaceValue = resource.Namespace.Value;
-        var existing = await Scoped(context.Documents).SingleOrDefaultAsync(
-            value => value.Namespace == namespaceValue && value.Kind == resource.Kind && value.Name == resource.Metadata.Name, cancellationToken);
+        ControlPlaneDocument? byUid = null;
+        if (resource.Uid != Guid.Empty)
+            byUid = await context.Documents.SingleOrDefaultAsync(value => value.Uid == resource.Uid, cancellationToken);
+        if (byUid is not null && ScopeOf(byUid) != scope)
+            throw new ControlPlaneConcurrencyException("The ownership scope of an existing resource is immutable.");
+        var existing = byUid ?? await context.Documents.SingleOrDefaultAsync(
+            value => value.ScopeKey == scope.Key && value.Namespace == namespaceValue && value.Kind == resource.Kind && value.Name == resource.Metadata.Name, cancellationToken);
         if (existing is null && ifMatch is not null) throw new ControlPlaneConcurrencyException("If-Match cannot update a resource that does not exist.");
         if (existing is not null && ifNoneMatch) throw new ControlPlaneConcurrencyException("If-None-Match prevented replacement of an existing resource.");
         if (existing is not null && ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
@@ -118,7 +151,6 @@ public sealed class PostgreSqlControlPlaneStore(
         var uid = existing?.Uid ?? Guid.NewGuid();
         if (existing is not null && resource.Uid != Guid.Empty && resource.Uid != uid)
             throw new ControlPlaneConcurrencyException("The UID of an existing resource is immutable.");
-        var scope = ResolveScope(resource);
         var versioned = ApplySystemState(resource, uid, scope.TenantId, scope.WorkspaceId, etag);
         if (existing is null)
         {
@@ -132,6 +164,8 @@ public sealed class PostgreSqlControlPlaneStore(
                 Namespace = namespaceValue,
                 TenantId = scope.TenantId,
                 WorkspaceId = scope.WorkspaceId,
+                ScopeType = ScopeName(scope.Type),
+                ScopeKey = scope.Key,
                 Payload = JsonSerializer.Serialize(versioned, JsonOptions),
                 ETag = etag,
                 UpdatedAt = now
@@ -145,6 +179,8 @@ public sealed class PostgreSqlControlPlaneStore(
             existing.Namespace = namespaceValue;
             existing.TenantId = scope.TenantId;
             existing.WorkspaceId = scope.WorkspaceId;
+            existing.ScopeType = ScopeName(scope.Type);
+            existing.ScopeKey = scope.Key;
             existing.Payload = JsonSerializer.Serialize(versioned, JsonOptions);
             existing.ETag = etag;
             existing.UpdatedAt = now;
@@ -160,6 +196,7 @@ public sealed class PostgreSqlControlPlaneStore(
         var now = timeProvider.GetUtcNow();
         var uid = Guid.NewGuid();
         var scope = ResolveScope(resource);
+        EnsureCanWrite(scope);
         var versioned = ApplySystemState(resource, uid, scope.TenantId, scope.WorkspaceId, etag);
         context.Documents.Add(new ControlPlaneDocument
         {
@@ -171,6 +208,8 @@ public sealed class PostgreSqlControlPlaneStore(
             Namespace = resource.Namespace.Value,
             TenantId = scope.TenantId,
             WorkspaceId = scope.WorkspaceId,
+            ScopeType = ScopeName(scope.Type),
+            ScopeKey = scope.Key,
             Payload = JsonSerializer.Serialize(versioned, JsonOptions),
             ETag = etag,
             UpdatedAt = now
@@ -181,11 +220,14 @@ public sealed class PostgreSqlControlPlaneStore(
     }
 
     public async Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken)
+        => await DeleteExactAsync(key.AtScope(LegacyExactScope()), ifMatch, cancellationToken);
+
+    public async Task DeleteExactAsync(ScopedResourceAddress address, string? ifMatch, CancellationToken cancellationToken)
     {
+        EnsureCanWrite(address.Scope);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var namespaceValue = key.Namespace.Value;
-        var existing = await Scoped(context.Documents).SingleOrDefaultAsync(value => value.Namespace == namespaceValue && value.Kind == key.Kind && value.Name == key.Name, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(key);
+        var existing = await context.Documents.SingleOrDefaultAsync(value => value.ScopeKey == address.Scope.Key && value.Namespace == address.Namespace.Value && value.Kind == address.Kind && value.Name == address.Name, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(new ResourceKey(address.Kind, address.Name, address.Namespace));
         if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
             throw new ControlPlaneConcurrencyException("The supplied ETag does not match the current resource version.");
         context.Documents.Remove(existing);
@@ -238,13 +280,16 @@ public sealed class PostgreSqlControlPlaneStore(
         return requestContext.AccessMode switch
         {
             ControlPlaneAccessMode.System => query,
+            ControlPlaneAccessMode.Tenant => query.Where(value => value.ScopeKey == ResourceScope.Tenant(requestContext.Current.TenantId).Key),
             ControlPlaneAccessMode.Workspace => query.Where(value => value.TenantId == requestContext.Current.TenantId
                 && value.WorkspaceId == requestContext.Current.WorkspaceId),
             _ => throw new InvalidOperationException("Control Plane access requires an explicit workspace or system context.")
         };
     }
 
-    private (Guid TenantId, Guid WorkspaceId) ResolveScope(Resource resource)
+    private ResourceScope ResolveScope(Resource resource) => ResolveWriteScope(resource);
+
+    private ResourceScope ResolveWriteScope(Resource resource)
     {
         if (requestContext.AccessMode == ControlPlaneAccessMode.Workspace)
         {
@@ -252,16 +297,82 @@ public sealed class PostgreSqlControlPlaneStore(
             if (resource.TenantId != Guid.Empty && resource.TenantId != current.TenantId
                 || resource.WorkspaceId != Guid.Empty && resource.WorkspaceId != current.WorkspaceId)
                 throw new InvalidOperationException("A workspace-scoped operation cannot write a resource into another scope.");
-            return (current.TenantId, current.WorkspaceId);
+            return ResourceScope.Workspace(current.TenantId, current.WorkspaceId);
+        }
+        if (requestContext.AccessMode == ControlPlaneAccessMode.Tenant)
+        {
+            var current = requestContext.Current;
+            if (resource.TenantId != Guid.Empty && resource.TenantId != current.TenantId || resource.WorkspaceId != Guid.Empty)
+                throw new InvalidOperationException("A tenant-scoped operation cannot write a resource into another scope.");
+            return ResourceScope.Tenant(current.TenantId);
         }
         if (requestContext.AccessMode == ControlPlaneAccessMode.System)
         {
-            if (resource.TenantId == Guid.Empty || resource.WorkspaceId == Guid.Empty)
-                return (resource.TenantId, resource.WorkspaceId);
-            return (resource.TenantId, resource.WorkspaceId);
+            if (resource.WorkspaceId != Guid.Empty) return ResourceScope.Workspace(resource.TenantId, resource.WorkspaceId);
+            if (resource.TenantId != Guid.Empty) return ResourceScope.Tenant(resource.TenantId);
+            return ResourceScope.Instance;
         }
         throw new InvalidOperationException("Control Plane access requires an explicit workspace or system context.");
     }
+
+    private async Task<IReadOnlyList<StoredResource<T>>> ListScopedAsync<T>(ResourceScope target, string kind, int skip, int take, bool visible, CancellationToken cancellationToken) where T : Resource
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        EnsureCanRead(target);
+        take = Math.Min(take, 1000);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = context.Documents.AsNoTracking().Where(value => value.Kind == kind);
+        query = visible ? VisibleFrom(query, target) : query.Where(value => value.ScopeKey == target.Key);
+        var documents = await query.OrderBy(value => value.ScopeType).ThenBy(value => value.ScopeKey).ThenBy(value => value.Namespace).ThenBy(value => value.Name).Skip(skip).Take(take).ToArrayAsync(cancellationToken);
+        return documents.Select(Deserialize<T>).ToArray();
+    }
+
+    private static IQueryable<ControlPlaneDocument> VisibleFrom(IQueryable<ControlPlaneDocument> query, ResourceScope target) => target.Type switch
+    {
+        ResourceScopeType.Instance => query.Where(value => value.ScopeKey == "instance"),
+        ResourceScopeType.Tenant => query.Where(value => value.ScopeKey == "instance" || value.ScopeKey == target.Key),
+        ResourceScopeType.Workspace => query.Where(value => value.ScopeKey == "instance" || value.ScopeKey == ResourceScope.Tenant(target.TenantId).Key || value.ScopeKey == target.Key),
+        _ => throw new InvalidOperationException($"Unsupported resource scope type '{target.Type}'.")
+    };
+
+    private ResourceScope LegacyExactScope() => requestContext.AccessMode switch
+    {
+        ControlPlaneAccessMode.System => ResourceScope.Instance,
+        ControlPlaneAccessMode.Tenant => ResourceScope.Tenant(requestContext.Current.TenantId),
+        ControlPlaneAccessMode.Workspace => ResourceScope.Workspace(requestContext.Current.TenantId, requestContext.Current.WorkspaceId),
+        _ => throw new InvalidOperationException("Control Plane access requires an explicit tenant, workspace, or system context.")
+    };
+
+    private bool CanRead(ResourceScope scope) => requestContext.AccessMode switch
+    {
+        ControlPlaneAccessMode.System => true,
+        ControlPlaneAccessMode.Tenant => scope.IsVisibleFrom(ResourceScope.Tenant(requestContext.Current.TenantId)),
+        ControlPlaneAccessMode.Workspace => scope.IsVisibleFrom(ResourceScope.Workspace(requestContext.Current.TenantId, requestContext.Current.WorkspaceId)),
+        _ => false
+    };
+
+    private void EnsureCanRead(ResourceScope scope)
+    {
+        if (!CanRead(scope)) throw new InvalidOperationException($"The current Control Plane context cannot read scope '{scope}'.");
+    }
+
+    private void EnsureCanWrite(ResourceScope scope)
+    {
+        var allowed = requestContext.AccessMode switch
+        {
+            ControlPlaneAccessMode.System => true,
+            ControlPlaneAccessMode.Tenant => scope == ResourceScope.Tenant(requestContext.Current.TenantId),
+            ControlPlaneAccessMode.Workspace => scope == ResourceScope.Workspace(requestContext.Current.TenantId, requestContext.Current.WorkspaceId),
+            _ => false
+        };
+        if (!allowed) throw new InvalidOperationException($"The current Control Plane context cannot write scope '{scope}'.");
+    }
+
+    private static ResourceScope ScopeOf(ControlPlaneDocument document) => ResourceScope.From(
+        Enum.Parse<ResourceScopeType>(document.ScopeType, ignoreCase: true), document.TenantId ?? Guid.Empty, document.WorkspaceId ?? Guid.Empty);
+
+    private static string ScopeName(ResourceScopeType type) => type.ToString().ToLowerInvariant();
 
     private static async Task SaveAsync(ControlPlaneDbContext context, CancellationToken cancellationToken)
     {

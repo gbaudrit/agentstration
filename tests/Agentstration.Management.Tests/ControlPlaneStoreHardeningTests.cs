@@ -71,6 +71,97 @@ public sealed class ControlPlaneStoreHardeningTests
     }
 
     [TestMethod]
+    public async Task ExactScopesAllowHomonymousResourcesAndKeepUidAsPhysicalIdentity()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var workspaceA = Guid.NewGuid();
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
+        var scopes = new[]
+        {
+            ResourceScope.Instance,
+            ResourceScope.Tenant(tenantA),
+            ResourceScope.Tenant(tenantB),
+            ResourceScope.Workspace(tenantA, workspaceA)
+        };
+
+        var stored = new List<StoredResource<ExtensionResource>>();
+        foreach (var scope in scopes)
+            stored.Add(await fixture.Store.PutExactAsync(scope, Resource("shared"), null, true, default));
+
+        Assert.AreEqual(4, stored.Select(value => value.Value.Uid).Distinct().Count());
+        CollectionAssert.AreEqual(scopes, stored.Select(value => value.Value.OwnershipScope).ToArray());
+        foreach (var value in stored)
+        {
+            var byAddress = await fixture.Store.GetExactAsync<ExtensionResource>(new ScopedResourceAddress(value.Value.OwnershipScope, ResourceNamespace.Default, "MemoryProvider", "shared"), default);
+            var byUid = await fixture.Store.GetByUidAsync<ExtensionResource>(value.Value.Uid, default);
+            Assert.AreEqual(value.Value.Uid, byAddress?.Value.Uid);
+            Assert.AreEqual(value.Value.Uid, byUid?.Value.Uid);
+        }
+    }
+
+    [TestMethod]
+    public async Task VisibleQueriesAreDownwardOnlyAndDoNotMergeOrShadowHomonyms()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var workspaceA = Guid.NewGuid();
+        var workspaceB = Guid.NewGuid();
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
+        await fixture.Store.PutExactAsync(ResourceScope.Instance, Resource("shared"), null, true, default);
+        await fixture.Store.PutExactAsync(ResourceScope.Tenant(tenantA), Resource("shared"), null, true, default);
+        await fixture.Store.PutExactAsync(ResourceScope.Tenant(tenantB), Resource("shared"), null, true, default);
+        await fixture.Store.PutExactAsync(ResourceScope.Workspace(tenantA, workspaceA), Resource("shared"), null, true, default);
+        await fixture.Store.PutExactAsync(ResourceScope.Workspace(tenantA, workspaceB), Resource("shared"), null, true, default);
+
+        var visible = await fixture.Store.ListVisibleAsync<ExtensionResource>(ResourceScope.Workspace(tenantA, workspaceA), "MemoryProvider", 0, 10, default);
+
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScope.Instance.Key, ResourceScope.Tenant(tenantA).Key, ResourceScope.Workspace(tenantA, workspaceA).Key },
+            visible.Select(value => value.Value.OwnershipScope.Key).ToArray());
+        Assert.IsTrue(visible.All(value => value.Value.Name == "shared"));
+    }
+
+    [TestMethod]
+    public async Task TenantContextCanReadAncestorsButCannotCrossTenantOrWriteAnotherScope()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var context = new TestRequestContext();
+        context.UseSystem();
+        await using var fixture = await StoreFixture.CreateAsync(context);
+        var instance = await fixture.Store.PutExactAsync(ResourceScope.Instance, Resource("instance"), null, true, default);
+        var own = await fixture.Store.PutExactAsync(ResourceScope.Tenant(tenantA), Resource("own"), null, true, default);
+        var foreign = await fixture.Store.PutExactAsync(ResourceScope.Tenant(tenantB), Resource("foreign"), null, true, default);
+
+        context.UseTenant(Guid.NewGuid(), tenantA);
+        var visible = await fixture.Store.ListVisibleAsync<ExtensionResource>(ResourceScope.Tenant(tenantA), "MemoryProvider", 0, 10, default);
+        CollectionAssert.AreEquivalent(new[] { "instance", "own" }, visible.Select(value => value.Value.Name).ToArray());
+        Assert.AreEqual(instance.Value.Uid, (await fixture.Store.GetByUidAsync<ExtensionResource>(instance.Value.Uid, default))?.Value.Uid);
+        Assert.AreEqual(own.Value.Uid, (await fixture.Store.GetByUidAsync<ExtensionResource>(own.Value.Uid, default))?.Value.Uid);
+        Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(foreign.Value.Uid, default));
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            fixture.Store.PutExactAsync(ResourceScope.Instance, Resource("blocked"), null, true, default));
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            fixture.Store.GetExactAsync<ExtensionResource>(new ScopedResourceAddress(ResourceScope.Tenant(tenantB), ResourceNamespace.Default, "MemoryProvider", "foreign"), default));
+    }
+
+    [TestMethod]
+    public async Task ExistingUidCannotMoveToAnotherOwnershipScope()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
+        var stored = await fixture.Store.PutExactAsync(ResourceScope.Instance, Resource("fixed"), null, true, default);
+
+        await Assert.ThrowsExactlyAsync<ControlPlaneConcurrencyException>(() => fixture.Store.PutExactAsync(
+            ResourceScope.Tenant(tenantId),
+            Resource("fixed") with { Uid = stored.Value.Uid },
+            stored.ETag,
+            false,
+            default));
+    }
+
+    [TestMethod]
     public async Task RuntimeResolverReturnsOnlyExecutableRuntimeViewForExactGeneration()
     {
         await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
@@ -231,6 +322,7 @@ public sealed class ControlPlaneStoreHardeningTests
         public ControlPlaneAccessMode AccessMode { get; private set; } = ControlPlaneAccessMode.Unavailable;
         public RequestContext Current => current ?? throw new InvalidOperationException("No workspace context is active.");
         public void UseSystem() { current = null; AccessMode = ControlPlaneAccessMode.System; }
+        public void UseTenant(Guid principalId, Guid tenantId) { current = new RequestContext(principalId, tenantId, Guid.Empty); AccessMode = ControlPlaneAccessMode.Tenant; }
         public void UseWorkspace(RequestContext value) { current = value; AccessMode = ControlPlaneAccessMode.Workspace; }
     }
 

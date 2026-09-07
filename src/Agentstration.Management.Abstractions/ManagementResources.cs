@@ -51,6 +51,7 @@ public readonly record struct ResourceKey(string Kind, string Name, ResourceName
     }
 
     public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
+    public ScopedResourceAddress AtScope(ResourceScope scope) => ScopedResourceAddress.Create(scope, Namespace, Kind, Name);
     public override string ToString() => Address.ToString();
 }
 
@@ -67,6 +68,12 @@ public abstract record Resource
     public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
     public Guid TenantId { get; init; }
     public Guid WorkspaceId { get; init; }
+    [JsonIgnore]
+    public ResourceScope OwnershipScope => WorkspaceId != Guid.Empty
+        ? ResourceScope.Workspace(TenantId, WorkspaceId)
+        : TenantId != Guid.Empty
+            ? ResourceScope.Tenant(TenantId)
+            : ResourceScope.Instance;
     public long Generation { get; init; }
     public ResourceStatus Status { get; init; } = new() { ProvisioningState = ProvisioningState.Accepted };
     public string? ETag { get; init; }

@@ -1,6 +1,6 @@
 # ADR-0035: Resource names are scoped by explicit namespaces
 
-Status: Accepted — 2026-08-14
+Status: Partially superseded by ADR-0079 — 2026-09-07
 
 ## Context
 

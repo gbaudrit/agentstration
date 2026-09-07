@@ -14,6 +14,7 @@ using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.ModelProviders;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
@@ -189,6 +190,18 @@ public sealed class DependencyTests
     {
         var references = typeof(IControlPlaneStore).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("EntityFramework", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ManagementStoreExposesDistinctExactAndDescendantVisibleScopeContracts()
+    {
+        var methods = typeof(IControlPlaneStore).GetMethods().Select(method => method.Name).ToHashSet(StringComparer.Ordinal);
+
+        CollectionAssert.IsSubsetOf(
+            new[] { "GetByUidAsync", "GetExactAsync", "ListExactAsync", "ListVisibleAsync", "PutExactAsync", "DeleteExactAsync" },
+            methods.ToArray());
+        Assert.AreEqual(typeof(ResourceScope), typeof(Resource).GetProperty(nameof(Resource.OwnershipScope))?.PropertyType);
+        Assert.AreEqual(typeof(ResourceScope), typeof(ScopedResourceAddress).GetProperty(nameof(ScopedResourceAddress.Scope))?.PropertyType);
     }
 
     [TestMethod]

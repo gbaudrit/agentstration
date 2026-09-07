@@ -59,6 +59,16 @@ namespace Agentstration.Management.Storage.PostgreSql.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("ScopeKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<Guid?>("TenantId")
                         .HasColumnType("uuid");
 
@@ -73,7 +83,7 @@ namespace Agentstration.Management.Storage.PostgreSql.Migrations
 
                     b.HasKey("StorageKey");
 
-                    b.HasIndex("WorkspaceId", "Namespace", "Kind", "Name")
+                    b.HasIndex("ScopeKey", "Namespace", "Kind", "Name")
                         .IsUnique();
 
                     b.ToTable("ControlPlaneResources", "management");

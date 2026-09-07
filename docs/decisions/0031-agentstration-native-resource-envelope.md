@@ -1,6 +1,6 @@
 # ADR-0031: Agentstration-native declarative resource envelope
 
-Status: Accepted — 2026-08-12
+Status: Partially superseded by ADR-0079 — 2026-09-07
 
 ## Decision
 

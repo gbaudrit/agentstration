@@ -12,6 +12,67 @@ public readonly record struct WorkspaceId(Guid Value)
     public override string ToString() => Value.ToString("D");
 }
 
+public enum ResourceScopeType
+{
+    Instance,
+    Tenant,
+    Workspace
+}
+
+/// <summary>Identifies the immutable owner of a Management resource.</summary>
+public readonly record struct ResourceScope
+{
+    private ResourceScope(ResourceScopeType type, Guid tenantId, Guid workspaceId)
+    {
+        Type = type;
+        TenantId = tenantId;
+        WorkspaceId = workspaceId;
+    }
+
+    public ResourceScopeType Type { get; }
+    public Guid TenantId { get; }
+    public Guid WorkspaceId { get; }
+    public string Key => Type switch
+    {
+        ResourceScopeType.Instance => "instance",
+        ResourceScopeType.Tenant => $"tenant:{TenantId:D}",
+        ResourceScopeType.Workspace => $"workspace:{WorkspaceId:D}",
+        _ => throw new InvalidOperationException($"Unsupported resource scope type '{Type}'.")
+    };
+
+    public static ResourceScope Instance => new(ResourceScopeType.Instance, Guid.Empty, Guid.Empty);
+    public static ResourceScope Tenant(Guid tenantId)
+    {
+        if (tenantId == Guid.Empty) throw new ArgumentException("A tenant scope requires a non-empty Tenant ID.", nameof(tenantId));
+        return new(ResourceScopeType.Tenant, tenantId, Guid.Empty);
+    }
+
+    public static ResourceScope Workspace(Guid tenantId, Guid workspaceId)
+    {
+        if (tenantId == Guid.Empty) throw new ArgumentException("A workspace scope requires a non-empty Tenant ID.", nameof(tenantId));
+        if (workspaceId == Guid.Empty) throw new ArgumentException("A workspace scope requires a non-empty Workspace ID.", nameof(workspaceId));
+        return new(ResourceScopeType.Workspace, tenantId, workspaceId);
+    }
+
+    public static ResourceScope From(ResourceScopeType type, Guid tenantId, Guid workspaceId) => type switch
+    {
+        ResourceScopeType.Instance when tenantId == Guid.Empty && workspaceId == Guid.Empty => Instance,
+        ResourceScopeType.Tenant when workspaceId == Guid.Empty => Tenant(tenantId),
+        ResourceScopeType.Workspace => Workspace(tenantId, workspaceId),
+        _ => throw new ArgumentException("The scope type and identifiers are inconsistent.")
+    };
+
+    public bool IsVisibleFrom(ResourceScope target) => Type switch
+    {
+        ResourceScopeType.Instance => true,
+        ResourceScopeType.Tenant => (target.Type is ResourceScopeType.Tenant or ResourceScopeType.Workspace) && target.TenantId == TenantId,
+        ResourceScopeType.Workspace => target.Type == ResourceScopeType.Workspace && target.TenantId == TenantId && target.WorkspaceId == WorkspaceId,
+        _ => false
+    };
+
+    public override string ToString() => Key;
+}
+
 [JsonConverter(typeof(ResourceNamespaceJsonConverter))]
 public readonly struct ResourceNamespace : IEquatable<ResourceNamespace>
 {
@@ -51,6 +112,19 @@ public readonly record struct ResourceAddress(ResourceNamespace Namespace, strin
     }
 
     public override string ToString() => $"{Namespace}/{Kind}/{Name}";
+}
+
+public readonly record struct ScopedResourceAddress(ResourceScope Scope, ResourceNamespace Namespace, string Kind, string Name)
+{
+    public static ScopedResourceAddress Create(ResourceScope scope, ResourceNamespace @namespace, string kind, string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return new(scope, @namespace, kind, name);
+    }
+
+    public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
+    public override string ToString() => $"{Scope}/{Address}";
 }
 
 public sealed class ResourceNamespaceJsonConverter : JsonConverter<ResourceNamespace>
