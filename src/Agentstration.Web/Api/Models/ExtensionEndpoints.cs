@@ -65,7 +65,8 @@ public static class ExtensionEndpoints
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
                 Kind = ResourceKinds.ExtensionRegistration,
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Definition = body.Properties
+                Definition = body.Properties,
+                ScopeRef = body.ScopeRef
             }, cancellationToken);
             response.Headers.Location = $"/api/extensionregistrations/{Uri.EscapeDataString(stored.Value.Name)}?resourceNamespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}";
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);

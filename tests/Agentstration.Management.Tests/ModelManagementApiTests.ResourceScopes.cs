@@ -106,4 +106,25 @@ public sealed partial class ModelManagementApiTests
             value.Kind == ResourceKinds.Vault && value.Name == "inventory-vault"));
         Assert.IsFalse(workspaceNode.Resources.Any(value => value.Name == "inventory-vault"));
     }
+
+    [TestMethod]
+    public async Task ResourceCreationHonorsTheScopeSelectedByTheConsole()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var targets = await client.GetFromJsonAsync<ResourceScopeTargetResponse[]>(
+            $"/api/resource-scopes/targets?kind={ResourceKinds.RuntimeProfile}");
+        var tenant = targets!.Single();
+
+        using var created = await client.PostAsJsonAsync(
+            "/api/runtimeprofiles",
+            new CreateRuntimeProfileRequest(
+                "explicit-scope-runtime",
+                new RuntimeProfileProperties { DisplayName = "Explicit scope runtime", RuntimeType = "microsoft-agent-framework" },
+                ScopeRef: tenant.ScopeRef));
+
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
+        var resource = await created.Content.ReadFromJsonAsync<RuntimeProfileResource>();
+        Assert.AreEqual(tenant.ScopeRef, resource?.ScopeRef);
+    }
 }

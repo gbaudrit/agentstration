@@ -215,6 +215,7 @@ public sealed record PackInstallationPreview(
     bool AlreadyInstalled)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeKind TargetScope { get; init; } = ResourceScopeKind.Workspace;
     public IReadOnlyList<PackBindingPreview> Bindings { get; init; } = [];
     public bool CanInstall => !AlreadyInstalled && Resources.All(resource => !resource.AlreadyExists);
     public bool RequiresConfiguration => Bindings.Any(binding => !binding.IsResolved);

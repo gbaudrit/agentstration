@@ -33,6 +33,7 @@
                 <label>@T("Name")<InputText @bind-Value="form.Name" disabled="@(!creating)" /></label>
                 <label>@T("Namespace")<InputText @bind-Value="form.Namespace" disabled="@(!creating)" /></label>
                 <label>@T("DisplayName")<InputText @bind-Value="form.DisplayName" /></label>
+                <ResourceScopeFormField ResourceKind="@ResourceKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" Disabled="@(!creating)" />
                 <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
                 <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /><small>@T("ExpectedExtensionId.Help")</small></label>
                 <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>

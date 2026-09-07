@@ -37,12 +37,14 @@ public sealed record ModelProviderStatusResponse(string Provider, string Status,
 public sealed record CreateModelProviderRequest(
     string Name,
     ModelProviderProperties Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 public sealed record PutModelProviderRequest(ModelProviderProperties Properties);
 public sealed record CreateExtensionRegistrationRequest(
     string Name,
     ExtensionRegistrationProperties Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 public sealed record PutExtensionRegistrationRequest(ExtensionRegistrationProperties Properties);
 public sealed record ExtensionDiscoveryResponse(int Sources, int Created, int Updated, int Unchanged);
 public sealed record ModelProviderUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
@@ -92,7 +94,8 @@ public sealed record ExtensionResponse(
 public sealed record CreateModelProfileRequest(
     string Name,
     ModelProfileProperties Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 
 public sealed record PutModelProfileRequest(ModelProfileProperties Properties);
 
@@ -160,7 +163,8 @@ public sealed record AgentModelResponse(
 public sealed record CreateRuntimeProfileRequest(
     string Name,
     RuntimeProfileProperties Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 public sealed record PutRuntimeProfileRequest(RuntimeProfileProperties Properties);
 public sealed record RuntimeProfileSummaryResponse(
     string Id,

@@ -113,6 +113,7 @@ public sealed partial class PackManagementService
             existingInstallation is not null)
         {
             Namespace = @namespace,
+            TargetScope = archive.Manifest.Definition.TargetScope,
             Bindings = bindingPreviews
         };
         return (preview, selectedHandlers);

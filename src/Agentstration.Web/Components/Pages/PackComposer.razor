@@ -38,6 +38,7 @@ else
             <label><span>@T("DisplayName")</span><input @bind="displayName" /></label>
             <label><span>@T("Audience")</span><select @bind="audience"><option value="@PackAudience.Universal">@T("Audience.Universal")</option><option value="@PackAudience.Personal">@T("Audience.Personal")</option><option value="@PackAudience.Professional">@T("Audience.Professional")</option></select></label>
             <label><span>@T("Purpose")</span><select @bind="purpose"><option value="@PackPurpose.Standard">@T("Purpose.Standard")</option><option value="@PackPurpose.Sample">@T("Purpose.Sample")</option><option value="@PackPurpose.Template">@T("Purpose.Template")</option></select></label>
+            <ResourceScopeFormField ResourceKind="@PackAuthoringKinds.PackProject" @bind-Value="selectedScope" />
             <label><span>@T("Categories")</span><input @bind="categories" placeholder="automation, support" /></label>
             <label><span>@T("Tags")</span><input @bind="tags" placeholder="local, experimental" /></label>
             <label class="wide"><span>@T("Description")</span><textarea rows="3" @bind="description"></textarea></label>
@@ -178,6 +179,7 @@ else
 }
 
 @code {
+    private ResourceScopeRef? selectedScope;
     private readonly CancellationTokenSource cancellation = new();
     private readonly HashSet<ResourceAddress> selected = [];
     private CancellationTokenSource? previewCancellation;

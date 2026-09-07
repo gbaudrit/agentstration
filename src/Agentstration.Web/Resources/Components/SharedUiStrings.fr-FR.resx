@@ -7,4 +7,6 @@
   <data name="ResourceScope.Instance" xml:space="preserve"><value>Instance</value></data>
   <data name="ResourceScope.Tenant" xml:space="preserve"><value>Tenant</value></data>
   <data name="ResourceScope.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="ResourceScope.Loading" xml:space="preserve"><value>Chargement des périmètres…</value></data>
+  <data name="ResourceScope.Unavailable" xml:space="preserve"><value>Aucun périmètre disponible</value></data>
 </root>

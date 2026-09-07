@@ -135,6 +135,7 @@ else
                 <section class="pack-preview">
                     <div class="panel-header"><div><strong>@(preview.Metadata.DisplayName ?? preview.Metadata.Name)</strong><small><code>@preview.Metadata.Publisher/@preview.Metadata.Name</code> · @preview.Metadata.Version · @PurposeLabel(preview.Metadata.Purpose) · @AudienceLabel(preview.Metadata.Audience)</small></div><StatusBadge Text="@PreviewStatus" Status="@(CanInstall ? UiStatus.Success : UiStatus.Warning)" /></div>
                     @if (!string.IsNullOrWhiteSpace(preview.Metadata.Description)) { <p>@preview.Metadata.Description</p> }
+                    <ResourceScopeFormField ResourceKind="@ResourceKinds.InstalledPack" RequiredKind="@preview.TargetScope" @bind-Value="installScope" Disabled="true" />
                     <div class="pack-resource-list compact">
                         @foreach (var resource in preview.Resources)
                         {

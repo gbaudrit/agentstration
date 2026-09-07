@@ -72,6 +72,7 @@ else
                 <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
                 <label><span>@T("Handler")</span><InputText @bind-Value="model.Handler" /><ValidationMessage For="() => model.Handler" /></label>
                 <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <ResourceScopeFormField ResourceKind="@ResourceKinds.Agent" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
             </div>
             @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">@T("Uid"): <code>@resourceId</code></p> }
         </section>
@@ -153,6 +154,7 @@ else
     private bool isDirty;
     private bool applyRuntimeOnSubmit = true;
     private bool sourceMode;
+    private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Default;
     private string OverviewUrl => $"/agents/{Uri.EscapeDataString(Name ?? string.Empty)}";
@@ -196,6 +198,7 @@ else
             {
                 var snapshot = await Client.GetAgentAsync(AgentResourceNamespace, Name!, cancellation.Token);
                 model = AgentEditorModel.FromResource(snapshot.Value);
+                selectedScope = snapshot.Value.ScopeRef;
                 etag = snapshot.ETag;
                 resourceId = snapshot.Value.Uid.ToString("D");
                 generation = snapshot.Value.Generation;
@@ -326,7 +329,7 @@ else
         try
         {
             var wasNew = IsNew;
-            var request = model.ToRequest();
+            var request = Request();
             var snapshot = await Client.PutAgentAsync(request, etag, wasNew, cancellation.Token);
             etag = snapshot.ETag;
             resourceId = snapshot.Value.Uid.ToString("D");
@@ -365,6 +368,8 @@ else
         }
         finally { saving = false; }
     }
+
+    private AgentResourceRequest Request() => model!.ToRequest() with { ScopeRef = selectedScope };
 
     private async Task ReconcileAsync()
     {
