@@ -91,7 +91,8 @@ public sealed class ControlPlaneStoreHardeningTests
 
         Assert.AreEqual(4, stored.Select(value => value.Value.Uid).Distinct().Count());
         CollectionAssert.AreEqual(scopes, stored.Select(value => value.Value.OwnershipScope).ToArray());
-        Assert.AreEqual(stored[0].Value.Uid, (await fixture.Store.GetAsync<ExtensionResource>(new ResourceKey("MemoryProvider", "shared"), default))?.Value.Uid);
+        await Assert.ThrowsExactlyAsync<ControlPlaneAmbiguousResourceException>(() =>
+            fixture.Store.GetAsync<ExtensionResource>(new ResourceKey("MemoryProvider", "shared"), default));
         foreach (var value in stored)
         {
             var byAddress = await fixture.Store.GetExactAsync<ExtensionResource>(new ScopedResourceAddress(value.Value.OwnershipScope, ResourceNamespace.Default, "MemoryProvider", "shared"), default);

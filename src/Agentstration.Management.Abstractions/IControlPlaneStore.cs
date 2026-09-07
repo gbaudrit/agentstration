@@ -94,6 +94,7 @@ public interface IModelProfileReferenceValidator
 }
 
 public sealed class ControlPlaneConcurrencyException(string message) : Exception(message);
+public sealed class ControlPlaneAmbiguousResourceException(ResourceKey key) : Exception($"Resource '{key}' exists in more than one ownership scope; use an exact scoped address.");
 public sealed class ControlPlaneResourceNotFoundException : Exception
 {
     public ControlPlaneResourceNotFoundException(ResourceKey key) : base($"Resource '{key}' was not found.") { }

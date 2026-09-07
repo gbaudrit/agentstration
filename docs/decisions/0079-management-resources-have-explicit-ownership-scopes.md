@@ -25,7 +25,7 @@ Store contracts distinguish operations intentionally:
 - `GetExact`, `ListExact`, `PutExact`, and `DeleteExact` operate on one explicit ownership scope;
 - `GetByUid` resolves the globally unique physical identity subject to scope access;
 - `ListVisible` returns all resources visible from a target scope;
-- existing unqualified operations retain exact workspace behavior for workspace request contexts; an unqualified system name lookup addresses only the instance scope, while unrestricted system enumeration remains explicitly global.
+- existing unqualified operations retain exact workspace behavior for workspace request contexts; an unqualified system name lookup succeeds only when exactly one scope matches and otherwise reports ambiguity, while unrestricted system enumeration remains explicitly global.
 
 Visibility is downward only. An instance resource is visible everywhere; a tenant resource is visible only in that tenant and its workspaces; a workspace resource is visible only in that workspace. Effective visibility returns every matching resource. It never merges, shadows, overrides, or deduplicates homonymous resources.
 

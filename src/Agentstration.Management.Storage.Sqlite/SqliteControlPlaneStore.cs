@@ -159,7 +159,16 @@ public sealed class SqliteControlPlaneStore(
 
     public async Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource
     {
-        return await GetExactAsync<T>(key.AtScope(LegacyExactScope()), cancellationToken);
+        if (requestContext.AccessMode != ControlPlaneAccessMode.System)
+            return await GetExactAsync<T>(key.AtScope(LegacyExactScope()), cancellationToken);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var matches = await context.Documents.AsNoTracking().Where(value => value.Namespace == key.Namespace.Value && value.Kind == key.Kind && value.Name == key.Name).Take(2).ToArrayAsync(cancellationToken);
+        return matches.Length switch
+        {
+            0 => null,
+            1 => Deserialize<T>(matches[0]),
+            _ => throw new ControlPlaneAmbiguousResourceException(key)
+        };
     }
 
     public async Task<StoredResource<T>?> GetByUidAsync<T>(Guid uid, CancellationToken cancellationToken) where T : Resource
@@ -206,13 +215,14 @@ public sealed class SqliteControlPlaneStore(
         EnsureCanWrite(scope);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var namespaceValue = resource.Namespace.Value;
-        ControlPlaneDocument? byUid = null;
-        if (resource.Uid != Guid.Empty)
-            byUid = await context.Documents.SingleOrDefaultAsync(value => value.Uid == resource.Uid, cancellationToken);
-        if (byUid is not null && ScopeOf(byUid) != scope)
-            throw new ControlPlaneConcurrencyException("The ownership scope of an existing resource is immutable.");
-        var existing = byUid ?? await context.Documents.SingleOrDefaultAsync(
+        var existing = await context.Documents.SingleOrDefaultAsync(
             value => value.ScopeKey == scope.Key && value.Namespace == namespaceValue && value.Kind == resource.Kind && value.Name == resource.Metadata.Name, cancellationToken);
+        if (existing is null && resource.Uid != Guid.Empty && !ifNoneMatch)
+        {
+            var byUid = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Uid == resource.Uid, cancellationToken);
+            if (byUid is not null && ScopeOf(byUid) != scope)
+                throw new ControlPlaneConcurrencyException("The ownership scope of an existing resource is immutable.");
+        }
         if (existing is null && ifMatch is not null) throw new ControlPlaneConcurrencyException("If-Match cannot update a resource that does not exist.");
         if (existing is not null && ifNoneMatch) throw new ControlPlaneConcurrencyException("If-None-Match prevented replacement of an existing resource.");
         if (existing is not null && ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
@@ -292,7 +302,25 @@ public sealed class SqliteControlPlaneStore(
     }
 
     public async Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken)
-        => await DeleteExactAsync(key.AtScope(LegacyExactScope()), ifMatch, cancellationToken);
+    {
+        if (requestContext.AccessMode != ControlPlaneAccessMode.System)
+        {
+            await DeleteExactAsync(key.AtScope(LegacyExactScope()), ifMatch, cancellationToken);
+            return;
+        }
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var matches = await context.Documents.Where(value => value.Namespace == key.Namespace.Value && value.Kind == key.Kind && value.Name == key.Name).Take(2).ToArrayAsync(cancellationToken);
+        var existing = matches.Length switch
+        {
+            0 => throw new ControlPlaneResourceNotFoundException(key),
+            1 => matches[0],
+            _ => throw new ControlPlaneAmbiguousResourceException(key)
+        };
+        if (ifMatch is not null && !string.Equals(existing.ETag, ifMatch, StringComparison.Ordinal))
+            throw new ControlPlaneConcurrencyException("The supplied ETag does not match the current resource version.");
+        context.Documents.Remove(existing);
+        await SaveAsync(context, cancellationToken);
+    }
 
     public async Task DeleteExactAsync(ScopedResourceAddress address, string? ifMatch, CancellationToken cancellationToken)
     {
