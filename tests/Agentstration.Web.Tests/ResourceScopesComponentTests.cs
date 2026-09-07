@@ -41,6 +41,7 @@ public sealed class ResourceScopesComponentTests
         Assert.HasCount(2, rendered.FindAll("td.resource-action a.text-button"));
         Assert.HasCount(1, rendered.FindAll(".scope-no-link"));
         Assert.HasCount(3, rendered.FindAll(".kind-summary-item"));
+        Assert.IsEmpty(rendered.FindAll(".resource-kind-mark"));
     }
 
     private sealed class FakeClient(ResourceScopeInventoryResponse inventory) : IResourceScopeInventoryClient
