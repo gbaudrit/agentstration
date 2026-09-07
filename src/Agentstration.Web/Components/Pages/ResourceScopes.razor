@@ -85,11 +85,11 @@ else
                         <Header><tr><th>@T("Resource")</th><th>@T("Kind")</th><th>@T("Namespace")</th><th>@T("Updated")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
                         <Row Context="resource">
                             <tr class="resource-row">
-                                <td><div class="resource-identity"><span class="resource-kind-mark" aria-hidden="true"></span><span>@if (ResourceUrl(resource) is { } titleUrl) { <a class="resource-name" href="@titleUrl">@resource.Name</a> } else { <strong>@resource.Name</strong> }<small>@resource.Uid</small></span></div></td>
+                                <td><div class="resource-identity"><span class="resource-kind-mark" aria-hidden="true"></span><span>@if (ResourceUrl(resource) is { } titleUrl) { <a class="resource-name-link" href="@titleUrl">@resource.Name</a> } else { <strong>@resource.Name</strong> }<small>@resource.Uid</small></span></div></td>
                                 <td><span class="pack-kind">@resource.Kind</span></td>
                                 <td><code>@resource.Namespace.Value</code></td>
                                 <td><time datetime="@resource.UpdatedAt.ToString("O")">@resource.UpdatedAt.ToLocalTime().ToString("g")</time></td>
-                                <td class="resource-action">@if (ResourceUrl(resource) is { } url) { <a class="scope-open-link" href="@url" aria-label="@T("OpenNamedResource", resource.Name)">@T("Open") <span aria-hidden="true">→</span></a> } else { <span class="scope-no-link" title="@T("NoDirectPage")">—</span> }</td>
+                                <td class="resource-action">@if (ResourceUrl(resource) is { } url) { <a class="text-button" href="@url" aria-label="@T("OpenNamedResource", resource.Name)">@T("Open") <span aria-hidden="true">→</span></a> } else { <span class="scope-no-link" title="@T("NoDirectPage")">—</span> }</td>
                             </tr>
                         </Row>
                     </DataGrid>

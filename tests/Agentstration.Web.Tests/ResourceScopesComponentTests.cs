@@ -37,6 +37,8 @@ public sealed class ResourceScopesComponentTests
 
         Assert.IsNotNull(rendered.Find("a[href='/namespaces/team-a/agents/support%20agent']"));
         Assert.IsNotNull(rendered.Find($"a[href='/secrets/api%20key?scopeRef={Uri.EscapeDataString(workspaceScope.Value)}']"));
+        Assert.HasCount(2, rendered.FindAll("a.resource-name-link"));
+        Assert.HasCount(2, rendered.FindAll("td.resource-action a.text-button"));
         Assert.HasCount(1, rendered.FindAll(".scope-no-link"));
         Assert.HasCount(3, rendered.FindAll(".kind-summary-item"));
     }
