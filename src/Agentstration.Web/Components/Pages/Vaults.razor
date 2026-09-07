@@ -12,8 +12,8 @@ else if (items.Count == 0) { <EmptyState Title="@T("NoVaults")" Message="@T("NoV
 else
 {
     <DataGrid TItem="VaultResponse" Items="items">
-        <Header><tr><th>@T("Name")</th><th>@T("Scope")</th><th>@T("Provider")</th><th>@T("Status")</th><th>@T("Location")</th><th></th></tr></Header>
-        <Row Context="item"><tr><td><strong>@item.Resource.Definition.DisplayName</strong><br /><code>@item.Resource.Name</code></td><td><ResourceScopeBadge ScopeRef="@item.Resource.ScopeRef" /></td><td>@ProviderText(item.Resource.Definition.ProviderType)</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" /></td><td>@T("Local")</td><td><a class="text-button" href="@ResourceUrl(item.Resource)">@T("ManageArrow")</a></td></tr></Row>
+        <Header><tr><th>@T("Name")</th><th>@T("Provider")</th><th>@T("Status")</th><th>@T("Location")</th><th></th></tr></Header>
+        <Row Context="item"><tr><td><span class="resource-name-with-scope"><strong>@item.Resource.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="@item.Resource.ScopeRef" Compact /></span><code>@item.Resource.Name</code></td><td>@ProviderText(item.Resource.Definition.ProviderType)</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" /></td><td>@T("Local")</td><td><a class="text-button" href="@ResourceUrl(item.Resource)">@T("ManageArrow")</a></td></tr></Row>
     </DataGrid>
 }
 

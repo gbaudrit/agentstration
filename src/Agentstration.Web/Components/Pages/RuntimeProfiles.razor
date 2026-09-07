@@ -14,8 +14,8 @@ else if (profiles.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T
 else
 {
     <DataGrid TItem="RuntimeProfileSummaryResponse" Items="profiles">
-        <Header><tr><th>@T("Profile")</th><th>@T("Scope")</th><th>@T("Namespace")</th><th>@T("Runtime")</th><th>@T("Session")</th><th>@T("Streaming")</th><th>@T("Usage")</th><th></th></tr></Header>
-        <Row Context="profile"><tr><td><strong>@profile.Properties.DisplayName</strong><br /><code>@profile.Name</code></td><td><ResourceScopeBadge ScopeRef="@profile.ScopeRef" /></td><td><code>@profile.Namespace</code></td><td><code>@profile.Properties.RuntimeType</code></td><td>@SessionLabel(profile.Properties.Execution.SessionMode)</td><td>@StreamingLabel(profile.Properties.Execution.Streaming)</td><td>@DeploymentCount(profile.UsageCount)</td><td><a class="text-button" href="@Url(profile)">@T("Open")</a></td></tr></Row>
+        <Header><tr><th>@T("Profile")</th><th>@T("Namespace")</th><th>@T("Runtime")</th><th>@T("Session")</th><th>@T("Streaming")</th><th>@T("Usage")</th><th></th></tr></Header>
+        <Row Context="profile"><tr><td><span class="resource-name-with-scope"><strong>@profile.Properties.DisplayName</strong><ResourceScopeBadge ScopeRef="@profile.ScopeRef" Compact /></span><code>@profile.Name</code></td><td><code>@profile.Namespace</code></td><td><code>@profile.Properties.RuntimeType</code></td><td>@SessionLabel(profile.Properties.Execution.SessionMode)</td><td>@StreamingLabel(profile.Properties.Execution.Streaming)</td><td>@DeploymentCount(profile.UsageCount)</td><td><a class="text-button" href="@Url(profile)">@T("Open")</a></td></tr></Row>
     </DataGrid>
 }
 

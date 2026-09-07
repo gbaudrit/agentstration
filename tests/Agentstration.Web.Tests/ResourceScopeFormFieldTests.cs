@@ -11,6 +11,22 @@ namespace Agentstration.Web.Tests;
 public sealed class ResourceScopeFormFieldTests
 {
     [TestMethod]
+    public void CompactBadgeKeepsScopeAsInlineMetadata()
+    {
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+        var rendered = context.Render<ResourceScopeBadge>(parameters => parameters
+            .Add(component => component.ScopeRef, scope)
+            .Add(component => component.Compact, true));
+
+        var badge = rendered.Find(".resource-scope-badge-compact");
+        Assert.AreEqual(scope.Value, badge.GetAttribute("title"));
+        Assert.AreEqual("Workspace", badge.TextContent);
+    }
+
+    [TestMethod]
     public void SelectsTheWritableWorkspaceByDefault()
     {
         var tenant = new ResourceScopeTargetResponse(ResourceScopeRef.Tenant(Guid.NewGuid()), ResourceScopeKind.Tenant, "Development", true);

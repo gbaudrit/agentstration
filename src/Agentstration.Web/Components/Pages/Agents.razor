@@ -34,10 +34,9 @@ else if (Filtered.Count == 0)
 else
 {
     <DataGrid TItem="AgentSummary" Items="Filtered">
-        <Header><tr><th>Agent</th><th>@T("Scope")</th><th>@T("Namespace")</th><th>@T("Definition")</th><th>@T("GenerationHeader")</th><th>@T("ModelProfile")</th><th>@T("Deployment")</th><th>@T("LastActivity")</th><th>@T("Status")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
+        <Header><tr><th>Agent</th><th>@T("Namespace")</th><th>@T("Definition")</th><th>@T("GenerationHeader")</th><th>@T("ModelProfile")</th><th>@T("Deployment")</th><th>@T("LastActivity")</th><th>@T("Status")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
         <Row Context="item"><tr class="agent-row">
-            <td><a class="resource-name-link" href="@EditUrl(item)">@item.Name</a><span class="resource-secondary"><code>@TechnicalName(item)</code></span></td>
-            <td><ResourceScopeBadge ScopeRef="@item.ScopeRef" /></td>
+            <td><span class="resource-name-with-scope"><a class="resource-name-link" href="@EditUrl(item)">@item.Name</a><ResourceScopeBadge ScopeRef="@item.ScopeRef" Compact /></span><span class="resource-secondary"><code>@TechnicalName(item)</code></span></td>
             <td><code>@item.Namespace.Value</code></td>
             <td><strong>@ResourceName(item.Type)</strong></td>
             <td class="agent-generation"><code>@item.Version</code></td>

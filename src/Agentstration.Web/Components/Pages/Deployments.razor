@@ -16,8 +16,8 @@ else if (items.Count == 0)
 else
 {
     <DataGrid TItem="DeploymentSummary" Items="items">
-        <Header><tr><th>@T("Deployment")</th><th>@T("Scope")</th><th>@T("Agent")</th><th>@T("Status")</th><th>@T("Hosting")</th><th>@T("RuntimeProfile")</th><th>@T("Revision")</th><th>@T("Updated")</th><th>@T("Error")</th></tr></Header>
-        <Row Context="item"><tr id="@DeploymentAnchor(item)"><td><code>@item.Id</code><br /><small>@item.Namespace</small></td><td><ResourceScopeBadge Kind="@ResourceScopeKind.Workspace" /></td><td>@item.Agent</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /><br /><small>@T("DesiredState", StateText(item.DesiredState))</small></td><td>@HostingText(item.HostingMode)<br /><small>@item.Environment</small></td><td>@item.RuntimeProfile</td><td><code>@(item.ObservedRevision ?? item.Revision)</code></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td>@(item.Error ?? "—")</td></tr></Row>
+        <Header><tr><th>@T("Deployment")</th><th>@T("Agent")</th><th>@T("Status")</th><th>@T("Hosting")</th><th>@T("RuntimeProfile")</th><th>@T("Revision")</th><th>@T("Updated")</th><th>@T("Error")</th></tr></Header>
+        <Row Context="item"><tr id="@DeploymentAnchor(item)"><td><span class="resource-name-with-scope"><code>@item.Id</code><ResourceScopeBadge Kind="@ResourceScopeKind.Workspace" Compact /></span><small>@item.Namespace</small></td><td>@item.Agent</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /><br /><small>@T("DesiredState", StateText(item.DesiredState))</small></td><td>@HostingText(item.HostingMode)<br /><small>@item.Environment</small></td><td>@item.RuntimeProfile</td><td><code>@(item.ObservedRevision ?? item.Revision)</code></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td>@(item.Error ?? "—")</td></tr></Row>
     </DataGrid>
 }
 

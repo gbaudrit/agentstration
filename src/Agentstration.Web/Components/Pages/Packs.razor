@@ -40,10 +40,9 @@ else
     else
     {
         <DataGrid TItem="InstalledPackResource" Items="packs">
-            <Header><tr><th>@T("Pack")</th><th>@T("Scope")</th><th>@T("Purpose")</th><th>@T("Audience")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Resources")</th><th>@T("Installed")</th><th></th></tr></Header>
+            <Header><tr><th>@T("Pack")</th><th>@T("Purpose")</th><th>@T("Audience")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Resources")</th><th>@T("Installed")</th><th></th></tr></Header>
             <Row Context="pack"><tr class="@(IsSelected(pack) ? "selected-pack" : null)">
-                <td><strong>@DisplayName(pack)</strong><br /><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></td>
-                <td><ResourceScopeBadge ScopeRef="pack.ScopeRef" /></td>
+                <td><span class="resource-name-with-scope"><strong>@DisplayName(pack)</strong><ResourceScopeBadge ScopeRef="pack.ScopeRef" Compact /></span><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></td>
                 <td><span class="pack-kind">@PurposeLabel(pack.Definition.Purpose)</span></td>
                 <td>@AudienceLabel(pack.Definition.Audience)</td>
                 <td><code>@pack.Definition.Version</code></td>

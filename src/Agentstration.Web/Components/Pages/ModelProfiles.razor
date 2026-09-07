@@ -32,10 +32,9 @@ else if (profiles?.Count == 0)
 else
 {
     <DataGrid TItem="ModelProfileSummaryResponse" Items="profiles ?? []">
-        <Header><tr><th>@T("Profile")</th><th>@T("Scope")</th><th>@T("Namespace")</th><th>@T("Provider")</th><th>@T("Model")</th><th>@T("Usage")</th><th>@T("Status")</th><th>@T("Actions")</th></tr></Header>
+        <Header><tr><th>@T("Profile")</th><th>@T("Namespace")</th><th>@T("Provider")</th><th>@T("Model")</th><th>@T("Usage")</th><th>@T("Status")</th><th>@T("Actions")</th></tr></Header>
         <Row Context="profile"><tr>
-            <td><strong>@profile.Properties.DisplayName</strong><br /><code>@profile.Name</code></td>
-            <td><ResourceScopeBadge ScopeRef="@profile.ScopeRef" /></td>
+            <td><span class="resource-name-with-scope"><strong>@profile.Properties.DisplayName</strong><ResourceScopeBadge ScopeRef="@profile.ScopeRef" Compact /></span><code>@profile.Name</code></td>
             <td><code>@profile.Namespace</code></td>
             <td>@(profile.Properties.Provider.DisplayName ?? profile.Properties.Provider.Name)</td><td><code>@profile.Properties.Model.Name</code></td>
             <td>@AgentCount(profile.Properties.UsageCount)</td><td><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@ModelManagementUi.Status(profile.Properties.Status)" /></td>

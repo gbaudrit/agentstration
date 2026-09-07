@@ -3,11 +3,12 @@
 
 @if (EffectiveKind is { } kind)
 {
-    <span class="resource-scope-badge" title="@ScopeRef?.Value">@Localizer[$"ResourceScope.{kind}"].Value</span>
+    <span class="resource-scope-badge @(Compact ? "resource-scope-badge-compact" : null)" title="@ScopeRef?.Value">@Localizer[$"ResourceScope.{kind}"].Value</span>
 }
 
 @code {
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
     [Parameter] public ResourceScopeKind? Kind { get; set; }
+    [Parameter] public bool Compact { get; set; }
     private ResourceScopeKind? EffectiveKind => ScopeRef?.Kind ?? Kind;
 }
