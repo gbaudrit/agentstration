@@ -91,6 +91,7 @@ public sealed class ControlPlaneStoreHardeningTests
 
         Assert.AreEqual(4, stored.Select(value => value.Value.Uid).Distinct().Count());
         CollectionAssert.AreEqual(scopes, stored.Select(value => value.Value.OwnershipScope).ToArray());
+        Assert.AreEqual(stored[0].Value.Uid, (await fixture.Store.GetAsync<ExtensionResource>(new ResourceKey("MemoryProvider", "shared"), default))?.Value.Uid);
         foreach (var value in stored)
         {
             var byAddress = await fixture.Store.GetExactAsync<ExtensionResource>(new ScopedResourceAddress(value.Value.OwnershipScope, ResourceNamespace.Default, "MemoryProvider", "shared"), default);
@@ -98,6 +99,14 @@ public sealed class ControlPlaneStoreHardeningTests
             Assert.AreEqual(value.Value.Uid, byAddress?.Value.Uid);
             Assert.AreEqual(value.Value.Uid, byUid?.Value.Uid);
         }
+
+        await Assert.ThrowsExactlyAsync<ControlPlaneConcurrencyException>(() =>
+            fixture.Store.PutExactAsync(ResourceScope.Tenant(tenantA), Resource("shared"), null, true, default));
+        Assert.HasCount(1, await fixture.Store.ListExactAsync<ExtensionResource>(ResourceScope.Tenant(tenantA), "MemoryProvider", 0, 10, default));
+
+        var workspaceAddress = new ScopedResourceAddress(ResourceScope.Workspace(tenantA, workspaceA), ResourceNamespace.Default, "MemoryProvider", "shared");
+        await fixture.Store.DeleteExactAsync(workspaceAddress, stored[3].ETag, default);
+        Assert.IsNull(await fixture.Store.GetExactAsync<ExtensionResource>(workspaceAddress, default));
     }
 
     [TestMethod]
