@@ -44,9 +44,10 @@ else
     else
     {
         <DataGrid TItem="StoredResource<TriggerResource>" Items="Filtered">
-            <Header><tr><th>@T("Trigger")</th><th>@T("State")</th><th>@T("Schedule")</th><th>@T("Target")</th><th>@T("NextOccurrence")</th><th>@T("LastOutcome")</th><th></th></tr></Header>
+            <Header><tr><th>@T("Trigger")</th><th>@T("Scope")</th><th>@T("State")</th><th>@T("Schedule")</th><th>@T("Target")</th><th>@T("NextOccurrence")</th><th>@T("LastOutcome")</th><th></th></tr></Header>
             <Row Context="stored"><tr>
                 <td><strong><a href="@DetailsUrl(stored.Value)">@stored.Value.Definition.DisplayName</a></strong><small class="table-secondary">@stored.Value.Namespace.Value/@stored.Value.Name</small></td>
+                <td><ResourceScopeBadge ScopeRef="stored.Value.ScopeRef" /></td>
                 <td><StatusBadge Text="@(stored.Value.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(stored.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /></td>
                 <td>@TriggerUi.ScheduleLabel(stored.Value.Definition.Source.Schedule, Localizer)</td>
                 <td><a class="text-button" href="@FlowUrl(stored.Value)">@stored.Value.Definition.Target.Flow?.Name</a></td>

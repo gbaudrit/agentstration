@@ -24,8 +24,8 @@ public sealed class ResourceScopesLocalizationTests
                 .BuildServiceProvider();
             var strings = services.GetRequiredService<IStringLocalizer<ResourceScopesStrings>>();
 
-            Assert.AreEqual("Scopes de ressources", strings["Title"].Value);
-            Assert.AreEqual("Scope sélectionné", strings["SelectedScopeResources"].Value);
+            Assert.AreEqual("Périmètres des ressources", strings["Title"].Value);
+            Assert.AreEqual("Périmètre sélectionné", strings["SelectedScopeResources"].Value);
             Assert.AreEqual("Ressources : 1", strings["ResourceCount", 1].Value);
         }
         finally

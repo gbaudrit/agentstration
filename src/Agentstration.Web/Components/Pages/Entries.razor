@@ -41,6 +41,7 @@ else
                             </span>
                             <span class="entry-description">@(string.IsNullOrWhiteSpace(item.Value.Description) ? T("EntryFallbackDescription", ResourceName(item.Value.Binding.ResourceId)) : item.Value.Description)</span>
                             <span class="entry-metadata">
+                                <span><ResourceScopeBadge Kind="@ResourceScopeKind.Workspace" /></span>
                                 <span><UiIcon Name="@(item.Value.Binding.Kind == EntryBindingKind.Agent ? "agent" : "workflow")" />@EnumLabel("Binding", item.Value.Binding.Kind) <strong>@ResourceName(item.Value.Binding.ResourceId)</strong></span>
                                 <span><UiIcon Name="layers" />@item.Value.Id.Namespace</span>
                                 <span>@T("DraftRevisionCompact", item.Value.Revision)</span>

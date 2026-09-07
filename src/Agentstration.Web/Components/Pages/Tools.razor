@@ -14,8 +14,8 @@ else if (tools.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("E
 else
 {
     <DataGrid TItem="ToolResource" Items="tools">
-        <Header><tr><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th></th></tr></Header>
-        <Row Context="tool"><tr><td><strong>@tool.Definition.DisplayName</strong><br /><code>@tool.Definition.ExternalId</code></td><td>@ResourceName(tool.Definition.Provider?.ResourceId)</td><td><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.Name)}")">@T("Details")</a></td></tr></Row>
+        <Header><tr><th>@T("Tool")</th><th>@T("Scope")</th><th>@T("Provider")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th></th></tr></Header>
+        <Row Context="tool"><tr><td><strong>@tool.Definition.DisplayName</strong><br /><code>@tool.Definition.ExternalId</code></td><td><ResourceScopeBadge ScopeRef="tool.ScopeRef" /></td><td>@ResourceName(tool.Definition.Provider?.ResourceId)</td><td><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td>@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.Name)}")">@T("Details")</a></td></tr></Row>
     </DataGrid>
 }
 

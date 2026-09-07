@@ -1,11 +1,13 @@
 @namespace Agentstration.Web.Components
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
 
-@if (ScopeRef is { } scope)
+@if (EffectiveKind is { } kind)
 {
-    <span class="resource-scope-badge" title="@scope.Value">@Localizer[$"ResourceScope.{scope.Kind}"].Value</span>
+    <span class="resource-scope-badge" title="@ScopeRef?.Value">@Localizer[$"ResourceScope.{kind}"].Value</span>
 }
 
 @code {
-    [Parameter, EditorRequired] public ResourceScopeRef? ScopeRef { get; set; }
+    [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
+    [Parameter] public ResourceScopeKind? Kind { get; set; }
+    private ResourceScopeKind? EffectiveKind => ScopeRef?.Kind ?? Kind;
 }

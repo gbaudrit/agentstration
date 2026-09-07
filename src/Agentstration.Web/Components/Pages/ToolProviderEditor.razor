@@ -30,7 +30,7 @@ else
 
     @if (!IsNew) { <section class="panel" id="tools"><div class="panel-header"><div><h2>@T("Tools")</h2><p>@T("ToolsDiscovered", ToolCount(tools.Count))</p></div></div>
         @if (tools.Count == 0) { <EmptyState Title="@T("NoToolsTitle")" Message="@T("NoToolsMessage")" /> }
-        else { <DataGrid TItem="ToolResource" Items="tools"><Header><tr><th>@T("Name")</th><th>@T("Status")</th><th>@T("Enabled")</th><th></th></tr></Header><Row Context="tool"><tr><td><strong>@tool.Definition.DisplayName</strong><br/><code>@tool.Definition.ExternalId</code></td><td>@AvailabilityLabel(tool.Definition.Discovery?.Available == true)</td><td><input type="checkbox" checked="@tool.Definition.Enabled" @onchange="args => EnableAsync(tool, (bool)args.Value!)" /></td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.Name)}")">@T("Inspect")</a></td></tr></Row></DataGrid> }
+        else { <DataGrid TItem="ToolResource" Items="tools"><Header><tr><th>@T("Name")</th><th>@T("Scope")</th><th>@T("Status")</th><th>@T("Enabled")</th><th></th></tr></Header><Row Context="tool"><tr><td><strong>@tool.Definition.DisplayName</strong><br/><code>@tool.Definition.ExternalId</code></td><td><ResourceScopeBadge ScopeRef="tool.ScopeRef" /></td><td>@AvailabilityLabel(tool.Definition.Discovery?.Available == true)</td><td><input type="checkbox" checked="@tool.Definition.Enabled" @onchange="args => EnableAsync(tool, (bool)args.Value!)" /></td><td><a class="text-button" href="@($"/tools/{Uri.EscapeDataString(tool.Name)}")">@T("Inspect")</a></td></tr></Row></DataGrid> }
     </section> }
 }
 
