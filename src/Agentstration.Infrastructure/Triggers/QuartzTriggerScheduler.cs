@@ -34,7 +34,7 @@ public sealed class QuartzTriggerScheduler(ISchedulerFactory schedulers) : ITrig
         await scheduler.DeleteJob(new JobKey($"{workspaceId:N}-{triggerUid:N}", Group), cancellationToken);
     }
 
-    private static JobKey JobKey(TriggerResource trigger) => new($"{trigger.WorkspaceId:N}-{trigger.Uid:N}", Group);
+    private static JobKey JobKey(TriggerResource trigger) => new($"{trigger.RequireScopeTargetId(ResourceScopeKind.Workspace):N}-{trigger.Uid:N}", Group);
 
     private static ITrigger BuildTrigger(TriggerResource trigger, TriggerSchedule schedule)
     {

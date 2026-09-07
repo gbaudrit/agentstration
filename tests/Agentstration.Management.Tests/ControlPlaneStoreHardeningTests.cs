@@ -12,6 +12,72 @@ namespace Agentstration.Management.Tests;
 public sealed class ControlPlaneStoreHardeningTests
 {
     [TestMethod]
+    public void ScopeReferencesUseCanonicalStablePaths()
+    {
+        var tenantId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var workspaceId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+        Assert.AreEqual("/instance", ResourceScopeRef.Instance.Value);
+        Assert.AreEqual($"/tenants/{tenantId:D}", ResourceScopeRef.Tenant(tenantId).Value);
+        Assert.AreEqual($"/workspaces/{workspaceId:D}", ResourceScopeRef.Workspace(workspaceId).Value);
+        Assert.AreEqual(ResourceScopeRef.Workspace(workspaceId), ResourceScopeRef.Parse($"/workspaces/{workspaceId:D}"));
+        Assert.IsFalse(ResourceScopeRef.TryParse($"/workspaces/{workspaceId:D}".ToUpperInvariant(), out _));
+    }
+
+    [TestMethod]
+    public async Task TenantAndWorkspaceCreationAtomicallyCreatesTheirHierarchy()
+    {
+        var tenantId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
+
+        await fixture.EnsureWorkspaceAsync(tenantId, workspaceId);
+        var resolved = await fixture.ScopeResolver.ResolveAsync(ResourceScopeRef.Workspace(workspaceId), default);
+
+        Assert.IsNotNull(resolved);
+        Assert.AreEqual(ResourceScopeKind.Workspace, resolved.Scope.Kind);
+        CollectionAssert.AreEqual(
+            new[] { ResourceScopeRef.Tenant(tenantId), ResourceScopeRef.Instance },
+            resolved.Ancestors.Select(value => value.Ref).ToArray());
+    }
+
+    [TestMethod]
+    public async Task PreScopeSqliteSchemaFailsWithoutDeletingOperatorData()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "agentstration-old-scope-schema", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var database = Path.Combine(directory, "management.db");
+        try
+        {
+            await using (var connection = new SqliteConnection($"Data Source={database}"))
+            {
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                command.CommandText = "CREATE TABLE ControlPlaneResources (ResourceId TEXT NOT NULL PRIMARY KEY, Payload TEXT NOT NULL)";
+                await command.ExecuteNonQueryAsync();
+            }
+            var services = new ServiceCollection()
+                .AddSingleton(TimeProvider.System)
+                .AddSingleton<ICurrentRequestContext, SystemOperationRequestContext>()
+                .AddSqliteControlPlane($"Data Source={database}")
+                .BuildServiceProvider();
+            await using (services)
+            {
+                var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+                    services.GetRequiredService<IControlPlaneStore>().InitializeAsync(default));
+                StringAssert.Contains(exception.Message, "Delete the pre-release database and reseed");
+            }
+
+            Assert.IsTrue(File.Exists(database));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [TestMethod]
     public async Task StoreAppliesCommonSystemStateToUnknownResourceKindWithoutAdapterSwitch()
     {
         await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
@@ -53,18 +119,19 @@ public sealed class ControlPlaneStoreHardeningTests
         var context = new TestRequestContext();
         context.UseSystem();
         await using var fixture = await StoreFixture.CreateAsync(context);
-        await fixture.Store.PutAsync(Resource("first", tenantId, firstWorkspaceId), null, true, default);
-        await fixture.Store.PutAsync(Resource("second", tenantId, secondWorkspaceId), null, true, default);
+        await fixture.EnsureWorkspaceAsync(tenantId, firstWorkspaceId);
+        await fixture.EnsureWorkspaceAsync(tenantId, secondWorkspaceId);
+        await fixture.Store.PutExactAsync(ResourceScopeRef.Workspace(firstWorkspaceId), Resource("first"), null, true, default);
+        await fixture.Store.PutExactAsync(ResourceScopeRef.Workspace(secondWorkspaceId), Resource("second"), null, true, default);
 
         context.UseWorkspace(new RequestContext(Guid.NewGuid(), tenantId, firstWorkspaceId));
         var scoped = await fixture.Store.ListAllAsync<ExtensionResource>("MemoryProvider", default);
         CollectionAssert.AreEqual(new[] { "first" }, scoped.Select(value => value.Value.Metadata.Name).ToArray());
         Assert.IsNull(await fixture.Store.GetAsync<ExtensionResource>(new ResourceKey("MemoryProvider", "second"), default));
         var workspaceOwned = await fixture.Store.PutAsync(Resource("workspace-owned"), null, true, default);
-        Assert.AreEqual(tenantId, workspaceOwned.Value.TenantId);
-        Assert.AreEqual(firstWorkspaceId, workspaceOwned.Value.WorkspaceId);
+        Assert.AreEqual(ResourceScopeRef.Workspace(firstWorkspaceId), workspaceOwned.Value.ScopeRef);
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
-            fixture.Store.PutAsync(Resource("cross-scope", tenantId, secondWorkspaceId), null, true, default));
+            fixture.Store.PutExactAsync(ResourceScopeRef.Workspace(secondWorkspaceId), Resource("cross-scope"), null, true, default));
 
         context.UseSystem();
         Assert.HasCount(3, await fixture.Store.ListAllAsync<ExtensionResource>("MemoryProvider", default));
@@ -77,12 +144,15 @@ public sealed class ControlPlaneStoreHardeningTests
         var tenantB = Guid.NewGuid();
         var workspaceA = Guid.NewGuid();
         await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
+        await fixture.EnsureTenantAsync(tenantA);
+        await fixture.EnsureTenantAsync(tenantB);
+        await fixture.EnsureWorkspaceAsync(tenantA, workspaceA);
         var scopes = new[]
         {
-            ResourceScope.Instance,
-            ResourceScope.Tenant(tenantA),
-            ResourceScope.Tenant(tenantB),
-            ResourceScope.Workspace(tenantA, workspaceA)
+            ResourceScopeRef.Instance,
+            ResourceScopeRef.Tenant(tenantA),
+            ResourceScopeRef.Tenant(tenantB),
+            ResourceScopeRef.Workspace(workspaceA)
         };
 
         var stored = new List<StoredResource<ExtensionResource>>();
@@ -90,22 +160,22 @@ public sealed class ControlPlaneStoreHardeningTests
             stored.Add(await fixture.Store.PutExactAsync(scope, Resource("shared"), null, true, default));
 
         Assert.AreEqual(4, stored.Select(value => value.Value.Uid).Distinct().Count());
-        CollectionAssert.AreEqual(scopes, stored.Select(value => value.Value.OwnershipScope).ToArray());
+        CollectionAssert.AreEqual(scopes, stored.Select(value => value.Value.ScopeRef!.Value).ToArray());
         await Assert.ThrowsExactlyAsync<ControlPlaneAmbiguousResourceException>(() =>
             fixture.Store.GetAsync<ExtensionResource>(new ResourceKey("MemoryProvider", "shared"), default));
         foreach (var value in stored)
         {
-            var byAddress = await fixture.Store.GetExactAsync<ExtensionResource>(new ScopedResourceAddress(value.Value.OwnershipScope, ResourceNamespace.Default, "MemoryProvider", "shared"), default);
+            var byAddress = await fixture.Store.GetExactAsync<ExtensionResource>(new ScopedResourceAddress(value.Value.ScopeRef!.Value, ResourceNamespace.Default, "MemoryProvider", "shared"), default);
             var byUid = await fixture.Store.GetByUidAsync<ExtensionResource>(value.Value.Uid, default);
             Assert.AreEqual(value.Value.Uid, byAddress?.Value.Uid);
             Assert.AreEqual(value.Value.Uid, byUid?.Value.Uid);
         }
 
         await Assert.ThrowsExactlyAsync<ControlPlaneConcurrencyException>(() =>
-            fixture.Store.PutExactAsync(ResourceScope.Tenant(tenantA), Resource("shared"), null, true, default));
-        Assert.HasCount(1, await fixture.Store.ListExactAsync<ExtensionResource>(ResourceScope.Tenant(tenantA), "MemoryProvider", 0, 10, default));
+            fixture.Store.PutExactAsync(ResourceScopeRef.Tenant(tenantA), Resource("shared"), null, true, default));
+        Assert.HasCount(1, await fixture.Store.ListExactAsync<ExtensionResource>(ResourceScopeRef.Tenant(tenantA), "MemoryProvider", 0, 10, default));
 
-        var workspaceAddress = new ScopedResourceAddress(ResourceScope.Workspace(tenantA, workspaceA), ResourceNamespace.Default, "MemoryProvider", "shared");
+        var workspaceAddress = new ScopedResourceAddress(ResourceScopeRef.Workspace(workspaceA), ResourceNamespace.Default, "MemoryProvider", "shared");
         await fixture.Store.DeleteExactAsync(workspaceAddress, stored[3].ETag, default);
         Assert.IsNull(await fixture.Store.GetExactAsync<ExtensionResource>(workspaceAddress, default));
     }
@@ -118,17 +188,21 @@ public sealed class ControlPlaneStoreHardeningTests
         var workspaceA = Guid.NewGuid();
         var workspaceB = Guid.NewGuid();
         await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
-        await fixture.Store.PutExactAsync(ResourceScope.Instance, Resource("shared"), null, true, default);
-        await fixture.Store.PutExactAsync(ResourceScope.Tenant(tenantA), Resource("shared"), null, true, default);
-        await fixture.Store.PutExactAsync(ResourceScope.Tenant(tenantB), Resource("shared"), null, true, default);
-        await fixture.Store.PutExactAsync(ResourceScope.Workspace(tenantA, workspaceA), Resource("shared"), null, true, default);
-        await fixture.Store.PutExactAsync(ResourceScope.Workspace(tenantA, workspaceB), Resource("shared"), null, true, default);
+        await fixture.EnsureTenantAsync(tenantA);
+        await fixture.EnsureTenantAsync(tenantB);
+        await fixture.EnsureWorkspaceAsync(tenantA, workspaceA);
+        await fixture.EnsureWorkspaceAsync(tenantA, workspaceB);
+        await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, Resource("shared"), null, true, default);
+        await fixture.Store.PutExactAsync(ResourceScopeRef.Tenant(tenantA), Resource("shared"), null, true, default);
+        await fixture.Store.PutExactAsync(ResourceScopeRef.Tenant(tenantB), Resource("shared"), null, true, default);
+        await fixture.Store.PutExactAsync(ResourceScopeRef.Workspace(workspaceA), Resource("shared"), null, true, default);
+        await fixture.Store.PutExactAsync(ResourceScopeRef.Workspace(workspaceB), Resource("shared"), null, true, default);
 
-        var visible = await fixture.Store.ListVisibleAsync<ExtensionResource>(ResourceScope.Workspace(tenantA, workspaceA), "MemoryProvider", 0, 10, default);
+        var visible = await fixture.Store.ListVisibleAsync<ExtensionResource>(ResourceScopeRef.Workspace(workspaceA), "MemoryProvider", 0, 10, default);
 
         CollectionAssert.AreEquivalent(
-            new[] { ResourceScope.Instance.Key, ResourceScope.Tenant(tenantA).Key, ResourceScope.Workspace(tenantA, workspaceA).Key },
-            visible.Select(value => value.Value.OwnershipScope.Key).ToArray());
+            new[] { ResourceScopeRef.Instance.Value, ResourceScopeRef.Tenant(tenantA).Value, ResourceScopeRef.Workspace(workspaceA).Value },
+            visible.Select(value => value.Value.ScopeRef!.Value.Value).ToArray());
         Assert.IsTrue(visible.All(value => value.Value.Name == "shared"));
     }
 
@@ -140,20 +214,22 @@ public sealed class ControlPlaneStoreHardeningTests
         var context = new TestRequestContext();
         context.UseSystem();
         await using var fixture = await StoreFixture.CreateAsync(context);
-        var instance = await fixture.Store.PutExactAsync(ResourceScope.Instance, Resource("instance"), null, true, default);
-        var own = await fixture.Store.PutExactAsync(ResourceScope.Tenant(tenantA), Resource("own"), null, true, default);
-        var foreign = await fixture.Store.PutExactAsync(ResourceScope.Tenant(tenantB), Resource("foreign"), null, true, default);
+        await fixture.EnsureTenantAsync(tenantA);
+        await fixture.EnsureTenantAsync(tenantB);
+        var instance = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, Resource("instance"), null, true, default);
+        var own = await fixture.Store.PutExactAsync(ResourceScopeRef.Tenant(tenantA), Resource("own"), null, true, default);
+        var foreign = await fixture.Store.PutExactAsync(ResourceScopeRef.Tenant(tenantB), Resource("foreign"), null, true, default);
 
         context.UseTenant(Guid.NewGuid(), tenantA);
-        var visible = await fixture.Store.ListVisibleAsync<ExtensionResource>(ResourceScope.Tenant(tenantA), "MemoryProvider", 0, 10, default);
+        var visible = await fixture.Store.ListVisibleAsync<ExtensionResource>(ResourceScopeRef.Tenant(tenantA), "MemoryProvider", 0, 10, default);
         CollectionAssert.AreEquivalent(new[] { "instance", "own" }, visible.Select(value => value.Value.Name).ToArray());
         Assert.AreEqual(instance.Value.Uid, (await fixture.Store.GetByUidAsync<ExtensionResource>(instance.Value.Uid, default))?.Value.Uid);
         Assert.AreEqual(own.Value.Uid, (await fixture.Store.GetByUidAsync<ExtensionResource>(own.Value.Uid, default))?.Value.Uid);
         Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(foreign.Value.Uid, default));
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
-            fixture.Store.PutExactAsync(ResourceScope.Instance, Resource("blocked"), null, true, default));
+            fixture.Store.PutExactAsync(ResourceScopeRef.Instance, Resource("blocked"), null, true, default));
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
-            fixture.Store.GetExactAsync<ExtensionResource>(new ScopedResourceAddress(ResourceScope.Tenant(tenantB), ResourceNamespace.Default, "MemoryProvider", "foreign"), default));
+            fixture.Store.GetExactAsync<ExtensionResource>(new ScopedResourceAddress(ResourceScopeRef.Tenant(tenantB), ResourceNamespace.Default, "MemoryProvider", "foreign"), default));
     }
 
     [TestMethod]
@@ -161,10 +237,11 @@ public sealed class ControlPlaneStoreHardeningTests
     {
         var tenantId = Guid.NewGuid();
         await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
-        var stored = await fixture.Store.PutExactAsync(ResourceScope.Instance, Resource("fixed"), null, true, default);
+        await fixture.EnsureTenantAsync(tenantId);
+        var stored = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, Resource("fixed"), null, true, default);
 
         await Assert.ThrowsExactlyAsync<ControlPlaneConcurrencyException>(() => fixture.Store.PutExactAsync(
-            ResourceScope.Tenant(tenantId),
+            ResourceScopeRef.Tenant(tenantId),
             Resource("fixed") with { Uid = stored.Value.Uid },
             stored.ETag,
             false,
@@ -315,13 +392,11 @@ public sealed class ControlPlaneStoreHardeningTests
         public ExtensionDefinition Definition { get; init; } = null!;
     }
 
-    private static ExtensionResource Resource(string name, Guid tenantId = default, Guid workspaceId = default) => new()
+    private static ExtensionResource Resource(string name) => new()
     {
         ApiVersion = "extensions.agentstration.io/v1",
         Kind = "MemoryProvider",
         Metadata = new ResourceMetadata { Name = name },
-        TenantId = tenantId,
-        WorkspaceId = workspaceId,
         Definition = new ExtensionDefinition("sqlite")
     };
 
@@ -344,7 +419,23 @@ public sealed class ControlPlaneStoreHardeningTests
     {
         public IControlPlaneStore Store { get; } = store;
         public IAgentResourceQueries Queries { get; } = queries;
+        public IResourceScopeResolver ScopeResolver => Provider.GetRequiredService<IResourceScopeResolver>();
         public ICurrentRequestContext RequestContext => Provider.GetRequiredService<ICurrentRequestContext>();
+
+        public async Task EnsureTenantAsync(Guid tenantId)
+        {
+            var identities = Provider.GetRequiredService<IIdentityStore>();
+            if (await identities.GetTenantAsync(tenantId, default) is null)
+                await identities.AddTenantAsync(new(tenantId, $"tenant-{tenantId:N}", "Test tenant", TenantStatus.Active, DateTimeOffset.UtcNow), default);
+        }
+
+        public async Task EnsureWorkspaceAsync(Guid tenantId, Guid workspaceId)
+        {
+            await EnsureTenantAsync(tenantId);
+            var identities = Provider.GetRequiredService<IIdentityStore>();
+            if (await identities.GetWorkspaceAsync(tenantId, workspaceId, default) is null)
+                await identities.AddWorkspaceAsync(new(workspaceId, tenantId, $"workspace-{workspaceId:N}", "Test workspace", WorkspaceStatus.Active, DateTimeOffset.UtcNow), default);
+        }
 
         public static async Task<StoreFixture> CreateAsync(ICurrentRequestContext? context = null)
         {

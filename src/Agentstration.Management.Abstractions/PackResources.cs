@@ -60,6 +60,7 @@ public sealed record PackMetadata
 
 public sealed record PackDefinition
 {
+    public ResourceScopeKind TargetScope { get; init; } = ResourceScopeKind.Workspace;
     public IReadOnlyList<string> Resources { get; init; } = [];
     public IReadOnlyList<PackRequirement> Requirements { get; init; } = [];
     public IReadOnlyList<PackBindingRequirement> Bindings { get; init; } = [];

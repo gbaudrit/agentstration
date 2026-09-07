@@ -193,15 +193,16 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void ManagementStoreExposesDistinctExactAndDescendantVisibleScopeContracts()
+    public void ManagementStoreExposesHierarchicalScopeContracts()
     {
         var methods = typeof(IControlPlaneStore).GetMethods().Select(method => method.Name).ToHashSet(StringComparer.Ordinal);
 
         CollectionAssert.IsSubsetOf(
             new[] { "GetByUidAsync", "GetExactAsync", "ListExactAsync", "ListVisibleAsync", "PutExactAsync", "DeleteExactAsync" },
             methods.ToArray());
-        Assert.AreEqual(typeof(ResourceScope), typeof(Resource).GetProperty(nameof(Resource.OwnershipScope))?.PropertyType);
-        Assert.AreEqual(typeof(ResourceScope), typeof(ScopedResourceAddress).GetProperty(nameof(ScopedResourceAddress.Scope))?.PropertyType);
+        Assert.AreEqual(typeof(ResourceScopeRef?), typeof(Resource).GetProperty(nameof(Resource.ScopeRef))?.PropertyType);
+        Assert.AreEqual(typeof(ResourceScopeRef), typeof(ScopedResourceAddress).GetProperty(nameof(ScopedResourceAddress.ScopeRef))?.PropertyType);
+        Assert.IsTrue(typeof(IResourceScopeResolver).IsInterface);
     }
 
     [TestMethod]

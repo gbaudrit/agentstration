@@ -24,6 +24,12 @@ namespace Agentstration.Management.Tests;
 public sealed class PackTests
 {
     [TestMethod]
+    public void PackDefinitionDefaultsToWorkspaceScope()
+    {
+        Assert.AreEqual(ResourceScopeKind.Workspace, new PackDefinition().TargetScope);
+    }
+
+    [TestMethod]
     public async Task ComposerCreatesProjectFromWorkspaceCatalog()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));

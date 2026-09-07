@@ -1,4 +1,5 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Hosting;
 
@@ -229,8 +230,7 @@ public sealed class BootstrapProfileManagementService(
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.BootstrapApplication,
             Metadata = new ResourceMetadata { Name = id.ToString("N") },
-            TenantId = preview.Target?.TenantId ?? Guid.Empty,
-            WorkspaceId = preview.Target?.WorkspaceId ?? Guid.Empty,
+            ScopeRef = ApplicationScopeRef(preview),
             Generation = 1,
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Creating },
             Definition = new BootstrapApplicationProperties
@@ -247,6 +247,14 @@ public sealed class BootstrapProfileManagementService(
         };
         return await SaveApplicationAsync(resource, null, cancellationToken);
     }
+
+    private static ResourceScopeRef ApplicationScopeRef(BootstrapCompositionPreview preview) => preview.Scope switch
+    {
+        BootstrapProfileScope.Instance => ResourceScopeRef.Instance,
+        BootstrapProfileScope.Tenant when preview.Target?.TenantId is Guid tenantId => ResourceScopeRef.Tenant(tenantId),
+        BootstrapProfileScope.Workspace when preview.Target?.WorkspaceId is Guid workspaceId => ResourceScopeRef.Workspace(workspaceId),
+        _ => throw new DeclarativeBootstrapException($"Bootstrap scope '{preview.Scope}' requires an explicit target.")
+    };
 
     private BootstrapApplicationResource Complete(
         BootstrapApplicationResource application,

@@ -108,7 +108,7 @@ else
         catch (Exception exception) { SetError(exception); }
         finally { loading = false; }
     }
-    private async Task LoadHistoryAsync() { if (stored is null) return; refreshing = true; try { history = await Firing.ListHistoryAsync(stored.Value.WorkspaceId, stored.Value.Uid, 100, CancellationToken.None); } catch (Exception exception) { SetError(exception); } finally { refreshing = false; } }
+    private async Task LoadHistoryAsync() { if (stored is null) return; refreshing = true; try { history = await Firing.ListHistoryAsync(stored.Value.RequireScopeTargetId(ResourceScopeKind.Workspace), stored.Value.Uid, 100, CancellationToken.None); } catch (Exception exception) { SetError(exception); } finally { refreshing = false; } }
     private async Task RunNowAsync() { if (stored is null || running || !CanExecute) return; running = true; ClearMessage(); try { var occurrence = await Firing.RunNowAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); SetSuccess(occurrence.WorkItemId is null ? T("RunCompleted", T($"OccurrenceOutcome.{occurrence.Outcome}")) : T("WorkSubmitted", Short(occurrence.WorkItemId))); Notifications.Add(new(Guid.NewGuid(), T("Notification.Fired"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success)); await ReloadAsync(); } catch (Exception exception) { SetError(exception); } finally { running = false; } }
     private async Task EnableAsync() { confirmEnable = false; await SetEnabledAsync(true); }
     private async Task DisableAsync() => await SetEnabledAsync(false);

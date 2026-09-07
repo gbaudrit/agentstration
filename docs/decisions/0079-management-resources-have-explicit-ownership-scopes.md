@@ -1,49 +1,38 @@
-# ADR-0079: Management resources have explicit ownership scopes
+# ADR-0079: Management resources use explicit hierarchical scopes
 
 Status: Accepted — 2026-09-07
 
 ## Context
 
-Management resource UIDs are globally unique, but logical identity was `(workspace, namespace, kind, name)`. Tenant and instance ownership were represented only by empty `WorkspaceId`/`TenantId` combinations. This made tenant-level uniqueness unsafe and made a system lookup by kind/name ambiguous when homonymous resources existed at several levels.
-
-Sources require instance, tenant, or workspace ownership, and the same requirement can apply to later Management resource kinds. A Source-specific store would repeat a cross-cutting identity and authorization problem.
+Management resources were owned through nullable `TenantId` and `WorkspaceId` fields. That representation duplicated topology, made instance and tenant ownership implicit, and coupled logical identity to a fixed three-case column layout. The product has not shipped this schema, so compatibility migration and dual-write behavior would add cost without preserving user data.
 
 ## Decision
 
-Every Management resource row has one explicit, immutable ownership scope:
+Management persists a `ResourceScopes` hierarchy with an internal numeric `Id`, a unique canonical `Ref`, a `Kind`, a `TargetKey`, and an immutable nullable `ParentScopeId`. V1 creates these nodes:
 
-- `instance`, with no Tenant or Workspace identifier;
-- `tenant:{tenantUid}`, with exactly one Tenant identifier;
-- `workspace:{workspaceUid}`, with both its Tenant and Workspace identifiers.
+```text
+/instance
+└── /tenants/{tenantId:D}
+    └── /workspaces/{workspaceId:D}
+```
 
-`ResourceScope` validates those combinations. Its normalized `ScopeKey` is persisted with `ScopeType`, `TenantId`, and `WorkspaceId`. The UID-derived storage key remains the globally unique physical primary key and durable provenance identity. An existing UID cannot move to another scope.
+Creating a Tenant or Workspace creates its scope in the same database transaction. The instance scope is seeded when a fresh Management store is initialized. The generic hierarchy and parent link allow another scope kind, such as project, to be added without adding another ownership column to every resource.
 
-The exact logical identity is `(scope, namespace, kind, name)`. SQLite and PostgreSQL enforce it with a unique index on `(ScopeKey, Namespace, Kind, Name)`. Homonymous resources at different scopes remain independent and retain different UIDs.
+Every `ControlPlaneResources` row has one required `ScopeId` foreign key. Resource rows no longer contain ownership `TenantId` or `WorkspaceId` columns. The public local resource envelope exposes the immutable canonical `scopeRef`; portable input manifests omit it and the receiving operation assigns the authorized target scope. A resource UID remains its globally unique physical identity and cannot move between scopes.
 
-Store contracts distinguish operations intentionally:
+Exact logical identity is `(scope, namespace, kind, name)`. Exact reads, writes, lists, and deletes are explicit store operations. Visible enumeration walks only the target scope and its ancestors. A workspace therefore sees its workspace, tenant, and instance resources; a tenant sees its tenant and instance resources; instance sees only instance resources. Siblings and descendants are never visible. Homonymous resources remain separate results: visibility does not merge, shadow, or override them. A system lookup that omits scope fails when the logical address is ambiguous.
 
-- `GetExact`, `ListExact`, `PutExact`, and `DeleteExact` operate on one explicit ownership scope;
-- `GetByUid` resolves the globally unique physical identity subject to scope access;
-- `ListVisible` returns all resources visible from a target scope;
-- existing unqualified operations retain exact workspace behavior for workspace request contexts; an unqualified system name lookup succeeds only when exactly one scope matches and otherwise reports ambiguity, while unrestricted system enumeration remains explicitly global.
+Request contexts authorize the exact scopes they may access. Tenant and instance writes are never inferred from a workspace request. Resource-kind policy remains separate: support in the generic store does not make every kind valid at every scope.
 
-Visibility is downward only. An instance resource is visible everywhere; a tenant resource is visible only in that tenant and its workspaces; a workspace resource is visible only in that workspace. Effective visibility returns every matching resource. It never merges, shadows, overrides, or deduplicates homonymous resources.
+Bootstrap Profile and Pack definitions default an omitted `targetScope` to `workspace`. Tenant and instance targets must be explicit. No automatic promotion from workspace to a broader scope is allowed.
 
-Workspace contexts can write only their workspace and read that workspace plus its ancestors. Tenant contexts can write only their tenant and read that tenant plus the instance scope. System contexts may operate on any explicit scope. The store enforces these isolation rules; transport/application authorization must still decide whether a caller is allowed to establish a tenant or system context.
-
-This foundation does not declare that every resource kind may be created at every scope. Each vertical continues to define its supported ownership levels and creation authorization.
-
-## Migration
-
-SQLite initialization adds `ScopeType` and `ScopeKey` when absent, classifies existing rows from their current Tenant/Workspace columns, removes the workspace-only unique index, and creates the exact-scope unique index. PostgreSQL applies the equivalent EF migration. Existing workspace rows remain workspace-owned and their payload and UID are unchanged.
+SQLite databases and the PostgreSQL Management schema are fully reseeded. The PostgreSQL migration history is replaced with a new initial migration. There is no backfill, compatibility table reconstruction, legacy-column support, or dual write. An old SQLite schema fails initialization with a message requiring reset; it is never deleted automatically.
 
 ## Consequences
 
-- UID remains sufficient for physical references and provenance.
-- Logical name resolution cannot accidentally cross ownership scopes.
-- Tenant resources with the same name can coexist in different tenants.
-- Consumers must choose exact ownership or descendant-visible enumeration explicitly.
-- A later resource vertical can adopt multiple scopes without creating a separate persistence model.
-- Cross-scope promotion, configuration inheritance, merging, overrides, and payload deduplication remain outside this decision.
-
-This decision partially supersedes the Management logical-identity statements in ADR-0031 and ADR-0035. ADR-0053 continues to govern modules and resource types that are explicitly workspace-owned.
+- Ownership and hierarchy have one data-backed representation shared by exact lookup, visibility, and authorization.
+- Resource payloads no longer duplicate tenant/workspace ownership.
+- Scope parents are immutable and topology creation cannot leave a Tenant or Workspace without its scope.
+- SQLite remains the executable local default and PostgreSQL remains behaviorally aligned.
+- The pre-release schema change is intentionally breaking for existing local databases and requires reseeding.
+- This decision partially supersedes the ownership and identity portions of ADR-0031, ADR-0035, and ADR-0077.

@@ -12,65 +12,83 @@ public readonly record struct WorkspaceId(Guid Value)
     public override string ToString() => Value.ToString("D");
 }
 
-public enum ResourceScopeType
+[JsonConverter(typeof(JsonStringEnumConverter<ResourceScopeKind>))]
+public enum ResourceScopeKind
 {
-    Instance,
-    Tenant,
-    Workspace
+    [JsonStringEnumMemberName("instance")] Instance,
+    [JsonStringEnumMemberName("tenant")] Tenant,
+    [JsonStringEnumMemberName("workspace")] Workspace
 }
 
-/// <summary>Identifies the immutable owner of a Management resource.</summary>
-public readonly record struct ResourceScope
+/// <summary>Canonical local reference to the immutable owner of a Management resource.</summary>
+[JsonConverter(typeof(ResourceScopeRefJsonConverter))]
+public readonly struct ResourceScopeRef : IEquatable<ResourceScopeRef>
 {
-    private ResourceScope(ResourceScopeType type, Guid tenantId, Guid workspaceId)
+    private readonly string? value;
+
+    private ResourceScopeRef(string value, ResourceScopeKind kind, Guid? targetId)
     {
-        Type = type;
-        TenantId = tenantId;
-        WorkspaceId = workspaceId;
+        this.value = value;
+        Kind = kind;
+        TargetId = targetId;
     }
 
-    public ResourceScopeType Type { get; }
-    public Guid TenantId { get; }
-    public Guid WorkspaceId { get; }
-    public string Key => Type switch
-    {
-        ResourceScopeType.Instance => "instance",
-        ResourceScopeType.Tenant => $"tenant:{TenantId:D}",
-        ResourceScopeType.Workspace => $"workspace:{WorkspaceId:D}",
-        _ => throw new InvalidOperationException($"Unsupported resource scope type '{Type}'.")
-    };
+    public static ResourceScopeRef Instance { get; } = new("/instance", ResourceScopeKind.Instance, null);
+    public ResourceScopeKind Kind { get; }
+    public Guid? TargetId { get; }
+    public string Value => value ?? throw new InvalidOperationException("The resource scope reference is not initialized.");
+    public string TargetKey => TargetId?.ToString("D") ?? "instance";
 
-    public static ResourceScope Instance => new(ResourceScopeType.Instance, Guid.Empty, Guid.Empty);
-    public static ResourceScope Tenant(Guid tenantId)
+    public static ResourceScopeRef Tenant(Guid tenantId) => Create(ResourceScopeKind.Tenant, "tenants", tenantId);
+    public static ResourceScopeRef Workspace(Guid workspaceId) => Create(ResourceScopeKind.Workspace, "workspaces", workspaceId);
+
+    public static ResourceScopeRef Parse(string value)
     {
-        if (tenantId == Guid.Empty) throw new ArgumentException("A tenant scope requires a non-empty Tenant ID.", nameof(tenantId));
-        return new(ResourceScopeType.Tenant, tenantId, Guid.Empty);
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        if (string.Equals(value, Instance.Value, StringComparison.Ordinal)) return Instance;
+        if (TryParseTarget(value, "/tenants/", ResourceScopeKind.Tenant, out var tenant)) return tenant;
+        if (TryParseTarget(value, "/workspaces/", ResourceScopeKind.Workspace, out var workspace)) return workspace;
+        throw new FormatException($"Resource scope reference '{value}' is not canonical.");
     }
 
-    public static ResourceScope Workspace(Guid tenantId, Guid workspaceId)
+    public static bool TryParse(string? value, out ResourceScopeRef scope)
     {
-        if (tenantId == Guid.Empty) throw new ArgumentException("A workspace scope requires a non-empty Tenant ID.", nameof(tenantId));
-        if (workspaceId == Guid.Empty) throw new ArgumentException("A workspace scope requires a non-empty Workspace ID.", nameof(workspaceId));
-        return new(ResourceScopeType.Workspace, tenantId, workspaceId);
+        try
+        {
+            scope = Parse(value!);
+            return true;
+        }
+        catch (Exception exception) when (exception is ArgumentException or FormatException)
+        {
+            scope = default;
+            return false;
+        }
     }
 
-    public static ResourceScope From(ResourceScopeType type, Guid tenantId, Guid workspaceId) => type switch
-    {
-        ResourceScopeType.Instance when tenantId == Guid.Empty && workspaceId == Guid.Empty => Instance,
-        ResourceScopeType.Tenant when workspaceId == Guid.Empty => Tenant(tenantId),
-        ResourceScopeType.Workspace => Workspace(tenantId, workspaceId),
-        _ => throw new ArgumentException("The scope type and identifiers are inconsistent.")
-    };
+    public bool Equals(ResourceScopeRef other) => string.Equals(value, other.value, StringComparison.Ordinal);
+    public override bool Equals(object? obj) => obj is ResourceScopeRef other && Equals(other);
+    public override int GetHashCode() => value is null ? 0 : StringComparer.Ordinal.GetHashCode(value);
+    public override string ToString() => Value;
+    public static bool operator ==(ResourceScopeRef left, ResourceScopeRef right) => left.Equals(right);
+    public static bool operator !=(ResourceScopeRef left, ResourceScopeRef right) => !left.Equals(right);
 
-    public bool IsVisibleFrom(ResourceScope target) => Type switch
+    private static ResourceScopeRef Create(ResourceScopeKind kind, string segment, Guid targetId)
     {
-        ResourceScopeType.Instance => true,
-        ResourceScopeType.Tenant => (target.Type is ResourceScopeType.Tenant or ResourceScopeType.Workspace) && target.TenantId == TenantId,
-        ResourceScopeType.Workspace => target.Type == ResourceScopeType.Workspace && target.TenantId == TenantId && target.WorkspaceId == WorkspaceId,
-        _ => false
-    };
+        if (targetId == Guid.Empty) throw new ArgumentException($"A {kind.ToString().ToLowerInvariant()} scope requires a non-empty target ID.", nameof(targetId));
+        return new($"/{segment}/{targetId:D}", kind, targetId);
+    }
 
-    public override string ToString() => Key;
+    private static bool TryParseTarget(string value, string prefix, ResourceScopeKind kind, out ResourceScopeRef scope)
+    {
+        scope = default;
+        if (!value.StartsWith(prefix, StringComparison.Ordinal)) return false;
+        var identifier = value[prefix.Length..];
+        if (!Guid.TryParseExact(identifier, "D", out var targetId) || targetId == Guid.Empty) return false;
+        var canonical = Create(kind, prefix[1..^1], targetId);
+        if (!string.Equals(value, canonical.Value, StringComparison.Ordinal)) return false;
+        scope = canonical;
+        return true;
+    }
 }
 
 [JsonConverter(typeof(ResourceNamespaceJsonConverter))]
@@ -114,17 +132,17 @@ public readonly record struct ResourceAddress(ResourceNamespace Namespace, strin
     public override string ToString() => $"{Namespace}/{Kind}/{Name}";
 }
 
-public readonly record struct ScopedResourceAddress(ResourceScope Scope, ResourceNamespace Namespace, string Kind, string Name)
+public readonly record struct ScopedResourceAddress(ResourceScopeRef ScopeRef, ResourceNamespace Namespace, string Kind, string Name)
 {
-    public static ScopedResourceAddress Create(ResourceScope scope, ResourceNamespace @namespace, string kind, string name)
+    public static ScopedResourceAddress Create(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string kind, string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return new(scope, @namespace, kind, name);
+        return new(scopeRef, @namespace, kind, name);
     }
 
     public ResourceAddress Address => ResourceAddress.Create(Namespace, Kind, Name);
-    public override string ToString() => $"{Scope}/{Address}";
+    public override string ToString() => $"{ScopeRef}/{Address}";
 }
 
 public sealed class ResourceNamespaceJsonConverter : JsonConverter<ResourceNamespace>
@@ -133,5 +151,14 @@ public sealed class ResourceNamespaceJsonConverter : JsonConverter<ResourceNames
         ResourceNamespace.Parse(reader.GetString());
 
     public override void Write(Utf8JsonWriter writer, ResourceNamespace value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.Value);
+}
+
+public sealed class ResourceScopeRefJsonConverter : JsonConverter<ResourceScopeRef>
+{
+    public override ResourceScopeRef Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        ResourceScopeRef.Parse(reader.GetString() ?? throw new JsonException("A resource scope reference must be a string."));
+
+    public override void Write(Utf8JsonWriter writer, ResourceScopeRef value, JsonSerializerOptions options) =>
         writer.WriteStringValue(value.Value);
 }

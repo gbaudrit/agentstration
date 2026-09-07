@@ -25,7 +25,7 @@ public sealed class ManagedToolExecutionHookTests
                 return ValueTask.FromResult<JsonElement?>(null);
             }),
             [],
-            new ManagementToolExecutionHookResolver(new HookResourceStore([Hook()])),
+            new ManagementToolExecutionHookResolver(new HookResourceStore([Hook()]), new TestScopeResolver()),
             [lifecycle],
             TimeProvider.System);
 
@@ -56,8 +56,7 @@ public sealed class ManagedToolExecutionHookTests
         var providerCalls = 0;
         var resources = new[]
         {
-            Hook() with { WorkspaceId = Guid.NewGuid() },
-            Hook() with { TenantId = Guid.NewGuid() },
+            Hook() with { ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()) },
             Hook() with
             {
                 Metadata = new ResourceMetadata { Name = "other-tool" },
@@ -79,14 +78,15 @@ public sealed class ManagedToolExecutionHookTests
                 return ValueTask.FromResult<JsonElement?>(null);
             }),
             [],
-            new ManagementToolExecutionHookResolver(new HookResourceStore(resources)),
+            new ManagementToolExecutionHookResolver(new HookResourceStore(resources), new TestScopeResolver()),
             [],
             TimeProvider.System);
 
         await pipeline.ExecuteAsync(Context(), default);
         await pipeline.ExecuteAsync(Context() with { WorkspaceId = null }, default);
+        await pipeline.ExecuteAsync(Context() with { TenantId = Guid.NewGuid() }, default);
 
-        Assert.AreEqual(2, providerCalls);
+        Assert.AreEqual(3, providerCalls);
     }
 
     [TestMethod]
@@ -101,7 +101,7 @@ public sealed class ManagedToolExecutionHookTests
                 return ValueTask.FromResult<JsonElement?>(null);
             }),
             [],
-            new ManagementToolExecutionHookResolver(new FailingHookResourceStore()),
+            new ManagementToolExecutionHookResolver(new FailingHookResourceStore(), new TestScopeResolver()),
             [lifecycle],
             TimeProvider.System);
 
@@ -120,8 +120,7 @@ public sealed class ManagedToolExecutionHookTests
         ApiVersion = ManagementApiVersions.CoreV1,
         Kind = ResourceKinds.ToolExecutionHook,
         Metadata = new ResourceMetadata { Name = "managed-deny" },
-        TenantId = Tenant,
-        WorkspaceId = Workspace.Value,
+        ScopeRef = ResourceScopeRef.Workspace(Workspace.Value),
         Generation = 1,
         Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
         Definition = new ToolExecutionHookProperties
@@ -200,5 +199,17 @@ public sealed class ManagedToolExecutionHookTests
         public Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();
         public Task<StoredResource<T>> CreateImmutableAsync<T>(T resource, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException();
         public Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class TestScopeResolver : IResourceScopeResolver
+    {
+        public Task<ResolvedResourceScope?> ResolveAsync(ResourceScopeRef scopeRef, CancellationToken cancellationToken)
+        {
+            if (scopeRef.Kind != ResourceScopeKind.Workspace) return Task.FromResult<ResolvedResourceScope?>(null);
+            var instance = new ResourceScope(1, ResourceScopeRef.Instance, ResourceScopeKind.Instance, "instance", null);
+            var tenant = new ResourceScope(2, ResourceScopeRef.Tenant(Tenant), ResourceScopeKind.Tenant, Tenant.ToString("D"), instance.Id);
+            var workspace = new ResourceScope(3, scopeRef, ResourceScopeKind.Workspace, scopeRef.TargetKey, tenant.Id);
+            return Task.FromResult<ResolvedResourceScope?>(new(workspace, [tenant, instance]));
+        }
     }
 }

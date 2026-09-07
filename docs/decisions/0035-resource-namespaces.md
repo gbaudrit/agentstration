@@ -8,13 +8,13 @@ A workspace can host independent sets of Agents, Flows, Entries, model resources
 
 ## Decision
 
-Resource identity is `(workspace, namespace, kind, name)`. `default` is the implicit namespace for existing resources, routes, and serialized references.
+Resource identity is `(scope, namespace, kind, name)`. `default` is the implicit namespace for existing resources, routes, and serialized references. ADR-0079 defines the scope hierarchy and exact-versus-visible lookup semantics.
 
 `Agentstration.Resources` owns the provider-neutral `ResourceNamespace` and `ResourceAddress` value types. Management metadata, Flow and Workplace identifiers, and Runtime agent references carry this value without creating dependencies between their bounded contexts.
 
 A reference may omit its namespace. An omitted namespace resolves relative to the namespace of the resource containing the reference. An explicitly supplied namespace is preserved. Public namespace-specific routes use `/api/namespaces/{namespace}/...`; existing routes remain compatibility aliases for `default`.
 
-SQLite logical keys and unique indexes include the namespace. Existing rows and keys migrate to `default`, preserving their old addresses.
+SQLite logical keys and unique indexes include the scope and namespace. The pre-release scope change uses a full reseed as defined by ADR-0079.
 
 ## Consequences
 
