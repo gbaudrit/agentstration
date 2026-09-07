@@ -47,7 +47,7 @@ else
             @if (Selected is { } selected)
             {
                 <div class="panel-header scope-detail-header">
-                    <div class="scope-heading"><span class="scope-emblem scope-kind-@selected.Kind.ToString().ToLowerInvariant()" aria-hidden="true"></span><div><p class="eyebrow">@KindLabel(selected.Kind)</p><h2>@ScopeDisplayName(selected)</h2></div></div>
+                    <div class="scope-heading"><div><p class="eyebrow">@KindLabel(selected.Kind)</p><h2>@ScopeDisplayName(selected)</h2></div></div>
                     <div class="scope-detail-badges"><ResourceScopeBadge ScopeRef="selected.ScopeRef" />@if (selected.IsCurrent) { <StatusBadge Text="@T("Current")" Status="UiStatus.Info" /> }</div>
                 </div>
                 <code class="scope-reference">@selected.ScopeRef.Value</code>
