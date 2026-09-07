@@ -1,7 +1,7 @@
 @namespace Agentstration.Web.Components
 @inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.ResourceScopesStrings> Localizer
 
-<button type="button" class="scope-tree-node @(Selected ? "selected" : null)" style="--scope-depth: @Depth" @onclick="SelectAsync" aria-current="@(Selected ? "true" : null)">
+<button type="button" class="scope-tree-node scope-kind-@Scope.Kind.ToString().ToLowerInvariant() @(Selected ? "selected" : null)" style="--scope-depth: @Depth" @onclick="SelectAsync" aria-current="@(Selected ? "true" : null)">
     <span class="scope-tree-marker" aria-hidden="true"></span>
     <span><strong>@DisplayName</strong><small>@Localizer[$"ScopeKind.{Scope.Kind}"].Value · @Localizer["ResourceCount", Scope.Resources.Count].Value</small></span>
     @if (Scope.IsCurrent) { <span class="scope-current-dot" title="@Localizer["Current"]"></span> }

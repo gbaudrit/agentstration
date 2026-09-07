@@ -17,6 +17,7 @@
   <data name="SelectedScopeResources" xml:space="preserve"><value>Selected scope</value></data>
   <data name="Hierarchy" xml:space="preserve"><value>Hierarchy</value></data>
   <data name="OwnershipScopes" xml:space="preserve"><value>Ownership scopes</value></data>
+  <data name="HierarchyDescription" xml:space="preserve"><value>Select a level to inspect the resources it owns directly.</value></data>
   <data name="InstanceName" xml:space="preserve"><value>Agentstration instance</value></data>
   <data name="Current" xml:space="preserve"><value>Current</value></data>
   <data name="Search" xml:space="preserve"><value>Search</value></data>
@@ -26,6 +27,12 @@
   <data name="Resource" xml:space="preserve"><value>Resource</value></data>
   <data name="Namespace" xml:space="preserve"><value>Namespace</value></data>
   <data name="Updated" xml:space="preserve"><value>Updated</value></data>
+  <data name="Actions" xml:space="preserve"><value>Actions</value></data>
+  <data name="Open" xml:space="preserve"><value>Open</value></data>
+  <data name="OpenNamedResource" xml:space="preserve"><value>Open {0}</value></data>
+  <data name="NoDirectPage" xml:space="preserve"><value>This resource has no dedicated console page.</value></data>
+  <data name="ResourceTypes" xml:space="preserve"><value>Resource types in this scope</value></data>
+  <data name="LinksRequireCurrentWorkspace" xml:space="preserve"><value>Switch to this workspace to open its resources.</value></data>
   <data name="NoResources" xml:space="preserve"><value>No matching resources</value></data>
   <data name="NoResourcesMessage" xml:space="preserve"><value>This scope owns no resource matching the current filters.</value></data>
   <data name="ResourceCount" xml:space="preserve"><value>Resources: {0}</value></data>

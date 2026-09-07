@@ -17,6 +17,7 @@
   <data name="SelectedScopeResources" xml:space="preserve"><value>Scope sélectionné</value></data>
   <data name="Hierarchy" xml:space="preserve"><value>Hiérarchie</value></data>
   <data name="OwnershipScopes" xml:space="preserve"><value>Scopes de propriété</value></data>
+  <data name="HierarchyDescription" xml:space="preserve"><value>Sélectionnez un niveau pour examiner les ressources qu’il possède directement.</value></data>
   <data name="InstanceName" xml:space="preserve"><value>Instance Agentstration</value></data>
   <data name="Current" xml:space="preserve"><value>Actuel</value></data>
   <data name="Search" xml:space="preserve"><value>Rechercher</value></data>
@@ -26,6 +27,12 @@
   <data name="Resource" xml:space="preserve"><value>Ressource</value></data>
   <data name="Namespace" xml:space="preserve"><value>Espace de noms</value></data>
   <data name="Updated" xml:space="preserve"><value>Mise à jour</value></data>
+  <data name="Actions" xml:space="preserve"><value>Actions</value></data>
+  <data name="Open" xml:space="preserve"><value>Ouvrir</value></data>
+  <data name="OpenNamedResource" xml:space="preserve"><value>Ouvrir {0}</value></data>
+  <data name="NoDirectPage" xml:space="preserve"><value>Cette ressource ne possède pas de page dédiée dans la console.</value></data>
+  <data name="ResourceTypes" xml:space="preserve"><value>Types de ressources dans ce scope</value></data>
+  <data name="LinksRequireCurrentWorkspace" xml:space="preserve"><value>Basculez vers ce workspace pour ouvrir ses ressources.</value></data>
   <data name="NoResources" xml:space="preserve"><value>Aucune ressource correspondante</value></data>
   <data name="NoResourcesMessage" xml:space="preserve"><value>Ce scope ne possède aucune ressource correspondant aux filtres actuels.</value></data>
   <data name="ResourceCount" xml:space="preserve"><value>Ressources : {0}</value></data>
