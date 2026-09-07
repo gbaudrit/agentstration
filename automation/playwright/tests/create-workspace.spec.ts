@@ -11,9 +11,10 @@ const workspace: CreateWorkspaceInput = {
 };
 
 test('an administrator can create and select a campaign workspace @smoke', async ({ page, product }) => {
+  const pages = new ProductPages(page);
   await createWorkspace({
     ...product,
-    pages: new ProductPages(page),
+    pages,
     checkpoint: ignoreCheckpoints,
   }, workspace);
 
@@ -22,7 +23,11 @@ test('an administrator can create and select a campaign workspace @smoke', async
   const workspaceId = await row.getAttribute('data-workspace-id');
   expect(workspaceId).not.toBeNull();
   await expect(page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-workspace-id', workspaceId!);
+  await expect(page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-workspace-name', workspace.name);
   await expect(page.getByTestId(TestIds.organizationWorkspaces.create)).toHaveAccessibleName(
     ExpectedTextByLocale['en-US'].organizationWorkspaces.createWorkspace,
+  );
+  await expect(pages.organizationWorkspaces.selectByName('missing-campaign')).rejects.toThrow(
+    /not available in the workspace selector.*Available workspaces:/,
   );
 });

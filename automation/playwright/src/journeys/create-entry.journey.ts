@@ -1,6 +1,7 @@
 import { Checkpoints } from '../contracts/checkpoints.js';
 import type { EntryDefinition } from '../pages/entry-editor.page.js';
 import type { Journey } from './journey.js';
+import { prepareConsoleJourney } from './prepare-console.journey.js';
 
 export type CreateEntryInput = EntryDefinition & {
   username?: string;
@@ -10,12 +11,7 @@ export type CreateEntryInput = EntryDefinition & {
 
 export const createEntry: Journey<CreateEntryInput> = async (context, input) => {
   validate(input);
-  await context.pages.login.signIn(context.consoleUrl, input.username, input.password);
-  await context.pages.ensureTheme(context.theme ?? 'dark');
-  if (input.workspaceName) {
-    await context.pages.organizationWorkspaces.open(context.consoleUrl);
-    await context.pages.organizationWorkspaces.selectByName(input.workspaceName);
-  }
+  await prepareConsoleJourney(context, input);
 
   const editor = context.pages.entryEditor;
   await editor.openNew(context.consoleUrl);

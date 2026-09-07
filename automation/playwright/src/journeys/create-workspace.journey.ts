@@ -25,14 +25,14 @@ export const createWorkspace: Journey<CreateWorkspaceInput> = async (context, in
     target: context.pages.organizationWorkspaces.createForm,
   });
 
-  const workspaceId = await context.pages.organizationWorkspaces.create(input);
+  await context.pages.organizationWorkspaces.create(input);
   await context.checkpoint({
     name: Checkpoints.createWorkspace.created,
     page: context.pages.page,
     target: context.pages.organizationWorkspaces.row(input.name),
   });
 
-  await context.pages.organizationWorkspaces.select(workspaceId);
+  await context.pages.organizationWorkspaces.selectByName(input.name);
   await context.checkpoint({
     name: Checkpoints.createWorkspace.selected,
     page: context.pages.page,

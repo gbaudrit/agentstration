@@ -40,11 +40,29 @@ export class OrganizationWorkspacesPage {
   }
 
   public async selectByName(name: string): Promise<void> {
-    const workspaceId = await this.workspaceId(name);
-    if (!workspaceId) throw new Error(`Campaign workspace '${name}' does not exist.`);
-    const currentWorkspaceId = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-workspace-id');
-    if (currentWorkspaceId === workspaceId) return;
+    const shell = this.page.getByTestId(TestIds.console.shell);
+    await shell.waitFor({ state: 'visible' });
+    if (await shell.getAttribute('data-workspace-name') === name) return;
+
+    const selector = this.page.getByTestId(TestIds.console.workspaceSelector);
+    if (await selector.count() === 0) {
+      throw new Error(`Campaign workspace '${name}' is not available in the workspace selector.`);
+    }
+
+    const options = await selector.locator('option').evaluateAll(elements => elements.map(element => ({
+      name: element.getAttribute('data-workspace-name'),
+      value: (element as HTMLOptionElement).value,
+    })));
+    const workspaceId = options.find(option => option.name === name)?.value;
+    if (!workspaceId) {
+      const availableNames = options.map(option => option.name).filter(Boolean).join(', ');
+      throw new Error(`Campaign workspace '${name}' is not available in the workspace selector. Available workspaces: ${availableNames || 'none'}.`);
+    }
+
     await this.select(workspaceId);
+    if (await shell.getAttribute('data-workspace-name') !== name) {
+      throw new Error(`Workspace selector did not activate campaign workspace '${name}'.`);
+    }
   }
 
   public row(name: string): Locator {

@@ -32,11 +32,12 @@ $env:AGENTSTRATION_CONSOLE_URL = "http://localhost:53400"
 $env:AGENTSTRATION_WORKPLACE_URL = "http://localhost:53401"
 $env:AGENTSTRATION_USERNAME = "admin"
 $env:AGENTSTRATION_PASSWORD = "admin"
+$env:AGENTSTRATION_WORKSPACE_NAME = "playwright-campaign"
 Set-Location automation/playwright
 npx playwright test --ui
 ```
 
-`AGENTSTRATION_USERNAME` and `AGENTSTRATION_PASSWORD` are required together when `AGENTSTRATION_CONSOLE_URL` selects external UI-test mode. Explicit `username` and `password` journey input overrides the environment pair. Managed local hosts retain the public Development fixture `admin / admin`; the environment-selected external mode never falls back to it silently. `AGENTSTRATION_WORKPLACE_URL` is optional for Console-only tests and otherwise falls back to the Console URL. In external mode Playwright neither starts nor stops the product, and it does not isolate or reset its data. Use a disposable instance or a dedicated campaign Workspace, and expect create-only journeys to reject resources left by an earlier run. Remove the environment variables to return to managed isolated hosts.
+`AGENTSTRATION_USERNAME` and `AGENTSTRATION_PASSWORD` are required together when `AGENTSTRATION_CONSOLE_URL` selects external UI-test mode. Explicit `username` and `password` journey input overrides the environment pair. `AGENTSTRATION_WORKSPACE_NAME` selects an existing campaign Workspace by its stable technical name from the Console header; an explicit journey `workspaceName` overrides it. The journey fails immediately if the configured Workspace is not offered by the selector and never creates it implicitly. Managed local hosts retain the public Development fixture `admin / admin`; the environment-selected external mode never falls back to it silently. `AGENTSTRATION_WORKPLACE_URL` is optional for Console-only tests and otherwise falls back to the Console URL. In external mode Playwright neither starts nor stops the product, and it does not isolate or reset its data. Use a disposable instance or a dedicated campaign Workspace, and expect create-only journeys to reject resources left by an earlier run. Remove the environment variables to return to managed isolated hosts.
 
 ## Design rules
 
@@ -66,7 +67,7 @@ The scoped [`automation/playwright/AGENTS.md`](../../automation/playwright/AGENT
 
 A campaign workspace is the durable data sandbox for a related set of UX tests, screenshots, or video takes. It is not the campaign definition itself: locale, theme, viewport, product revision, scenario data, and output evidence remain explicit plan dimensions.
 
-The `create-workspace` journey creates and selects a new workspace and fails if its technical name already exists. Other journeys may accept `workspaceName` to select a workspace prepared by the caller, but they never silently create, replace, reuse, or delete it. Required resources must be seeded or installed explicitly in that workspace before a dependent journey runs.
+The `create-workspace` journey creates and selects a new workspace and fails if its technical name already exists. Other journeys resolve the Workspace from an explicit `workspaceName`, then `AGENTSTRATION_WORKSPACE_NAME`, and otherwise keep the current Workspace. A configured Workspace is selected directly from the global Console header; the journeys do not visit Organization settings and never silently create, replace, reuse, or delete it. Required resources must be seeded or installed explicitly in that workspace before a dependent journey runs.
 
 For an existing Console instance, a typical campaign begins with:
 

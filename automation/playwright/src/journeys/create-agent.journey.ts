@@ -1,6 +1,7 @@
 import type { AgentDefinition } from '../pages/agent-editor.page.js';
 import { Checkpoints } from '../contracts/checkpoints.js';
 import type { Journey } from './journey.js';
+import { prepareConsoleJourney } from './prepare-console.journey.js';
 
 export type CreateAgentInput = AgentDefinition & {
   username?: string;
@@ -10,12 +11,7 @@ export type CreateAgentInput = AgentDefinition & {
 
 export const createAgent: Journey<CreateAgentInput> = async (context, input) => {
   validate(input);
-  await context.pages.login.signIn(context.consoleUrl, input.username, input.password);
-  await context.pages.ensureTheme(context.theme ?? 'dark');
-  if (input.workspaceName) {
-    await context.pages.organizationWorkspaces.open(context.consoleUrl);
-    await context.pages.organizationWorkspaces.selectByName(input.workspaceName);
-  }
+  await prepareConsoleJourney(context, input);
   await context.pages.agentEditor.openNew(context.consoleUrl);
   await context.checkpoint({
     name: Checkpoints.createAgent.formEmpty,
