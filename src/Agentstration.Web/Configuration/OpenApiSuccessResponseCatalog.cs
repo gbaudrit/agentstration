@@ -242,6 +242,11 @@ internal static class OpenApiSuccessResponseCatalog
                     : Json<SourceBindingStatusView>(200, "Get Source Provider binding status");
             if (path.EndsWith("/status", StringComparison.OrdinalIgnoreCase))
                 return Json<SourceChannelStatusView>(200, "Get Source Channel status");
+            if (path.EndsWith("/verification", StringComparison.OrdinalIgnoreCase)
+                && path.Contains("/snapshots/", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceChannelSnapshotVerificationView>(200, "Get Source Channel Snapshot verification");
+            if (path.EndsWith("/verification", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceDefinitionVerificationView>(200, "Get Source Version verification");
             if (path.EndsWith("/versions/{versionUid}", StringComparison.OrdinalIgnoreCase))
                 return Json<SourceVersionResource>(200, "Get an immutable Source Version");
             if (path.EndsWith("/versions", StringComparison.OrdinalIgnoreCase))

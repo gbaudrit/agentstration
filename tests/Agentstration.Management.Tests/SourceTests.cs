@@ -21,6 +21,103 @@ namespace Agentstration.Management.Tests;
 public sealed class SourceTests
 {
     [TestMethod]
+    public void VerificationIndexContractAcceptsMovingAndImmutableManifestLocations()
+    {
+        var index = new SourceVerificationIndexReader().Read($$"""
+            apiVersion: agentstration.io/v1
+            kind: VerifiedSourceIndex
+            metadata:
+              name: official
+            definition:
+              sources:
+                - source:
+                    publisher: agentstration
+                    name: bootstrap-samples
+                  version: "1"
+                  manifestDigest: sha256:{{new string('a', 64)}}
+                  publisher:
+                    name: agentstration
+                    displayName: Agentstration
+                  manifestLocations:
+                    - url: https://registry.agentstration.io/latest/source.yaml
+                      mutable: true
+                    - url: https://registry.agentstration.io/versions/1/source.yaml
+                  evidence:
+                    type: official-static-index
+                    authority: agentstration
+                  channels: []
+            """);
+
+        Assert.AreEqual(2, index.Definition.Sources.Single().ManifestLocations.Count);
+        Assert.IsTrue(index.Definition.Sources.Single().ManifestLocations.Single(value => value.Mutable).Mutable);
+    }
+
+    [TestMethod]
+    public async Task ExactDefinitionDigestIsVerifiedForYamlAndUrlImportsWithoutBecomingRequiredAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        var manifest = Manifest("1", "Published name", includeChannel: false);
+        var parsed = new SourceManifestReader().Read(manifest);
+        fixture.VerificationIndex.Index = VerificationIndex("1", parsed.Digest);
+
+        var yaml = await fixture.Service.ImportYamlAsync(manifest, default);
+        fixture.Retriever.Content = manifest;
+        var url = await fixture.Service.ImportUrlAsync(new Uri("https://registry.example/source.yaml"), default);
+
+        Assert.AreEqual(SourceVerificationStatus.Verified, yaml.Verification.Status);
+        Assert.AreEqual(SourceVerificationStatus.Verified, url.Verification.Status);
+        Assert.AreEqual(SourceImportOutcome.Unchanged, url.Outcome);
+
+        fixture.VerificationIndex.Index = VerificationIndex("2", parsed.Digest);
+        var unlisted = await fixture.Service.ImportYamlAsync(Manifest("2", "Changed", includeChannel: false), default);
+        Assert.AreEqual(SourceVerificationStatus.Unverified, unlisted.Verification.Status);
+
+        fixture.VerificationIndex.Failure = new HttpRequestException("offline");
+        var unavailable = await fixture.Verification.VerifyDefinitionAsync(yaml.Version, default);
+        Assert.AreEqual(SourceVerificationStatus.Unavailable, unavailable.Status);
+        Assert.IsNotNull(await fixture.Service.GetVersionExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", yaml.Version.Uid, default));
+    }
+
+    [TestMethod]
+    public async Task SnapshotVerificationRequiresItsExactChannelRevisionAndContentDigestAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        var refreshed = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+        var evidence = new SourceVerificationEvidence { Type = "official-snapshot", Authority = "agentstration" };
+        var exactChannel = new VerifiedSourceChannelDefinition
+        {
+            Name = "stable",
+            Revision = refreshed.Snapshot.Definition.ResolvedRevision,
+            SnapshotDigest = refreshed.Snapshot.Definition.Artifact.Sha256,
+            Evidence = evidence
+        };
+        fixture.VerificationIndex.Index = VerificationIndex(
+            imported.Version.Definition.Version,
+            imported.Version.Definition.ManifestDigest,
+            [exactChannel]);
+
+        var verified = await fixture.Verification.VerifySnapshotAsync(imported.Version, refreshed.Snapshot, default);
+        Assert.AreEqual(SourceVerificationStatus.Verified, verified.Status);
+        Assert.AreEqual(evidence, verified.Evidence);
+
+        fixture.VerificationIndex.Index = VerificationIndex(
+            imported.Version.Definition.Version,
+            imported.Version.Definition.ManifestDigest,
+            [exactChannel with { SnapshotDigest = $"sha256:{new string('0', 64)}" }]);
+        var changed = await fixture.Verification.VerifySnapshotAsync(imported.Version, refreshed.Snapshot, default);
+        Assert.AreEqual(SourceVerificationStatus.Unverified, changed.Status);
+        Assert.IsNull(changed.Evidence);
+    }
+
+    [TestMethod]
     public void ChannelCompatibilityUsesSemanticPrereleaseOrderingAndExclusiveMaximum()
     {
         var versions = new FakeAgentstrationVersionProvider();
@@ -603,6 +700,22 @@ public sealed class SourceTests
     }
 
     [TestMethod]
+    public async Task VerificationIndexProviderIsOptionalAndRequiresHttpsAsync()
+    {
+        using var client = new HttpClient(new StubHttpHandler(_ => throw new AssertFailedException("No request was expected.")));
+        var reader = new SourceVerificationIndexReader();
+        var disabled = new HttpSourceVerificationIndexProvider(client, new SourceVerificationIndexOptions(), reader);
+        Assert.IsNull(await disabled.GetAsync(default));
+
+        var insecure = new HttpSourceVerificationIndexProvider(
+            client,
+            new SourceVerificationIndexOptions { Url = "http://registry.example/verified-sources.yaml" },
+            reader);
+        var error = await Assert.ThrowsExactlyAsync<SourceValidationException>(() => insecure.GetAsync(default));
+        Assert.AreEqual("source_verification_index_url_invalid", error.Code);
+    }
+
+    [TestMethod]
     public async Task PlatformApiImportsListsAndUpdatesDisplayNameAsync()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
@@ -621,6 +734,12 @@ public sealed class SourceTests
         Assert.AreEqual("Published name", imported.Source.Configuration.Definition.DisplayName);
         var workspaceScope = ResourceScopeRef.Workspace(context.Context.WorkspaceId);
         Assert.AreEqual(workspaceScope, imported.Source.Source.ScopeRef);
+        Assert.AreEqual(SourceVerificationStatus.Unverified, imported.Verification.Status);
+        var verification = await client.GetFromJsonAsync<SourceDefinitionVerificationView>(
+            $"/api/sources/agentstration/{name}/versions/{imported.Version.Uid:D}/verification?scopeRef={Uri.EscapeDataString(workspaceScope.ToString())}");
+        Assert.IsNotNull(verification);
+        Assert.AreEqual("agentstration", verification.DeclaredPublisher.Name);
+        Assert.IsNull(verification.VerifiedPublisher);
 
         var instanceResponse = await client.PostAsJsonAsync(
             "/api/sources/imports/yaml",
@@ -817,6 +936,28 @@ public sealed class SourceTests
         }
     };
 
+    private static VerifiedSourceIndexManifest VerificationIndex(
+        string version,
+        string manifestDigest,
+        IReadOnlyList<VerifiedSourceChannelDefinition>? channels = null) => new()
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = SourceVerificationKinds.VerifiedSourceIndex,
+            Definition = new VerifiedSourceIndexDefinition
+            {
+                Sources = [new VerifiedSourceDefinition
+                {
+                    Source = new() { Publisher = "agentstration", Name = "official-samples" },
+                    Version = version,
+                    ManifestDigest = manifestDigest,
+                    Publisher = new() { Name = "agentstration", DisplayName = "Agentstration" },
+                    ManifestLocations = [new() { Url = "https://registry.example/source.yaml", Mutable = true }],
+                    Evidence = new() { Type = "official-static-index", Authority = "agentstration" },
+                    Channels = channels ?? []
+                }]
+            }
+        };
+
     private sealed class StubHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
@@ -825,8 +966,24 @@ public sealed class SourceTests
 
     private sealed class StubRetriever : ISourceManifestRetriever
     {
+        public string? Content { get; set; }
+
         public Task<RetrievedSourceManifest> RetrieveAsync(Uri source, CancellationToken cancellationToken) =>
-            throw new SourceRetrievalException("not_configured", "No test HTTP source is configured.");
+            Content is null
+                ? throw new SourceRetrievalException("not_configured", "No test HTTP source is configured.")
+                : Task.FromResult(new RetrievedSourceManifest(Content, new SourceManifestOrigin { Url = source.AbsoluteUri }));
+    }
+
+    private sealed class FakeSourceVerificationIndexProvider : ISourceVerificationIndexProvider
+    {
+        public VerifiedSourceIndexManifest? Index { get; set; }
+        public Exception? Failure { get; set; }
+
+        public Task<VerifiedSourceIndexManifest?> GetAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Failure is null ? Task.FromResult(Index) : Task.FromException<VerifiedSourceIndexManifest?>(Failure);
+        }
     }
 
     private sealed class Fixture : IAsyncDisposable
@@ -840,6 +997,9 @@ public sealed class SourceTests
         public SourceBindingManagementService Bindings => services.GetRequiredService<SourceBindingManagementService>();
         public SourceChannelSnapshotService Snapshots => services.GetRequiredService<SourceChannelSnapshotService>();
         public SourceCatalogService Catalogs => services.GetRequiredService<SourceCatalogService>();
+        public SourceVerificationService Verification => services.GetRequiredService<SourceVerificationService>();
+        public FakeSourceVerificationIndexProvider VerificationIndex => services.GetRequiredService<FakeSourceVerificationIndexProvider>();
+        public StubRetriever Retriever => services.GetRequiredService<StubRetriever>();
         public FakeSourceProviderMaterializer Materializer => services.GetRequiredService<FakeSourceProviderMaterializer>();
         public FakeAgentstrationVersionProvider Versions => services.GetRequiredService<FakeAgentstrationVersionProvider>();
         public FakeExtensionInspector Inspector => services.GetRequiredService<FakeExtensionInspector>();
@@ -870,7 +1030,11 @@ public sealed class SourceTests
                 provider.GetRequiredService<IResourceScopeResolver>()));
             collection.AddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
             collection.AddSingleton<ISourceManifestReader, SourceManifestReader>();
-            collection.AddSingleton<ISourceManifestRetriever, StubRetriever>();
+            collection.AddSingleton<StubRetriever>();
+            collection.AddSingleton<ISourceManifestRetriever>(provider => provider.GetRequiredService<StubRetriever>());
+            collection.AddSingleton<FakeSourceVerificationIndexProvider>();
+            collection.AddSingleton<ISourceVerificationIndexProvider>(provider => provider.GetRequiredService<FakeSourceVerificationIndexProvider>());
+            collection.AddSingleton<SourceVerificationService>();
             collection.AddSingleton<SourceManagementService>();
             collection.AddSingleton<ExtensionRegistrationManagementService>();
             collection.AddSingleton<SourceProviderManagementService>();

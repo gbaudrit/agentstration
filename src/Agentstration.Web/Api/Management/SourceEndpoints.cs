@@ -18,11 +18,13 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         sources.MapGet("/{publisher}/{name}", GetAsync);
         sources.MapGet("/{publisher}/{name}/versions", ListVersionsAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}", GetVersionAsync);
+        sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/verification", GetVersionVerificationAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/bindings", GetBindingsAsync);
         sources.MapPut("/{publisher}/{name}/versions/{versionUid:guid}/bindings", ConfigureBindingsAsync);
         sources.MapPost("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/refresh", RefreshChannelAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots", ListChannelSnapshotsAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}", GetChannelSnapshotAsync);
+        sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/verification", GetChannelSnapshotVerificationAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/status", GetChannelStatusAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/catalogs", BrowseCatalogsAsync);
         sources.MapPut("/{publisher}/{name}/display-name", UpdateDisplayNameAsync);
@@ -119,6 +121,22 @@ internal sealed class SourceEndpoints : IManagementEndpoint
                 ? await service.UpdateDisplayNameExactAsync(scope, publisher, name, request.DisplayName, ifMatch, cancellationToken)
                 : await service.UpdateDisplayNameAsync(publisher, name, request.DisplayName, ifMatch, cancellationToken);
             return ManagementHttp.ResourceResult(updated, response, StatusCodes.Status200OK);
+        });
+
+    private static Task<IResult> GetVersionVerificationAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string? scopeRef,
+        SourceManagementService sources,
+        SourceVerificationService verification,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var scope = await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken);
+            var version = await sources.GetVersionExactAsync(scope, publisher, name, versionUid, cancellationToken)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            return Results.Ok(await verification.VerifyDefinitionAsync(version, cancellationToken));
         });
 
     private static Task<IResult> GetBindingsAsync(
@@ -226,6 +244,27 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.GetStatusAsync(
             await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
             publisher, name, versionUid, channel, cancellationToken)));
+
+    private static Task<IResult> GetChannelSnapshotVerificationAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channel,
+        Guid snapshotUid,
+        string? scopeRef,
+        SourceManagementService sources,
+        SourceChannelSnapshotService snapshots,
+        SourceVerificationService verification,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var scope = await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken);
+            var version = await sources.GetVersionExactAsync(scope, publisher, name, versionUid, cancellationToken)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            var snapshot = await snapshots.GetAsync(scope, publisher, name, versionUid, channel, snapshotUid, cancellationToken)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")));
+            return Results.Ok(await verification.VerifySnapshotAsync(version, snapshot, cancellationToken));
+        });
 
     private static async Task<Agentstration.Resources.ResourceScopeRef> ResolveScopeAsync(
         string? value,

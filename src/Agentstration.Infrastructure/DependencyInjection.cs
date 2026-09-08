@@ -49,7 +49,8 @@ public static class DependencyInjection
         string? flowConnectionString = null,
         string? runtimeConnectionString = null,
         AgentstrationStorageOptions? storageOptions = null,
-        bool enableHostedServices = true)
+        bool enableHostedServices = true,
+        SourceVerificationIndexOptions? sourceVerificationIndexOptions = null)
     {
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton<LocalBootstrapOptions>();
@@ -157,6 +158,7 @@ public static class DependencyInjection
         services.AddSingleton<PackAuthoringService>();
         services.AddSingleton<PackCompositionService>();
         services.AddSingleton<ISourceManifestReader, Agentstration.Management.Contracts.SourceManifestReader>();
+        services.AddSingleton<ISourceVerificationIndexReader, Agentstration.Management.Contracts.SourceVerificationIndexReader>();
         services.AddHttpClient<ISourceManifestRetriever, HttpSourceManifestRetriever>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(15);
@@ -166,7 +168,23 @@ public static class DependencyInjection
             AllowAutoRedirect = true,
             MaxAutomaticRedirections = 5
         });
+        sourceVerificationIndexOptions ??= new SourceVerificationIndexOptions();
+        if (sourceVerificationIndexOptions.TimeoutSeconds is < 1 or > 60)
+            throw new InvalidOperationException("Source verification index timeout must be between 1 and 60 seconds.");
+        if (sourceVerificationIndexOptions.MaximumBytes is < 1024 or > Agentstration.Management.Contracts.SourceVerificationIndexReader.MaximumIndexBytes)
+            throw new InvalidOperationException($"Source verification index maximum bytes must be between 1024 and {Agentstration.Management.Contracts.SourceVerificationIndexReader.MaximumIndexBytes}.");
+        services.AddSingleton(sourceVerificationIndexOptions);
+        services.AddHttpClient<ISourceVerificationIndexProvider, HttpSourceVerificationIndexProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(sourceVerificationIndexOptions.TimeoutSeconds);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Source-Verification/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 5
+        });
         services.AddSingleton<SourceManagementService>();
+        services.AddSingleton<SourceVerificationService>();
         services.AddSingleton<SourceBindingManagementService>();
         services.AddSingleton<IAgentstrationVersionProvider, AssemblyAgentstrationVersionProvider>();
         services.AddSingleton<SourceChannelCompatibilityEvaluator>();

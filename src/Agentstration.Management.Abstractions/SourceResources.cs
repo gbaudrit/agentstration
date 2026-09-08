@@ -147,6 +147,97 @@ public sealed record SourceManifestOrigin
     public DateTimeOffset? LastModified { get; init; }
 }
 
+public static class SourceVerificationKinds
+{
+    public const string VerifiedSourceIndex = "VerifiedSourceIndex";
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<SourceVerificationStatus>))]
+public enum SourceVerificationStatus
+{
+    [JsonStringEnumMemberName("verified")] Verified,
+    [JsonStringEnumMemberName("unverified")] Unverified,
+    [JsonStringEnumMemberName("unavailable")] Unavailable
+}
+
+public sealed record VerifiedSourceIdentity
+{
+    public required string Publisher { get; init; }
+    public required string Name { get; init; }
+}
+
+public sealed record SourceVerificationEvidence
+{
+    public required string Type { get; init; }
+    public required string Authority { get; init; }
+    public string? Reference { get; init; }
+}
+
+public sealed record VerifiedSourceManifestLocation
+{
+    public required string Url { get; init; }
+    public bool Mutable { get; init; }
+}
+
+public sealed record VerifiedSourceChannelDefinition
+{
+    public required string Name { get; init; }
+    public required string Revision { get; init; }
+    public required string SnapshotDigest { get; init; }
+    public required SourceVerificationEvidence Evidence { get; init; }
+}
+
+public sealed record VerifiedSourceDefinition
+{
+    public required VerifiedSourceIdentity Source { get; init; }
+    public required string Version { get; init; }
+    public required string ManifestDigest { get; init; }
+    public required SourcePublisher Publisher { get; init; }
+    public IReadOnlyList<VerifiedSourceManifestLocation> ManifestLocations { get; init; } = [];
+    public required SourceVerificationEvidence Evidence { get; init; }
+    public IReadOnlyList<VerifiedSourceChannelDefinition> Channels { get; init; } = [];
+}
+
+public sealed record VerifiedSourceIndexDefinition
+{
+    public IReadOnlyList<VerifiedSourceDefinition> Sources { get; init; } = [];
+}
+
+public sealed record VerifiedSourceIndexManifest
+{
+    public required string ApiVersion { get; init; }
+    public required string Kind { get; init; }
+    public ResourceMetadata Metadata { get; init; } = new();
+    public required VerifiedSourceIndexDefinition Definition { get; init; }
+}
+
+public sealed record SourceDefinitionVerificationView(
+    SourceVerificationStatus Status,
+    string ReasonCode,
+    SourcePublisher DeclaredPublisher,
+    SourcePublisher? VerifiedPublisher,
+    SourceVerificationEvidence? Evidence,
+    IReadOnlyList<VerifiedSourceManifestLocation> ManifestLocations);
+
+public sealed record SourceChannelSnapshotVerificationView(
+    SourceVerificationStatus Status,
+    string ReasonCode,
+    SourceDefinitionVerificationView Definition,
+    string Channel,
+    string Revision,
+    string SnapshotDigest,
+    SourceVerificationEvidence? Evidence);
+
+public interface ISourceVerificationIndexProvider
+{
+    Task<VerifiedSourceIndexManifest?> GetAsync(CancellationToken cancellationToken);
+}
+
+public interface ISourceVerificationIndexReader
+{
+    VerifiedSourceIndexManifest Read(string content);
+}
+
 public sealed record SourceConfigurationProperties
 {
     public required Guid SourceUid { get; init; }
@@ -501,4 +592,5 @@ public sealed record SourceView(
 public sealed record SourceImportResult(
     SourceView Source,
     SourceVersionResource Version,
-    SourceImportOutcome Outcome);
+    SourceImportOutcome Outcome,
+    SourceDefinitionVerificationView Verification);

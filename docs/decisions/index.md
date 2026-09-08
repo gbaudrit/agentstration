@@ -117,3 +117,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 85. [ADR-0085 — Source Channel snapshots pin provider provenance](0085-source-channel-snapshots-pin-provider-provenance.md)
 86. [ADR-0086 — Source catalogs resolve inside pinned snapshots](0086-source-catalogs-resolve-inside-pinned-snapshots.md)
 87. [ADR-0087 — Source Channel compatibility uses Semantic Version intervals](0087-source-channel-compatibility-uses-semantic-version-intervals.md)
+88. [ADR-0088 — Source verification binds exact definitions and snapshots](0088-source-verification-binds-exact-definitions-and-snapshots.md)
