@@ -31,7 +31,7 @@ The same `Agentstration.Web` process is the authoritative server for Console and
 
 ## Run with Compose
 
-All Compose definitions live under `deploy/compose`. The `base.yml` topology remains a minimal deterministic launch. Choose one provider-specific topology to run its AEP extension together with the Utilities extension.
+All Compose definitions live under `deploy/compose`. The colocated [Compose command reference](../../deploy/compose/README.md) provides copy-ready SQLite, PostgreSQL, model-management, log, and shutdown commands. The `base.yml` topology remains a minimal deterministic launch. Choose one provider-specific topology to run its AEP extension together with the Utilities extension.
 
 For a container-owned Ollama instance:
 
