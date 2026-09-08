@@ -81,6 +81,16 @@ public sealed class BootstrapProfileManagementService(
         return await bootstrap.PreviewAsync(selection, cancellationToken);
     }
 
+    public async Task<BootstrapProfileSummary> GetSourceProfileAsync(
+        BootstrapSourceProfileSelection selection,
+        Guid actorPrincipalId,
+        CancellationToken cancellationToken)
+    {
+        await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        await using var loaded = await sourceProfiles.LoadAsync(selection, cancellationToken);
+        return loaded.Profiles.Single().Summary;
+    }
+
     public async Task<IReadOnlyList<BootstrapBindingTargetOption>> GetBindingTargetsAsync(
         BootstrapApplicationTarget? target,
         BootstrapBindingTargetKind targetKind,
