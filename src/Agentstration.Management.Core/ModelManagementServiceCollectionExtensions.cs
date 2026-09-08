@@ -11,6 +11,7 @@ public static class ModelManagementServiceCollectionExtensions
     public static IServiceCollection AddAgentstrationModelManagement(this IServiceCollection services)
     {
         services.AddSingleton<ModelProviderManagementService>();
+        services.AddSingleton<SourceProviderManagementService>();
         services.AddSingleton<IModelProviderConfigurationStore>(provider => provider.GetRequiredService<ModelProviderManagementService>());
         services.AddSingleton<ModelProfileManagementService>();
         services.AddSingleton<ModelProfileOptionMigrationService>();

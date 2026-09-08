@@ -17,6 +17,7 @@
   <Folder Name="/samples/">
     <Project Path="samples/HelloAepExtension/HelloAepExtension.csproj" />
     <Project Path="samples/ModelProviderExtension/ModelProviderExtension.csproj" />
+    <Project Path="samples/SourceProviderExtension/SourceProviderExtension.csproj" />
     <Project Path="samples/ToolsExtension/ToolsExtension.csproj" />
   </Folder>
   <Folder Name="/tests/">

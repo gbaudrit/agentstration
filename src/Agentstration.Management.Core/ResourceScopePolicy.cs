@@ -9,6 +9,8 @@ public static class ResourceScopePolicy
 {
     private static readonly IReadOnlySet<ResourceScopeKind> InstanceTenantWorkspace =
         new HashSet<ResourceScopeKind>([ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace]);
+    private static readonly IReadOnlySet<ResourceScopeKind> InstanceOnly =
+        new HashSet<ResourceScopeKind>([ResourceScopeKind.Instance]);
     private static readonly IReadOnlySet<ResourceScopeKind> TenantOnly =
         new HashSet<ResourceScopeKind>([ResourceScopeKind.Tenant]);
     private static readonly IReadOnlySet<ResourceScopeKind> WorkspaceOnly =
@@ -16,6 +18,7 @@ public static class ResourceScopePolicy
     public static IReadOnlySet<ResourceScopeKind> AllowedScopes(string kind) => kind switch
     {
         ResourceKinds.ModelProvider or ResourceKinds.ModelProfile or ResourceKinds.RuntimeProfile => TenantOnly,
+        ResourceKinds.SourceProvider => InstanceOnly,
         ResourceKinds.Vault or ResourceKinds.Secret => InstanceTenantWorkspace,
         ResourceKinds.ToolProvider or ResourceKinds.Tool or ResourceKinds.ToolExecutionHook => WorkspaceOnly,
         ResourceKinds.Agent or ResourceKinds.AgentRevision or ResourceKinds.AgentDeployment or ResourceKinds.Trigger => WorkspaceOnly,

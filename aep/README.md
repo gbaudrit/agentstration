@@ -28,11 +28,12 @@ dotnet run --project inspector/Agentstration.Aep.Inspector.Web
 
 Open the Inspector at `http://localhost:5190` and connect to `http://localhost:5200`.
 
-Two executable capability samples exercise the interactive workbench without a provider dependency:
+Three executable capability samples exercise protocol capabilities without an external provider dependency:
 
 ```powershell
 dotnet run --project samples/ModelProviderExtension # http://localhost:5201
 dotnet run --project samples/ToolsExtension         # http://localhost:5202
+dotnet run --project samples/SourceProviderExtension
 ```
 
 The Inspector provides:
@@ -45,6 +46,8 @@ The Inspector provides:
 - conformance validation and formatted raw payloads.
 
 Extensions can publish immutable option-set versions and explicit directed migrations through `aep.configuration`. Consumers pin the option-set id, version, and schema digest; a newer preferred version does not silently reinterpret existing values. Migration requests validate every step before returning a new envelope. Secret annotations and schema-driven editing in the standalone Inspector remain future work.
+
+The `SourceProviderExtension` sample demonstrates the native `aep.source-provider` Resolve/Materialize lifecycle entirely offline. Source Provider configuration uses the versioned `source-channel` option scope, and materialization is bounded by archive size, entry count, expanded size, timeout, exact revision, and SHA-256 integrity checks. AEP does not interpret Source catalogs or expose acquisition as an MCP tool.
 
 ## CLI
 

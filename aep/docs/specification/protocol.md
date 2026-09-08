@@ -36,6 +36,7 @@ Initial registered names are:
 
 - `aep.health`
 - `aep.model-provider`
+- `aep.source-provider`
 - `aep.tools`
 - `aep.configuration`
 
@@ -43,9 +44,19 @@ Unknown names are preserved. Each capability evolves through its own version and
 
 The model-provider capability currently uses `/aep/model-providers`. AEP tool contributions may map to MCP servers; MCP remains authoritative for tool schema and invocation.
 
+### Source providers
+
+An extension that advertises `aep.source-provider` exposes descriptors at `/aep/source-providers`. Each `source-provider` contribution uses an immutable configuration option set whose scope is `source-channel`.
+
+`POST /aep/source-providers/{providerId}/resolve` accepts the complete versioned Channel configuration envelope and returns an immutable provider revision plus provider-defined integrity algorithm and digest. `POST /aep/source-providers/{providerId}/materialize` accepts the same configuration, the exact resolved revision, and positive limits for archive bytes, entry count, expanded bytes, and execution time. It returns an opaque archive with the exact revision, media type, declared sizes, and SHA-256 content digest.
+
+The server intersects client limits with its own configured maxima. Revision mismatches, digest mismatches, invalid option envelopes, provider timeouts, and exceeded limits fail closed through stable AEP errors. Consumers must also enforce the declared limits and integrity before extracting an archive. Archive paths and contents are not interpreted by AEP.
+
+Source providers own acquisition only. Source identity, version and Channel lifecycle, snapshot retention, path isolation, and interpretation of Agentstration catalogs, Bootstrap Profiles, or Packs remain consumer responsibilities. Source acquisition is not an MCP Tool capability.
+
 ### Versioned configuration
 
-An extension that advertises `aep.configuration` exposes an `AepConfigurationCatalog` at the capability endpoint, conventionally `/aep/configuration`. An option set identifies one contribution and one scope, declares a preferred authoring version, and publishes all supported immutable versions with their JSON Schema and SHA-256 digest.
+An extension that advertises `aep.configuration` exposes an `AepConfigurationCatalog` at the capability endpoint, conventionally `/aep/configuration`. An option set identifies one contribution and one scope, declares a preferred authoring version, and publishes all supported immutable versions with their JSON Schema and SHA-256 digest. Model-provider options use `model-profile`; Source Provider options use `source-channel`.
 
 Native request options carry `optionSet`, exact `version`, `schemaDigest`, and an object-valued `values` member. Servers reject an unknown set, removed version, changed digest, or schema-invalid value before invoking the contribution. Changing a schema requires a new option-set version; changing the preferred version does not migrate pinned requests.
 

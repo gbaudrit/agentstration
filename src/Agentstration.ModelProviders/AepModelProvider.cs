@@ -128,6 +128,8 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
                     .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.ModelProvider, value.Id))
                     .Concat((manifest.Contributions.Tools ?? [])
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.Tool, value.Id)))
+                    .Concat((manifest.Contributions.SourceProviders ?? [])
+                        .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.SourceProvider, value.Id)))
                     .ToArray(),
                 catalog.OptionSets.Select(Map).ToArray());
         }
