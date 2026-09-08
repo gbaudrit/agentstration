@@ -11,15 +11,41 @@ public sealed partial class SourceManagementService(
     IRequestContextScopeFactory scopes,
     ISourceManifestReader manifests,
     ISourceManifestRetriever retrieval,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ResourceScopeOperationService scopeOperations)
 {
     public async Task<SourceImportResult> ImportYamlAsync(string rawManifest, CancellationToken cancellationToken) =>
-        await ImportAsync(manifests.Read(rawManifest), null, cancellationToken);
+        await ImportYamlAsync(rawManifest, null, cancellationToken);
+
+    public async Task<SourceImportResult> ImportYamlAsync(
+        string rawManifest,
+        ResourceScopeRef? scopeRef,
+        CancellationToken cancellationToken) =>
+        await ImportAsync(
+            manifests.Read(rawManifest),
+            null,
+            scopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.Source),
+            cancellationToken);
 
     public async Task<SourceImportResult> ImportUrlAsync(Uri source, CancellationToken cancellationToken)
+        => await ImportUrlAsync(source, null, cancellationToken);
+
+    public async Task<SourceImportResult> ImportUrlAsync(
+        Uri source,
+        ResourceScopeRef? scopeRef,
+        CancellationToken cancellationToken)
     {
-        var retrieved = await retrieval.RetrieveAsync(source, cancellationToken);
-        return await ImportAsync(manifests.Read(retrieved.Content), retrieved.Origin, cancellationToken);
+        var targetScopeRef = scopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.Source);
+        return await scopeOperations.WriteAsync(
+            ResourceKinds.Source,
+            targetScopeRef,
+            AuthorizationPermissions.ResourcesWrite,
+            async token =>
+            {
+                var retrieved = await retrieval.RetrieveAsync(source, token);
+                return await ImportCoreAsync(manifests.Read(retrieved.Content), retrieved.Origin, targetScopeRef, token);
+            },
+            cancellationToken);
     }
 
     public async Task<IReadOnlyList<SourceView>> ListAsync(CancellationToken cancellationToken)
@@ -50,11 +76,44 @@ public sealed partial class SourceManagementService(
         return await BuildViewAsync(source.Value, cancellationToken);
     }
 
+    public async Task<SourceView?> GetExactAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        ValidatePortableName(publisher, "publisher");
+        ValidatePortableName(name, "metadata.name");
+        using var system = scopes.PushSystem();
+        var @namespace = new ResourceNamespace(publisher);
+        var source = await store.GetExactAsync<SourceResource>(
+            ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.Source, name),
+            cancellationToken);
+        return source is null ? null : await BuildViewAsync(source.Value, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<SourceVersionResource>> ListVersionsAsync(string publisher, string name, CancellationToken cancellationToken)
     {
         var source = await GetRequiredAsync(publisher, name, cancellationToken);
+        return await ListVersionsAsync(source, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SourceVersionResource>> ListVersionsExactAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var source = (await GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+        return await ListVersionsAsync(source, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<SourceVersionResource>> ListVersionsAsync(SourceResource source, CancellationToken cancellationToken)
+    {
+        var scopeRef = RequireScope(source);
         using var system = scopes.PushSystem();
-        return (await store.ListAllAsync<SourceVersionResource>(ResourceKinds.SourceVersion, cancellationToken))
+        return (await store.ListExactAsync<SourceVersionResource>(scopeRef, ResourceKinds.SourceVersion, 0, int.MaxValue, cancellationToken))
             .Where(value => value.Value.Definition.SourceUid == source.Uid)
             .OrderByDescending(value => value.Value.Definition.ImportedAt)
             .Select(value => value.Value)
@@ -63,6 +122,14 @@ public sealed partial class SourceManagementService(
 
     public async Task<SourceVersionResource?> GetVersionAsync(string publisher, string name, Guid versionUid, CancellationToken cancellationToken) =>
         (await ListVersionsAsync(publisher, name, cancellationToken)).SingleOrDefault(value => value.Uid == versionUid);
+
+    public async Task<SourceVersionResource?> GetVersionExactAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        Guid versionUid,
+        CancellationToken cancellationToken) =>
+        (await ListVersionsExactAsync(scopeRef, publisher, name, cancellationToken)).SingleOrDefault(value => value.Uid == versionUid);
 
     public async Task<StoredResource<SourceConfigurationResource>> UpdateDisplayNameAsync(
         string publisher,
@@ -74,18 +141,61 @@ public sealed partial class SourceManagementService(
         if (string.IsNullOrWhiteSpace(displayName) || displayName.Trim().Length > 200)
             throw Invalid("source_display_name_invalid", "Display name must contain 1 to 200 characters.");
         var source = await GetRequiredAsync(publisher, name, cancellationToken);
-        using var system = scopes.PushSystem();
-        var key = new ResourceKey(ResourceKinds.SourceConfiguration, source.Metadata.Name, source.Namespace);
-        var current = await store.GetAsync<SourceConfigurationResource>(key, cancellationToken)
-            ?? throw new ControlPlaneResourceNotFoundException(key);
-        return await store.PutAsync(current.Value with
-        {
-            Generation = checked(current.Value.Generation + 1),
-            Definition = current.Value.Definition with { DisplayName = displayName.Trim() }
-        }, ifMatch, false, cancellationToken);
+        return await UpdateDisplayNameAsync(source, displayName, ifMatch, cancellationToken);
     }
 
-    private async Task<SourceImportResult> ImportAsync(ParsedSourceManifest parsed, SourceManifestOrigin? origin, CancellationToken cancellationToken)
+    public async Task<StoredResource<SourceConfigurationResource>> UpdateDisplayNameExactAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        string displayName,
+        string ifMatch,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(displayName) || displayName.Trim().Length > 200)
+            throw Invalid("source_display_name_invalid", "Display name must contain 1 to 200 characters.");
+        var source = (await GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+        return await UpdateDisplayNameAsync(source, displayName, ifMatch, cancellationToken);
+    }
+
+    private async Task<StoredResource<SourceConfigurationResource>> UpdateDisplayNameAsync(
+        SourceResource source,
+        string displayName,
+        string ifMatch,
+        CancellationToken cancellationToken)
+    {
+        var scopeRef = RequireScope(source);
+        return await scopeOperations.WriteAsync(ResourceKinds.SourceConfiguration, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        {
+            var address = ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceConfiguration, source.Metadata.Name);
+            var current = await store.GetExactAsync<SourceConfigurationResource>(address, token)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceConfiguration, source.Metadata.Name, source.Namespace));
+            return await store.PutExactAsync(scopeRef, current.Value with
+            {
+                Generation = checked(current.Value.Generation + 1),
+                Definition = current.Value.Definition with { DisplayName = displayName.Trim() }
+            }, ifMatch, false, token);
+        }, cancellationToken);
+    }
+
+    private async Task<SourceImportResult> ImportAsync(
+        ParsedSourceManifest parsed,
+        SourceManifestOrigin? origin,
+        ResourceScopeRef scopeRef,
+        CancellationToken cancellationToken) =>
+        await scopeOperations.WriteAsync(
+            ResourceKinds.Source,
+            scopeRef,
+            AuthorizationPermissions.ResourcesWrite,
+            token => ImportCoreAsync(parsed, origin, scopeRef, token),
+            cancellationToken);
+
+    private async Task<SourceImportResult> ImportCoreAsync(
+        ParsedSourceManifest parsed,
+        SourceManifestOrigin? origin,
+        ResourceScopeRef scopeRef,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -93,15 +203,14 @@ public sealed partial class SourceManagementService(
         }
         catch (SourceValidationException exception)
         {
-            await TryRecordRejectedAsync(parsed, origin, exception, cancellationToken);
+            await TryRecordRejectedAsync(parsed, origin, scopeRef, exception, cancellationToken);
             throw;
         }
         var manifest = parsed.Manifest;
         var now = timeProvider.GetUtcNow();
         var @namespace = new ResourceNamespace(manifest.Definition.Publisher.Name);
-        using var system = scopes.PushSystem();
-        var sourceKey = new ResourceKey(ResourceKinds.Source, manifest.Metadata.Name, @namespace);
-        var storedSource = await store.GetAsync<SourceResource>(sourceKey, cancellationToken);
+        var sourceAddress = ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.Source, manifest.Metadata.Name);
+        var storedSource = await store.GetExactAsync<SourceResource>(sourceAddress, cancellationToken);
         if (storedSource is null)
         {
             storedSource = await store.CreateImmutableAsync(new SourceResource
@@ -109,13 +218,14 @@ public sealed partial class SourceManagementService(
                 ApiVersion = ManagementApiVersions.CoreV1,
                 Kind = ResourceKinds.Source,
                 Metadata = new ResourceMetadata { Name = manifest.Metadata.Name, Namespace = @namespace },
+                ScopeRef = scopeRef,
                 Definition = new SourceIdentityProperties { Publisher = manifest.Definition.Publisher.Name },
                 Status = Succeeded()
             }, cancellationToken);
         }
 
         var source = storedSource.Value;
-        var versions = (await store.ListAllAsync<SourceVersionResource>(ResourceKinds.SourceVersion, cancellationToken))
+        var versions = (await store.ListExactAsync<SourceVersionResource>(scopeRef, ResourceKinds.SourceVersion, 0, int.MaxValue, cancellationToken))
             .Where(value => value.Value.Definition.SourceUid == source.Uid)
             .ToArray();
         var sameVersion = versions.SingleOrDefault(value => string.Equals(value.Value.Definition.Version, manifest.Definition.Version, StringComparison.Ordinal));
@@ -141,6 +251,7 @@ public sealed partial class SourceManagementService(
                 ApiVersion = ManagementApiVersions.CoreV1,
                 Kind = ResourceKinds.SourceVersion,
                 Metadata = new ResourceMetadata { Name = versionName, Namespace = @namespace },
+                ScopeRef = scopeRef,
                 Definition = new SourceVersionProperties
                 {
                     SourceUid = source.Uid,
@@ -159,15 +270,16 @@ public sealed partial class SourceManagementService(
             outcome = SourceImportOutcome.Created;
         }
 
-        var configurationKey = new ResourceKey(ResourceKinds.SourceConfiguration, source.Metadata.Name, @namespace);
-        var configuration = await store.GetAsync<SourceConfigurationResource>(configurationKey, cancellationToken);
+        var configurationAddress = ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.SourceConfiguration, source.Metadata.Name);
+        var configuration = await store.GetExactAsync<SourceConfigurationResource>(configurationAddress, cancellationToken);
         if (configuration is null)
         {
-            configuration = await store.PutAsync(new SourceConfigurationResource
+            configuration = await store.PutExactAsync(scopeRef, new SourceConfigurationResource
             {
                 ApiVersion = ManagementApiVersions.CoreV1,
                 Kind = ResourceKinds.SourceConfiguration,
                 Metadata = new ResourceMetadata { Name = source.Metadata.Name, Namespace = @namespace },
+                ScopeRef = scopeRef,
                 Generation = 1,
                 Definition = new SourceConfigurationProperties
                 {
@@ -187,6 +299,7 @@ public sealed partial class SourceManagementService(
     private async Task TryRecordRejectedAsync(
         ParsedSourceManifest parsed,
         SourceManifestOrigin? origin,
+        ResourceScopeRef scopeRef,
         SourceValidationException exception,
         CancellationToken cancellationToken)
     {
@@ -194,8 +307,9 @@ public sealed partial class SourceManagementService(
         var publisher = manifest.Definition?.Publisher?.Name;
         var name = manifest.Metadata?.Name;
         if (publisher is null || name is null || !PortableNameRegex().IsMatch(publisher) || !PortableNameRegex().IsMatch(name)) return;
-        using var system = scopes.PushSystem();
-        var source = await store.GetAsync<SourceResource>(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)), cancellationToken);
+        var source = await store.GetExactAsync<SourceResource>(
+            ScopedResourceAddress.Create(scopeRef, new ResourceNamespace(publisher), ResourceKinds.Source, name),
+            cancellationToken);
         if (source is null) return;
         await RecordAsync(
             source.Value,
@@ -222,8 +336,9 @@ public sealed partial class SourceManagementService(
         string? errorMessage,
         CancellationToken cancellationToken)
     {
-        var observedKey = new ResourceKey(ResourceKinds.SourceObservedState, source.Metadata.Name, source.Namespace);
-        var current = await store.GetAsync<SourceObservedResource>(observedKey, cancellationToken);
+        var scopeRef = RequireScope(source);
+        var observedAddress = ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceObservedState, source.Metadata.Name);
+        var current = await store.GetExactAsync<SourceObservedResource>(observedAddress, cancellationToken);
         var properties = new SourceObservedProperties
         {
             SourceUid = source.Uid,
@@ -234,11 +349,12 @@ public sealed partial class SourceManagementService(
             ErrorCode = errorCode,
             ErrorMessage = errorMessage
         };
-        _ = await store.PutAsync(new SourceObservedResource
+        _ = await store.PutExactAsync(scopeRef, new SourceObservedResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.SourceObservedState,
             Metadata = new ResourceMetadata { Name = source.Metadata.Name, Namespace = source.Namespace },
+            ScopeRef = scopeRef,
             Generation = current is null ? 1 : checked(current.Value.Generation + 1),
             Definition = properties,
             Status = errorCode is null ? Succeeded() : Failed(errorCode, errorMessage!)
@@ -249,6 +365,7 @@ public sealed partial class SourceManagementService(
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.SourceImportRecord,
             Metadata = new ResourceMetadata { Name = $"import-{Guid.NewGuid():N}", Namespace = source.Namespace },
+            ScopeRef = scopeRef,
             Definition = new SourceImportRecordProperties
             {
                 SourceUid = source.Uid,
@@ -267,11 +384,16 @@ public sealed partial class SourceManagementService(
 
     private async Task<SourceView> BuildViewAsync(SourceResource source, CancellationToken cancellationToken)
     {
-        var configuration = await store.GetAsync<SourceConfigurationResource>(new(ResourceKinds.SourceConfiguration, source.Metadata.Name, source.Namespace), cancellationToken)
+        var scopeRef = RequireScope(source);
+        var configuration = await store.GetExactAsync<SourceConfigurationResource>(
+            ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceConfiguration, source.Metadata.Name),
+            cancellationToken)
             ?? throw new InvalidOperationException($"Source '{source.Definition.Publisher}/{source.Metadata.Name}' has no local configuration.");
-        var observed = await store.GetAsync<SourceObservedResource>(new(ResourceKinds.SourceObservedState, source.Metadata.Name, source.Namespace), cancellationToken)
+        var observed = await store.GetExactAsync<SourceObservedResource>(
+            ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceObservedState, source.Metadata.Name),
+            cancellationToken)
             ?? throw new InvalidOperationException($"Source '{source.Definition.Publisher}/{source.Metadata.Name}' has no observed state.");
-        var count = (await store.ListAllAsync<SourceVersionResource>(ResourceKinds.SourceVersion, cancellationToken))
+        var count = (await store.ListExactAsync<SourceVersionResource>(scopeRef, ResourceKinds.SourceVersion, 0, int.MaxValue, cancellationToken))
             .Count(value => value.Value.Definition.SourceUid == source.Uid);
         return new SourceView(source, configuration.Value, observed.Value, count);
     }
@@ -279,6 +401,9 @@ public sealed partial class SourceManagementService(
     private async Task<SourceResource> GetRequiredAsync(string publisher, string name, CancellationToken cancellationToken) =>
         (await GetAsync(publisher, name, cancellationToken))?.Source
         ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+
+    private static ResourceScopeRef RequireScope(Resource resource) =>
+        resource.ScopeRef ?? throw new InvalidOperationException($"Resource '{resource.Address}' has no ownership scope.");
 
     private static void Validate(PublishedSourceVersionManifest manifest)
     {

@@ -21,11 +21,17 @@ public sealed class CurrentRequestContext : ICurrentRequestContext, IRequestCont
     public ControlPlaneAccessMode AccessMode => ambient.Value?.AccessMode ?? ControlPlaneAccessMode.Unavailable;
     public RequestContext Current => ambient.Value switch
     {
-        { AccessMode: ControlPlaneAccessMode.Workspace, Context: not null } value => value.Context,
+        { AccessMode: ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Tenant, Context: not null } value => value.Context,
         { AccessMode: ControlPlaneAccessMode.System } => throw new InvalidOperationException("System operations do not have a workspace request context."),
         _ => throw new InvalidOperationException("The request context has not been initialized.")
     };
     public IDisposable Push(RequestContext context) => Push(new AmbientRequestContext(ControlPlaneAccessMode.Workspace, context));
+    public IDisposable PushTenant(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null)
+    {
+        if (principalId == Guid.Empty) throw new ArgumentException("A tenant context requires a non-empty Principal ID.", nameof(principalId));
+        if (tenantId == Guid.Empty) throw new ArgumentException("A tenant context requires a non-empty Tenant ID.", nameof(tenantId));
+        return Push(new AmbientRequestContext(ControlPlaneAccessMode.Tenant, new RequestContext(principalId, tenantId, Guid.Empty, restriction)));
+    }
     public IDisposable PushSystem() => Push(new AmbientRequestContext(ControlPlaneAccessMode.System, null));
 
     private IDisposable Push(AmbientRequestContext context)

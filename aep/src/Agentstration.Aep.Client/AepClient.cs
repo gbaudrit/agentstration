@@ -21,7 +21,13 @@ public interface IAepModelProvidersClient
     AepModelProviderClient CreateModelProvider(string providerId);
 }
 
-public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProvidersClient
+public interface IAepSourceProvidersClient
+{
+    Task<IReadOnlyList<AepSourceProviderDescriptor>> ListSourceProvidersAsync(CancellationToken cancellationToken = default);
+    AepSourceProviderClient CreateSourceProvider(string providerId);
+}
+
+public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProvidersClient, IAepSourceProvidersClient
 {
     public Task<AepManifest> GetManifestAsync(CancellationToken cancellationToken = default) => DiscoverAsync(cancellationToken);
 
@@ -72,6 +78,88 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
     }
 
     public AepModelProviderClient CreateModelProvider(string providerId) => new(this, providerId);
+
+    public async Task<IReadOnlyList<AepSourceProviderDescriptor>> ListSourceProvidersAsync(CancellationToken cancellationToken = default)
+    {
+        var manifest = await DiscoverAsync(cancellationToken);
+        if (!manifest.Capabilities.ContainsKey(AepCapabilityNames.SourceProvider)) return [];
+        using var response = await SendAsync(HttpMethod.Get, AepProtocol.SourceProvidersPath, null, cancellationToken);
+        return await ReadAsync<AepSourceProviderDescriptor[]>(response, cancellationToken);
+    }
+
+    public AepSourceProviderClient CreateSourceProvider(string providerId) => new(this, providerId);
+
+    internal async Task<AepSourceResolveResponse> ResolveSourceAsync(
+        string providerId,
+        AepSourceResolveRequest request,
+        CancellationToken cancellationToken)
+    {
+        await RequireSourceProviderAsync(providerId, cancellationToken);
+        using var response = await SendAsync(HttpMethod.Post, $"{AepProtocol.SourceProvidersPath}/{Uri.EscapeDataString(providerId)}/resolve", request, cancellationToken);
+        var result = await ReadAsync<AepSourceResolveResponse>(response, cancellationToken);
+        if (string.IsNullOrWhiteSpace(result.Revision)
+            || result.Integrity is null
+            || string.IsNullOrWhiteSpace(result.Integrity.Algorithm)
+            || string.IsNullOrWhiteSpace(result.Integrity.Digest))
+            throw new AepProtocolException("invalid_source_response", "The extension returned an invalid immutable source revision.");
+        return result;
+    }
+
+    internal async Task<AepSourceMaterializeResponse> MaterializeSourceAsync(
+        string providerId,
+        AepSourceMaterializeRequest request,
+        CancellationToken cancellationToken)
+    {
+        await RequireSourceProviderAsync(providerId, cancellationToken);
+        if (request.Limits.MaxArchiveBytes <= 0 || request.Limits.MaxEntries <= 0 || request.Limits.MaxExpandedBytes <= 0 || request.Limits.TimeoutSeconds <= 0)
+            throw new ArgumentOutOfRangeException(nameof(request), "All source materialization limits must be positive.");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(request.Limits.TimeoutSeconds).Add(TimeSpan.FromSeconds(5)));
+        HttpResponseMessage response;
+        try
+        {
+            response = await SendAsync(HttpMethod.Post, $"{AepProtocol.SourceProvidersPath}/{Uri.EscapeDataString(providerId)}/materialize", request, timeout.Token);
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+        {
+            throw new AepProtocolException("source_provider_timeout", "Source materialization exceeded its time limit.", innerException: exception);
+        }
+        using (response)
+        {
+            var wireLimit = request.Limits.MaxArchiveBytes > (long.MaxValue - 65_536) / 2
+                ? long.MaxValue
+                : request.Limits.MaxArchiveBytes * 2 + 65_536;
+            try { await response.Content.LoadIntoBufferAsync(wireLimit, timeout.Token); }
+            catch (HttpRequestException exception)
+            {
+                throw new AepProtocolException("source_archive_too_large", "The extension response exceeds the requested archive limit.", innerException: exception);
+            }
+            var result = await ReadAsync<AepSourceMaterializeResponse>(response, timeout.Token);
+            if (result.Archive is null || result.Archive.Content is null || result.Archive.Integrity is null)
+                throw new AepProtocolException("invalid_source_response", "The extension returned an incomplete source archive.");
+            if (!string.Equals(result.Revision, request.Revision, StringComparison.Ordinal))
+                throw new AepProtocolException("source_revision_mismatch", "The extension materialized a different source revision.");
+            if (result.Archive.Content.LongLength > request.Limits.MaxArchiveBytes
+                || result.Archive.EntryCount < 0
+                || result.Archive.EntryCount > request.Limits.MaxEntries
+                || result.Archive.ExpandedBytes < 0
+                || result.Archive.ExpandedBytes > request.Limits.MaxExpandedBytes)
+                throw new AepProtocolException("source_limits_exceeded", "The extension returned a source archive outside the requested limits.");
+            var actualDigest = AepContentIntegrity.Sha256(result.Archive.Content);
+            if (!string.Equals(actualDigest.Algorithm, result.Archive.Integrity.Algorithm, StringComparison.Ordinal)
+                || !string.Equals(actualDigest.Digest, result.Archive.Integrity.Digest, StringComparison.OrdinalIgnoreCase))
+                throw new AepProtocolException("source_integrity_mismatch", "The extension returned a source archive with invalid integrity metadata.");
+            return result;
+        }
+    }
+
+    private async Task RequireSourceProviderAsync(string providerId, CancellationToken cancellationToken)
+    {
+        var manifest = await DiscoverAsync(cancellationToken);
+        if (!manifest.Capabilities.ContainsKey(AepCapabilityNames.SourceProvider)
+            || !(manifest.Contributions.SourceProviders ?? []).Any(value => string.Equals(value.Id, providerId, StringComparison.OrdinalIgnoreCase)))
+            throw new AepProtocolException("source_provider_unavailable", $"Source provider '{providerId}' is not advertised by the extension.");
+    }
 
     internal async Task<AepChatResponse> ChatAsync(string providerId, AepChatRequest request, CancellationToken cancellationToken)
     {
@@ -137,9 +225,18 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
         return response;
     }
 
-    private static async Task<T> ReadAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken) =>
-        await response.Content.ReadFromJsonAsync<T>(AepProtocol.JsonOptions, cancellationToken)
-        ?? throw new AepProtocolException("invalid_response", "The extension returned an empty response.", response.StatusCode);
+    private static async Task<T> ReadAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<T>(AepProtocol.JsonOptions, cancellationToken)
+                ?? throw new AepProtocolException("invalid_response", "The extension returned an empty response.", response.StatusCode);
+        }
+        catch (JsonException exception)
+        {
+            throw new AepProtocolException("invalid_response", "The extension returned malformed JSON.", response.StatusCode, exception);
+        }
+    }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
@@ -167,6 +264,19 @@ public sealed class AepModelProviderClient(AepClient client, string providerId)
 
     public IAsyncEnumerable<AepChatUpdate> ChatStreamingAsync(AepChatRequest request, CancellationToken cancellationToken = default) =>
         client.StreamAsync(providerId, request, cancellationToken);
+}
+
+public sealed class AepSourceProviderClient(AepClient client, string providerId)
+{
+    public Task<AepSourceResolveResponse> ResolveAsync(
+        AepSourceResolveRequest request,
+        CancellationToken cancellationToken = default) =>
+        client.ResolveSourceAsync(providerId, request, cancellationToken);
+
+    public Task<AepSourceMaterializeResponse> MaterializeAsync(
+        AepSourceMaterializeRequest request,
+        CancellationToken cancellationToken = default) =>
+        client.MaterializeSourceAsync(providerId, request, cancellationToken);
 }
 
 public sealed class AepProtocolException(string code, string message, HttpStatusCode? statusCode = null, Exception? innerException = null)

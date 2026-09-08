@@ -14,5 +14,6 @@ metadata:
     - offline
     - runtime
 definition:
+  targetScope: tenant
   resources:
     - profiles/offline-pack.yaml

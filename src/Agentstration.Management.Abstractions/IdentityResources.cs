@@ -122,7 +122,7 @@ public sealed record RequestContext(
 {
     public Guid UserId => PrincipalId;
 }
-public enum ControlPlaneAccessMode { Unavailable, Workspace, System }
+public enum ControlPlaneAccessMode { Unavailable = 0, Workspace = 1, System = 2, Tenant = 3 }
 
 public interface ICurrentRequestContext
 {
@@ -148,7 +148,15 @@ public sealed class SystemOperationRequestContext : ICurrentRequestContext
 public interface IRequestContextScopeFactory
 {
     IDisposable Push(RequestContext context);
+    IDisposable PushTenant(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null);
     IDisposable PushSystem();
+}
+
+public sealed class TenantOperationRequestContext(Guid principalId, Guid tenantId, AuthorizationRestriction? restriction = null) : ICurrentRequestContext
+{
+    public bool IsInitialized => false;
+    public ControlPlaneAccessMode AccessMode => ControlPlaneAccessMode.Tenant;
+    public RequestContext Current { get; } = new(principalId, tenantId, Guid.Empty, restriction);
 }
 
 public interface IPrincipalResolver

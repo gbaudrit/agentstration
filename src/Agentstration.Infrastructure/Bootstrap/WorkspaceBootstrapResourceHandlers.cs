@@ -47,7 +47,7 @@ internal static class WorkspaceBootstrapResource
 public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagementService service) : IBootstrapResourceHandler
 {
     public string Kind => ResourceKinds.ModelProvider;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -78,7 +78,7 @@ public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagemen
 public sealed class RuntimeProfileBootstrapResourceHandler(RuntimeProfileManagementService service) : IBootstrapResourceHandler
 {
     public string Kind => ResourceKinds.RuntimeProfile;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -111,7 +111,7 @@ public sealed class ModelProfileBootstrapResourceHandler(
     ModelProviderManagementService providers) : IBootstrapResourceHandler
 {
     public string Kind => ResourceKinds.ModelProfile;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Workspace;
+    public BootstrapProfileScope Scope => BootstrapProfileScope.Tenant;
 
     public async Task<BootstrapResourcePlanResult> PlanAsync(
         BootstrapResourceDocument resource,
@@ -150,8 +150,6 @@ public sealed class ModelProfileBootstrapResourceHandler(
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Definition.DisplayName);
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Definition.Provider.Name);
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Definition.Model.Name);
-        if (resource.Definition.Provider.WorkspaceRef is not null)
-            throw new InvalidOperationException("Cross-workspace model provider references are not supported.");
         if (resource.Definition.Generation.Temperature is < 0 or > 2)
             throw new InvalidOperationException("Model profile temperature must be between 0 and 2.");
     }
@@ -204,10 +202,6 @@ public sealed class AgentBootstrapResourceHandler(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Definition.DisplayName);
         ArgumentException.ThrowIfNullOrWhiteSpace(resource.Definition.Instructions);
-        if (resource.Definition.ModelProfile.WorkspaceRef is not null
-            || resource.Definition.RuntimeProfile.WorkspaceRef is not null
-            || resource.Definition.Tools.Any(tool => tool.WorkspaceRef is not null))
-            throw new InvalidOperationException("Cross-workspace Agent references are not supported.");
     }
 }
 

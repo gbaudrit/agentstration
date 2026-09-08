@@ -11,12 +11,9 @@ public static class ManagementDemoData
         var agents = services.GetRequiredService<AgentManagementService>();
         var providers = services.GetRequiredService<ModelProviderManagementService>();
         var extensions = services.GetRequiredService<ExtensionRegistrationManagementService>();
-        var extensionDiscovery = services.GetRequiredService<ExtensionSourceDiscoveryService>();
         var profiles = services.GetRequiredService<ModelProfileManagementService>();
         var store = services.GetRequiredService<IControlPlaneStore>();
         var configuration = services.GetRequiredService<IConfiguration>();
-        _ = await extensionDiscovery.DiscoverAsync(cancellationToken);
-
         if (await extensions.GetAsync(ResourceNamespace.Default, "ollama-extension", cancellationToken) is not null
             && await providers.GetAsync("ollama-local", cancellationToken) is null)
         {
@@ -68,7 +65,8 @@ public static class ManagementDemoData
             }, cancellationToken);
         }
 
-        if (await profiles.GetAsync("reasoning-default", cancellationToken) is null)
+        var ollamaProvider = await providers.GetAsync("ollama-local", cancellationToken);
+        if (ollamaProvider is not null && await profiles.GetAsync("reasoning-default", cancellationToken) is null)
         {
             await profiles.CreateAsync(new ModelProfileResource
             {
@@ -85,6 +83,8 @@ public static class ManagementDemoData
                 }
             }, cancellationToken);
         }
+
+        if (await profiles.GetAsync("reasoning-default", cancellationToken) is null) return;
 
         await EnsureAgentAsync(agents, store, "dotnet-expert", "Specialized agent for .NET, C#, ASP.NET Core, and runtime diagnostics.", "Focus on .NET and C#. Provide safe, practical guidance.", ["dotnet", "csharp", "aspnet"], [], cancellationToken);
         await EnsureAgentAsync(agents, store, "sql-expert", "Specialized agent for SQL query performance and database diagnostics.", "Focus on SQL performance and read-only diagnostics.", ["sql", "database", "query-performance"], [], cancellationToken);

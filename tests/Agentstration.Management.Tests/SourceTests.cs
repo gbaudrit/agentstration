@@ -5,6 +5,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.Resources;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -16,9 +17,28 @@ namespace Agentstration.Management.Tests;
 public sealed class SourceTests
 {
     [TestMethod]
+    public void SourceResourceFamilySupportsEveryOwnershipScope()
+    {
+        var kinds = new[]
+        {
+            ResourceKinds.Source,
+            ResourceKinds.SourceVersion,
+            ResourceKinds.SourceConfiguration,
+            ResourceKinds.SourceObservedState,
+            ResourceKinds.SourceImportRecord
+        };
+
+        foreach (var kind in kinds)
+            CollectionAssert.AreEquivalent(
+                new[] { ResourceScopeKind.Instance, ResourceScopeKind.Tenant, ResourceScopeKind.Workspace },
+                ResourceScopePolicy.AllowedScopes(kind).ToArray());
+    }
+
+    [TestMethod]
     public async Task ImportIsIdempotentAndRejectsSameVersionWithAnotherDigestAsync()
     {
         await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
         var first = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
         var repeated = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
 
@@ -33,7 +53,6 @@ public sealed class SourceTests
         StringAssert.Contains(conflict.Message, "different manifest digest");
         Assert.HasCount(1, await fixture.Service.ListVersionsAsync("agentstration", "official-samples", default));
 
-        using var system = fixture.Context.PushSystem();
         var records = await fixture.Store.ListAllAsync<SourceImportRecordResource>(ResourceKinds.SourceImportRecord, default);
         CollectionAssert.AreEquivalent(
             new[] { SourceImportOutcome.Created, SourceImportOutcome.Unchanged, SourceImportOutcome.Rejected },
@@ -44,6 +63,7 @@ public sealed class SourceTests
     public async Task NewVersionKeepsHistoryAndNeverOverwritesLocalDisplayNameAsync()
     {
         await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
         var imported = await fixture.Service.ImportYamlAsync(Manifest("release-a", "Published name", includeChannel: true), default);
         var configured = await fixture.Service.UpdateDisplayNameAsync(
             "agentstration", "official-samples", "My local name", imported.Source.Configuration.ETag!, default);
@@ -56,7 +76,6 @@ public sealed class SourceTests
         Assert.IsTrue(versions.Single(value => value.Definition.Version == "release-a").Definition.PublishedDefinition.Channels.Any(value => value.Name == "stable"));
         Assert.IsEmpty(versions.Single(value => value.Definition.Version == "release-b").Definition.PublishedDefinition.Channels);
         Assert.IsFalse(typeof(SourceResource).GetProperties().Any(property => property.Name.Equals("ActiveVersion", StringComparison.OrdinalIgnoreCase)));
-        using var system = fixture.Context.PushSystem();
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => fixture.Store.PutAsync(next.Source.Source, next.Source.Source.ETag, false, default));
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => fixture.Store.PutAsync(next.Version, next.Version.ETag, false, default));
     }
@@ -65,6 +84,7 @@ public sealed class SourceTests
     public async Task InvalidLaterDefinitionPreservesVersionsAndExposesObservedFailureAsync()
     {
         await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
         _ = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: false), default);
         var invalid = Manifest("2", "Published name", includeChannel: true)
             .Replace("binding: git-distribution", "binding: missing", StringComparison.Ordinal);
@@ -86,9 +106,13 @@ public sealed class SourceTests
         try
         {
             await using (var first = await Fixture.CreateAsync(database))
+            {
+                using var system = first.Context.PushSystem();
                 _ = await first.Service.ImportYamlAsync(Manifest("2026-09", "Official samples", includeChannel: false), default);
+            }
             await using (var restarted = await Fixture.CreateAsync(database))
             {
+                using var system = restarted.Context.PushSystem();
                 var source = await restarted.Service.GetAsync("agentstration", "official-samples", default);
                 Assert.IsNotNull(source);
                 Assert.AreEqual(1, source.VersionCount);
@@ -161,8 +185,21 @@ public sealed class SourceTests
         var imported = await response.Content.ReadFromJsonAsync<SourceImportResult>();
         Assert.IsNotNull(imported);
         Assert.AreEqual("Published name", imported.Source.Configuration.Definition.DisplayName);
+        var workspaceScope = ResourceScopeRef.Workspace(context.Context.WorkspaceId);
+        Assert.AreEqual(workspaceScope, imported.Source.Source.ScopeRef);
 
-        using var update = new HttpRequestMessage(HttpMethod.Put, $"/api/sources/agentstration/{name}/display-name")
+        var instanceResponse = await client.PostAsJsonAsync(
+            "/api/sources/imports/yaml",
+            new ImportSourceYamlRequest(manifest, ResourceScopeRef.Instance));
+        Assert.AreEqual(HttpStatusCode.Created, instanceResponse.StatusCode);
+        var instance = await instanceResponse.Content.ReadFromJsonAsync<SourceImportResult>();
+        Assert.IsNotNull(instance);
+        Assert.AreEqual(ResourceScopeRef.Instance, instance.Source.Source.ScopeRef);
+        Assert.AreNotEqual(imported.Source.Source.Uid, instance.Source.Source.Uid);
+
+        using var update = new HttpRequestMessage(
+            HttpMethod.Put,
+            $"/api/sources/agentstration/{name}/display-name?scopeRef={Uri.EscapeDataString(workspaceScope.ToString())}")
         {
             Content = JsonContent.Create(new UpdateSourceDisplayNameRequest("Local name"))
         };
@@ -226,6 +263,13 @@ public sealed class SourceTests
             collection.AddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>());
             collection.AddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>());
             collection.AddSqliteControlPlane($"Data Source={database}");
+            collection.AddSingleton(provider => new ResourceScopeOperationService(
+                provider.GetRequiredService<CurrentRequestContext>(),
+                provider.GetRequiredService<CurrentRequestContext>(),
+                null!,
+                null!,
+                null!,
+                provider.GetRequiredService<IResourceScopeResolver>()));
             collection.AddSingleton<ISourceManifestReader, SourceManifestReader>();
             collection.AddSingleton<ISourceManifestRetriever, StubRetriever>();
             collection.AddSingleton<SourceManagementService>();

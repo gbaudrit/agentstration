@@ -50,7 +50,8 @@ public sealed class ModelProviderNavigationTests
         {
             Assert.AreEqual(ProviderNamespace, providers.RequestedModelNamespace);
             Assert.AreEqual("ollama/local", providers.RequestedModelProvider);
-            var provider = rendered.Find("select");
+            var provider = rendered.FindAll("select").Single(element =>
+                element.QuerySelector("option[value='shared.models:ollama/local']") is not null);
             Assert.AreEqual("shared.models:ollama/local", provider.GetAttribute("value"));
         });
     }

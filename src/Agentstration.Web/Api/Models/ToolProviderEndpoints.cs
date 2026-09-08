@@ -38,7 +38,7 @@ internal static class ToolProviderEndpoints
     private static Task<IResult> CreateProviderAsync(CreateToolProviderRequest body, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>
         {
-            var stored = await service.PutProviderAsync(Resource(body.Name, body.Properties), null, true, cancellationToken);
+            var stored = await service.PutProviderAsync(Resource(body.Name, body.Properties) with { ScopeRef = body.ScopeRef }, null, true, cancellationToken);
             try { _ = await service.RefreshDiscoveryAsync(stored.Value.Metadata.Name, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
             stored = await service.GetProviderAsync(stored.Value.Metadata.Name, cancellationToken) ?? stored;
             response.Headers.Location = $"/api/toolproviders/{Uri.EscapeDataString(body.Name)}";

@@ -83,6 +83,6 @@ internal sealed class TriggerEndpoints : IManagementEndpoint
     private static Task<IResult> HistoryCoreAsync(ResourceNamespace @namespace, string name, int? take, TriggerManagementService management, TriggerFiringService firing, CancellationToken token) => ManagementHttp.ExecuteAsync(async () =>
     {
         var trigger = await management.GetAsync(@namespace, name, token) ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Trigger, name, @namespace));
-        return Results.Ok(await firing.ListHistoryAsync(trigger.Value.WorkspaceId, trigger.Value.Uid, take ?? 50, token));
+        return Results.Ok(await firing.ListHistoryAsync(trigger.Value.RequireScopeTargetId(ResourceScopeKind.Workspace), trigger.Value.Uid, take ?? 50, token));
     });
 }

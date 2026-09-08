@@ -6,6 +6,7 @@ html,body{margin:0;min-height:100%}body{background:#eef2f7}.blazor-error-boundar
 .task-summary-card{display:flex;flex-direction:column;gap:.35rem;padding:var(--space-4)}.task-summary-card span{color:var(--color-text-muted);font-size:.82rem}.task-summary-card strong{font-size:1.55rem}
 .realtime-status{display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--color-text-muted)}.realtime-status.state-live span{color:var(--color-success)}.realtime-status.state-reconnecting span{color:var(--color-warning)}
 .table-secondary,.attention-count{display:block;color:var(--color-text-muted);margin-top:.25rem}.attention-count{color:var(--color-warning)}
+.resource-name-with-scope{display:flex;align-items:center;gap:.45rem;min-width:0}.resource-name-with-scope>:first-child{min-width:0}
 .task-filters{display:grid;grid-template-columns:minmax(14rem,2fr) repeat(3,minmax(10rem,1fr)) auto;gap:var(--space-3);align-items:end;margin-bottom:var(--space-5)}
 .task-pagination{display:flex;justify-content:space-between;align-items:center;margin-top:var(--space-4)}
 .task-detail-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(18rem,1fr);gap:var(--space-5)}.task-detail-stack{display:grid;gap:var(--space-5)}

@@ -30,6 +30,7 @@ else
                 <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
                 <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
                 <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
+                <ResourceScopeFormField ResourceKind="@ResourceKinds.ModelProfile" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
                 <label class="form-span-2"><span>@T("DescriptionLabel")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
             </div>
         </section>
@@ -153,6 +154,7 @@ else
     private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
     private ExtensionOptionsEditorModel? optionEditor; private bool rawOptions;
     private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete;
+    private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
     private string SelectedProvider => model is null || string.IsNullOrWhiteSpace(model.ProviderName) ? string.Empty : $"{model.ProviderNamespace}:{model.ProviderName}";
@@ -185,7 +187,7 @@ else
             else
             {
                 var snapshot = await Client.GetModelProfileAsync(SelectedNamespace, Name!, cancellation.Token);
-                model = ModelProfileEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag;
+                model = ModelProfileEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag;
                 usages = (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value;
                 resolution = await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
             }
@@ -221,7 +223,7 @@ else
         {
             if (!rawOptions && optionEditor?.CanGuide == true) model.ProviderOptionsJson = optionEditor.ToProviderOptionsJson();
             ResourceSnapshot<ModelProfileResource> snapshot = IsNew
-                ? await Client.CreateModelProfileAsync(model.ToCreateRequest(), cancellation.Token)
+                ? await Client.CreateModelProfileAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token)
                 : await Client.UpdateModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, model.ToPutRequest(), etag!, cancellation.Token);
             etag = snapshot.ETag; Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
             Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name));

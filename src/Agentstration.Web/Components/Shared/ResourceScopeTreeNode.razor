@@ -1,0 +1,19 @@
+@namespace Agentstration.Web.Components
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.ResourceScopesStrings> Localizer
+
+<button type="button" class="scope-tree-node scope-kind-@Scope.Kind.ToString().ToLowerInvariant() @(Selected ? "selected" : null)" style="--scope-depth: @Depth" @onclick="SelectAsync" aria-current="@(Selected ? "true" : null)">
+    <span class="scope-tree-marker" aria-hidden="true"></span>
+    <span class="scope-tree-label">
+        <span class="scope-tree-title"><strong>@DisplayName</strong>@if (Scope.IsCurrent) { <span class="scope-current-dot" title="@Localizer["Current"]" aria-label="@Localizer["Current"]"></span> }</span>
+        <small>@Localizer[$"ScopeKind.{Scope.Kind}"].Value · @Localizer["ResourceCount", Scope.Resources.Count].Value</small>
+    </span>
+</button>
+
+@code {
+    [Parameter, EditorRequired] public ResourceScopeInventoryNodeResponse Scope { get; set; } = null!;
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public bool Selected { get; set; }
+    [Parameter] public EventCallback<ResourceScopeRef> OnSelected { get; set; }
+    private string DisplayName => Scope.Kind == ResourceScopeKind.Instance ? Localizer["InstanceName"].Value : Scope.DisplayName;
+    private Task SelectAsync() => OnSelected.InvokeAsync(Scope.ScopeRef);
+}

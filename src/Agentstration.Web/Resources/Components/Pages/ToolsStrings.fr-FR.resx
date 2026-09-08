@@ -12,6 +12,7 @@
   <data name="EmptyTitle"><value>Aucun outil découvert</value></data>
   <data name="EmptyMessage"><value>Créez un fournisseur d’outils et actualisez la découverte. Les nouveaux outils restent désactivés par défaut.</value></data>
   <data name="Tool"><value>Outil</value></data>
+  <data name="Scope"><value>Périmètre</value></data>
   <data name="Provider"><value>Fournisseur</value></data>
   <data name="Availability"><value>Disponibilité</value></data>
   <data name="Enabled"><value>Activé</value></data>

@@ -25,7 +25,7 @@ else
     <DataGrid TItem="ModelProviderResponse" Items="providers ?? []">
         <Header><tr><th>@T("Provider")</th><th>@T("Namespace")</th><th>@T("Type")</th><th>@T("Management")</th><th>@T("Status")</th><th>@T("Models")</th><th></th></tr></Header>
         <Row Context="provider"><tr>
-            <td><strong>@provider.Properties.DisplayName</strong><br /><code>@provider.Name</code></td>
+            <td><span class="resource-name-with-scope"><strong>@provider.Properties.DisplayName</strong><ResourceScopeBadge ScopeRef="@provider.ScopeRef" Compact /></span><code>@provider.Name</code></td>
             <td><code>@provider.Namespace</code></td>
             <td>@provider.Properties.ContributionId</td><td>@provider.Properties.RegistrationSource</td>
             <td><StatusBadge Text="@StatusLabel(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></td>

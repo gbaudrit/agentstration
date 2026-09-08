@@ -2,7 +2,7 @@
 
 A Source gives publisher-owned reusable content a stable identity in Agentstration. Its portable coordinate is `publisher/name`; Agentstration also assigns an immutable UID for durable references.
 
-Sources and Source Versions are instance-scoped and administered through the Management API by Platform administrators. A Source has no repository, branch, active-version property, or Channel content. Those concerns belong to later provider and snapshot layers.
+Sources and Source Versions are owned by an explicit instance, tenant, or workspace scope and administered through the Management API by Platform administrators. An interactive import defaults to the current workspace unless an explicit scope is supplied. A Source has no repository, branch, active-version property, or Channel content. Those concerns belong to later provider and snapshot layers.
 
 ## Published definition
 
@@ -41,6 +41,8 @@ Agentstration retains the exact YAML and a canonical SHA-256 digest. Importing t
 
 Platform administrators can import pasted YAML through `POST /api/sources/imports/yaml` or an HTTP(S) URL through `POST /api/sources/imports/url`. A manifest is limited to one MiB and one YAML document. URL retrieval has the same content limit and a finite timeout.
 
+Import requests may carry `scopeRef` (`/instance`, `/tenants/{id}`, or `/workspaces/{id}`). When it is omitted from an interactive request, the current workspace is used. Detail, version, and display-name routes accept the same value as the `scopeRef` query parameter so a homonymous Source is addressed exactly.
+
 The manifest URL is only the definition origin. It is never interpreted as a Channel transport and does not cause Git provider inference.
 
 Three concerns remain separate:
@@ -51,6 +53,6 @@ Three concerns remain separate:
 
 The display name is initialized from the first Source Version default, falling back to `metadata.name`. An administrator edit is preserved by every later import; this increment intentionally provides no reset action.
 
-List Sources with `GET /api/sources`, inspect their versions with `GET /api/sources/{publisher}/{name}/versions`, and update the local display name with an ETag-protected `PUT /api/sources/{publisher}/{name}/display-name`.
+List Sources with `GET /api/sources`, inspect their versions with `GET /api/sources/{publisher}/{name}/versions?scopeRef=...`, and update the local display name with an ETag-protected `PUT /api/sources/{publisher}/{name}/display-name?scopeRef=...`.
 
 Channel materialization, Source Provider selection, compatibility evaluation, periodic refresh, catalog browsing, and Bootstrap/Pack consumption are introduced by the related Source feature increments.

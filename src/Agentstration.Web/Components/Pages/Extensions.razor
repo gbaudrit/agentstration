@@ -33,6 +33,7 @@
                 <label>@T("Name")<InputText @bind-Value="form.Name" disabled="@(!creating)" /></label>
                 <label>@T("Namespace")<InputText @bind-Value="form.Namespace" disabled="@(!creating)" /></label>
                 <label>@T("DisplayName")<InputText @bind-Value="form.DisplayName" /></label>
+                <ResourceScopeFormField ResourceKind="@ResourceKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" Disabled="@(!creating)" />
                 <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
                 <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /><small>@T("ExpectedExtensionId.Help")</small></label>
                 <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
@@ -48,7 +49,7 @@
         <DataGrid TItem="ExtensionRegistrationResource" Items="registrations">
             <Header><tr><th>@T("Registration")</th><th>@T("Endpoint")</th><th>@T("Discovery")</th><th>@T("Actions")</th></tr></Header>
             <Row Context="registration"><tr>
-                <td><strong>@registration.Definition.DisplayName</strong><br /><code>@registration.Namespace/@registration.Name</code></td>
+                <td><span class="resource-name-with-scope"><strong>@registration.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="@registration.ScopeRef" Compact /></span><code>@registration.Namespace/@registration.Name</code></td>
                 <td><code>@registration.Definition.Endpoint</code></td>
                 <td><StatusBadge Text="@(registration.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@ModelManagementUi.Status(registration.Definition.Enabled ? "available" : "disabled")" /></td>
                 <td>

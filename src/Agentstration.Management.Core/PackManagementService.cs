@@ -20,6 +20,7 @@ public sealed partial class PackManagementService
     private readonly IControlPlaneStore store;
     private readonly TimeProvider timeProvider;
     private readonly IPackArtifactStore? artifacts;
+    private readonly ResourceScopeOperationService? scopeOperations;
     private readonly IReadOnlyDictionary<string, IPackResourceHandler> handlers;
 
     public PackManagementService(IControlPlaneStore store, IEnumerable<IPackResourceHandler> resourceHandlers, TimeProvider timeProvider)
@@ -31,6 +32,17 @@ public sealed partial class PackManagementService
         this.timeProvider = timeProvider;
         this.artifacts = artifacts;
         handlers = resourceHandlers.ToDictionary(value => value.Kind, StringComparer.Ordinal);
+    }
+
+    public PackManagementService(
+        IControlPlaneStore store,
+        IEnumerable<IPackResourceHandler> resourceHandlers,
+        TimeProvider timeProvider,
+        IPackArtifactStore? artifacts,
+        ResourceScopeOperationService scopeOperations)
+        : this(store, resourceHandlers, timeProvider, artifacts)
+    {
+        this.scopeOperations = scopeOperations;
     }
 
 
@@ -101,6 +113,7 @@ public sealed partial class PackManagementService
             existingInstallation is not null)
         {
             Namespace = @namespace,
+            TargetScope = archive.Manifest.Definition.TargetScope,
             Bindings = bindingPreviews
         };
         return (preview, selectedHandlers);

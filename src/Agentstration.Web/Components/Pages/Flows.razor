@@ -13,7 +13,7 @@ else
 {
     <DataGrid TItem="FlowSummary" Items="items">
         <Header><tr><th>@T("Flow")</th><th>@T("Namespace")</th><th>@T("Kind")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Updated")</th><th></th></tr></Header>
-        <Row Context="item"><tr><td><strong>@item.Name</strong><br/><code>@item.Id</code></td><td><code>@item.Namespace.Value</code></td><td>@item.Kind</td><td>@item.Version</td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td><a class="text-button" href="@item.DetailsUrl">@T("Open")</a></td></tr></Row>
+        <Row Context="item"><tr><td><span class="resource-name-with-scope"><strong>@item.Name</strong><ResourceScopeBadge Kind="@ResourceScopeKind.Workspace" Compact /></span><code>@item.Id</code></td><td><code>@item.Namespace.Value</code></td><td>@item.Kind</td><td>@item.Version</td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td><td><a class="text-button" href="@item.DetailsUrl">@T("Open")</a></td></tr></Row>
     </DataGrid>
 }
 @code {

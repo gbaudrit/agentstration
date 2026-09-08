@@ -174,6 +174,165 @@ public sealed class AepConformanceTests
         Assert.IsTrue(session.Traces.Any(value => value.Url?.AbsolutePath == "/mcp"));
     }
 
+    [TestMethod]
+    public async Task SourceProviderResolvesAndMaterializesExactRevisionOffline()
+    {
+        await using var factory = new WebApplicationFactory<global::Aep.Samples.SourceProvider.Program>();
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var provider = client.CreateSourceProvider("deterministic");
+        var configuration = await SourceConfigurationAsync(client, "main");
+
+        var resolved = await provider.ResolveAsync(new(configuration));
+        var materialized = await provider.MaterializeAsync(new(
+            configuration,
+            resolved.Revision,
+            new(1024, 10, 4096, 5)));
+
+        Assert.IsTrue((await client.GetManifestAsync()).Capabilities.ContainsKey(AepCapabilityNames.SourceProvider));
+        Assert.AreEqual("deterministic", (await client.ListSourceProvidersAsync()).Single().Id);
+        var optionSet = (await client.GetConfigurationAsync()).OptionSets.Single();
+        Assert.AreEqual(AepContributionKinds.SourceProvider, optionSet.ContributionKind);
+        Assert.AreEqual(AepOptionScopes.SourceChannel, optionSet.Scope);
+        Assert.AreEqual(64, resolved.Revision.Length);
+        Assert.AreEqual(resolved.Revision, materialized.Revision);
+        Assert.AreEqual("application/zip", materialized.Archive.MediaType);
+        Assert.AreEqual(AepContentIntegrity.Sha256(materialized.Archive.Content), materialized.Archive.Integrity);
+    }
+
+    [TestMethod]
+    public async Task SourceProviderRejectsSchemaInvalidChannelOptionsBeforeInvocation()
+    {
+        await using var factory = new WebApplicationFactory<global::Aep.Samples.SourceProvider.Program>();
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var configuration = await SourceConfigurationAsync(client, "main");
+        configuration = configuration with { Values = JsonSerializer.SerializeToElement(new { unsupported = true }) };
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() =>
+            client.CreateSourceProvider("deterministic").ResolveAsync(new(configuration)));
+
+        Assert.AreEqual("invalid_options", exception.Code);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, exception.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task SourceProviderFailsClosedOnRevisionMismatch()
+    {
+        await using var factory = SourceFactory<InvalidSourceProvider>();
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var configuration = await SourceConfigurationAsync(client, "main");
+        var provider = client.CreateSourceProvider("deterministic");
+
+        var revision = (await provider.ResolveAsync(new(configuration))).Revision;
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => provider.MaterializeAsync(new(
+            configuration,
+            revision,
+            new(1024, 10, 4096, 5))));
+
+        Assert.AreEqual("source_revision_mismatch", exception.Code);
+        Assert.AreEqual(HttpStatusCode.BadGateway, exception.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task SourceProviderFailsClosedOnIntegrityMismatch()
+    {
+        await using var factory = SourceFactory<InvalidIntegritySourceProvider>();
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var configuration = await SourceConfigurationAsync(client, "main");
+        var provider = client.CreateSourceProvider("deterministic");
+        var revision = (await provider.ResolveAsync(new(configuration))).Revision;
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => provider.MaterializeAsync(new(
+            configuration,
+            revision,
+            new(1024, 10, 4096, 5))));
+
+        Assert.AreEqual("source_integrity_mismatch", exception.Code);
+        Assert.AreEqual(HttpStatusCode.BadGateway, exception.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task SourceProviderEnforcesArchiveLimits()
+    {
+        await using var factory = SourceFactory<OversizedSourceProvider>();
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var configuration = await SourceConfigurationAsync(client, "main");
+        var provider = client.CreateSourceProvider("deterministic");
+        var revision = (await provider.ResolveAsync(new(configuration))).Revision;
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => provider.MaterializeAsync(new(
+            configuration,
+            revision,
+            new(4, 1, 4, 5))));
+
+        Assert.AreEqual("source_archive_too_large", exception.Code);
+        Assert.AreEqual(HttpStatusCode.RequestEntityTooLarge, exception.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task SourceProviderPropagatesCallerCancellation()
+    {
+        await using var factory = SourceFactory<WaitingSourceProvider>();
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var configuration = await SourceConfigurationAsync(client, "cancel");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            client.CreateSourceProvider("deterministic").ResolveAsync(new(configuration), cancellation.Token));
+    }
+
+    [TestMethod]
+    public async Task SourceProviderMaterializationTimesOutSafely()
+    {
+        await using var factory = SourceFactory<WaitingSourceProvider>();
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient);
+        var configuration = await SourceConfigurationAsync(client, "main");
+        var provider = client.CreateSourceProvider("deterministic");
+        var revision = (await provider.ResolveAsync(new(configuration))).Revision;
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => provider.MaterializeAsync(new(
+            configuration,
+            revision,
+            new(1024, 10, 4096, 1))));
+
+        Assert.AreEqual("source_provider_timeout", exception.Code);
+        Assert.AreEqual(HttpStatusCode.GatewayTimeout, exception.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task SourceProviderClientRejectsMalformedResponses()
+    {
+        using var httpClient = new HttpClient(new MalformedSourceHandler()) { BaseAddress = new Uri("http://extension") };
+        var configuration = new AepVersionedOptions("test/source-channel", "1.0", $"sha256:{new string('0', 64)}", JsonSerializer.SerializeToElement(new { }));
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() =>
+            new AepClient(httpClient).CreateSourceProvider("test").ResolveAsync(new(configuration)));
+
+        Assert.AreEqual("invalid_response", exception.Code);
+    }
+
+    private static async Task<AepVersionedOptions> SourceConfigurationAsync(AepClient client, string selector)
+    {
+        var optionSet = (await client.GetConfigurationAsync()).OptionSets.Single();
+        var version = optionSet.Versions.Single(value => value.Version == optionSet.PreferredVersion);
+        return new(optionSet.Id, version.Version, version.SchemaDigest, JsonSerializer.SerializeToElement(new { selector }));
+    }
+
+    private static WebApplicationFactory<global::Aep.Samples.SourceProvider.Program> SourceFactory<TProvider>()
+        where TProvider : class, IAepSourceProvider =>
+        new WebApplicationFactory<global::Aep.Samples.SourceProvider.Program>().WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IAepSourceProvider>();
+                services.AddSingleton<IAepSourceProvider, TProvider>();
+            }));
+
     private sealed class MemoryTraceSink : IAepHttpTraceSink
     {
         public AepHttpTrace? Trace { get; private set; }
@@ -242,6 +401,80 @@ public sealed class AepConformanceTests
             yield return new AepChatUpdate([], AepRole.Assistant, "test-model", AepFinishReason.Stop);
             yield return new AepChatUpdate([AepContent.FromText("must-not-be-written")], AepRole.Assistant, "test-model");
             await Task.CompletedTask;
+        }
+    }
+
+    private sealed class MalformedSourceHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == AepProtocol.DiscoveryPath)
+            {
+                var manifest = new AepManifest(
+                    AepProtocol.Version,
+                    new("test", "Test", "1.0.0"),
+                    new Dictionary<string, AepCapabilityDescriptor> { [AepCapabilityNames.SourceProvider] = new("1.0", AepProtocol.SourceProvidersPath) },
+                    new([], SourceProviders: [new("test", "Test source")]));
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(manifest, options: AepProtocol.JsonOptions) });
+            }
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{ malformed", Encoding.UTF8, "application/json") });
+        }
+    }
+
+    public abstract class TestSourceProvider : IAepSourceProvider
+    {
+        public AepSourceProviderDescriptor Descriptor { get; } = new("deterministic", "Test source provider");
+
+        public virtual Task<AepSourceResolveResponse> ResolveAsync(AepSourceResolveRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new AepSourceResolveResponse(new string('a', 64), new("sha256", new string('a', 64))));
+
+        public abstract Task<AepSourceMaterializeResponse> MaterializeAsync(AepSourceMaterializeRequest request, CancellationToken cancellationToken);
+    }
+
+    public sealed class InvalidSourceProvider : TestSourceProvider
+    {
+        public override Task<AepSourceMaterializeResponse> MaterializeAsync(AepSourceMaterializeRequest request, CancellationToken cancellationToken)
+        {
+            var content = Encoding.UTF8.GetBytes("fixture");
+            return Task.FromResult(new AepSourceMaterializeResponse("different", new("application/zip", content, content.Length, 1, AepContentIntegrity.Sha256(content))));
+        }
+    }
+
+    public sealed class OversizedSourceProvider : TestSourceProvider
+    {
+        public override Task<AepSourceMaterializeResponse> MaterializeAsync(AepSourceMaterializeRequest request, CancellationToken cancellationToken)
+        {
+            var content = Encoding.UTF8.GetBytes("oversized");
+            return Task.FromResult(new AepSourceMaterializeResponse(request.Revision, new("application/zip", content, content.Length, 1, AepContentIntegrity.Sha256(content))));
+        }
+    }
+
+    public sealed class InvalidIntegritySourceProvider : TestSourceProvider
+    {
+        public override Task<AepSourceMaterializeResponse> MaterializeAsync(AepSourceMaterializeRequest request, CancellationToken cancellationToken)
+        {
+            var content = Encoding.UTF8.GetBytes("fixture");
+            return Task.FromResult(new AepSourceMaterializeResponse(request.Revision, new("application/zip", content, content.Length, 1, new("sha256", new string('0', 64)))));
+        }
+    }
+
+    public sealed class WaitingSourceProvider : TestSourceProvider
+    {
+        public override async Task<AepSourceResolveResponse> ResolveAsync(AepSourceResolveRequest request, CancellationToken cancellationToken)
+        {
+            if (request.Configuration.Values.TryGetProperty("selector", out var selector)
+                && string.Equals(selector.GetString(), "cancel", StringComparison.Ordinal))
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException();
+            }
+            return await base.ResolveAsync(request, cancellationToken);
+        }
+
+        public override async Task<AepSourceMaterializeResponse> MaterializeAsync(AepSourceMaterializeRequest request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException();
         }
     }
 }

@@ -10,6 +10,10 @@ internal static class ManagementHttp
         try { return await action(); }
         catch (ControlPlaneResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource_not_found", detail: exception.Message); }
         catch (ControlPlaneConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
+        catch (ResourceReferenceOutsideScopeException exception) { return Results.Problem(statusCode: 400, title: "resource_reference_outside_scope", detail: exception.Message); }
+        catch (ResourceReferenceAmbiguousException exception) { return Results.Problem(statusCode: 400, title: "resource_reference_ambiguous", detail: exception.Message); }
+        catch (ResourceScopeAccessDeniedException exception) { return Results.Problem(statusCode: 403, title: "resource_scope_access_denied", detail: exception.Message); }
+        catch (ResourceScopePolicyException exception) { return Results.Problem(statusCode: 422, title: "resource_scope_invalid", detail: exception.Message); }
         catch (AgentRevisionPurgeBlockedException exception)
         {
             var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails

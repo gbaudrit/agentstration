@@ -108,4 +108,7 @@ Use **Proposed** when implementation or repository evidence does not establish a
 76. [ADR-0076 — UI localization uses RESX and Principal culture preferences](0076-ui-localization-uses-resx-and-principal-culture-preferences.md)
 77. [ADR-0077 — Bootstrap profiles are explicit administrative applications](0077-bootstrap-profiles-are-explicit-administrative-applications.md)
 78. [ADR-0078 — PostgreSQL is an optional server storage profile](0078-postgresql-is-an-optional-server-storage-profile.md)
-79. [ADR-0079 — Sources have immutable versioned definitions](0079-sources-have-immutable-versioned-definitions.md)
+79. [ADR-0079 — Management resources use explicit hierarchical scopes](0079-management-resources-have-explicit-ownership-scopes.md)
+80. [ADR-0080 — Management resource kinds have an initial scope policy](0080-management-resource-kinds-have-an-initial-scope-policy.md)
+81. [ADR-0081 — Source Providers are bounded AEP contributions](0081-source-providers-are-bounded-aep-contributions.md)
+82. [ADR-0082 — Sources have immutable versioned definitions](0082-sources-have-immutable-versioned-definitions.md)

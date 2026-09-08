@@ -1,6 +1,6 @@
 # ADR-0077: Bootstrap profiles are explicit administrative applications
 
-Status: Accepted — 2026-08-29
+Status: Partially superseded by ADR-0079 — 2026-09-07
 
 ## Context
 
@@ -10,7 +10,7 @@ Manual application must not become a reconciliation controller. It must expose c
 
 ## Decision
 
-Every profile may contain a reserved `profile.yaml` descriptor using kind `BootstrapProfile`. Its `metadata.name` matches the immediate catalog directory and its definition declares a display name, description, and exactly one `targetScope`: `instance`, `tenant`, or `workspace`. Profiles composed in one application must share that scope. Tenant and Workspace applications require an explicit target; the current navigation context is never an implicit target.
+Every profile may contain a reserved `profile.yaml` descriptor using kind `BootstrapProfile`. Its `metadata.name` matches the immediate catalog directory and its definition declares a display name, description, and optional `targetScope`: `instance`, `tenant`, or `workspace`. Omission means `workspace` as established by ADR-0079. Profiles composed in one application must share that scope. Tenant and Workspace applications require an explicit target; the current navigation context is never an implicit target.
 
 A PlatformAdmin-only Console page and HTTP boundary list profiles, compose an ordered selection, choose the required target, and produce a state-aware preview. The preview identifies each resource as create, skip, conflict, or invalid and returns a digest covering ordered profiles, all profile files, scope, and target. Applying requires that digest. Applications are serialized in-process, re-previewed under the chosen scope, and rejected if the catalog or target changed.
 

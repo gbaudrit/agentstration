@@ -173,8 +173,7 @@ public sealed class WorkspacePackResourceCatalog(
         var clean = agent with
         {
             Uid = Guid.Empty,
-            TenantId = Guid.Empty,
-            WorkspaceId = Guid.Empty,
+            ScopeRef = null,
             Generation = 1,
             ETag = null,
             Metadata = CleanMetadata(agent.Metadata),
@@ -238,8 +237,7 @@ public sealed class WorkspacePackResourceCatalog(
         var clean = profile with
         {
             Uid = Guid.Empty,
-            TenantId = Guid.Empty,
-            WorkspaceId = Guid.Empty,
+            ScopeRef = null,
             Generation = 1,
             ETag = null,
             Metadata = CleanMetadata(profile.Metadata),
@@ -261,8 +259,7 @@ public sealed class WorkspacePackResourceCatalog(
         var clean = provider with
         {
             Uid = Guid.Empty,
-            TenantId = Guid.Empty,
-            WorkspaceId = Guid.Empty,
+            ScopeRef = null,
             Generation = 1,
             ETag = null,
             Metadata = CleanMetadata(provider.Metadata),
@@ -281,8 +278,7 @@ public sealed class WorkspacePackResourceCatalog(
         var clean = runtime with
         {
             Uid = Guid.Empty,
-            TenantId = Guid.Empty,
-            WorkspaceId = Guid.Empty,
+            ScopeRef = null,
             Generation = 1,
             ETag = null,
             Metadata = CleanMetadata(runtime.Metadata),

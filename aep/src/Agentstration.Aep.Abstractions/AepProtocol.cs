@@ -11,6 +11,7 @@ public static class AepProtocol
     public const string LegacyDiscoveryPath = "/.well-known/agentstration";
     public const string HealthPath = "/aep/health";
     public const string ModelProvidersPath = "/aep/model-providers";
+    public const string SourceProvidersPath = "/aep/source-providers";
     public const string ConfigurationPath = "/aep/configuration";
     public const string ConfigurationMigrationPath = "/aep/configuration/migrate";
 
@@ -28,6 +29,7 @@ public static class AepCapabilityNames
 {
     public const string Health = "aep.health";
     public const string ModelProvider = "aep.model-provider";
+    public const string SourceProvider = "aep.source-provider";
     public const string Tools = "aep.tools";
     public const string Configuration = "aep.configuration";
 }
@@ -42,12 +44,14 @@ public sealed record AepCapabilityDescriptor(
 public static class AepContributionKinds
 {
     public const string ModelProvider = "model-provider";
+    public const string SourceProvider = "source-provider";
     public const string Tool = "tool";
 }
 
 public static class AepOptionScopes
 {
     public const string ModelProfile = "model-profile";
+    public const string SourceChannel = "source-channel";
 }
 
 public sealed record AepOptionSetVersionDescriptor(
@@ -230,7 +234,47 @@ public sealed record AepHealth(string Status, string? Details = null);
 
 public sealed record AepContributions(
     IReadOnlyList<AepModelProviderDescriptor> ModelProviders,
-    IReadOnlyList<AepToolContribution>? Tools = null);
+    IReadOnlyList<AepToolContribution>? Tools = null,
+    IReadOnlyList<AepSourceProviderDescriptor>? SourceProviders = null);
+
+public sealed record AepSourceProviderDescriptor(
+    string Id,
+    string DisplayName,
+    string? Description = null,
+    IReadOnlyDictionary<string, JsonElement>? Metadata = null);
+
+public sealed record AepContentIntegrity(string Algorithm, string Digest)
+{
+    public static AepContentIntegrity Sha256(ReadOnlySpan<byte> content) =>
+        new("sha256", Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant());
+}
+
+public sealed record AepSourceResolveRequest(AepVersionedOptions Configuration);
+
+public sealed record AepSourceResolveResponse(
+    string Revision,
+    AepContentIntegrity Integrity,
+    IReadOnlyDictionary<string, JsonElement>? Metadata = null);
+
+public sealed record AepSourceMaterializationLimits(
+    long MaxArchiveBytes,
+    int MaxEntries,
+    long MaxExpandedBytes,
+    int TimeoutSeconds);
+
+public sealed record AepSourceMaterializeRequest(
+    AepVersionedOptions Configuration,
+    string Revision,
+    AepSourceMaterializationLimits Limits);
+
+public sealed record AepSourceArchive(
+    string MediaType,
+    byte[] Content,
+    long ExpandedBytes,
+    int EntryCount,
+    AepContentIntegrity Integrity);
+
+public sealed record AepSourceMaterializeResponse(string Revision, AepSourceArchive Archive);
 
 public sealed record AepMcpDescriptor(IReadOnlyList<AepMcpServerDescriptor> Servers);
 
@@ -267,6 +311,13 @@ public static class AepDescriptorValidator
             if (string.IsNullOrWhiteSpace(tool.Mcp.Tool)) errors.Add($"Tool contribution '{tool.Id}' MCP tool name is required.");
             if (string.IsNullOrWhiteSpace(tool.Mcp.Server) || !servers.Contains(tool.Mcp.Server))
                 errors.Add($"Tool contribution '{tool.Id}' references unknown MCP server '{tool.Mcp.Server}'.");
+        }
+        var sourceProviders = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var provider in descriptor.Contributions.SourceProviders ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(provider.Id)) errors.Add("Source provider contribution id is required.");
+            else if (!sourceProviders.Add(provider.Id)) errors.Add($"Source provider contribution '{provider.Id}' is duplicated.");
+            if (string.IsNullOrWhiteSpace(provider.DisplayName)) errors.Add($"Source provider contribution '{provider.Id}' displayName is required.");
         }
         return errors;
     }

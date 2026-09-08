@@ -12,6 +12,7 @@
   <data name="EmptyTitle"><value>No discovered tools</value></data>
   <data name="EmptyMessage"><value>Create a Tool Provider and refresh discovery. Newly discovered tools remain disabled by default.</value></data>
   <data name="Tool"><value>Tool</value></data>
+  <data name="Scope"><value>Scope</value></data>
   <data name="Provider"><value>Provider</value></data>
   <data name="Availability"><value>Availability</value></data>
   <data name="Enabled"><value>Enabled</value></data>

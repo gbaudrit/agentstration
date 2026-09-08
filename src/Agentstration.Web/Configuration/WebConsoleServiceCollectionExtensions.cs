@@ -69,6 +69,7 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<PacksApiClient, IPacksClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
         AddSensitiveClient<SecretsApiClient, ISecretsClient>(services, configured.ManagementApi);
+        AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);
         AddClient<ManagementApiClient, IAgentRunnerManagementClient>(services, configured.ManagementApi);
         AddClient<RuntimeApiClient, IAgentRunnerRuntimeClient>(services, configured.RuntimeApi);
 
