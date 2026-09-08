@@ -304,6 +304,150 @@ public interface ISourceSnapshotArtifactStore
     Task<Stream> OpenReadAsync(SourceSnapshotArtifactReference reference, CancellationToken cancellationToken);
 }
 
+public static class SourceCatalogKinds
+{
+    public const string Bootstrap = "BootstrapCatalog";
+    public const string Pack = "PackCatalog";
+}
+
+public static class SourceCatalogLimits
+{
+    public const int MaximumManifestBytes = 1024 * 1024;
+}
+
+public sealed record BootstrapCatalogVariant
+{
+    public required string Locale { get; init; }
+    public required string Path { get; init; }
+}
+
+public sealed record BootstrapCatalogEntry
+{
+    public required string Name { get; init; }
+    public required string DefaultLocale { get; init; }
+    public IReadOnlyList<BootstrapCatalogVariant> Variants { get; init; } = [];
+}
+
+public sealed record BootstrapCatalogProperties
+{
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public IReadOnlyList<BootstrapCatalogEntry> Entries { get; init; } = [];
+}
+
+public sealed record BootstrapCatalogManifest
+{
+    public required string ApiVersion { get; init; }
+    public required string Kind { get; init; }
+    public ResourceMetadata Metadata { get; init; } = new();
+    public required BootstrapCatalogProperties Definition { get; init; }
+}
+
+public sealed record PackCatalogEntry
+{
+    public required string Name { get; init; }
+    public string? DisplayName { get; init; }
+    public string? Description { get; init; }
+    public required string Path { get; init; }
+}
+
+public sealed record PackCatalogProperties
+{
+    public required string DisplayName { get; init; }
+    public string? Description { get; init; }
+    public IReadOnlyList<PackCatalogEntry> Entries { get; init; } = [];
+}
+
+public sealed record PackCatalogManifest
+{
+    public required string ApiVersion { get; init; }
+    public required string Kind { get; init; }
+    public ResourceMetadata Metadata { get; init; } = new();
+    public required PackCatalogProperties Definition { get; init; }
+}
+
+public sealed record ParsedSourceCatalog(
+    string Kind,
+    string Name,
+    BootstrapCatalogManifest? Bootstrap,
+    PackCatalogManifest? Pack);
+
+public sealed record SourceBootstrapBindingContract(string Name, BootstrapBindingTargetKind TargetKind, bool Required);
+public sealed record SourceBootstrapProfileContract(
+    string Name,
+    BootstrapProfileScope TargetScope,
+    IReadOnlyList<SourceBootstrapBindingContract> Bindings);
+
+public interface ISourceCatalogManifestReader
+{
+    ParsedSourceCatalog ReadCatalog(string content, string declaredKind);
+    SourceBootstrapProfileContract ReadBootstrapProfile(string content);
+}
+
+public interface ISourceSnapshotContent : IAsyncDisposable
+{
+    IReadOnlyCollection<string> Paths { get; }
+    Task<string> ReadTextAsync(string normalizedPath, int maximumBytes, CancellationToken cancellationToken);
+}
+
+public interface ISourceSnapshotContentReader
+{
+    Task<ISourceSnapshotContent> OpenAsync(SourceSnapshotArtifactReference reference, CancellationToken cancellationToken);
+}
+
+public sealed record SourceCatalogProvenance(
+    Guid SourceUid,
+    Guid SourceVersionUid,
+    string SourceVersion,
+    string Channel,
+    Guid SnapshotUid,
+    string SnapshotDigest,
+    string CatalogKind,
+    string CatalogName,
+    string CatalogPath);
+
+public sealed record SourceBootstrapVariantView(string Locale, string Path);
+public sealed record SourceBootstrapEntryView(
+    string Name,
+    string DefaultLocale,
+    IReadOnlyList<SourceBootstrapVariantView> Variants,
+    string ResolvedLocale,
+    string ResolvedPath);
+public sealed record SourcePackEntryView(string Name, string? DisplayName, string? Description, string Path);
+public sealed record SourceCatalogView(
+    SourceCatalogProvenance Provenance,
+    string DisplayName,
+    string? Description,
+    IReadOnlyList<SourceBootstrapEntryView> BootstrapEntries,
+    IReadOnlyList<SourcePackEntryView> PackEntries);
+
+public static class SourceDescendantPath
+{
+    public static string Normalize(string value, string label)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !string.Equals(value, value.Trim(), StringComparison.Ordinal))
+            throw new SourceValidationException("source_path_invalid", $"{label} must be a non-empty relative descendant path.");
+        if (value.StartsWith('/') || value.StartsWith('\\') || value.Contains('\\') || value.Contains('\0'))
+            throw new SourceValidationException("source_path_invalid", $"{label} must use a relative forward-slash path.");
+        var segments = value.Split('/');
+        if (segments.Any(segment => segment.Length == 0 || segment is "." or ".." || segment.Contains(':') || segment.Any(char.IsControl)))
+            throw new SourceValidationException("source_path_invalid", $"{label} contains an empty, absolute, current, or parent segment.");
+        return string.Join('/', segments);
+    }
+
+    public static string Combine(string? parent, string descendant, string label)
+    {
+        var child = Normalize(descendant, label);
+        return string.IsNullOrEmpty(parent) ? child : $"{Normalize(parent, label)}/{child}";
+    }
+
+    public static string? Parent(string normalizedPath)
+    {
+        var index = normalizedPath.LastIndexOf('/');
+        return index < 0 ? null : normalizedPath[..index];
+    }
+}
+
 public sealed record ParsedSourceManifest(
     PublishedSourceVersionManifest Manifest,
     string RawManifest,

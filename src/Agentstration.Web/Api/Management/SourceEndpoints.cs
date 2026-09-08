@@ -24,6 +24,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots", ListChannelSnapshotsAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}", GetChannelSnapshotAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/status", GetChannelStatusAsync);
+        sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/catalogs", BrowseCatalogsAsync);
         sources.MapPut("/{publisher}/{name}/display-name", UpdateDisplayNameAsync);
     }
 
@@ -238,6 +239,21 @@ internal sealed class SourceEndpoints : IManagementEndpoint
             ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)));
         return source.ScopeRef ?? throw new InvalidOperationException("A Source must have an ownership scope.");
     }
+
+    private static Task<IResult> BrowseCatalogsAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channel,
+        Guid snapshotUid,
+        string? scopeRef,
+        string? locale,
+        SourceCatalogService service,
+        SourceManagementService sources,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.BrowseAsync(
+            await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
+            publisher, name, versionUid, channel, snapshotUid, locale, cancellationToken)));
 
     private static void EnforceRequestBound(HttpRequest request)
     {

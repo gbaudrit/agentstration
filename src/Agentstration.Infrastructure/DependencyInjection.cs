@@ -169,8 +169,11 @@ public static class DependencyInjection
         services.AddSingleton<SourceManagementService>();
         services.AddSingleton<SourceBindingManagementService>();
         services.AddSingleton<ISourceSnapshotArtifactStore>(_ => new FileSystemSourceSnapshotArtifactStore(Path.Combine(dataDirectory, "source-snapshots")));
+        services.AddSingleton<ISourceSnapshotContentReader, ZipSourceSnapshotContentReader>();
+        services.AddSingleton<ISourceCatalogManifestReader, Agentstration.Management.Contracts.SourceCatalogManifestReader>();
         services.AddSingleton(new SourceMaterializationLimits());
         services.AddSingleton<SourceChannelSnapshotService>();
+        services.AddSingleton<SourceCatalogService>();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
