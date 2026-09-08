@@ -12,7 +12,8 @@ public sealed partial class SourceManagementService(
     ISourceManifestReader manifests,
     ISourceManifestRetriever retrieval,
     TimeProvider timeProvider,
-    ResourceScopeOperationService scopeOperations)
+    ResourceScopeOperationService scopeOperations,
+    SourceVerificationService verification)
 {
     public async Task<SourceImportResult> ImportYamlAsync(string rawManifest, CancellationToken cancellationToken) =>
         await ImportYamlAsync(rawManifest, null, cancellationToken);
@@ -293,7 +294,7 @@ public sealed partial class SourceManagementService(
 
         await RecordAsync(source, now, outcome, manifest.Definition.Version, parsed.Digest, version.Uid, origin, null, null, cancellationToken);
         var view = await BuildViewAsync(source, cancellationToken);
-        return new SourceImportResult(view, version, outcome);
+        return new SourceImportResult(view, version, outcome, await verification.VerifyDefinitionAsync(version, cancellationToken));
     }
 
     private async Task TryRecordRejectedAsync(

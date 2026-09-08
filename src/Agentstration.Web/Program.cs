@@ -91,6 +91,9 @@ var controlPlaneConnectionString = BuildSqliteConnectionString("Data:ControlPlan
 var workPlaneConnectionString = BuildSqliteConnectionString("Data:WorkPlanePath", "work-plane.db");
 var flowConnectionString = BuildSqliteConnectionString("Data:FlowPath", "flow-plane.db");
 var runtimeConnectionString = BuildSqliteConnectionString("Data:RuntimePath", "runtime-plane.db");
+var sourceVerificationIndexOptions = builder.Configuration
+    .GetSection(Agentstration.Infrastructure.Sources.SourceVerificationIndexOptions.SectionName)
+    .Get<Agentstration.Infrastructure.Sources.SourceVerificationIndexOptions>() ?? new();
 builder.Services.AddAgentstration(
     dataDirectory,
     aiOptions,
@@ -99,7 +102,8 @@ builder.Services.AddAgentstration(
     flowConnectionString,
     runtimeConnectionString,
     storageOptions,
-    enableHostedServices: hostedServicesEnabled);
+    enableHostedServices: hostedServicesEnabled,
+    sourceVerificationIndexOptions: sourceVerificationIndexOptions);
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);

@@ -23,6 +23,9 @@ definition:
       targetKind: sourceProvider
   channels:
     - name: stable
+      compatibility:
+        agentstration:
+          minVersion: 0.2.0-alpha.1
       provider:
         binding: distribution
       configuration:
@@ -74,4 +77,28 @@ The display name is initialized from the first Source Version default, falling b
 
 List Sources with `GET /api/sources`, inspect their versions with `GET /api/sources/{publisher}/{name}/versions?scopeRef=...`, and update the local display name with an ETag-protected `PUT /api/sources/{publisher}/{name}/display-name?scopeRef=...`.
 
-Git Channel acquisition is available through AEP. Source Provider binding selection, durable Channel snapshots, compatibility evaluation, periodic refresh, catalog browsing, and Bootstrap/Pack consumption are introduced by the related Source feature increments.
+## Optional verification index
+
+Agentstration can consult a static verification index without making it a startup or offline dependency:
+
+```json
+{
+  "Agentstration": {
+    "Sources": {
+      "VerificationIndex": {
+        "Url": "https://registry.example/verified-sources.yaml",
+        "TimeoutSeconds": 10,
+        "MaximumBytes": 1048576
+      }
+    }
+  }
+}
+```
+
+No URL is configured by default. The index is loaded only when an import or verification query asks for it. An unavailable or invalid index reports verification as unavailable but never rolls back an import or invalidates a retained Source Version or snapshot.
+
+Definition verification matches the exact `publisher/name`, opaque Source Version, and canonical manifest digest. The origin URL is not part of trust, so pasted YAML and the same document retrieved from a moving or immutable URL produce the same result. Query it with `GET /api/sources/{publisher}/{name}/versions/{versionUid}/verification?scopeRef=...`.
+
+Snapshot verification is independent and additionally requires the exact Channel, immutable provider revision, and complete snapshot archive digest. Query it with `GET /api/sources/{publisher}/{name}/versions/{versionUid}/channels/{channel}/snapshots/{snapshotUid}/verification?scopeRef=...`. A verified definition alone does not verify Channel content, and a locale or descendant path never establishes trust.
+
+Git Channel acquisition, Source Provider binding selection, durable Channel snapshots, compatibility evaluation, and catalog browsing are available through their respective Management APIs. Periodic refresh and Bootstrap/Pack application from Source selections remain separate increments.
