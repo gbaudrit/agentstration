@@ -38,7 +38,7 @@ It is built on the Microsoft .NET AI stack and currently executes agents through
 
 ### Packs and automation
 
-- immutable, explicitly scoped Source identities and versioned publisher definitions, plus a bounded AEP Git provider that pins explicit Channel refs to exact commits before materialization;
+- immutable, explicitly scoped Source identities and versioned publisher definitions, per-Channel Agentstration compatibility, plus a bounded AEP Git provider that pins explicit Channel refs to exact commits before materialization;
 - offline ZIP Pack installation with deterministic `publisher.name` namespaces and retained provenance;
 - Pack inventory, resource bindings, exact-source forks, local authoring and builds, replacement and modification-safe uninstall;
 - Pack Studio and workspace composition for ordinary Agentstration resources—Packs distribute resources but are never executed;

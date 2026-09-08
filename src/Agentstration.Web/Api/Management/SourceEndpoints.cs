@@ -223,7 +223,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         SourceChannelSnapshotService service,
         SourceManagementService sources,
         CancellationToken cancellationToken) =>
-        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.GetObservedAsync(
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.GetStatusAsync(
             await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
             publisher, name, versionUid, channel, cancellationToken)));
 

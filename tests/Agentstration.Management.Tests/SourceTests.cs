@@ -21,6 +21,96 @@ namespace Agentstration.Management.Tests;
 public sealed class SourceTests
 {
     [TestMethod]
+    public void ChannelCompatibilityUsesSemanticPrereleaseOrderingAndExclusiveMaximum()
+    {
+        var versions = new FakeAgentstrationVersionProvider();
+        var evaluator = new SourceChannelCompatibilityEvaluator(versions);
+        var channel = CompatibilityChannel("0.2.0-alpha.1", "0.2.0");
+
+        versions.CurrentVersion = "0.2.0-alpha.0";
+        Assert.AreEqual(SourceChannelCompatibilityStatus.Incompatible, evaluator.Evaluate(channel).Status);
+        versions.CurrentVersion = "0.2.0-alpha.1+build.42";
+        Assert.AreEqual(SourceChannelCompatibilityStatus.Compatible, evaluator.Evaluate(channel).Status);
+        versions.CurrentVersion = "0.2.0-beta.1";
+        Assert.AreEqual(SourceChannelCompatibilityStatus.Compatible, evaluator.Evaluate(channel).Status);
+        versions.CurrentVersion = "0.2.0";
+        Assert.AreEqual(SourceChannelCompatibilityStatus.Incompatible, evaluator.Evaluate(channel).Status);
+        versions.CurrentVersion = null;
+        Assert.AreEqual(SourceChannelCompatibilityStatus.CompatibilityUnknown, evaluator.Evaluate(channel).Status);
+        var unknownError = Assert.ThrowsExactly<SourceValidationException>(() => evaluator.RequireCompatible(channel));
+        Assert.AreEqual("source_channel_compatibility_unknown", unknownError.Code);
+
+        var openEnded = CompatibilityChannel("0.2.0-alpha.1", null);
+        versions.CurrentVersion = "99.0.0";
+        Assert.AreEqual(SourceChannelCompatibilityStatus.Compatible, evaluator.Evaluate(openEnded).Status);
+    }
+
+    [TestMethod]
+    public async Task ImportRejectsInvalidCompatibilityVersionsAndIntervalsAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        var invalidVersion = Manifest("invalid", "Name", includeChannel: true)
+            .Replace("0.2.0-alpha.1", "0.02.0", StringComparison.Ordinal);
+        var versionError = await Assert.ThrowsExactlyAsync<SourceValidationException>(() =>
+            fixture.Service.ImportYamlAsync(invalidVersion, default));
+        Assert.AreEqual("source_compatibility_version_invalid", versionError.Code);
+
+        var missing = Manifest("missing", "Name", includeChannel: true)
+            .Replace("      compatibility:\n        agentstration:\n          minVersion: 0.2.0-alpha.1\n", string.Empty, StringComparison.Ordinal);
+        var missingError = await Assert.ThrowsExactlyAsync<SourceValidationException>(() =>
+            fixture.Service.ImportYamlAsync(missing, default));
+        Assert.AreEqual("source_channel_compatibility_missing", missingError.Code);
+
+        var invalidInterval = Manifest("interval", "Name", includeChannel: true)
+            .Replace("minVersion: 0.2.0-alpha.1", "minVersion: 0.2.0\n          maxVersionExclusive: 0.2.0-alpha.1", StringComparison.Ordinal);
+        var intervalError = await Assert.ThrowsExactlyAsync<SourceValidationException>(() =>
+            fixture.Service.ImportYamlAsync(invalidInterval, default));
+        Assert.AreEqual("source_compatibility_interval_invalid", intervalError.Code);
+    }
+
+    [TestMethod]
+    public async Task CompatibilityIsRecalculatedAndBlocksRefreshAndCatalogConsumptionAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        fixture.Materializer.Content = CatalogArchive(
+            ("catalog.yaml", BootstrapCatalog()),
+            ("profiles/solution-discovery/fr-FR/profile.yaml", BootstrapProfile("workspace")),
+            ("profiles/solution-discovery/en-US/profile.yaml", BootstrapProfile("workspace")));
+        fixture.Versions.CurrentVersion = "0.1.0";
+        var manifest = ManifestWithCatalog("1").Replace(
+            "minVersion: 0.2.0-alpha.1", "minVersion: 0.2.0-alpha.1\n          maxVersionExclusive: 0.3.0", StringComparison.Ordinal);
+        var imported = await fixture.Service.ImportYamlAsync(manifest, default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+
+        var refreshError = await Assert.ThrowsExactlyAsync<SourceValidationException>(() => fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default));
+        Assert.AreEqual("source_channel_incompatible", refreshError.Code);
+        Assert.AreEqual(0, fixture.Materializer.MaterializeCount);
+
+        fixture.Versions.CurrentVersion = "0.2.0";
+        var refreshed = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+        fixture.Versions.CurrentVersion = "0.3.0";
+        var status = await fixture.Snapshots.GetStatusAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+        var browseError = await Assert.ThrowsExactlyAsync<SourceValidationException>(() => fixture.Catalogs.BrowseAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid,
+            "stable", refreshed.Snapshot.Uid, null, default));
+
+        Assert.AreEqual(SourceChannelCompatibilityStatus.Incompatible, status.Compatibility.Status);
+        Assert.AreEqual("source_running_version_at_or_above_maximum", status.Compatibility.ReasonCode);
+        Assert.AreEqual(refreshed.Snapshot.Uid, status.Refresh?.Definition.CurrentSnapshotUid);
+        Assert.AreEqual("source_channel_incompatible", browseError.Code);
+        Assert.IsNotNull(await fixture.Snapshots.GetAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid,
+            "stable", refreshed.Snapshot.Uid, default));
+    }
+
+    [TestMethod]
     public async Task CatalogDiscoveryMatchesRegistryContractAndPinsLocaleAndProvenanceAsync()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -632,7 +722,7 @@ public sealed class SourceTests
           publisher:
             name: agentstration
           bindings:{{(includeChannel ? "\n    - name: git-distribution\n      targetKind: sourceProvider" : " []")}}
-          channels:{{(includeChannel ? "\n    - name: stable\n      provider:\n        binding: git-distribution\n      configuration:\n        optionSet: git/source-channel\n        version: \"1.0\"\n        schemaDigest: sha256:test\n        values: {}" : " []")}}
+          channels:{{(includeChannel ? "\n    - name: stable\n      compatibility:\n        agentstration:\n          minVersion: 0.2.0-alpha.1\n      provider:\n        binding: git-distribution\n      configuration:\n        optionSet: git/source-channel\n        version: \"1.0\"\n        schemaDigest: sha256:test\n        values: {}" : " []")}}
           catalogs: []
         """;
 
@@ -714,6 +804,19 @@ public sealed class SourceTests
         Target = new("git-local", @namespace: ResourceNamespace.Default)
     };
 
+    private static SourceChannelDefinition CompatibilityChannel(string minimum, string? maximum) => new()
+    {
+        Name = "stable",
+        Compatibility = new() { Agentstration = new() { MinVersion = minimum, MaxVersionExclusive = maximum } },
+        Provider = new() { Binding = "git-distribution" },
+        Configuration = new()
+        {
+            OptionSet = "git/source-channel",
+            Version = "1.0",
+            SchemaDigest = "sha256:test"
+        }
+    };
+
     private sealed class StubHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
@@ -738,6 +841,7 @@ public sealed class SourceTests
         public SourceChannelSnapshotService Snapshots => services.GetRequiredService<SourceChannelSnapshotService>();
         public SourceCatalogService Catalogs => services.GetRequiredService<SourceCatalogService>();
         public FakeSourceProviderMaterializer Materializer => services.GetRequiredService<FakeSourceProviderMaterializer>();
+        public FakeAgentstrationVersionProvider Versions => services.GetRequiredService<FakeAgentstrationVersionProvider>();
         public FakeExtensionInspector Inspector => services.GetRequiredService<FakeExtensionInspector>();
 
         private Fixture(ServiceProvider services, string database, bool ownsDatabase)
@@ -773,6 +877,9 @@ public sealed class SourceTests
             collection.AddSingleton<FakeExtensionInspector>();
             collection.AddSingleton<IExtensionInspector>(provider => provider.GetRequiredService<FakeExtensionInspector>());
             collection.AddSingleton<SourceBindingManagementService>();
+            collection.AddSingleton<FakeAgentstrationVersionProvider>();
+            collection.AddSingleton<IAgentstrationVersionProvider>(provider => provider.GetRequiredService<FakeAgentstrationVersionProvider>());
+            collection.AddSingleton<SourceChannelCompatibilityEvaluator>();
             collection.AddSingleton<FakeSourceProviderMaterializer>();
             collection.AddSingleton<ISourceProviderMaterializer>(provider => provider.GetRequiredService<FakeSourceProviderMaterializer>());
             collection.AddSingleton<ISourceSnapshotArtifactStore, MemorySourceSnapshotArtifactStore>();
@@ -874,6 +981,11 @@ public sealed class SourceTests
             return Task.FromResult(new MaterializedSourceRevision(
                 revision, "application/zip", Content, Content.Length * 10L, 100, new("sha256", Digest(Content))));
         }
+    }
+
+    private sealed class FakeAgentstrationVersionProvider : IAgentstrationVersionProvider
+    {
+        public string? CurrentVersion { get; set; } = "0.2.0-alpha.1";
     }
 
     private sealed class MemorySourceSnapshotArtifactStore : ISourceSnapshotArtifactStore

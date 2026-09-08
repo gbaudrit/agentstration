@@ -240,6 +240,8 @@ internal static class OpenApiSuccessResponseCatalog
                 return method == "PUT"
                     ? Json<SourceBindingConfigurationResult>(200, "Configure Source Provider bindings")
                     : Json<SourceBindingStatusView>(200, "Get Source Provider binding status");
+            if (path.EndsWith("/status", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceChannelStatusView>(200, "Get Source Channel status");
             if (path.EndsWith("/versions/{versionUid}", StringComparison.OrdinalIgnoreCase))
                 return Json<SourceVersionResource>(200, "Get an immutable Source Version");
             if (path.EndsWith("/versions", StringComparison.OrdinalIgnoreCase))
