@@ -72,6 +72,10 @@ var localAiExtension = builder.AddProject<Projects.Agentstration_Extensions_Loca
     .WithEnvironment("LocalAI__Endpoint", parsedLocalAiEndpoint.AbsoluteUri)
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
+var gitExtension = builder.AddProject<Projects.Agentstration_Extensions_Git>("git-source-extension")
+    .WithEnvironment("Agentstration__Slot", slot)
+    .WithHttpHealthCheck("/health")
+    .WithDynamicHostPorts(dynamicApplicationPorts);
 var utilitiesExtension = builder.AddProject<Projects.Agentstration_Extensions_Utilities>("utilities-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithHttpHealthCheck("/health")
@@ -92,6 +96,7 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Ollama__Endpoint", ollamaExtension.GetEndpoint("http"))
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.LlamaCpp__Endpoint", llamaCppExtension.GetEndpoint("http"))
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.LocalAI__Endpoint", localAiExtension.GetEndpoint("http"))
+    .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Git__Endpoint", gitExtension.GetEndpoint("http"))
     .WithEnvironment("Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint", utilitiesExtension.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WaitFor(ollamaExtension)
@@ -104,6 +109,7 @@ for (var index = 0; index < initialBootstrapProfiles.Length; index++)
     console.WithEnvironment($"Agentstration__Bootstrap__InitialProfiles__{index}", initialBootstrapProfiles[index]);
 console.WaitFor(llamaCppExtension);
 console.WaitFor(localAiExtension);
+console.WaitFor(gitExtension);
 console.WaitFor(utilitiesExtension);
 console
     .WithEnvironment("Agentstration__ManagementApi__BaseAddress", console.GetEndpoint("http"))

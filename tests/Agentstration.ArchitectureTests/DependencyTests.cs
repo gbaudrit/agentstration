@@ -3,6 +3,7 @@ using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Application.Work;
+using Agentstration.Extensions.Git;
 using Agentstration.Extensions.LlamaCpp;
 using Agentstration.Extensions.LocalAI;
 using Agentstration.Extensions.Ollama;
@@ -97,6 +98,7 @@ public sealed class DependencyTests
         Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
             || name.Contains("LlamaCpp", StringComparison.Ordinal)
             || name.Contains("LocalAI", StringComparison.Ordinal)
+            || name.Contains("Extensions.Git", StringComparison.Ordinal)
             || name.Contains("Aspire", StringComparison.Ordinal)
             || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
@@ -111,7 +113,8 @@ public sealed class DependencyTests
             || reference.Name.Contains("Microsoft.Extensions.AI", StringComparison.Ordinal)
             || reference.Name.Contains("Ollama", StringComparison.Ordinal)
             || reference.Name.Contains("LlamaCpp", StringComparison.Ordinal)
-            || reference.Name.Contains("LocalAI", StringComparison.Ordinal)));
+            || reference.Name.Contains("LocalAI", StringComparison.Ordinal)
+            || reference.Name.Contains("Extensions.Git", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -155,12 +158,23 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void GitSourceExtensionDoesNotReferenceManagementRuntimeMafOrAspireHosting()
+    {
+        var references = typeof(GitSourceProvider).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Runtime", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+            || name.Contains("Aspire.Hosting", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public void AgentFrameworkRuntimeDoesNotReferenceConcreteModelProviders()
     {
         var references = typeof(AgentFrameworkRuntimeFactory).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Ollama", StringComparison.Ordinal)
             || name.Contains("LlamaCpp", StringComparison.Ordinal)
-            || name.Contains("LocalAI", StringComparison.Ordinal)));
+            || name.Contains("LocalAI", StringComparison.Ordinal)
+            || name.Contains("Extensions.Git", StringComparison.Ordinal)));
     }
 
     [TestMethod]

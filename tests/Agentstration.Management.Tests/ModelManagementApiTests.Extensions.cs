@@ -82,6 +82,26 @@ public sealed partial class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task GitSourceExtensionConfigurationUsesTheAspireRegistrationIdentity()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.Git:Endpoint", "http://localhost:5295");
+            builder.UseSetting("ConnectionStrings:git-source-extension", "Endpoint=http://localhost:5295");
+            builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        });
+        using var client = factory.CreateClient();
+
+        var extension = await client.GetFromJsonAsync<ExtensionRegistrationResource>(
+            "/api/extensionregistrations/git-source-extension");
+
+        Assert.IsNotNull(extension);
+        Assert.AreEqual("Agentstration.Extensions.Git", extension.Definition.ExpectedExtensionId);
+        Assert.AreEqual(new Uri("http://localhost:5295/"), extension.Definition.Endpoint);
+    }
+
+    [TestMethod]
     public async Task ExtensionsApiReportsConfiguredProvidersWithoutRequiringThemToBeOnline()
     {
         await using var factory = Factory();

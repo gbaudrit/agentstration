@@ -24,6 +24,7 @@
     <Project Path="src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <Project Path="src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
     <Project Path="src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
+    <Project Path="src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
     <Project Path="src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
     <Project Path="src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
     <Project Path="src/Agentstration.Runtime.AgentFramework/Agentstration.Runtime.AgentFramework.csproj" />
@@ -55,6 +56,7 @@
     <Project Path="tests/Agentstration.ArchitectureTests/Agentstration.ArchitectureTests.csproj" />
     <Project Path="tests/Agentstration.Management.Tests/Agentstration.Management.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
+    <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
     <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Components.Tests/Agentstration.Web.Components.Tests.csproj" />
