@@ -19,6 +19,8 @@ namespace Agentstration.Aep.Tests;
 [TestClass]
 public sealed class AepConformanceTests
 {
+    private const string WorkloadToken = "9KxYV9x5g1cX1Jf7mK4sW8qR2nT6pB3dL0hZ7uA5eQc";
+
     [TestMethod]
     public async Task CanonicalClientDiscoversCapabilitiesAndHealth()
     {
@@ -46,6 +48,85 @@ public sealed class AepConformanceTests
         var legacy = await httpClient.GetStringAsync(AepProtocol.LegacyDiscoveryPath);
 
         Assert.AreEqual(canonical, legacy);
+    }
+
+    [TestMethod]
+    public async Task StaticBearerProtectsEveryProtocolEndpointButNotPlatformHealth()
+    {
+        await using var factory = AuthenticatedFactory(AepAuthenticationDefaults.InvokePermission);
+        using var anonymous = factory.CreateClient();
+        using var authenticatedHttp = factory.CreateClient();
+        var authenticated = new AepClient(authenticatedHttp, new StaticAepAccessTokenProvider(WorkloadToken));
+
+        using var discovery = await anonymous.GetAsync(AepProtocol.DiscoveryPath);
+        using var protocolHealth = await anonymous.GetAsync(AepProtocol.HealthPath);
+        using var platformHealth = await anonymous.GetAsync("/health");
+        var manifest = await authenticated.GetManifestAsync();
+
+        Assert.AreEqual(HttpStatusCode.Unauthorized, discovery.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, protocolHealth.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, platformHealth.StatusCode);
+        Assert.AreEqual("sample.hello", manifest.Extension.Id);
+    }
+
+    [TestMethod]
+    public async Task StaticBearerReturnsForbiddenWhenWorkloadLacksInvokePermission()
+    {
+        await using var factory = AuthenticatedFactory("aep.observe");
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient, new StaticAepAccessTokenProvider(WorkloadToken));
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => client.GetManifestAsync());
+
+        Assert.AreEqual(HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.AreEqual("authorization_denied", exception.Code);
+    }
+
+    [TestMethod]
+    public void StaticBearerGeneratorCreatesRedacted256BitCredential()
+    {
+        var credential = AepStaticBearerCredentials.Generate("agentstration-test");
+
+        Assert.AreEqual("agentstration-test", credential.ClientId);
+        Assert.AreEqual(32, credential.TokenId.Length);
+        Assert.IsGreaterThanOrEqualTo(43, credential.AccessToken.Length);
+        Assert.AreEqual("***", credential.ToString());
+    }
+
+    [TestMethod]
+    public async Task AccessTokensAreAppliedPerRequestWithoutMutatingDefaultHeaders()
+    {
+        using var firstHandler = new CapturingAuthorizationHandler();
+        using var secondHandler = new CapturingAuthorizationHandler();
+        using var firstHttp = new HttpClient(firstHandler) { BaseAddress = new Uri("http://first-extension") };
+        using var secondHttp = new HttpClient(secondHandler) { BaseAddress = new Uri("http://second-extension") };
+        var first = new AepClient(firstHttp, new StaticAepAccessTokenProvider(WorkloadToken));
+        var second = new AepClient(secondHttp, new StaticAepAccessTokenProvider(new string('x', 32)));
+
+        await Task.WhenAll(first.GetManifestAsync(), second.GetManifestAsync());
+
+        Assert.AreEqual(WorkloadToken, firstHandler.Token);
+        Assert.AreEqual(new string('x', 32), secondHandler.Token);
+        Assert.IsNull(firstHttp.DefaultRequestHeaders.Authorization);
+        Assert.IsNull(secondHttp.DefaultRequestHeaders.Authorization);
+    }
+
+    [TestMethod]
+    public async Task StaticBearerAuthenticatesStreamingCalls()
+    {
+        await using var factory = new WebApplicationFactory<global::Aep.Samples.ModelProvider.Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+                services.AddAepStaticBearerAuthentication(options =>
+                    options.AddToken("test-token", "agentstration-test", WorkloadToken))));
+        using var httpClient = factory.CreateClient();
+        var provider = new AepClient(httpClient, new StaticAepAccessTokenProvider(WorkloadToken)).CreateModelProvider("echo");
+        var request = new AepChatRequest("echo-1", [new AepMessage(AepRole.User, [AepContent.FromText("secured")])]);
+        var updates = new List<AepChatUpdate>();
+
+        await foreach (var update in provider.ChatStreamingAsync(request)) updates.Add(update);
+
+        Assert.AreEqual(AepFinishReason.Stop, updates.Last().FinishReason);
+        Assert.AreEqual("Echo: secured", string.Concat(updates.SelectMany(value => value.Contents).Select(value => value.Text)));
     }
 
     [TestMethod]
@@ -333,6 +414,11 @@ public sealed class AepConformanceTests
                 services.AddSingleton<IAepSourceProvider, TProvider>();
             }));
 
+    private static WebApplicationFactory<global::Program> AuthenticatedFactory(params string[] permissions) =>
+        new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            services.AddAepStaticBearerAuthentication(options =>
+                options.AddToken("test-token", "agentstration-test", WorkloadToken, permissions))));
+
     private sealed class MemoryTraceSink : IAepHttpTraceSink
     {
         public AepHttpTrace? Trace { get; private set; }
@@ -345,6 +431,25 @@ public sealed class AepConformanceTests
         {
             Content = new StringContent(JsonSerializer.Serialize(new { token = "response-secret" }), Encoding.UTF8, "application/json")
         });
+    }
+
+    private sealed class CapturingAuthorizationHandler : HttpMessageHandler
+    {
+        public string? Token { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Token = request.Headers.Authorization?.Parameter;
+            var manifest = new AepManifest(
+                AepProtocol.Version,
+                new AepExtensionIdentity("test", "Test", "1.0.0"),
+                new Dictionary<string, AepCapabilityDescriptor>(),
+                new AepContributions([], []));
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(manifest, options: AepProtocol.JsonOptions)
+            });
+        }
     }
 
     private sealed class TerminalStreamingHandler : HttpMessageHandler

@@ -65,3 +65,9 @@ An extension may register directed migration edges between versions of the same 
 ## Security
 
 Endpoints must not embed credentials. Clients and inspectors must redact authorization, cookies, tokens, passwords, API keys, and properties explicitly described as secret. Protocol traces are diagnostic data and must be bounded and treated as sensitive.
+
+Extensions may require workload authentication for the complete AEP protocol surface. The initial SDK profile uses an opaque static Bearer with at least 256 bits of random secret material. The server stores token digests, compares them in constant time, and creates a workload principal with a stable client ID, non-secret token ID, and explicit permissions. Multiple active token IDs allow overlap during rotation.
+
+When this profile is enabled, `/.well-known/aep`, its compatibility alias, `/aep/health`, and every discovery, configuration, migration, provider, chat, streaming, and source-provider operation require the `aep.invoke` permission. Missing or invalid authentication returns `401`; an authenticated workload without the permission returns `403`. A minimal host `/health` endpoint may remain anonymous because it is outside AEP and exposes no extension details.
+
+Authentication is optional at SDK composition level: a host may instead apply another ASP.NET Core scheme and policy. Human cookies, personal access tokens, and interactive identity are never AEP workload credentials.

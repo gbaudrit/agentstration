@@ -49,6 +49,25 @@ Extensions can publish immutable option-set versions and explicit directed migra
 
 The `SourceProviderExtension` sample demonstrates the native `aep.source-provider` Resolve/Materialize lifecycle entirely offline. Source Provider configuration uses the versioned `source-channel` option scope, and materialization is bounded by archive size, entry count, expanded size, timeout, exact revision, and SHA-256 integrity checks. AEP does not interpret Source catalogs or expose acquisition as an MCP tool.
 
+## Authenticate AEP traffic
+
+The client accepts a request-scoped credential provider. It applies the Bearer to each request without changing shared `HttpClient.DefaultRequestHeaders`:
+
+```csharp
+var client = new AepClient(httpClient, new StaticAepAccessTokenProvider(token));
+```
+
+An ASP.NET Core extension can opt into the matching fail-closed policy. All AEP protocol routes are protected; only the minimal platform `/health` route remains anonymous:
+
+```csharp
+builder.Services
+    .AddAep(options => options.Extension = new("sample", "Sample", "1.0.0"))
+    .AddAepStaticBearerAuthentication(options =>
+        options.AddToken(tokenId, clientId, token, AepAuthenticationDefaults.InvokePermission));
+```
+
+Tokens are opaque values with at least 256 bits of entropy. `AepStaticBearerCredentials.Generate` creates a suitable one-time issuance value. The server retains only SHA-256 digests and supports multiple active token IDs so callers can overlap credentials during rotation. Never place the clear token in configuration committed to source control, URLs, manifests, traces, or diagnostic output.
+
 ## CLI
 
 ```powershell
