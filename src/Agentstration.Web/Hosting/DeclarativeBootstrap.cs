@@ -103,7 +103,7 @@ public sealed class DeclarativeBootstrapService(
                         BootstrapResourceDisposition.Invalid, $"Unknown bootstrap resource kind '{resource.Kind}'."));
                     continue;
                 }
-                if (handler.Scope != profile.Summary.Scope)
+                if (!IsCompatibleScope(handler.Scope, profile.Summary.Scope))
                 {
                     resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name,
                         BootstrapResourceDisposition.Invalid, $"Resource scope '{handler.Scope}' does not match profile scope '{profile.Summary.Scope}'."));
@@ -131,6 +131,10 @@ public sealed class DeclarativeBootstrapService(
             ComputeDigest(profiles, scope, selection.Target, bindings),
             resources);
     }
+
+    private static bool IsCompatibleScope(BootstrapProfileScope resourceScope, BootstrapProfileScope profileScope) =>
+        resourceScope == profileScope
+        || (profileScope == BootstrapProfileScope.Workspace && resourceScope == BootstrapProfileScope.Tenant);
 
     public async Task<BootstrapExecutionResult> ExecuteAsync(
         BootstrapProfileSelection selection,
@@ -203,7 +207,7 @@ public sealed class DeclarativeBootstrapService(
         };
         lines.AddRange(profiles.Select(profile => $"{profile.Summary.Name}:{profile.Summary.Digest}"));
         lines.AddRange(bindings.Select(binding =>
-            $"{binding.Profile}:{binding.Name}:{binding.Target.Name}:{binding.Target.Namespace?.Value ?? string.Empty}:{binding.Target.WorkspaceRef ?? string.Empty}"));
+            $"{binding.Profile}:{binding.Name}:{binding.Target.Name}:{binding.Target.Namespace?.Value ?? string.Empty}:{binding.Target.ScopeRef?.Value ?? string.Empty}"));
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines)))).ToLowerInvariant();
     }
 
@@ -233,12 +237,10 @@ public sealed class DeclarativeBootstrapService(
                 }
                 if (string.IsNullOrWhiteSpace(target.Name))
                     throw new DeclarativeBootstrapException($"Bootstrap binding '{profile.Summary.Name}/{binding.Name}' requires a target name.");
-                if (target.WorkspaceRef is not null)
-                    throw new DeclarativeBootstrapException($"Bootstrap binding '{profile.Summary.Name}/{binding.Name}' cannot target another Workspace.");
                 resolved.Add(new(
                     profile.Summary.Name,
                     binding.Name,
-                    new ResourceReference(target.Name, @namespace: target.Namespace ?? ResourceNamespace.Default)));
+                    new ResourceReference(target.Name, target.ScopeRef, target.Namespace ?? ResourceNamespace.Default)));
             }
         }
         if (selected.Count > 0)

@@ -37,6 +37,7 @@ public partial class Extensions
     private bool creating;
     private string? etag;
     private RegistrationForm form = new();
+    private ResourceScopeRef? selectedScope;
     private ExtensionRegistrationResource? pendingDelete;
     private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
     private bool migrating;
@@ -82,6 +83,7 @@ public partial class Extensions
     private void StartCreate()
     {
         form = new();
+        selectedScope = null;
         etag = null;
         creating = true;
         editing = true;
@@ -93,6 +95,7 @@ public partial class Extensions
         {
             var snapshot = await Client.GetRegistrationAsync(registration.Namespace, registration.Name, cancellation.Token);
             form = RegistrationForm.From(snapshot.Value);
+            selectedScope = snapshot.Value.ScopeRef;
             etag = snapshot.ETag;
             creating = false;
             editing = true;
@@ -110,7 +113,7 @@ public partial class Extensions
                 throw new AgentstrationApiException(T("EndpointMustBeAbsolute"), Guid.NewGuid().ToString("N"));
             var properties = new ExtensionRegistrationProperties { DisplayName = form.DisplayName, Endpoint = endpoint, Enabled = form.Enabled, ExpectedExtensionId = form.ExpectedExtensionId };
             if (creating)
-                _ = await Client.CreateRegistrationAsync(new(form.Name, properties, form.Namespace), cancellation.Token);
+                _ = await Client.CreateRegistrationAsync(new(form.Name, properties, form.Namespace, selectedScope), cancellation.Token);
             else
                 _ = await Client.UpdateRegistrationAsync(ResourceNamespace.Parse(form.Namespace), form.Name, new(properties), etag!, cancellation.Token);
             editing = false;

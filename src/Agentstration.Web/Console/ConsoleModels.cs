@@ -8,6 +8,7 @@ namespace Agentstration.Web.Console;
 public sealed record AgentSummary(string Id, string Name, string Type, string Version, string Status, IReadOnlyList<string> Capabilities, string Runtime, DateTimeOffset LastActivity, string ModelProfile = "Not configured")
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
     public string? DeploymentId { get; init; }
     public ResourceAddress ModelProfileAddress => ResourceAddress.Create(ModelProfileNamespace, Agentstration.Management.Abstractions.ResourceKinds.ModelProfile, ModelProfile);

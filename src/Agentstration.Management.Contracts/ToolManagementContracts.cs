@@ -1,8 +1,9 @@
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Contracts;
 
-public sealed record CreateToolProviderRequest(string Name, ToolProviderProperties Properties);
+public sealed record CreateToolProviderRequest(string Name, ToolProviderProperties Properties, ResourceScopeRef? ScopeRef = null);
 public sealed record PutToolProviderRequest(ToolProviderProperties Properties);
 public sealed record SetToolEnabledRequest(bool Enabled);
 public sealed record ToolDiscoveryDiffResponse(int New, int Changed, int Unchanged, int Unavailable, int Total);

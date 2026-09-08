@@ -302,8 +302,6 @@ public sealed class BootstrapProfileCatalog(
                 throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' declares binding '{binding.Name}' more than once.");
             if (binding.TargetKind is null)
                 throw new DeclarativeBootstrapException($"Bootstrap profile binding '{profile}/{binding.Name}' requires targetKind.");
-            if (binding.DefaultTarget?.WorkspaceRef is not null)
-                throw new DeclarativeBootstrapException($"Bootstrap profile binding '{profile}/{binding.Name}' cannot target another Workspace.");
             result.Add(new(
                 binding.Name,
                 binding.TargetKind.Value,

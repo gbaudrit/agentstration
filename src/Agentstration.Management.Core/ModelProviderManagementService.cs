@@ -8,6 +8,8 @@ namespace Agentstration.Management.Core;
 
 public sealed class ModelProviderManagementService(
     IControlPlaneStore store,
+    IResourceReferenceResolver references,
+    ResourceScopeOperationService scopeOperations,
     IEnumerable<IModelProviderDiscovery> discoveries,
     TimeProvider timeProvider) : IModelProviderConfigurationStore
 {
@@ -15,20 +17,29 @@ public sealed class ModelProviderManagementService(
     public async Task ValidateForCreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        _ = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, cancellationToken);
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.ModelProvider);
+        ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
+        _ = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, scopeRef, cancellationToken);
     }
 
     public async Task<StoredResource<ModelProviderResource>> CreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        if (await GetAsync(resource.Namespace, resource.Metadata.Name, cancellationToken) is not null) throw new ControlPlaneConcurrencyException($"Model provider '{resource.Address}' already exists.");
-        var definition = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, cancellationToken);
-        return await store.PutAsync(resource with
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.ModelProvider);
+        return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            Generation = 1,
-            Definition = definition,
-            Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
-        }, null, true, cancellationToken);
+            var address = ScopedResourceAddress.Create(scopeRef, resource.Namespace, ResourceKinds.ModelProvider, resource.Name);
+            if (await store.GetExactAsync<ModelProviderResource>(address, token) is not null)
+                throw new ControlPlaneConcurrencyException($"Model provider '{resource.Address}' already exists in scope '{scopeRef}'.");
+            var definition = await ValidateAndNormalizeAsync(resource.Namespace, resource.Definition, scopeRef, token);
+            return await store.PutExactAsync(scopeRef, resource with
+            {
+                ScopeRef = scopeRef,
+                Generation = 1,
+                Definition = definition,
+                Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
+            }, null, true, token);
+        }, cancellationToken);
     }
 
     public async Task<StoredResource<ModelProviderResource>> PutAsync(string name, ModelProviderProperties definition, string? ifMatch, CancellationToken cancellationToken)
@@ -37,17 +48,23 @@ public sealed class ModelProviderManagementService(
     public async Task<StoredResource<ModelProviderResource>> PutAsync(ResourceNamespace @namespace, string name, ModelProviderProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {
         var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
-        var validated = await ValidateAndNormalizeAsync(existing.Value.Namespace, definition, cancellationToken);
-        return await store.PutAsync(existing.Value with
+        var scopeRef = existing.Value.ScopeRef ?? throw new ModelProviderValidationException("The model provider has no ownership scope.");
+        return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            Generation = checked(existing.Value.Generation + 1),
-            Definition = validated,
-            Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
-        }, ifMatch, false, cancellationToken);
+            var validated = await ValidateAndNormalizeAsync(existing.Value.Namespace, definition, scopeRef, token);
+            return await store.PutExactAsync(scopeRef, existing.Value with
+            {
+                Generation = checked(existing.Value.Generation + 1),
+                Definition = validated,
+                Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
+            }, ifMatch, false, token);
+        }, cancellationToken);
     }
 
     public Task<StoredResource<ModelProviderResource>?> GetAsync(string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(new ResourceKey(ResourceKinds.ModelProvider, name), cancellationToken);
     public Task<StoredResource<ModelProviderResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => store.GetAsync<ModelProviderResource>(new ResourceKey(ResourceKinds.ModelProvider, name, @namespace), cancellationToken);
+    public Task<StoredResource<ModelProviderResource>?> GetExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        store.GetExactAsync<ModelProviderResource>(ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.ModelProvider, name), cancellationToken);
 
     public async Task<IReadOnlyList<ModelProviderView>> ListAsync(CancellationToken cancellationToken)
     {
@@ -91,20 +108,20 @@ public sealed class ModelProviderManagementService(
             .Select(profile => new ModelProviderUsage(profile.Value.Kind, profile.Value.Metadata.Name, profile.Value.Definition.DisplayName))
             .ToArray();
 
-    public async Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken)
-    {
-        _ = await GetAsync(name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
-        var usages = await GetUsagesAsync(name, cancellationToken);
-        if (usages.Count > 0) throw new ModelProviderInUseException(name, usages);
-        await store.DeleteAsync(new(ResourceKinds.ModelProvider, name), ifMatch, cancellationToken);
-    }
+    public Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken) =>
+        DeleteAsync(ResourceNamespace.Default, name, ifMatch, cancellationToken);
 
     public async Task DeleteAsync(ResourceNamespace @namespace, string name, string? ifMatch, CancellationToken cancellationToken)
     {
-        _ = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
+        var existing = await GetAsync(@namespace, name, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(name);
         var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
         if (usages.Count > 0) throw new ModelProviderInUseException(name, usages);
-        await store.DeleteAsync(new(ResourceKinds.ModelProvider, name, @namespace), ifMatch, cancellationToken);
+        var scopeRef = existing.Value.ScopeRef ?? throw new ModelProviderValidationException("The model provider has no ownership scope.");
+        await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
+        {
+            await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.ModelProvider, name), ifMatch, token);
+            return true;
+        }, cancellationToken);
     }
 
     private async Task<ModelProviderView> InspectAsync(ModelProviderConfiguration provider, bool includeModels, CancellationToken cancellationToken)
@@ -130,6 +147,18 @@ public sealed class ModelProviderManagementService(
         return await ToConfigurationAsync(resource.Value, cancellationToken);
     }
 
+    public async Task<ModelProviderConfiguration> GetConfigurationRequiredAsync(
+        ResourceReference reference,
+        ResourceNamespace ownerNamespace,
+        ResourceScopeRef consumerScopeRef,
+        CancellationToken cancellationToken)
+    {
+        var resource = await references.ResolveAsync<ModelProviderResource>(
+            reference, ownerNamespace, ResourceKinds.ModelProvider, consumerScopeRef, cancellationToken)
+            ?? throw new ModelProviderConfigurationNotFoundException(reference.Name);
+        return await ToConfigurationAsync(resource.Value, cancellationToken);
+    }
+
     ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredAsync(string name, CancellationToken cancellationToken) => new(GetConfigurationRequiredAsync(name, cancellationToken));
     ValueTask<ModelProviderConfiguration> IModelProviderConfigurationStore.GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => new(GetConfigurationRequiredAsync(@namespace, name, cancellationToken));
 
@@ -140,16 +169,15 @@ public sealed class ModelProviderManagementService(
     private async Task<ModelProviderProperties> ValidateAndNormalizeAsync(
         ResourceNamespace ownerNamespace,
         ModelProviderProperties definition,
+        ResourceScopeRef ownerScopeRef,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.DisplayName);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.ContributionId);
-        if (definition.Extension.WorkspaceRef is not null)
-            throw new ModelProviderValidationException("Cross-workspace extension references are not supported.");
         var extensionAddress = definition.Extension.Resolve(ownerNamespace, ResourceKinds.ExtensionRegistration);
-        if (await store.GetAsync<ExtensionRegistrationResource>(new(extensionAddress.Kind, extensionAddress.Name, extensionAddress.Namespace), cancellationToken) is null)
-            throw new ModelProviderValidationException($"Referenced extension registration '{extensionAddress}' does not exist.");
+        if (await references.ResolveAsync<ExtensionRegistrationResource>(definition.Extension, ownerNamespace, ResourceKinds.ExtensionRegistration, ownerScopeRef, cancellationToken) is null)
+            throw new ModelProviderValidationException($"Referenced extension registration '{extensionAddress}' does not exist or is not visible from '{ownerScopeRef}'.");
         if (FindDiscovery(AepModelProvider.AdapterType) is null)
             throw new ModelProviderValidationException("The AEP model-provider adapter is not registered in this host.");
         return definition with
@@ -162,13 +190,18 @@ public sealed class ModelProviderManagementService(
     private async Task<ModelProviderConfiguration> ToConfigurationAsync(ModelProviderResource resource, CancellationToken cancellationToken)
     {
         var extensionAddress = resource.Definition.Extension.Resolve(resource.Namespace, ResourceKinds.ExtensionRegistration);
-        var extension = await store.GetAsync<ExtensionRegistrationResource>(
-            new(extensionAddress.Kind, extensionAddress.Name, extensionAddress.Namespace), cancellationToken)
+        var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
+            resource.Definition.Extension,
+            resource.Namespace,
+            ResourceKinds.ExtensionRegistration,
+            resource.ScopeRef ?? throw new ModelProviderConfigurationException("The model provider has no ownership scope."),
+            cancellationToken)
             ?? throw new ModelProviderConfigurationException($"Extension registration '{extensionAddress}' was not found.");
         return new()
         {
             Uid = resource.Uid,
             Namespace = resource.Namespace,
+            ScopeRef = resource.ScopeRef,
             Name = resource.Metadata.Name,
             AdapterType = AepModelProvider.AdapterType,
             ContributionId = resource.Definition.ContributionId,

@@ -10,6 +10,7 @@ public sealed record ModelProviderConfiguration
 {
     public required Guid Uid { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public ResourceScopeRef? ScopeRef { get; init; }
     public required string Name { get; init; }
     public required string AdapterType { get; init; }
     public required string ContributionId { get; init; }

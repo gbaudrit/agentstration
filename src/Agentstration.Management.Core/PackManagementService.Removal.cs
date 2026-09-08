@@ -14,6 +14,29 @@ public sealed partial class PackManagementService
     public async Task UninstallAsync(PackIdentity identity, PackRemovalOptions removalOptions, CancellationToken cancellationToken)
     {
         var installed = await GetAsync(identity, cancellationToken) ?? throw new PackNotFoundException(identity);
+        if (scopeOperations is not null && installed.Value.ScopeRef is { } scopeRef)
+        {
+            _ = await scopeOperations.WriteAsync(
+                installed.Value,
+                scopeRef,
+                AuthorizationPermissions.ResourcesDelete,
+                async token =>
+                {
+                    await UninstallCoreAsync(identity, installed, removalOptions, token);
+                    return true;
+                },
+                cancellationToken);
+            return;
+        }
+        await UninstallCoreAsync(identity, installed, removalOptions, cancellationToken);
+    }
+
+    private async Task UninstallCoreAsync(
+        PackIdentity identity,
+        StoredResource<InstalledPackResource> installed,
+        PackRemovalOptions removalOptions,
+        CancellationToken cancellationToken)
+    {
         installed = await UpdateAsync(installed, installed.Value.Definition with { State = InstalledPackState.Uninstalling }, ProvisioningState.Deleting, cancellationToken);
         var remaining = installed.Value.Definition.ManagedResources.ToList();
         try
@@ -33,7 +56,10 @@ public sealed partial class PackManagementService
                 installed = await UpdateAsync(installed, installed.Value.Definition with { ManagedResources = remaining.ToArray() }, ProvisioningState.Deleting, cancellationToken);
             }
 
-            await store.DeleteAsync(new(ResourceKinds.InstalledPack, identity.ResourceName), installed.ETag, cancellationToken);
+            if (installed.Value.ScopeRef is { } scopeRef)
+                await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, installed.Value.Namespace, ResourceKinds.InstalledPack, identity.ResourceName), installed.ETag, cancellationToken);
+            else
+                await store.DeleteAsync(new(ResourceKinds.InstalledPack, identity.ResourceName), installed.ETag, cancellationToken);
         }
         catch (Exception exception)
         {

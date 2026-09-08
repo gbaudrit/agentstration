@@ -115,10 +115,16 @@ public sealed class SqliteControlPlaneStore(
 
     public async Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource
     {
-        if (requestContext.AccessMode != ControlPlaneAccessMode.System)
-            return await GetExactAsync<T>(key.AtScope(CurrentScopeRef()), cancellationToken);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var matches = await context.Documents.AsNoTracking().Include(value => value.Scope).Where(value => value.Namespace == key.Namespace.Value && value.Kind == key.Kind && value.Name == key.Name).Take(2).ToArrayAsync(cancellationToken);
+        var query = context.Documents.AsNoTracking().Include(value => value.Scope)
+            .Where(value => value.Namespace == key.Namespace.Value && value.Kind == key.Kind && value.Name == key.Name);
+        if (requestContext.AccessMode != ControlPlaneAccessMode.System)
+        {
+            var target = await RequireScopeAsync(context, CurrentScopeRef(), cancellationToken);
+            var visibleScopeIds = await VisibleScopeIdsAsync(context, target, cancellationToken);
+            query = query.Where(value => visibleScopeIds.Contains(value.ScopeId));
+        }
+        var matches = await query.Take(2).ToArrayAsync(cancellationToken);
         return matches.Length switch
         {
             0 => null,
@@ -151,6 +157,35 @@ public sealed class SqliteControlPlaneStore(
 
     public Task<IReadOnlyList<StoredResource<T>>> ListVisibleAsync<T>(ResourceScopeRef targetScopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
         ListScopedAsync<T>(targetScopeRef, kind, skip, take, visible: true, cancellationToken);
+
+    public async Task<IReadOnlyList<ResourceInventoryEntry>> ListExactInventoryAsync(
+        ResourceScopeRef scopeRef,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 1000);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var scope = await RequireScopeAsync(context, scopeRef, cancellationToken);
+        await EnsureCanReadAsync(context, scope, cancellationToken);
+        var documents = await context.Documents.AsNoTracking()
+            .Where(value => value.ScopeId == scope.Id)
+            .OrderBy(value => value.Kind)
+            .ThenBy(value => value.Namespace)
+            .ThenBy(value => value.Name)
+            .Skip(skip)
+            .Take(take)
+            .ToArrayAsync(cancellationToken);
+        return documents.Select(value => new ResourceInventoryEntry(
+            value.Uid,
+            scopeRef,
+            ResourceNamespace.Parse(value.Namespace),
+            value.Kind,
+            value.Name,
+            value.UpdatedAt)).ToArray();
+    }
 
     public async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource
     {
@@ -399,8 +434,13 @@ public sealed class SqliteControlPlaneStore(
         return requestContext.AccessMode switch
         {
             ControlPlaneAccessMode.System => query,
-            ControlPlaneAccessMode.Tenant => query.Where(value => value.Scope.Ref == ResourceScopeRef.Tenant(requestContext.Current.TenantId).Value),
-            ControlPlaneAccessMode.Workspace => query.Where(value => value.Scope.Ref == ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId).Value),
+            ControlPlaneAccessMode.Tenant => query.Where(value =>
+                value.Scope.Ref == ResourceScopeRef.Tenant(requestContext.Current.TenantId).Value
+                || value.Scope.Ref == ResourceScopeRef.Instance.Value),
+            ControlPlaneAccessMode.Workspace => query.Where(value =>
+                value.Scope.Ref == ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId).Value
+                || value.Scope.Ref == ResourceScopeRef.Tenant(requestContext.Current.TenantId).Value
+                || value.Scope.Ref == ResourceScopeRef.Instance.Value),
             _ => throw new InvalidOperationException("Control Plane access requires an explicit workspace or system context.")
         };
     }

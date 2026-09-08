@@ -14,16 +14,9 @@ public sealed class ExtensionSourceDiscoveryService(
 {
     public async Task DiscoverForActiveWorkspacesAsync(CancellationToken cancellationToken)
     {
-        foreach (var tenant in (await identities.ListTenantsAsync(cancellationToken))
-            .Where(value => value.Status == TenantStatus.Active))
-        {
-            foreach (var workspace in (await identities.ListWorkspacesAsync(tenant.Id, cancellationToken))
-                .Where(value => value.Status == WorkspaceStatus.Active))
-            {
-                using var scope = requestScopes.Push(new RequestContext(Guid.Empty, tenant.Id, workspace.Id));
-                _ = await DiscoverAsync(cancellationToken);
-            }
-        }
+        if (!(await identities.ListTenantsAsync(cancellationToken)).Any(value => value.Status == TenantStatus.Active)) return;
+        using var scope = requestScopes.PushSystem();
+        _ = await DiscoverAsync(cancellationToken);
     }
 
     public async Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken)
@@ -35,7 +28,11 @@ public sealed class ExtensionSourceDiscoveryService(
 
         foreach (var source in sources.Values)
         {
-            var existing = await registrations.GetAsync(ResourceNamespace.Default, source.Name, cancellationToken);
+            var existing = await registrations.GetExactAsync(
+                ResourceScopeRef.Instance,
+                ResourceNamespace.Default,
+                source.Name,
+                cancellationToken);
             var definition = new ExtensionRegistrationProperties
             {
                 DisplayName = source.DisplayName,

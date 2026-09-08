@@ -99,9 +99,9 @@ public sealed record ResourceStatus
 
 public sealed record ResourceReference
 {
-    public ResourceReference(string name, string? workspaceRef = null, ResourceNamespace? @namespace = null) { Name = name; WorkspaceRef = workspaceRef; Namespace = @namespace; }
+    public ResourceReference(string name, ResourceScopeRef? scopeRef = null, ResourceNamespace? @namespace = null) { Name = name; ScopeRef = scopeRef; Namespace = @namespace; }
     public string Name { get; init; }
-    public string? WorkspaceRef { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
     [JsonIgnore] public string ResourceId => Name;
     public ResourceNamespace? Namespace { get; init; }
     public ResourceAddress Resolve(ResourceNamespace ownerNamespace, string kind) =>
