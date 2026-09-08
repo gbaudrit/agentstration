@@ -173,12 +173,12 @@ public sealed class GitSourceProviderTests
         string temporaryRoot,
         bool allowLocal = true,
         long maximumRepositoryBytes = 32 * 1024 * 1024) => new(Options.Create(new GitSourceProviderOptions
-    {
-        AllowLocalRepositories = allowLocal,
-        TemporaryDirectory = Path.Combine(temporaryRoot, "provider-work"),
-        MaximumRepositoryBytes = maximumRepositoryBytes,
-        ResolveTimeoutSeconds = 10
-    }));
+        {
+            AllowLocalRepositories = allowLocal,
+            TemporaryDirectory = Path.Combine(temporaryRoot, "provider-work"),
+            MaximumRepositoryBytes = maximumRepositoryBytes,
+            ResolveTimeoutSeconds = 10
+        }));
 
     private static AepVersionedOptions Configuration(
         string repository,
