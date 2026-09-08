@@ -1,3 +1,5 @@
+name: agentstration
+
 services:
   aep-key-provisioner:
     image: alpine:3.22
@@ -12,7 +14,7 @@ services:
 
   ollama-extension:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.extension
       args: { PROJECT: src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.Ollama.dll }
     environment: { Aep__EnrollmentMode: SharedKeyFile, Aep__SharedKeyFile__Path: /run/aep-key/token }
@@ -21,7 +23,7 @@ services:
 
   llama-cpp-extension:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.extension
       args: { PROJECT: src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.LlamaCpp.dll }
     environment: { Aep__EnrollmentMode: SharedKeyFile, Aep__SharedKeyFile__Path: /run/aep-key/token }
@@ -30,7 +32,7 @@ services:
 
   localai-extension:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.extension
       args: { PROJECT: src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.LocalAI.dll }
     environment: { Aep__EnrollmentMode: SharedKeyFile, Aep__SharedKeyFile__Path: /run/aep-key/token }
@@ -39,7 +41,7 @@ services:
 
   utilities-extension:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.extension
       args: { PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.Utilities.dll }
     environment: { Aep__EnrollmentMode: SharedKeyFile, Aep__SharedKeyFile__Path: /run/aep-key/token }
@@ -47,8 +49,10 @@ services:
     depends_on: { aep-key-provisioner: { condition: service_completed_successfully } }
 
   agentstration:
-    build: .
-    ports: ["5080:8080"]
+    build:
+      context: ../..
+    ports:
+      - "5080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       AI__Provider: Deterministic

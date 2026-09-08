@@ -6,6 +6,7 @@ obj/
 TestResults/
 artifacts/
 .models/
+deploy/compose/.env.postgresql
 .agentstration*/
 *.user
 *.suo

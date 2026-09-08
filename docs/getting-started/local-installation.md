@@ -31,12 +31,12 @@ The same `Agentstration.Web` process is the authoritative server for Console and
 
 ## Run with Compose
 
-The base `docker-compose.yml` remains a minimal deterministic launch. Choose one provider-specific topology to run its AEP extension together with the Utilities extension.
+All Compose definitions live under `deploy/compose`. The `base.yml` topology remains a minimal deterministic launch. Choose one provider-specific topology to run its AEP extension together with the Utilities extension.
 
 For a container-owned Ollama instance:
 
 ```powershell
-docker compose -f docker-compose.ollama.yml up --build
+docker compose -f deploy/compose/ollama.yml up --build
 ```
 
 The Ollama topology builds the authoritative server plus the Ollama and Utilities AEP extensions. It also starts an Ollama inference server with a persistent `ollama-data` volume. Only Agentstration is published to the host, at `http://localhost:5100` by default; extension and Ollama traffic stay on the Compose network.
@@ -46,14 +46,14 @@ For llama.cpp, first place a GGUF model in the ignored `.models/llama-cpp` direc
 ```powershell
 New-Item -ItemType Directory -Force .models/llama-cpp
 Copy-Item C:\path\to\model.gguf .models/llama-cpp/model.gguf
-docker compose -f docker-compose.llama-cpp.yml up --build
+docker compose -f deploy/compose/llama-cpp.yml up --build
 ```
 
 For LocalAI:
 
 ```powershell
-docker compose -f docker-compose.localai.yml up --build
-docker compose -f docker-compose.localai.yml exec localai local-ai models install <model>
+docker compose -f deploy/compose/localai.yml up --build
+docker compose -f deploy/compose/localai.yml exec localai local-ai models install <model>
 ```
 
 Both topologies run their inference server inside Docker; neither needs `aep-host` or `host.docker.internal`. Run only the topology for the provider being tested. The provider-specific files publish the same Agentstration port and share the same default Compose project data volume.
@@ -73,9 +73,9 @@ Both topologies run their inference server inside Docker; neither needs `aep-hos
 Install a model explicitly after startup:
 
 ```powershell
-docker compose -f docker-compose.ollama.yml exec ollama ollama pull qwen3:1.7b
-docker compose -f docker-compose.ollama.yml exec ollama ollama run qwen3:1.7b
-docker compose -f docker-compose.ollama.yml exec ollama ollama ps
+docker compose -f deploy/compose/ollama.yml exec ollama ollama pull qwen3:1.7b
+docker compose -f deploy/compose/ollama.yml exec ollama ollama run qwen3:1.7b
+docker compose -f deploy/compose/ollama.yml exec ollama ollama ps
 ```
 
 The model volume survives container recreation. Remove it only through an explicit Compose volume deletion when the cached models are no longer needed.
@@ -83,3 +83,27 @@ The model volume survives container recreation. Remove it only through an explic
 The default Ollama container is CPU-capable. Ollama's Linux image can use Vulkan when the Docker host exposes `/dev/dri`, but that device is not available in every WSL configuration. Do not add a `/dev/dri` mapping until the device exists on the Docker host; Compose would otherwise fail before Ollama starts. The `PROCESSOR` column from `ollama ps` reports whether a loaded model uses CPU, GPU, or both.
 
 The default images are CPU-capable. GPU variants require the corresponding device to be exposed by the Docker host; keep the CPU images until GPU passthrough is verified.
+
+### PostgreSQL variants
+
+The shared `postgresql.yml` overlay can be combined with the minimal or any provider-specific topology. Create its ignored environment file once and replace the disposable password:
+
+```powershell
+Copy-Item deploy/compose/.env.postgresql.example deploy/compose/.env.postgresql
+```
+
+Then select the required variant:
+
+```powershell
+# Minimal deterministic + PostgreSQL
+docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/base.yml -f deploy/compose/postgresql.yml up --build
+
+# Ollama + PostgreSQL
+docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/ollama.yml -f deploy/compose/postgresql.yml up --build
+
+# llama.cpp + PostgreSQL
+docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/llama-cpp.yml -f deploy/compose/postgresql.yml up --build
+
+# LocalAI + PostgreSQL
+docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/localai.yml -f deploy/compose/postgresql.yml up --build
+```

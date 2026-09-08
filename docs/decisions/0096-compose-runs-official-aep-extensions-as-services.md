@@ -12,7 +12,7 @@ The native inference servers have a different lifecycle. They may already run on
 
 ## Decision
 
-- Provider-specific `docker-compose.ollama.yml`, `docker-compose.llama-cpp.yml`, and `docker-compose.localai.yml` topologies build and run only the selected model-provider extension plus the provider-neutral Utilities extension. The base `docker-compose.yml` remains the minimal deterministic launch.
+- Provider-specific `deploy/compose/ollama.yml`, `llama-cpp.yml`, and `localai.yml` topologies build and run only the selected model-provider extension plus the provider-neutral Utilities extension. `deploy/compose/base.yml` remains the minimal deterministic launch.
 - Agentstration receives the selected model-provider and Utilities AEP service URLs through its existing `Agentstration:Extensions` configuration. Compose does not introduce a second registry or persist container identity in Management resources.
 - Compose does not download a model, publish extension ports to the host, or manage third-party extension installation and upgrades.
 - One parameterized extension Dockerfile provides a common build/runtime shape while each service still publishes and starts its own autonomous project.

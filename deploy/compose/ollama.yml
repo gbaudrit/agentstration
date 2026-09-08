@@ -1,3 +1,5 @@
+name: agentstration
+
 services:
   ollama:
     image: ${OLLAMA_IMAGE:-ollama/ollama:0.33.2}
@@ -11,8 +13,8 @@ services:
 
   ollama-extension:
     build:
-      context: .
-      dockerfile: Dockerfile.aep-extension
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile.aep-extension
       args:
         EXTENSION_PROJECT: src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj
     command: ["Agentstration.Extensions.Ollama.dll"]
@@ -24,14 +26,15 @@ services:
 
   utilities-extension:
     build:
-      context: .
-      dockerfile: Dockerfile.aep-extension
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile.aep-extension
       args:
         EXTENSION_PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
     command: ["Agentstration.Extensions.Utilities.dll"]
 
   agentstration:
-    build: .
+    build:
+      context: ../..
     depends_on:
       - ollama-extension
       - utilities-extension

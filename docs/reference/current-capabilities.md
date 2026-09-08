@@ -193,7 +193,7 @@ The AppHost exposes the authoritative server, Workplace, and autonomous extensio
 Or with one provider-specific AEP container topology, for example Ollama:
 
 ```powershell
-docker compose -f docker-compose.ollama.yml up --build
+docker compose -f deploy/compose/ollama.yml up --build
 ```
 
 ## AI modes

@@ -12,9 +12,9 @@ Compose is also useful for comparing inference performance in a reproducible Lin
 
 ## Decision
 
-- The provider-specific `docker-compose.ollama.yml` topology includes the Ollama AEP extension, the Utilities extension, a version-pinned Ollama service, and a persistent named volume for its model store. The base Compose topology remains minimal and deterministic; llama.cpp and LocalAI have separate Compose files.
+- The provider-specific `deploy/compose/ollama.yml` topology includes the Ollama AEP extension, the Utilities extension, a version-pinned Ollama service, and a persistent named volume for its model store. The base Compose topology remains minimal and deterministic; llama.cpp and LocalAI have separate Compose files.
 - The Ollama AEP extension uses the Compose service name and internal port. It does not traverse the Windows/WSL host boundary.
-- No Ollama port is published to the host. Operators use `docker compose -f docker-compose.ollama.yml exec` for direct diagnostics and model management.
+- No Ollama port is published to the host. Operators use `docker compose -f deploy/compose/ollama.yml exec` for direct diagnostics and model management.
 - Compose never pulls a model implicitly. Model selection and installation remain explicit operator actions.
 - GPU devices are not declared in the default topology. The default must start when `/dev/dri` is absent. Operators may add a device mapping through an environment-specific override after verifying GPU passthrough on the Docker host.
 - Aspire continues to consume an operator-owned Ollama installation as decided by ADR-0029. Direct Web startup and the deterministic fallback are unchanged.

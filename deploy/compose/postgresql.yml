@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: agentstration
       POSTGRES_USER: ${POSTGRES_USER:-agentstration}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment or an uncommitted .env file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment or an uncommitted environment file}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

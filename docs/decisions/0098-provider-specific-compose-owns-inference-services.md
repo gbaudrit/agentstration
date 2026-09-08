@@ -12,12 +12,13 @@ Official CPU-capable images exist for both inference servers. llama.cpp requires
 
 ## Decision
 
-- `docker-compose.llama-cpp.yml` starts a pinned official llama.cpp server image, its AEP extension, Utilities, and Agentstration on one internal network.
+- `deploy/compose/llama-cpp.yml` starts a pinned official llama.cpp server image, its AEP extension, Utilities, and Agentstration on one internal network.
 - llama.cpp reads one explicitly selected GGUF file from an ignored host directory mounted read-only. Compose never downloads that model.
-- `docker-compose.localai.yml` starts a pinned official LocalAI image, its AEP extension, Utilities, and Agentstration on one internal network.
+- `deploy/compose/localai.yml` starts a pinned official LocalAI image, its AEP extension, Utilities, and Agentstration on one internal network.
 - LocalAI persists model and application state in named volumes. Its catalog starts empty and model installation remains an explicit operator action.
 - The AEP extensions address their inference services by Compose service name. Neither topology uses `host.docker.internal`, `host-gateway`, or a published inference port.
 - CPU-capable images are the safe defaults. GPU-specific images and device mappings remain explicit environment-specific overrides.
+- `deploy/compose/postgresql.yml` is a shared storage overlay that can be combined with the minimal or any provider-specific topology.
 - Aspire continues to consume operator-owned inference servers as decided by ADR-0061 and ADR-0067.
 
 ## Consequences
