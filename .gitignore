@@ -5,6 +5,7 @@ obj/
 .vscode/
 TestResults/
 artifacts/
+.models/
 .agentstration*/
 *.user
 *.suo

@@ -176,11 +176,13 @@ For Aspire orchestration and its local dashboard:
 dotnet run --project src/Agentstration.AppHost
 ```
 
-Or use Compose:
+Or use one of the provider-specific Compose topologies. For Ollama:
 
 ```powershell
-docker compose up --build
+docker compose -f docker-compose.ollama.yml up --build
 ```
+
+This topology includes Ollama, its AEP extension, the Utilities extension, and a persistent model volume. Pull models explicitly with `docker compose -f docker-compose.ollama.yml exec ollama ollama pull <model>`; Compose never downloads one implicitly. The `docker-compose.llama-cpp.yml` and `docker-compose.localai.yml` topologies likewise include their inference server, matching AEP extension, Utilities, and persistent model storage. llama.cpp expects an explicitly supplied GGUF file; LocalAI starts with an empty model catalog. Set `AI_PROVIDER=Deterministic` for the explicit offline fallback. The base `docker-compose.yml` remains the minimal deterministic topology.
 
 SQLite remains the standalone default. To start the optional PostgreSQL 17 profile, create an uncommitted `.env` from `.env.postgresql.example`, replace the development password, and run:
 
@@ -192,7 +194,7 @@ PostgreSQL stores relational module data in six schemas but leaves secrets, Data
 
 For Aspire, set `Agentstration:Storage:Provider=PostgreSql`. Its generated password is persisted in user-secrets and relational data is kept in the worktree-isolated Docker volume `agentstration-<slot>-<instance-id>-postgresql`; file-backed state remains under the slot data directory. See [configuration](docs/getting-started/configuration.md#postgresql-storage-profile) for startup behavior, reset, troubleshooting, and backup guidance.
 
-Aspire starts Agentstration and its AEP extensions, but does not install inference servers or download models. Follow the [local installation guide](https://docs.agentstration.io/getting-started/local-installation) and [model provider guide](https://docs.agentstration.io/concepts/model-providers) for provider-specific setup.
+Aspire starts Agentstration's AEP extensions against existing inference servers. Provider-specific Compose files isolate Ollama, llama.cpp, and LocalAI, with each topology owning its inference service and model storage. No topology downloads a model implicitly. Follow the [local installation guide](https://docs.agentstration.io/getting-started/local-installation) and [model provider guide](https://docs.agentstration.io/concepts/model-providers) for provider-specific setup.
 
 ## Build and test
 

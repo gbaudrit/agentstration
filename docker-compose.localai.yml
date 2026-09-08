@@ -1,0 +1,57 @@
+services:
+  localai:
+    image: ${LOCALAI_IMAGE:-localai/localai:v4.9.0}
+    environment:
+      LOCALAI_API_KEY: ${LOCALAI_API_KEY:-}
+    volumes:
+      - localai-models:/models
+      - localai-data:/data
+
+  localai-extension:
+    build:
+      context: .
+      dockerfile: Dockerfile.aep-extension
+      args:
+        EXTENSION_PROJECT: src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj
+    command: ["Agentstration.Extensions.LocalAI.dll"]
+    depends_on:
+      - localai
+    environment:
+      LocalAI__Endpoint: http://localai:8080
+      LocalAI__ApiKey: ${LOCALAI_API_KEY:-}
+
+  utilities-extension:
+    build:
+      context: .
+      dockerfile: Dockerfile.aep-extension
+      args:
+        EXTENSION_PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
+    command: ["Agentstration.Extensions.Utilities.dll"]
+
+  agentstration:
+    build: .
+    depends_on:
+      - localai-extension
+      - utilities-extension
+    ports:
+      - "127.0.0.1:${AGENTSTRATION_HTTP_PORT:-5100}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      AI__Provider: ${AI_PROVIDER:-Managed}
+      Data__Directory: /data
+      Data__ControlPlanePath: /data/control-plane.db
+      Data__WorkPlanePath: /data/work-plane.db
+      Data__FlowPath: /data/flow-plane.db
+      Agentstration__ManagementApi__BaseAddress: http://localhost:8080/
+      Agentstration__RuntimeApi__BaseAddress: http://localhost:8080/
+      Agentstration__WorkApi__BaseAddress: http://localhost:8080/
+      Agentstration__FlowApi__BaseAddress: http://localhost:8080/
+      Agentstration__Extensions__Agentstration.Extensions.LocalAI__Endpoint: http://localai-extension:8080
+      Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint: http://utilities-extension:8080
+    volumes:
+      - agentstration-data:/data
+
+volumes:
+  agentstration-data:
+  localai-models:
+  localai-data:

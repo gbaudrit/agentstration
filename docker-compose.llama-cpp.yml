@@ -1,0 +1,61 @@
+services:
+  llama-cpp:
+    image: ${LLAMA_CPP_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-b10830}
+    command:
+      - -m
+      - /models/${LLAMA_CPP_MODEL:-model.gguf}
+      - --alias
+      - ${LLAMA_CPP_MODEL_ALIAS:-local-gguf}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --jinja
+    volumes:
+      - ${LLAMA_CPP_MODELS_PATH:-./.models/llama-cpp}:/models:ro
+
+  llama-cpp-extension:
+    build:
+      context: .
+      dockerfile: Dockerfile.aep-extension
+      args:
+        EXTENSION_PROJECT: src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj
+    command: ["Agentstration.Extensions.LlamaCpp.dll"]
+    depends_on:
+      - llama-cpp
+    environment:
+      LlamaCpp__Endpoint: http://llama-cpp:8080
+
+  utilities-extension:
+    build:
+      context: .
+      dockerfile: Dockerfile.aep-extension
+      args:
+        EXTENSION_PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
+    command: ["Agentstration.Extensions.Utilities.dll"]
+
+  agentstration:
+    build: .
+    depends_on:
+      - llama-cpp-extension
+      - utilities-extension
+    ports:
+      - "127.0.0.1:${AGENTSTRATION_HTTP_PORT:-5100}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      AI__Provider: ${AI_PROVIDER:-Managed}
+      Data__Directory: /data
+      Data__ControlPlanePath: /data/control-plane.db
+      Data__WorkPlanePath: /data/work-plane.db
+      Data__FlowPath: /data/flow-plane.db
+      Agentstration__ManagementApi__BaseAddress: http://localhost:8080/
+      Agentstration__RuntimeApi__BaseAddress: http://localhost:8080/
+      Agentstration__WorkApi__BaseAddress: http://localhost:8080/
+      Agentstration__FlowApi__BaseAddress: http://localhost:8080/
+      Agentstration__Extensions__Agentstration.Extensions.LlamaCpp__Endpoint: http://llama-cpp-extension:8080
+      Agentstration__Extensions__Agentstration.Extensions.Utilities__Endpoint: http://utilities-extension:8080
+    volumes:
+      - agentstration-data:/data
+
+volumes:
+  agentstration-data:

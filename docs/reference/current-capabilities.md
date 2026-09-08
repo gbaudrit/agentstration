@@ -190,10 +190,10 @@ dotnet run --project src/Agentstration.AppHost
 
 The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to `Ollama:Endpoint` (default `http://localhost:11434`), the llama.cpp extension to `LlamaCpp:Endpoint` (default `http://localhost:8080`), and the LocalAI extension to `LocalAI:Endpoint` (default `http://localhost:8081`). It provisions no inference server or model. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
 
-Or with containers:
+Or with one provider-specific AEP container topology, for example Ollama:
 
 ```powershell
-docker compose up --build
+docker compose -f docker-compose.ollama.yml up --build
 ```
 
 ## AI modes
