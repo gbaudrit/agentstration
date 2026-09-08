@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
@@ -19,6 +20,117 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class SourceTests
 {
+    [TestMethod]
+    public async Task CatalogDiscoveryMatchesRegistryContractAndPinsLocaleAndProvenanceAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        fixture.Materializer.Content = CatalogArchive(
+            ("catalog.yaml", BootstrapCatalog()),
+            ("profiles/solution-discovery/fr-FR/profile.yaml", BootstrapProfile("workspace")),
+            ("profiles/solution-discovery/en-US/profile.yaml", BootstrapProfile("workspace")),
+            ("unreferenced/catalog.yaml", "not: a catalog"));
+        var imported = await fixture.Service.ImportYamlAsync(ManifestWithCatalog("1"), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        var refreshed = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+
+        var exact = await fixture.Catalogs.BrowseAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid,
+            "stable", refreshed.Snapshot.Uid, "en-US", default);
+        var fallback = await fixture.Catalogs.BrowseAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid,
+            "stable", refreshed.Snapshot.Uid, "fr-CA", default);
+
+        var catalog = exact.Single();
+        var entry = catalog.BootstrapEntries.Single();
+        Assert.AreEqual("en-US", entry.ResolvedLocale);
+        Assert.AreEqual("profiles/solution-discovery/en-US", entry.ResolvedPath);
+        CollectionAssert.AreEquivalent(new[] { "en-US", "fr-FR" }, entry.Variants.Select(value => value.Locale).ToArray());
+        Assert.AreEqual("fr-FR", fallback.Single().BootstrapEntries.Single().ResolvedLocale);
+        Assert.AreEqual(refreshed.Snapshot.Uid, catalog.Provenance.SnapshotUid);
+        Assert.AreEqual(refreshed.Snapshot.Definition.Artifact.Sha256, catalog.Provenance.SnapshotDigest);
+        Assert.AreEqual("catalog.yaml", catalog.Provenance.CatalogPath);
+    }
+
+    [TestMethod]
+    public async Task BootstrapTranslationsMustKeepTheSameScopeAndBindingsAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        fixture.Materializer.Content = CatalogArchive(
+            ("catalog.yaml", BootstrapCatalog()),
+            ("profiles/solution-discovery/fr-FR/profile.yaml", BootstrapProfile("workspace")),
+            ("profiles/solution-discovery/en-US/profile.yaml", BootstrapProfile("tenant")));
+        var imported = await fixture.Service.ImportYamlAsync(ManifestWithCatalog("1"), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        var refreshed = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+
+        var error = await Assert.ThrowsExactlyAsync<SourceValidationException>(() => fixture.Catalogs.BrowseAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid,
+            "stable", refreshed.Snapshot.Uid, null, default));
+
+        Assert.AreEqual("source_bootstrap_variant_contract_mismatch", error.Code);
+    }
+
+    [TestMethod]
+    public async Task CatalogContentRejectsTraversalAndSymbolicLinksAsync()
+    {
+        var store = new MemorySourceSnapshotArtifactStore();
+        var reader = new ZipSourceSnapshotContentReader(store);
+        var traversal = CatalogArchive(("../catalog.yaml", "value"));
+        var traversalReference = await store.SaveAsync(Materialized(traversal), default);
+        var traversalError = await Assert.ThrowsExactlyAsync<SourceValidationException>(() => reader.OpenAsync(traversalReference, default));
+        Assert.AreEqual("source_path_invalid", traversalError.Code);
+
+        var symbolicLink = CatalogArchive([("catalog.yaml", "target")], symbolicLink: true);
+        var symbolicLinkReference = await store.SaveAsync(Materialized(symbolicLink), default);
+        var linkError = await Assert.ThrowsExactlyAsync<SourceValidationException>(() => reader.OpenAsync(symbolicLinkReference, default));
+        Assert.AreEqual("source_snapshot_link_forbidden", linkError.Code);
+    }
+
+    [TestMethod]
+    public void CatalogManifestRejectsNonCanonicalAndMissingDefaultLocales()
+    {
+        var reader = new SourceCatalogManifestReader();
+        var nonCanonical = Assert.ThrowsExactly<SourceValidationException>(() => reader.ReadCatalog(
+            BootstrapCatalog().Replace("fr-FR", "fr-fr", StringComparison.Ordinal), SourceCatalogKinds.Bootstrap));
+        Assert.AreEqual("source_catalog_locale_invalid", nonCanonical.Code);
+
+        var missingDefault = Assert.ThrowsExactly<SourceValidationException>(() => reader.ReadCatalog(
+            BootstrapCatalog().Replace("defaultLocale: fr-FR", "defaultLocale: de-DE", StringComparison.Ordinal),
+            SourceCatalogKinds.Bootstrap));
+        Assert.AreEqual("source_catalog_default_locale_missing", missingDefault.Code);
+    }
+
+    [TestMethod]
+    public async Task PackCatalogResolvesOnlyDeclaredSnapshotDescendantsAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        fixture.Materializer.Content = CatalogArchive(
+            ("catalogs/packs.yaml", PackCatalog()),
+            ("catalogs/packs/who-am-i.zip", "immutable pack bytes"));
+        var imported = await fixture.Service.ImportYamlAsync(
+            ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml"), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        var refreshed = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+
+        var result = await fixture.Catalogs.BrowseAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid,
+            "stable", refreshed.Snapshot.Uid, null, default);
+
+        Assert.AreEqual("catalogs/packs/who-am-i.zip", result.Single().PackEntries.Single().Path);
+    }
+
     [TestMethod]
     public void SourceResourceFamilySupportsEveryOwnershipScope()
     {
@@ -524,6 +636,77 @@ public sealed class SourceTests
           catalogs: []
         """;
 
+    private static string ManifestWithCatalog(
+        string version,
+        string kind = SourceCatalogKinds.Bootstrap,
+        string path = "catalog.yaml") => Manifest(version, "Published name", includeChannel: true)
+        .Replace("catalogs: []", $"catalogs:\n    - kind: {kind}\n      path: {path}", StringComparison.Ordinal);
+
+    private static string BootstrapCatalog() => """
+        apiVersion: agentstration.io/v1
+        kind: BootstrapCatalog
+        metadata:
+          name: official-bootstrap-samples
+        definition:
+          displayName: Agentstration Bootstrap samples
+          description: Official profiles for discovering and demonstrating Agentstration.
+          entries:
+            - name: solution-discovery
+              defaultLocale: fr-FR
+              variants:
+                - locale: fr-FR
+                  path: profiles/solution-discovery/fr-FR
+                - locale: en-US
+                  path: profiles/solution-discovery/en-US
+        """;
+
+    private static string BootstrapProfile(string targetScope) => $$"""
+        apiVersion: agentstration.io/v1
+        kind: BootstrapProfile
+        metadata:
+          name: solution-discovery
+        definition:
+          targetScope: {{targetScope}}
+          bindings:
+            - name: agent-model
+              targetKind: modelProfile
+              required: true
+        """;
+
+    private static string PackCatalog() => """
+        apiVersion: agentstration.io/v1
+        kind: PackCatalog
+        metadata:
+          name: official-packs
+        definition:
+          displayName: Official Packs
+          entries:
+            - name: who-am-i
+              displayName: Who am I
+              path: packs/who-am-i.zip
+        """;
+
+    private static byte[] CatalogArchive(params (string Path, string Content)[] entries) => CatalogArchive(entries, symbolicLink: false);
+
+    private static byte[] CatalogArchive((string Path, string Content)[] entries, bool symbolicLink)
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var item in entries)
+            {
+                var entry = archive.CreateEntry(item.Path);
+                if (symbolicLink) entry.ExternalAttributes = unchecked((int)0xA0000000);
+                using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
+                writer.Write(item.Content);
+            }
+        }
+        return stream.ToArray();
+    }
+
+    private static MaterializedSourceRevision Materialized(byte[] content) => new(
+        "revision", "application/zip", content, content.Length * 10L, 100, new("sha256", Digest(content)));
+
     private static SourceBindingSelection Selection() => new()
     {
         Name = "git-distribution",
@@ -553,6 +736,7 @@ public sealed class SourceTests
         public IControlPlaneStore Store => services.GetRequiredService<IControlPlaneStore>();
         public SourceBindingManagementService Bindings => services.GetRequiredService<SourceBindingManagementService>();
         public SourceChannelSnapshotService Snapshots => services.GetRequiredService<SourceChannelSnapshotService>();
+        public SourceCatalogService Catalogs => services.GetRequiredService<SourceCatalogService>();
         public FakeSourceProviderMaterializer Materializer => services.GetRequiredService<FakeSourceProviderMaterializer>();
         public FakeExtensionInspector Inspector => services.GetRequiredService<FakeExtensionInspector>();
 
@@ -592,8 +776,11 @@ public sealed class SourceTests
             collection.AddSingleton<FakeSourceProviderMaterializer>();
             collection.AddSingleton<ISourceProviderMaterializer>(provider => provider.GetRequiredService<FakeSourceProviderMaterializer>());
             collection.AddSingleton<ISourceSnapshotArtifactStore, MemorySourceSnapshotArtifactStore>();
+            collection.AddSingleton<ISourceSnapshotContentReader, ZipSourceSnapshotContentReader>();
+            collection.AddSingleton<ISourceCatalogManifestReader, SourceCatalogManifestReader>();
             collection.AddSingleton(new SourceMaterializationLimits());
             collection.AddSingleton<SourceChannelSnapshotService>();
+            collection.AddSingleton<SourceCatalogService>();
             var services = collection.BuildServiceProvider();
             var fixture = new Fixture(services, database, ownsDatabase);
             using (fixture.Context.PushSystem()) await fixture.Store.InitializeAsync(default);
@@ -666,7 +853,7 @@ public sealed class SourceTests
 
     private sealed class FakeSourceProviderMaterializer : ISourceProviderMaterializer
     {
-        private static readonly byte[] Content = "source archive"u8.ToArray();
+        public byte[] Content { get; set; } = "source archive"u8.ToArray();
         public string Revision { get; set; } = "revision-1";
         public Exception? Failure { get; set; }
         public TimeSpan Delay { get; set; }
@@ -685,7 +872,7 @@ public sealed class SourceTests
             if (Failure is not null) throw Failure;
             MaterializeCount++;
             return Task.FromResult(new MaterializedSourceRevision(
-                revision, "application/zip", Content, Content.Length, 1, new("sha256", Digest(Content))));
+                revision, "application/zip", Content, Content.Length * 10L, 100, new("sha256", Digest(Content))));
         }
     }
 

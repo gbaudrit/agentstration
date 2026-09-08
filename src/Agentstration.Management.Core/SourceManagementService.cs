@@ -458,7 +458,11 @@ public sealed partial class SourceManagementService(
         {
             if (string.IsNullOrWhiteSpace(catalog.Kind) || string.IsNullOrWhiteSpace(catalog.Path))
                 throw Invalid("source_catalog_invalid", "Catalog kind and path are required.");
+            if (catalog.Kind is not (SourceCatalogKinds.Bootstrap or SourceCatalogKinds.Pack))
+                throw Invalid("source_catalog_kind_unsupported", $"Catalog kind '{catalog.Kind}' is not supported.");
+            _ = SourceDescendantPath.Normalize(catalog.Path, $"Catalog '{catalog.Kind}' path");
         }
+        EnsureUnique(catalogs.Select(value => $"{value.Kind}:{value.Path}"), "source_catalog_duplicate", "catalog");
     }
 
     private static void ValidatePortableName(string value, string field)
