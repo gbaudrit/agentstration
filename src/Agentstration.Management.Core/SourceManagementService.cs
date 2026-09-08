@@ -445,6 +445,7 @@ public sealed partial class SourceManagementService(
         foreach (var channel in channels)
         {
             ValidateIdentifier(channel.Name, "definition.channels[].name");
+            SourceChannelCompatibilityEvaluator.Validate(channel.Compatibility?.Agentstration, channel.Name);
             if (channel.Provider is null || string.IsNullOrWhiteSpace(channel.Provider.Binding)
                 || !bindings.Any(binding => string.Equals(binding.Name, channel.Provider.Binding, StringComparison.Ordinal)))
                 throw Invalid("source_channel_binding_invalid", $"Channel '{channel.Name}' must reference a declared Source Provider binding.");

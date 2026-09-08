@@ -9,6 +9,7 @@ namespace Agentstration.Management.Core;
 public sealed class SourceChannelSnapshotService(
     SourceManagementService sources,
     SourceBindingManagementService bindings,
+    SourceChannelCompatibilityEvaluator compatibility,
     IControlPlaneStore store,
     IResourceReferenceResolver references,
     ISourceProviderMaterializer materializer,
@@ -91,6 +92,25 @@ public sealed class SourceChannelSnapshotService(
                 ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceChannelObservedState, StateName(versionUid, channel)), token))?.Value;
         }, cancellationToken);
 
+    public async Task<SourceChannelStatusView> GetStatusAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channelName,
+        CancellationToken cancellationToken) =>
+        await scopeOperations.WriteAsync(ResourceKinds.SourceChannelObservedState, scopeRef, AuthorizationPermissions.ResourcesRead, async token =>
+        {
+            var source = (await sources.GetExactAsync(scopeRef, publisher, name, token))?.Source
+                ?? throw NotFound(ResourceKinds.Source, name, publisher);
+            var version = await RequiredVersionAsync(source, versionUid, token);
+            var channel = version.Definition.PublishedDefinition.Channels.SingleOrDefault(value =>
+                string.Equals(value.Name, channelName, StringComparison.Ordinal))
+                ?? throw Invalid("source_channel_missing", $"Source Version '{version.Definition.Version}' has no channel named '{channelName}'.");
+            var observed = await LoadObservedAsync(scopeRef, source, versionUid, channelName, token);
+            return new SourceChannelStatusView(channel.Name, compatibility.Evaluate(channel), observed?.Value);
+        }, cancellationToken);
+
     private async Task<SourceChannelRefreshResult> RefreshCoreAsync(
         SourceResource source,
         Guid versionUid,
@@ -125,6 +145,7 @@ public sealed class SourceChannelSnapshotService(
         var now = timeProvider.GetUtcNow();
         try
         {
+            compatibility.RequireCompatible(channel);
             var status = await bindings.GetStatusExactAsync(scopeRef, source.Definition.Publisher, source.Name, versionUid, cancellationToken);
             var bindingStatus = status.Bindings.SingleOrDefault(value => value.Channels.Contains(channel.Name, StringComparer.Ordinal));
             if (bindingStatus is null || !string.Equals(bindingStatus.Status, "ready", StringComparison.Ordinal))

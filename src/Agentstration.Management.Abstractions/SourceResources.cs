@@ -51,6 +51,26 @@ public sealed record SourceCompatibility
     public SourceCompatibilityBounds? Agentstration { get; init; }
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<SourceChannelCompatibilityStatus>))]
+public enum SourceChannelCompatibilityStatus
+{
+    Compatible,
+    Incompatible,
+    CompatibilityUnknown
+}
+
+public sealed record SourceChannelCompatibilityView(
+    SourceChannelCompatibilityStatus Status,
+    string? RunningVersion,
+    SourceCompatibilityBounds? Declared,
+    string? ReasonCode,
+    string? Reason);
+
+public interface IAgentstrationVersionProvider
+{
+    string? CurrentVersion { get; }
+}
+
 public sealed record SourceChannelConfiguration
 {
     public required string OptionSet { get; init; }
@@ -268,6 +288,11 @@ public sealed record SourceChannelRefreshResult(
     SourceChannelSnapshotResource Snapshot,
     SourceChannelObservedResource Observed,
     SourceChannelSnapshotReference Pin);
+
+public sealed record SourceChannelStatusView(
+    string Channel,
+    SourceChannelCompatibilityView Compatibility,
+    SourceChannelObservedResource? Refresh);
 
 public sealed record SourceProviderInvocation(
     Uri Endpoint,

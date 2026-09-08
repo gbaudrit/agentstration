@@ -7,6 +7,7 @@ namespace Agentstration.Management.Core;
 public sealed class SourceCatalogService(
     SourceManagementService sources,
     SourceChannelSnapshotService snapshots,
+    SourceChannelCompatibilityEvaluator compatibility,
     ISourceSnapshotContentReader contentReader,
     ISourceCatalogManifestReader manifests,
     ResourceScopeOperationService scopeOperations)
@@ -26,6 +27,10 @@ public sealed class SourceCatalogService(
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, sourceName, new ResourceNamespace(publisher)));
             var version = await sources.GetVersionExactAsync(scopeRef, publisher, sourceName, versionUid, token)
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+            var channelDefinition = version.Definition.PublishedDefinition.Channels.SingleOrDefault(value =>
+                string.Equals(value.Name, channel, StringComparison.Ordinal))
+                ?? throw Invalid("source_channel_missing", $"Source Version '{version.Definition.Version}' has no channel named '{channel}'.");
+            compatibility.RequireCompatible(channelDefinition);
             var snapshot = await snapshots.GetAsync(scopeRef, publisher, sourceName, versionUid, channel, snapshotUid, token)
                 ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")));
             var requestedLocale = ValidateRequestedLocale(locale);
