@@ -5,6 +5,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
+using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -81,6 +82,100 @@ public sealed class SourceTests
     }
 
     [TestMethod]
+    public async Task BindingSelectionIsExplicitReusableAndExcludedFromPublishedVersionsAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var first = await fixture.Service.ImportYamlAsync(Manifest("release-a", "Published name", includeChannel: true), default);
+
+        var unresolved = await fixture.Bindings.GetStatusAsync("agentstration", "official-samples", first.Version.Uid, default);
+        Assert.IsFalse(unresolved.Ready);
+        Assert.AreEqual("unresolved", unresolved.Bindings.Single().Status);
+
+        var configured = await fixture.Bindings.ConfigureAsync(
+            "agentstration",
+            "official-samples",
+            first.Version.Uid,
+            [Selection()],
+            first.Source.Configuration.ETag!,
+            default);
+        Assert.IsTrue(configured.Status.Ready);
+        Assert.AreEqual("ready", configured.Status.Bindings.Single().Status);
+        Assert.AreEqual(ResourceScopeRef.Instance, configured.Configuration.Definition.Bindings.Single().Target.ScopeRef);
+        Assert.IsFalse(first.Version.Definition.RawManifest.Contains("git-local", StringComparison.Ordinal));
+
+        var second = await fixture.Service.ImportYamlAsync(Manifest("release-b", "Published name", includeChannel: true), default);
+        var reused = await fixture.Bindings.GetStatusAsync("agentstration", "official-samples", second.Version.Uid, default);
+        Assert.IsTrue(reused.Ready);
+        Assert.AreEqual("git-local", reused.Bindings.Single().Target?.Name);
+
+        var cleared = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", second.Version.Uid, [], second.Source.Configuration.ETag!, default);
+        Assert.IsFalse(cleared.Status.Ready);
+        Assert.AreEqual("unresolved", cleared.Status.Bindings.Single().Status);
+        var restored = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", second.Version.Uid, [Selection()], cleared.Configuration.ETag!, default);
+        Assert.IsTrue(restored.Status.Ready);
+
+        var removed = await fixture.Service.ImportYamlAsync(Manifest("release-c", "Published name", includeChannel: false), default);
+        var removedStatus = await fixture.Bindings.GetStatusAsync("agentstration", "official-samples", removed.Version.Uid, default);
+        Assert.IsTrue(removedStatus.Ready);
+        Assert.IsEmpty(removedStatus.Bindings);
+        Assert.AreEqual("git-distribution", removedStatus.StaleSelections.Single().Name);
+    }
+
+    [TestMethod]
+    public async Task BindingConfigurationRejectsDuplicateUnknownWrongKindAndMissingSelectionsAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        var etag = imported.Source.Configuration.ETag!;
+
+        await AssertCodeAsync("source_binding_selection_duplicate", [Selection(), Selection()]);
+        await AssertCodeAsync("source_binding_selection_unknown", [Selection() with { Name = "other" }]);
+        await AssertCodeAsync("source_binding_selection_kind_invalid", [Selection() with { TargetKind = "modelProvider" }]);
+        await AssertCodeAsync("source_binding_provider_missing", [Selection() with { Target = new("missing") }]);
+
+        async Task AssertCodeAsync(string code, IReadOnlyList<SourceBindingSelection> selections)
+        {
+            var exception = await Assert.ThrowsExactlyAsync<SourceValidationException>(() => fixture.Bindings.ConfigureAsync(
+                "agentstration", "official-samples", imported.Version.Uid, selections, etag, default));
+            Assert.AreEqual(code, exception.Code);
+        }
+    }
+
+    [TestMethod]
+    public async Task BindingStatusReportsUnavailableContributionAndSchemaIncompatibilityAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        var configured = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        Assert.IsTrue(configured.Status.Ready);
+
+        fixture.Inspector.Status = "unavailable";
+        var unavailable = await fixture.Bindings.GetStatusAsync("agentstration", "official-samples", imported.Version.Uid, default);
+        Assert.AreEqual("unavailable", unavailable.Bindings.Single().Status);
+        Assert.AreEqual("source_binding_extension_unavailable", unavailable.Bindings.Single().Issues.Single().Code);
+
+        fixture.Inspector.Status = "available";
+        fixture.Inspector.IncludeContribution = false;
+        var missingContribution = await fixture.Bindings.GetStatusAsync("agentstration", "official-samples", imported.Version.Uid, default);
+        Assert.AreEqual("source_binding_contribution_missing", missingContribution.Bindings.Single().Issues.Single().Code);
+
+        fixture.Inspector.IncludeContribution = true;
+        fixture.Inspector.SchemaDigest = "sha256:changed";
+        var incompatible = await fixture.Bindings.GetStatusAsync("agentstration", "official-samples", imported.Version.Uid, default);
+        Assert.AreEqual("incompatible", incompatible.Bindings.Single().Status);
+        Assert.AreEqual("source_channel_schema_digest_mismatch", incompatible.Bindings.Single().Issues.Single().Code);
+    }
+
+    [TestMethod]
     public async Task InvalidLaterDefinitionPreservesVersionsAndExposesObservedFailureAsync()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -108,7 +203,10 @@ public sealed class SourceTests
             await using (var first = await Fixture.CreateAsync(database))
             {
                 using var system = first.Context.PushSystem();
-                _ = await first.Service.ImportYamlAsync(Manifest("2026-09", "Official samples", includeChannel: false), default);
+                await first.CreateSourceProviderAsync();
+                var imported = await first.Service.ImportYamlAsync(Manifest("2026-09", "Official samples", includeChannel: true), default);
+                _ = await first.Bindings.ConfigureAsync(
+                    "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
             }
             await using (var restarted = await Fixture.CreateAsync(database))
             {
@@ -116,7 +214,9 @@ public sealed class SourceTests
                 var source = await restarted.Service.GetAsync("agentstration", "official-samples", default);
                 Assert.IsNotNull(source);
                 Assert.AreEqual(1, source.VersionCount);
-                Assert.AreEqual("2026-09", (await restarted.Service.ListVersionsAsync("agentstration", "official-samples", default)).Single().Definition.Version);
+                var version = (await restarted.Service.ListVersionsAsync("agentstration", "official-samples", default)).Single();
+                Assert.AreEqual("2026-09", version.Definition.Version);
+                Assert.IsTrue((await restarted.Bindings.GetStatusAsync("agentstration", "official-samples", version.Uid, default)).Ready);
             }
         }
         finally
@@ -179,7 +279,7 @@ public sealed class SourceTests
             new PlatformAdministrator(context.Context.PrincipalId, DateTimeOffset.UtcNow),
             default);
         var name = $"source-{Guid.NewGuid():N}"[..30];
-        var manifest = Manifest("1", "Published name", false).Replace("official-samples", name, StringComparison.Ordinal);
+        var manifest = Manifest("1", "Published name", true).Replace("official-samples", name, StringComparison.Ordinal);
         var response = await client.PostAsJsonAsync("/api/sources/imports/yaml", new ImportSourceYamlRequest(manifest));
         Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
         var imported = await response.Content.ReadFromJsonAsync<SourceImportResult>();
@@ -208,6 +308,73 @@ public sealed class SourceTests
         updatedResponse.EnsureSuccessStatusCode();
         var updated = await updatedResponse.Content.ReadFromJsonAsync<SourceConfigurationResource>();
         Assert.AreEqual("Local name", updated?.Definition.DisplayName);
+
+        var providerName = $"git-{name}";
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>().CreateAsync(new ExtensionRegistrationResource
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.ExtensionRegistration,
+                Metadata = new ResourceMetadata { Name = providerName },
+                ScopeRef = ResourceScopeRef.Instance,
+                Definition = new ExtensionRegistrationProperties
+                {
+                    DisplayName = "Disabled test source extension",
+                    Endpoint = new Uri("http://source-extension.invalid/"),
+                    Enabled = false,
+                    Source = ExtensionRegistrationSource.Configuration
+                }
+            }, default);
+            await factory.Services.GetRequiredService<SourceProviderManagementService>().CreateAsync(new SourceProviderResource
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.SourceProvider,
+                Metadata = new ResourceMetadata { Name = providerName },
+                ScopeRef = ResourceScopeRef.Instance,
+                Definition = new SourceProviderProperties
+                {
+                    DisplayName = "Local Git",
+                    Extension = new(providerName, ResourceScopeRef.Instance, ResourceNamespace.Default),
+                    ContributionId = "git"
+                }
+            }, default);
+        }
+
+        using var configure = new HttpRequestMessage(
+            HttpMethod.Put,
+            $"/api/sources/agentstration/{name}/versions/{imported.Version.Uid:D}/bindings?scopeRef={Uri.EscapeDataString(workspaceScope.ToString())}")
+        {
+            Content = JsonContent.Create(new ConfigureSourceBindingsRequest([Selection() with
+            {
+                Target = new(providerName, ResourceScopeRef.Instance, ResourceNamespace.Default)
+            }]))
+        };
+        configure.Headers.TryAddWithoutValidation("If-Match", updated?.ETag);
+        var configureResponse = await client.SendAsync(configure);
+        Assert.AreEqual(HttpStatusCode.OK, configureResponse.StatusCode, await configureResponse.Content.ReadAsStringAsync());
+        var bindingResult = await configureResponse.Content.ReadFromJsonAsync<SourceBindingConfigurationResult>();
+        Assert.IsNotNull(bindingResult);
+        Assert.AreEqual(workspaceScope, bindingResult.Configuration.ScopeRef);
+        Assert.AreEqual("unavailable", bindingResult.Status.Bindings.Single().Status);
+    }
+
+    [TestMethod]
+    public async Task SourceBindingApiRequiresPlatformAdministratorAsync()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        SourceImportResult imported;
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            imported = await factory.Services.GetRequiredService<SourceManagementService>().ImportYamlAsync(
+                Manifest("1", "Published name", includeChannel: true),
+                ResourceScopeRef.Instance,
+                default);
+        }
+
+        var response = await client.GetAsync($"/api/sources/agentstration/official-samples/versions/{imported.Version.Uid:D}/bindings?scopeRef=%2Finstance");
+        Assert.AreEqual(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private static string Manifest(string version, string displayName, bool includeChannel) => $$"""
@@ -224,6 +391,13 @@ public sealed class SourceTests
           channels:{{(includeChannel ? "\n    - name: stable\n      provider:\n        binding: git-distribution\n      configuration:\n        optionSet: git/source-channel\n        version: \"1.0\"\n        schemaDigest: sha256:test\n        values: {}" : " []")}}
           catalogs: []
         """;
+
+    private static SourceBindingSelection Selection() => new()
+    {
+        Name = "git-distribution",
+        TargetKind = SourceKinds.SourceProvider,
+        Target = new("git-local", @namespace: ResourceNamespace.Default)
+    };
 
     private sealed class StubHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
     {
@@ -245,6 +419,8 @@ public sealed class SourceTests
         public SourceManagementService Service => services.GetRequiredService<SourceManagementService>();
         public CurrentRequestContext Context => services.GetRequiredService<CurrentRequestContext>();
         public IControlPlaneStore Store => services.GetRequiredService<IControlPlaneStore>();
+        public SourceBindingManagementService Bindings => services.GetRequiredService<SourceBindingManagementService>();
+        public FakeExtensionInspector Inspector => services.GetRequiredService<FakeExtensionInspector>();
 
         private Fixture(ServiceProvider services, string database, bool ownsDatabase)
         {
@@ -270,13 +446,50 @@ public sealed class SourceTests
                 null!,
                 null!,
                 provider.GetRequiredService<IResourceScopeResolver>()));
+            collection.AddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
             collection.AddSingleton<ISourceManifestReader, SourceManifestReader>();
             collection.AddSingleton<ISourceManifestRetriever, StubRetriever>();
             collection.AddSingleton<SourceManagementService>();
+            collection.AddSingleton<ExtensionRegistrationManagementService>();
+            collection.AddSingleton<SourceProviderManagementService>();
+            collection.AddSingleton<FakeExtensionInspector>();
+            collection.AddSingleton<IExtensionInspector>(provider => provider.GetRequiredService<FakeExtensionInspector>());
+            collection.AddSingleton<SourceBindingManagementService>();
             var services = collection.BuildServiceProvider();
             var fixture = new Fixture(services, database, ownsDatabase);
             using (fixture.Context.PushSystem()) await fixture.Store.InitializeAsync(default);
             return fixture;
+        }
+
+        public async Task CreateSourceProviderAsync()
+        {
+            var registrations = services.GetRequiredService<ExtensionRegistrationManagementService>();
+            await registrations.CreateAsync(new ExtensionRegistrationResource
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.ExtensionRegistration,
+                Metadata = new ResourceMetadata { Name = "source-extension" },
+                ScopeRef = ResourceScopeRef.Instance,
+                Definition = new ExtensionRegistrationProperties
+                {
+                    DisplayName = "Source extension",
+                    Endpoint = new Uri("http://source-extension/"),
+                    Source = ExtensionRegistrationSource.Configuration
+                }
+            }, default);
+            await services.GetRequiredService<SourceProviderManagementService>().CreateAsync(new SourceProviderResource
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.SourceProvider,
+                Metadata = new ResourceMetadata { Name = "git-local" },
+                ScopeRef = ResourceScopeRef.Instance,
+                Definition = new SourceProviderProperties
+                {
+                    DisplayName = "Local Git",
+                    Extension = new("source-extension", ResourceScopeRef.Instance, ResourceNamespace.Default),
+                    ContributionId = "git"
+                }
+            }, default);
         }
 
         public async ValueTask DisposeAsync()
@@ -286,5 +499,29 @@ public sealed class SourceTests
             SqliteConnection.ClearAllPools();
             File.Delete(database);
         }
+    }
+
+    private sealed class FakeExtensionInspector : IExtensionInspector
+    {
+        private static readonly System.Text.Json.JsonElement Schema = System.Text.Json.JsonDocument.Parse("""
+            { "type": "object", "additionalProperties": true }
+            """).RootElement.Clone();
+
+        public string Status { get; set; } = "available";
+        public bool IncludeContribution { get; set; } = true;
+        public string SchemaDigest { get; set; } = "sha256:test";
+        public bool CanHandle(string providerType) => true;
+        public bool CanInspectEndpoint(Uri endpoint) => true;
+        public ValueTask<ExtensionInspection> InspectAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
+            InspectAsync(provider.Name, provider.Endpoint, cancellationToken);
+        public ValueTask<ExtensionInspection> InspectAsync(string registrationName, Uri endpoint, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ExtensionInspection(
+                registrationName,
+                endpoint,
+                Status,
+                new("source-extension", "Source extension", "1.0.0", null),
+                IncludeContribution ? [new("source-provider", "git")] : [],
+                [new("git/source-channel", "source-provider", "git", ExtensionOptionScopes.SourceChannel, "1.0", [new("1.0", SchemaDigest, Schema, false)])],
+                Status == "available" ? null : "The extension is unavailable."));
     }
 }

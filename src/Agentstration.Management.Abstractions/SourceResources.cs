@@ -131,6 +131,14 @@ public sealed record SourceConfigurationProperties
     public required Guid SourceUid { get; init; }
     public required string DisplayName { get; init; }
     public SourceManifestOrigin? Origin { get; init; }
+    public IReadOnlyList<SourceBindingSelection> Bindings { get; init; } = [];
+}
+
+public sealed record SourceBindingSelection
+{
+    public required string Name { get; init; }
+    public required string TargetKind { get; init; }
+    public required ResourceReference Target { get; init; }
 }
 
 public sealed record SourceConfigurationResource : Resource
