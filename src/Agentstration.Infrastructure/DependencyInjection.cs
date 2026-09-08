@@ -167,6 +167,7 @@ public static class DependencyInjection
             MaxAutomaticRedirections = 5
         });
         services.AddSingleton<SourceManagementService>();
+        services.AddSingleton<SourceBindingManagementService>();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();

@@ -18,6 +18,8 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         sources.MapGet("/{publisher}/{name}", GetAsync);
         sources.MapGet("/{publisher}/{name}/versions", ListVersionsAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}", GetVersionAsync);
+        sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/bindings", GetBindingsAsync);
+        sources.MapPut("/{publisher}/{name}/versions/{versionUid:guid}/bindings", ConfigureBindingsAsync);
         sources.MapPut("/{publisher}/{name}/display-name", UpdateDisplayNameAsync);
     }
 
@@ -112,6 +114,44 @@ internal sealed class SourceEndpoints : IManagementEndpoint
                 ? await service.UpdateDisplayNameExactAsync(scope, publisher, name, request.DisplayName, ifMatch, cancellationToken)
                 : await service.UpdateDisplayNameAsync(publisher, name, request.DisplayName, ifMatch, cancellationToken);
             return ManagementHttp.ResourceResult(updated, response, StatusCodes.Status200OK);
+        });
+
+    private static Task<IResult> GetBindingsAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string? scopeRef,
+        HttpResponse response,
+        SourceBindingManagementService service,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var status = Scope(scopeRef) is { } scope
+                ? await service.GetStatusExactAsync(scope, publisher, name, versionUid, cancellationToken)
+                : await service.GetStatusAsync(publisher, name, versionUid, cancellationToken);
+            response.Headers.ETag = status.ConfigurationETag;
+            return Results.Ok(status);
+        });
+
+    private static Task<IResult> ConfigureBindingsAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string? scopeRef,
+        ConfigureSourceBindingsRequest request,
+        HttpRequest httpRequest,
+        HttpResponse response,
+        SourceBindingManagementService service,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var ifMatch = ManagementHttp.IfMatch(httpRequest)
+                ?? throw new ControlPlaneConcurrencyException("Updating Source bindings requires If-Match.");
+            var result = Scope(scopeRef) is { } scope
+                ? await service.ConfigureExactAsync(scope, publisher, name, versionUid, request.Bindings, ifMatch, cancellationToken)
+                : await service.ConfigureAsync(publisher, name, versionUid, request.Bindings, ifMatch, cancellationToken);
+            response.Headers.ETag = result.Configuration.ETag;
+            return Results.Ok(result);
         });
 
     private static void SetImportLocation(HttpResponse response, SourceImportResult result)
