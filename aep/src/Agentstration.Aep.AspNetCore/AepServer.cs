@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Aep.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -67,25 +68,31 @@ public static class AepServerExtensions
 
     public static IEndpointRouteBuilder MapAgentstrationAep(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet(AepProtocol.DiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers, IEnumerable<IAepSourceProvider> sourceProviders, IEnumerable<IAepOptionMigrator> migrators) =>
-            Results.Json(CreateManifest(options.Value, providers, sourceProviders, migrators), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.LegacyDiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers, IEnumerable<IAepSourceProvider> sourceProviders, IEnumerable<IAepOptionMigrator> migrators) =>
-            Results.Json(CreateManifest(options.Value, providers, sourceProviders, migrators), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.HealthPath, () => Results.Json(new AepHealth("available"), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.ModelProvidersPath, (IEnumerable<IAepModelProvider> providers) =>
-            Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.SourceProvidersPath, (IEnumerable<IAepSourceProvider> providers) =>
-            Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions));
-        endpoints.MapGet(AepProtocol.ConfigurationPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepOptionMigrator> migrators) =>
-            Results.Json(CreateConfigurationCatalog(options.Value.OptionSets, migrators), AepProtocol.JsonOptions));
-        endpoints.MapPost(AepProtocol.ConfigurationMigrationPath, MigrateOptionsAsync);
-        endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync);
-        endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync);
-        endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync);
-        endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/health", ProviderHealthAsync);
-        endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/resolve", ResolveSourceAsync);
-        endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/materialize", MaterializeSourceAsync);
-        endpoints.MapHealthChecks("/health");
+        var protocolEndpoints = new List<IEndpointConventionBuilder>();
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.DiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers, IEnumerable<IAepSourceProvider> sourceProviders, IEnumerable<IAepOptionMigrator> migrators) =>
+            Results.Json(CreateManifest(options.Value, providers, sourceProviders, migrators), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.LegacyDiscoveryPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepModelProvider> providers, IEnumerable<IAepSourceProvider> sourceProviders, IEnumerable<IAepOptionMigrator> migrators) =>
+            Results.Json(CreateManifest(options.Value, providers, sourceProviders, migrators), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.HealthPath, () => Results.Json(new AepHealth("available"), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.ModelProvidersPath, (IEnumerable<IAepModelProvider> providers) =>
+            Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.SourceProvidersPath, (IEnumerable<IAepSourceProvider> providers) =>
+            Results.Json(providers.Select(value => value.Descriptor).ToArray(), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapGet(AepProtocol.ConfigurationPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepOptionMigrator> migrators) =>
+            Results.Json(CreateConfigurationCatalog(options.Value.OptionSets, migrators), AepProtocol.JsonOptions)));
+        protocolEndpoints.Add(endpoints.MapPost(AepProtocol.ConfigurationMigrationPath, MigrateOptionsAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat/stream", StreamAsync));
+        protocolEndpoints.Add(endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/models", ListModelsAsync));
+        protocolEndpoints.Add(endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/health", ProviderHealthAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/resolve", ResolveSourceAsync));
+        protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/materialize", MaterializeSourceAsync));
+        endpoints.MapHealthChecks("/health").AllowAnonymous();
+        if (endpoints.ServiceProvider.GetService<AepAuthenticationMarker>() is not null)
+        {
+            foreach (var endpoint in protocolEndpoints)
+                endpoint.RequireAuthorization(AepAuthenticationDefaults.Policy);
+        }
         return endpoints;
     }
 

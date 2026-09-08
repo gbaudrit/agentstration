@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -27,7 +28,7 @@ public interface IAepSourceProvidersClient
     AepSourceProviderClient CreateSourceProvider(string providerId);
 }
 
-public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProvidersClient, IAepSourceProvidersClient
+public sealed class AepClient(HttpClient httpClient, IAepAccessTokenProvider? accessTokenProvider = null) : IAepClient, IAepModelProvidersClient, IAepSourceProvidersClient
 {
     public Task<AepManifest> GetManifestAsync(CancellationToken cancellationToken = default) => DiscoverAsync(cancellationToken);
 
@@ -193,6 +194,7 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
             Content = JsonContent.Create(request, options: AepProtocol.JsonOptions)
         };
         message.Headers.Accept.ParseAdd("text/event-stream");
+        await ApplyAccessTokenAsync(message, cancellationToken);
         HttpResponseMessage response;
         try { response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken); }
         catch (HttpRequestException exception) { throw new AepProtocolException("extension_unreachable", "The AEP extension is unreachable.", innerException: exception); }
@@ -218,11 +220,21 @@ public sealed class AepClient(HttpClient httpClient) : IAepClient, IAepModelProv
     {
         using var request = new HttpRequestMessage(method, path);
         if (body is not null) request.Content = JsonContent.Create(body, options: AepProtocol.JsonOptions);
+        await ApplyAccessTokenAsync(request, cancellationToken);
         HttpResponseMessage response;
         try { response = await httpClient.SendAsync(request, cancellationToken); }
         catch (HttpRequestException exception) { throw new AepProtocolException("extension_unreachable", "The AEP extension is unreachable.", innerException: exception); }
         await EnsureSuccessAsync(response, cancellationToken);
         return response;
+    }
+
+    private async ValueTask ApplyAccessTokenAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        if (accessTokenProvider is null) return;
+        var token = await accessTokenProvider.GetAccessTokenAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(token))
+            throw new AepProtocolException("credential_unavailable", "The AEP workload credential is unavailable.");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
