@@ -46,17 +46,17 @@ public sealed class ManagementPlaneTests
     }
 
     [TestMethod]
-    public void ResourceReferenceRoundTripsNameAndOptionalWorkspace()
+    public void ResourceReferenceRoundTripsNameAndOptionalScope()
     {
         var local = JsonSerializer.Deserialize<ResourceReference>("{\"name\":\"profile-a\"}", JsonOptions);
-        var remote = JsonSerializer.Deserialize<ResourceReference>("{\"name\":\"profile-b\",\"workspaceRef\":\"shared\"}", JsonOptions);
+        var remote = JsonSerializer.Deserialize<ResourceReference>("{\"name\":\"profile-b\",\"scopeRef\":\"/tenants/11111111-1111-1111-1111-111111111111\"}", JsonOptions);
 
         Assert.IsNotNull(local);
         Assert.AreEqual("profile-a", local.Name);
-        Assert.IsNull(local.WorkspaceRef);
+        Assert.IsNull(local.ScopeRef);
         Assert.IsNotNull(remote);
         Assert.AreEqual("profile-b", remote.Name);
-        Assert.AreEqual("shared", remote.WorkspaceRef);
+        Assert.AreEqual(ResourceScopeRef.Tenant(Guid.Parse("11111111-1111-1111-1111-111111111111")), remote.ScopeRef);
     }
 
     [TestMethod]

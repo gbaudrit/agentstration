@@ -91,6 +91,6 @@ public sealed class LocalSecretVaultTests
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     }
 
-    private static SecretVaultContext Context() => new(Guid.NewGuid(), Guid.NewGuid(), ResourceAddress.Create(ResourceNamespace.Default, "Vault", "local"), new Dictionary<string, System.Text.Json.JsonElement>());
+    private static SecretVaultContext Context() => new(ResourceScopeRef.Workspace(Guid.NewGuid()), ResourceAddress.Create(ResourceNamespace.Default, "Vault", "local"), new Dictionary<string, System.Text.Json.JsonElement>());
     private sealed class FixedKey(byte[] key) : IMasterKeyProvider { public ValueTask<byte[]> GetKeyAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(key.ToArray()); }
 }

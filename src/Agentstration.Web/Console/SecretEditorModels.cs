@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
@@ -22,7 +23,7 @@ public sealed class SecretEditorModel
     public string? Description { get; set; }
     [Required] public string VaultName { get; set; } = string.Empty;
     [Required] public string Key { get; set; } = string.Empty;
-    public SecretProperties Properties() => new() { DisplayName = DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(), Vault = new ResourceReference(VaultName), Key = Key.Trim(), SecretType = SecretType.Opaque };
+    public SecretProperties Properties(ResourceScopeRef? vaultScopeRef = null) => new() { DisplayName = DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(), Vault = new ResourceReference(VaultName, vaultScopeRef), Key = Key.Trim(), SecretType = SecretType.Opaque };
     public static SecretEditorModel From(SecretResource value) => new() { Name = value.Name, DisplayName = value.Definition.DisplayName, Description = value.Definition.Description, VaultName = value.Definition.Vault.Name, Key = value.Definition.Key };
 
     public static string IdentifierFromDisplayName(string? value)

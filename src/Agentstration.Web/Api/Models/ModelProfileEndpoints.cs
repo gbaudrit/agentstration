@@ -38,7 +38,8 @@ internal sealed class ListModelProfilesEndpoint : IModelManagementEndpoint
                         profile.Value.Definition.Output,
                         resolution.Status,
                         usages.Count),
-                    profile.Value.Namespace.Value));
+                    profile.Value.Namespace.Value,
+                    profile.Value.ScopeRef));
             }
             return Results.Ok(new ValueResponse<ModelProfileSummaryResponse>(responses));
         });
@@ -68,7 +69,8 @@ internal sealed class CreateModelProfileEndpoint : IModelManagementEndpoint
                 Metadata = new ResourceMetadata { Name = body.Name, Namespace = ModelManagementHttp.Namespace(body.Namespace) },
                 Kind = ResourceKinds.ModelProfile,
                 ApiVersion = ManagementApiVersions.CoreV1,
-                Definition = body.Properties
+                Definition = body.Properties,
+                ScopeRef = body.ScopeRef
             }, cancellationToken);
             response.Headers.Location = $"/api/modelprofiles/{Uri.EscapeDataString(stored.Value.Metadata.Name)}?resourceNamespace={Uri.EscapeDataString(stored.Value.Namespace.Value)}";
             return ModelManagementHttp.ResourceResult(stored, response, StatusCodes.Status201Created);

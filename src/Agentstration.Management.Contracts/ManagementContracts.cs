@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Contracts;
 
@@ -8,6 +10,8 @@ public record ResourceDeclaration<TDefinition>
     public required string Kind { get; init; }
     public required ResourceMetadata Metadata { get; init; }
     public required TDefinition Definition { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ResourceScopeRef? ScopeRef { get; init; }
 }
 
 public sealed record AgentResourceRequest : ResourceDeclaration<AgentProperties>;

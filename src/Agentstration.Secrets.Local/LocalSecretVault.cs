@@ -120,10 +120,10 @@ public sealed class LocalSecretVaultProvider(string rootPath, IMasterKeyProvider
     private string PathFor(SecretVaultContext context, string key)
     {
         ValidateKey(key);
-        var identity = $"{context.TenantId:N}:{context.WorkspaceId:N}:{context.Vault}:{key}";
+        var identity = $"{context.ScopeRef}:{context.Vault}:{key}";
         return Path.Combine(rootPath, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity))) + ".secret");
     }
 
-    private static byte[] AssociatedData(SecretVaultContext context, string key) => Encoding.UTF8.GetBytes($"{context.TenantId:N}:{context.WorkspaceId:N}:{context.Vault}:{key}:v1");
+    private static byte[] AssociatedData(SecretVaultContext context, string key) => Encoding.UTF8.GetBytes($"{context.ScopeRef}:{context.Vault}:{key}:v1");
     private static void ValidateKey(string key) { ArgumentException.ThrowIfNullOrWhiteSpace(key); if (key.Length > 256) throw new ArgumentException("Secret keys cannot exceed 256 characters.", nameof(key)); }
 }

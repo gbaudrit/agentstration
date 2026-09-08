@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Contracts;
 
@@ -22,7 +23,8 @@ public sealed record ModelProviderResponse(
     string Id,
     string Name,
     ModelProviderPropertiesResponse Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 
 public sealed record AvailableModelResponse(
     string Name,
@@ -35,12 +37,14 @@ public sealed record ModelProviderStatusResponse(string Provider, string Status,
 public sealed record CreateModelProviderRequest(
     string Name,
     ModelProviderProperties Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 public sealed record PutModelProviderRequest(ModelProviderProperties Properties);
 public sealed record CreateExtensionRegistrationRequest(
     string Name,
     ExtensionRegistrationProperties Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 public sealed record PutExtensionRegistrationRequest(ExtensionRegistrationProperties Properties);
 public sealed record ExtensionDiscoveryResponse(int Sources, int Created, int Updated, int Unchanged);
 public sealed record ModelProviderUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
@@ -90,7 +94,8 @@ public sealed record ExtensionResponse(
 public sealed record CreateModelProfileRequest(
     string Name,
     ModelProfileProperties Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 
 public sealed record PutModelProfileRequest(ModelProfileProperties Properties);
 
@@ -112,7 +117,8 @@ public sealed record ModelProfileSummaryResponse(
     string Id,
     string Name,
     ModelProfileSummaryPropertiesResponse Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 
 public sealed record ModelProfileUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
 public sealed record ModelProfileUsagesResponse(IReadOnlyList<ModelProfileUsageResponse> Value, int Count);
@@ -157,14 +163,16 @@ public sealed record AgentModelResponse(
 public sealed record CreateRuntimeProfileRequest(
     string Name,
     RuntimeProfileProperties Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 public sealed record PutRuntimeProfileRequest(RuntimeProfileProperties Properties);
 public sealed record RuntimeProfileSummaryResponse(
     string Id,
     string Name,
     RuntimeProfileProperties Properties,
     int UsageCount,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 public sealed record RuntimeProfileUsageResponse(
     string ResourceId,
     string Name,

@@ -23,4 +23,5 @@
   <data name="Streaming.Automatic"><value>Automatique</value></data>
   <data name="Streaming.Enabled"><value>Activée</value></data>
   <data name="Streaming.Disabled"><value>Désactivée</value></data>
+  <data name="Scope"><value>Périmètre</value></data>
 </root>

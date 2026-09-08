@@ -44,4 +44,5 @@
   <data name="SavedWithStatus"><value>Fournisseur enregistré ; état de la découverte : {0}.</value></data>
   <data name="ConnectionSucceeded"><value>Connexion établie. La négociation du protocole a réussi. Outils découverts : {0}.</value></data>
   <data name="DiscoverySummary"><value>Découverte : {0} inchangés, {1} nouveaux, {2} modifiés, {3} indisponibles.</value></data>
+  <data name="Scope"><value>Périmètre</value></data>
 </root>

@@ -56,7 +56,7 @@ internal sealed record BootstrapProfileDefinition
 {
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
-    public string TargetScope { get; init; } = "instance";
+    public string TargetScope { get; init; } = "workspace";
     public IReadOnlyList<BootstrapProfileBindingDefinition> Bindings { get; init; } = [];
 }
 
@@ -112,7 +112,7 @@ public sealed class BootstrapProfileCatalog(
             try { profiles.Add((await LoadProfileAsync(rootPath, name, cancellationToken)).Summary); }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                profiles.Add(new(name, name, null, BootstrapProfileScope.Instance, 0, 0, string.Empty, [], false, exception.Message));
+                profiles.Add(new(name, name, null, BootstrapProfileScope.Workspace, 0, 0, string.Empty, [], false, exception.Message));
             }
         }
         return new(rootPath, options.InitialBootstrapEnabled, options.InitialProfiles, profiles);
@@ -171,7 +171,7 @@ public sealed class BootstrapProfileCatalog(
 
         var displayName = profile;
         string? description = null;
-        var scope = BootstrapProfileScope.Instance;
+        var scope = BootstrapProfileScope.Workspace;
         IReadOnlyList<BootstrapProfileBinding> bindings = [];
         var descriptorPath = Path.Combine(profilePath, DescriptorFileName);
         if (File.Exists(descriptorPath))
@@ -302,8 +302,6 @@ public sealed class BootstrapProfileCatalog(
                 throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' declares binding '{binding.Name}' more than once.");
             if (binding.TargetKind is null)
                 throw new DeclarativeBootstrapException($"Bootstrap profile binding '{profile}/{binding.Name}' requires targetKind.");
-            if (binding.DefaultTarget?.WorkspaceRef is not null)
-                throw new DeclarativeBootstrapException($"Bootstrap profile binding '{profile}/{binding.Name}' cannot target another Workspace.");
             result.Add(new(
                 binding.Name,
                 binding.TargetKind.Value,

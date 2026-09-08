@@ -1,4 +1,4 @@
-# ADR-0080 — Source Providers are bounded AEP contributions
+# ADR-0081 — Source Providers are bounded AEP contributions
 
 ## Status
 
@@ -13,7 +13,7 @@ Sources need replaceable acquisition transports. A Source Channel may use Git or
 - AEP registers the `aep.source-provider` capability and `source-provider` contribution kind. A contribution publishes an id and display metadata; its provider-specific Channel configuration is described by an immutable versioned option set with scope `source-channel`.
 - A Source Provider has two operations. `Resolve` maps a configured selector to an immutable provider revision and integrity metadata. `Materialize` accepts that exact revision and returns an opaque archive with its revision, media type, SHA-256 digest, entry count, and expanded size.
 - Materialization limits are explicit protocol input. The server intersects the requested limits with its configured maximum archive bytes, entry count, expanded bytes, and timeout. It validates the returned revision, limits, and digest before responding. The canonical client repeats revision, limit, and digest checks.
-- Agentstration stores an ordinary `SourceProvider` resource containing a display name, a typed reference to the owning `ExtensionRegistration`, and the contribution id. The registration remains the only owner of the AEP endpoint, enabled state, extension identity, and credentials. Portable Source manifests bind logical names to these local resources separately.
+- Agentstration stores an instance-owned `SourceProvider` resource containing a display name, a typed reference to an instance-owned `ExtensionRegistration`, and the contribution id. The registration remains the only owner of the AEP endpoint, enabled state, extension identity, and credentials. Portable Source manifests bind logical names to these local resources separately.
 - The archive remains opaque to AEP. Agentstration owns Source identity, SourceVersion and Channel lifecycle, path isolation, snapshot persistence, catalog parsing, Bootstrap semantics, and Pack semantics. Source acquisition is native AEP behavior and is not exposed as an MCP agent tool.
 
 ## Consequences

@@ -39,7 +39,8 @@ internal sealed class PutAgentEndpoint : IManagementEndpoint
                 ApiVersion = body.ApiVersion,
                 Kind = body.Kind,
                 Metadata = body.Metadata,
-                Definition = body.Definition
+                Definition = body.Definition,
+                ScopeRef = body.ScopeRef
             };
             var stored = await service.PutAgentAsync(resource, ManagementHttp.IfMatch(request), ManagementHttp.IfNoneMatch(request), cancellationToken);
             return ManagementHttp.ResourceResult(stored, response, StatusCodes.Status200OK);

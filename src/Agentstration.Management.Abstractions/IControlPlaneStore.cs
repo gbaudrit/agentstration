@@ -27,11 +27,28 @@ public interface IAgentRevisionRunRetention
 }
 
 public sealed record StoredResource<T>(T Value, string ETag, DateTimeOffset UpdatedAt) where T : Resource;
+public sealed record ResourceInventoryEntry(
+    Guid Uid,
+    ResourceScopeRef ScopeRef,
+    ResourceNamespace Namespace,
+    string Kind,
+    string Name,
+    DateTimeOffset UpdatedAt);
 
 public interface IControlPlaneStore
 {
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource;
+    Task<StoredResource<T>?> GetByUidAsync<T>(Guid uid, CancellationToken cancellationToken) where T : Resource =>
+        throw new NotSupportedException("This store does not support UID lookup.");
+    Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource =>
+        throw new NotSupportedException("This store does not support exact-scope lookup.");
+    Task<IReadOnlyList<StoredResource<T>>> ListExactAsync<T>(ResourceScopeRef scopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
+        throw new NotSupportedException("This store does not support exact-scope enumeration.");
+    Task<IReadOnlyList<StoredResource<T>>> ListVisibleAsync<T>(ResourceScopeRef targetScopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
+        throw new NotSupportedException("This store does not support descendant-visible enumeration.");
+    Task<IReadOnlyList<ResourceInventoryEntry>> ListExactInventoryAsync(ResourceScopeRef scopeRef, int skip, int take, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This store does not support exact-scope inventory enumeration.");
     Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource;
     async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(ResourceNamespace @namespace, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource
     {
@@ -61,8 +78,12 @@ public interface IControlPlaneStore
         }
     }
     Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource;
+    Task<StoredResource<T>> PutExactAsync<T>(ResourceScopeRef scopeRef, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource =>
+        throw new NotSupportedException("This store does not support exact-scope writes.");
     Task<StoredResource<T>> CreateImmutableAsync<T>(T resource, CancellationToken cancellationToken) where T : Resource;
     Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken);
+    Task DeleteExactAsync(ScopedResourceAddress address, string? ifMatch, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This store does not support exact-scope deletes.");
 }
 
 public interface IAgentResourceQueries
@@ -78,10 +99,11 @@ public interface IAgentResourceQueries
 
 public interface IModelProfileReferenceValidator
 {
-    Task ValidateAsync(ResourceReference profileReference, CancellationToken cancellationToken);
+    Task ValidateAsync(ResourceReference profileReference, ResourceNamespace ownerNamespace, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken);
 }
 
 public sealed class ControlPlaneConcurrencyException(string message) : Exception(message);
+public sealed class ControlPlaneAmbiguousResourceException(ResourceKey key) : Exception($"Resource '{key}' exists in more than one ownership scope; use an exact scoped address.");
 public sealed class ControlPlaneResourceNotFoundException : Exception
 {
     public ControlPlaneResourceNotFoundException(ResourceKey key) : base($"Resource '{key}' was not found.") { }

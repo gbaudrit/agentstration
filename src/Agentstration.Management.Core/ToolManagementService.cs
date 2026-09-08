@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Core;
 
@@ -92,7 +93,7 @@ public sealed class ToolManagementService(IControlPlaneStore store, IEnumerable<
                     ApiVersion = ManagementApiVersions.CoreV1,
                     Kind = ResourceKinds.Tool,
                     Metadata = new ResourceMetadata { Name = name },
-                    WorkspaceId = provider.WorkspaceId,
+                    ScopeRef = provider.ScopeRef,
                     Generation = 1,
                     Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
                     Definition = new ToolResourceProperties

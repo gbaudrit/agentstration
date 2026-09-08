@@ -1,0 +1,22 @@
+.resource-scope-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: .18rem .48rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: .75rem;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.resource-scope-badge-compact {
+    padding: .1rem .38rem;
+    border-color: color-mix(in srgb, var(--primary) 18%, var(--border));
+    background: color-mix(in srgb, var(--primary-soft) 45%, var(--surface));
+    color: var(--muted);
+    font-size: .67rem;
+    font-weight: 600;
+    line-height: 1.25;
+}

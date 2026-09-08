@@ -32,6 +32,7 @@ public partial class Packs
     private ResourceSnapshot<InstalledPackResource>? selected;
     private AgentstrationApiException? error;
     private PackInstallationPreview? preview;
+    private ResourceScopeRef? installScope;
     private IReadOnlyList<ModelProfileSummaryResponse> modelProfiles = [];
     private IReadOnlyList<ModelProviderResponse> modelProviders = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
@@ -105,6 +106,7 @@ public partial class Packs
     private void OpenInstall()
     {
         preview = null;
+        installScope = null;
         archive = null;
         archiveName = string.Empty;
         installError = null;
@@ -123,6 +125,7 @@ public partial class Packs
     {
         previewing = true;
         preview = null;
+        installScope = null;
         archive = null;
         installError = null;
         replaceExisting = false;

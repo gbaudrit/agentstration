@@ -91,6 +91,22 @@ public sealed class DeclarativeBootstrapTests
     }
 
     [TestMethod]
+    public async Task ProfileWithoutDescriptorDefaultsToWorkspaceScope()
+    {
+        using var directory = new TemporaryDirectory();
+        var profile = Directory.CreateDirectory(Path.Combine(directory.Path, "workspace-default"));
+        await File.WriteAllTextAsync(Path.Combine(profile.FullName, "10-resource.yaml"), Resource("Recording", "one"));
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agentstration:Bootstrap:Path"] = directory.Path
+        }).Build();
+
+        var snapshot = await new BootstrapProfileCatalog(configuration, new TestHostEnvironment(directory.Path)).GetSnapshotAsync(default);
+
+        Assert.AreEqual(BootstrapProfileScope.Workspace, snapshot.Profiles.Single().Scope);
+    }
+
+    [TestMethod]
     public async Task VersionedSolutionDiscoveryProfileDeclaresSixResourcesAndItsModelBinding()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -676,8 +692,7 @@ public sealed class DeclarativeBootstrapTests
             .GetAsync(ResourceNamespace.Default, "startup-order", default);
 
         Assert.IsNotNull(registration);
-        Assert.AreEqual(tenant.Id, registration.Value.TenantId);
-        Assert.AreEqual(workspace.Id, registration.Value.WorkspaceId);
+        Assert.AreEqual(ResourceScopeRef.Instance, registration.Value.ScopeRef);
     }
 
     [TestMethod]
@@ -731,6 +746,8 @@ public sealed class DeclarativeBootstrapTests
         IReadOnlyList<string> profiles,
         bool enabled = true)
     {
+        foreach (var profile in profiles)
+            EnsureInstanceProfileDescriptor(Path.Combine(root, profile));
         var values = new Dictionary<string, string?>
         {
             ["Agentstration:Bootstrap:Path"] = root,
@@ -757,8 +774,10 @@ public sealed class DeclarativeBootstrapTests
         string path,
         string? password,
         Action<IServiceCollection>? configureServices = null,
-        bool configureOllamaExtension = false) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        bool configureOllamaExtension = false)
+    {
+        EnsureInstanceProfileDescriptor(path);
+        return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", "Local");
@@ -770,9 +789,12 @@ public sealed class DeclarativeBootstrapTests
             if (password is not null) builder.UseSetting("Agentstration:Bootstrap:Secrets:AdminPassword", password);
             if (configureServices is not null) builder.ConfigureServices(configureServices);
         });
+    }
 
-    private static WebApplicationFactory<Program> FactoryWithExtensionPresenceHandler(string path, bool discoverOnStartup) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+    private static WebApplicationFactory<Program> FactoryWithExtensionPresenceHandler(string path, bool discoverOnStartup)
+    {
+        EnsureInstanceProfileDescriptor(path);
+        return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Agentstration:Authentication:Mode", "Development");
@@ -788,6 +810,14 @@ public sealed class DeclarativeBootstrapTests
                     provider.GetRequiredService<ExtensionPresenceBootstrapHandler>());
             });
         });
+    }
+
+    private static void EnsureInstanceProfileDescriptor(string profilePath)
+    {
+        if (!Directory.Exists(profilePath)) return;
+        var descriptor = Path.Combine(profilePath, "profile.yaml");
+        if (!File.Exists(descriptor)) File.WriteAllText(descriptor, Profile(Path.GetFileName(profilePath), "instance"));
+    }
 
     private static string PlatformAdministrator() => $$"""
         apiVersion: {{ManagementApiVersions.CoreV1}}

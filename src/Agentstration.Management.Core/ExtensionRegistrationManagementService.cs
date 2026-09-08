@@ -13,7 +13,10 @@ public sealed class ExtensionRegistrationInUseException(string name, IReadOnlyLi
     public IReadOnlyList<ExtensionRegistrationUsage> Usages { get; } = usages;
 }
 
-public sealed class ExtensionRegistrationManagementService(IControlPlaneStore store)
+public sealed class ExtensionRegistrationManagementService(
+    IControlPlaneStore store,
+    IResourceReferenceResolver references,
+    ResourceScopeOperationService scopeOperations)
 {
     public Task<StoredResource<ExtensionRegistrationResource>?> GetAsync(
         ResourceNamespace @namespace,
@@ -21,6 +24,15 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
         CancellationToken cancellationToken) =>
         store.GetAsync<ExtensionRegistrationResource>(
             new(ResourceKinds.ExtensionRegistration, name, @namespace),
+            cancellationToken);
+
+    public Task<StoredResource<ExtensionRegistrationResource>?> GetExactAsync(
+        ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
+        string name,
+        CancellationToken cancellationToken) =>
+        store.GetExactAsync<ExtensionRegistrationResource>(
+            ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.ExtensionRegistration, name),
             cancellationToken);
 
     public Task<IReadOnlyList<StoredResource<ExtensionRegistrationResource>>> ListAsync(
@@ -32,19 +44,23 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
         CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        var definition = await ValidateDefinitionAsync(resource.Namespace, resource.Metadata.Name, resource.Definition, cancellationToken);
-        if (await GetAsync(resource.Namespace, resource.Name, cancellationToken) is not null)
-            throw new ControlPlaneConcurrencyException($"Extension registration '{resource.Address}' already exists.");
-        return await store.PutAsync(
-            resource with
+        var scopeRef = resource.ScopeRef ?? DefaultScopeRef(resource.Definition.Source);
+        return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        {
+            var definition = await ValidateDefinitionAsync(resource.Namespace, resource.Metadata.Name, resource.Definition, scopeRef, token);
+            if (await GetExactAsync(scopeRef, resource.Namespace, resource.Name, token) is not null)
+                throw new ControlPlaneConcurrencyException($"Extension registration '{resource.Address}' already exists in scope '{scopeRef}'.");
+            return await store.PutExactAsync(scopeRef, resource with
             {
+                ScopeRef = scopeRef,
                 Generation = 1,
                 Definition = definition,
                 Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
             },
             null,
             true,
-            cancellationToken);
+            token);
+        }, cancellationToken);
     }
 
     public async Task<StoredResource<ExtensionRegistrationResource>> PutAsync(
@@ -58,9 +74,11 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
             ?? throw new ExtensionRegistrationNotFoundException(new(@namespace, ResourceKinds.ExtensionRegistration, name));
         if (existing.Value.Definition.Source != ExtensionRegistrationSource.Manual)
             throw new ExtensionRegistrationValidationException("Configuration and Aspire extension registrations are read-only.");
-        var validated = await ValidateDefinitionAsync(@namespace, name, definition, cancellationToken);
-        return await store.PutAsync(
-            existing.Value with
+        var scopeRef = existing.Value.ScopeRef ?? throw new ExtensionRegistrationValidationException("The extension registration has no ownership scope.");
+        return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        {
+            var validated = await ValidateDefinitionAsync(@namespace, name, definition, scopeRef, token);
+            return await store.PutExactAsync(scopeRef, existing.Value with
             {
                 Generation = checked(existing.Value.Generation + 1),
                 Definition = validated,
@@ -68,7 +86,8 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
             },
             ifMatch,
             false,
-            cancellationToken);
+            token);
+        }, cancellationToken);
     }
 
     public async Task DeleteAsync(
@@ -81,9 +100,17 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
             ?? throw new ExtensionRegistrationNotFoundException(new(@namespace, ResourceKinds.ExtensionRegistration, name));
         if (existing.Value.Definition.Source != ExtensionRegistrationSource.Manual)
             throw new ExtensionRegistrationValidationException("Configuration and Aspire extension registrations are read-only.");
-        var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
+        var scopeRef = existing.Value.ScopeRef ?? throw new ExtensionRegistrationValidationException("The extension registration has no ownership scope.");
+        var usages = await GetUsagesAsync(scopeRef, @namespace, name, cancellationToken);
         if (usages.Count > 0) throw new ExtensionRegistrationInUseException(name, usages);
-        await store.DeleteAsync(new(ResourceKinds.ExtensionRegistration, name, @namespace), ifMatch, cancellationToken);
+        await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
+        {
+            await store.DeleteExactAsync(
+                ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.ExtensionRegistration, name),
+                ifMatch,
+                token);
+            return true;
+        }, cancellationToken);
     }
 
     public async Task<StoredResource<ExtensionRegistrationResource>> SynchronizeAsync(
@@ -94,8 +121,9 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
         if (definition.Source == ExtensionRegistrationSource.Manual)
             throw new ExtensionRegistrationValidationException("Discovered registrations must identify their configuration source.");
         var @namespace = ResourceNamespace.Default;
-        var validated = await ValidateDefinitionAsync(@namespace, name, definition, cancellationToken);
-        var existing = await GetAsync(@namespace, name, cancellationToken);
+        var scopeRef = ResourceScopeRef.Instance;
+        var validated = await ValidateDefinitionAsync(@namespace, name, definition, scopeRef, cancellationToken);
+        var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken);
         if (existing is null)
         {
             return await CreateAsync(new ExtensionRegistrationResource
@@ -103,11 +131,12 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
                 ApiVersion = ManagementApiVersions.CoreV1,
                 Kind = ResourceKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = name },
+                ScopeRef = scopeRef,
                 Definition = validated
             }, cancellationToken);
         }
         if (existing.Value.Definition == validated) return existing;
-        return await store.PutAsync(existing.Value with
+        return await store.PutExactAsync(scopeRef, existing.Value with
         {
             Generation = checked(existing.Value.Generation + 1),
             Definition = validated,
@@ -116,6 +145,21 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
     }
 
     public async Task<IReadOnlyList<ExtensionRegistrationUsage>> GetUsagesAsync(
+        ResourceNamespace @namespace,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var registration = await GetAsync(@namespace, name, cancellationToken)
+            ?? throw new ExtensionRegistrationNotFoundException(new(@namespace, ResourceKinds.ExtensionRegistration, name));
+        return await GetUsagesAsync(
+            registration.Value.ScopeRef ?? throw new ExtensionRegistrationValidationException("The extension registration has no ownership scope."),
+            @namespace,
+            name,
+            cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<ExtensionRegistrationUsage>> GetUsagesAsync(
+        ResourceScopeRef scopeRef,
         ResourceNamespace @namespace,
         string name,
         CancellationToken cancellationToken) =>
@@ -135,7 +179,10 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
             .Where(value =>
             {
                 var address = value.Value.Definition.Extension.Resolve(value.Value.Namespace, ResourceKinds.ExtensionRegistration);
-                return address.Namespace == @namespace && string.Equals(address.Name, name, StringComparison.Ordinal);
+                return address.Namespace == @namespace
+                    && string.Equals(address.Name, name, StringComparison.Ordinal)
+                    && (value.Value.Definition.Extension.ScopeRef is null
+                        || value.Value.Definition.Extension.ScopeRef == scopeRef);
             })
             .Select(value => new ExtensionRegistrationUsage(
                 value.Value.Kind,
@@ -148,6 +195,7 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
         ResourceNamespace @namespace,
         string name,
         ExtensionRegistrationProperties definition,
+        ResourceScopeRef ownerScopeRef,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -160,8 +208,9 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
             || !string.IsNullOrEmpty(definition.Endpoint.Fragment))
             throw new ExtensionRegistrationValidationException("Extension endpoint cannot contain credentials, a query string, or a fragment.");
         var endpoint = Normalize(definition.Endpoint);
-        await ValidateCredentialAsync(@namespace, definition.Credential, cancellationToken);
-        var duplicate = (await ListAsync(cancellationToken)).FirstOrDefault(value =>
+        await ValidateCredentialAsync(@namespace, definition.Credential, ownerScopeRef, cancellationToken);
+        var duplicate = (await store.ListVisibleAsync<ExtensionRegistrationResource>(
+                ownerScopeRef, ResourceKinds.ExtensionRegistration, 0, 200, cancellationToken)).FirstOrDefault(value =>
             value.Value.Namespace == @namespace
             && !string.Equals(value.Value.Name, name, StringComparison.Ordinal)
             && Uri.Compare(
@@ -181,15 +230,23 @@ public sealed class ExtensionRegistrationManagementService(IControlPlaneStore st
         };
     }
 
-    private async Task ValidateCredentialAsync(ResourceNamespace ownerNamespace, ResourceReference? credential, CancellationToken cancellationToken)
+    private async Task ValidateCredentialAsync(
+        ResourceNamespace ownerNamespace,
+        ResourceReference? credential,
+        ResourceScopeRef ownerScopeRef,
+        CancellationToken cancellationToken)
     {
         if (credential is null) return;
-        if (credential.WorkspaceRef is not null)
-            throw new ExtensionRegistrationValidationException("Cross-workspace secret references are not supported.");
         var address = credential.Resolve(ownerNamespace, ResourceKinds.Secret);
-        if (await store.GetAsync<SecretResource>(new(address.Kind, address.Name, address.Namespace), cancellationToken) is null)
-            throw new ExtensionRegistrationValidationException($"Referenced secret '{address}' does not exist.");
+        if (await references.ResolveAsync<SecretResource>(
+                credential, ownerNamespace, ResourceKinds.Secret, ownerScopeRef, cancellationToken) is null)
+            throw new ExtensionRegistrationValidationException($"Referenced secret '{address}' does not exist or is not visible from '{ownerScopeRef}'.");
     }
+
+    private ResourceScopeRef DefaultScopeRef(ExtensionRegistrationSource source) =>
+        source == ExtensionRegistrationSource.Manual
+            ? scopeOperations.DefaultScopeRef(ResourceKinds.ExtensionRegistration)
+            : ResourceScopeRef.Instance;
 
     private static void ValidateIdentity(ExtensionRegistrationResource resource)
     {

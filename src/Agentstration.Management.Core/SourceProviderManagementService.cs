@@ -6,31 +6,41 @@ namespace Agentstration.Management.Core;
 public sealed class SourceProviderValidationException(string message) : Exception(message);
 public sealed class SourceProviderNotFoundException(ResourceAddress address) : Exception($"Source provider '{address}' was not found.");
 
-public sealed class SourceProviderManagementService(IControlPlaneStore store)
+public sealed class SourceProviderManagementService(
+    IControlPlaneStore store,
+    IResourceReferenceResolver references,
+    ResourceScopeOperationService scopeOperations)
 {
     public Task<StoredResource<SourceProviderResource>?> GetAsync(
         ResourceNamespace @namespace,
         string name,
         CancellationToken cancellationToken) =>
-        store.GetAsync<SourceProviderResource>(new(ResourceKinds.SourceProvider, name, @namespace), cancellationToken);
+        store.GetExactAsync<SourceProviderResource>(
+            ScopedResourceAddress.Create(ResourceScopeRef.Instance, @namespace, ResourceKinds.SourceProvider, name),
+            cancellationToken);
 
     public Task<IReadOnlyList<StoredResource<SourceProviderResource>>> ListAsync(CancellationToken cancellationToken) =>
-        store.ListAllAsync<SourceProviderResource>(ResourceKinds.SourceProvider, cancellationToken);
+        store.ListExactAsync<SourceProviderResource>(ResourceScopeRef.Instance, ResourceKinds.SourceProvider, 0, int.MaxValue, cancellationToken);
 
     public async Task<StoredResource<SourceProviderResource>> CreateAsync(
         SourceProviderResource resource,
         CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        if (await GetAsync(resource.Namespace, resource.Name, cancellationToken) is not null)
-            throw new ControlPlaneConcurrencyException($"Source provider '{resource.Address}' already exists.");
-        var definition = await ValidateDefinitionAsync(resource.Namespace, resource.Definition, cancellationToken);
-        return await store.PutAsync(resource with
+        var scopeRef = resource.ScopeRef ?? ResourceScopeRef.Instance;
+        return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            Generation = 1,
-            Definition = definition,
-            Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
-        }, null, true, cancellationToken);
+            if (await GetAsync(resource.Namespace, resource.Name, token) is not null)
+                throw new ControlPlaneConcurrencyException($"Source provider '{resource.Address}' already exists.");
+            var definition = await ValidateDefinitionAsync(resource.Namespace, resource.Definition, scopeRef, token);
+            return await store.PutExactAsync(scopeRef, resource with
+            {
+                ScopeRef = scopeRef,
+                Generation = 1,
+                Definition = definition,
+                Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
+            }, null, true, token);
+        }, cancellationToken);
     }
 
     public async Task<StoredResource<SourceProviderResource>> PutAsync(
@@ -42,13 +52,18 @@ public sealed class SourceProviderManagementService(IControlPlaneStore store)
     {
         var existing = await GetAsync(@namespace, name, cancellationToken)
             ?? throw new SourceProviderNotFoundException(new(@namespace, ResourceKinds.SourceProvider, name));
-        var validated = await ValidateDefinitionAsync(@namespace, definition, cancellationToken);
-        return await store.PutAsync(existing.Value with
+        var scopeRef = existing.Value.ScopeRef
+            ?? throw new SourceProviderValidationException("The Source Provider has no ownership scope.");
+        return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            Generation = checked(existing.Value.Generation + 1),
-            Definition = validated,
-            Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
-        }, ifMatch, false, cancellationToken);
+            var validated = await ValidateDefinitionAsync(@namespace, definition, scopeRef, token);
+            return await store.PutExactAsync(scopeRef, existing.Value with
+            {
+                Generation = checked(existing.Value.Generation + 1),
+                Definition = validated,
+                Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
+            }, ifMatch, false, token);
+        }, cancellationToken);
     }
 
     public async Task DeleteAsync(
@@ -57,14 +72,24 @@ public sealed class SourceProviderManagementService(IControlPlaneStore store)
         string? ifMatch,
         CancellationToken cancellationToken)
     {
-        _ = await GetAsync(@namespace, name, cancellationToken)
+        var existing = await GetAsync(@namespace, name, cancellationToken)
             ?? throw new SourceProviderNotFoundException(new(@namespace, ResourceKinds.SourceProvider, name));
-        await store.DeleteAsync(new(ResourceKinds.SourceProvider, name, @namespace), ifMatch, cancellationToken);
+        var scopeRef = existing.Value.ScopeRef
+            ?? throw new SourceProviderValidationException("The Source Provider has no ownership scope.");
+        await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
+        {
+            await store.DeleteExactAsync(
+                ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.SourceProvider, name),
+                ifMatch,
+                token);
+            return true;
+        }, cancellationToken);
     }
 
     private async Task<SourceProviderProperties> ValidateDefinitionAsync(
         ResourceNamespace ownerNamespace,
         SourceProviderProperties definition,
+        ResourceScopeRef ownerScopeRef,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -72,10 +97,13 @@ public sealed class SourceProviderManagementService(IControlPlaneStore store)
             throw new SourceProviderValidationException("A display name is required.");
         if (string.IsNullOrWhiteSpace(definition.ContributionId))
             throw new SourceProviderValidationException("An AEP source-provider contribution id is required.");
-        if (definition.Extension.WorkspaceRef is not null)
-            throw new SourceProviderValidationException("Cross-workspace extension references are not supported.");
         var extensionAddress = definition.Extension.Resolve(ownerNamespace, ResourceKinds.ExtensionRegistration);
-        if (await store.GetAsync<ExtensionRegistrationResource>(new(extensionAddress.Kind, extensionAddress.Name, extensionAddress.Namespace), cancellationToken) is null)
+        if (await references.ResolveAsync<ExtensionRegistrationResource>(
+                definition.Extension,
+                ownerNamespace,
+                ResourceKinds.ExtensionRegistration,
+                ownerScopeRef,
+                cancellationToken) is null)
             throw new SourceProviderValidationException($"Referenced extension registration '{extensionAddress}' does not exist.");
         return definition with
         {

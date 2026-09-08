@@ -1,0 +1,26 @@
+@namespace Agentstration.Web.Components
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
+
+<label>
+    <span>@Localizer["ResourceScope.Label"]</span>
+    <select value="@(Value?.Value ?? string.Empty)" @onchange="ChangeAsync" disabled="@Disabled">
+        @foreach (var target in Targets)
+        {
+            <option value="@target.ScopeRef.Value" disabled="@(!target.CanWrite)">@Label(target)</option>
+        }
+    </select>
+    <small>@Localizer["ResourceScope.Help"]</small>
+</label>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ResourceScopeTargetResponse> Targets { get; set; } = [];
+    [Parameter] public ResourceScopeRef? Value { get; set; }
+    [Parameter] public EventCallback<ResourceScopeRef?> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    private string Label(ResourceScopeTargetResponse target) =>
+        $"{Localizer[$"ResourceScope.{target.Kind}"].Value} · {target.DisplayName}";
+
+    private Task ChangeAsync(ChangeEventArgs args) =>
+        ValueChanged.InvokeAsync(string.IsNullOrWhiteSpace(args.Value?.ToString()) ? null : ResourceScopeRef.Parse(args.Value!.ToString()!));
+}

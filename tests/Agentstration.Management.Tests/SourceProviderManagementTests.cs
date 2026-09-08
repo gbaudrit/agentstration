@@ -8,14 +8,14 @@ namespace Agentstration.Management.Tests;
 public sealed class SourceProviderManagementTests
 {
     [TestMethod]
-    public async Task SourceProviderBindsExtensionRegistrationAndContributionWithoutOwningEndpoint()
+    public async Task SourceProviderBindsInstanceExtensionRegistrationAndContributionWithoutOwningEndpoint()
     {
-        var store = new MemoryStore();
-        await store.PutAsync(Extension(), null, true, default);
-        var service = new SourceProviderManagementService(store);
+        using var fixture = new Fixture();
+        await fixture.Registrations.CreateAsync(Extension(), default);
 
-        var created = await service.CreateAsync(SourceProvider(), default);
+        var created = await fixture.SourceProviders.CreateAsync(SourceProvider(), default);
 
+        Assert.AreEqual(ResourceScopeRef.Instance, created.Value.ScopeRef);
         Assert.AreEqual("source-extension", created.Value.Definition.Extension.Name);
         Assert.AreEqual("git", created.Value.Definition.ContributionId);
         Assert.AreEqual(1, created.Value.Generation);
@@ -24,35 +24,54 @@ public sealed class SourceProviderManagementTests
     }
 
     [TestMethod]
-    public async Task SourceProviderRejectsMissingAndCrossWorkspaceExtensionBindings()
+    public async Task SourceProviderRejectsMissingOrNonInstanceExtensionBindings()
     {
-        var store = new MemoryStore();
-        var service = new SourceProviderManagementService(store);
+        using var fixture = new Fixture();
 
-        await Assert.ThrowsAsync<SourceProviderValidationException>(() => service.CreateAsync(SourceProvider(), default));
-        await store.PutAsync(Extension(), null, true, default);
-        var crossWorkspace = SourceProvider() with
+        await Assert.ThrowsAsync<SourceProviderValidationException>(() =>
+            fixture.SourceProviders.CreateAsync(SourceProvider(), default));
+        await fixture.Registrations.CreateAsync(Extension(), default);
+        var tenantReference = SourceProvider() with
         {
             Definition = SourceProvider().Definition with
             {
-                Extension = new ResourceReference("source-extension", workspaceRef: "another")
+                Extension = new ResourceReference(
+                    "source-extension",
+                    ResourceScopeRef.Tenant(Guid.NewGuid()))
             }
         };
-        await Assert.ThrowsAsync<SourceProviderValidationException>(() => service.CreateAsync(crossWorkspace, default));
+
+        await Assert.ThrowsAsync<ResourceReferenceOutsideScopeException>(() =>
+            fixture.SourceProviders.CreateAsync(tenantReference, default));
     }
 
     [TestMethod]
-    public async Task ExtensionRegistrationCannotBeDeletedWhileSourceProviderReferencesIt()
+    public async Task SourceProviderRejectsNonInstanceOwnership()
     {
-        var store = new MemoryStore();
-        var registration = new ExtensionRegistrationManagementService(store);
-        await registration.CreateAsync(Extension(), default);
-        await new SourceProviderManagementService(store).CreateAsync(SourceProvider(), default);
+        using var fixture = new Fixture();
+        await fixture.Registrations.CreateAsync(Extension(), default);
+        var tenantOwned = SourceProvider() with
+        {
+            ScopeRef = ResourceScopeRef.Tenant(Guid.NewGuid())
+        };
 
-        var exception = await Assert.ThrowsAsync<ExtensionRegistrationInUseException>(() =>
-            registration.DeleteAsync(ResourceNamespace.Default, "source-extension", null, default));
+        await Assert.ThrowsAsync<ResourceScopePolicyException>(() =>
+            fixture.SourceProviders.CreateAsync(tenantOwned, default));
+    }
 
-        Assert.AreEqual(ResourceKinds.SourceProvider, exception.Usages.Single().Kind);
+    [TestMethod]
+    public async Task ExtensionRegistrationUsageIncludesReferencingSourceProvider()
+    {
+        using var fixture = new Fixture();
+        await fixture.Registrations.CreateAsync(Extension(), default);
+        await fixture.SourceProviders.CreateAsync(SourceProvider(), default);
+
+        var usages = await fixture.Registrations.GetUsagesAsync(
+            ResourceNamespace.Default,
+            "source-extension",
+            default);
+
+        Assert.AreEqual(ResourceKinds.SourceProvider, usages.Single().Kind);
     }
 
     private static ExtensionRegistrationResource Extension() => new()
@@ -60,10 +79,12 @@ public sealed class SourceProviderManagementTests
         ApiVersion = ManagementApiVersions.CoreV1,
         Kind = ResourceKinds.ExtensionRegistration,
         Metadata = new ResourceMetadata { Name = "source-extension" },
+        ScopeRef = ResourceScopeRef.Instance,
         Definition = new ExtensionRegistrationProperties
         {
             DisplayName = "Source extension",
-            Endpoint = new Uri("http://127.0.0.1:5300")
+            Endpoint = new Uri("http://127.0.0.1:5300"),
+            Source = ExtensionRegistrationSource.Configuration
         }
     };
 
@@ -80,32 +101,82 @@ public sealed class SourceProviderManagementTests
         }
     };
 
+    private sealed class Fixture : IDisposable
+    {
+        private readonly IDisposable systemScope;
+
+        public Fixture()
+        {
+            var context = new CurrentRequestContext();
+            systemScope = context.PushSystem();
+            Store = new MemoryStore();
+            var scopes = new InstanceScopeResolver();
+            var references = new ResourceReferenceResolver(Store, scopes);
+            var operations = new ResourceScopeOperationService(
+                context,
+                context,
+                null!,
+                null!,
+                null!,
+                scopes);
+            Registrations = new ExtensionRegistrationManagementService(Store, references, operations);
+            SourceProviders = new SourceProviderManagementService(Store, references, operations);
+        }
+
+        public MemoryStore Store { get; }
+        public ExtensionRegistrationManagementService Registrations { get; }
+        public SourceProviderManagementService SourceProviders { get; }
+        public void Dispose() => systemScope.Dispose();
+    }
+
+    private sealed class InstanceScopeResolver : IResourceScopeResolver
+    {
+        private static readonly ResourceScope Instance = new(1, ResourceScopeRef.Instance, ResourceScopeKind.Instance, "instance", null);
+
+        public Task<ResolvedResourceScope?> ResolveAsync(ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+            Task.FromResult<ResolvedResourceScope?>(scopeRef == ResourceScopeRef.Instance
+                ? new(Instance, [])
+                : null);
+    }
+
     private sealed class MemoryStore : IControlPlaneStore
     {
-        private readonly Dictionary<ResourceKey, (Resource Value, string ETag, DateTimeOffset At)> values = [];
+        private readonly Dictionary<ScopedResourceAddress, (Resource Value, string ETag, DateTimeOffset At)> values = [];
         private long version;
 
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task<StoredResource<T>?> GetAsync<T>(ResourceKey key, CancellationToken cancellationToken) where T : Resource =>
-            Task.FromResult(values.TryGetValue(key, out var entry) && entry.Value is T typed
+            GetExactAsync<T>(key.AtScope(ResourceScopeRef.Instance), cancellationToken);
+
+        public Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource =>
+            Task.FromResult(values.TryGetValue(address, out var entry) && entry.Value is T typed
                 ? new StoredResource<T>(typed, entry.ETag, entry.At)
                 : null);
 
         public Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
+            ListExactAsync<T>(ResourceScopeRef.Instance, kind, skip, take, cancellationToken);
+
+        public Task<IReadOnlyList<StoredResource<T>>> ListExactAsync<T>(ResourceScopeRef scopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
             Task.FromResult<IReadOnlyList<StoredResource<T>>>(values
-                .Where(value => value.Key.Kind == kind && value.Value.Value is T)
+                .Where(value => value.Key.ScopeRef == scopeRef && value.Key.Address.Kind == kind && value.Value.Value is T)
                 .Select(value => new StoredResource<T>((T)value.Value.Value, value.Value.ETag, value.Value.At))
                 .Skip(skip)
                 .Take(take)
                 .ToArray());
 
-        public Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
+        public Task<IReadOnlyList<StoredResource<T>>> ListVisibleAsync<T>(ResourceScopeRef targetScopeRef, string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource =>
+            ListExactAsync<T>(targetScopeRef, kind, skip, take, cancellationToken);
+
+        public Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource =>
+            PutExactAsync(resource.ScopeRef ?? ResourceScopeRef.Instance, resource, ifMatch, ifNoneMatch, cancellationToken);
+
+        public Task<StoredResource<T>> PutExactAsync<T>(ResourceScopeRef scopeRef, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
         {
-            var key = new ResourceKey(resource.Kind, resource.Name, resource.Namespace);
+            var key = ScopedResourceAddress.Create(scopeRef, resource.Namespace, resource.Kind, resource.Name);
             if (ifNoneMatch && values.ContainsKey(key)) throw new ControlPlaneConcurrencyException("Already exists.");
             var etag = $"\"{Interlocked.Increment(ref version)}\"";
-            var value = resource.WithSystemState(resource.Uid == Guid.Empty ? Guid.NewGuid() : resource.Uid, resource.TenantId, resource.WorkspaceId, etag);
+            var value = resource.WithSystemState(resource.Uid == Guid.Empty ? Guid.NewGuid() : resource.Uid, scopeRef, etag);
             values[key] = (value, etag, DateTimeOffset.UnixEpoch);
             return Task.FromResult(new StoredResource<T>((T)value, etag, DateTimeOffset.UnixEpoch));
         }
@@ -113,9 +184,12 @@ public sealed class SourceProviderManagementTests
         public Task<StoredResource<T>> CreateImmutableAsync<T>(T resource, CancellationToken cancellationToken) where T : Resource =>
             PutAsync(resource, null, true, cancellationToken);
 
-        public Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken)
+        public Task DeleteAsync(ResourceKey key, string? ifMatch, CancellationToken cancellationToken) =>
+            DeleteExactAsync(key.AtScope(ResourceScopeRef.Instance), ifMatch, cancellationToken);
+
+        public Task DeleteExactAsync(ScopedResourceAddress address, string? ifMatch, CancellationToken cancellationToken)
         {
-            values.Remove(key);
+            values.Remove(address);
             return Task.CompletedTask;
         }
     }
