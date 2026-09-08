@@ -32,6 +32,7 @@ public sealed class BootstrapApplicationLock
 
 public sealed class BootstrapProfileManagementService(
     BootstrapProfileCatalog catalog,
+    SourceBootstrapProfileLoader sourceProfiles,
     DeclarativeBootstrapService bootstrap,
     IIdentityStore identities,
     IPlatformAuthorizationService platformAuthorization,
@@ -85,7 +86,8 @@ public sealed class BootstrapProfileManagementService(
         BootstrapBindingTargetKind targetKind,
         IReadOnlyList<string> profiles,
         Guid actorPrincipalId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        BootstrapSourceProfileSelection? source = null)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         if (target?.TenantId is null || target.WorkspaceId is null)
@@ -120,7 +122,10 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.Secret => ResourceKinds.Secret,
             _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")
         };
-        var planned = (await catalog.LoadAsync(profiles, cancellationToken))
+        await using var loadedSelection = source is null
+            ? new LoadedBootstrapSelection(await catalog.LoadAsync(profiles, cancellationToken))
+            : await sourceProfiles.LoadAsync(source, cancellationToken);
+        var planned = loadedSelection.Profiles
             .SelectMany(profile => profile.Resources)
             .Where(source => string.Equals(source.Resource.Kind, resourceKind, StringComparison.Ordinal))
             .Select(source => new BootstrapBindingTargetOption(
@@ -241,6 +246,7 @@ public sealed class BootstrapProfileManagementService(
                 Scope = preview.Scope,
                 Target = preview.Target,
                 Bindings = preview.Bindings,
+                SourceProvenance = preview.SourceProvenance,
                 Digest = preview.Digest,
                 StartedAt = timeProvider.GetUtcNow()
             }

@@ -128,6 +128,7 @@ else
         useDevelopmentPasswordPolicy: builder.Environment.IsDevelopment());
 builder.Services.AddScoped<DeclarativeBootstrapService>();
 builder.Services.AddSingleton<BootstrapProfileCatalog>();
+builder.Services.AddSingleton<SourceBootstrapProfileLoader>();
 builder.Services.AddSingleton<BootstrapApplicationLock>();
 builder.Services.AddScoped<BootstrapProfileManagementService>();
 builder.Services.AddSingleton<SignalRFlowRunEventSink>();

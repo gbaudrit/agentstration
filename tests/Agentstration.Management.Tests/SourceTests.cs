@@ -10,10 +10,15 @@ using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
+using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Management.Tests;
 
@@ -240,6 +245,84 @@ public sealed class SourceTests
         Assert.AreEqual(refreshed.Snapshot.Uid, catalog.Provenance.SnapshotUid);
         Assert.AreEqual(refreshed.Snapshot.Definition.Artifact.Sha256, catalog.Provenance.SnapshotDigest);
         Assert.AreEqual("catalog.yaml", catalog.Provenance.CatalogPath);
+    }
+
+    [TestMethod]
+    public async Task SourceBootstrapUsesPinnedLocaleAndPersistsCompleteProvenanceAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        fixture.Materializer.Content = CatalogArchive(
+            ("catalog.yaml", BootstrapCatalog()),
+            ("profiles/solution-discovery/fr-FR/profile.yaml", BootstrapProfileWithoutBindings("instance")),
+            ("profiles/solution-discovery/fr-FR/10-recording.yaml", RecordingResource("accueil-fr")),
+            ("profiles/solution-discovery/en-US/profile.yaml", BootstrapProfileWithoutBindings("instance")),
+            ("profiles/solution-discovery/en-US/10-recording.yaml", RecordingResource("welcome-en")));
+        var imported = await fixture.Service.ImportYamlAsync(ManifestWithCatalog("1"), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        var refreshed = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+
+        var configuration = new ConfigurationBuilder().Build();
+        var localCatalog = new BootstrapProfileCatalog(configuration, new TestHostEnvironment());
+        var sourceLoader = new SourceBootstrapProfileLoader(
+            localCatalog, fixture.Catalogs, fixture.Service, fixture.Snapshots, fixture.ContentReader);
+        var handler = new RecordingBootstrapHandler();
+        var bootstrap = new DeclarativeBootstrapService(
+            configuration, localCatalog, [handler], NullLogger<DeclarativeBootstrapService>.Instance, sourceLoader);
+        var management = new BootstrapProfileManagementService(
+            localCatalog, sourceLoader, bootstrap, null!, new AllowPlatformAdministrator(), fixture.Context,
+            fixture.Store, new RecordingAuditWriter(), TimeProvider.System, new BootstrapApplicationLock());
+        var french = new BootstrapSourceProfileSelection(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable",
+            refreshed.Snapshot.Uid, "official-bootstrap-samples", "solution-discovery", "fr-FR",
+            "profiles/solution-discovery/fr-FR");
+        var selection = new BootstrapProfileSelection([], Source: french);
+        var actor = Guid.NewGuid();
+
+        var preview = await management.PreviewAsync(selection, actor, default);
+        Assert.AreEqual("fr-FR", preview.SourceProvenance?.Locale);
+        Assert.AreEqual("accueil-fr", preview.Resources.Single().Name);
+
+        var englishSelection = selection with
+        {
+            Source = french with { Locale = "en-US", Path = "profiles/solution-discovery/en-US" }
+        };
+        var stale = await Assert.ThrowsExactlyAsync<DeclarativeBootstrapException>(() =>
+            management.ApplyAsync(englishSelection, preview.Digest, actor, default));
+        StringAssert.Contains(stale.Message, "changed after preview");
+
+        fixture.Materializer.Revision = "revision-2";
+        fixture.Materializer.Content = CatalogArchive(
+            ("catalog.yaml", BootstrapCatalog()),
+            ("profiles/solution-discovery/fr-FR/profile.yaml", BootstrapProfileWithoutBindings("instance")),
+            ("profiles/solution-discovery/fr-FR/10-recording.yaml", RecordingResource("newer-fr")),
+            ("profiles/solution-discovery/en-US/profile.yaml", BootstrapProfileWithoutBindings("instance")),
+            ("profiles/solution-discovery/en-US/10-recording.yaml", RecordingResource("newer-en")));
+        var newer = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+        Assert.AreNotEqual(refreshed.Snapshot.Uid, newer.Snapshot.Uid);
+
+        var application = await management.ApplyAsync(selection, preview.Digest, actor, default);
+        var provenance = application.Definition.SourceProvenance;
+        Assert.IsNotNull(provenance);
+        Assert.AreEqual(imported.Source.Source.Uid, provenance.SourceUid);
+        Assert.AreEqual(imported.Version.Uid, provenance.SourceVersionUid);
+        Assert.AreEqual(imported.Version.Definition.ManifestDigest, provenance.SourceVersionDigest);
+        Assert.AreEqual(refreshed.Snapshot.Definition.ResolvedRevision, provenance.ProviderRevision);
+        Assert.AreEqual(refreshed.Snapshot.Uid, provenance.SnapshotUid);
+        Assert.AreEqual(refreshed.Snapshot.Definition.Artifact.Sha256, provenance.SnapshotDigest);
+        Assert.AreEqual("official-bootstrap-samples", provenance.CatalogName);
+        Assert.AreEqual("solution-discovery", provenance.EntryName);
+        Assert.AreEqual("fr-FR", provenance.Locale);
+        Assert.AreEqual("profiles/solution-discovery/fr-FR", provenance.Path);
+        CollectionAssert.AreEqual(new[] { "accueil-fr" }, handler.Applied.ToArray());
+
+        var mismatch = await Assert.ThrowsExactlyAsync<DeclarativeBootstrapException>(() =>
+            management.PreviewAsync(selection with { Source = french with { Publisher = "different-publisher" } }, actor, default));
+        StringAssert.Contains(mismatch.Message, "publisher mismatch is not rewritten");
     }
 
     [TestMethod]
@@ -882,6 +965,24 @@ public sealed class SourceTests
               required: true
         """;
 
+    private static string RecordingResource(string name) => $$"""
+        apiVersion: agentstration.io/v1
+        kind: Recording
+        metadata:
+          name: {{name}}
+        definition: {}
+        """;
+
+    private static string BootstrapProfileWithoutBindings(string targetScope) => $$"""
+        apiVersion: agentstration.io/v1
+        kind: BootstrapProfile
+        metadata:
+          name: solution-discovery
+        definition:
+          targetScope: {{targetScope}}
+          bindings: []
+        """;
+
     private static string PackCatalog() => """
         apiVersion: agentstration.io/v1
         kind: PackCatalog
@@ -997,6 +1098,7 @@ public sealed class SourceTests
         public SourceBindingManagementService Bindings => services.GetRequiredService<SourceBindingManagementService>();
         public SourceChannelSnapshotService Snapshots => services.GetRequiredService<SourceChannelSnapshotService>();
         public SourceCatalogService Catalogs => services.GetRequiredService<SourceCatalogService>();
+        public ISourceSnapshotContentReader ContentReader => services.GetRequiredService<ISourceSnapshotContentReader>();
         public SourceVerificationService Verification => services.GetRequiredService<SourceVerificationService>();
         public FakeSourceVerificationIndexProvider VerificationIndex => services.GetRequiredService<FakeSourceVerificationIndexProvider>();
         public StubRetriever Retriever => services.GetRequiredService<StubRetriever>();
@@ -1096,6 +1198,48 @@ public sealed class SourceTests
             SqliteConnection.ClearAllPools();
             File.Delete(database);
         }
+    }
+
+    private sealed class RecordingBootstrapHandler : IBootstrapResourceHandler
+    {
+        public string Kind => "Recording";
+        public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
+        public List<string> Applied { get; } = [];
+
+        public Task<BootstrapResourcePlanResult> PlanAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            BootstrapPlanningContext planning,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new BootstrapResourcePlanResult(BootstrapResourceDisposition.Create));
+
+        public Task<BootstrapResourceApplyResult> ApplyAsync(
+            BootstrapResourceDocument resource,
+            BootstrapResourceOperationContext operation,
+            CancellationToken cancellationToken)
+        {
+            Applied.Add(resource.Metadata.Name);
+            return Task.FromResult(BootstrapResourceApplyResult.Created);
+        }
+    }
+
+    private sealed class AllowPlatformAdministrator : IPlatformAuthorizationService
+    {
+        public Task<bool> IsPlatformAdministratorAsync(Guid principalId, CancellationToken cancellationToken) =>
+            Task.FromResult(true);
+    }
+
+    private sealed class RecordingAuditWriter : ISecurityAuditWriter
+    {
+        public Task WriteAsync(SecurityAuditWrite entry, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Development;
+        public string ApplicationName { get; set; } = nameof(SourceTests);
+        public string ContentRootPath { get; set; } = Path.GetTempPath();
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 
     private sealed class FakeExtensionInspector : IExtensionInspector
