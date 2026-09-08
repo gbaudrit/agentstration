@@ -28,8 +28,12 @@ public interface IAepSourceProvidersClient
     AepSourceProviderClient CreateSourceProvider(string providerId);
 }
 
-public sealed class AepClient(HttpClient httpClient, IAepAccessTokenProvider? accessTokenProvider = null) : IAepClient, IAepModelProvidersClient, IAepSourceProvidersClient
+public sealed class AepClient(
+    HttpClient httpClient,
+    IAepAccessTokenProvider? accessTokenProvider = null,
+    AepTransportSecurityOptions? transportOptions = null) : IAepClient, IAepModelProvidersClient, IAepSourceProvidersClient
 {
+    private readonly AepTransportSecurityOptions transportOptions = transportOptions ?? new();
     public Task<AepManifest> GetManifestAsync(CancellationToken cancellationToken = default) => DiscoverAsync(cancellationToken);
 
     public async Task<AepManifest> DiscoverAsync(CancellationToken cancellationToken = default)
@@ -135,7 +139,7 @@ public sealed class AepClient(HttpClient httpClient, IAepAccessTokenProvider? ac
             {
                 throw new AepProtocolException("source_archive_too_large", "The extension response exceeds the requested archive limit.", innerException: exception);
             }
-            var result = await ReadAsync<AepSourceMaterializeResponse>(response, timeout.Token);
+            var result = await ReadAsync<AepSourceMaterializeResponse>(response, timeout.Token, wireLimit);
             if (result.Archive is null || result.Archive.Content is null || result.Archive.Integrity is null)
                 throw new AepProtocolException("invalid_source_response", "The extension returned an incomplete source archive.");
             if (!string.Equals(result.Revision, request.Revision, StringComparison.Ordinal))
@@ -189,7 +193,7 @@ public sealed class AepClient(HttpClient httpClient, IAepAccessTokenProvider? ac
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         _ = await DiscoverAsync(cancellationToken);
-        using var message = new HttpRequestMessage(HttpMethod.Post, $"{AepProtocol.ModelProvidersPath}/{Uri.EscapeDataString(providerId)}/chat/stream")
+        using var message = new HttpRequestMessage(HttpMethod.Post, ResolveProtocolUri($"{AepProtocol.ModelProvidersPath}/{Uri.EscapeDataString(providerId)}/chat/stream"))
         {
             Content = JsonContent.Create(request, options: AepProtocol.JsonOptions)
         };
@@ -203,11 +207,19 @@ public sealed class AepClient(HttpClient httpClient, IAepAccessTokenProvider? ac
             await EnsureSuccessAsync(response, cancellationToken);
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var reader = new StreamReader(stream);
+            long streamedCharacters = 0;
+            var updateCount = 0;
             while (await reader.ReadLineAsync(cancellationToken) is { } line)
             {
+                streamedCharacters += line.Length;
+                if (line.Length > transportOptions.MaximumStreamingLineCharacters
+                    || streamedCharacters > transportOptions.MaximumResponseBytes)
+                    throw new AepProtocolException("response_too_large", "The AEP streaming response exceeded its configured limits.", response.StatusCode);
                 if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
                 var data = line[5..].TrimStart();
                 if (data.Length == 0) continue;
+                if (++updateCount > transportOptions.MaximumStreamingUpdates)
+                    throw new AepProtocolException("response_too_large", "The AEP streaming response exceeded its configured limits.", response.StatusCode);
                 var update = JsonSerializer.Deserialize<AepChatUpdate>(data, AepProtocol.JsonOptions)
                     ?? throw new AepProtocolException("invalid_response", "The extension returned an empty streaming update.");
                 yield return update;
@@ -218,7 +230,7 @@ public sealed class AepClient(HttpClient httpClient, IAepAccessTokenProvider? ac
 
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, object? body, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(method, path);
+        using var request = new HttpRequestMessage(method, ResolveProtocolUri(path));
         if (body is not null) request.Content = JsonContent.Create(body, options: AepProtocol.JsonOptions);
         await ApplyAccessTokenAsync(request, cancellationToken);
         HttpResponseMessage response;
@@ -237,16 +249,35 @@ public sealed class AepClient(HttpClient httpClient, IAepAccessTokenProvider? ac
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
-    private static async Task<T> ReadAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
+    private async Task<T> ReadAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken, long? maximumBytes = null)
     {
         try
         {
+            var limit = maximumBytes ?? transportOptions.MaximumResponseBytes;
+            if (response.Content.Headers.ContentLength > limit)
+                throw new AepProtocolException("response_too_large", "The AEP response exceeded its configured size limit.", response.StatusCode);
+            await response.Content.LoadIntoBufferAsync(limit, cancellationToken);
             return await response.Content.ReadFromJsonAsync<T>(AepProtocol.JsonOptions, cancellationToken)
                 ?? throw new AepProtocolException("invalid_response", "The extension returned an empty response.", response.StatusCode);
         }
         catch (JsonException exception)
         {
             throw new AepProtocolException("invalid_response", "The extension returned malformed JSON.", response.StatusCode, exception);
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new AepProtocolException("response_too_large", "The AEP response exceeded its configured size limit.", response.StatusCode, exception);
+        }
+    }
+
+    private Uri ResolveProtocolUri(string path)
+    {
+        if (httpClient.BaseAddress is null)
+            throw new AepProtocolException("endpoint_invalid", "The AEP client requires an absolute base address.");
+        try { return AepTransportSecurity.ResolveSameOrigin(httpClient.BaseAddress, path); }
+        catch (AepTransportSecurityException exception)
+        {
+            throw new AepProtocolException(exception.Code, exception.Message, innerException: exception);
         }
     }
 

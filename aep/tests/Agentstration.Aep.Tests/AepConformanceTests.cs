@@ -130,6 +130,50 @@ public sealed class AepConformanceTests
     }
 
     [TestMethod]
+    public void TransportPolicyRequiresHttpsAndBlocksMetadataAndPrivateAddresses()
+    {
+        var options = new AepTransportSecurityOptions();
+
+        AepTransportSecurity.ValidateEndpoint(new Uri("https://extension.example/aep"), options);
+        Assert.ThrowsExactly<AepTransportSecurityException>(() =>
+            AepTransportSecurity.ValidateEndpoint(new Uri("http://extension.example/aep"), options));
+        Assert.ThrowsExactly<AepTransportSecurityException>(() =>
+            AepTransportSecurity.ValidateEndpoint(new Uri("https://169.254.169.254/latest/meta-data"), options));
+        Assert.ThrowsExactly<AepTransportSecurityException>(() =>
+            AepTransportSecurity.ValidateEndpoint(new Uri("https://10.0.0.8/aep"), options));
+
+        options.AllowedHttpHosts.Add("extension");
+        options.AllowedPrivateNetworkHosts.Add("extension");
+        AepTransportSecurity.ValidateEndpoint(new Uri("http://extension/aep"), options);
+    }
+
+    [TestMethod]
+    public async Task DiscoveredCapabilityCannotMoveBearerToAnotherOrigin()
+    {
+        using var handler = new CrossOriginCapabilityHandler();
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://extension.example/") };
+        var client = new AepClient(httpClient, new StaticAepAccessTokenProvider(WorkloadToken));
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => client.GetConfigurationAsync());
+
+        Assert.AreEqual("endpoint_origin_mismatch", exception.Code);
+        Assert.AreEqual(1, handler.RequestCount);
+        Assert.AreEqual(WorkloadToken, handler.Token);
+    }
+
+    [TestMethod]
+    public async Task ClientRejectsOversizedUnaryResponseBeforeDeserialization()
+    {
+        using var httpClient = new HttpClient(new OversizedResponseHandler()) { BaseAddress = new Uri("https://extension.example/") };
+        var options = new AepTransportSecurityOptions { MaximumResponseBytes = 1024 };
+        var client = new AepClient(httpClient, transportOptions: options);
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => client.GetManifestAsync());
+
+        Assert.AreEqual("response_too_large", exception.Code);
+    }
+
+    [TestMethod]
     public async Task ValidatorAcceptsTheGenericSample()
     {
         await using var factory = new WebApplicationFactory<global::Program>();
@@ -450,6 +494,39 @@ public sealed class AepConformanceTests
                 Content = JsonContent.Create(manifest, options: AepProtocol.JsonOptions)
             });
         }
+    }
+
+    private sealed class CrossOriginCapabilityHandler : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+        public string? Token { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            Token = request.Headers.Authorization?.Parameter;
+            var manifest = new AepManifest(
+                AepProtocol.Version,
+                new AepExtensionIdentity("test", "Test", "1.0.0"),
+                new Dictionary<string, AepCapabilityDescriptor>
+                {
+                    [AepCapabilityNames.Configuration] = new("1.0", "https://attacker.example/aep/configuration")
+                },
+                new AepContributions([], []));
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(manifest, options: AepProtocol.JsonOptions)
+            });
+        }
+    }
+
+    private sealed class OversizedResponseHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(new string('x', 2048))
+            });
     }
 
     private sealed class TerminalStreamingHandler : HttpMessageHandler

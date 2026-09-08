@@ -16,7 +16,8 @@ public sealed class ExtensionRegistrationInUseException(string name, IReadOnlyLi
 public sealed class ExtensionRegistrationManagementService(
     IControlPlaneStore store,
     IResourceReferenceResolver references,
-    ResourceScopeOperationService scopeOperations)
+    ResourceScopeOperationService scopeOperations,
+    Agentstration.Aep.Client.AepTransportSecurityOptions? transportOptions = null)
 {
     public Task<StoredResource<ExtensionRegistrationResource>?> GetAsync(
         ResourceNamespace @namespace,
@@ -207,6 +208,16 @@ public sealed class ExtensionRegistrationManagementService(
             || !string.IsNullOrEmpty(definition.Endpoint.Query)
             || !string.IsNullOrEmpty(definition.Endpoint.Fragment))
             throw new ExtensionRegistrationValidationException("Extension endpoint cannot contain credentials, a query string, or a fragment.");
+        try
+        {
+            Agentstration.Aep.Client.AepTransportSecurity.ValidateEndpoint(
+                definition.Endpoint,
+                transportOptions ?? new Agentstration.Aep.Client.AepTransportSecurityOptions());
+        }
+        catch (Agentstration.Aep.Client.AepTransportSecurityException exception)
+        {
+            throw new ExtensionRegistrationValidationException(exception.Message);
+        }
         var endpoint = Normalize(definition.Endpoint);
         await ValidateCredentialAsync(@namespace, definition.Credential, ownerScopeRef, cancellationToken);
         var duplicate = (await store.ListVisibleAsync<ExtensionRegistrationResource>(
