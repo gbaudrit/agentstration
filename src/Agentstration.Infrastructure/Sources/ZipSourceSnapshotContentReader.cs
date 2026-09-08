@@ -51,7 +51,7 @@ public sealed class ZipSourceSnapshotContentReader(ISourceSnapshotArtifactStore 
 
         public IReadOnlyCollection<string> Paths { get; }
 
-        public async Task<string> ReadTextAsync(string normalizedPath, int maximumBytes, CancellationToken cancellationToken)
+        public async Task<byte[]> ReadBytesAsync(string normalizedPath, int maximumBytes, CancellationToken cancellationToken)
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(maximumBytes, 1);
             var path = SourceDescendantPath.Normalize(normalizedPath, "Snapshot content path");
@@ -70,10 +70,16 @@ public sealed class ZipSourceSnapshotContentReader(ISourceSnapshotArtifactStore 
                     throw new SourceValidationException("source_content_size_limit", $"Snapshot content '{path}' exceeds {maximumBytes} bytes.");
                 await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
             }
-            try { return StrictUtf8.GetString(output.GetBuffer(), 0, checked((int)output.Length)); }
+            return output.ToArray();
+        }
+
+        public async Task<string> ReadTextAsync(string normalizedPath, int maximumBytes, CancellationToken cancellationToken)
+        {
+            var bytes = await ReadBytesAsync(normalizedPath, maximumBytes, cancellationToken);
+            try { return StrictUtf8.GetString(bytes); }
             catch (DecoderFallbackException exception)
             {
-                throw new SourceValidationException("source_content_encoding_invalid", $"Snapshot content '{path}' is not valid UTF-8: {exception.Message}");
+                throw new SourceValidationException("source_content_encoding_invalid", $"Snapshot content '{normalizedPath}' is not valid UTF-8: {exception.Message}");
             }
         }
 

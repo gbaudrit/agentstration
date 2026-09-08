@@ -134,6 +134,12 @@ public sealed class BootstrapProfileCatalog(
         return loaded;
     }
 
+    internal Task<LoadedBootstrapProfile> LoadFromRootAsync(
+        string rootPath,
+        string profile,
+        CancellationToken cancellationToken) =>
+        LoadProfileAsync(rootPath, profile, cancellationToken);
+
     private async Task<LoadedBootstrapProfile> LoadProfileAsync(
         string rootPath,
         string profile,

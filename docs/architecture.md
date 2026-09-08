@@ -355,6 +355,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 35. **Delivered Source catalog discovery increment:** explicitly declared Bootstrap and Pack catalogs are read only from a pinned snapshot through descendant-only paths and without archive extraction. Bootstrap variants use canonical locales, exact-or-explicit-default selection, autonomous profile descriptors, and invariant profile names, scopes, and bindings. Query results retain exact Source, version, Channel, snapshot, digest, catalog, locale, and path provenance. See ADR-0086.
 36. **Delivered Source Channel compatibility increment:** every Channel declares an inclusive minimum and optional exclusive maximum Agentstration Semantic Version. Status is recalculated from the running product version as compatible, incompatible, or unknown; refresh and catalog consumption fail closed without deleting retained snapshots. Compatibility applies uniformly to every catalog and locale variant. See ADR-0087.
 37. **Delivered optional Source verification increment:** a bounded lazily loaded static index can match an immutable Source Version by exact identity, opaque version, and canonical manifest digest. Channel evidence independently matches an exact revision and complete snapshot digest; URLs, domains, publisher declarations, and locales never establish trust. Missing or failed index access leaves Agentstration usable offline and never invalidates retained local state. See ADR-0088.
+38. **Delivered Source Bootstrap application increment:** a compatible pinned Source catalog entry and exact locale variant are adapted into the existing administrative Bootstrap preview and application pipeline. Confirmation pins version, Channel Snapshot, catalog, entry, locale, path, target, and bindings in one digest; successful history retains complete Source and provider provenance while local Bootstrap remains unchanged. See ADR-0089.
 
 ## ADR catalog
 
@@ -421,3 +422,4 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0086: Source catalogs resolve inside pinned snapshots
 - ADR-0087: Source Channel compatibility uses Semantic Version intervals
 - ADR-0088: Source verification binds exact definitions and snapshots
+- ADR-0089: Source Bootstrap profiles reuse administrative applications

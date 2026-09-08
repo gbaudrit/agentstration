@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Abstractions;
 
@@ -47,6 +48,37 @@ public enum BootstrapResourceDisposition
 }
 
 public sealed record BootstrapApplicationTarget(Guid? TenantId = null, Guid? WorkspaceId = null);
+
+public sealed record BootstrapSourceProfileSelection(
+    ResourceScopeRef ScopeRef,
+    string Publisher,
+    string SourceName,
+    Guid SourceVersionUid,
+    string Channel,
+    Guid SnapshotUid,
+    string CatalogName,
+    string EntryName,
+    string Locale,
+    string Path);
+
+public sealed record BootstrapSourceProvenance(
+    ResourceScopeRef ScopeRef,
+    Guid SourceUid,
+    string Publisher,
+    string SourceName,
+    Guid SourceVersionUid,
+    string SourceVersion,
+    string SourceVersionDigest,
+    string Channel,
+    string ProviderRevision,
+    Guid SnapshotUid,
+    string SnapshotDigest,
+    string CatalogKind,
+    string CatalogName,
+    string CatalogPath,
+    string EntryName,
+    string Locale,
+    string Path);
 
 public sealed record BootstrapBindingSelection(
     string Profile,
@@ -138,6 +170,7 @@ public sealed record BootstrapApplicationProperties
     public BootstrapProfileScope Scope { get; init; }
     public BootstrapApplicationTarget? Target { get; init; }
     public IReadOnlyList<BootstrapBindingSelection> Bindings { get; init; } = [];
+    public BootstrapSourceProvenance? SourceProvenance { get; init; }
     public string Digest { get; init; } = string.Empty;
     public DateTimeOffset StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }

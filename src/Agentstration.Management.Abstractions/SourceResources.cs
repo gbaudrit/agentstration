@@ -503,6 +503,7 @@ public interface ISourceCatalogManifestReader
 public interface ISourceSnapshotContent : IAsyncDisposable
 {
     IReadOnlyCollection<string> Paths { get; }
+    Task<byte[]> ReadBytesAsync(string normalizedPath, int maximumBytes, CancellationToken cancellationToken);
     Task<string> ReadTextAsync(string normalizedPath, int maximumBytes, CancellationToken cancellationToken);
 }
 
