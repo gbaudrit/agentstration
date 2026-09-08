@@ -30,6 +30,7 @@ src/
   Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
   Agentstration.Extensions.LlamaCpp/ autonomous AEP-to-llama.cpp service
   Agentstration.Extensions.LocalAI/  autonomous AEP-to-LocalAI service
+  Agentstration.Extensions.Git/      bounded AEP Git Source Provider service
   Agentstration.ModelProviders/      provider-neutral model-provider resolution through AEP
   Agentstration.Tools.Mcp/           Tool catalog, AEP-to-MCP resolution, official MCP client
   Agentstration.Runtime.Abstractions/
@@ -67,6 +68,7 @@ Web -> ModelProviders -> Aep.MicrosoftExtensionsAI -> Aep.Client
 Extensions.Ollama -> Aep.AspNetCore + OllamaSharp
 Extensions.LlamaCpp -> Aep.AspNetCore + native HTTP
 Extensions.LocalAI -> Aep.AspNetCore + native HTTP
+Extensions.Git -> Aep.AspNetCore + bounded Git process
 AppHost -> provider extensions (configured local inference endpoints)
 Runtime.AgentFramework -> runtime abstractions + ModelProviders + Microsoft Agent Framework
 Application -> Work + Work storage abstractions
@@ -406,3 +408,6 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0060: Entry owns Workplace execution presentation
 - ADR-0061: llama.cpp AEP provider and effective capability resolution
 - ADR-0062: immutable versioned extension option contracts
+- ADR-0081: Source Providers are bounded AEP contributions
+- ADR-0082: Sources have immutable versioned definitions
+- ADR-0083: Git Source Provider pins and archives exact commits

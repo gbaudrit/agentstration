@@ -45,6 +45,25 @@ Import requests may carry `scopeRef` (`/instance`, `/tenants/{id}`, or `/workspa
 
 The manifest URL is only the definition origin. It is never interpreted as a Channel transport and does not cause Git provider inference.
 
+## Git Channel transport
+
+The `Agentstration.Extensions.Git` AEP extension provides the first Source Channel transport. Its versioned `io.agentstration.git/source-channel` options require a public HTTPS repository and an explicit branch, tag, or commit:
+
+```yaml
+configuration:
+  optionSet: io.agentstration.git/source-channel
+  version: 1.0.0
+  schemaDigest: <digest advertised by the extension>
+  values:
+    repository: https://github.com/example/catalog.git
+    ref: refs/heads/main
+    rootPath: distribution/stable
+```
+
+Branches and tags are resolved to an immutable commit SHA before content is acquired. Materialization fetches that exact commit and returns a bounded ZIP; it never checks out or executes repository code, hooks, submodules, or build scripts. The provider accepts no implicit default branch and supports public repositories only. `credentialsRef` is reserved but rejected until private authentication has a complete local Secret boundary.
+
+The standalone extension requires `git` on `PATH` and can be started with `dotnet run --project src/Agentstration.Extensions.Git`; its default development endpoint is `http://localhost:5290`. `GitSourceProvider:GitExecutable`, `GitSourceProvider:MaximumRepositoryBytes`, and `GitSourceProvider:ResolveTimeoutSeconds` configure its executable and hard limits. Local file repositories remain disabled unless `GitSourceProvider:AllowLocalRepositories=true` is set explicitly for development or offline tests. Aspire starts and registers the extension automatically.
+
 Three concerns remain separate:
 
 - the immutable published Source Version;
@@ -55,4 +74,4 @@ The display name is initialized from the first Source Version default, falling b
 
 List Sources with `GET /api/sources`, inspect their versions with `GET /api/sources/{publisher}/{name}/versions?scopeRef=...`, and update the local display name with an ETag-protected `PUT /api/sources/{publisher}/{name}/display-name?scopeRef=...`.
 
-Channel materialization, Source Provider selection, compatibility evaluation, periodic refresh, catalog browsing, and Bootstrap/Pack consumption are introduced by the related Source feature increments.
+Git Channel acquisition is available through AEP. Source Provider binding selection, durable Channel snapshots, compatibility evaluation, periodic refresh, catalog browsing, and Bootstrap/Pack consumption are introduced by the related Source feature increments.
