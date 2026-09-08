@@ -229,6 +229,20 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/triggers", StringComparison.OrdinalIgnoreCase)) return Json<IReadOnlyList<TriggerResource>>(200, "List Triggers");
             return Json<TriggerResource>(200, method == "PUT" ? "Create or update a Trigger" : "Get a Trigger");
         }
+        if (path.StartsWith("/api/sources", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.EndsWith("/imports/yaml", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith("/imports/url", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceImportResult>(201, "Import a Source Version");
+            if (path.EndsWith("/display-name", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceConfigurationResource>(200, "Update a Source display name");
+            if (path.EndsWith("/versions/{versionUid}", StringComparison.OrdinalIgnoreCase))
+                return Json<SourceVersionResource>(200, "Get an immutable Source Version");
+            if (path.EndsWith("/versions", StringComparison.OrdinalIgnoreCase))
+                return Json<IReadOnlyList<SourceVersionResource>>(200, "List immutable Source Versions");
+            if (path == "/api/sources") return Json<IReadOnlyList<SourceView>>(200, "List Sources");
+            return Json<SourceView>(200, "Get a Source");
+        }
         return Pack(method, path);
     }
 

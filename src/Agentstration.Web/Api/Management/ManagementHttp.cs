@@ -34,6 +34,9 @@ internal static class ManagementHttp
         catch (PackResourceModifiedException exception) { return Results.Problem(statusCode: 409, title: "pack_resource_modified", detail: exception.Message); }
         catch (TriggerValidationException exception) { return Results.Problem(statusCode: 422, title: exception.Code, detail: exception.Message); }
         catch (TriggerExecutionException exception) { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
+        catch (SourceValidationException exception) { return Results.Problem(statusCode: 422, title: exception.Code, detail: exception.Message); }
+        catch (SourceVersionConflictException exception) { return Results.Problem(statusCode: 409, title: "source_version_digest_conflict", detail: exception.Message); }
+        catch (SourceRetrievalException exception) { return Results.Problem(statusCode: 502, title: exception.Code, detail: exception.Message); }
         catch (AgentDefinitionValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
         catch (ModelProfileValidationException exception)
         {

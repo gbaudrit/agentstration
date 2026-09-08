@@ -19,6 +19,8 @@ public static class ResourceScopePolicy
     {
         ResourceKinds.ModelProvider or ResourceKinds.ModelProfile or ResourceKinds.RuntimeProfile => TenantOnly,
         ResourceKinds.SourceProvider => InstanceOnly,
+        ResourceKinds.Source or ResourceKinds.SourceVersion or ResourceKinds.SourceConfiguration
+            or ResourceKinds.SourceObservedState or ResourceKinds.SourceImportRecord => InstanceTenantWorkspace,
         ResourceKinds.Vault or ResourceKinds.Secret => InstanceTenantWorkspace,
         ResourceKinds.ToolProvider or ResourceKinds.Tool or ResourceKinds.ToolExecutionHook => WorkspaceOnly,
         ResourceKinds.Agent or ResourceKinds.AgentRevision or ResourceKinds.AgentDeployment or ResourceKinds.Trigger => WorkspaceOnly,

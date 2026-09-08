@@ -13,8 +13,16 @@ public static class ResourceManifestSerializer
     {
         WriteIndented = true
     };
+    private static readonly JsonSerializerOptions StrictJsonOptions = new(JsonOptions)
+    {
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+    };
 
-    static ResourceManifestSerializer() => JsonOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+    static ResourceManifestSerializer()
+    {
+        JsonOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        StrictJsonOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+    }
 
     private static readonly ISerializer YamlSerializer = new SerializerBuilder()
         .WithNamingConvention(CamelCaseNamingConvention.Instance)
@@ -29,6 +37,10 @@ public static class ResourceManifestSerializer
 
     public static T FromJson<T>(string manifest) =>
         JsonSerializer.Deserialize<T>(manifest, JsonOptions)
+        ?? throw new JsonException("The resource manifest is empty.");
+
+    public static T FromJsonStrict<T>(string manifest) =>
+        JsonSerializer.Deserialize<T>(manifest, StrictJsonOptions)
         ?? throw new JsonException("The resource manifest is empty.");
 
     public static string ToYaml<T>(T resource)

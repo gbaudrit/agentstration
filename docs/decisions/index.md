@@ -111,3 +111,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 79. [ADR-0079 — Management resources use explicit hierarchical scopes](0079-management-resources-have-explicit-ownership-scopes.md)
 80. [ADR-0080 — Management resource kinds have an initial scope policy](0080-management-resource-kinds-have-an-initial-scope-policy.md)
 81. [ADR-0081 — Source Providers are bounded AEP contributions](0081-source-providers-are-bounded-aep-contributions.md)
+82. [ADR-0082 — Sources have immutable versioned definitions](0082-sources-have-immutable-versioned-definitions.md)
