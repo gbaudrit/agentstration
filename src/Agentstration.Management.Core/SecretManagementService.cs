@@ -13,7 +13,10 @@ public sealed class VaultInitializationNotSupportedException(string providerType
 public sealed record SecretView(SecretResource Resource, SecretValueStatus ValueStatus);
 public sealed record VaultView(VaultResource Resource, string Status);
 
-public sealed class SecretManagementService(IControlPlaneStore store, IEnumerable<ISecretVaultProvider> providers) : ISecretResolver
+public sealed class SecretManagementService(
+    IControlPlaneStore store,
+    IResourceScopeResolver scopeResolver,
+    IEnumerable<ISecretVaultProvider> providers) : ISecretResolver
 {
     public Task<IReadOnlyList<StoredResource<VaultResource>>> ListVaultsAsync(CancellationToken cancellationToken) => store.ListAllAsync<VaultResource>(ResourceKinds.Vault, cancellationToken);
     public async Task<IReadOnlyList<VaultView>> ListVaultViewsAsync(CancellationToken cancellationToken) =>
@@ -42,7 +45,8 @@ public sealed class SecretManagementService(IControlPlaneStore store, IEnumerabl
         var vault = (await GetVaultAsync(name, cancellationToken))?.Value ?? throw new VaultResourceNotFoundException(name);
         var initializer = providers.OfType<ISecretVaultInitializer>().SingleOrDefault(value => string.Equals(value.ProviderType, vault.Definition.ProviderType, StringComparison.OrdinalIgnoreCase))
             ?? throw new VaultInitializationNotSupportedException(vault.Definition.ProviderType);
-        var result = await initializer.InitializeAsync(new(vault.TenantId, vault.WorkspaceId, vault.Address, vault.Definition.ProviderOptions), cancellationToken);
+        var ownership = await WorkspaceOwnershipAsync(vault, cancellationToken);
+        var result = await initializer.InitializeAsync(new(ownership.TenantId, ownership.WorkspaceId, vault.Address, vault.Definition.ProviderOptions), cancellationToken);
         return result.Created ? result : throw new VaultAlreadyInitializedException(name);
     }
 
@@ -93,7 +97,8 @@ public sealed class SecretManagementService(IControlPlaneStore store, IEnumerabl
         if (address.Kind != ResourceKinds.Secret) throw new SecretManagementException("The referenced resource must be a Secret.");
         var secret = (await store.GetAsync<SecretResource>(new(address.Kind, address.Name, address.Namespace), cancellationToken))?.Value;
         if (secret is null) return null;
-        if (secret.TenantId != resolution.TenantId || secret.WorkspaceId != resolution.WorkspaceId) throw new SecretAccessDeniedException(address);
+        var ownership = await WorkspaceOwnershipAsync(secret, cancellationToken);
+        if (ownership.TenantId != resolution.TenantId || ownership.WorkspaceId != resolution.WorkspaceId) throw new SecretAccessDeniedException(address);
         var (provider, context) = await ProviderAsync(secret, cancellationToken);
         var value = await provider.GetAsync(context, secret.Definition.Key, cancellationToken);
         return value is null ? null : new ResolvedSecret(address, context.Vault, value);
@@ -108,7 +113,8 @@ public sealed class SecretManagementService(IControlPlaneStore store, IEnumerabl
     private async Task<VaultView> ViewAsync(VaultResource vault, CancellationToken cancellationToken)
     {
         var provider = providers.SingleOrDefault(value => string.Equals(value.ProviderType, vault.Definition.ProviderType, StringComparison.OrdinalIgnoreCase));
-        return new(vault, provider is null ? "unavailable" : await provider.GetHealthAsync(new(vault.TenantId, vault.WorkspaceId, vault.Address, vault.Definition.ProviderOptions), cancellationToken));
+        var ownership = await WorkspaceOwnershipAsync(vault, cancellationToken);
+        return new(vault, provider is null ? "unavailable" : await provider.GetHealthAsync(new(ownership.TenantId, ownership.WorkspaceId, vault.Address, vault.Definition.ProviderOptions), cancellationToken));
     }
     private async Task<(ISecretVaultProvider Provider, SecretVaultContext Context)> ProviderAsync(SecretResource secret, CancellationToken cancellationToken)
     {
@@ -116,7 +122,21 @@ public sealed class SecretManagementService(IControlPlaneStore store, IEnumerabl
         var address = secret.Definition.Vault.Resolve(secret.Namespace, ResourceKinds.Vault);
         var vault = (await store.GetAsync<VaultResource>(new(address.Kind, address.Name, address.Namespace), cancellationToken))?.Value ?? throw new VaultResourceNotFoundException(address.Name);
         var provider = providers.SingleOrDefault(value => string.Equals(value.ProviderType, vault.Definition.ProviderType, StringComparison.OrdinalIgnoreCase)) ?? throw new SecretVaultUnavailableException(vault.Definition.ProviderType);
-        return (provider, new(vault.TenantId, vault.WorkspaceId, vault.Address, vault.Definition.ProviderOptions));
+        var ownership = await WorkspaceOwnershipAsync(vault, cancellationToken);
+        return (provider, new(ownership.TenantId, ownership.WorkspaceId, vault.Address, vault.Definition.ProviderOptions));
+    }
+
+    private async Task<(Guid TenantId, Guid WorkspaceId)> WorkspaceOwnershipAsync(Resource resource, CancellationToken cancellationToken)
+    {
+        if (resource.ScopeRef is not { } scopeRef || scopeRef.Kind != ResourceScopeKind.Workspace || scopeRef.TargetId is not Guid workspaceId)
+            throw new SecretManagementException($"Resource '{resource.Address}' must belong to a workspace scope.");
+        var resolved = await scopeResolver.ResolveAsync(scopeRef, cancellationToken)
+            ?? throw new SecretManagementException($"Resource scope '{scopeRef}' was not found.");
+        var tenant = resolved.Ancestors.SingleOrDefault(value => value.Kind == ResourceScopeKind.Tenant)
+            ?? throw new SecretManagementException($"Workspace scope '{scopeRef}' has no tenant parent.");
+        if (tenant.Ref.TargetId is not Guid tenantId)
+            throw new SecretManagementException($"Tenant scope '{tenant.Ref}' has an invalid target.");
+        return (tenantId, workspaceId);
     }
     private static void ValidateVault(VaultResource resource)
     {

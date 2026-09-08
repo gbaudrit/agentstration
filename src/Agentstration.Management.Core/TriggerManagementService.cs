@@ -78,7 +78,7 @@ public sealed class TriggerManagementService(
     {
         var current = await GetRequiredAsync(@namespace, name, cancellationToken);
         await store.DeleteAsync(new(ResourceKinds.Trigger, name, @namespace), ifMatch, cancellationToken);
-        await scheduler.RemoveAsync(current.Value.WorkspaceId, current.Value.Uid, cancellationToken);
+        await scheduler.RemoveAsync(WorkspaceId(current.Value), current.Value.Uid, cancellationToken);
     }
 
     private async Task<StoredResource<TriggerResource>> GetRequiredAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
@@ -134,6 +134,13 @@ public sealed class TriggerManagementService(
 
     private static ResourceStatus Succeeded() => new() { ProvisioningState = ProvisioningState.Succeeded };
     private static TriggerValidationException Invalid(string field, string message) => new("trigger_invalid", $"{field}: {message}");
+
+    private static Guid WorkspaceId(Resource resource) =>
+        resource.ScopeRef is { } scopeRef
+        && scopeRef.Kind == ResourceScopeKind.Workspace
+        && scopeRef.TargetId is Guid workspaceId
+            ? workspaceId
+            : throw new InvalidOperationException("A Trigger must belong to a workspace scope.");
 }
 
 public sealed class TriggerFiringService(
@@ -163,11 +170,13 @@ public sealed class TriggerFiringService(
     {
         if (!trigger.Definition.Enabled) throw new TriggerExecutionException("trigger_disabled", "The Trigger is disabled.");
         var scope = trigger.Definition.ExecutionScope ?? throw new TriggerExecutionException("trigger_identity_missing", "The Trigger has no execution identity.");
+        var workspaceId = WorkspaceId(trigger);
+        if (scope.WorkspaceId != workspaceId) throw new TriggerExecutionException("trigger_scope_mismatch", "The Trigger execution identity does not match its resource scope.");
         var occurrence = new TriggerOccurrence
         {
             Id = occurrenceId,
-            TenantId = trigger.TenantId,
-            WorkspaceId = trigger.WorkspaceId,
+            TenantId = scope.TenantId,
+            WorkspaceId = workspaceId,
             TriggerUid = trigger.Uid,
             TriggerName = trigger.Name,
             TriggerNamespace = trigger.Namespace,
@@ -177,14 +186,14 @@ public sealed class TriggerFiringService(
         };
         if (!await occurrences.TryCreateAsync(occurrence, cancellationToken))
         {
-            var existing = (await occurrences.ListAsync(trigger.WorkspaceId, trigger.Uid, 200, cancellationToken)).Single(value => value.Id == occurrenceId);
+            var existing = (await occurrences.ListAsync(workspaceId, trigger.Uid, 200, cancellationToken)).Single(value => value.Id == occurrenceId);
             if (existing.Outcome == TriggerOccurrenceOutcome.Pending)
             {
-                var recovered = await workSubmitter.GetExistingAsync(trigger.WorkspaceId, occurrenceId, cancellationToken);
+                var recovered = await workSubmitter.GetExistingAsync(workspaceId, occurrenceId, cancellationToken);
                 if (recovered is not null)
                 {
                     var recoveredAt = timeProvider.GetUtcNow();
-                    await occurrences.CompleteAsync(trigger.WorkspaceId, occurrenceId, TriggerOccurrenceOutcome.Submitted, recoveredAt, recovered.WorkItemId, null, null, cancellationToken);
+                    await occurrences.CompleteAsync(workspaceId, occurrenceId, TriggerOccurrenceOutcome.Submitted, recoveredAt, recovered.WorkItemId, null, null, cancellationToken);
                     var recoveredOccurrence = existing with { FiredAt = recoveredAt, Outcome = TriggerOccurrenceOutcome.Submitted, WorkItemId = recovered.WorkItemId };
                     await RecordObservedAsync(trigger, recoveredOccurrence, cancellationToken);
                     return recoveredOccurrence;
@@ -199,15 +208,15 @@ public sealed class TriggerFiringService(
             await authorizer.AuthorizeAsync(scope, cancellationToken);
             using var executionScope = authorizer.Enter(scope);
             if (trigger.Definition.ConcurrencyPolicy == TriggerConcurrencyPolicy.Skip
-                && await workSubmitter.HasActiveWorkAsync(trigger.WorkspaceId, trigger.Uid, cancellationToken))
+                && await workSubmitter.HasActiveWorkAsync(workspaceId, trigger.Uid, cancellationToken))
             {
-                await occurrences.CompleteAsync(trigger.WorkspaceId, occurrenceId, TriggerOccurrenceOutcome.Skipped, firedAt, null, "concurrency_skip", null, cancellationToken);
+                await occurrences.CompleteAsync(workspaceId, occurrenceId, TriggerOccurrenceOutcome.Skipped, firedAt, null, "concurrency_skip", null, cancellationToken);
                 var skipped = occurrence with { FiredAt = firedAt, Outcome = TriggerOccurrenceOutcome.Skipped, ErrorCode = "concurrency_skip" };
                 await RecordObservedAsync(trigger, skipped, cancellationToken);
                 return skipped;
             }
             var submission = await workSubmitter.SubmitAsync(trigger, occurrence, cancellationToken);
-            await occurrences.CompleteAsync(trigger.WorkspaceId, occurrenceId, TriggerOccurrenceOutcome.Submitted, firedAt, submission.WorkItemId, null, null, cancellationToken);
+            await occurrences.CompleteAsync(workspaceId, occurrenceId, TriggerOccurrenceOutcome.Submitted, firedAt, submission.WorkItemId, null, null, cancellationToken);
             var submitted = occurrence with { FiredAt = firedAt, Outcome = TriggerOccurrenceOutcome.Submitted, WorkItemId = submission.WorkItemId };
             await RecordObservedAsync(trigger, submitted, cancellationToken);
             return submitted;
@@ -215,7 +224,7 @@ public sealed class TriggerFiringService(
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             var code = exception is TriggerExecutionException known ? known.Code : "work_submission_failed";
-            await occurrences.CompleteAsync(trigger.WorkspaceId, occurrenceId, TriggerOccurrenceOutcome.Failed, firedAt, null, code, exception.Message, cancellationToken);
+            await occurrences.CompleteAsync(workspaceId, occurrenceId, TriggerOccurrenceOutcome.Failed, firedAt, null, code, exception.Message, cancellationToken);
             var failed = occurrence with { FiredAt = firedAt, Outcome = TriggerOccurrenceOutcome.Failed, ErrorCode = code, ErrorMessage = exception.Message };
             await RecordObservedAsync(trigger, failed, cancellationToken);
             return failed;
@@ -253,8 +262,15 @@ public sealed class TriggerFiringService(
 
     public static Guid DeterministicOccurrenceId(TriggerResource trigger, DateTimeOffset scheduledAt)
     {
-        var value = $"{trigger.WorkspaceId:N}:{trigger.Uid:N}:{scheduledAt.ToUniversalTime():O}";
+        var value = $"{WorkspaceId(trigger):N}:{trigger.Uid:N}:{scheduledAt.ToUniversalTime():O}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
         return new Guid(hash.AsSpan(0, 16));
     }
+
+    private static Guid WorkspaceId(Resource resource) =>
+        resource.ScopeRef is { } scopeRef
+        && scopeRef.Kind == ResourceScopeKind.Workspace
+        && scopeRef.TargetId is Guid workspaceId
+            ? workspaceId
+            : throw new TriggerExecutionException("trigger_scope_missing", "A Trigger must belong to a workspace scope.");
 }

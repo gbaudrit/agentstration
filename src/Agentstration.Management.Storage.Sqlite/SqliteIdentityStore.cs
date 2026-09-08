@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Management.Abstractions;
+using Agentstration.Resources;
 using Microsoft.EntityFrameworkCore;
 
 namespace Agentstration.Management.Storage.Sqlite;
@@ -44,12 +45,40 @@ public sealed class SqliteIdentityStore(IDbContextFactory<ControlPlaneDbContext>
     public async Task<Tenant?> FindTenantByNameAsync(string name, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.Tenants.AsNoTracking().SingleOrDefaultAsync(x => x.Name == name, token)); }
     public async Task<Tenant?> GetTenantAsync(Guid id, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.Tenants.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, token)); }
     public async Task<IReadOnlyList<Tenant>> ListTenantsAsync(CancellationToken token) { await using var db = await CreateAsync(token); return (await db.Tenants.AsNoTracking().OrderBy(x => x.Name).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
-    public Task AddTenantAsync(Tenant x, CancellationToken token) => AddAsync(db => db.Tenants.Add(new() { Id = x.Id, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, CreatedAt = x.CreatedAt }), token);
+    public async Task AddTenantAsync(Tenant x, CancellationToken token)
+    {
+        await using var db = await CreateAsync(token);
+        var parent = await db.ResourceScopes.SingleAsync(value => value.Ref == ResourceScopeRef.Instance.Value, token);
+        db.Tenants.Add(new() { Id = x.Id, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, CreatedAt = x.CreatedAt });
+        db.ResourceScopes.Add(new()
+        {
+            Ref = ResourceScopeRef.Tenant(x.Id).Value,
+            Kind = "tenant",
+            TargetKey = x.Id.ToString("D"),
+            ParentScopeId = parent.Id
+        });
+        await SaveAsync(db, token);
+    }
     public async Task<Workspace?> FindWorkspaceByNameAsync(Guid tenantId, string name, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.Workspaces.AsNoTracking().SingleOrDefaultAsync(x => x.TenantId == tenantId && x.Name == name, token)); }
     public async Task<Workspace?> GetWorkspaceAsync(Guid id, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.Workspaces.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, token)); }
     public async Task<Workspace?> GetWorkspaceAsync(Guid tenantId, Guid id, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.Workspaces.AsNoTracking().SingleOrDefaultAsync(x => x.TenantId == tenantId && x.Id == id, token)); }
     public async Task<IReadOnlyList<Workspace>> ListWorkspacesAsync(Guid tenantId, CancellationToken token) { await using var db = await CreateAsync(token); return (await db.Workspaces.AsNoTracking().Where(x => x.TenantId == tenantId).OrderBy(x => x.Name).ToArrayAsync(token)).Select(x => Map(x)!).ToArray(); }
-    public Task AddWorkspaceAsync(Workspace x, CancellationToken token) => AddAsync(db => db.Workspaces.Add(new() { Id = x.Id, TenantId = x.TenantId, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, CreatedAt = x.CreatedAt }), token);
+    public async Task AddWorkspaceAsync(Workspace x, CancellationToken token)
+    {
+        await using var db = await CreateAsync(token);
+        var parentRef = ResourceScopeRef.Tenant(x.TenantId).Value;
+        var parent = await db.ResourceScopes.SingleOrDefaultAsync(value => value.Ref == parentRef, token)
+            ?? throw new InvalidOperationException($"Tenant scope '{parentRef}' does not exist.");
+        db.Workspaces.Add(new() { Id = x.Id, TenantId = x.TenantId, Name = x.Name, DisplayName = x.DisplayName, Status = x.Status, CreatedAt = x.CreatedAt });
+        db.ResourceScopes.Add(new()
+        {
+            Ref = ResourceScopeRef.Workspace(x.Id).Value,
+            Kind = "workspace",
+            TargetKey = x.Id.ToString("D"),
+            ParentScopeId = parent.Id
+        });
+        await SaveAsync(db, token);
+    }
     public async Task<Principal?> GetPrincipalAsync(Guid id, CancellationToken token) { await using var db = await CreateAsync(token); return Map(await db.Principals.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, token)); }
     public Task AddPrincipalAsync(Principal x, CancellationToken token) => AddAsync(db => db.Principals.Add(new() { Id = x.Id, Kind = x.Kind, DisplayName = x.DisplayName, Email = x.Email, Status = x.Status, CreatedAt = x.CreatedAt }), token);
     public async Task UpdatePrincipalAsync(Principal x, CancellationToken token) { await using var db = await CreateAsync(token); var row = await db.Principals.SingleOrDefaultAsync(value => value.Id == x.Id, token) ?? throw new KeyNotFoundException($"Principal '{x.Id}' was not found."); row.Kind = x.Kind; row.DisplayName = x.DisplayName; row.Email = x.Email; row.Status = x.Status; try { await db.SaveChangesAsync(token); } catch (DbUpdateException ex) { throw new ControlPlaneConcurrencyException(ex.InnerException?.Message ?? ex.Message); } }
@@ -93,6 +122,11 @@ public sealed class SqliteIdentityStore(IDbContextFactory<ControlPlaneDbContext>
     public async Task RecordUseAsync(Guid tokenId, DateTimeOffset usedAt, TimeSpan minimumInterval, CancellationToken token) { await using var db = await CreateAsync(token); var row = await db.PersonalAccessTokens.SingleOrDefaultAsync(x => x.Id == tokenId, token); if (row is null || row.LastUsedAt is { } previous && usedAt - previous < minimumInterval) return; row.LastUsedAt = usedAt; await db.SaveChangesAsync(token); }
     private async Task<ControlPlaneDbContext> CreateAsync(CancellationToken token) => await contextFactory.CreateDbContextAsync(token);
     private async Task AddAsync(Action<ControlPlaneDbContext> add, CancellationToken token) { await using var db = await CreateAsync(token); add(db); try { await db.SaveChangesAsync(token); } catch (DbUpdateException ex) { throw new ControlPlaneConcurrencyException(ex.InnerException?.Message ?? ex.Message); } }
+    private static async Task SaveAsync(ControlPlaneDbContext db, CancellationToken token)
+    {
+        try { await db.SaveChangesAsync(token); }
+        catch (DbUpdateException exception) { throw new ControlPlaneConcurrencyException(exception.InnerException?.Message ?? exception.Message); }
+    }
     private static Tenant? Map(TenantRow? x) => x is null ? null : new(x.Id, x.Name, x.DisplayName, x.Status, x.CreatedAt);
     private static Workspace? Map(WorkspaceRow? x) => x is null ? null : new(x.Id, x.TenantId, x.Name, x.DisplayName, x.Status, x.CreatedAt);
     private static Principal? Map(PrincipalRow? x) => x is null ? null : new(x.Id, x.Kind, x.DisplayName, x.Email, x.Status, x.CreatedAt);

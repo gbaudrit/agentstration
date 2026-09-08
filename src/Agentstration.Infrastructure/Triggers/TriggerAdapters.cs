@@ -124,7 +124,7 @@ public sealed class TriggerWorkSubmitter(FlowService flows, WorkItemService work
     public async Task<TriggerSubmission> SubmitAsync(TriggerResource trigger, TriggerOccurrence occurrence, CancellationToken cancellationToken)
     {
         var target = trigger.Definition.Target.Flow ?? throw new TriggerExecutionException("trigger_target_invalid", "The Trigger Flow target is missing.");
-        var workspaceId = new WorkspaceId(trigger.WorkspaceId);
+        var workspaceId = new WorkspaceId(occurrence.WorkspaceId);
         var ownerNamespace = trigger.Namespace;
         var reference = new FlowReference(new FlowId(target.Name, target.Namespace ?? ownerNamespace), target.Version, target.Version is null, target.Namespace);
         var resolved = await flows.ResolveAsync(workspaceId, reference, ownerNamespace, cancellationToken);

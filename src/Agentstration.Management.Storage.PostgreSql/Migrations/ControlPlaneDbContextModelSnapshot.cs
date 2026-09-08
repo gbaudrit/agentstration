@@ -37,16 +37,12 @@ namespace Agentstration.Management.Storage.PostgreSql.Migrations
                         .HasColumnType("character varying(64)");
 
                     b.Property<string>("Kind")
+                        .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<string>("LegacyResourceType")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("ResourceType");
-
                     b.Property<string>("Name")
+                        .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
@@ -59,21 +55,21 @@ namespace Agentstration.Management.Storage.PostgreSql.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid");
+                    b.Property<long>("ScopeId")
+                        .HasColumnType("bigint");
 
-                    b.Property<Guid?>("Uid")
+                    b.Property<Guid>("Uid")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("WorkspaceId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("StorageKey");
 
-                    b.HasIndex("WorkspaceId", "Namespace", "Kind", "Name")
+                    b.HasIndex("Uid")
+                        .IsUnique();
+
+                    b.HasIndex("ScopeId", "Namespace", "Kind", "Name")
                         .IsUnique();
 
                     b.ToTable("ControlPlaneResources", "management");
@@ -244,6 +240,45 @@ namespace Agentstration.Management.Storage.PostgreSql.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users", "management");
+                });
+
+            modelBuilder.Entity("Agentstration.Management.Storage.PostgreSql.ResourceScopeRow", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<long?>("ParentScopeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Ref")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("TargetKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentScopeId");
+
+                    b.HasIndex("Ref")
+                        .IsUnique();
+
+                    b.HasIndex("Kind", "TargetKey")
+                        .IsUnique();
+
+                    b.ToTable("ResourceScopes", "management");
                 });
 
             modelBuilder.Entity("Agentstration.Management.Storage.PostgreSql.RoleAssignmentRow", b =>
@@ -540,6 +575,17 @@ namespace Agentstration.Management.Storage.PostgreSql.Migrations
                     b.ToTable("Workspaces", "management");
                 });
 
+            modelBuilder.Entity("Agentstration.Management.Storage.PostgreSql.ControlPlaneDocument", b =>
+                {
+                    b.HasOne("Agentstration.Management.Storage.PostgreSql.ResourceScopeRow", "Scope")
+                        .WithMany()
+                        .HasForeignKey("ScopeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Scope");
+                });
+
             modelBuilder.Entity("Agentstration.Management.Storage.PostgreSql.ExternalIdentityRow", b =>
                 {
                     b.HasOne("Agentstration.Management.Storage.PostgreSql.PrincipalRow", null)
@@ -589,6 +635,14 @@ namespace Agentstration.Management.Storage.PostgreSql.Migrations
                         .HasForeignKey("Agentstration.Management.Storage.PostgreSql.PrincipalPreferencesRow", "PrincipalId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Agentstration.Management.Storage.PostgreSql.ResourceScopeRow", b =>
+                {
+                    b.HasOne("Agentstration.Management.Storage.PostgreSql.ResourceScopeRow", null)
+                        .WithMany()
+                        .HasForeignKey("ParentScopeId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Agentstration.Management.Storage.PostgreSql.TenantMembershipRow", b =>

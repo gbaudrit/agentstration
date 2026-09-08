@@ -1,5 +1,6 @@
 using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -15,25 +16,27 @@ public partial class InitialPostgreSql : Migration
             name: "management");
 
         migrationBuilder.CreateTable(
-            name: "ControlPlaneResources",
+            name: "ResourceScopes",
             schema: "management",
             columns: table => new
             {
-                ResourceId = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
-                ResourceType = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                Uid = table.Column<Guid>(type: "uuid", nullable: true),
-                Kind = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                Namespace = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                TenantId = table.Column<Guid>(type: "uuid", nullable: true),
-                WorkspaceId = table.Column<Guid>(type: "uuid", nullable: true),
-                Payload = table.Column<string>(type: "text", nullable: false),
-                ETag = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                Id = table.Column<long>(type: "bigint", nullable: false)
+                    .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                Ref = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                Kind = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                TargetKey = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                ParentScopeId = table.Column<long>(type: "bigint", nullable: true)
             },
             constraints: table =>
             {
-                table.PrimaryKey("PK_ControlPlaneResources", x => x.ResourceId);
+                table.PrimaryKey("PK_ResourceScopes", x => x.Id);
+                table.ForeignKey(
+                    name: "FK_ResourceScopes_ResourceScopes_ParentScopeId",
+                    column: x => x.ParentScopeId,
+                    principalSchema: "management",
+                    principalTable: "ResourceScopes",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Restrict);
             });
 
         migrationBuilder.CreateTable(
@@ -148,6 +151,33 @@ public partial class InitialPostgreSql : Migration
             constraints: table =>
             {
                 table.PrimaryKey("PK_Users", x => x.Id);
+            });
+
+        migrationBuilder.CreateTable(
+            name: "ControlPlaneResources",
+            schema: "management",
+            columns: table => new
+            {
+                ResourceId = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
+                Uid = table.Column<Guid>(type: "uuid", nullable: false),
+                Kind = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                Namespace = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                ScopeId = table.Column<long>(type: "bigint", nullable: false),
+                Payload = table.Column<string>(type: "text", nullable: false),
+                ETag = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_ControlPlaneResources", x => x.ResourceId);
+                table.ForeignKey(
+                    name: "FK_ControlPlaneResources_ResourceScopes_ScopeId",
+                    column: x => x.ScopeId,
+                    principalSchema: "management",
+                    principalTable: "ResourceScopes",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Restrict);
             });
 
         migrationBuilder.CreateTable(
@@ -356,10 +386,17 @@ public partial class InitialPostgreSql : Migration
             });
 
         migrationBuilder.CreateIndex(
-            name: "IX_ControlPlaneResources_WorkspaceId_Namespace_Kind_Name",
+            name: "IX_ControlPlaneResources_ScopeId_Namespace_Kind_Name",
             schema: "management",
             table: "ControlPlaneResources",
-            columns: new[] { "WorkspaceId", "Namespace", "Kind", "Name" },
+            columns: new[] { "ScopeId", "Namespace", "Kind", "Name" },
+            unique: true);
+
+        migrationBuilder.CreateIndex(
+            name: "IX_ControlPlaneResources_Uid",
+            schema: "management",
+            table: "ControlPlaneResources",
+            column: "Uid",
             unique: true);
 
         migrationBuilder.CreateIndex(
@@ -406,6 +443,26 @@ public partial class InitialPostgreSql : Migration
             schema: "management",
             table: "PersonalAccessTokens",
             column: "WorkspaceId");
+
+        migrationBuilder.CreateIndex(
+            name: "IX_ResourceScopes_Kind_TargetKey",
+            schema: "management",
+            table: "ResourceScopes",
+            columns: new[] { "Kind", "TargetKey" },
+            unique: true);
+
+        migrationBuilder.CreateIndex(
+            name: "IX_ResourceScopes_ParentScopeId",
+            schema: "management",
+            table: "ResourceScopes",
+            column: "ParentScopeId");
+
+        migrationBuilder.CreateIndex(
+            name: "IX_ResourceScopes_Ref",
+            schema: "management",
+            table: "ResourceScopes",
+            column: "Ref",
+            unique: true);
 
         migrationBuilder.CreateIndex(
             name: "IX_RoleAssignments_TenantId_PrincipalId",
@@ -553,6 +610,10 @@ public partial class InitialPostgreSql : Migration
 
         migrationBuilder.DropTable(
             name: "WorkspaceMemberships",
+            schema: "management");
+
+        migrationBuilder.DropTable(
+            name: "ResourceScopes",
             schema: "management");
 
         migrationBuilder.DropTable(

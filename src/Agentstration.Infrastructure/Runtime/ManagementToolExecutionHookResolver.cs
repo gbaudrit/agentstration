@@ -1,10 +1,13 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Infrastructure.Runtime;
 
-public sealed class ManagementToolExecutionHookResolver(IControlPlaneStore store) : IToolExecutionHookResolver
+public sealed class ManagementToolExecutionHookResolver(
+    IControlPlaneStore store,
+    IResourceScopeResolver scopeResolver) : IToolExecutionHookResolver
 {
     public async ValueTask<IReadOnlyList<IToolExecutionHook>> ResolveAsync(
         ToolExecutionContext context,
@@ -14,13 +17,19 @@ public sealed class ManagementToolExecutionHookResolver(IControlPlaneStore store
         if (context.WorkspaceId is not { } workspaceId)
             return [];
 
+        var workspaceScopeRef = ResourceScopeRef.Workspace(workspaceId.Value);
+        var workspaceScope = await scopeResolver.ResolveAsync(workspaceScopeRef, cancellationToken);
+        if (workspaceScope is null
+            || context.TenantId is { } tenantId
+            && workspaceScope.Ancestors.All(value => value.Ref != ResourceScopeRef.Tenant(tenantId)))
+            return [];
+
         var resources = await store.ListAllAsync<ToolExecutionHookResource>(ResourceKinds.ToolExecutionHook, cancellationToken);
         var hooks = new List<IToolExecutionHook>();
         foreach (var stored in resources)
         {
             var resource = stored.Value;
-            if (resource.WorkspaceId != workspaceId.Value
-                || context.TenantId is { } tenantId && resource.TenantId != tenantId
+            if (resource.ScopeRef != workspaceScopeRef
                 || !resource.Definition.Enabled
                 || !Matches(resource.Definition.Selector.Tools, context.ToolId)
                 || !Matches(resource.Definition.Selector.Providers, context.ToolProviderId)
