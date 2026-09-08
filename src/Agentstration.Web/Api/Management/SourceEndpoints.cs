@@ -20,6 +20,10 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}", GetVersionAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/bindings", GetBindingsAsync);
         sources.MapPut("/{publisher}/{name}/versions/{versionUid:guid}/bindings", ConfigureBindingsAsync);
+        sources.MapPost("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/refresh", RefreshChannelAsync);
+        sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots", ListChannelSnapshotsAsync);
+        sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}", GetChannelSnapshotAsync);
+        sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/status", GetChannelStatusAsync);
         sources.MapPut("/{publisher}/{name}/display-name", UpdateDisplayNameAsync);
     }
 
@@ -159,6 +163,80 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         var scopeRef = result.Source.Source.ScopeRef
             ?? throw new InvalidOperationException("An imported Source must have an ownership scope.");
         response.Headers.Location = $"/api/sources/{Uri.EscapeDataString(result.Source.Source.Definition.Publisher)}/{Uri.EscapeDataString(result.Source.Source.Metadata.Name)}/versions/{result.Version.Uid:D}?scopeRef={Uri.EscapeDataString(scopeRef.ToString())}";
+    }
+
+    private static Task<IResult> RefreshChannelAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channel,
+        string? scopeRef,
+        HttpResponse response,
+        SourceChannelSnapshotService service,
+        SourceManagementService sources,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var scope = await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken);
+            var result = await service.RefreshExactAsync(scope, publisher, name, versionUid, channel, cancellationToken);
+            response.Headers.Location = $"/api/sources/{Uri.EscapeDataString(publisher)}/{Uri.EscapeDataString(name)}/versions/{versionUid:D}/channels/{Uri.EscapeDataString(channel)}/snapshots/{result.Snapshot.Uid:D}?scopeRef={Uri.EscapeDataString(scope.ToString())}";
+            return Results.Json(result, statusCode: result.Outcome == SourceChannelRefreshOutcome.Created
+                ? StatusCodes.Status201Created
+                : StatusCodes.Status200OK);
+        });
+
+    private static Task<IResult> ListChannelSnapshotsAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channel,
+        string? scopeRef,
+        SourceChannelSnapshotService service,
+        SourceManagementService sources,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.ListAsync(
+            await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
+            publisher, name, versionUid, channel, cancellationToken)));
+
+    private static Task<IResult> GetChannelSnapshotAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channel,
+        Guid snapshotUid,
+        string? scopeRef,
+        SourceChannelSnapshotService service,
+        SourceManagementService sources,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.GetAsync(
+            await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
+            publisher, name, versionUid, channel, snapshotUid, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceChannelSnapshot, snapshotUid.ToString("D")))));
+
+    private static Task<IResult> GetChannelStatusAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channel,
+        string? scopeRef,
+        SourceChannelSnapshotService service,
+        SourceManagementService sources,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.GetObservedAsync(
+            await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
+            publisher, name, versionUid, channel, cancellationToken)));
+
+    private static async Task<Agentstration.Resources.ResourceScopeRef> ResolveScopeAsync(
+        string? value,
+        string publisher,
+        string name,
+        SourceManagementService sources,
+        CancellationToken cancellationToken)
+    {
+        if (Scope(value) is { } explicitScope) return explicitScope;
+        var source = (await sources.GetAsync(publisher, name, cancellationToken))?.Source
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)));
+        return source.ScopeRef ?? throw new InvalidOperationException("A Source must have an ownership scope.");
     }
 
     private static void EnforceRequestBound(HttpRequest request)

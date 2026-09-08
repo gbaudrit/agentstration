@@ -351,6 +351,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 31. **Delivered opt-in Tool argument retention:** `Agentstration:ToolExecution:PersistArguments` defaults to `false`. Manual Runtime Runs expose an immutable tri-state override (`inherit`, `retain`, `do not retain`); retries preserve it. When effective, provider-neutral arguments are copied into the durable lifecycle projection, bounded by the host `MaximumArgumentsLength`, and shown on the Tool Governance view. Provider results remain excluded. See ADR-0059.
 32. **Delivered Entry-driven Workplace presentation increment:** Entry configures participant, progress, Task, and Result presentation while Workplace composes existing durable Work primitives into one conversation timeline. Flow and Runtime remain presentation-neutral. See ADR-0060.
 33. **Delivered Source Provider binding increment:** immutable Source Versions declare logical provider roles while same-scope mutable Source configuration selects exact instance-owned Source Providers. ETag-protected APIs expose explicit unresolved, unavailable, incompatible, ready, and stale-selection states for a requested Source Version without automatic provider selection. See ADR-0084.
+34. **Delivered Source Channel snapshot increment:** a manual refresh resolves a ready AEP binding, materializes the exact bounded revision into content-addressed storage, and publishes immutable same-scope snapshot metadata with exact provider provenance. Unchanged revisions reuse their pin, failed refreshes retain the last usable snapshot, and locale selection remains downstream of pinning. See ADR-0085.
 
 ## ADR catalog
 
@@ -413,3 +414,4 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0082: Sources have immutable versioned definitions
 - ADR-0083: Git Source Provider pins and archives exact commits
 - ADR-0084: Source Provider bindings are local version-aware configuration
+- ADR-0085: Source Channel snapshots pin provider provenance

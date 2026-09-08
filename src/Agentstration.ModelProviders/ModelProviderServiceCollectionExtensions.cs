@@ -1,3 +1,4 @@
+using Agentstration.Management.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +23,7 @@ public static class ModelProviderServiceCollectionExtensions
         services.AddSingleton<IModelProviderCapabilitiesResolver>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IExtensionInspector>(services => services.GetRequiredService<AepModelProvider>());
         services.AddSingleton<IExtensionOptionsMigrator>(services => services.GetRequiredService<AepModelProvider>());
+        services.AddSingleton<ISourceProviderMaterializer, AepSourceProviderMaterializer>();
         services.AddSingleton<IModelProviderResolver, ModelProviderResolver>();
         if (useManagedProfileResolver) services.AddSingleton<IChatClientResolver, ChatClientResolver>();
         return services;

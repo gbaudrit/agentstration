@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using Agentstration.Infrastructure.Sources;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
@@ -26,7 +28,9 @@ public sealed class SourceTests
             ResourceKinds.SourceVersion,
             ResourceKinds.SourceConfiguration,
             ResourceKinds.SourceObservedState,
-            ResourceKinds.SourceImportRecord
+            ResourceKinds.SourceImportRecord,
+            ResourceKinds.SourceChannelSnapshot,
+            ResourceKinds.SourceChannelObservedState
         };
 
         foreach (var kind in kinds)
@@ -173,6 +177,134 @@ public sealed class SourceTests
         var incompatible = await fixture.Bindings.GetStatusAsync("agentstration", "official-samples", imported.Version.Uid, default);
         Assert.AreEqual("incompatible", incompatible.Bindings.Single().Status);
         Assert.AreEqual("source_channel_schema_digest_mismatch", incompatible.Bindings.Single().Issues.Single().Code);
+    }
+
+    [TestMethod]
+    public async Task ChannelRefreshCreatesImmutableSnapshotAndReturnsStablePinWhenUnchangedAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+
+        var first = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+        var repeated = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+
+        Assert.AreEqual(SourceChannelRefreshOutcome.Created, first.Outcome);
+        Assert.AreEqual(SourceChannelRefreshOutcome.Unchanged, repeated.Outcome);
+        Assert.AreEqual(first.Snapshot.Uid, repeated.Snapshot.Uid);
+        Assert.AreEqual(first.Pin, repeated.Pin);
+        Assert.AreEqual(1, fixture.Materializer.MaterializeCount);
+        Assert.HasCount(1, await fixture.Snapshots.ListAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default));
+        Assert.AreEqual("git", first.Snapshot.Definition.Provider.ContributionId);
+        Assert.AreEqual("revision-1", first.Snapshot.Definition.ResolvedRevision);
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            fixture.Store.PutExactAsync(ResourceScopeRef.Instance, first.Snapshot, first.Snapshot.ETag, false, default));
+    }
+
+    [TestMethod]
+    public async Task MovedRevisionCreatesSnapshotAndFailureRetainsLastUsablePinAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        var first = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+
+        fixture.Materializer.Revision = "revision-2";
+        var moved = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+        fixture.Materializer.Failure = new SourceRetrievalException("provider_failed", "Provider failed.");
+        var error = await Assert.ThrowsExactlyAsync<SourceRetrievalException>(() => fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default));
+        var observed = await fixture.Snapshots.GetObservedAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+
+        Assert.AreEqual("provider_failed", error.Code);
+        Assert.AreNotEqual(first.Snapshot.Uid, moved.Snapshot.Uid);
+        Assert.HasCount(2, await fixture.Snapshots.ListAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default));
+        Assert.IsNotNull(observed);
+        Assert.AreEqual(SourceChannelRefreshOutcome.Failed, observed.Definition.LastOutcome);
+        Assert.AreEqual(moved.Snapshot.Uid, observed.Definition.CurrentSnapshotUid);
+        Assert.AreEqual("provider_failed", observed.Definition.ErrorCode);
+    }
+
+    [TestMethod]
+    public async Task ConcurrentRefreshMaterializesOnlyOnceAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        fixture.Materializer.Delay = TimeSpan.FromMilliseconds(50);
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default)));
+
+        Assert.AreEqual(1, fixture.Materializer.MaterializeCount);
+        Assert.AreEqual(1, results.Count(value => value.Outcome == SourceChannelRefreshOutcome.Created));
+        Assert.AreEqual(3, results.Count(value => value.Outcome == SourceChannelRefreshOutcome.Unchanged));
+        Assert.AreEqual(1, results.Select(value => value.Snapshot.Uid).Distinct().Count());
+    }
+
+    [TestMethod]
+    public async Task CancelledRefreshPublishesNeitherFailureNorSnapshotAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        fixture.Materializer.Delay = TimeSpan.FromSeconds(10);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(25));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", cancellation.Token));
+
+        Assert.IsNull(await fixture.Snapshots.GetObservedAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default));
+        Assert.IsEmpty(await fixture.Snapshots.ListAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default));
+    }
+
+    [TestMethod]
+    public async Task SnapshotArtifactStoreIsContentAddressedAndRejectsInvalidIntegrityAsync()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"agentstration-source-artifacts-{Guid.NewGuid():N}");
+        try
+        {
+            var store = new FileSystemSourceSnapshotArtifactStore(directory);
+            var content = "archive"u8.ToArray();
+            var materialized = new MaterializedSourceRevision(
+                "revision", "application/zip", content, content.Length, 1, new("sha256", Digest(content)));
+            var first = await store.SaveAsync(materialized, default);
+            var repeated = await store.SaveAsync(materialized, default);
+            await using var stream = await store.OpenReadAsync(first, default);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+
+            Assert.AreEqual(first, repeated);
+            CollectionAssert.AreEqual(content, memory.ToArray());
+            var invalid = materialized with { Integrity = new("sha256", new string('0', 64)) };
+            var error = await Assert.ThrowsExactlyAsync<SourceRetrievalException>(() => store.SaveAsync(invalid, default));
+            Assert.AreEqual("source_integrity_mismatch", error.Code);
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
     }
 
     [TestMethod]
@@ -420,6 +552,8 @@ public sealed class SourceTests
         public CurrentRequestContext Context => services.GetRequiredService<CurrentRequestContext>();
         public IControlPlaneStore Store => services.GetRequiredService<IControlPlaneStore>();
         public SourceBindingManagementService Bindings => services.GetRequiredService<SourceBindingManagementService>();
+        public SourceChannelSnapshotService Snapshots => services.GetRequiredService<SourceChannelSnapshotService>();
+        public FakeSourceProviderMaterializer Materializer => services.GetRequiredService<FakeSourceProviderMaterializer>();
         public FakeExtensionInspector Inspector => services.GetRequiredService<FakeExtensionInspector>();
 
         private Fixture(ServiceProvider services, string database, bool ownsDatabase)
@@ -455,6 +589,11 @@ public sealed class SourceTests
             collection.AddSingleton<FakeExtensionInspector>();
             collection.AddSingleton<IExtensionInspector>(provider => provider.GetRequiredService<FakeExtensionInspector>());
             collection.AddSingleton<SourceBindingManagementService>();
+            collection.AddSingleton<FakeSourceProviderMaterializer>();
+            collection.AddSingleton<ISourceProviderMaterializer>(provider => provider.GetRequiredService<FakeSourceProviderMaterializer>());
+            collection.AddSingleton<ISourceSnapshotArtifactStore, MemorySourceSnapshotArtifactStore>();
+            collection.AddSingleton(new SourceMaterializationLimits());
+            collection.AddSingleton<SourceChannelSnapshotService>();
             var services = collection.BuildServiceProvider();
             var fixture = new Fixture(services, database, ownsDatabase);
             using (fixture.Context.PushSystem()) await fixture.Store.InitializeAsync(default);
@@ -524,4 +663,51 @@ public sealed class SourceTests
                 [new("git/source-channel", "source-provider", "git", ExtensionOptionScopes.SourceChannel, "1.0", [new("1.0", SchemaDigest, Schema, false)])],
                 Status == "available" ? null : "The extension is unavailable."));
     }
+
+    private sealed class FakeSourceProviderMaterializer : ISourceProviderMaterializer
+    {
+        private static readonly byte[] Content = "source archive"u8.ToArray();
+        public string Revision { get; set; } = "revision-1";
+        public Exception? Failure { get; set; }
+        public TimeSpan Delay { get; set; }
+        public int MaterializeCount { get; private set; }
+
+        public async Task<ResolvedSourceRevision> ResolveAsync(SourceProviderInvocation invocation, CancellationToken cancellationToken)
+        {
+            if (Delay > TimeSpan.Zero) await Task.Delay(Delay, cancellationToken);
+            if (Failure is not null) throw Failure;
+            return new(Revision, new("sha256", Digest(Encoding.UTF8.GetBytes(Revision))));
+        }
+
+        public Task<MaterializedSourceRevision> MaterializeAsync(SourceProviderInvocation invocation, string revision, SourceMaterializationLimits limits, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Failure is not null) throw Failure;
+            MaterializeCount++;
+            return Task.FromResult(new MaterializedSourceRevision(
+                revision, "application/zip", Content, Content.Length, 1, new("sha256", Digest(Content))));
+        }
+    }
+
+    private sealed class MemorySourceSnapshotArtifactStore : ISourceSnapshotArtifactStore
+    {
+        private readonly Dictionary<string, byte[]> values = new(StringComparer.Ordinal);
+
+        public Task<SourceSnapshotArtifactReference> SaveAsync(MaterializedSourceRevision content, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var digest = Digest(content.Content.Span);
+            values.TryAdd(digest, content.Content.ToArray());
+            return Task.FromResult(new SourceSnapshotArtifactReference(
+                digest, content.MediaType, digest, content.Content.Length, content.ExpandedBytes, content.EntryCount));
+        }
+
+        public Task<Stream> OpenReadAsync(SourceSnapshotArtifactReference reference, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<Stream>(new MemoryStream(values[reference.StorageKey], writable: false));
+        }
+    }
+
+    private static string Digest(ReadOnlySpan<byte> content) => Convert.ToHexStringLower(SHA256.HashData(content));
 }
