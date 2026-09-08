@@ -1,6 +1,6 @@
+using System.Text.Json.Serialization;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
-using System.Text.Json.Serialization;
 
 namespace Agentstration.Management.Contracts;
 

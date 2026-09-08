@@ -94,11 +94,14 @@ public sealed class ModelProfileManagementService(
         bool includeCapabilityDiagnostics = false)
     {
         ModelProviderConfiguration provider;
-        try { provider = await providerConfigurations.GetConfigurationRequiredAsync(
+        try
+        {
+            provider = await providerConfigurations.GetConfigurationRequiredAsync(
             profile.Definition.Provider,
             profile.Namespace,
             profile.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope."),
-            cancellationToken); }
+            cancellationToken);
+        }
         catch (ModelProviderResolutionException) { return new(profile, null, new("unavailable", "Provider not found."), null, "unavailable", ["The referenced provider does not exist."]); }
         var discovery = discoveries.SingleOrDefault(candidate => candidate.CanHandle(provider.AdapterType));
         if (discovery is null) return new(profile, provider, new("unknown", "No discovery adapter."), null, "unknown", ["No provider discovery adapter is registered."]);
