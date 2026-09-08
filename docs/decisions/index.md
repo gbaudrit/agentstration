@@ -114,3 +114,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 82. [ADR-0082 — Sources have immutable versioned definitions](0082-sources-have-immutable-versioned-definitions.md)
 83. [ADR-0083 — Git Source Provider pins and archives exact commits](0083-git-source-provider-pins-and-archives-exact-commits.md)
 84. [ADR-0084 — Source Provider bindings are local version-aware configuration](0084-source-provider-bindings-are-local-version-aware-configuration.md)
+85. [ADR-0085 — Source Channel snapshots pin provider provenance](0085-source-channel-snapshots-pin-provider-provenance.md)

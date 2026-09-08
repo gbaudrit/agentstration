@@ -210,7 +210,7 @@ public sealed class PostgreSqlControlPlaneStore(
 
     public async Task<StoredResource<T>> PutExactAsync<T>(ResourceScopeRef scopeRef, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource
     {
-        if (resource is AgentRevision or SourceResource or SourceVersionResource)
+        if (resource is AgentRevision or SourceResource or SourceVersionResource or SourceChannelSnapshotResource)
             throw new InvalidOperationException($"Resource kind '{resource.Kind}' is immutable and must be created through CreateImmutableAsync.");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         EnsureCanWrite(scopeRef);
