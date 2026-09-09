@@ -58,9 +58,9 @@ GitHub API clients do not execute issue forms. Automation and coding agents must
 
 The `ai-defect` label marks a structural, architectural, behavioral, or code-quality defect introduced by an AI-generated or AI-assisted change. It supplements the issue's type and priority labels; it does not replace either.
 
-When an agent resolves a labeled issue, the corrective pull request must also carry `ai-defect` and add or update one [AI Defect Record](../ai-defects/index.md). The record uses the issue number as its identifier and captures evidence, faulty assumptions, missed signals, safeguard gaps, the correction, prevention, and completed validation. This is distinct from an ADR: an AIDR records learning from a defect, while an ADR records a durable architectural decision.
+When an agent resolves a labeled issue, the corrective pull request must also carry `ai-defect` and add or update one [AI Defect CAR](../ai-defects/index.md). The CAR uses the issue number as its identifier and captures evidence, faulty assumptions, missed signals, safeguard gaps, the correction, prevention, and completed validation. This is distinct from an ADR: a CAR identifies and addresses the causes of a defect, while an ADR records a durable architectural decision.
 
-The pull request metadata check runs when labels change and rejects an `ai-defect` pull request that does not change a numbered record under `docs/ai-defects/` or link that record from the pull request description.
+The pull request metadata check runs when labels change and rejects an `ai-defect` pull request that does not change a numbered CAR under `docs/ai-defects/` or link that CAR from the pull request description.
 
 ## Apply the issue label catalog
 
@@ -92,7 +92,7 @@ Pull requests to `main` run these workflows:
 
 | Check | Purpose | Required by the prepared ruleset |
 |---|---|---|
-| `pull-request-metadata` | Require PR metadata and an AI Defect Record for `ai-defect` remediation | Yes |
+| `pull-request-metadata` | Require PR metadata and an AI Defect CAR for `ai-defect` remediation | Yes |
 | `build-and-test` | Restore, Release build, tests, and changed-file formatting for Agentstration and the complete AEP solution | Yes |
 | `container` | Validate the production Docker build after code validation | No |
 | `CodeQL / C#` | Static security analysis | No; review after initial successful scans |
