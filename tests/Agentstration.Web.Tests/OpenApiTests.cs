@@ -61,7 +61,11 @@ public sealed class OpenApiTests
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         CollectionAssert.AreEquivalent(
-            new[] { "health", "api/auth/bootstrap", "api/auth/local/login", "api/auth/oidc/login", "login", "bootstrap", "access-denied" },
+            new[]
+            {
+                "health", "api/auth/bootstrap", "api/auth/local/login", "api/auth/oidc/login", "login", "bootstrap", "access-denied",
+                "api/aep/enrollments/announce", "api/aep/enrollments/claim", "api/aep/enrollments/ready"
+            },
             anonymous);
     }
 

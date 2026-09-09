@@ -23,6 +23,7 @@ public sealed class AepEnrollmentService(
     IEnumerable<ISecretVaultProvider> vaultProviders,
     IHttpClientFactory httpClients,
     AepTransportSecurityOptions transportOptions,
+    IRequestContextScopeFactory scopeFactory,
     TimeProvider timeProvider)
 {
     public const int MaximumAttempts = 5;
@@ -31,6 +32,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<AepEnrollmentAnnouncementResponse> AnnounceAsync(AepEnrollmentAnnouncement announcement, CancellationToken cancellationToken)
     {
+        using var scopeContext = scopeFactory.PushSystem();
         ValidateAnnouncement(announcement);
         var workspace = await identities.GetWorkspaceAsync(announcement.TenantId, announcement.WorkspaceId, cancellationToken);
         if (workspace?.Status != WorkspaceStatus.Active)
@@ -135,6 +137,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<AepEnrollmentCredential> ClaimAsync(AepEnrollmentClaim claim, CancellationToken cancellationToken)
     {
+        using var scopeContext = scopeFactory.PushSystem();
         if (claim.RequestId == Guid.Empty || claim.InstanceId != claim.RequestId || claim.WorkspaceId == Guid.Empty
             || string.IsNullOrWhiteSpace(claim.Code) || claim.Code.Length > 64)
             throw new AepEnrollmentException("invalid_claim", "The enrollment claim is invalid.");
@@ -198,6 +201,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<AepEnrollmentReadyResponse> ReadyAsync(AepEnrollmentReady ready, CancellationToken cancellationToken)
     {
+        using var scopeContext = scopeFactory.PushSystem();
         var stored = await GetAsync(ready.WorkspaceId, ready.RequestId, cancellationToken);
         var definition = stored.Value.Definition;
         if (definition.InstanceId != ready.InstanceId || definition.State != AepEnrollmentState.CredentialIssued

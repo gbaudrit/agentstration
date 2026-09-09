@@ -50,7 +50,8 @@ public partial class Extensions
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusLabel(string status) => T($"Status.{status}");
 
-    private bool CanAdministerEnrollments => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private bool CanAdministerEnrollments => Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState state
+        && state.HasPermission(AuthorizationPermissions.ResourcesWrite);
 
     protected override async Task OnInitializedAsync()
     {

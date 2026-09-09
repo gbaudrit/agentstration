@@ -43,6 +43,14 @@ public sealed class ResourceScopeOperationService(
     public ResourceScopeRef TargetScopeRef(ResourceScopeKind kind)
     {
         if (kind == ResourceScopeKind.Instance) return ResourceScopeRef.Instance;
+        if (requestContext.AccessMode == ControlPlaneAccessMode.Tenant)
+        {
+            if (kind == ResourceScopeKind.Tenant)
+                return ResourceScopeRef.Tenant(requestContext.Current.TenantId);
+            throw new ResourceScopePolicyException($"A tenant Control Plane context cannot target a {kind.ToString().ToLowerInvariant()} scope.");
+        }
+        if (requestContext.AccessMode == ControlPlaneAccessMode.System)
+            throw new ResourceScopePolicyException($"A system Control Plane context cannot infer a {kind.ToString().ToLowerInvariant()} scope.");
         var current = RequireInteractiveContext();
         return kind switch
         {
