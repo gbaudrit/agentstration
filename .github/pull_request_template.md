@@ -6,7 +6,7 @@
 
 ## Changes
 
-<!-- Use concise bullets for the implemented behavior, relevant tests, and documentation. For ai-defect remediation, link the numbered AI Defect Record here and apply ai-defect to this pull request. -->
+<!-- Use concise bullets for the implemented behavior, relevant tests, and documentation. For ai-defect remediation, link the numbered AI Defect CAR here and apply ai-defect to this pull request. -->
 
 ## Validation
 
