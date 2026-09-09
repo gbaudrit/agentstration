@@ -36,6 +36,9 @@ public sealed class SourcesLocalizationTests
             Assert.AreEqual("Versions", strings["Tab.Versions"].Value);
             Assert.AreEqual("Bindings", strings["Tab.Bindings"].Value);
             Assert.AreEqual("Contenu", strings["Tab.Content"].Value);
+            Assert.AreEqual(
+                "Git Source Provider — git (configuré à l’enregistrement)",
+                strings["DiscoveredProvider", "Git Source Provider", "git"].Value);
         }
         finally
         {

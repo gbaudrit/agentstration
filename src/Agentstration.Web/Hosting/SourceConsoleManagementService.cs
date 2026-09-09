@@ -1,3 +1,4 @@
+using Agentstration.Aep.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
@@ -13,10 +14,18 @@ public sealed record SourceConsoleChannelView(
 
 public sealed record SourceConsoleListItem(SourceView Source, SourceVersionResource? LatestVersion);
 
+public sealed record SourceConsoleProviderCandidate(
+    string Key,
+    string RegistrationName,
+    ResourceNamespace RegistrationNamespace,
+    string DisplayName,
+    string ContributionId);
+
 public sealed record SourceConsoleBindingSelection(
     string Name,
     string TargetKind,
-    ResourceReference? Target);
+    ResourceReference? Target,
+    SourceConsoleProviderCandidate? Candidate);
 
 public sealed record SourceConsoleDetailView(
     SourceView Source,
@@ -25,12 +34,14 @@ public sealed record SourceConsoleDetailView(
     SourceDefinitionVerificationView Verification,
     SourceBindingStatusView Bindings,
     IReadOnlyList<StoredResource<SourceProviderResource>> Providers,
+    IReadOnlyList<SourceConsoleProviderCandidate> ProviderCandidates,
     IReadOnlyList<SourceConsoleChannelView> Channels);
 
 public sealed class SourceConsoleManagementService(
     SourceManagementService sources,
     SourceBindingManagementService bindings,
     SourceProviderManagementService providers,
+    ExtensionManagementService extensions,
     SourceChannelSnapshotService snapshots,
     SourceCatalogService catalogs,
     SourceVerificationService verification,
@@ -119,6 +130,7 @@ public sealed class SourceConsoleManagementService(
         }
 
         var availableProviders = await providers.ListAsync(cancellationToken);
+        var providerCandidates = await DiscoverProviderCandidatesAsync(availableProviders, cancellationToken);
         return new(
             source,
             versions,
@@ -126,6 +138,7 @@ public sealed class SourceConsoleManagementService(
             await verification.VerifyDefinitionAsync(selectedVersion, cancellationToken),
             bindingStatus,
             availableProviders,
+            providerCandidates,
             channelViews);
     }
 
@@ -154,12 +167,19 @@ public sealed class SourceConsoleManagementService(
         CancellationToken cancellationToken)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
-        var resolvedSelections = selections.Select(selection => new SourceBindingSelection
+        var resolvedSelections = new List<SourceBindingSelection>(selections.Count);
+        foreach (var selection in selections)
         {
-            Name = selection.Name,
-            TargetKind = selection.TargetKind,
-            Target = selection.Target ?? throw new SourceProviderValidationException("A configured Source Provider selection is required.")
-        }).ToArray();
+            var target = selection.Target
+                ?? await EnsureProviderAsync(selection.Candidate
+                    ?? throw new SourceProviderValidationException("A Source Provider selection is required."), cancellationToken);
+            resolvedSelections.Add(new SourceBindingSelection
+            {
+                Name = selection.Name,
+                TargetKind = selection.TargetKind,
+                Target = target
+            });
+        }
         _ = await bindings.ConfigureExactAsync(
             scopeRef, publisher, name, versionUid, resolvedSelections, etag, cancellationToken);
     }
@@ -200,4 +220,98 @@ public sealed class SourceConsoleManagementService(
             throw new AuthorizationDeniedException("platform/admin");
     }
 
+    private async Task<IReadOnlyList<SourceConsoleProviderCandidate>> DiscoverProviderCandidatesAsync(
+        IReadOnlyList<StoredResource<SourceProviderResource>> availableProviders,
+        CancellationToken cancellationToken)
+    {
+        var candidates = new List<SourceConsoleProviderCandidate>();
+        foreach (var extension in await extensions.ListAsync(cancellationToken))
+        {
+            if (!string.Equals(extension.Status, "available", StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (var contribution in extension.Contributions.Where(value =>
+                string.Equals(value.Kind, AepContributionKinds.SourceProvider, StringComparison.OrdinalIgnoreCase)))
+            {
+                if (availableProviders.Any(provider => References(provider.Value, extension, contribution.Id))) continue;
+                candidates.Add(new(
+                    $"{extension.RegistrationNamespace}\n{extension.RegistrationName}\n{contribution.Id}",
+                    extension.RegistrationName,
+                    new ResourceNamespace(extension.RegistrationNamespace),
+                    extension.Extension?.Name ?? extension.RegistrationName,
+                    contribution.Id));
+            }
+        }
+        return candidates;
+    }
+
+    private async Task<ResourceReference> EnsureProviderAsync(
+        SourceConsoleProviderCandidate candidate,
+        CancellationToken cancellationToken)
+    {
+        var extension = (await extensions.ListAsync(cancellationToken)).SingleOrDefault(value =>
+            string.Equals(value.RegistrationNamespace, candidate.RegistrationNamespace.Value, StringComparison.Ordinal)
+            && string.Equals(value.RegistrationName, candidate.RegistrationName, StringComparison.Ordinal));
+        if (extension is null
+            || !string.Equals(extension.Status, "available", StringComparison.OrdinalIgnoreCase)
+            || !extension.Contributions.Any(value =>
+                string.Equals(value.Kind, AepContributionKinds.SourceProvider, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(value.Id, candidate.ContributionId, StringComparison.OrdinalIgnoreCase)))
+            throw new SourceProviderValidationException("The selected Source Provider contribution is no longer available.");
+
+        var availableProviders = await providers.ListAsync(cancellationToken);
+        var existing = availableProviders.SingleOrDefault(provider => References(provider.Value, extension, candidate.ContributionId));
+        if (existing is not null) return ProviderReference(existing.Value);
+
+        var baseName = Slug($"{candidate.RegistrationName}-{candidate.ContributionId}");
+        var name = baseName;
+        for (var suffix = 2; availableProviders.Any(value =>
+                 value.Value.Namespace == candidate.RegistrationNamespace
+                 && string.Equals(value.Value.Name, name, StringComparison.Ordinal)); suffix++)
+            name = $"{baseName}-{suffix}";
+
+        var resource = new SourceProviderResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.SourceProvider,
+            Metadata = new ResourceMetadata { Namespace = candidate.RegistrationNamespace, Name = name },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new SourceProviderProperties
+            {
+                DisplayName = candidate.DisplayName,
+                Extension = new(candidate.RegistrationName, ResourceScopeRef.Instance, candidate.RegistrationNamespace),
+                ContributionId = candidate.ContributionId
+            }
+        };
+        StoredResource<SourceProviderResource> created;
+        try
+        {
+            created = await providers.CreateAsync(resource, cancellationToken);
+        }
+        catch (ControlPlaneConcurrencyException)
+        {
+            var raced = (await providers.ListAsync(cancellationToken))
+                .SingleOrDefault(provider => References(provider.Value, extension, candidate.ContributionId));
+            if (raced is null) throw;
+            created = raced;
+        }
+        return ProviderReference(created.Value);
+    }
+
+    private static bool References(SourceProviderResource provider, ExtensionView extension, string contributionId)
+    {
+        var address = provider.Definition.Extension.Resolve(provider.Namespace, ResourceKinds.ExtensionRegistration);
+        return address.Namespace.Value == extension.RegistrationNamespace
+            && string.Equals(address.Name, extension.RegistrationName, StringComparison.Ordinal)
+            && string.Equals(provider.Definition.ContributionId, contributionId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static ResourceReference ProviderReference(SourceProviderResource provider) =>
+        new(provider.Name, ResourceScopeRef.Instance, provider.Namespace);
+
+    private static string Slug(string value)
+    {
+        var slug = string.Concat(value.ToLowerInvariant().Select(character => char.IsAsciiLetterOrDigit(character) ? character : '-')).Trim('-');
+        while (slug.Contains("--", StringComparison.Ordinal)) slug = slug.Replace("--", "-", StringComparison.Ordinal);
+        if (slug.Length == 0) slug = "source-provider";
+        return slug.Length <= 128 ? slug : slug[..128].TrimEnd('-');
+    }
 }
