@@ -184,6 +184,58 @@ public sealed partial class SourceManagementService(
         }, cancellationToken);
     }
 
+    public async Task DeleteExactAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        string ifMatch,
+        CancellationToken cancellationToken)
+    {
+        ValidatePortableName(publisher, "publisher");
+        ValidatePortableName(name, "metadata.name");
+        var address = ScopedResourceAddress.Create(
+            scopeRef, new ResourceNamespace(publisher), ResourceKinds.Source, name);
+        var source = await store.GetExactAsync<SourceResource>(address, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, address.Namespace));
+        if (!string.Equals(source.ETag, ifMatch, StringComparison.Ordinal))
+            throw new ControlPlaneConcurrencyException("The Source changed since it was loaded.");
+
+        await scopeOperations.WriteAsync(
+            ResourceKinds.Source,
+            scopeRef,
+            AuthorizationPermissions.ResourcesDelete,
+            async token =>
+            {
+                await DeleteChildrenAsync<SourceChannelObservedResource>(scopeRef, ResourceKinds.SourceChannelObservedState, source.Value.Uid, value => value.Definition.SourceUid, token);
+                await DeleteChildrenAsync<SourceChannelSnapshotResource>(scopeRef, ResourceKinds.SourceChannelSnapshot, source.Value.Uid, value => value.Definition.SourceUid, token);
+                await DeleteChildrenAsync<SourceImportRecordResource>(scopeRef, ResourceKinds.SourceImportRecord, source.Value.Uid, value => value.Definition.SourceUid, token);
+                await DeleteChildrenAsync<SourceConfigurationResource>(scopeRef, ResourceKinds.SourceConfiguration, source.Value.Uid, value => value.Definition.SourceUid, token);
+                await DeleteChildrenAsync<SourceObservedResource>(scopeRef, ResourceKinds.SourceObservedState, source.Value.Uid, value => value.Definition.SourceUid, token);
+                await DeleteChildrenAsync<SourceVersionResource>(scopeRef, ResourceKinds.SourceVersion, source.Value.Uid, value => value.Definition.SourceUid, token);
+                await store.DeleteExactAsync(address, ifMatch, token);
+                return true;
+            },
+            cancellationToken);
+    }
+
+    private async Task DeleteChildrenAsync<T>(
+        ResourceScopeRef scopeRef,
+        string kind,
+        Guid sourceUid,
+        Func<T, Guid> sourceUidSelector,
+        CancellationToken cancellationToken)
+        where T : Resource
+    {
+        var children = await store.ListExactAsync<T>(scopeRef, kind, 0, int.MaxValue, cancellationToken);
+        foreach (var child in children.Where(value => sourceUidSelector(value.Value) == sourceUid))
+        {
+            await store.DeleteExactAsync(
+                ScopedResourceAddress.Create(scopeRef, child.Value.Namespace, kind, child.Value.Name),
+                child.ETag,
+                cancellationToken);
+        }
+    }
+
     private async Task<SourceImportResult> ReadAndImportCoreAsync(
         string rawManifest,
         SourceManifestOrigin? origin,

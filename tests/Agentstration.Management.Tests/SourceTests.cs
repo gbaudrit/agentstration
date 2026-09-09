@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using Agentstration.Infrastructure.Sources;
+using Agentstration.Infrastructure.Packs;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
@@ -403,6 +404,89 @@ public sealed class SourceTests
     }
 
     [TestMethod]
+    public async Task SourcePackInstallationPinsSnapshotAndPersistsCompleteProvenanceAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var pack = PackArchive("agentstration", "who-am-i");
+        fixture.Materializer.Content = CatalogArchiveBytes(
+            ("catalogs/packs.yaml", Encoding.UTF8.GetBytes(PackCatalog())),
+            ("catalogs/packs/who-am-i.zip", pack));
+        var imported = await fixture.Service.ImportYamlAsync(
+            ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml"), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        var first = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+        var selection = new SourcePackSelection(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable",
+            first.Snapshot.Uid, "official-packs", "who-am-i", "catalogs/packs/who-am-i.zip");
+
+        var preview = await fixture.SourcePacks.PreviewAsync(selection, [], default);
+        Assert.AreEqual("who-am-i", preview.Metadata.Name);
+        Assert.AreEqual("welcome", preview.Resources.Single().Name);
+
+        fixture.Materializer.Revision = "revision-2";
+        fixture.Materializer.Content = CatalogArchiveBytes(
+            ("catalogs/packs.yaml", Encoding.UTF8.GetBytes(PackCatalog())),
+            ("catalogs/packs/who-am-i.zip", PackArchive("agentstration", "who-am-i", "newer")));
+        _ = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+
+        var installed = await fixture.SourcePacks.InstallAsync(
+            selection, false, [], new PackRemovalOptions(), default);
+        var provenance = installed.Value.Definition.SourceProvenance;
+        Assert.IsNotNull(provenance);
+        Assert.AreEqual(first.Snapshot.Uid, provenance.SnapshotUid);
+        Assert.AreEqual(first.Snapshot.Definition.Artifact.Sha256, provenance.SnapshotDigest);
+        Assert.AreEqual(imported.Version.Definition.ManifestDigest, provenance.SourceVersionDigest);
+        Assert.AreEqual(first.Snapshot.Definition.ResolvedRevision, provenance.ProviderRevision);
+        Assert.AreEqual("official-packs", provenance.CatalogName);
+        Assert.AreEqual("who-am-i", provenance.EntryName);
+        Assert.AreEqual("catalogs/packs/who-am-i.zip", provenance.Path);
+        Assert.AreEqual("welcome", installed.Value.Definition.ManagedResources.Single().Name);
+
+        await fixture.Service.DeleteExactAsync(
+            ResourceScopeRef.Instance,
+            "agentstration",
+            "official-samples",
+            imported.Source.Source.ETag!,
+            default);
+        var retained = (await fixture.Store.ListExactAsync<InstalledPackResource>(
+            ResourceScopeRef.Instance, ResourceKinds.InstalledPack, 0, int.MaxValue, default)).Single();
+        Assert.AreEqual(installed.Value.Uid, retained.Value.Uid);
+        Assert.AreEqual(imported.Source.Source.Uid, retained.Value.Definition.SourceProvenance?.SourceUid);
+    }
+
+    [TestMethod]
+    public async Task SourcePackInstallationRejectsPublisherAndPinnedPathMismatchAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        fixture.Materializer.Content = CatalogArchiveBytes(
+            ("catalogs/packs.yaml", Encoding.UTF8.GetBytes(PackCatalog())),
+            ("catalogs/packs/who-am-i.zip", PackArchive("other", "who-am-i")));
+        var imported = await fixture.Service.ImportYamlAsync(
+            ManifestWithCatalog("1", SourceCatalogKinds.Pack, "catalogs/packs.yaml"), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        var refreshed = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+        var selection = new SourcePackSelection(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable",
+            refreshed.Snapshot.Uid, "official-packs", "who-am-i", "catalogs/packs/who-am-i.zip");
+
+        var publisher = await Assert.ThrowsExactlyAsync<SourceValidationException>(() =>
+            fixture.SourcePacks.PreviewAsync(selection, [], default));
+        Assert.AreEqual("source_pack_publisher_mismatch", publisher.Code);
+        var stale = await Assert.ThrowsExactlyAsync<SourceValidationException>(() =>
+            fixture.SourcePacks.PreviewAsync(selection with { Path = "catalogs/packs/other.zip" }, [], default));
+        Assert.AreEqual("source_pack_selection_stale", stale.Code);
+    }
+
+    [TestMethod]
     public void SourceResourceFamilySupportsEveryOwnershipScope()
     {
         var kinds = new[]
@@ -466,6 +550,43 @@ public sealed class SourceTests
         Assert.IsFalse(typeof(SourceResource).GetProperties().Any(property => property.Name.Equals("ActiveVersion", StringComparison.OrdinalIgnoreCase)));
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => fixture.Store.PutAsync(next.Source.Source, next.Source.Source.ETag, false, default));
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => fixture.Store.PutAsync(next.Version, next.Version.ETag, false, default));
+    }
+
+    [TestMethod]
+    public async Task DeleteRemovesTheSourceFamilyAndAllowsImportUnderAnotherIdentityAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        await fixture.CreateSourceProviderAsync();
+        var imported = await fixture.Service.ImportYamlAsync(Manifest("1", "Published name", includeChannel: true), default);
+        _ = await fixture.Bindings.ConfigureAsync(
+            "agentstration", "official-samples", imported.Version.Uid, [Selection()], imported.Source.Configuration.ETag!, default);
+        _ = await fixture.Snapshots.RefreshExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
+
+        await fixture.Service.DeleteExactAsync(
+            ResourceScopeRef.Instance,
+            "agentstration",
+            "official-samples",
+            imported.Source.Source.ETag!,
+            default);
+
+        Assert.IsNull(await fixture.Service.GetExactAsync(
+            ResourceScopeRef.Instance, "agentstration", "official-samples", default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceVersionResource>(ResourceScopeRef.Instance, ResourceKinds.SourceVersion, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceConfigurationResource>(ResourceScopeRef.Instance, ResourceKinds.SourceConfiguration, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceObservedResource>(ResourceScopeRef.Instance, ResourceKinds.SourceObservedState, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceImportRecordResource>(ResourceScopeRef.Instance, ResourceKinds.SourceImportRecord, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelSnapshotResource>(ResourceScopeRef.Instance, ResourceKinds.SourceChannelSnapshot, 0, int.MaxValue, default));
+        Assert.IsEmpty(await fixture.Store.ListExactAsync<SourceChannelObservedResource>(ResourceScopeRef.Instance, ResourceKinds.SourceChannelObservedState, 0, int.MaxValue, default));
+
+        var reimported = await fixture.Service.ImportYamlAsync(
+            Manifest("1", "Published name", includeChannel: true)
+                .Replace("name: official-samples", "name: packs", StringComparison.Ordinal),
+            default);
+        Assert.AreNotEqual(imported.Source.Source.Uid, reimported.Source.Source.Uid);
+        Assert.AreEqual("agentstration", reimported.Source.Source.Definition.Publisher);
+        Assert.AreEqual("packs", reimported.Source.Source.Name);
     }
 
     [TestMethod]
@@ -926,6 +1047,17 @@ public sealed class SourceTests
         Assert.IsNotNull(bindingResult);
         Assert.AreEqual(workspaceScope, bindingResult.Configuration.ScopeRef);
         Assert.AreEqual("unavailable", bindingResult.Status.Bindings.Single().Status);
+
+        using var delete = new HttpRequestMessage(
+            HttpMethod.Delete,
+            $"/api/sources/agentstration/{name}?scopeRef={Uri.EscapeDataString(workspaceScope.ToString())}");
+        delete.Headers.TryAddWithoutValidation("If-Match", imported.Source.Source.ETag);
+        var deleteResponse = await client.SendAsync(delete);
+        Assert.AreEqual(HttpStatusCode.NoContent, deleteResponse.StatusCode, await deleteResponse.Content.ReadAsStringAsync());
+        Assert.IsNull(await factory.Services.GetRequiredService<SourceManagementService>().GetExactAsync(
+            workspaceScope, "agentstration", name, default));
+        Assert.IsNotNull(await factory.Services.GetRequiredService<SourceManagementService>().GetExactAsync(
+            ResourceScopeRef.Instance, "agentstration", name, default));
     }
 
     [TestMethod]
@@ -1031,6 +1163,45 @@ public sealed class SourceTests
 
     private static byte[] CatalogArchive(params (string Path, string Content)[] entries) => CatalogArchive(entries, symbolicLink: false);
 
+    private static byte[] CatalogArchiveBytes(params (string Path, byte[] Content)[] entries)
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var item in entries)
+            {
+                var entry = archive.CreateEntry(item.Path);
+                using var output = entry.Open();
+                output.Write(item.Content);
+            }
+        }
+        return stream.ToArray();
+    }
+
+    private static byte[] PackArchive(string publisher, string name, string resourceName = "welcome")
+    {
+        var manifest = $$"""
+            apiVersion: agentstration.io/v1
+            kind: Pack
+            metadata:
+              publisher: {{publisher}}
+              name: {{name}}
+              version: 1.0.0
+            definition:
+              targetScope: instance
+              resources:
+                - resources/welcome.yaml
+            """;
+        var resource = $$"""
+            apiVersion: agentstration.io/v1
+            kind: Recording
+            metadata:
+              name: {{resourceName}}
+            definition: {}
+            """;
+        return CatalogArchive(("pack.yaml", manifest), ("resources/welcome.yaml", resource));
+    }
+
     private static byte[] CatalogArchive((string Path, string Content)[] entries, bool symbolicLink)
     {
         using var stream = new MemoryStream();
@@ -1131,6 +1302,7 @@ public sealed class SourceTests
         public SourceBindingManagementService Bindings => services.GetRequiredService<SourceBindingManagementService>();
         public SourceChannelSnapshotService Snapshots => services.GetRequiredService<SourceChannelSnapshotService>();
         public SourceCatalogService Catalogs => services.GetRequiredService<SourceCatalogService>();
+        public SourcePackInstallationService SourcePacks => services.GetRequiredService<SourcePackInstallationService>();
         public ISourceSnapshotContentReader ContentReader => services.GetRequiredService<ISourceSnapshotContentReader>();
         public SourceVerificationService Verification => services.GetRequiredService<SourceVerificationService>();
         public FakeSourceVerificationIndexProvider VerificationIndex => services.GetRequiredService<FakeSourceVerificationIndexProvider>();
@@ -1188,6 +1360,10 @@ public sealed class SourceTests
             collection.AddSingleton(new SourceMaterializationLimits());
             collection.AddSingleton<SourceChannelSnapshotService>();
             collection.AddSingleton<SourceCatalogService>();
+            collection.AddSingleton<IPackArchiveReader, ZipPackArchiveReader>();
+            collection.AddSingleton<IPackResourceHandler, SourcePackRecordingHandler>();
+            collection.AddSingleton<PackManagementService>();
+            collection.AddSingleton<SourcePackInstallationService>();
             var services = collection.BuildServiceProvider();
             var fixture = new Fixture(services, database, ownsDatabase);
             using (fixture.Context.PushSystem()) await fixture.Store.InitializeAsync(default);
@@ -1232,6 +1408,24 @@ public sealed class SourceTests
             SqliteConnection.ClearAllPools();
             File.Delete(database);
         }
+    }
+
+    private sealed class SourcePackRecordingHandler : IPackResourceHandler
+    {
+        private readonly Dictionary<string, ManagedPackResource> resources = new(StringComparer.Ordinal);
+        public string Kind => "Recording";
+        public int InstallOrder => 0;
+        public Task ValidateAsync(PackResourceDocument resource, IReadOnlyList<PackResourceDocument> allResources, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<bool> ExistsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => Task.FromResult(resources.ContainsKey(name));
+        public Task<ManagedPackResource> InstallAsync(PackResourceDocument resource, PackIdentity pack, ResourceNamespace @namespace, string packVersion, CancellationToken cancellationToken)
+        {
+            var managed = new ManagedPackResource { Namespace = @namespace, Kind = resource.Kind, Name = resource.Name, Path = resource.Path, VersionToken = packVersion };
+            resources[resource.Name] = managed;
+            return Task.FromResult(managed);
+        }
+        public Task<ManagedPackResource> UpdateAsync(PackResourceDocument resource, ManagedPackResource current, PackIdentity pack, string packVersion, CancellationToken cancellationToken) => InstallAsync(resource, pack, current.Namespace, packVersion, cancellationToken);
+        public Task<string?> GetVersionTokenAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => Task.FromResult(resources.TryGetValue(name, out var value) ? value.VersionToken : null);
+        public Task DeleteAsync(ManagedPackResource resource, PackRemovalOptions options, CancellationToken cancellationToken) { resources.Remove(resource.Name); return Task.CompletedTask; }
     }
 
     private sealed class RecordingBootstrapHandler : IBootstrapResourceHandler

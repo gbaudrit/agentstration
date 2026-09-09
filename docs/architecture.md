@@ -357,6 +357,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 37. **Delivered optional Source verification increment:** a bounded lazily loaded static index can match an immutable Source Version by exact identity, opaque version, and canonical manifest digest. Channel evidence independently matches an exact revision and complete snapshot digest; URLs, domains, publisher declarations, and locales never establish trust. Missing or failed index access leaves Agentstration usable offline and never invalidates retained local state. See ADR-0088.
 38. **Delivered Source Bootstrap application increment:** a compatible pinned Source catalog entry and exact locale variant are adapted into the existing administrative Bootstrap preview and application pipeline. Confirmation pins version, Channel Snapshot, catalog, entry, locale, path, target, and bindings in one digest; successful history retains complete Source and provider provenance while local Bootstrap remains unchanged. See ADR-0089.
 39. **Delivered Source Provider administration increment:** Platform administrators explicitly configure instance-owned Source Providers from discovered AEP contributions through ETag-protected APIs and the Console. Observed status and Source-binding usages remain visible, referenced providers cannot be deleted, and Source binding edits never create or select a provider implicitly. See ADR-0081 and ADR-0084.
+40. **Delivered Source Pack installation increment:** compatible Pack catalog entries from an exact pinned Source snapshot are previewed and installed through the existing Pack lifecycle. The immutable selection is revalidated at confirmation, complete Source and provider provenance is retained on the installed Pack, and local archive installation remains unchanged. See ADR-0095.
 
 ## ADR catalog
 
@@ -420,6 +421,7 @@ SQLite schema evolution for the workspace-scope hardening increment is reset-onl
 - ADR-0083: Git Source Provider pins and archives exact commits
 - ADR-0084: Source Provider bindings are local version-aware configuration
 - ADR-0085: Source Channel snapshots pin provider provenance
+- ADR-0095: Source Pack installation reuses the Pack lifecycle
 - ADR-0086: Source catalogs resolve inside pinned snapshots
 - ADR-0087: Source Channel compatibility uses Semantic Version intervals
 - ADR-0088: Source verification binds exact definitions and snapshots

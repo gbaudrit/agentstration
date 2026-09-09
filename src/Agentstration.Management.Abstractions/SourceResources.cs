@@ -545,6 +545,24 @@ public sealed record SourceBootstrapEntryView(
     string ResolvedLocale,
     string ResolvedPath);
 public sealed record SourcePackEntryView(string Name, string? DisplayName, string? Description, string Path);
+
+public sealed record SourcePackSelection(
+    ResourceScopeRef SourceScope,
+    string Publisher,
+    string SourceName,
+    Guid SourceVersionUid,
+    string Channel,
+    Guid SnapshotUid,
+    string CatalogName,
+    string EntryName,
+    string Path);
+
+public sealed record SourcePackInstallRequest(
+    SourcePackSelection Selection,
+    bool ReplaceExisting = false,
+    bool RemoveDashboardReferences = false,
+    IReadOnlyList<PackBindingSelection>? Bindings = null);
+
 public sealed record SourceCatalogView(
     SourceCatalogProvenance Provenance,
     string DisplayName,

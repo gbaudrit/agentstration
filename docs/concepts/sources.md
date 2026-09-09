@@ -85,6 +85,8 @@ The display name is initialized from the first Source Version default, falling b
 
 List Sources with `GET /api/sources`, inspect their versions with `GET /api/sources/{publisher}/{name}/versions?scopeRef=...`, and update the local display name with an ETag-protected `PUT /api/sources/{publisher}/{name}/display-name?scopeRef=...`.
 
+The published `publisher/name` pair is immutable and cannot be changed by refreshing a Source. Renaming that identity requires deleting the local Source and importing the manifest under its new identity. The ETag-protected `DELETE /api/sources/{publisher}/{name}?scopeRef=...` operation removes the Source definition, versions, local configuration, import history, and Channel snapshot metadata. It does not uninstall Packs already installed from the Source, delete their retained provenance, or modify the external registry.
+
 ## Optional verification index
 
 Agentstration can consult a static verification index without making it a startup or offline dependency:
@@ -109,4 +111,4 @@ Definition verification matches the exact `publisher/name`, opaque Source Versio
 
 Snapshot verification is independent and additionally requires the exact Channel, immutable provider revision, and complete snapshot archive digest. Query it with `GET /api/sources/{publisher}/{name}/versions/{versionUid}/channels/{channel}/snapshots/{snapshotUid}/verification?scopeRef=...`. A verified definition alone does not verify Channel content, and a locale or descendant path never establishes trust.
 
-Git Channel acquisition, explicit Source Provider administration and binding selection, durable Channel snapshots, compatibility evaluation, and catalog browsing are available through their respective Management APIs. Periodic refresh and Pack application from Source selections remain separate increments.
+Git Channel acquisition, explicit Source Provider administration and binding selection, durable Channel snapshots, compatibility evaluation, catalog browsing, Bootstrap application, and Pack installation are available through their respective Management APIs and the Console. Source Pack preview and installation retain the exact version, Channel, snapshot, catalog, entry, descendant path, provider revision, and digests while delegating target scope, bindings, replacement, ownership, and uninstall to the existing Pack lifecycle. Periodic refresh remains a separate increment.
