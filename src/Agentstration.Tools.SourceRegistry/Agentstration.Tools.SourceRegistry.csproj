@@ -6,8 +6,13 @@
     <ToolCommandName>agentstration-source-registry</ToolCommandName>
     <PackageId>Agentstration.SourceRegistry.Tool</PackageId>
     <IsPackable>true</IsPackable>
+    <Authors>gbaudrit</Authors>
+    <Company>Agentstration</Company>
     <Description>Offline validation and canonical digest tooling for Agentstration Source Version and Source Registry publications.</Description>
     <PackageTags>agentstration;source;registry;manifest;validation</PackageTags>
+    <PackageProjectUrl>https://github.com/gbaudrit/agentstration</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <Copyright>Copyright (c) 2026 gbaudrit</Copyright>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
