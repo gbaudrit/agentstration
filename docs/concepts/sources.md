@@ -67,6 +67,14 @@ Branches and tags are resolved to an immutable commit SHA before content is acqu
 
 The standalone extension requires `git` on `PATH` and can be started with `dotnet run --project src/Agentstration.Extensions.Git`; its default development endpoint is `http://localhost:5290`. `GitSourceProvider:GitExecutable`, `GitSourceProvider:MaximumRepositoryBytes`, and `GitSourceProvider:ResolveTimeoutSeconds` configure its executable and hard limits. Local file repositories remain disabled unless `GitSourceProvider:AllowLocalRepositories=true` is set explicitly for development or offline tests. Aspire starts and registers the extension automatically.
 
+## Local Source Providers
+
+A local `SourceProvider` is an instance-owned Management resource that selects one `source-provider` contribution from an instance-visible `ExtensionRegistration`. The registration remains the only owner of the endpoint, enabled state, expected extension identity, and credentials. Repository, ref, path, locale, and all other transport values remain immutable Channel configuration.
+
+Platform administrators manage these resources under **Configure > Source providers**. The Extensions view links each discovered source-provider contribution to a prefilled creation form. The provider detail view reports the observed contribution status, advertised source-channel option contracts, and every Source binding that references it. A referenced provider cannot be deleted.
+
+The REST surface is `/api/sourceproviders`: list, create, get, update, and delete operations are complemented by `/{providerName}/status` and `/{providerName}/usages`. Writes use ETags. Source binding forms only list already configured providers and never create or select one automatically.
+
 Three concerns remain separate:
 
 - the immutable published Source Version;
@@ -101,4 +109,4 @@ Definition verification matches the exact `publisher/name`, opaque Source Versio
 
 Snapshot verification is independent and additionally requires the exact Channel, immutable provider revision, and complete snapshot archive digest. Query it with `GET /api/sources/{publisher}/{name}/versions/{versionUid}/channels/{channel}/snapshots/{snapshotUid}/verification?scopeRef=...`. A verified definition alone does not verify Channel content, and a locale or descendant path never establishes trust.
 
-Git Channel acquisition, Source Provider binding selection, durable Channel snapshots, compatibility evaluation, and catalog browsing are available through their respective Management APIs. Periodic refresh and Bootstrap/Pack application from Source selections remain separate increments.
+Git Channel acquisition, explicit Source Provider administration and binding selection, durable Channel snapshots, compatibility evaluation, and catalog browsing are available through their respective Management APIs. Periodic refresh and Pack application from Source selections remain separate increments.

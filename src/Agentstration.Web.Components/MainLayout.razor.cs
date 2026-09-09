@@ -22,7 +22,7 @@ public partial class MainLayout
         new("Group.Build", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.ModelProfiles", "/modelprofiles", "layers", "model"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Entries", "/entries", "entry", "work")]),
         new("Group.Operate", [new("Nav.Triggers", "/triggers", "clock", "work"), new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.Tasks", "/tasks", "tasks", "work")]),
         new("Group.Runs", [new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
-        new("Group.Configure", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work"), new("Nav.Packs", "/packs", "package"), new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key")]),
+        new("Group.Configure", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work"), new("Nav.Packs", "/packs", "package"), new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "database", "source"), new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key")]),
         new("Group.System", [new("Nav.ResourceScopes", "/settings/resource-scopes", "layers", RequiredPermissions: ["resources/read"]), new("Nav.Sources", "/settings/sources", "database"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "upload-cloud"), new("Nav.Profile", "/settings/profile", "user-circle"), new("Nav.Settings", "/settings", "settings")])
     ];
 
@@ -49,6 +49,8 @@ public partial class MainLayout
         new("Nav.WorkplaceSetup", "/workspaces", "▦", "Group.Configure", "workspace composition primary entries espace composition"),
         new("Nav.Packs", "/packs", "▣", "Group.Configure", "package distribution install archive resources paquet installation"),
         new("Command.CreateModelProvider", "/modelproviders/new", "+", "Command", "new nouveau provider fournisseur"),
+        new("Nav.SourceProviders", "/sourceproviders", "◫", "Group.Configure", "source providers fournisseurs Git AEP"),
+        new("Command.CreateSourceProvider", "/sourceproviders/new", "+", "Command", "new nouveau source provider fournisseur"),
         new("Nav.RuntimeProfiles", "/runtimeprofiles", "◈", "Group.Configure", "runtime configuration exécution"),
         new("Command.CreateRuntimeProfile", "/runtimeprofiles/new", "+", "Command", "new nouveau runtime profile profil"),
         new("Nav.Secrets", "/secrets", "◆", "Group.Configure", "credentials Vaults write only secrets identifiants coffres"),

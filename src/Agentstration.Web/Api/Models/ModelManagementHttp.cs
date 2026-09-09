@@ -21,6 +21,13 @@ internal static class ModelManagementHttp
                 new Dictionary<string, object?> { ["references"] = exception.Usages });
         }
         catch (ModelProviderValidationException exception) { return Problem("model-provider-invalid", "Invalid model provider", 422, exception.Message); }
+        catch (SourceProviderNotFoundException exception) { return Problem("source-provider-not-found", "Source Provider not found", 404, exception.Message); }
+        catch (SourceProviderInUseException exception)
+        {
+            return Problem("source-provider-in-use", "Source Provider is in use", 409, exception.Message,
+                new Dictionary<string, object?> { ["references"] = exception.Usages });
+        }
+        catch (SourceProviderValidationException exception) { return Problem("source-provider-invalid", "Invalid Source Provider", 422, exception.Message); }
         catch (ExtensionRegistrationNotFoundException exception) { return Problem("extension-registration-not-found", "Extension registration not found", 404, exception.Message); }
         catch (ExtensionRegistrationInUseException exception) { return Problem("extension-registration-in-use", "Extension registration in use", 409, exception.Message); }
         catch (ExtensionRegistrationValidationException exception) { return Problem("extension-registration-invalid", "Invalid extension registration", 422, exception.Message); }
@@ -64,6 +71,12 @@ internal static class ModelManagementHttp
     }
 
     public static IResult ResourceResult(StoredResource<ModelProviderResource> stored, HttpResponse response, int statusCode)
+    {
+        response.Headers.ETag = stored.ETag;
+        return Results.Json(stored.Value, statusCode: statusCode);
+    }
+
+    public static IResult ResourceResult(StoredResource<SourceProviderResource> stored, HttpResponse response, int statusCode)
     {
         response.Headers.ETag = stored.ETag;
         return Results.Json(stored.Value, statusCode: statusCode);

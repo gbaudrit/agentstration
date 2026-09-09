@@ -128,10 +128,11 @@ else
         @if (detail.Bindings.Bindings.Count == 0) { <p>@T("NoBindings")</p> }
         else
         {
+            @if (detail.Providers.Count == 0) { <div class="form-alert form-alert-warning"><span>@T("NoConfiguredProviders")</span><a class="text-link" href="@ConfigureProviderUrl()">@T("ConfigureProvider") →</a></div> }
             <div class="binding-grid">
                 @foreach (var binding in detail.Bindings.Bindings)
                 {
-                    <label><span>@binding.Name <small>@string.Join(", ", binding.Channels)</small></span><select value="@BindingValue(binding)" @onchange="args => SetBinding(binding, args)" disabled="@busy"><option value="">@T("SelectProvider")</option>@foreach (var provider in CompatibleProviders(binding.TargetKind)) { <option value="@ProviderValue(provider.Value)">@provider.Value.Definition.DisplayName — @provider.Value.Namespace/@provider.Value.Name</option> }@foreach (var candidate in CompatibleProviderCandidates(binding.TargetKind)) { <option value="@CandidateValue(candidate)">@F("DiscoveredProvider", candidate.DisplayName, candidate.ContributionId)</option> }</select>@if (binding.Issues.Count > 0) { <small class="inline-warning">@string.Join(" ", binding.Issues.Select(value => value.Message))</small> }</label>
+                    <label><span>@binding.Name <small>@string.Join(", ", binding.Channels)</small></span><select value="@BindingValue(binding)" @onchange="args => SetBinding(binding, args)" disabled="@busy"><option value="">@T("SelectProvider")</option>@foreach (var provider in CompatibleProviders(binding.TargetKind)) { <option value="@ProviderValue(provider.Value)">@provider.Value.Definition.DisplayName — @provider.Value.Namespace/@provider.Value.Name</option> }</select>@if (binding.Issues.Count > 0) { <small class="inline-warning">@string.Join(" ", binding.Issues.Select(value => value.Message))</small> }</label>
                 }
             </div>
             <div class="panel-actions"><button class="button-primary" disabled="@busy" @onclick="SaveBindingsAsync">@T("SaveBindings")</button></div>
@@ -206,7 +207,7 @@ else
                 detail = await Service.GetAsync(ResourceScopeRef.Parse(ScopeRefValue), Publisher, Name, VersionUid, catalogLocale, RequestContext.Current.PrincipalId, lifetime.Token);
                 displayName = detail.Source.Configuration.Definition.DisplayName;
                 bindingSelections.Clear();
-                foreach (var binding in detail.Bindings.Bindings.Where(value => value.Target is not null)) bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, binding.Target, null);
+                foreach (var binding in detail.Bindings.Bindings.Where(value => value.Target is not null)) bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, binding.Target);
             }
             else sources = await Service.ListAsync(RequestContext.Current.PrincipalId, lifetime.Token);
         }
@@ -242,12 +243,9 @@ else
         if (value.StartsWith("provider\n", StringComparison.Ordinal))
         {
             var parts = value.Split('\n', 3);
-            bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, new(parts[2], ResourceScopeRef.Instance, new(parts[1])), null);
+            bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, new(parts[2], ResourceScopeRef.Instance, new(parts[1])));
             return;
         }
-        var candidateKey = value["candidate\n".Length..];
-        var candidate = detail!.ProviderCandidates.Single(item => item.Key == candidateKey);
-        bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, null, candidate);
     }
 
     private void SetImportMode(string mode) => importMode = mode;
@@ -262,16 +260,13 @@ else
 
     private ResourceScopeRef ScopeRef() => ResourceScopeRef.Parse(ScopeRefValue!);
     private IEnumerable<StoredResource<SourceProviderResource>> CompatibleProviders(string targetKind) => targetKind == SourceKinds.SourceProvider ? detail!.Providers : [];
-    private IEnumerable<SourceConsoleProviderCandidate> CompatibleProviderCandidates(string targetKind) => targetKind == SourceKinds.SourceProvider ? detail!.ProviderCandidates : [];
     private static string ProviderValue(SourceProviderResource provider) => $"provider\n{provider.Namespace.Value}\n{provider.Name}";
-    private static string CandidateValue(SourceConsoleProviderCandidate candidate) => $"candidate\n{candidate.Key}";
     private string BindingValue(SourceBindingStatus binding)
     {
         if (!bindingSelections.TryGetValue(binding.Name, out var selection)) return string.Empty;
-        return selection.Target is { } target
-            ? $"provider\n{target.Namespace?.Value ?? "default"}\n{target.Name}"
-            : selection.Candidate is { } candidate ? CandidateValue(candidate) : string.Empty;
+        return selection.Target is { } target ? $"provider\n{target.Namespace?.Value ?? "default"}\n{target.Name}" : string.Empty;
     }
+    private string ConfigureProviderUrl() => $"/sourceproviders/new?returnUrl={Uri.EscapeDataString(SourceUrl(detail!.Source))}";
     private static string Short(string value) => value.Length <= 14 ? value : value[..14];
     private static bool IsHealthy(SourceConsoleListItem source) => source.Source.Observed.Definition.LastOutcome != SourceImportOutcome.Rejected;
     private string SourceUrl(SourceConsoleListItem source) => SourceUrl(source.Source);

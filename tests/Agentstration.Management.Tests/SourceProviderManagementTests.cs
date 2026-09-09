@@ -1,5 +1,6 @@
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.ModelProviders;
 using Agentstration.Resources;
 
 namespace Agentstration.Management.Tests;
@@ -74,6 +75,56 @@ public sealed class SourceProviderManagementTests
         Assert.AreEqual(ResourceKinds.SourceProvider, usages.Single().Kind);
     }
 
+    [TestMethod]
+    public async Task ReferencingSourceBindingIsReportedAndPreventsDeletion()
+    {
+        using var fixture = new Fixture();
+        await fixture.Registrations.CreateAsync(Extension(), default);
+        var provider = await fixture.SourceProviders.CreateAsync(SourceProvider(), default);
+        await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new SourceConfigurationResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.SourceConfiguration,
+            Metadata = new ResourceMetadata { Name = "catalog", Namespace = new("agentstration") },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new SourceConfigurationProperties
+            {
+                SourceUid = Guid.NewGuid(),
+                DisplayName = "Catalog",
+                Bindings = [new SourceBindingSelection
+                {
+                    Name = "git-distribution",
+                    TargetKind = SourceKinds.SourceProvider,
+                    Target = new(provider.Value.Name, ResourceScopeRef.Instance, provider.Value.Namespace)
+                }]
+            }
+        }, null, true, default);
+
+        var usage = (await fixture.SourceProviders.GetUsagesAsync(ResourceNamespace.Default, provider.Value.Name, default)).Single();
+
+        Assert.AreEqual("agentstration", usage.Publisher);
+        Assert.AreEqual("catalog", usage.SourceName);
+        Assert.AreEqual("git-distribution", usage.BindingName);
+        await Assert.ThrowsAsync<SourceProviderInUseException>(() =>
+            fixture.SourceProviders.DeleteAsync(ResourceNamespace.Default, provider.Value.Name, provider.ETag, default));
+    }
+
+    [TestMethod]
+    public async Task StatusValidatesTheAdvertisedSourceProviderContribution()
+    {
+        var inspector = new FakeInspector();
+        using var fixture = new Fixture([inspector]);
+        await fixture.Registrations.CreateAsync(Extension(), default);
+        await fixture.SourceProviders.CreateAsync(SourceProvider(), default);
+
+        var available = await fixture.SourceProviders.GetStatusAsync(ResourceNamespace.Default, "git-local", default);
+        inspector.IncludeContribution = false;
+        var incompatible = await fixture.SourceProviders.GetStatusAsync(ResourceNamespace.Default, "git-local", default);
+
+        Assert.AreEqual("available", available.Status);
+        Assert.AreEqual("incompatible", incompatible.Status);
+    }
+
     private static ExtensionRegistrationResource Extension() => new()
     {
         ApiVersion = ManagementApiVersions.CoreV1,
@@ -105,7 +156,7 @@ public sealed class SourceProviderManagementTests
     {
         private readonly IDisposable systemScope;
 
-        public Fixture()
+        public Fixture(IEnumerable<IExtensionInspector>? inspectors = null)
         {
             var context = new CurrentRequestContext();
             systemScope = context.PushSystem();
@@ -120,13 +171,30 @@ public sealed class SourceProviderManagementTests
                 null!,
                 scopes);
             Registrations = new ExtensionRegistrationManagementService(Store, references, operations);
-            SourceProviders = new SourceProviderManagementService(Store, references, operations);
+            SourceProviders = new SourceProviderManagementService(Store, references, operations, inspectors ?? [], TimeProvider.System);
         }
 
         public MemoryStore Store { get; }
         public ExtensionRegistrationManagementService Registrations { get; }
         public SourceProviderManagementService SourceProviders { get; }
         public void Dispose() => systemScope.Dispose();
+    }
+
+    private sealed class FakeInspector : IExtensionInspector
+    {
+        public bool IncludeContribution { get; set; } = true;
+        public bool CanHandle(string providerType) => true;
+        public bool CanInspectEndpoint(Uri endpoint) => true;
+        public ValueTask<ExtensionInspection> InspectAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default) =>
+            InspectAsync(provider.Name, provider.Endpoint, cancellationToken);
+        public ValueTask<ExtensionInspection> InspectAsync(string registrationName, Uri endpoint, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ExtensionInspection(
+                registrationName,
+                endpoint,
+                "available",
+                new("source-extension", "Source extension", "1.0.0", null),
+                IncludeContribution ? [new("source-provider", "git")] : [],
+                []));
     }
 
     private sealed class InstanceScopeResolver : IResourceScopeResolver

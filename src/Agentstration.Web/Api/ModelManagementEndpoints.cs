@@ -34,6 +34,7 @@ public static class ModelManagementEndpoints
         SecretEndpoints.Map(endpoints);
         ResourceScopeEndpoints.Map(endpoints);
         ExtensionEndpoints.Map(endpoints);
+        SourceProviderEndpoints.Map(endpoints);
 
         var agents = endpoints.MapGroup("/api/agents");
         GetAgentModelEndpoint.Map(agents);
