@@ -17,7 +17,19 @@ Commit `.config/dotnet-tools.json`. Other contributors and CI restore the pinned
 dotnet tool restore
 ```
 
-The package is prepared for exact-version installation and local-feed validation. Public NuGet publication will be enabled after the repository's trusted publishing profile is configured.
+Release tags publish the package to NuGet.org through short-lived OIDC credentials. No consumer credential is required to install or restore it.
+
+Update an existing local pin deliberately to another exact version:
+
+```text
+dotnet tool update Agentstration.SourceRegistry.Tool --version <exact-version>
+```
+
+Remove the local tool from the current manifest with:
+
+```text
+dotnet tool uninstall Agentstration.SourceRegistry.Tool
+```
 
 ## Commands
 

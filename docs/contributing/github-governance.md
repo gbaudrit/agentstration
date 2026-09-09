@@ -165,6 +165,15 @@ Docker Hub publication requires an existing `agentstration/agentstration` reposi
 - `DOCKERHUB_USERNAME`: the Docker Hub account allowed to push the repository;
 - `DOCKERHUB_TOKEN`: a scoped Docker Hub access token with write permission. Do not store an account password.
 
+NuGet.org publication uses trusted publishing and does not use a long-lived API-key secret. The NuGet account `gbaudrit` must own `Agentstration.SourceRegistry.Tool` and configure a trusted publishing policy with:
+
+- repository owner: `gbaudrit`;
+- repository: `agentstration`;
+- workflow file: `release.yml`;
+- environment: empty, because the release job does not select a GitHub environment.
+
+The policy may remain pending until its first successful publication. Create or reactivate it shortly before pushing the release tag; NuGet.org uses the workflow's GitHub OIDC identity to activate and bind the policy.
+
 For example, after the release change has merged and all required checks have passed:
 
 ```powershell
@@ -174,4 +183,4 @@ git tag -a v0.2.0-alpha.1 -m "Agentstration 0.2.0-alpha.1"
 git push origin v0.2.0-alpha.1
 ```
 
-GitHub Actions then repeats restore, Release build, and tests; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. Alpha releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag. Correct a failed release through a reviewed commit and a new prerelease identifier.
+GitHub Actions then repeats restore, Release build, and tests; smoke-tests and packs `Agentstration.SourceRegistry.Tool`; publishes that exact package to NuGet.org with a short-lived OIDC credential; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. The `.nupkg` is also retained in the workflow artifact and GitHub prerelease. Alpha container releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag or package version. Correct a failed release through a reviewed commit and a new prerelease identifier.

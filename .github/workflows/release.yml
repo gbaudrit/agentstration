@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 env:
   DOCKER_IMAGE: agentstration/agentstration
@@ -62,6 +63,16 @@ jobs:
         run: dotnet build aep/Aep.slnx --configuration Release --no-restore
       - name: Test autonomous AEP SDK
         run: dotnet test aep/Aep.slnx --configuration Release --no-build
+      - name: Smoke-test Source Registry tool package
+        shell: pwsh
+        run: ./scripts/ci/test-source-registry-tool-package.ps1 -Configuration Release -NoBuild
+      - name: Pack Source Registry tool
+        run: >-
+          dotnet pack src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj
+          --configuration Release
+          --no-restore
+          --no-build
+          --output artifacts
       - name: Publish framework-dependent applications
         shell: pwsh
         run: |
@@ -80,7 +91,7 @@ jobs:
       - name: Write SHA-256 checksums
         shell: pwsh
         run: |
-          Get-ChildItem artifacts/*.zip | Sort-Object Name | ForEach-Object {
+          Get-ChildItem artifacts/*.zip, artifacts/*.nupkg | Sort-Object Name | ForEach-Object {
             $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
             "$hash  $($_.Name)"
           } | Set-Content -Encoding utf8NoBOM artifacts/SHA256SUMS
@@ -140,6 +151,16 @@ jobs:
             "digest=${{ steps.container.outputs.digest }}"
             "platforms=linux/amd64,linux/arm64"
           ) | Set-Content -Encoding utf8NoBOM artifacts/container-image.txt
+      - name: Authenticate to NuGet.org with trusted publishing
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: gbaudrit
+      - name: Publish Source Registry tool to NuGet.org
+        run: >-
+          dotnet nuget push artifacts/Agentstration.SourceRegistry.Tool.${{ steps.version.outputs.version }}.nupkg
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
       - name: Upload validated release artifacts
         uses: actions/upload-artifact@v6
         with:
@@ -151,7 +172,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           gh release create "$GITHUB_REF_NAME"
-          artifacts/*.zip artifacts/SHA256SUMS artifacts/container-image.txt
+          artifacts/*.zip artifacts/*.nupkg artifacts/SHA256SUMS artifacts/container-image.txt
           --verify-tag
           --prerelease
           --title "Agentstration ${{ steps.version.outputs.version }}"
