@@ -1,8 +1,11 @@
+using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
@@ -83,5 +86,64 @@ public sealed partial class ModelManagementApiTests
             new Uri("https://attacker.example/aep/enrollment/pair")), default));
 
         Assert.AreEqual("pairing_origin_mismatch", exception.Code);
+    }
+
+    [TestMethod]
+    public async Task CredentialRotationPreservesWorkspaceBoundClientIdentity()
+    {
+        var handler = new EnrollmentLifecycleHandler("extension.pairing-test");
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IHttpClientFactory>();
+            services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var service = factory.Services.GetRequiredService<AepEnrollmentService>();
+        var instanceId = Guid.NewGuid();
+        _ = await service.AnnounceAsync(new(
+            instanceId,
+            context.TenantId,
+            context.WorkspaceId,
+            new AepExtensionIdentity("extension.pairing-test", "Pairing test", "1.0.0"),
+            new Uri("https://extension.example/"),
+            new Uri("https://extension.example/aep/enrollment/pair")), default);
+        var code = await service.RotateAsync(context, instanceId, default);
+        var credential = await service.ClaimAsync(new(instanceId, instanceId, context.WorkspaceId, code.Code), default);
+        _ = await service.ReadyAsync(new(instanceId, instanceId, context.WorkspaceId, credential.CompletionToken), default);
+
+        _ = await service.RotateCredentialAsync(context, instanceId, default);
+
+        Assert.IsNotNull(handler.Rotation);
+        Assert.AreEqual(instanceId, handler.Rotation.InstanceId);
+        Assert.AreEqual($"agentstration:{context.WorkspaceId:D}:{instanceId:D}", handler.Rotation.ClientId);
+        Assert.AreEqual(1, handler.PreviousRevocationCount);
+    }
+
+    private sealed class EnrollmentHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+    }
+
+    private sealed class EnrollmentLifecycleHandler(string extensionId) : HttpMessageHandler
+    {
+        public AepCredentialRotation? Rotation { get; private set; }
+        public int PreviousRevocationCount { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri?.AbsolutePath == AepEnrollmentProtocol.CredentialRotationPath)
+                Rotation = await request.Content!.ReadFromJsonAsync<AepCredentialRotation>(AepProtocol.JsonOptions, cancellationToken);
+            else if (request.RequestUri?.AbsolutePath == AepEnrollmentProtocol.PreviousCredentialRevocationPath)
+                PreviousRevocationCount++;
+
+            if (request.RequestUri?.AbsolutePath != AepProtocol.DiscoveryPath)
+                return new(HttpStatusCode.OK);
+            var manifest = new AepManifest(
+                AepProtocol.Version,
+                new(extensionId, "Pairing test", "1.0.0"),
+                new Dictionary<string, AepCapabilityDescriptor>(),
+                new AepContributions([]));
+            return new(HttpStatusCode.OK) { Content = JsonContent.Create(manifest, options: AepProtocol.JsonOptions) };
+        }
     }
 }

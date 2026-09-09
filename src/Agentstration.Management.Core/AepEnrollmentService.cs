@@ -261,7 +261,7 @@ public sealed class AepEnrollmentService(
         {
             await SendLifecycleAsync(stored.Value, AepEnrollmentProtocol.CredentialRotationPath, oldToken,
                 new AepCredentialRotation(stored.Value.Definition.InstanceId,
-                    $"agentstration:{stored.Value.Definition.TenantId:D}:{stored.Value.Definition.InstanceId:D}", newToken), cancellationToken);
+                    $"agentstration:{context.WorkspaceId:D}:{stored.Value.Definition.InstanceId:D}", newToken), cancellationToken);
             await WriteTokenAsync(stored.Value, newToken, cancellationToken);
             await VerifyAsync(stored.Value, newToken, cancellationToken);
             await SendLifecycleAsync(stored.Value, AepEnrollmentProtocol.PreviousCredentialRevocationPath, newToken, null, cancellationToken);
