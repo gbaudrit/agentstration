@@ -25,9 +25,9 @@ else
     <DataGrid TItem="SourceProviderSummaryResponse" Items="providers ?? []">
         <Header><tr><th>@T("Provider")</th><th>@T("Namespace")</th><th>@T("Extension")</th><th>@T("Contribution")</th><th>@T("OwnershipScope")</th><th>@T("Status")</th><th></th></tr></Header>
         <Row Context="provider"><tr>
-            <td><strong>@provider.DisplayName</strong><br /><code>@provider.Name</code></td>
+            <td><a class="resource-name-link" href="@DetailsUrl(provider)">@provider.DisplayName</a><br /><code>@provider.Name</code></td>
             <td><code>@provider.Namespace</code></td>
-            <td><code>@provider.ExtensionNamespace/@provider.ExtensionName</code></td>
+            <td><a class="text-button" href="/extensions">@provider.ExtensionNamespace/@provider.ExtensionName</a></td>
             <td><code>@provider.ContributionId</code></td>
             <td><ResourceScopeBadge ScopeRef="@provider.ScopeRef" Compact /></td>
             <td><StatusBadge Text="@StatusLabel(provider.Status)" Status="@ModelManagementUi.Status(provider.Status)" /></td>
