@@ -76,17 +76,19 @@ else if (detail is null)
         }
         else
         {
-            <DataGrid TItem="SourceConsoleListItem" Items="FilteredSources">
-                <Header><tr><th>@T("Source")</th><th>@T("OwnershipScope")</th><th>@T("Origin")</th><th>@T("LatestImport")</th><th>@T("Health")</th><th></th></tr></Header>
-                <Row Context="item"><tr>
-                    <td><strong>@item.Source.Configuration.Definition.DisplayName</strong><br /><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></td>
-                    <td><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" Compact /></td>
-                    <td>@Origin(item)</td>
-                    <td><strong>@(item.LatestVersion?.Definition.Version ?? "—")</strong><br /><small>@item.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g") · @F("VersionCount", item.Source.VersionCount)</small></td>
-                    <td><StatusBadge Text="@ImportOutcome(item.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(item) ? UiStatus.Success : UiStatus.Danger)" /></td>
-                    <td><a class="text-link" href="@SourceUrl(item)">@T("Open") →</a></td>
-                </tr></Row>
-            </DataGrid>
+            <div class="source-table">
+                <DataGrid TItem="SourceConsoleListItem" Items="FilteredSources">
+                    <Header><tr><th>@T("Source")</th><th>@T("OwnershipScope")</th><th>@T("Origin")</th><th>@T("LatestImport")</th><th>@T("Health")</th><th></th></tr></Header>
+                    <Row Context="item"><tr>
+                        <td><a class="resource-name-link" href="@SourceUrl(item)">@item.Source.Configuration.Definition.DisplayName</a><br /><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></td>
+                        <td><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" Compact /></td>
+                        <td><span class="source-origin" title="@Origin(item)">@Origin(item)</span></td>
+                        <td><strong>@(item.LatestVersion?.Definition.Version ?? "—")</strong><br /><small>@item.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g") · @F("VersionCount", item.Source.VersionCount)</small></td>
+                        <td><StatusBadge Text="@ImportOutcome(item.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(item) ? UiStatus.Success : UiStatus.Danger)" /></td>
+                        <td><a class="text-link" href="@SourceUrl(item)">@T("Open") →</a></td>
+                    </tr></Row>
+                </DataGrid>
+            </div>
         }
     </section>
 }

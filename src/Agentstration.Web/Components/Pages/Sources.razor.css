@@ -4,8 +4,25 @@
 .source-import-tabs .active { color: var(--primary); box-shadow: inset 0 -2px var(--primary); }
 .form-wide { grid-column: 1 / -1; }
 .form-wide textarea { min-height: 15rem; resize: vertical; font-family: var(--font-mono, monospace); }
-.source-search { display: block; max-width: 36rem; margin: 1rem 0; }
+.source-search { display: grid; gap: .45rem; max-width: 36rem; margin: 1rem 0; }
+.source-search input { width: 100%; min-width: 0; }
+.source-table { min-width: 0; }
+.source-table ::deep .data-grid { min-width: 52rem; table-layout: fixed; white-space: normal; }
+.source-table ::deep th:nth-child(1) { width: 18%; }
+.source-table ::deep th:nth-child(2) { width: 13%; }
+.source-table ::deep th:nth-child(3) { width: 30%; }
+.source-table ::deep th:nth-child(4) { width: 17%; }
+.source-table ::deep th:nth-child(5) { width: 14%; }
+.source-table ::deep th:nth-child(6) { width: 8%; }
+.source-table ::deep td { min-width: 0; }
+.source-table ::deep code,
+.source-table ::deep small { overflow-wrap: anywhere; }
+.source-origin { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .source-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.source-detail-grid > * { min-width: 0; }
+.source-detail-grid > .panel > label { display: grid; gap: .45rem; }
+.source-detail-grid > .panel > label input { width: 100%; min-width: 0; }
+.source-detail-grid .resource-details dd { min-width: 0; overflow-wrap: anywhere; }
 .source-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .source-heading h2 { margin: 0; }
 .source-title { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
