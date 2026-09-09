@@ -39,6 +39,26 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
     {
         lock (sync)
         {
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    clientId = string.Empty;
+                    return false;
+                }
+                var persisted = LoadExisting(path);
+                if (persisted.InstanceId != state.InstanceId)
+                {
+                    clientId = string.Empty;
+                    return false;
+                }
+                state = persisted;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+            {
+                clientId = string.Empty;
+                return false;
+            }
             clientId = state.ClientId ?? string.Empty;
             if (!IsPaired || string.IsNullOrWhiteSpace(clientId)) return false;
             return Matches(state.TokenDigest, suppliedDigest) | Matches(state.PreviousTokenDigest, suppliedDigest);
@@ -110,20 +130,22 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
 
     private static AepPairingState LoadOrCreate(string path)
     {
-        if (File.Exists(path))
-        {
-            var loaded = JsonSerializer.Deserialize<AepPairingState>(File.ReadAllText(path))
-                ?? throw new InvalidDataException("The AEP pairing state file is invalid.");
-            if (loaded.InstanceId == Guid.Empty || loaded.Status is not ("unpaired" or "paired" or "revoked")
-                || loaded.Status == "paired" && (string.IsNullOrWhiteSpace(loaded.ClientId) || !ValidDigest(loaded.TokenDigest ?? string.Empty)
-                    || loaded.PreviousTokenDigest is not null && !ValidDigest(loaded.PreviousTokenDigest))
-                || loaded.Status != "paired" && (loaded.TokenDigest is not null || loaded.PreviousTokenDigest is not null))
-                throw new InvalidDataException("The AEP pairing state file is incomplete.");
-            return loaded;
-        }
+        if (File.Exists(path)) return LoadExisting(path);
         var created = new AepPairingState(Guid.NewGuid(), "unpaired", null, null);
         WriteAtomic(path, created);
         return created;
+    }
+
+    private static AepPairingState LoadExisting(string path)
+    {
+        var loaded = JsonSerializer.Deserialize<AepPairingState>(File.ReadAllText(path))
+            ?? throw new InvalidDataException("The AEP pairing state file is invalid.");
+        if (loaded.InstanceId == Guid.Empty || loaded.Status is not ("unpaired" or "paired" or "revoked")
+            || loaded.Status == "paired" && (string.IsNullOrWhiteSpace(loaded.ClientId) || !ValidDigest(loaded.TokenDigest ?? string.Empty)
+                || loaded.PreviousTokenDigest is not null && !ValidDigest(loaded.PreviousTokenDigest))
+            || loaded.Status != "paired" && (loaded.TokenDigest is not null || loaded.PreviousTokenDigest is not null))
+            throw new InvalidDataException("The AEP pairing state file is incomplete.");
+        return loaded;
     }
 
     private static void WriteAtomic(string path, AepPairingState value)
