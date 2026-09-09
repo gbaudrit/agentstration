@@ -37,6 +37,34 @@ The digest has the stable form `sha256:<lowercase-hex>`. Property order, YAML co
 
 Successful validation prints the validated Source identity, opaque version, and digest. Failures print one path-qualified diagnostic to standard error and never print the full manifest.
 
+Validate a complete local Registry publication without modifying it:
+
+```text
+dotnet tool run agentstration-source-registry registry validate registry.yaml \
+  --publication-root . \
+  --base-uri https://example.test/
+```
+
+Build the deterministic static publication tree:
+
+```text
+dotnet tool run agentstration-source-registry registry build registry.yaml \
+  --publication-root . \
+  --base-uri https://example.test/ \
+  --output ./published
+```
+
+Both commands validate the strict `agentstration.io/v1` contract, safe same-origin URL mapping, duplicates, `latest`, limits, and every referenced Source Version identity, opaque version, and canonical digest. `registry build` additionally emits only:
+
+```text
+published/
+  registry.json
+  registry.sha256
+  <referenced Source Version manifests>
+```
+
+`registry.json` contains RFC 8785 canonical JSON without a trailing newline. `registry.sha256` contains the separate catalogue digest followed by LF. Referenced manifests are copied byte-for-byte; unreferenced and hosting-specific files are not copied. Input and output trees must not overlap, and links, reparse points, unsafe paths, case collisions, and a non-empty output directory are rejected.
+
 ## Exit codes
 
 | Code | Meaning |
@@ -56,16 +84,17 @@ Restore the exact version before the offline validation step:
   with:
     global-json-file: global.json
 - run: dotnet tool restore
-- run: dotnet tool run agentstration-source-registry source validate sources/agentstration/bootstrap-samples/1/source.yaml
+- run: >-
+    dotnet tool run agentstration-source-registry registry validate registry.yaml
+    --publication-root .
+    --base-uri https://registry.example/
 ```
 
 Tool restoration may contact the configured package source. Command execution after restoration performs no network access.
 
-## Registry contract status
+## Registry contract
 
-Issue [#232](https://github.com/gbaudrit/agentstration/issues/232) currently describes an illustrative `SourceRegistry` shape, but its canonical catalogue digest, final URL-resolution rules, duplicate policy, bounds, and schema-evolution rules are not yet executable production contracts. The tool therefore does not expose `registry validate` or `registry build` yet. Adding either command before those rules exist would create a second, incompatible registry authority.
-
-The future Registry commands will reuse `SourceManifestReader` for every referenced `SourceVersion`, operate only on an explicit publication root or descriptor, copy no implicit files, and remain offline. Their implementation is tracked by #232 and #234.
+The commands implement the executable static Registry v1 contract defined by [#232](https://github.com/gbaudrit/agentstration/issues/232). The shared contract reader owns schema validation, canonical ordering and the catalogue digest; every referenced `SourceVersion` still goes through the production `SourceManifestReader` used by Agentstration imports.
 
 ## Boundary
 

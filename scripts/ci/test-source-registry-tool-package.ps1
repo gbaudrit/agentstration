@@ -8,6 +8,8 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $project = Join-Path $repositoryRoot "src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj"
 $fixture = Join-Path $repositoryRoot "tests/Agentstration.Tools.SourceRegistry.Tests/Fixtures/valid-source.yaml"
+$registryFixture = Join-Path $repositoryRoot "tests/Agentstration.Tools.SourceRegistry.Tests/Fixtures/registry.yaml"
+$fixtureRoot = Split-Path -Parent $registryFixture
 $temporaryDirectory = if ($IsWindows) {
     Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) "Temp"
 }
@@ -18,6 +20,7 @@ $temporaryBase = Join-Path $temporaryDirectory "agentstration-source-registry-to
 $temporaryRoot = Join-Path $temporaryBase ([Guid]::NewGuid().ToString("N"))
 $feed = Join-Path $temporaryRoot "feed"
 $consumer = Join-Path $temporaryRoot "consumer with spaces"
+$publication = Join-Path $temporaryRoot "publication output"
 
 New-Item -ItemType Directory -Path $feed, $consumer -Force | Out-Null
 try {
@@ -44,6 +47,15 @@ try {
         }
         & dotnet tool run agentstration-source-registry source validate $fixture
         if ($LASTEXITCODE -ne 0) { throw "Installed Source Registry validation command failed." }
+        & dotnet tool run agentstration-source-registry registry validate $registryFixture --publication-root $fixtureRoot --base-uri https://example.test/
+        if ($LASTEXITCODE -ne 0) { throw "Installed Registry publication validation command failed." }
+        & dotnet tool run agentstration-source-registry registry build $registryFixture --publication-root $fixtureRoot --base-uri https://example.test/ --output $publication
+        if ($LASTEXITCODE -ne 0) { throw "Installed Registry publication build command failed." }
+        if (-not (Test-Path -LiteralPath (Join-Path $publication "registry.json")) -or
+            -not (Test-Path -LiteralPath (Join-Path $publication "registry.sha256")) -or
+            -not (Test-Path -LiteralPath (Join-Path $publication "valid-source.yaml"))) {
+            throw "Installed Registry publication build did not emit the allowlisted tree."
+        }
     }
     finally {
         Pop-Location
