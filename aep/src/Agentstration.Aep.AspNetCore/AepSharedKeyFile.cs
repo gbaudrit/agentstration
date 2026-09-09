@@ -77,7 +77,7 @@ public static class AepSharedKeyFileServiceCollectionExtensions
             throw new InvalidOperationException("Aep:EnrollmentMode must be Disabled, PairingCode, or SharedKeyFile.");
         if (mode == AepEnrollmentMode.Disabled) return services;
         if (mode == AepEnrollmentMode.PairingCode)
-            throw new InvalidOperationException("PairingCode enrollment is not available in this host version.");
+            return services.AddPairingCode(configuration);
         var path = configuration["Aep:SharedKeyFile:Path"];
         if (string.IsNullOrWhiteSpace(path))
             throw new InvalidOperationException("Aep:SharedKeyFile:Path is required for SharedKeyFile enrollment.");

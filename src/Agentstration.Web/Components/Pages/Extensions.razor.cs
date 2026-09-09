@@ -28,6 +28,7 @@ public partial class Extensions
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<ExtensionResponse>? extensions;
     private IReadOnlyList<ExtensionRegistrationResource>? registrations;
+    private IReadOnlyList<AepEnrollmentRequestResource>? enrollments;
     private AgentstrationApiException? error;
     private bool loading;
     private bool discovering;
@@ -41,10 +42,22 @@ public partial class Extensions
     private ExtensionRegistrationResource? pendingDelete;
     private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
     private bool migrating;
+    private bool pairingBusy;
+    private string? activePairingCode;
+    private DateTimeOffset? activePairingExpiry;
+    private Uri? activePairingUri;
+    private bool clipboardFallback;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusLabel(string status) => T($"Status.{status}");
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    private bool CanAdministerEnrollments => Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState state
+        && state.HasPermission(AuthorizationPermissions.ResourcesWrite);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ = RefreshCountdownAsync();
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
@@ -54,13 +67,82 @@ public partial class Extensions
         {
             var extensionsTask = Client.GetExtensionsAsync(cancellation.Token);
             var registrationsTask = Client.GetRegistrationsAsync(cancellation.Token);
-            await Task.WhenAll(extensionsTask, registrationsTask);
+            var enrollmentsTask = CanAdministerEnrollments ? Client.GetEnrollmentsAsync(cancellation.Token) : Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([]);
+            await Task.WhenAll(extensionsTask, registrationsTask, enrollmentsTask);
             extensions = await extensionsTask;
             registrations = await registrationsTask;
+            enrollments = await enrollmentsTask;
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
     }
+
+    private async Task CopyAndOpenAsync(AepEnrollmentRequestResource enrollment)
+    {
+        pairingBusy = true;
+        error = null;
+        try
+        {
+            var result = await Client.RotateEnrollmentCodeAsync(enrollment.Definition.InstanceId, cancellation.Token);
+            activePairingCode = result.Code;
+            activePairingExpiry = result.ExpiresAt;
+            activePairingUri = enrollment.Definition.PairingUri;
+            clipboardFallback = !await JavaScript.InvokeAsync<bool>("agentstrationEnrollment.copyAndOpen", cancellation.Token, result.Code, activePairingUri.AbsoluteUri);
+            await LoadAsync();
+        }
+        catch (JSException) { clipboardFallback = true; }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { pairingBusy = false; }
+    }
+
+    private async Task CopyCodeAsync()
+    {
+        if (activePairingCode is null) return;
+        try { await JavaScript.InvokeVoidAsync("agentstrationEnrollment.copy", cancellation.Token, activePairingCode); clipboardFallback = false; }
+        catch (JSException) { clipboardFallback = true; }
+    }
+
+    private async Task OpenExtension()
+    {
+        if (activePairingUri is not null) await JavaScript.InvokeVoidAsync("agentstrationEnrollment.open", activePairingUri.AbsoluteUri);
+    }
+
+    private async Task RejectAsync(AepEnrollmentRequestResource enrollment)
+    {
+        pairingBusy = true;
+        try { await Client.RejectEnrollmentAsync(enrollment.Definition.InstanceId, cancellation.Token); await LoadAsync(); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { pairingBusy = false; }
+    }
+
+    private async Task CancelEnrollmentAsync(AepEnrollmentRequestResource enrollment)
+    {
+        pairingBusy = true;
+        try { await Client.CancelEnrollmentAsync(enrollment.Definition.InstanceId, cancellation.Token); await LoadAsync(); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { pairingBusy = false; }
+    }
+
+    private async Task RefreshCountdownAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try { while (await timer.WaitForNextTickAsync(cancellation.Token)) await InvokeAsync(StateHasChanged); }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+    }
+
+    private static bool CanRotate(AepEnrollmentState state) => state is AepEnrollmentState.Pending
+        or AepEnrollmentState.CodeIssued or AepEnrollmentState.Expired or AepEnrollmentState.AttemptsExceeded
+        or AepEnrollmentState.VerificationFailed;
+    private static UiStatus EnrollmentStatus(AepEnrollmentState state) => state switch
+    {
+        AepEnrollmentState.Available => UiStatus.Success,
+        AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled or AepEnrollmentState.Expired or AepEnrollmentState.AttemptsExceeded or AepEnrollmentState.VerificationFailed => UiStatus.Danger,
+        AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying => UiStatus.Warning,
+        _ => UiStatus.Neutral
+    };
+    private static long SecondsRemaining(DateTimeOffset expires) => Math.Max(0, (long)Math.Ceiling((expires - DateTimeOffset.UtcNow).TotalSeconds));
+    private static string EnrollmentAge(AepEnrollmentRequestResource request) =>
+        $"{Math.Max(0, (long)(DateTimeOffset.UtcNow - request.Definition.AnnouncedAt).TotalMinutes)}m";
 
     private async Task DiscoverAsync()
     {

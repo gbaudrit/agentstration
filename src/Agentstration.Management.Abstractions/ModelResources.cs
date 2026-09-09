@@ -61,6 +61,48 @@ public sealed record ExtensionRegistrationResource : Resource
     public ExtensionRegistrationProperties Definition { get; init; } = null!;
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<AepEnrollmentState>))]
+public enum AepEnrollmentState
+{
+    [JsonStringEnumMemberName("pending")] Pending,
+    [JsonStringEnumMemberName("codeIssued")] CodeIssued,
+    [JsonStringEnumMemberName("credentialIssued")] CredentialIssued,
+    [JsonStringEnumMemberName("verifying")] Verifying,
+    [JsonStringEnumMemberName("available")] Available,
+    [JsonStringEnumMemberName("expired")] Expired,
+    [JsonStringEnumMemberName("attemptsExceeded")] AttemptsExceeded,
+    [JsonStringEnumMemberName("rejected")] Rejected,
+    [JsonStringEnumMemberName("cancelled")] Cancelled,
+    [JsonStringEnumMemberName("verificationFailed")] VerificationFailed
+}
+
+public sealed record AepEnrollmentRequestProperties
+{
+    public required Guid InstanceId { get; init; }
+    public required Guid TenantId { get; init; }
+    public required string ExtensionId { get; init; }
+    public required string ExtensionName { get; init; }
+    public required string ExtensionVersion { get; init; }
+    public required Uri Endpoint { get; init; }
+    public required Uri PairingUri { get; init; }
+    public AepEnrollmentState State { get; init; }
+    public DateTimeOffset AnnouncedAt { get; init; }
+    public DateTimeOffset? CodeIssuedAt { get; init; }
+    public DateTimeOffset? CodeExpiresAt { get; init; }
+    public int AttemptCount { get; init; }
+    public string? CodeSalt { get; init; }
+    public string? CodeDigest { get; init; }
+    public string? CompletionDigest { get; init; }
+    public string? CredentialSecretName { get; init; }
+    public string? RegistrationName { get; init; }
+    public string? Outcome { get; init; }
+}
+
+public sealed record AepEnrollmentRequestResource : Resource
+{
+    public AepEnrollmentRequestProperties Definition { get; init; } = null!;
+}
+
 [JsonConverter(typeof(JsonStringEnumConverter<SecretType>))]
 public enum SecretType { [JsonStringEnumMemberName("opaque")] Opaque }
 

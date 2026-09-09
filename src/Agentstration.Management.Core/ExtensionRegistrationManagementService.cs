@@ -45,7 +45,7 @@ public sealed class ExtensionRegistrationManagementService(
         CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        var scopeRef = resource.ScopeRef ?? DefaultScopeRef(resource.Definition.Source);
+        var scopeRef = resource.ScopeRef ?? DefaultScopeRef(resource.Definition);
         return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             var definition = await ValidateDefinitionAsync(resource.Namespace, resource.Metadata.Name, resource.Definition, scopeRef, token);
@@ -272,10 +272,12 @@ public sealed class ExtensionRegistrationManagementService(
             throw new ExtensionRegistrationValidationException($"Referenced secret '{address}' does not exist or is not visible from '{ownerScopeRef}'.");
     }
 
-    private ResourceScopeRef DefaultScopeRef(ExtensionRegistrationSource source) =>
-        source == ExtensionRegistrationSource.Manual
-            ? scopeOperations.DefaultScopeRef(ResourceKinds.ExtensionRegistration)
-            : ResourceScopeRef.Instance;
+    private ResourceScopeRef DefaultScopeRef(ExtensionRegistrationProperties definition) =>
+        definition.EnrollmentMode == AepEnrollmentMode.PairingCode
+            ? scopeOperations.TargetScopeRef(ResourceScopeKind.Workspace)
+            : definition.Source == ExtensionRegistrationSource.Manual
+                ? scopeOperations.TargetScopeRef(ResourceScopeKind.Tenant)
+                : ResourceScopeRef.Instance;
 
     private static void ValidateIdentity(ExtensionRegistrationResource resource)
     {

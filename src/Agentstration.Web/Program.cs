@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
 using Agentstration.Infrastructure;
@@ -12,6 +13,7 @@ using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Security.AspNetCoreIdentity.PostgreSql;
 using Agentstration.Web;
+using Agentstration.Web.Api;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Configuration;
@@ -19,6 +21,7 @@ using Agentstration.Web.Features.Flows;
 using Agentstration.Web.Features.Workplace;
 using Agentstration.Web.Hosting;
 using Agentstration.Work;
+using Microsoft.AspNetCore.RateLimiting;
 using ModelContextProtocol.AspNetCore;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -111,6 +114,15 @@ builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
 builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
+builder.Services.AddRateLimiter(options => options.AddPolicy("aep-enrollment-public", context =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        })));
 builder.Services.AddAgentstrationOpenApi();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
@@ -220,6 +232,7 @@ if (genAiObservability.HttpPayloadCapture.Enabled)
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseRequestLocalization();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<PrincipalResolutionMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
@@ -238,6 +251,7 @@ app.MapAgentstrationIdentityApi();
 app.MapAgentstrationBootstrapProfiles();
 app.MapAgentstrationManagementApi();
 app.MapAgentstrationModelManagementApi();
+app.MapAgentstrationAepEnrollment();
 app.MapAgentstrationWorkApi();
 app.MapAgentstrationWorkplaceApi();
 app.MapAgentstrationWorkOperationsApi();

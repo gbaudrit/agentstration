@@ -76,6 +76,8 @@ builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 
 Set `Aep:EnrollmentMode=SharedKeyFile` and `Aep:SharedKeyFile:Path` to a file containing one bounded UTF-8 token line. Missing or malformed files fail during startup. `Disabled` leaves AEP authentication unconfigured; `PairingCode` is a separate enrollment mode and does not publish endpoints in SharedKeyFile mode.
 
+For a manual host, set `Aep:EnrollmentMode=PairingCode` and configure `Aep:PairingCode:AuthorityUrl`, `PublicEndpoint`, `TenantId`, `WorkspaceId`, and a durable writable `StateFile`. The SDK announces its stable instance ID, exposes the same-origin `/aep/enrollment/pair` form, and keeps all functional AEP endpoints authenticated while unpaired. After a successful claim it persists only the issued client ID and token digest; it does not revert to unpaired when the authority is unavailable.
+
 ## CLI
 
 ```powershell
