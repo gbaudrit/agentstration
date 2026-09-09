@@ -195,10 +195,14 @@ public sealed class AepConformanceTests
                     (await replacementClient.PostAsync(AepEnrollmentProtocol.PreviousCredentialRevocationPath, null)).StatusCode);
                 using (var lifecycleState = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile)))
                     Assert.AreEqual(JsonValueKind.Null, lifecycleState.RootElement.GetProperty("PreviousTokenDigest").ValueKind);
-                Assert.AreEqual(HttpStatusCode.Unauthorized, (await client.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+                using var revokedOriginalClient = factory.CreateClient();
+                revokedOriginalClient.DefaultRequestHeaders.Authorization = new("Bearer", original);
+                Assert.AreEqual(HttpStatusCode.Unauthorized, (await revokedOriginalClient.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
                 Assert.AreEqual(HttpStatusCode.OK,
                     (await replacementClient.PostAsync(AepEnrollmentProtocol.CredentialRevocationPath, null)).StatusCode);
-                Assert.AreEqual(HttpStatusCode.Unauthorized, (await replacementClient.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+                using var revokedReplacementClient = factory.CreateClient();
+                revokedReplacementClient.DefaultRequestHeaders.Authorization = new("Bearer", replacement);
+                Assert.AreEqual(HttpStatusCode.Unauthorized, (await revokedReplacementClient.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
             }
 
             await using (var restarted = PairingFactory(stateFile))
