@@ -165,7 +165,7 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
         return loaded;
     }
 
-    private static IReadOnlyList<string> AppendRevoked(IReadOnlyList<string>? existing, params string?[] candidates) =>
+    private static string[] AppendRevoked(IReadOnlyList<string>? existing, params string?[] candidates) =>
         (existing ?? [])
             .Concat(candidates.OfType<string>())
             .Distinct(StringComparer.Ordinal)
