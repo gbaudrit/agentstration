@@ -52,7 +52,7 @@ public sealed class AepSourceProviderMaterializer(IHttpClientFactory httpClients
     private AepSourceProviderClient Client(SourceProviderInvocation invocation)
     {
         var http = httpClients.CreateClient("agentstration-aep");
-        http.BaseAddress = invocation.Endpoint;
+        if (http.BaseAddress != invocation.Endpoint) http.BaseAddress = invocation.Endpoint;
         return new AepClient(
             http,
             AepExtensionCredentials.Create(

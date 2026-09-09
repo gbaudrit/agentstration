@@ -191,7 +191,7 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
     private AepClient CreateClient(ModelProviderConfiguration provider)
     {
         var client = httpClients.CreateClient("agentstration-aep");
-        client.BaseAddress = provider.Endpoint;
+        if (client.BaseAddress != provider.Endpoint) client.BaseAddress = provider.Endpoint;
         return new AepClient(
             client,
             AepExtensionCredentials.Create(
@@ -213,7 +213,7 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
     private AepClient CreateClient(Uri endpoint)
     {
         var client = httpClients.CreateClient("agentstration-aep");
-        client.BaseAddress = endpoint;
+        if (client.BaseAddress != endpoint) client.BaseAddress = endpoint;
         return new AepClient(client);
     }
 
