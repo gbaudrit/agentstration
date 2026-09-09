@@ -13,6 +13,12 @@
     <ProjectReference Include="../Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(UseLocalAepProjects)' == 'true'">
+    <ProjectReference Include="../../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseLocalAepProjects)' != 'true'">
+    <PackageReference Include="Agentstration.Aep.AspNetCore" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
   </ItemGroup>
