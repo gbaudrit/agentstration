@@ -33,5 +33,10 @@
     "name": "triage:confirmed",
     "color": "0E8A16",
     "description": "A maintainer confirmed the issue triage."
+  },
+  {
+    "name": "ai-defect",
+    "color": "A371F7",
+    "description": "Structural, architectural, or code-quality defect introduced by AI."
   }
 ]
