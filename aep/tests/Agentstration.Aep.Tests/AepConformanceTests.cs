@@ -165,6 +165,7 @@ public sealed class AepConformanceTests
         var stateFile = Path.Combine(directory, "state.json");
         var instanceId = Guid.NewGuid();
         var clientId = "agentstration:lifecycle-test";
+        var original = AepStaticBearerCredentials.Generate(clientId).AccessToken;
         var replacement = AepStaticBearerCredentials.Generate(clientId).AccessToken;
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(stateFile, JsonSerializer.Serialize(new
@@ -172,14 +173,14 @@ public sealed class AepConformanceTests
             InstanceId = instanceId,
             Status = "paired",
             ClientId = clientId,
-            TokenDigest = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(WorkloadToken)))
+            TokenDigest = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(original)))
         }));
         try
         {
             await using (var factory = PairingFactory(stateFile))
             {
                 using var client = factory.CreateClient();
-                client.DefaultRequestHeaders.Authorization = new("Bearer", WorkloadToken);
+                client.DefaultRequestHeaders.Authorization = new("Bearer", original);
                 using var rotated = await client.PostAsJsonAsync(AepEnrollmentProtocol.CredentialRotationPath,
                     new AepCredentialRotation(instanceId, clientId, replacement), AepProtocol.JsonOptions);
                 Assert.AreEqual(HttpStatusCode.OK, rotated.StatusCode);
@@ -192,6 +193,8 @@ public sealed class AepConformanceTests
 
                 Assert.AreEqual(HttpStatusCode.OK,
                     (await replacementClient.PostAsync(AepEnrollmentProtocol.PreviousCredentialRevocationPath, null)).StatusCode);
+                using (var state = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile)))
+                    Assert.AreEqual(JsonValueKind.Null, state.RootElement.GetProperty("PreviousTokenDigest").ValueKind);
                 Assert.AreEqual(HttpStatusCode.Unauthorized, (await client.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
                 Assert.AreEqual(HttpStatusCode.OK,
                     (await replacementClient.PostAsync(AepEnrollmentProtocol.CredentialRevocationPath, null)).StatusCode);
