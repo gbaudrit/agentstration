@@ -46,7 +46,7 @@ jobs:
             $headRevision = [string]$event.pull_request.head.sha
             $changedFiles = @(git diff --name-only --diff-filter=AM $baseRevision $headRevision -- 'docs/ai-defects')
             if ($LASTEXITCODE -ne 0) {
-              $errors.Add("Could not inspect changed AI Defect Record files.")
+              $errors.Add("Could not inspect changed AI Defect CAR files.")
             }
             else {
               $recordFiles = @($changedFiles | Where-Object {
@@ -54,10 +54,10 @@ jobs:
               })
 
               if ($recordFiles.Count -eq 0) {
-                $errors.Add("A pull request labeled ai-defect must add or update a numbered record under docs/ai-defects/.")
+                $errors.Add("A pull request labeled ai-defect must add or update a numbered CAR under docs/ai-defects/.")
               }
               elseif (-not ($recordFiles | Where-Object { $bodyWithoutComments.Contains($_) })) {
-                $errors.Add("The pull request description must link the changed AI Defect Record.")
+                $errors.Add("The pull request description must link the changed AI Defect CAR.")
               }
             }
           }
