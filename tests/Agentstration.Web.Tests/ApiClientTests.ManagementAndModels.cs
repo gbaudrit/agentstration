@@ -241,7 +241,10 @@ public sealed partial class ApiClientTests
             var response = new HttpResponseMessage(request.Method == HttpMethod.Delete ? HttpStatusCode.NoContent : HttpStatusCode.OK);
             if (request.Method != HttpMethod.Delete) { response.Content = JsonContent.Create(provider); response.Headers.ETag = new("\"v2\""); }
             return response;
-        })) { BaseAddress = new("http://localhost/") };
+        }))
+        {
+            BaseAddress = new("http://localhost/")
+        };
         var client = new SourceProvidersApiClient(httpClient);
 
         _ = await client.UpdateSourceProviderAsync(provider.Namespace, provider.Name, new(provider.Definition), "\"v1\"", default);
