@@ -68,6 +68,14 @@ builder.Services
 
 Tokens are opaque values with at least 256 bits of entropy. `AepStaticBearerCredentials.Generate` creates a suitable one-time issuance value. The server retains only SHA-256 digests and supports multiple active token IDs so callers can overlap credentials during rotation. Never place the clear token in configuration committed to source control, URLs, manifests, traces, or diagnostic output.
 
+An orchestrated extension can enable the same policy from a read-only shared-key file:
+
+```csharp
+builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
+```
+
+Set `Aep:EnrollmentMode=SharedKeyFile` and `Aep:SharedKeyFile:Path` to a file containing one bounded UTF-8 token line. Missing or malformed files fail during startup. `Disabled` leaves AEP authentication unconfigured; `PairingCode` is a separate enrollment mode and does not publish endpoints in SharedKeyFile mode.
+
 ## CLI
 
 ```powershell

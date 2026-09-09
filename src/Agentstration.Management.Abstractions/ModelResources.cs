@@ -24,6 +24,14 @@ public enum AepTransportAuthenticationMode
     [JsonStringEnumMemberName("staticBearer")] StaticBearer
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<AepEnrollmentMode>))]
+public enum AepEnrollmentMode
+{
+    [JsonStringEnumMemberName("disabled")] Disabled,
+    [JsonStringEnumMemberName("pairingCode")] PairingCode,
+    [JsonStringEnumMemberName("sharedKeyFile")] SharedKeyFile
+}
+
 public sealed record ModelProviderProperties
 {
     public required string DisplayName { get; init; }
@@ -44,6 +52,7 @@ public sealed record ExtensionRegistrationProperties
     public string? ExpectedExtensionId { get; init; }
     public ExtensionRegistrationSource Source { get; init; } = ExtensionRegistrationSource.Manual;
     public AepTransportAuthenticationMode AuthenticationMode { get; init; }
+    public AepEnrollmentMode EnrollmentMode { get; init; }
     public ResourceReference? Credential { get; init; }
 }
 

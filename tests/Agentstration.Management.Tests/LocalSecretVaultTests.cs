@@ -91,6 +91,33 @@ public sealed class LocalSecretVaultTests
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     }
 
+    [TestMethod]
+    public async Task SharedKeyFileVaultIsReadOnlyAndReturnsAValidatedToken()
+    {
+        var path = Path.GetTempFileName();
+        var token = new string('k', SharedKeyFileSecretVaultProvider.MinimumTokenBytes);
+        await File.WriteAllTextAsync(path, token + "\n");
+        try
+        {
+            var provider = new SharedKeyFileSecretVaultProvider();
+            var context = new SecretVaultContext(
+                ResourceScopeRef.Instance,
+                ResourceAddress.Create(ResourceNamespace.Default, "Vault", "shared-key"),
+                new Dictionary<string, JsonElement> { ["path"] = JsonSerializer.SerializeToElement(path) });
+
+            using var value = await provider.GetAsync(context, "token");
+
+            Assert.IsNotNull(value);
+            Assert.AreEqual(token, Encoding.UTF8.GetString(value.AccessValue().Span));
+            Assert.AreEqual(SecretValueStatus.Configured, await provider.GetStatusAsync(context, "token"));
+            await Assert.ThrowsExactlyAsync<NotSupportedException>(() => provider.SetAsync(context, "token", value));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static SecretVaultContext Context() => new(ResourceScopeRef.Workspace(Guid.NewGuid()), ResourceAddress.Create(ResourceNamespace.Default, "Vault", "local"), new Dictionary<string, System.Text.Json.JsonElement>());
     private sealed class FixedKey(byte[] key) : IMasterKeyProvider { public ValueTask<byte[]> GetKeyAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(key.ToArray()); }
 }

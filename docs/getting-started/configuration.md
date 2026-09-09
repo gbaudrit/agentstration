@@ -43,6 +43,17 @@ credential:
   scopeRef: /tenants/00000000-0000-0000-0000-000000000001
 ```
 
+For orchestrated development, `enrollmentMode: sharedKeyFile` reads the credential through a read-only Secret provider instead of copying it into Management storage:
+
+```yaml
+authenticationMode: staticBearer
+enrollmentMode: sharedKeyFile
+sharedKeyFile:
+  path: /run/aep-keys/ollama/token
+```
+
+The file must be a single UTF-8 token line containing at least 32 bytes and no more than 4096 bytes; only a final LF or CRLF is tolerated. Missing, unreadable, short, multiline, malformed, or oversized files fail closed. Aspire provisions distinct files automatically beneath the ignored slot data directory. Docker Compose provisions distinct persistent volumes and mounts each extension's key read-only; `docker compose down -v` removes those development credentials.
+
 For an intentional Compose service name or private HTTPS extension, add the exact DNS host to the narrowest applicable list. An HTTP service must be present in both lists when it resolves to a private address:
 
 ```json
