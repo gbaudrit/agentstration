@@ -381,6 +381,156 @@ public sealed class SourceRegistryCliTests
     }
 
     [TestMethod]
+    public void RegistryIndexJsonAndYamlHaveTheSameCanonicalDigestAndOrder()
+    {
+        var digest = "sha256:" + new string('1', 64);
+        var yaml = Index(("zed", "1.0.0", null, "registry-zed.json", digest), ("alpha", "0.2.0", "0.3.0", "registry-alpha.json", digest));
+        var json = """
+            {"metadata":{"name":"official"},"definition":{"catalogs":[{"registryDigest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","registryUrl":"registry-zed.json","compatibility":{"agentstration":{"minVersion":"1.0.0"}},"name":"zed"},{"name":"alpha","compatibility":{"agentstration":{"maxVersionExclusive":"0.3.0","minVersion":"0.2.0"}},"registryUrl":"registry-alpha.json","registryDigest":"sha256:1111111111111111111111111111111111111111111111111111111111111111"}]},"kind":"SourceRegistryIndex","apiVersion":"agentstration.io/v1"}
+            """;
+        var reader = new SourceRegistryIndexReader();
+
+        var parsedYaml = reader.Read(yaml, "index.yaml", new Uri("https://example.test/v1/"));
+        var parsedJson = reader.Read(json, "index.json", new Uri("https://example.test/v1/"));
+
+        Assert.AreEqual(parsedYaml.IndexDigest, parsedJson.IndexDigest);
+        CollectionAssert.AreEqual(parsedYaml.CanonicalJson, parsedJson.CanonicalJson);
+        Assert.AreEqual("alpha", parsedYaml.Manifest.Definition.Catalogs[0].Name);
+    }
+
+    [TestMethod]
+    public void RegistryIndexRejectsUnknownFieldsLimitsAndInvalidIntervals()
+    {
+        var digest = "sha256:" + new string('2', 64);
+        var reader = new SourceRegistryIndexReader();
+        var uri = new Uri("https://example.test/v1/");
+        var unknown = Index(("alpha", "0.2.0", "0.3.0", "registry.json", digest)).Replace("definition:", "unknown: true\ndefinition:", StringComparison.Ordinal);
+        var reversed = Index(("alpha", "0.3.0", "0.3.0", "registry.json", digest));
+        var catalogs = Enumerable.Range(0, SourceRegistryLimits.MaximumCatalogs + 1)
+            .Select(index => ($"catalog-{index}", "0.2.0", (string?)"0.3.0", $"registry-{index}.json", digest)).ToArray();
+
+        Assert.AreEqual("source_registry_index_invalid", Assert.ThrowsExactly<SourceValidationException>(() => reader.Read(unknown, "index.yaml", uri)).Code);
+        Assert.AreEqual("source_registry_index_interval_invalid", Assert.ThrowsExactly<SourceValidationException>(() => reader.Read(reversed, "index.yaml", uri)).Code);
+        Assert.AreEqual("source_registry_index_catalog_limit", Assert.ThrowsExactly<SourceValidationException>(() => reader.Read(Index(catalogs), "index.yaml", uri)).Code);
+        Assert.AreEqual("source_registry_index_size_limit", Assert.ThrowsExactly<SourceValidationException>(() => reader.Read(new string(' ', SourceRegistryLimits.MaximumIndexDocumentBytes + 1), "index.yaml", uri)).Code);
+    }
+
+    [TestMethod]
+    public async Task RegistryIndexBuildsOverlappingShardsAndDeduplicatesSharedManifestAsync()
+    {
+        using var files = new TemporaryDirectory("registry index publication tests");
+        var input = files.CreateDirectory("input");
+        var manifest = Manifest(includeChannel: true);
+        var manifestPath = files.WriteRelative(input, "sources/agentstration/official-samples/1/source.yaml", manifest);
+        var manifestDigest = new SourceManifestReader().Read(manifest).Digest;
+        var shardJson = Encoding.UTF8.GetString(new SourceRegistryReader().Read(Registry(manifestDigest), "registry.yaml").CanonicalJson);
+        var shardDigest = new SourceRegistryReader().Read(shardJson, "registry.json").RegistryDigest;
+        files.WriteRelative(input, "registry-a.json", shardJson);
+        files.WriteRelative(input, "registry-b.json", shardJson);
+        var indexPath = files.WriteRelative(input, "index.yaml", Index(
+            ("line-a", "0.2.0-alpha.1", "0.3.0", "registry-a.json", shardDigest),
+            ("line-b", "0.2.0", "0.4.0", "registry-b.json", shardDigest)));
+        var output = Path.Combine(files.Path, "output");
+        var secondOutput = Path.Combine(files.Path, "second-output");
+
+        var validation = await RunAsync(RegistryArguments("validate", indexPath, input));
+        var build = await RunAsync(RegistryArguments("build", indexPath, input, output));
+        var secondBuild = await RunAsync(RegistryArguments("build", indexPath, input, secondOutput));
+
+        Assert.AreEqual(SourceRegistryCli.SuccessExitCode, validation.ExitCode, validation.Error);
+        StringAssert.Contains(validation.Output, "valid SourceRegistryIndex official");
+        StringAssert.Contains(validation.Output, "shards=2 sources=1 versions=1");
+        Assert.AreEqual(SourceRegistryCli.SuccessExitCode, build.ExitCode, build.Error);
+        Assert.AreEqual(SourceRegistryCli.SuccessExitCode, secondBuild.ExitCode, secondBuild.Error);
+        Assert.IsTrue(File.Exists(Path.Combine(output, "index.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(output, "index.sha256")));
+        Assert.IsTrue(File.Exists(Path.Combine(output, "registry-a.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(output, "registry-a.sha256")));
+        Assert.IsTrue(File.Exists(Path.Combine(output, "registry-b.json")));
+        Assert.IsTrue(File.Exists(Path.Combine(output, "registry-b.sha256")));
+        CollectionAssert.AreEqual(File.ReadAllBytes(manifestPath), File.ReadAllBytes(Path.Combine(output, "sources", "agentstration", "official-samples", "1", "source.yaml")));
+        Assert.HasCount(7, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).ToArray());
+        var relativeFiles = Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Select(path => Path.GetRelativePath(output, path)).Order().ToArray();
+        CollectionAssert.AreEqual(relativeFiles, Directory.EnumerateFiles(secondOutput, "*", SearchOption.AllDirectories).Select(path => Path.GetRelativePath(secondOutput, path)).Order().ToArray());
+        foreach (var relativeFile in relativeFiles)
+            CollectionAssert.AreEqual(File.ReadAllBytes(Path.Combine(output, relativeFile)), File.ReadAllBytes(Path.Combine(secondOutput, relativeFile)));
+    }
+
+    [TestMethod]
+    public async Task RegistryIndexRejectsExactBoundaryWithoutChannelIntersectionAsync()
+    {
+        using var files = new TemporaryDirectory("registry index compatibility tests");
+        var input = files.CreateDirectory("input");
+        var manifest = Manifest(includeChannel: true).Replace("minVersion: 0.2.0-alpha.1", "minVersion: 0.3.0", StringComparison.Ordinal);
+        files.WriteRelative(input, "sources/agentstration/official-samples/1/source.yaml", manifest);
+        var manifestDigest = new SourceManifestReader().Read(manifest).Digest;
+        var shard = new SourceRegistryReader().Read(Registry(manifestDigest), "registry.yaml");
+        files.WriteRelative(input, "registry-line.json", Encoding.UTF8.GetString(shard.CanonicalJson));
+        var indexPath = files.WriteRelative(input, "index.yaml", Index(("line", "0.2.0", "0.3.0", "registry-line.json", shard.RegistryDigest)));
+
+        var result = await RunAsync(RegistryArguments("validate", indexPath, input));
+
+        Assert.AreEqual(SourceRegistryCli.ValidationExitCode, result.ExitCode);
+        StringAssert.Contains(result.Error, "source_registry_shard_compatibility_missing");
+    }
+
+    [TestMethod]
+    public async Task RegistryIndexRejectsMissingShardAndCanonicalDigestMismatchAsync()
+    {
+        using var files = new TemporaryDirectory("registry index shard integrity tests");
+        var input = files.CreateDirectory("input");
+        var wrongDigest = "sha256:" + new string('0', 64);
+        var indexPath = files.WriteRelative(input, "index.yaml", Index(("line", "0.2.0", "0.3.0", "registry-line.json", wrongDigest)));
+
+        var missing = await RunAsync(RegistryArguments("validate", indexPath, input));
+        files.WriteRelative(input, "registry-line.json", Encoding.UTF8.GetString(new SourceRegistryReader().Read(Registry("sha256:" + new string('1', 64)), "registry.yaml").CanonicalJson));
+        var mismatch = await RunAsync(RegistryArguments("validate", indexPath, input));
+
+        Assert.AreEqual(SourceRegistryCli.ValidationExitCode, missing.ExitCode);
+        StringAssert.Contains(missing.Error, "source_registry_index_registry_missing");
+        Assert.AreEqual(SourceRegistryCli.ValidationExitCode, mismatch.ExitCode);
+        StringAssert.Contains(mismatch.Error, "source_registry_index_digest_mismatch");
+    }
+
+    [TestMethod]
+    public async Task RegistryIndexRejectsCrossShardDigestConflictsAsync()
+    {
+        using var files = new TemporaryDirectory("registry index conflict tests");
+        var input = files.CreateDirectory("input");
+        var firstManifest = Manifest(includeChannel: true);
+        var secondManifest = firstManifest.Replace("Échantillon", "Autre échantillon", StringComparison.Ordinal);
+        var firstDigest = new SourceManifestReader().Read(firstManifest).Digest;
+        var secondDigest = new SourceManifestReader().Read(secondManifest).Digest;
+        files.WriteRelative(input, "sources/a.yaml", firstManifest);
+        files.WriteRelative(input, "sources/b.yaml", secondManifest);
+        var firstShard = new SourceRegistryReader().Read(Registry(firstDigest, "sources/a.yaml"), "registry.yaml");
+        var secondShard = new SourceRegistryReader().Read(Registry(secondDigest, "sources/b.yaml"), "registry.yaml");
+        files.WriteRelative(input, "registry-a.json", Encoding.UTF8.GetString(firstShard.CanonicalJson));
+        files.WriteRelative(input, "registry-b.json", Encoding.UTF8.GetString(secondShard.CanonicalJson));
+        var indexPath = files.WriteRelative(input, "index.yaml", Index(
+            ("a", "0.2.0", "0.3.0", "registry-a.json", firstShard.RegistryDigest),
+            ("b", "0.2.0", "0.3.0", "registry-b.json", secondShard.RegistryDigest)));
+
+        var result = await RunAsync(RegistryArguments("validate", indexPath, input));
+
+        Assert.AreEqual(SourceRegistryCli.ValidationExitCode, result.ExitCode);
+        StringAssert.Contains(result.Error, "source_registry_cross_shard_digest_conflict");
+    }
+
+    [TestMethod]
+    public void RegistryUrlResolutionUsesSpecificSameOriginAndPathErrors()
+    {
+        var baseUri = new Uri("https://example.test/v1/");
+
+        Assert.AreEqual("registry-a.json", SourceRegistryReferenceResolver.ResolveRegistryPublicationPath(baseUri, "registry-a.json"));
+        Assert.AreEqual("registry-a.json", SourceRegistryReferenceResolver.ResolveRegistryPublicationPath(baseUri, "https://EXAMPLE.test:443/v1/registry-a.json"));
+        Assert.AreEqual("source_registry_index_registry_origin_invalid", Assert.ThrowsExactly<SourceValidationException>(
+            () => SourceRegistryReferenceResolver.ResolveRegistryPublicationPath(baseUri, "https://other.test/v1/registry-a.json")).Code);
+        Assert.AreEqual("source_registry_index_registry_path_invalid", Assert.ThrowsExactly<SourceValidationException>(
+            () => SourceRegistryReferenceResolver.ResolveRegistryPublicationPath(baseUri, "../registry-a.json")).Code);
+    }
+
+    [TestMethod]
     public void ToolAssemblyHasNoServerNetworkOrStorageDependency()
     {
         var references = typeof(SourceRegistryCli).Assembly.GetReferencedAssemblies().Select(value => value.Name).ToArray();
@@ -439,6 +589,18 @@ public sealed class SourceRegistryCliTests
                   manifestUrl: {{manifestUrl}}
                   manifestDigest: {{digest}}
         """;
+
+    private static string Index(params (string Name, string Min, string? Max, string Url, string Digest)[] catalogs)
+    {
+        var result = new StringBuilder("apiVersion: agentstration.io/v1\nkind: SourceRegistryIndex\nmetadata:\n  name: official\ndefinition:\n  catalogs:\n");
+        foreach (var catalog in catalogs)
+        {
+            result.Append("    - name: ").Append(catalog.Name).Append("\n      compatibility:\n        agentstration:\n          minVersion: ").Append(catalog.Min).Append('\n');
+            if (catalog.Max is not null) result.Append("          maxVersionExclusive: ").Append(catalog.Max).Append('\n');
+            result.Append("      registryUrl: ").Append(catalog.Url).Append("\n      registryDigest: ").Append(catalog.Digest).Append('\n');
+        }
+        return result.ToString();
+    }
 
     private static string Manifest(bool includeChannel = false) => $$"""
         apiVersion: agentstration.io/v1

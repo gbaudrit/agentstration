@@ -3,10 +3,13 @@ namespace Agentstration.Management.Abstractions;
 public static class SourceRegistryKinds
 {
     public const string SourceRegistry = "SourceRegistry";
+    public const string SourceRegistryIndex = "SourceRegistryIndex";
 }
 
 public static class SourceRegistryLimits
 {
+    public const int MaximumIndexDocumentBytes = 1024 * 1024;
+    public const int MaximumCatalogs = 128;
     public const int MaximumDocumentBytes = 8 * 1024 * 1024;
     public const int MaximumDepth = 16;
     public const int MaximumPublishers = 256;
@@ -15,6 +18,32 @@ public static class SourceRegistryLimits
     public const int MaximumVersionsPerSource = 128;
     public const int MaximumVersions = 25_000;
 }
+
+public sealed record SourceRegistryCatalog
+{
+    public required string Name { get; init; }
+    public required SourceCompatibility Compatibility { get; init; }
+    public required string RegistryUrl { get; init; }
+    public required string RegistryDigest { get; init; }
+}
+
+public sealed record SourceRegistryIndexDefinition
+{
+    public required IReadOnlyList<SourceRegistryCatalog> Catalogs { get; init; }
+}
+
+public sealed record SourceRegistryIndexManifest
+{
+    public required string ApiVersion { get; init; }
+    public required string Kind { get; init; }
+    public required SourceRegistryMetadata Metadata { get; init; }
+    public required SourceRegistryIndexDefinition Definition { get; init; }
+}
+
+public sealed record ParsedSourceRegistryIndex(
+    SourceRegistryIndexManifest Manifest,
+    byte[] CanonicalJson,
+    string IndexDigest);
 
 public static class SourceRegistryPublisherStatuses
 {

@@ -5,40 +5,51 @@ namespace Agentstration.Management.Contracts;
 
 public static partial class SourceRegistryReferenceResolver
 {
-    public static string ResolvePublicationPath(Uri baseUri, string manifestUrl)
+    public static string ResolvePublicationPath(Uri baseUri, string manifestUrl) =>
+        ResolveManifestPublicationPath(baseUri, manifestUrl);
+
+    public static string ResolveManifestPublicationPath(Uri baseUri, string manifestUrl) =>
+        ResolvePublicationPath(baseUri, manifestUrl, "manifest");
+
+    public static string ResolveRegistryPublicationPath(Uri baseUri, string registryUrl) =>
+        ResolvePublicationPath(baseUri, registryUrl, "registry");
+
+    private static string ResolvePublicationPath(Uri baseUri, string referenceUrl, string referenceKind)
     {
         ArgumentNullException.ThrowIfNull(baseUri);
         ValidateBaseUri(baseUri);
-        if (string.IsNullOrWhiteSpace(manifestUrl) || manifestUrl.Length > 2048 || manifestUrl.Contains('%'))
-            throw Invalid("source_registry_manifest_url_invalid", "manifestUrl must be a non-empty URI without percent-encoding and at most 2048 characters.");
-        if (!Uri.TryCreate(manifestUrl, UriKind.RelativeOrAbsolute, out var reference))
-            throw Invalid("source_registry_manifest_url_invalid", $"manifestUrl '{manifestUrl}' is not a valid URI reference.");
-        if (!reference.IsAbsoluteUri && (manifestUrl.Contains('?') || manifestUrl.Contains('#')))
-            throw Invalid("source_registry_manifest_url_invalid", $"manifestUrl '{manifestUrl}' must not contain a query string or fragment.");
+        var property = referenceKind == "registry" ? "registryUrl" : "manifestUrl";
+        var codePrefix = referenceKind == "registry" ? "source_registry_index_registry" : "source_registry_manifest";
+        if (string.IsNullOrWhiteSpace(referenceUrl) || referenceUrl.Length > 2048 || referenceUrl.Contains('%'))
+            throw Invalid($"{codePrefix}_url_invalid", $"{property} must be a non-empty URI without percent-encoding and at most 2048 characters.");
+        if (!Uri.TryCreate(referenceUrl, UriKind.RelativeOrAbsolute, out var reference))
+            throw Invalid($"{codePrefix}_url_invalid", $"{property} '{referenceUrl}' is not a valid URI reference.");
+        if (!reference.IsAbsoluteUri && (referenceUrl.Contains('?') || referenceUrl.Contains('#')))
+            throw Invalid($"{codePrefix}_url_invalid", $"{property} '{referenceUrl}' must not contain a query string or fragment.");
         if (reference.IsAbsoluteUri)
         {
             if (reference.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(reference.UserInfo)
                 || !string.IsNullOrEmpty(reference.Query) || !string.IsNullOrEmpty(reference.Fragment))
-                throw Invalid("source_registry_manifest_url_invalid", $"manifestUrl '{manifestUrl}' must be an HTTP(S) URL without credentials, query, or fragment.");
+                throw Invalid($"{codePrefix}_url_invalid", $"{property} '{referenceUrl}' must be an HTTP(S) URL without credentials, query, or fragment.");
             if (!SameOrigin(baseUri, reference))
-                throw Invalid("source_registry_manifest_origin_invalid", $"manifestUrl '{manifestUrl}' must remain on the registry origin.");
+                throw Invalid($"{codePrefix}_origin_invalid", $"{property} '{referenceUrl}' must remain on the registry origin.");
         }
 
-        var rawPath = reference.IsAbsoluteUri ? OriginalAbsolutePath(manifestUrl) : manifestUrl;
-        RejectUnsafePath(rawPath, manifestUrl);
+        var rawPath = reference.IsAbsoluteUri ? OriginalAbsolutePath(referenceUrl) : referenceUrl;
+        RejectUnsafePath(rawPath, property, referenceUrl, codePrefix);
 
-        var registryDocument = new Uri(baseUri, "registry.json");
-        var resolved = new Uri(registryDocument, reference);
+        var publicationDocument = new Uri(baseUri, referenceKind == "registry" ? "index.json" : "registry.json");
+        var resolved = new Uri(publicationDocument, reference);
         if (!SameOrigin(baseUri, resolved))
-            throw Invalid("source_registry_manifest_origin_invalid", $"manifestUrl '{manifestUrl}' must remain on the registry origin.");
+            throw Invalid($"{codePrefix}_origin_invalid", $"{property} '{referenceUrl}' must remain on the registry origin.");
 
         var basePath = baseUri.AbsolutePath;
         var resolvedPath = resolved.AbsolutePath;
         if (!resolvedPath.StartsWith(basePath, StringComparison.Ordinal)
             || resolvedPath.Length == basePath.Length)
-            throw Invalid("source_registry_manifest_path_invalid", $"manifestUrl '{manifestUrl}' must resolve beneath the publication base path.");
+            throw Invalid($"{codePrefix}_path_invalid", $"{property} '{referenceUrl}' must resolve beneath the publication base path.");
         var descendant = resolvedPath[basePath.Length..];
-        RejectUnsafePath(descendant, manifestUrl);
+        RejectUnsafePath(descendant, property, referenceUrl, codePrefix);
         return descendant;
     }
 
@@ -49,7 +60,7 @@ public static partial class SourceRegistryReferenceResolver
             || !string.IsNullOrEmpty(baseUri.Fragment) || !baseUri.AbsoluteUri.EndsWith('/'))
             throw Invalid("source_registry_base_uri_invalid", "--base-uri must be an absolute HTTP(S) URI ending in '/' without credentials, query, or fragment.");
         var basePath = baseUri.GetComponents(UriComponents.Path, UriFormat.UriEscaped).TrimEnd('/');
-        if (basePath.Length > 0) RejectUnsafePath(basePath, baseUri.AbsoluteUri);
+        if (basePath.Length > 0) RejectUnsafePath(basePath, "--base-uri", baseUri.AbsoluteUri, "source_registry_base_uri");
     }
 
     private static string OriginalAbsolutePath(string value)
@@ -59,13 +70,13 @@ public static partial class SourceRegistryReferenceResolver
         return path < 0 ? string.Empty : value[(path + 1)..];
     }
 
-    private static void RejectUnsafePath(string path, string manifestUrl)
+    private static void RejectUnsafePath(string path, string property, string referenceUrl, string codePrefix)
     {
         if (path.StartsWith('/') || path.EndsWith('/') || path.Contains('\\') || path.Contains('%') || path.Contains("//", StringComparison.Ordinal))
-            throw Invalid("source_registry_manifest_path_invalid", $"manifestUrl '{manifestUrl}' contains an unsafe path.");
+            throw Invalid($"{codePrefix}_path_invalid", $"{property} '{referenceUrl}' contains an unsafe path.");
         var segments = path.Split('/');
         if (segments.Any(segment => segment is "." or ".." || !PathSegmentPattern().IsMatch(segment)))
-            throw Invalid("source_registry_manifest_path_invalid", $"manifestUrl '{manifestUrl}' contains an invalid path segment.");
+            throw Invalid($"{codePrefix}_path_invalid", $"{property} '{referenceUrl}' contains an invalid path segment.");
     }
 
     private static bool SameOrigin(Uri left, Uri right) =>

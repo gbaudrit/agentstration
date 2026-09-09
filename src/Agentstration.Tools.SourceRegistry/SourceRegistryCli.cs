@@ -15,8 +15,8 @@ public static class SourceRegistryCli
     private const string Usage = """
         Usage:
           agentstration-source-registry source <digest|validate> <source.yaml>
-          agentstration-source-registry registry validate <registry.yaml> --publication-root <root> --base-uri <uri>
-          agentstration-source-registry registry build <registry.yaml> --publication-root <root> --base-uri <uri> --output <root>
+          agentstration-source-registry registry validate <registry-or-index.yaml> --publication-root <root> --base-uri <uri>
+          agentstration-source-registry registry build <registry-or-index.yaml> --publication-root <root> --base-uri <uri> --output <root>
         """;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
@@ -105,8 +105,16 @@ public static class SourceRegistryCli
                 ? await service.ValidateAsync(registryPath, publicationRoot, baseUri, cancellationToken)
                 : await service.BuildAsync(registryPath, publicationRoot, baseUri, outputRoot!, cancellationToken);
             var action = arguments[1] == "validate" ? "valid" : "built";
-            await output.WriteLineAsync(
-                $"{displayPath}: {action} SourceRegistry {validation.Registry.Manifest.Metadata.Name} {validation.Registry.RegistryDigest} publishers={validation.Registry.Manifest.Definition.Publishers.Count} sources={validation.SourceCount} versions={validation.VersionCount}");
+            if (validation.Kind == SourceRegistryPublicationKind.Index)
+            {
+                await output.WriteLineAsync(
+                    $"{displayPath}: {action} SourceRegistryIndex {validation.Index!.Manifest.Metadata.Name} {validation.Index.IndexDigest} shards={validation.Shards.Count} sources={validation.SourceCount} versions={validation.VersionCount}");
+            }
+            else
+            {
+                await output.WriteLineAsync(
+                    $"{displayPath}: {action} SourceRegistry {validation.Registry!.Manifest.Metadata.Name} {validation.Registry.RegistryDigest} kind=shard publishers={validation.Registry.Manifest.Definition.Publishers.Count} sources={validation.SourceCount} versions={validation.VersionCount}");
+            }
             return SuccessExitCode;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

@@ -24,13 +24,13 @@ The package is prepared for exact-version installation and local-feed validation
 Validate one `SourceVersion` document through the same strict reader used by Agentstration imports:
 
 ```text
-dotnet tool run agentstration-source-registry source validate sources/agentstration/bootstrap-samples/1/source.yaml
+dotnet tool run agentstration-source-registry -- source validate sources/agentstration/bootstrap-samples/1/source.yaml
 ```
 
 Print only its canonical digest:
 
 ```text
-dotnet tool run agentstration-source-registry source digest sources/agentstration/bootstrap-samples/1/source.yaml
+dotnet tool run agentstration-source-registry -- source digest sources/agentstration/bootstrap-samples/1/source.yaml
 ```
 
 The digest has the stable form `sha256:<lowercase-hex>`. Property order, YAML comments, and presentation whitespace do not change it. Functional scalar types and array order remain significant.
@@ -40,30 +40,34 @@ Successful validation prints the validated Source identity, opaque version, and 
 Validate a complete local Registry publication without modifying it:
 
 ```text
-dotnet tool run agentstration-source-registry registry validate registry.yaml \
+dotnet tool run agentstration-source-registry -- registry validate index.yaml \
   --publication-root . \
-  --base-uri https://example.test/
+  --base-uri https://example.test/v1/
 ```
 
 Build the deterministic static publication tree:
 
 ```text
-dotnet tool run agentstration-source-registry registry build registry.yaml \
+dotnet tool run agentstration-source-registry -- registry build index.yaml \
   --publication-root . \
-  --base-uri https://example.test/ \
+  --base-uri https://example.test/v1/ \
   --output ./published
 ```
 
-Both commands validate the strict `agentstration.io/v1` contract, safe same-origin URL mapping, duplicates, `latest`, limits, and every referenced Source Version identity, opaque version, and canonical digest. `registry build` additionally emits only:
+Both commands accept either a direct `SourceRegistry` shard named `registry.*` or a complete `SourceRegistryIndex` named `index.*`. Index validation follows every declared shard offline, verifies its canonical digest, checks Channel compatibility intersection with the shard's Semantic Version interval, and applies cross-shard conflict and shared-manifest rules. Both forms validate safe same-origin URL mapping, duplicates, shard-local `latest`, limits, and every referenced Source Version identity, opaque version, and canonical digest.
+
+An index build emits only the complete reachable publication:
 
 ```text
 published/
-  registry.json
-  registry.sha256
-  <referenced Source Version manifests>
+  index.json
+  index.sha256
+  registry-<catalog>.json
+  registry-<catalog>.sha256
+  sources/<publisher>/<source>/<version>/source.yaml
 ```
 
-`registry.json` contains RFC 8785 canonical JSON without a trailing newline. `registry.sha256` contains the separate catalogue digest followed by LF. Referenced manifests are copied byte-for-byte; unreferenced and hosting-specific files are not copied. Input and output trees must not overlap, and links, reparse points, unsafe paths, case collisions, and a non-empty output directory are rejected.
+Index and shard documents contain RFC 8785 canonical JSON without a trailing newline. Their `.sha256` files contain the corresponding `indexDigest` or `registryDigest` followed by LF. Referenced manifests are copied byte-for-byte and identical shared targets are emitted once; unreferenced and hosting-specific files are not copied. Input and output trees must not overlap, and links, reparse points, unsafe paths, case collisions, and a non-empty output directory are rejected. Direct shard builds remain available and emit `registry.json`, `registry.sha256`, and their manifests.
 
 ## Exit codes
 
@@ -85,16 +89,16 @@ Restore the exact version before the offline validation step:
     global-json-file: global.json
 - run: dotnet tool restore
 - run: >-
-    dotnet tool run agentstration-source-registry registry validate registry.yaml
+    dotnet tool run agentstration-source-registry -- registry validate index.yaml
     --publication-root .
-    --base-uri https://registry.example/
+    --base-uri https://registry.example/v1/
 ```
 
 Tool restoration may contact the configured package source. Command execution after restoration performs no network access.
 
 ## Registry contract
 
-The commands implement the executable static Registry v1 contract defined by [#232](https://github.com/gbaudrit/agentstration/issues/232). The shared contract reader owns schema validation, canonical ordering and the catalogue digest; every referenced `SourceVersion` still goes through the production `SourceManifestReader` used by Agentstration imports.
+The commands implement the executable static Registry v1 contract defined by [#232](https://github.com/gbaudrit/agentstration/issues/232). `SourceRegistryIndex` is the small release-line index and `SourceRegistry` remains a bounded catalogue shard. The shared readers own schema validation, canonical ordering and separate index/shard digests; every referenced `SourceVersion` still goes through the production `SourceManifestReader` used by Agentstration imports.
 
 ## Boundary
 
