@@ -28,6 +28,7 @@ public partial class Extensions
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<ExtensionResponse>? extensions;
     private IReadOnlyList<ExtensionRegistrationResource>? registrations;
+    private IReadOnlyList<SourceProviderSummaryResponse> sourceProviders = [];
     private AgentstrationApiException? error;
     private bool loading;
     private bool discovering;
@@ -54,9 +55,11 @@ public partial class Extensions
         {
             var extensionsTask = Client.GetExtensionsAsync(cancellation.Token);
             var registrationsTask = Client.GetRegistrationsAsync(cancellation.Token);
-            await Task.WhenAll(extensionsTask, registrationsTask);
+            var sourceProvidersTask = SourceProvidersClient.GetSourceProvidersAsync(cancellation.Token);
+            await Task.WhenAll(extensionsTask, registrationsTask, sourceProvidersTask);
             extensions = await extensionsTask;
             registrations = await registrationsTask;
+            sourceProviders = await sourceProvidersTask;
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
@@ -232,6 +235,17 @@ public partial class Extensions
         $"/modelproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
     private static string ConfigureProviderUrl(ExtensionResponse extension, ExtensionContributionResponse contribution) =>
         $"/modelproviders/new?extension={Uri.EscapeDataString(extension.RegistrationName)}&extensionNamespace={Uri.EscapeDataString(extension.RegistrationNamespace)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(extension.Extension?.Name ?? contribution.Id)}";
+    private IReadOnlyList<SourceProviderSummaryResponse> SourceProviders(ExtensionResponse extension) => sourceProviders.Where(provider =>
+        provider.ExtensionNamespace == extension.RegistrationNamespace
+        && provider.ExtensionName == extension.RegistrationName).ToArray();
+    private bool IsInstanceRegistration(ExtensionResponse extension) => registrations?.Any(registration =>
+        registration.ScopeRef == ResourceScopeRef.Instance
+        && registration.Namespace.Value == extension.RegistrationNamespace
+        && registration.Name == extension.RegistrationName) == true;
+    private static string SourceProviderUrl(SourceProviderSummaryResponse provider) =>
+        $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+    private static string ConfigureSourceProviderUrl(ExtensionResponse extension, ExtensionContributionResponse contribution) =>
+        $"/sourceproviders/new?extension={Uri.EscapeDataString(extension.RegistrationName)}&extensionNamespace={Uri.EscapeDataString(extension.RegistrationNamespace)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(extension.Extension?.Name ?? contribution.Id)}";
 
     public void Dispose()
     {

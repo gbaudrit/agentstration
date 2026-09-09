@@ -296,6 +296,13 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/usages", StringComparison.OrdinalIgnoreCase)) return Json<ModelProviderUsagesResponse>(200, "List model provider usages");
             return Json<ModelProviderResource>(200, method == "PUT" ? "Update a model provider" : "Get a model provider");
         }
+        if (path.StartsWith("/api/sourceproviders", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path == "/api/sourceproviders") return method == "POST" ? Json<SourceProviderResource>(201, "Create a Source Provider") : Json<ValueResponse<SourceProviderSummaryResponse>>(200, "List Source Providers");
+            if (path.EndsWith("/status", StringComparison.OrdinalIgnoreCase)) return Json<SourceProviderStatusResponse>(200, "Get Source Provider status");
+            if (path.EndsWith("/usages", StringComparison.OrdinalIgnoreCase)) return Json<SourceProviderUsagesResponse>(200, "List Source Provider usages");
+            return Json<SourceProviderResource>(200, method == "PUT" ? "Update a Source Provider" : "Get a Source Provider");
+        }
         if (path.StartsWith("/api/modelprofiles", StringComparison.OrdinalIgnoreCase))
         {
             if (path == "/api/modelprofiles") return method == "POST" ? Json<ModelProfileResource>(201, "Create a model profile") : Json<ValueResponse<ModelProfileSummaryResponse>>(200, "List model profiles");
@@ -411,6 +418,7 @@ internal static class OpenApiSuccessResponseCatalog
         path.StartsWith("/api/extensions", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/extensionregistrations", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/modelproviders", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/api/sourceproviders", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/modelprofiles", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/runtimeprofiles", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/api/toolproviders", StringComparison.OrdinalIgnoreCase)

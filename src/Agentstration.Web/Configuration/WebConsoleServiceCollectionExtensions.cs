@@ -65,6 +65,7 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<HttpUserPreferencesClient, IUserPreferencesClient>(services, configured.ManagementApi);
         AddClient<ModelProvidersApiClient, IModelProvidersClient>(services, configured.ManagementApi);
         AddClient<ExtensionsApiClient, IExtensionsClient>(services, configured.ManagementApi);
+        AddClient<SourceProvidersApiClient, ISourceProvidersClient>(services, configured.ManagementApi);
         AddClient<ModelProfilesApiClient, IModelProfilesClient>(services, configured.ManagementApi);
         AddClient<AgentsModelApiClient, IAgentsModelClient>(services, configured.ManagementApi);
         AddClient<RuntimeProfilesApiClient, IRuntimeProfilesClient>(services, configured.ManagementApi);

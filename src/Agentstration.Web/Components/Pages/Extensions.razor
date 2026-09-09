@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject IExtensionsClient Client
 @inject IModelProfilesClient ProfilesClient
+@inject ISourceProvidersClient SourceProvidersClient
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
 
@@ -124,6 +125,7 @@ else
                 <dt>@T("AepEndpoint")</dt><dd><code>@extension.Endpoint</code></dd>
                 <dt>@T("Registration")</dt><dd><code>@extension.RegistrationNamespace/@extension.RegistrationName</code></dd>
                 <dt>@T("ModelProviders")</dt><dd>@(extension.Providers.Count == 0 ? "—" : string.Join(", ", extension.Providers.Select(value => $"{value.Namespace}/{value.Name} → {value.ContributionId}")))</dd>
+                <dt>@T("SourceProviders")</dt><dd>@(SourceProviders(extension).Count == 0 ? "—" : string.Join(", ", SourceProviders(extension).Select(value => $"{value.Namespace}/{value.Name} → {value.ContributionId}")))</dd>
                 <dt>@T("Contributions")</dt><dd>@(extension.Contributions.Count == 0 ? "—" : string.Join(", ", extension.Contributions.Select(value => $"{value.Kind}:{value.Id}")))</dd>
             </dl>
 
@@ -137,6 +139,27 @@ else
                     @foreach (var contribution in extension.Contributions.Where(value => value.Kind == "model-provider" && !extension.Providers.Any(provider => provider.ContributionId == value.Id)))
                     {
                         <a class="button-primary" href="@ConfigureProviderUrl(extension, contribution)">@T("ConfigureProvider", contribution.Id)</a>
+                    }
+                </div>
+            }
+
+            @if (extension.Contributions.Any(value => value.Kind == "source-provider"))
+            {
+                <div class="panel-actions">
+                    @foreach (var provider in SourceProviders(extension))
+                    {
+                        <a class="button-secondary" href="@SourceProviderUrl(provider)">@T("OpenSourceProvider", provider.Name)</a>
+                    }
+                    @if (IsInstanceRegistration(extension))
+                    {
+                        @foreach (var contribution in extension.Contributions.Where(value => value.Kind == "source-provider" && !SourceProviders(extension).Any(provider => provider.ContributionId.Equals(value.Id, StringComparison.OrdinalIgnoreCase))))
+                        {
+                            <a class="button-primary" href="@ConfigureSourceProviderUrl(extension, contribution)">@T("ConfigureSourceProvider", contribution.Id)</a>
+                        }
+                    }
+                    else
+                    {
+                        <span class="inline-warning">@T("SourceProviderRequiresInstanceExtension")</span>
                     }
                 </div>
             }
