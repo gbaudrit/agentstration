@@ -23,7 +23,7 @@ public partial class MainLayout
         new("Group.Operate", [new("Nav.Triggers", "/triggers", "clock", "work"), new("Nav.Deployments", "/deployments", "server", "runtime"), new("Nav.Tasks", "/tasks", "tasks", "work")]),
         new("Group.Runs", [new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
         new("Group.Configure", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work"), new("Nav.Packs", "/packs", "package"), new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "database", "source"), new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key")]),
-        new("Group.System", [new("Nav.ResourceScopes", "/settings/resource-scopes", "layers", RequiredPermissions: ["resources/read"]), new("Nav.Sources", "/settings/sources", "database"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "upload-cloud"), new("Nav.Profile", "/settings/profile", "user-circle"), new("Nav.Settings", "/settings", "settings")])
+        new("Group.System", [new("Nav.ResourceScopes", "/settings/resource-scopes", "layers", RequiredPermissions: ["resources/read"]), new("Nav.Sources", "/settings/sources", "books"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "upload-cloud"), new("Nav.Profile", "/settings/profile", "user-circle"), new("Nav.Settings", "/settings", "settings")])
     ];
 
     private static readonly CommandDefinition[] CommandDefinitions =
@@ -59,7 +59,7 @@ public partial class MainLayout
         new("Command.CreateVault", "/vaults/new", "+", "Command", "new nouveau secret storage coffre"),
         new("Nav.Settings", "/settings", "⚙", "Group.System", "configuration paramètres"),
         new("Nav.ResourceScopes", "/settings/resource-scopes", "◇", "Group.System", "resource ownership hierarchy scopes ressources propriété hiérarchie", ["resources/read"]),
-        new("Nav.Sources", "/settings/sources", "◫", "Group.System", "sources catalogs reusable content catalogues contenu réutilisable"),
+        new("Nav.Sources", "/settings/sources", "▤", "Group.System", "sources catalogs reusable content catalogues contenu réutilisable"),
         new("Command.ProfileSettings", "/settings/profile", "○", "Group.System", "appearance theme personal preferences apparence thème préférences"),
         new("Nav.Extensions", "/extensions", "⬢", "Group.System", "AEP option contracts compatibility extensions"),
         new("Nav.Cleanup", "/cleanup", "⌫", "Group.System", "cleanup clean delete purge nettoyage suppression", ["resources/delete", "runs/delete"]),

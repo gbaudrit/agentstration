@@ -149,7 +149,14 @@ else
             <div class="binding-grid">
                 @foreach (var binding in detail.Bindings.Bindings)
                 {
-                    <label><span>@binding.Name <small>@string.Join(", ", binding.Channels)</small></span><select value="@BindingValue(binding)" @onchange="args => SetBinding(binding, args)" disabled="@busy"><option value="">@T("SelectProvider")</option>@foreach (var provider in CompatibleProviders(binding.TargetKind)) { <option value="@ProviderValue(provider.Value)">@provider.Value.Definition.DisplayName — @provider.Value.Namespace/@provider.Value.Name</option> }</select>@if (binding.Issues.Count > 0) { <small class="inline-warning">@string.Join(" ", binding.Issues.Select(value => value.Message))</small> }</label>
+                    <article class="binding-card">
+                        <header>
+                            <span class="binding-identity"><span class="binding-icon" aria-hidden="true"><UiIcon Name="database" /></span><strong>@binding.Name</strong></span>
+                            <span class="binding-channels">@foreach (var channel in binding.Channels) { <code>@channel</code> }</span>
+                        </header>
+                        <label><span class="sr-only">@T("SelectProvider")</span><select value="@BindingValue(binding)" @onchange="args => SetBinding(binding, args)" disabled="@busy"><option value="">@T("SelectProvider")</option>@foreach (var provider in CompatibleProviders(binding.TargetKind)) { <option value="@ProviderValue(provider.Value)">@provider.Value.Definition.DisplayName — @provider.Value.Namespace/@provider.Value.Name</option> }</select></label>
+                        @if (binding.Issues.Count > 0) { <small class="inline-warning">@string.Join(" ", binding.Issues.Select(value => value.Message))</small> }
+                    </article>
                 }
             </div>
             <div class="panel-actions"><button class="button-primary" disabled="@busy" @onclick="SaveBindingsAsync">@T("SaveBindings")</button></div>
