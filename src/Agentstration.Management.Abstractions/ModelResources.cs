@@ -64,6 +64,7 @@ public sealed record ExtensionRegistrationResource : Resource
 [JsonConverter(typeof(JsonStringEnumConverter<AepEnrollmentState>))]
 public enum AepEnrollmentState
 {
+    [JsonStringEnumMemberName("unpaired")] Unpaired,
     [JsonStringEnumMemberName("pending")] Pending,
     [JsonStringEnumMemberName("codeIssued")] CodeIssued,
     [JsonStringEnumMemberName("credentialIssued")] CredentialIssued,
@@ -73,7 +74,9 @@ public enum AepEnrollmentState
     [JsonStringEnumMemberName("attemptsExceeded")] AttemptsExceeded,
     [JsonStringEnumMemberName("rejected")] Rejected,
     [JsonStringEnumMemberName("cancelled")] Cancelled,
-    [JsonStringEnumMemberName("verificationFailed")] VerificationFailed
+    [JsonStringEnumMemberName("verificationFailed")] VerificationFailed,
+    [JsonStringEnumMemberName("revoked")] Revoked,
+    [JsonStringEnumMemberName("disabled")] Disabled
 }
 
 public sealed record AepEnrollmentRequestProperties

@@ -1,3 +1,5 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using Agentstration.Aep.Abstractions;
@@ -24,6 +26,7 @@ public sealed class AepEnrollmentService(
     IHttpClientFactory httpClients,
     AepTransportSecurityOptions transportOptions,
     ICurrentRequestContext requestContext,
+    ISecurityAuditWriter audit,
     TimeProvider timeProvider)
 {
     public const int MaximumAttempts = 5;
@@ -79,6 +82,7 @@ public sealed class AepEnrollmentService(
             // A simultaneous restart announced the same deterministic instance.
             return await AnnounceAsync(announcement, cancellationToken);
         }
+        await AuditAsync(SecurityAuditActions.AepEnrollmentAnnounced, resource, null, cancellationToken);
         return new(announcement.InstanceId, "pending");
     }
 
@@ -117,6 +121,7 @@ public sealed class AepEnrollmentService(
         };
         CryptographicOperations.ZeroMemory(salt);
         _ = await UpdateAsync(stored, definition, cancellationToken);
+        await AuditAsync(SecurityAuditActions.AepPairingCodeIssued, stored.Value, null, cancellationToken);
         return new(requestId, code, expires);
     }
 
@@ -136,6 +141,11 @@ public sealed class AepEnrollmentService(
             CodeDigest = null,
             Outcome = State(state)
         }, cancellationToken);
+        await AuditAsync(
+            state == AepEnrollmentState.Rejected ? SecurityAuditActions.AepEnrollmentRejected : SecurityAuditActions.AepEnrollmentCancelled,
+            stored.Value,
+            null,
+            cancellationToken);
     }
 
     public async Task<AepEnrollmentCredential> ClaimAsync(AepEnrollmentClaim claim, CancellationToken cancellationToken)
@@ -192,6 +202,7 @@ public sealed class AepEnrollmentService(
         {
             var names = await PersistCredentialAndRegistrationAsync(stored.Value, accessToken, cancellationToken);
             _ = await UpdateAsync(stored, consumed with { CredentialSecretName = names.Secret, RegistrationName = names.Registration }, cancellationToken);
+            await AuditAsync(SecurityAuditActions.AepCredentialIssued, stored.Value, null, cancellationToken);
             return new(clientId, accessToken, completion);
         }
         catch
@@ -224,14 +235,62 @@ public sealed class AepEnrollmentService(
                 CompletionDigest = null,
                 Outcome = "available"
             }, cancellationToken);
+            await AuditAsync(SecurityAuditActions.AepEnrollmentAvailable, stored.Value, null, cancellationToken);
             return new("available");
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             try { _ = await UpdateAsync(stored, definition with { State = AepEnrollmentState.VerificationFailed, CompletionDigest = null, Outcome = "verification_failed" }, cancellationToken); }
             catch (ControlPlaneConcurrencyException) { }
+            await AuditAsync(SecurityAuditActions.AepEnrollmentFailed, stored.Value, "verification_failed", cancellationToken, SecurityAuditOutcome.Failed);
             throw new AepEnrollmentException("verification_failed", "The authenticated extension manifest could not be verified.", 502);
         }
+    }
+
+    public async Task<AepCredentialLifecycleResponse> RotateCredentialAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
+    {
+        using var scopeContext = RequestScopes().Push(context);
+        await AuthorizeAsync(context, cancellationToken);
+        var stored = await GetAsync(context.WorkspaceId, requestId, cancellationToken);
+        if (stored.Value.Definition.State != AepEnrollmentState.Available)
+            throw new AepEnrollmentException("credential_not_active", "The enrollment credential is not active.", 409);
+        stored = await UpdateAsync(stored, stored.Value.Definition with { State = AepEnrollmentState.Verifying, Outcome = "rotation_pending" }, cancellationToken);
+        var oldToken = await ReadTokenAsync(stored.Value, cancellationToken);
+        var newToken = GenerateToken();
+        try
+        {
+            await SendLifecycleAsync(stored.Value, AepEnrollmentProtocol.CredentialRotationPath, oldToken,
+                new AepCredentialRotation(stored.Value.Definition.InstanceId,
+                    $"agentstration:{stored.Value.Definition.TenantId:D}:{stored.Value.Definition.InstanceId:D}", newToken), cancellationToken);
+            await WriteTokenAsync(stored.Value, newToken, cancellationToken);
+            await VerifyAsync(stored.Value, newToken, cancellationToken);
+            await SendLifecycleAsync(stored.Value, AepEnrollmentProtocol.PreviousCredentialRevocationPath, newToken, null, cancellationToken);
+            _ = await UpdateAsync(stored, stored.Value.Definition with { State = AepEnrollmentState.Available, Outcome = "credential_rotated" }, cancellationToken);
+            await AuditAsync(SecurityAuditActions.AepCredentialRotated, stored.Value, null, cancellationToken);
+            return new("rotated");
+        }
+        catch (AepEnrollmentException exception)
+        {
+            try { _ = await UpdateAsync(stored, stored.Value.Definition with { State = AepEnrollmentState.VerificationFailed, Outcome = exception.Code }, cancellationToken); }
+            catch (ControlPlaneConcurrencyException) { }
+            await AuditAsync(SecurityAuditActions.AepEnrollmentFailed, stored.Value, exception.Code, cancellationToken, SecurityAuditOutcome.Failed);
+            throw;
+        }
+    }
+
+    public async Task RevokeCredentialAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
+    {
+        using var scopeContext = RequestScopes().Push(context);
+        await AuthorizeAsync(context, cancellationToken);
+        var stored = await GetAsync(context.WorkspaceId, requestId, cancellationToken);
+        if (stored.Value.Definition.State == AepEnrollmentState.Revoked) return;
+        if (stored.Value.Definition.State is not (AepEnrollmentState.Available or AepEnrollmentState.Disabled or AepEnrollmentState.VerificationFailed))
+            throw new AepEnrollmentException("credential_not_active", "The enrollment credential is not active.", 409);
+        var token = await ReadTokenAsync(stored.Value, cancellationToken);
+        await SendLifecycleAsync(stored.Value, AepEnrollmentProtocol.CredentialRevocationPath, token, null, cancellationToken);
+        await DeleteTokenAndDisableRegistrationAsync(stored.Value, cancellationToken);
+        _ = await UpdateAsync(stored, stored.Value.Definition with { State = AepEnrollmentState.Revoked, Outcome = "credential_revoked" }, cancellationToken);
+        await AuditAsync(SecurityAuditActions.AepCredentialRevoked, stored.Value, null, cancellationToken);
     }
 
     private async Task<(string Secret, string Registration)> PersistCredentialAndRegistrationAsync(AepEnrollmentRequestResource request, string token, CancellationToken cancellationToken)
@@ -322,6 +381,107 @@ public sealed class AepEnrollmentService(
             ?? throw new InvalidOperationException("The enrollment credential is unavailable.");
         return Encoding.UTF8.GetString(value.AccessValue().Span);
     }
+
+    private async Task WriteTokenAsync(AepEnrollmentRequestResource request, string token, CancellationToken cancellationToken)
+    {
+        var provider = EnrollmentVaultProvider();
+        var tokenBytes = Encoding.UTF8.GetBytes(token);
+        try
+        {
+            using var value = new SecretValue(tokenBytes);
+            await provider.SetAsync(EnrollmentVaultContext(request), CredentialName(request), value, cancellationToken);
+        }
+        finally { CryptographicOperations.ZeroMemory(tokenBytes); }
+    }
+
+    private async Task DeleteTokenAndDisableRegistrationAsync(AepEnrollmentRequestResource request, CancellationToken cancellationToken)
+    {
+        await EnrollmentVaultProvider().DeleteAsync(EnrollmentVaultContext(request), CredentialName(request), cancellationToken);
+        var scope = request.ScopeRef ?? throw new InvalidOperationException("The enrollment request is unscoped.");
+        var registrationName = request.Definition.RegistrationName
+            ?? throw new InvalidOperationException("The enrollment registration reference is unavailable.");
+        var address = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.ExtensionRegistration, registrationName);
+        var registration = await store.GetExactAsync<ExtensionRegistrationResource>(address, cancellationToken)
+            ?? throw new InvalidOperationException("The enrollment registration is unavailable.");
+        if (registration.Value.Definition.Enabled)
+            _ = await store.PutExactAsync(scope, registration.Value with
+            {
+                Generation = checked(registration.Value.Generation + 1),
+                Definition = registration.Value.Definition with { Enabled = false }
+            }, registration.ETag, false, cancellationToken);
+    }
+
+    private async Task VerifyAsync(AepEnrollmentRequestResource request, string token, CancellationToken cancellationToken)
+    {
+        using var http = httpClients.CreateClient("agentstration-aep");
+        http.BaseAddress = request.Definition.Endpoint;
+        try
+        {
+            _ = await new AepClient(http, new StaticAepAccessTokenProvider(token), transportOptions, request.Definition.ExtensionId)
+                .GetManifestAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            throw new AepEnrollmentException("verification_failed", "The rotated credential could not verify the extension identity.", 502);
+        }
+    }
+
+    private async Task SendLifecycleAsync(
+        AepEnrollmentRequestResource request,
+        string path,
+        string token,
+        object? body,
+        CancellationToken cancellationToken)
+    {
+        using var http = httpClients.CreateClient("agentstration-aep");
+        http.BaseAddress = request.Definition.Endpoint;
+        using var message = new HttpRequestMessage(HttpMethod.Post, path);
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (body is not null) message.Content = JsonContent.Create(body, body.GetType(), options: AepProtocol.JsonOptions);
+        HttpResponseMessage response;
+        try { response = await http.SendAsync(message, cancellationToken); }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            throw new AepEnrollmentException("extension_unreachable", "The extension enrollment endpoint is unreachable.", 502);
+        }
+        using (response)
+        {
+            if (response.IsSuccessStatusCode) return;
+            var code = response.StatusCode switch
+            {
+                System.Net.HttpStatusCode.Unauthorized => "authentication_failed",
+                System.Net.HttpStatusCode.Forbidden => "authorization_denied",
+                System.Net.HttpStatusCode.NotFound => "protocol_incompatible",
+                _ => "extension_unreachable"
+            };
+            throw new AepEnrollmentException(code, "The extension rejected the credential lifecycle operation.",
+                response.StatusCode == System.Net.HttpStatusCode.NotFound ? 409 : 502);
+        }
+    }
+
+    private ISecretVaultProvider EnrollmentVaultProvider() =>
+        vaultProviders.Single(value => string.Equals(value.ProviderType, "local", StringComparison.OrdinalIgnoreCase));
+
+    private static string CredentialName(AepEnrollmentRequestResource request) => request.Definition.CredentialSecretName
+        ?? throw new InvalidOperationException("The enrollment credential reference is unavailable.");
+
+    private static SecretVaultContext EnrollmentVaultContext(AepEnrollmentRequestResource request) => new(
+        request.ScopeRef ?? throw new InvalidOperationException("The enrollment request is unscoped."),
+        ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.Vault, VaultName),
+        new Dictionary<string, System.Text.Json.JsonElement>());
+
+    private Task AuditAsync(
+        string action,
+        AepEnrollmentRequestResource request,
+        string? reasonCode,
+        CancellationToken cancellationToken,
+        SecurityAuditOutcome outcome = SecurityAuditOutcome.Succeeded) => audit.WriteAsync(new(
+            action,
+            outcome,
+            TargetAccountId: request.Definition.InstanceId,
+            TenantId: request.Definition.TenantId,
+            WorkspaceId: request.ScopeRef?.Kind == ResourceScopeKind.Workspace ? request.ScopeRef.Value.TargetId : null,
+            ReasonCode: reasonCode), cancellationToken);
 
     private async Task AuthorizeAsync(RequestContext context, CancellationToken cancellationToken) =>
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.ResourcesWrite, cancellationToken);

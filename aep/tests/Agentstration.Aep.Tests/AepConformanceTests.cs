@@ -1,6 +1,7 @@
 using System.IO.Pipelines;
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
@@ -150,6 +151,65 @@ public sealed class AepConformanceTests
                 using var state = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile));
                 Assert.AreEqual(instanceId, state.RootElement.GetProperty("InstanceId").GetString());
             }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task PairingCredentialRotationOverlapsThenRevokesWithoutReopeningEnrollment()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"aep-pairing-lifecycle-{Guid.NewGuid():N}");
+        var stateFile = Path.Combine(directory, "state.json");
+        var instanceId = Guid.NewGuid();
+        var clientId = "agentstration:lifecycle-test";
+        var replacement = AepStaticBearerCredentials.Generate(clientId).AccessToken;
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(stateFile, JsonSerializer.Serialize(new
+        {
+            InstanceId = instanceId,
+            Status = "paired",
+            ClientId = clientId,
+            TokenDigest = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(WorkloadToken)))
+        }));
+        try
+        {
+            await using (var factory = PairingFactory(stateFile))
+            {
+                using var client = factory.CreateClient();
+                client.DefaultRequestHeaders.Authorization = new("Bearer", WorkloadToken);
+                using var rotated = await client.PostAsJsonAsync(AepEnrollmentProtocol.CredentialRotationPath,
+                    new AepCredentialRotation(instanceId, clientId, replacement), AepProtocol.JsonOptions);
+                Assert.AreEqual(HttpStatusCode.OK, rotated.StatusCode);
+
+                using var oldStillValid = await client.GetAsync(AepProtocol.DiscoveryPath);
+                Assert.AreEqual(HttpStatusCode.OK, oldStillValid.StatusCode);
+                using var replacementClient = factory.CreateClient();
+                replacementClient.DefaultRequestHeaders.Authorization = new("Bearer", replacement);
+                Assert.AreEqual(HttpStatusCode.OK, (await replacementClient.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+
+                Assert.AreEqual(HttpStatusCode.OK,
+                    (await replacementClient.PostAsync(AepEnrollmentProtocol.PreviousCredentialRevocationPath, null)).StatusCode);
+                Assert.AreEqual(HttpStatusCode.Unauthorized, (await client.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+                Assert.AreEqual(HttpStatusCode.OK,
+                    (await replacementClient.PostAsync(AepEnrollmentProtocol.CredentialRevocationPath, null)).StatusCode);
+                Assert.AreEqual(HttpStatusCode.Unauthorized, (await replacementClient.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+            }
+
+            await using (var restarted = PairingFactory(stateFile))
+            {
+                using var client = restarted.CreateClient();
+                using var closed = await client.PostAsync(AepEnrollmentProtocol.PairingPath,
+                    new FormUrlEncodedContent(new Dictionary<string, string> { ["code"] = "123456789" }));
+                Assert.AreEqual(HttpStatusCode.Gone, closed.StatusCode);
+            }
+
+            AepPairingLifecycle.ResetToUnpaired(stateFile);
+            using var state = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile));
+            Assert.AreEqual(instanceId.ToString("D"), state.RootElement.GetProperty("InstanceId").GetString());
+            Assert.AreEqual("unpaired", state.RootElement.GetProperty("Status").GetString());
         }
         finally
         {

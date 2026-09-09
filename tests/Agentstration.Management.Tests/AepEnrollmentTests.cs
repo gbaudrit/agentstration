@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
@@ -53,6 +54,16 @@ public sealed partial class ModelManagementApiTests
         Assert.IsNull(request.Definition.CompletionDigest);
         Assert.IsNotNull(request.Definition.CredentialSecretName);
         Assert.IsNotNull(request.Definition.RegistrationName);
+
+        var audit = (await factory.Services.GetRequiredService<ISecurityAuditStore>().ListLatestAsync(100, default))
+            .Where(value => value.TargetAccountId == instanceId)
+            .ToArray();
+        Assert.IsTrue(audit.Any(value => value.Action == SecurityAuditActions.AepEnrollmentAnnounced));
+        Assert.IsTrue(audit.Any(value => value.Action == SecurityAuditActions.AepPairingCodeIssued));
+        Assert.IsTrue(audit.Any(value => value.Action == SecurityAuditActions.AepCredentialIssued));
+        var auditJson = JsonSerializer.Serialize(audit);
+        Assert.DoesNotContain(second.Code, auditJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("CodeDigest", auditJson, StringComparison.Ordinal);
     }
 
     [TestMethod]

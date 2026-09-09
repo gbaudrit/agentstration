@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
 using Agentstration.Infrastructure;
@@ -114,15 +115,22 @@ builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
 builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
-builder.Services.AddRateLimiter(options => options.AddPolicy("aep-enrollment-public", context =>
-    RateLimitPartition.GetFixedWindowLimiter(
-        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = 30,
-            Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0
-        })));
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = static async (context, token) =>
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new { error = new AepEnrollmentError("rate_limited", "Too many enrollment requests; retry later.") }, token);
+    options.AddPolicy("aep-enrollment-public", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
 builder.Services.AddAgentstrationOpenApi();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
