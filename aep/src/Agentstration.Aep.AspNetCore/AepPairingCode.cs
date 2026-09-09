@@ -107,6 +107,13 @@ internal sealed class AepPairingCoordinator(
     IOptions<AepExtensionOptions> extensionOptions,
     ILogger<AepPairingCoordinator> logger) : BackgroundService
 {
+    private static readonly Action<ILogger, TimeSpan, Exception?> AnnouncementFailed = LoggerMessage.Define<TimeSpan>(
+        LogLevel.Warning, new EventId(1, "AepEnrollmentAnnouncementFailed"), "AEP enrollment announcement failed; retrying in {Delay}");
+    private static readonly Action<ILogger, string, Exception?> PairingRejected = LoggerMessage.Define<string>(
+        LogLevel.Warning, new EventId(2, "AepPairingRejected"), "AEP pairing failed with {Code}");
+    private static readonly Action<ILogger, Exception?> AuthorityUnavailable = LoggerMessage.Define(
+        LogLevel.Warning, new EventId(3, "AepEnrollmentAuthorityUnavailable"), "AEP pairing authority is unavailable");
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (state.IsPaired) return;
@@ -124,7 +131,7 @@ internal sealed class AepPairingCoordinator(
             }
             catch (Exception exception) when (exception is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
             {
-                logger.LogWarning(exception, "AEP enrollment announcement failed; retrying in {Delay}", delay);
+                AnnouncementFailed(logger, delay, exception);
                 await Task.Delay(delay, stoppingToken);
                 delay = TimeSpan.FromSeconds(Math.Min(delay.TotalSeconds * 2, 30));
             }
@@ -156,12 +163,12 @@ internal sealed class AepPairingCoordinator(
         }
         catch (AepPairingException exception)
         {
-            logger.LogWarning("AEP pairing failed with {Code}", exception.Code);
+            PairingRejected(logger, exception.Code, null);
             return (exception.StatusCode, Page("Pairing failed", HtmlEncoder.Default.Encode(exception.Message), includeForm: !state.IsPaired));
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(exception, "AEP pairing authority is unavailable");
+            AuthorityUnavailable(logger, exception);
             return (502, Page("Pairing failed", "The enrollment authority is unavailable.", includeForm: !state.IsPaired));
         }
     }

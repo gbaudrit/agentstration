@@ -101,9 +101,9 @@ public partial class Extensions
         catch (JSException) { clipboardFallback = true; }
     }
 
-    private void OpenExtension()
+    private async Task OpenExtension()
     {
-        if (activePairingUri is not null) _ = JavaScript.InvokeVoidAsync("agentstrationEnrollment.open", activePairingUri.AbsoluteUri);
+        if (activePairingUri is not null) await JavaScript.InvokeVoidAsync("agentstrationEnrollment.open", activePairingUri.AbsoluteUri);
     }
 
     private async Task RejectAsync(AepEnrollmentRequestResource enrollment)
