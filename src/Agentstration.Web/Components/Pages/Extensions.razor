@@ -36,6 +36,13 @@
                 <ResourceScopeFormField ResourceKind="@ResourceKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" Disabled="@(!creating)" />
                 <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
                 <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /><small>@T("ExpectedExtensionId.Help")</small></label>
+                <label>@T("AuthenticationMode")<InputSelect @bind-Value="form.AuthenticationMode"><option value="@AepTransportAuthenticationMode.None">@T("Authentication.None")</option><option value="@AepTransportAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></InputSelect></label>
+                @if (form.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer)
+                {
+                    <label>@T("CredentialName")<InputText @bind-Value="form.CredentialName" /></label>
+                    <label>@T("CredentialNamespace")<InputText @bind-Value="form.CredentialNamespace" /></label>
+                    <label>@T("CredentialScopeRef")<InputText @bind-Value="form.CredentialScopeRef" /><small>@T("CredentialScopeRef.Help")</small></label>
+                }
                 <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
             </div>
             <div class="panel-actions">

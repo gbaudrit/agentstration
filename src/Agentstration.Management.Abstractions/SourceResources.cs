@@ -388,7 +388,13 @@ public sealed record SourceChannelStatusView(
 public sealed record SourceProviderInvocation(
     Uri Endpoint,
     string ContributionId,
-    SourceChannelConfiguration Configuration);
+    SourceChannelConfiguration Configuration,
+    ResourceNamespace Namespace = default,
+    ResourceScopeRef? ExtensionScopeRef = null,
+    string? ExtensionName = null,
+    AepTransportAuthenticationMode AuthenticationMode = AepTransportAuthenticationMode.None,
+    ResourceReference? Credential = null,
+    string? ExpectedExtensionId = null);
 
 public sealed record ResolvedSourceRevision(
     string Revision,

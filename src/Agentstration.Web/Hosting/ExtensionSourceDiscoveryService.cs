@@ -38,7 +38,9 @@ public sealed class ExtensionSourceDiscoveryService(
                 DisplayName = source.DisplayName,
                 Endpoint = source.Endpoint,
                 ExpectedExtensionId = source.ExpectedExtensionId,
-                Source = source.Source
+                Source = source.Source,
+                AuthenticationMode = source.AuthenticationMode,
+                Credential = source.Credential
             };
 
             if (existing is null)
@@ -72,7 +74,9 @@ public sealed class ExtensionSourceDiscoveryService(
                 section["DisplayName"] ?? DisplayName(section.Key),
                 endpoint,
                 section.Key,
-                ExtensionRegistrationSource.Configuration);
+                ExtensionRegistrationSource.Configuration,
+                AuthenticationMode(section["AuthenticationMode"]),
+                Credential(section.GetSection("Credential")));
         }
 
         foreach (var section in configuration.GetSection("ConnectionStrings").GetChildren())
@@ -86,7 +90,9 @@ public sealed class ExtensionSourceDiscoveryService(
                 configured?.DisplayName ?? DisplayName(section.Key),
                 endpoint,
                 configured?.ExpectedExtensionId,
-                ExtensionRegistrationSource.Aspire);
+                ExtensionRegistrationSource.Aspire,
+                configured?.AuthenticationMode ?? AepTransportAuthenticationMode.None,
+                configured?.Credential);
         }
 
         return sources;
@@ -137,6 +143,20 @@ public sealed class ExtensionSourceDiscoveryService(
         _ => value
     };
 
+    private static AepTransportAuthenticationMode AuthenticationMode(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? AepTransportAuthenticationMode.None
+            : Enum.Parse<AepTransportAuthenticationMode>(value, ignoreCase: true);
+
+    private static ResourceReference? Credential(IConfigurationSection section)
+    {
+        var name = section["Name"];
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var scopeValue = section["ScopeRef"];
+        ResourceScopeRef? scopeRef = string.IsNullOrWhiteSpace(scopeValue) ? null : ResourceScopeRef.Parse(scopeValue);
+        return new ResourceReference(name, scopeRef, ResourceNamespace.Parse(section["Namespace"]));
+    }
+
     private static string Slug(string value)
     {
         var slug = string.Concat(value.ToLowerInvariant().Select(character => char.IsAsciiLetterOrDigit(character) ? character : '-')).Trim('-');
@@ -149,5 +169,7 @@ public sealed class ExtensionSourceDiscoveryService(
         string DisplayName,
         Uri Endpoint,
         string? ExpectedExtensionId,
-        ExtensionRegistrationSource Source);
+        ExtensionRegistrationSource Source,
+        AepTransportAuthenticationMode AuthenticationMode,
+        ResourceReference? Credential);
 }

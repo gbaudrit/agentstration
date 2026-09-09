@@ -241,6 +241,34 @@ public sealed partial class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task ExtensionRegistrationRequiresCredentialAndAuthenticationModeTogether()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var properties = new ExtensionRegistrationProperties
+        {
+            DisplayName = "Authenticated extension",
+            Endpoint = new("https://extension.example/aep")
+        };
+
+        using var ignoredCredential = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("ignored-credential", properties with
+            {
+                Credential = new ResourceReference("extension-token")
+            }));
+        using var missingCredential = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("missing-credential", properties with
+            {
+                AuthenticationMode = AepTransportAuthenticationMode.StaticBearer
+            }));
+
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, ignoredCredential.StatusCode);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, missingCredential.StatusCode);
+    }
+
+    [TestMethod]
     public async Task ExtensionRegistrationDeletionIsBlockedWhileAProviderReferencesIt()
     {
         await using var factory = Factory();
