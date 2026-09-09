@@ -1,4 +1,4 @@
-# AIDR-NNNN: Short defect title
+# CAR-NNNN: Short defect title
 
 ## Status
 
@@ -13,9 +13,15 @@ Open | Resolved | Prevented | Accepted — YYYY-MM-DD
 
 ## Defect
 
-Describe the violated expectation, the structural, architectural, or code-quality drift, its scope, and the observable evidence.
+Describe the violated expectation, the structural, architectural, behavioral, or code-quality drift, its scope, and the observable evidence.
 
-## Failure analysis
+## Detection
+
+- Stage: Code review | Tests/CI | Post-merge | Production
+- Detection mechanism:
+- Why it was not detected earlier:
+
+## Causal analysis
 
 ### Faulty approach
 
@@ -33,7 +39,7 @@ Identify repository instructions, established patterns, tests, review evidence, 
 
 Explain why existing tests, automation, review, or documentation did not prevent or detect the defect earlier.
 
-## Correction
+## Resolution
 
 Describe the implemented correction and why it restores the expected structure or behavior.
 
