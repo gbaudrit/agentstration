@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
 using Agentstration.Infrastructure;
@@ -20,13 +21,12 @@ using Agentstration.Web.Features.Flows;
 using Agentstration.Web.Features.Workplace;
 using Agentstration.Web.Hosting;
 using Agentstration.Work;
-using ModelContextProtocol.AspNetCore;
 using Microsoft.AspNetCore.RateLimiting;
+using ModelContextProtocol.AspNetCore;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 var bootstrapOptions = new LocalBootstrapOptions();
@@ -114,13 +114,6 @@ builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
 builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
-builder.Services.AddRateLimiter(options => options.AddFixedWindowLimiter("aep-enrollment-public", limiter =>
-{
-    limiter.PermitLimit = 30;
-    limiter.Window = TimeSpan.FromMinutes(1);
-    limiter.QueueLimit = 0;
-    limiter.AutoReplenishment = true;
-}));
 builder.Services.AddRateLimiter(options => options.AddPolicy("aep-enrollment-public", context =>
     RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
