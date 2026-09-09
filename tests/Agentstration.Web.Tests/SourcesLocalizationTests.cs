@@ -29,6 +29,9 @@ public sealed class SourcesLocalizationTests
             Assert.AreEqual("Périmètre de propriété", strings["OwnershipScope"].Value);
             Assert.AreEqual("Sélectionnée : fr-FR", strings["SelectedLocale", "fr-FR"].Value);
             Assert.AreEqual("repli depuis fr-FR", strings["FallbackFrom", "fr-FR"].Value);
+            Assert.AreEqual(
+                "Git Source Provider — git (configuré à l’enregistrement)",
+                strings["DiscoveredProvider", "Git Source Provider", "git"].Value);
         }
         finally
         {
