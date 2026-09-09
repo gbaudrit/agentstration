@@ -19,7 +19,7 @@ namespace Agentstration.Aep.Tests;
 [TestClass]
 public sealed class AepConformanceTests
 {
-    private const string WorkloadToken = "9KxYV9x5g1cX1Jf7mK4sW8qR2nT6pB3dL0hZ7uA5eQc";
+    private static readonly string WorkloadToken = AepStaticBearerCredentials.Generate("aep-conformance-tests").AccessToken;
 
     [TestMethod]
     public async Task CanonicalClientDiscoversCapabilitiesAndHealth()
@@ -91,6 +91,56 @@ public sealed class AepConformanceTests
         Assert.AreEqual(32, credential.TokenId.Length);
         Assert.IsGreaterThanOrEqualTo(43, credential.AccessToken.Length);
         Assert.AreEqual("***", credential.ToString());
+    }
+
+    [TestMethod]
+    public void SharedKeyFileAcceptsOnlyBoundedSingleLineUtf8Tokens()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"aep-shared-key-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var valid = Path.Combine(directory, "valid.key");
+            File.WriteAllText(valid, WorkloadToken + "\n");
+            Assert.AreEqual(WorkloadToken, AepSharedKeyFile.Read(valid));
+            var shortToken = Path.Combine(directory, "short.key");
+            File.WriteAllText(shortToken, "too-short\n");
+            Assert.ThrowsExactly<InvalidDataException>(() => AepSharedKeyFile.Read(shortToken));
+            var multiline = Path.Combine(directory, "multiline.key");
+            File.WriteAllText(multiline, WorkloadToken + "\nsecond-line\n");
+            Assert.ThrowsExactly<InvalidDataException>(() => AepSharedKeyFile.Read(multiline));
+            Assert.ThrowsExactly<InvalidOperationException>(() => AepSharedKeyFile.Read(Path.Combine(directory, "missing.key")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task SharedKeyFileEnrollmentAuthenticatesDiscovery()
+    {
+        var path = Path.GetTempFileName();
+        await File.WriteAllTextAsync(path, WorkloadToken + "\n");
+        try
+        {
+            await using var factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("Aep:EnrollmentMode", "SharedKeyFile");
+                builder.UseSetting("Aep:SharedKeyFile:Path", path);
+                builder.ConfigureServices((context, services) => services.AddAepEnrollmentAuthentication(context.Configuration));
+            });
+            using var anonymous = factory.CreateClient();
+            using var authenticated = factory.CreateClient();
+            authenticated.DefaultRequestHeaders.Authorization = new("Bearer", WorkloadToken);
+
+            Assert.AreEqual(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+            Assert.AreEqual(HttpStatusCode.OK, (await authenticated.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [TestMethod]

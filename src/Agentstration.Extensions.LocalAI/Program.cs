@@ -27,6 +27,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.OptionSets.Add(LocalAiOptionContracts.ModelProfile);
 });
 builder.Services.AddSingleton<IAepModelProvider>(services => services.GetRequiredService<LocalAiAepModelProvider>());
+builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 
 var app = builder.Build();
 app.MapAgentstrationAep();

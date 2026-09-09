@@ -1,4 +1,5 @@
 using Agentstration.AppHost;
+using Aspire.Hosting.ApplicationModel;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var worktreeRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", ".."));
@@ -24,6 +25,13 @@ if (!System.Text.RegularExpressions.Regex.IsMatch(slot, "^[a-z0-9](?:[a-z0-9-]{0
 var defaultSlotDataPath = Path.Combine(worktreeRoot, ".agentstration", "slots", slot);
 var slotDataPath = Path.GetFullPath(builder.Configuration["Agentstration:SlotDataPath"] ?? defaultSlotDataPath);
 Directory.CreateDirectory(slotDataPath);
+var sharedKeys = AepDevelopmentSharedKeys.Provision(
+    Path.Combine(slotDataPath, "aep-shared-keys"),
+    "ollama-extension",
+    "llama-cpp-extension",
+    "localai-extension",
+    "git-source-extension",
+    "utilities-extension");
 var configuredBootstrapPath = builder.Configuration["Agentstration:Bootstrap:Path"];
 var bootstrapPath = string.IsNullOrWhiteSpace(configuredBootstrapPath)
     ? string.Empty
@@ -60,24 +68,34 @@ if (!Uri.TryCreate(localAiEndpoint, UriKind.Absolute, out var parsedLocalAiEndpo
 var ollamaExtension = builder.AddProject<Projects.Agentstration_Extensions_Ollama>("ollama-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Ollama__Endpoint", parsedOllamaEndpoint.AbsoluteUri)
+    .WithEnvironment("Aep__EnrollmentMode", "SharedKeyFile")
+    .WithEnvironment("Aep__SharedKeyFile__Path", sharedKeys["ollama-extension"])
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
 var llamaCppExtension = builder.AddProject<Projects.Agentstration_Extensions_LlamaCpp>("llama-cpp-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("LlamaCpp__Endpoint", parsedLlamaCppEndpoint.AbsoluteUri)
+    .WithEnvironment("Aep__EnrollmentMode", "SharedKeyFile")
+    .WithEnvironment("Aep__SharedKeyFile__Path", sharedKeys["llama-cpp-extension"])
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
 var localAiExtension = builder.AddProject<Projects.Agentstration_Extensions_LocalAI>("localai-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("LocalAI__Endpoint", parsedLocalAiEndpoint.AbsoluteUri)
+    .WithEnvironment("Aep__EnrollmentMode", "SharedKeyFile")
+    .WithEnvironment("Aep__SharedKeyFile__Path", sharedKeys["localai-extension"])
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
 var gitExtension = builder.AddProject<Projects.Agentstration_Extensions_Git>("git-source-extension")
     .WithEnvironment("Agentstration__Slot", slot)
+    .WithEnvironment("Aep__EnrollmentMode", "SharedKeyFile")
+    .WithEnvironment("Aep__SharedKeyFile__Path", sharedKeys["git-source-extension"])
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
 var utilitiesExtension = builder.AddProject<Projects.Agentstration_Extensions_Utilities>("utilities-extension")
     .WithEnvironment("Agentstration__Slot", slot)
+    .WithEnvironment("Aep__EnrollmentMode", "SharedKeyFile")
+    .WithEnvironment("Aep__SharedKeyFile__Path", sharedKeys["utilities-extension"])
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
 
@@ -101,6 +119,18 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithHttpHealthCheck("/health")
     .WaitFor(ollamaExtension)
     .WithDynamicHostPorts(dynamicApplicationPorts);
+ConfigureSharedKey(console, "Agentstration.Extensions.Ollama", sharedKeys["ollama-extension"]);
+ConfigureSharedKey(console, "Agentstration.Extensions.LlamaCpp", sharedKeys["llama-cpp-extension"]);
+ConfigureSharedKey(console, "Agentstration.Extensions.LocalAI", sharedKeys["localai-extension"]);
+ConfigureSharedKey(console, "Agentstration.Extensions.Git", sharedKeys["git-source-extension"]);
+ConfigureSharedKey(console, "Agentstration.Extensions.Utilities", sharedKeys["utilities-extension"]);
+var allowedAepHosts = new[] { "localhost", "127.0.0.1", "::1", "ollama-extension", "llama-cpp-extension", "localai-extension", "git-source-extension", "utilities-extension" };
+for (var index = 0; index < allowedAepHosts.Length; index++)
+{
+    console
+        .WithEnvironment($"Agentstration__Aep__Transport__AllowedHttpHosts__{index}", allowedAepHosts[index])
+        .WithEnvironment($"Agentstration__Aep__Transport__AllowedPrivateNetworkHosts__{index}", allowedAepHosts[index]);
+}
 if (string.Equals(storageProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
     console.WithPostgreSqlStorage(builder, slot, instanceId);
 else
@@ -131,3 +161,12 @@ var workplace = builder.AddProject<Projects.Agentstration_Workplace_Web>("agents
 
 console.WithEnvironment("Agentstration__WorkplaceBaseUrl", workplace.GetEndpoint("http"));
 await builder.Build().RunAsync();
+
+static void ConfigureSharedKey(IResourceBuilder<ProjectResource> resource, string extensionId, string path)
+{
+    var prefix = $"Agentstration__Extensions__{extensionId}";
+    resource
+        .WithEnvironment($"{prefix}__AuthenticationMode", "StaticBearer")
+        .WithEnvironment($"{prefix}__EnrollmentMode", "SharedKeyFile")
+        .WithEnvironment($"{prefix}__SharedKeyFile__Path", path);
+}

@@ -93,6 +93,7 @@ public static class DependencyInjection
         services.AddSingleton<ISecretVaultProvider>(provider => new LocalSecretVaultProvider(
             secretPath,
             provider.GetRequiredService<IMasterKeyProvider>()));
+        services.AddSingleton<ISecretVaultProvider, SharedKeyFileSecretVaultProvider>();
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
         services.AddSingleton<IPrincipalResolver, ExternalIdentityPrincipalResolver>();

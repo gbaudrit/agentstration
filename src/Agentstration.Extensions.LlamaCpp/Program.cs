@@ -25,6 +25,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.OptionSets.Add(LlamaCppOptionContracts.ModelProfile);
 });
 builder.Services.AddSingleton<IAepModelProvider>(services => services.GetRequiredService<LlamaCppAepModelProvider>());
+builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 
 var app = builder.Build();
 app.MapAgentstrationAep();

@@ -221,10 +221,22 @@ public sealed class ExtensionRegistrationManagementService(
             throw new ExtensionRegistrationValidationException(exception.Message);
         }
         var endpoint = Normalize(definition.Endpoint);
+        if (definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            && definition.Source == ExtensionRegistrationSource.Manual)
+            throw new ExtensionRegistrationValidationException("SharedKeyFile enrollment is reserved for orchestrator-managed configuration or Aspire registrations.");
+        if (definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            && definition.AuthenticationMode != AepTransportAuthenticationMode.StaticBearer)
+            throw new ExtensionRegistrationValidationException("SharedKeyFile enrollment requires staticBearer transport authentication.");
         if (definition.AuthenticationMode == AepTransportAuthenticationMode.None && definition.Credential is not null)
             throw new ExtensionRegistrationValidationException("An AEP credential requires the staticBearer authentication mode.");
         if (definition.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer && definition.Credential is null)
             throw new ExtensionRegistrationValidationException("The staticBearer authentication mode requires a Secret credential.");
+        if (definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            && definition.Source == ExtensionRegistrationSource.Manual)
+            throw new ExtensionRegistrationValidationException("SharedKeyFile enrollment is reserved for configuration and Aspire registrations.");
+        if (definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            && definition.AuthenticationMode != AepTransportAuthenticationMode.StaticBearer)
+            throw new ExtensionRegistrationValidationException("SharedKeyFile enrollment requires staticBearer transport authentication.");
         await ValidateCredentialAsync(@namespace, definition.Credential, ownerScopeRef, cancellationToken);
         var duplicate = (await store.ListVisibleAsync<ExtensionRegistrationResource>(
                 ownerScopeRef, ResourceKinds.ExtensionRegistration, 0, 200, cancellationToken)).FirstOrDefault(value =>
