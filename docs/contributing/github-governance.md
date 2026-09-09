@@ -174,13 +174,14 @@ NuGet.org publication uses trusted publishing and does not use a long-lived API-
 
 The policy may remain pending until its first successful publication. Create or reactivate it shortly before pushing the release tag; NuGet.org uses the workflow's GitHub OIDC identity to activate and bind the policy.
 
-For example, after the release change has merged and all required checks have passed:
+For example, after the release change has merged, the version and release notes have been advanced to a new immutable version, and all required checks have passed:
 
 ```powershell
 git switch main
 git pull --ff-only
-git tag -a v0.2.0-alpha.1 -m "Agentstration 0.2.0-alpha.1"
-git push origin v0.2.0-alpha.1
+$version = "0.2.0-alpha.2" # Example; it must match Directory.Build.props and docs/releases/$version.md.
+git tag -a "v$version" -m "Agentstration $version"
+git push origin "v$version"
 ```
 
 GitHub Actions then repeats restore, Release build, and tests; smoke-tests and packs `Agentstration.SourceRegistry.Tool`; publishes that exact package to NuGet.org with a short-lived OIDC credential; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. The `.nupkg` is also retained in the workflow artifact and GitHub prerelease. Alpha container releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag or package version. Correct a failed release through a reviewed commit and a new prerelease identifier.
