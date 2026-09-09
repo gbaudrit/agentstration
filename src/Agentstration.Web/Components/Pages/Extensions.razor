@@ -3,6 +3,8 @@
 @inject IExtensionsClient Client
 @inject IModelProfilesClient ProfilesClient
 @inject NotificationState Notifications
+@inject ConsoleContextState ContextState
+@inject IJSRuntime JavaScript
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
 
 <PageTitle>@T("Extensions") · Agentstration</PageTitle>
@@ -16,6 +18,55 @@
 @if (!string.IsNullOrWhiteSpace(discoveryMessage))
 {
     <p class="inline-info">@discoveryMessage</p>
+}
+
+@if (CanAdministerEnrollments)
+{
+    <section class="panel resource-section">
+        <div class="panel-header">
+            <div><p class="eyebrow">@T("EnrollmentInbox")</p><h2>@T("PendingEnrollments")</h2><p>@T("PendingEnrollments.Description")</p></div>
+            <span>@T("EnrollmentCount", enrollments?.Count ?? 0)</span>
+        </div>
+        @if (enrollments?.Count > 0)
+        {
+            <DataGrid TItem="AepEnrollmentRequestResource" Items="enrollments">
+                <Header><tr><th>@T("Extension")</th><th>@T("Endpoint")</th><th>@T("Status")</th><th>@T("Actions")</th></tr></Header>
+                <Row Context="enrollment"><tr>
+                    <td><strong>@enrollment.Definition.ExtensionName</strong> @enrollment.Definition.ExtensionVersion<br /><code>@enrollment.Definition.ExtensionId</code><br /><small>@T("AnnouncedAgo", EnrollmentAge(enrollment))</small></td>
+                    <td><code>@enrollment.Definition.Endpoint</code><br /><small>@T("PairingOrigin", enrollment.Definition.PairingUri.GetLeftPart(UriPartial.Authority))</small></td>
+                    <td><StatusBadge Text="@enrollment.Definition.State.ToString()" Status="@EnrollmentStatus(enrollment.Definition.State)" />
+                        @if (enrollment.Definition.CodeExpiresAt is { } expires && enrollment.Definition.State == AepEnrollmentState.CodeIssued)
+                        { <br /><small>@T("CodeExpiresIn", SecondsRemaining(expires))</small> }
+                    </td>
+                    <td>
+                        @if (CanRotate(enrollment.Definition.State))
+                        {
+                            <button class="button-primary" @onclick="() => CopyAndOpenAsync(enrollment)" disabled="@pairingBusy">@T("CopyCodeAndOpen")</button>
+                            <button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button>
+                            <button class="button-secondary" @onclick="() => CancelEnrollmentAsync(enrollment)" disabled="@pairingBusy">@T("Cancel")</button>
+                        }
+                    </td>
+                </tr></Row>
+            </DataGrid>
+        }
+        else if (!loading)
+        {
+            <p>@T("NoPendingEnrollments")</p>
+        }
+        @if (activePairingCode is not null)
+        {
+            <div class="inline-warning" role="status">
+                <strong>@T("PairingCode")</strong> <code>@activePairingCode</code>
+                @if (activePairingExpiry is { } expiry) { <span> · @T("CodeExpiresIn", SecondsRemaining(expiry))</span> }
+                @if (clipboardFallback)
+                {
+                    <p>@T("ClipboardFallback")</p>
+                    <button class="button-secondary" @onclick="CopyCodeAsync">@T("Copy")</button>
+                    <button class="button-secondary" @onclick="OpenExtension">@T("OpenExtension")</button>
+                }
+            </div>
+        }
+    </section>
 }
 
 <section class="panel resource-section">

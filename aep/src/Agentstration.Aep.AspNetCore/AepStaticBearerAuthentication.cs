@@ -73,8 +73,14 @@ internal sealed record AepStaticBearerToken(
     byte[] Digest,
     IReadOnlyList<string> Permissions);
 
+internal interface IAepDynamicCredentialStore
+{
+    bool TryAuthenticate(ReadOnlySpan<byte> suppliedDigest, out string clientId);
+}
+
 internal sealed class AepStaticBearerAuthenticationHandler(
     IOptionsMonitor<AepStaticBearerOptions> options,
+    IEnumerable<IAepDynamicCredentialStore> dynamicCredentials,
     ILoggerFactory logger,
     UrlEncoder encoder)
     : AuthenticationHandler<AepStaticBearerOptions>(options, logger, encoder)
@@ -99,17 +105,24 @@ internal sealed class AepStaticBearerAuthenticationHandler(
             if (CryptographicOperations.FixedTimeEquals(suppliedDigest, candidate.Digest))
                 matched = candidate;
         }
-        CryptographicOperations.ZeroMemory(suppliedDigest);
+        string? dynamicClientId = null;
         if (matched is null)
+        {
+            foreach (var store in dynamicCredentials)
+                if (store.TryAuthenticate(suppliedDigest, out dynamicClientId)) break;
+        }
+        CryptographicOperations.ZeroMemory(suppliedDigest);
+        if (matched is null && dynamicClientId is null)
             return Task.FromResult(AuthenticateResult.Fail("Invalid AEP workload credential."));
 
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, matched.ClientId),
-            new(AepAuthenticationDefaults.ClientIdClaim, matched.ClientId),
-            new("aep:token_id", matched.TokenId)
+            new(ClaimTypes.NameIdentifier, matched?.ClientId ?? dynamicClientId!),
+            new(AepAuthenticationDefaults.ClientIdClaim, matched?.ClientId ?? dynamicClientId!),
+            new("aep:token_id", matched?.TokenId ?? "pairing-code")
         };
-        claims.AddRange(matched.Permissions.Select(value => new Claim(AepAuthenticationDefaults.PermissionClaim, value)));
+        claims.AddRange((matched?.Permissions ?? [AepAuthenticationDefaults.InvokePermission])
+            .Select(value => new Claim(AepAuthenticationDefaults.PermissionClaim, value)));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme.Name));
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name)));
     }

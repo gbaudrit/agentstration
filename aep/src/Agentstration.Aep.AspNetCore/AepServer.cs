@@ -88,12 +88,34 @@ public static class AepServerExtensions
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/resolve", ResolveSourceAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/materialize", MaterializeSourceAsync));
         endpoints.MapHealthChecks("/health").AllowAnonymous();
+        if (endpoints.ServiceProvider.GetService<AepPairingCoordinator>() is { } pairing)
+        {
+            endpoints.MapGet(AepEnrollmentProtocol.PairingPath, (HttpResponse response) =>
+            {
+                ProtectPairingResponse(response);
+                return Results.Content(pairing.PairingForm(), "text/html; charset=utf-8");
+            }).AllowAnonymous();
+            endpoints.MapPost(AepEnrollmentProtocol.PairingPath, async (HttpRequest request, HttpResponse response, CancellationToken token) =>
+            {
+                ProtectPairingResponse(response);
+                var form = await request.ReadFormAsync(token);
+                var result = await pairing.PairAsync(form["code"].ToString(), token);
+                return Results.Content(result.Html, "text/html; charset=utf-8", statusCode: result.Status);
+            }).AllowAnonymous();
+        }
         if (endpoints.ServiceProvider.GetService<AepAuthenticationMarker>() is not null)
         {
             foreach (var endpoint in protocolEndpoints)
                 endpoint.RequireAuthorization(AepAuthenticationDefaults.Policy);
         }
         return endpoints;
+    }
+
+    private static void ProtectPairingResponse(HttpResponse response)
+    {
+        response.Headers.CacheControl = "no-store";
+        response.Headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
+        response.Headers["Referrer-Policy"] = "no-referrer";
     }
 
     public static IEndpointRouteBuilder MapAep(this IEndpointRouteBuilder endpoints) => endpoints.MapAgentstrationAep();

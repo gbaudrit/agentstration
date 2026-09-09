@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Management.Core;
 using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
@@ -35,6 +36,10 @@ public interface IExtensionsClient
     Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken);
     Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken);
+    Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken);
+    Task<AepPairingCodeResult> RotateEnrollmentCodeAsync(Guid requestId, CancellationToken cancellationToken);
+    Task RejectEnrollmentAsync(Guid requestId, CancellationToken cancellationToken);
+    Task CancelEnrollmentAsync(Guid requestId, CancellationToken cancellationToken);
 }
 
 public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClient
@@ -67,6 +72,29 @@ public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClie
         using var message = new HttpRequestMessage(HttpMethod.Delete, RegistrationPath(@namespace, name));
         message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         using var response = await httpClient.SendAsync(message, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<AepEnrollmentRequestResource[]>(httpClient, "api/aep/enrollments", cancellationToken);
+
+    public async Task<AepPairingCodeResult> RotateEnrollmentCodeAsync(Guid requestId, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync($"api/aep/enrollments/{requestId:D}/rotate", null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<AepPairingCodeResult>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned an empty pairing code.", Guid.NewGuid().ToString("N"));
+    }
+
+    public Task RejectEnrollmentAsync(Guid requestId, CancellationToken cancellationToken) =>
+        EnrollmentActionAsync(requestId, "reject", cancellationToken);
+
+    public Task CancelEnrollmentAsync(Guid requestId, CancellationToken cancellationToken) =>
+        EnrollmentActionAsync(requestId, "cancel", cancellationToken);
+
+    private async Task EnrollmentActionAsync(Guid requestId, string action, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync($"api/aep/enrollments/{requestId:D}/{action}", null, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
     }
 

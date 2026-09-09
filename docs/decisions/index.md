@@ -121,3 +121,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 89. [ADR-0089 — Source Bootstrap profiles reuse administrative applications](0089-source-bootstrap-profiles-reuse-administrative-applications.md)
 90. [ADR-0090 — AEP credentials are scope-owned and late-bound](0090-aep-credentials-are-scope-owned-and-late-bound.md)
 91. [ADR-0091 — Orchestrators own development AEP shared keys](0091-orchestrators-own-development-aep-shared-keys.md)
+92. [ADR-0092 — Pair manually hosted AEP extensions with workspace-bound codes](0092-pair-aep-extensions-with-workspace-bound-codes.md)

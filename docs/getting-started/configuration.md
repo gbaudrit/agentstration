@@ -54,6 +54,20 @@ sharedKeyFile:
 
 The file must be a single UTF-8 token line containing at least 32 bytes and no more than 4096 bytes; only a final LF or CRLF is tolerated. Missing, unreadable, short, multiline, malformed, or oversized files fail closed. Aspire provisions distinct files automatically beneath the ignored slot data directory. Docker Compose provisions distinct persistent volumes and mounts each extension's key read-only; `docker compose down -v` removes those development credentials.
 
+For a manually hosted extension, PairingCode enrollment creates the first credential through an administrator-approved, workspace-bound flow:
+
+```text
+Aep__EnrollmentMode=PairingCode
+Aep__PairingCode__AuthorityUrl=https://agentstration.example/
+Aep__PairingCode__PublicEndpoint=https://extension.example/
+Aep__PairingCode__PairingUri=https://extension.example/aep/enrollment/pair
+Aep__PairingCode__TenantId=<tenant-guid>
+Aep__PairingCode__WorkspaceId=<workspace-guid>
+Aep__PairingCode__StateFile=/var/lib/extension/aep-pairing.json
+```
+
+The public endpoint and pairing URI must have the exact same origin. In **Extensions → Enrollment inbox**, an administrator selects **Copy code and open extension**; this creates a fresh 60-second code and invalidates any previously copied value. The code is entered in the extension form and never appears in a path, query, or fragment. `Aep__PairingCode__AllowInsecureHttp=true` is an explicit local-development escape hatch for the authority URL.
+
 For an intentional Compose service name or private HTTPS extension, add the exact DNS host to the narrowest applicable list. An HTTP service must be present in both lists when it resolves to a private address:
 
 ```json

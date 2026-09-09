@@ -10,6 +10,7 @@ using Agentstration.Aep.Inspector;
 using Agentstration.Aep.Validation;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -110,6 +111,45 @@ public sealed class AepConformanceTests
             File.WriteAllText(multiline, WorkloadToken + "\nsecond-line\n");
             Assert.ThrowsExactly<InvalidDataException>(() => AepSharedKeyFile.Read(multiline));
             Assert.ThrowsExactly<InvalidOperationException>(() => AepSharedKeyFile.Read(Path.Combine(directory, "missing.key")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task PairingCodeKeepsProtocolClosedAndPersistsItsInstanceIdentity()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"aep-pairing-{Guid.NewGuid():N}");
+        var stateFile = Path.Combine(directory, "state.json");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string instanceId;
+            await using (var factory = PairingFactory(stateFile))
+            {
+                using var client = factory.CreateClient();
+                using var discovery = await client.GetAsync(AepProtocol.DiscoveryPath);
+                using var pairing = await client.GetAsync(AepEnrollmentProtocol.PairingPath);
+                var html = await pairing.Content.ReadAsStringAsync();
+
+                Assert.AreEqual(HttpStatusCode.Unauthorized, discovery.StatusCode);
+                Assert.AreEqual(HttpStatusCode.OK, pairing.StatusCode);
+                StringAssert.Contains(html, "name=\"code\"");
+                Assert.IsFalse(html.Contains("?code=", StringComparison.Ordinal));
+                using var state = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile));
+                instanceId = state.RootElement.GetProperty("InstanceId").GetString()!;
+            }
+
+            await using (var restarted = PairingFactory(stateFile))
+            {
+                using var client = restarted.CreateClient();
+                using var pairing = await client.GetAsync(AepEnrollmentProtocol.PairingPath);
+                Assert.AreEqual(HttpStatusCode.OK, pairing.StatusCode);
+                using var state = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile));
+                Assert.AreEqual(instanceId, state.RootElement.GetProperty("InstanceId").GetString());
+            }
         }
         finally
         {
@@ -512,6 +552,26 @@ public sealed class AepConformanceTests
         new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             services.AddAepStaticBearerAuthentication(options =>
                 options.AddToken("test-token", "agentstration-test", WorkloadToken, permissions))));
+
+    private static WebApplicationFactory<global::Program> PairingFactory(string stateFile)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Aep:EnrollmentMode"] = "PairingCode",
+            ["Aep:PairingCode:AuthorityUrl"] = "http://127.0.0.1:1/",
+            ["Aep:PairingCode:AllowInsecureHttp"] = "true",
+            ["Aep:PairingCode:PublicEndpoint"] = "https://extension.example/",
+            ["Aep:PairingCode:PairingUri"] = "https://extension.example/aep/enrollment/pair",
+            ["Aep:PairingCode:TenantId"] = Guid.NewGuid().ToString("D"),
+            ["Aep:PairingCode:WorkspaceId"] = Guid.NewGuid().ToString("D"),
+            ["Aep:PairingCode:StateFile"] = stateFile
+        };
+        return new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(values));
+            builder.ConfigureServices((context, services) => services.AddAepEnrollmentAuthentication(context.Configuration));
+        });
+    }
 
     private sealed class MemoryTraceSink : IAepHttpTraceSink
     {

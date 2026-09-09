@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
 using Agentstration.Infrastructure;
@@ -12,6 +13,7 @@ using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Security.AspNetCoreIdentity.PostgreSql;
 using Agentstration.Web;
+using Agentstration.Web.Api;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Configuration;
@@ -20,10 +22,12 @@ using Agentstration.Web.Features.Workplace;
 using Agentstration.Web.Hosting;
 using Agentstration.Work;
 using ModelContextProtocol.AspNetCore;
+using Microsoft.AspNetCore.RateLimiting;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 var bootstrapOptions = new LocalBootstrapOptions();
@@ -111,6 +115,22 @@ builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
 builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
+builder.Services.AddRateLimiter(options => options.AddFixedWindowLimiter("aep-enrollment-public", limiter =>
+{
+    limiter.PermitLimit = 30;
+    limiter.Window = TimeSpan.FromMinutes(1);
+    limiter.QueueLimit = 0;
+    limiter.AutoReplenishment = true;
+}));
+builder.Services.AddRateLimiter(options => options.AddPolicy("aep-enrollment-public", context =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        })));
 builder.Services.AddAgentstrationOpenApi();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
@@ -220,11 +240,13 @@ if (genAiObservability.HttpPayloadCapture.Enabled)
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseRequestLocalization();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<PrincipalResolutionMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
 app.UseMiddleware<StandardManagementDataMiddleware>();
 app.UseAuthorization();
+app.UseRateLimiter();
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.MapAgentstrationOpenApi();
 app.UseAntiforgery();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
@@ -238,12 +260,14 @@ app.MapAgentstrationIdentityApi();
 app.MapAgentstrationBootstrapProfiles();
 app.MapAgentstrationManagementApi();
 app.MapAgentstrationModelManagementApi();
+app.MapAgentstrationAepEnrollment();
 app.MapAgentstrationWorkApi();
 app.MapAgentstrationWorkplaceApi();
 app.MapAgentstrationWorkOperationsApi();
 app.MapAgentstrationFlowApi();
 app.MapAgentstrationRuntimeApi();
 app.MapAgentstrationToolGovernanceAuditApi();
+app.MapAgentstrationAepEnrollment();
 app.MapHub<FlowRunHub>("/hubs/flow-runs").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
 app.MapHub<WorkplaceHub>("/hubs/workplace").RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
 if (app.Environment.IsDevelopment()) app.MapOllamaDiagnostics();
