@@ -84,6 +84,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<IReadOnlyList<AepEnrollmentRequestResource>> ListAsync(RequestContext context, CancellationToken cancellationToken)
     {
+        using var scopeContext = RequestScopes().Push(context);
         await AuthorizeAsync(context, cancellationToken);
         return (await store.ListExactAsync<AepEnrollmentRequestResource>(
             ResourceScopeRef.Workspace(context.WorkspaceId), ResourceKinds.AepEnrollmentRequest, 0, 200, cancellationToken))
@@ -94,6 +95,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<AepPairingCodeResult> RotateAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
     {
+        using var scopeContext = RequestScopes().Push(context);
         await AuthorizeAsync(context, cancellationToken);
         var stored = await GetAsync(context.WorkspaceId, requestId, cancellationToken);
         if (stored.Value.Definition.State is AepEnrollmentState.Available or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying)
@@ -120,6 +122,7 @@ public sealed class AepEnrollmentService(
 
     public async Task CloseAsync(RequestContext context, Guid requestId, AepEnrollmentState state, CancellationToken cancellationToken)
     {
+        using var scopeContext = RequestScopes().Push(context);
         await AuthorizeAsync(context, cancellationToken);
         if (state is not (AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled))
             throw new ArgumentOutOfRangeException(nameof(state));
