@@ -220,6 +220,15 @@ public sealed partial class ModelManagementApiTests
 
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, unsafeResponse.StatusCode);
 
+        using var insecureRemoteResponse = await client.PostAsJsonAsync(
+            "/api/extensionregistrations",
+            new CreateExtensionRegistrationRequest("insecure-remote-extension", unsafeProperties with
+            {
+                DisplayName = "Insecure remote",
+                Endpoint = new("http://extension.example/aep")
+            }));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, insecureRemoteResponse.StatusCode);
+
         var endpoint = new ExtensionRegistrationProperties { DisplayName = "First", Endpoint = new("http://127.0.0.1:6790") };
         using var first = await client.PostAsJsonAsync(
             "/api/extensionregistrations",

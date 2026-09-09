@@ -35,7 +35,10 @@ public sealed record AepInspectorTool(
 
 public sealed record AepToolInvocationResult(string ToolId, string RawResult, TimeSpan Duration);
 
-public sealed class InspectorSession(ILoggerFactory loggerFactory, Func<HttpMessageHandler>? handlerFactory = null) : IAepHttpTraceSink, IAsyncDisposable
+public sealed class InspectorSession(
+    ILoggerFactory loggerFactory,
+    Func<HttpMessageHandler>? handlerFactory = null,
+    AepTransportSecurityOptions? transportOptions = null) : IAepHttpTraceSink, IAsyncDisposable
 {
     private static readonly JsonSerializerOptions PrettyJson = new(AepProtocol.JsonOptions) { WriteIndented = true };
     private readonly List<AepHttpTrace> traces = [];
@@ -195,7 +198,8 @@ public sealed class InspectorSession(ILoggerFactory loggerFactory, Func<HttpMess
     }
 
     private AepClient RequiredClient() => client ?? throw new InvalidOperationException("Connect to an extension first.");
-    private HttpMessageHandler CreateHandler() => handlerFactory?.Invoke() ?? new HttpClientHandler();
+    private HttpMessageHandler CreateHandler() => handlerFactory?.Invoke()
+        ?? AepSecureHttpMessageHandler.Create(transportOptions ?? new AepTransportSecurityOptions());
     private static Uri ValidateEndpoint(string endpoint) =>
         Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && string.IsNullOrEmpty(uri.UserInfo)
             ? new Uri(uri.AbsoluteUri.TrimEnd('/') + '/')

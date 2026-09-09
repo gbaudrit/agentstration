@@ -275,8 +275,12 @@ public static class McpToolServiceCollectionExtensions
     public static IServiceCollection AddAgentstrationMcpTools(this IServiceCollection services)
     {
         services.TryAddSingleton<IConfiguration>(_ => new ConfigurationBuilder().Build());
-        services.AddHttpClient(AepClientName, client => client.Timeout = TimeSpan.FromSeconds(15));
-        services.AddHttpClient(McpClientName, client => client.Timeout = TimeSpan.FromSeconds(90));
+        services.TryAddSingleton(new AepTransportSecurityOptions());
+        services.AddHttpClient(AepClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
+            .ConfigurePrimaryHttpMessageHandler(provider =>
+                AepSecureHttpMessageHandler.Create(provider.GetRequiredService<AepTransportSecurityOptions>()));
+        services.AddHttpClient(McpClientName, client => client.Timeout = TimeSpan.FromSeconds(90))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddSingleton<IAepExtensionEndpointResolver, ConfigurationAepExtensionEndpointResolver>();
         services.AddSingleton<IToolProviderEnvironmentResolver, ConfigurationToolProviderEnvironmentResolver>();
         services.AddSingleton<ToolProviderAdapter>();

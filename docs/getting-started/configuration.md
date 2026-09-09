@@ -23,8 +23,32 @@ The main verified settings are:
 | `Agentstration:WorkApi:BaseAddress` | `http://localhost:5100/` | Console-to-Work-API connection on the authoritative server. |
 | `Agentstration:ApiBaseUrl` | `http://localhost:5100/` | Workplace-to-server API connection. |
 | `Agentstration:WorkplaceHubUrl` | `http://localhost:5100/hubs/workplace` | Workplace real-time endpoint. |
+| `Agentstration:Aep:Transport:AllowedHttpHosts` | loopback hosts | Exact local hosts permitted to use clear-text HTTP for AEP development. |
+| `Agentstration:Aep:Transport:AllowedPrivateNetworkHosts` | loopback hosts | Exact hosts whose DNS results may use private address ranges. |
+| `Agentstration:Aep:Transport:BlockPrivateNetworks` | `true` | Blocks private DNS/IP targets unless their host is explicitly allowed. |
 
 Provider-specific options and persisted model resources are described in [Model providers](../concepts/model-providers.md) and [Model profiles](../concepts/model-profiles.md). Do not store secrets in committed settings files.
+
+## AEP outbound transport
+
+Agentstration disables redirects for authenticated AEP requests and requires remote extensions to use HTTPS. The default local profile permits HTTP and private addresses only for `localhost`, `127.0.0.1`, and `::1`. Aspire resolves its local project endpoints through those loopback origins.
+
+For an intentional Compose service name or private HTTPS extension, add the exact DNS host to the narrowest applicable list. An HTTP service must be present in both lists when it resolves to a private address:
+
+```json
+{
+  "Agentstration": {
+    "Aep": {
+      "Transport": {
+        "AllowedHttpHosts": [ "localhost", "ollama-extension" ],
+        "AllowedPrivateNetworkHosts": [ "localhost", "ollama-extension" ]
+      }
+    }
+  }
+}
+```
+
+Environment-variable configuration uses numeric array indexes, for example `Agentstration__Aep__Transport__AllowedHttpHosts__0=ollama-extension`. Do not add a broad wildcard or cloud metadata/link-local address. DNS is re-evaluated when bounded pooled connections are renewed; TLS validation retains the platform certificate and hostname checks.
 
 ## PostgreSQL storage profile
 
