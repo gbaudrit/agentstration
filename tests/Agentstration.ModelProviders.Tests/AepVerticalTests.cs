@@ -11,6 +11,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.AI;
@@ -342,6 +343,113 @@ public sealed class AepVerticalTests
         StringAssert.Contains(exception.Message, "version '0.9.0' is not supported");
     }
 
+    [TestMethod]
+    public async Task ScopedAepCredentialIsResolvedForEveryRequestAndRotatesWithoutConfigurationChanges()
+    {
+        var resolver = new MutableSecretResolver("first-token");
+        var handler = new CredentialRecordingHandler("extension.test");
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://extension.test/") };
+        var provider = new AepModelProvider(new FixedHttpClientFactory(httpClient), resolver);
+        var configuration = AuthenticatedConfiguration("extension.test");
+
+        _ = await provider.ListModelsAsync(configuration);
+        resolver.Token = "second-token";
+        _ = await provider.ListModelsAsync(configuration);
+
+        CollectionAssert.AreEqual(
+            new[] { "Bearer first-token", "Bearer first-token", "Bearer second-token", "Bearer second-token" },
+            handler.Authorizations);
+        Assert.AreEqual(4, resolver.ResolutionCount);
+    }
+
+    [TestMethod]
+    public async Task MissingScopedCredentialFailsBeforeDiscoveryIsSent()
+    {
+        var resolver = new MutableSecretResolver(null);
+        var handler = new CredentialRecordingHandler("extension.test");
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://extension.test/") };
+        var provider = new AepModelProvider(new FixedHttpClientFactory(httpClient), resolver);
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() =>
+            provider.ListModelsAsync(AuthenticatedConfiguration("extension.test")).AsTask());
+
+        Assert.AreEqual("credential_unavailable", exception.Code);
+        Assert.IsEmpty(handler.Authorizations);
+    }
+
+    [TestMethod]
+    public async Task ConcurrentExtensionsKeepScopedCredentialsSeparated()
+    {
+        var resolver = new NamedSecretResolver(new Dictionary<string, string>
+        {
+            ["first-secret"] = "first-token",
+            ["second-secret"] = "second-token"
+        });
+        var firstHandler = new CredentialRecordingHandler("extension.first");
+        var secondHandler = new CredentialRecordingHandler("extension.second");
+        using var firstHttp = new HttpClient(firstHandler) { BaseAddress = new Uri("https://first.test/") };
+        using var secondHttp = new HttpClient(secondHandler) { BaseAddress = new Uri("https://second.test/") };
+        var first = new AepModelProvider(new FixedHttpClientFactory(firstHttp), resolver);
+        var second = new AepModelProvider(new FixedHttpClientFactory(secondHttp), resolver);
+        var firstConfiguration = AuthenticatedConfiguration("extension.first") with
+        {
+            Endpoint = firstHttp.BaseAddress!,
+            Credential = new ResourceReference("first-secret")
+        };
+        var secondConfiguration = AuthenticatedConfiguration("extension.second") with
+        {
+            Endpoint = secondHttp.BaseAddress!,
+            Credential = new ResourceReference("second-secret")
+        };
+
+        await Task.WhenAll(
+            first.ListModelsAsync(firstConfiguration).AsTask(),
+            second.ListModelsAsync(secondConfiguration).AsTask());
+
+        Assert.HasCount(2, firstHandler.Authorizations);
+        Assert.HasCount(2, secondHandler.Authorizations);
+        Assert.IsTrue(firstHandler.Authorizations.All(value => value == "Bearer first-token"));
+        Assert.IsTrue(secondHandler.Authorizations.All(value => value == "Bearer second-token"));
+    }
+
+    [TestMethod]
+    public async Task ExpectedExtensionIdentityIsCheckedBeforeFunctionalRequest()
+    {
+        var handler = new CredentialRecordingHandler("extension.other");
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://extension.test/") };
+        var provider = new AepModelProvider(new FixedHttpClientFactory(httpClient));
+        var configuration = AuthenticatedConfiguration("extension.expected") with
+        {
+            AuthenticationMode = AepTransportAuthenticationMode.None,
+            Credential = null
+        };
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => provider.ListModelsAsync(configuration).AsTask());
+
+        Assert.AreEqual("extension_identity_mismatch", exception.Code);
+        Assert.AreEqual(1, handler.RequestCount);
+    }
+
+    private static ModelProviderConfiguration AuthenticatedConfiguration(string expectedExtensionId)
+    {
+        var scope = ResourceScopeRef.Tenant(Guid.NewGuid());
+        return new ModelProviderConfiguration
+        {
+            Uid = Guid.NewGuid(),
+            Namespace = ResourceNamespace.Default,
+            ScopeRef = scope,
+            Name = "test-local",
+            AdapterType = AepModelProvider.AdapterType,
+            ContributionId = "test",
+            Extension = new ResourceReference("test-extension", scope),
+            ExtensionScopeRef = scope,
+            Endpoint = new Uri("https://extension.test/"),
+            ExpectedExtensionId = expectedExtensionId,
+            AuthenticationMode = AepTransportAuthenticationMode.StaticBearer,
+            Credential = new ResourceReference("test-secret", scope)
+        };
+    }
+
     private static AepChatRequest Request() => new("test-model", [new(AepRole.User, [AepContent.FromText("ping")])]);
 
     private sealed class AepExtensionFactory(bool addSecondOptionVersion = false, bool addThirdOptionVersion = false) : WebApplicationFactory<OllamaAepModelProvider>
@@ -446,6 +554,67 @@ public sealed class AepVerticalTests
         {
             Content = new StringContent(content, Encoding.UTF8, "application/json")
         });
+    }
+
+    private sealed class CredentialRecordingHandler(string extensionId) : HttpMessageHandler
+    {
+        public List<string> Authorizations { get; } = [];
+        public int RequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            if (request.Headers.Authorization is { } authorization)
+                Authorizations.Add(authorization.ToString());
+            var value = request.RequestUri?.AbsolutePath == AepProtocol.DiscoveryPath
+                ? JsonSerializer.Serialize(new AepManifest(
+                    AepProtocol.Version,
+                    new(extensionId, "Test", "1.0.0"),
+                    new Dictionary<string, AepCapabilityDescriptor>(),
+                    new([new("test", "Test", new(ModelDiscovery: true))])), AepProtocol.JsonOptions)
+                : JsonSerializer.Serialize(new[] { new AepModelDescriptor("test-model", "Test model") }, AepProtocol.JsonOptions);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(value, Encoding.UTF8, "application/json")
+            });
+        }
+    }
+
+    private sealed class MutableSecretResolver(string? token) : ISecretResolver
+    {
+        public string? Token { get; set; } = token;
+        public int ResolutionCount { get; private set; }
+
+        public Task<ResolvedSecret?> ResolveAsync(
+            SecretReference secret,
+            SecretResolutionContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ResolutionCount++;
+            if (Token is null) return Task.FromResult<ResolvedSecret?>(null);
+            var value = new SecretValue(Encoding.UTF8.GetBytes(Token));
+            return Task.FromResult<ResolvedSecret?>(new ResolvedSecret(
+                secret.Address,
+                new ResourceAddress(secret.Address.Namespace, ResourceKinds.Vault, "test-vault"),
+                value));
+        }
+    }
+
+    private sealed class NamedSecretResolver(IReadOnlyDictionary<string, string> tokens) : ISecretResolver
+    {
+        public Task<ResolvedSecret?> ResolveAsync(
+            SecretReference secret,
+            SecretResolutionContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!tokens.TryGetValue(secret.Address.Name, out var token)) return Task.FromResult<ResolvedSecret?>(null);
+            return Task.FromResult<ResolvedSecret?>(new ResolvedSecret(
+                secret.Address,
+                new ResourceAddress(secret.Address.Namespace, ResourceKinds.Vault, "test-vault"),
+                new SecretValue(Encoding.UTF8.GetBytes(token))));
+        }
     }
 
     private sealed class CapturingChatClient : IChatClient

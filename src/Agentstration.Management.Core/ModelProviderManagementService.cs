@@ -212,6 +212,8 @@ public sealed class ModelProviderManagementService(
             DisplayName = resource.Definition.DisplayName,
             RegistrationSource = extension.Value.Definition.Source,
             EndpointDisplayName = extension.Value.Definition.DisplayName,
+            ExtensionScopeRef = extension.Value.ScopeRef,
+            AuthenticationMode = extension.Value.Definition.AuthenticationMode,
             Credential = extension.Value.Definition.Credential
         };
     }

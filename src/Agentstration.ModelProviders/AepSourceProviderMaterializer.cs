@@ -1,10 +1,11 @@
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Management.Abstractions;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.ModelProviders;
 
-public sealed class AepSourceProviderMaterializer(IHttpClientFactory httpClients) : ISourceProviderMaterializer
+public sealed class AepSourceProviderMaterializer(IHttpClientFactory httpClients, ISecretResolver? secrets = null) : ISourceProviderMaterializer
 {
     public async Task<ResolvedSourceRevision> ResolveAsync(
         SourceProviderInvocation invocation,
@@ -52,7 +53,16 @@ public sealed class AepSourceProviderMaterializer(IHttpClientFactory httpClients
     {
         var http = httpClients.CreateClient("agentstration-aep");
         http.BaseAddress = invocation.Endpoint;
-        return new AepClient(http).CreateSourceProvider(invocation.ContributionId);
+        return new AepClient(
+            http,
+            AepExtensionCredentials.Create(
+                invocation.AuthenticationMode,
+                invocation.Credential,
+                invocation.Namespace,
+                invocation.ExtensionScopeRef,
+                invocation.ExtensionName,
+                secrets),
+            expectedExtensionId: invocation.ExpectedExtensionId).CreateSourceProvider(invocation.ContributionId);
     }
 
     private static AepVersionedOptions Map(SourceChannelConfiguration configuration) =>

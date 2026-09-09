@@ -1,11 +1,12 @@
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets.Abstractions;
 using Microsoft.Extensions.AI;
 
 namespace Agentstration.ModelProviders;
 
-public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
+public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretResolver? secrets = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
 {
     public const string AdapterType = "aep";
     public string ProviderType => AdapterType;
@@ -15,13 +16,12 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(deployment);
+        RequireEnabled(provider);
         if (string.IsNullOrWhiteSpace(deployment.ModelName))
             throw new ModelProviderConfigurationException($"AEP deployment '{deployment.Name}' must specify a model name.");
-        var client = httpClients.CreateClient("agentstration-aep");
-        client.BaseAddress = provider.Endpoint;
         deployment.ProviderOptions.TryGetValue(provider.ContributionId, out var nativeOptions);
         return new AepChatClient(
-            new AepClient(client).CreateModelProvider(provider.ContributionId),
+            CreateClient(provider).CreateModelProvider(provider.ContributionId),
             deployment.ModelName,
             nativeOptions is null ? null : Map(nativeOptions));
     }
@@ -39,9 +39,6 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         {
             var client = CreateClient(provider);
             var descriptor = await client.DiscoverAsync(cancellationToken);
-            if (provider.ExpectedExtensionId is { Length: > 0 } expectedId
-                && !string.Equals(descriptor.Extension.Id, expectedId, StringComparison.Ordinal))
-                return new ModelProviderHealth("incompatible", $"Expected extension '{expectedId}', but endpoint reports '{descriptor.Extension.Id}'.");
             var contribution = descriptor.Contributions.ModelProviders.FirstOrDefault(value => string.Equals(value.Id, provider.ContributionId, StringComparison.OrdinalIgnoreCase));
             if (contribution is null) return new ModelProviderHealth("unavailable", $"The extension does not contribute model provider '{provider.ContributionId}'.");
             var health = await client.CreateModelProvider(provider.ContributionId).GetHealthAsync(cancellationToken);
@@ -49,13 +46,14 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         }
         catch (AepProtocolException exception)
         {
-            return new ModelProviderHealth(exception.Code == "protocol_incompatible" ? "incompatible" : "unavailable", exception.Message);
+            return new ModelProviderHealth(exception.Code is "protocol_incompatible" or "extension_identity_mismatch" ? "incompatible" : "unavailable", exception.Message);
         }
         catch (HttpRequestException exception) { return new ModelProviderHealth("unreachable", exception.Message); }
     }
 
     public async ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(ModelProviderConfiguration provider, CancellationToken cancellationToken = default)
     {
+        RequireEnabled(provider);
         var models = await CreateClient(provider).CreateModelProvider(provider.ContributionId).ListModelsAsync(cancellationToken);
         return models.Select(value => new DiscoveredModel(
             value.Id,
@@ -70,11 +68,9 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         ModelDeploymentConfiguration deployment,
         CancellationToken cancellationToken = default)
     {
+        RequireEnabled(provider);
         var client = CreateClient(provider);
         var manifest = await client.DiscoverAsync(cancellationToken);
-        if (provider.ExpectedExtensionId is { Length: > 0 } expectedId
-            && !string.Equals(manifest.Extension.Id, expectedId, StringComparison.Ordinal))
-            throw new ModelProviderConfigurationException($"Expected extension '{expectedId}', but endpoint reports '{manifest.Extension.Id}'.");
         var contribution = manifest.Contributions.ModelProviders.SingleOrDefault(
             value => string.Equals(value.Id, provider.ContributionId, StringComparison.OrdinalIgnoreCase))
             ?? throw new ModelProviderConfigurationException($"The AEP extension does not contribute model provider '{provider.ContributionId}'.");
@@ -100,19 +96,28 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
 
     public bool CanInspectEndpoint(Uri endpoint) => endpoint.Scheme is "http" or "https";
 
-    public ValueTask<ExtensionInspection> InspectAsync(
+    public async ValueTask<ExtensionInspection> InspectAsync(
         ModelProviderConfiguration provider,
-        CancellationToken cancellationToken = default) =>
-        InspectAsync(provider.Name, provider.Endpoint, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        RequireEnabled(provider);
+        return await InspectAsync(provider.Name, provider.Endpoint, CreateClient(provider), cancellationToken);
+    }
 
     public async ValueTask<ExtensionInspection> InspectAsync(
         string registrationName,
         Uri endpoint,
         CancellationToken cancellationToken = default)
+        => await InspectAsync(registrationName, endpoint, CreateClient(endpoint), cancellationToken);
+
+    private static async ValueTask<ExtensionInspection> InspectAsync(
+        string registrationName,
+        Uri endpoint,
+        AepClient client,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var client = CreateClient(endpoint);
             var manifest = await client.DiscoverAsync(cancellationToken);
             var catalog = await client.GetConfigurationAsync(cancellationToken);
             return new ExtensionInspection(
@@ -160,6 +165,7 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
         string targetVersion,
         CancellationToken cancellationToken = default)
     {
+        RequireEnabled(provider);
         try
         {
             var response = await CreateClient(provider).MigrateOptionsAsync(new(
@@ -183,7 +189,26 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients) : IModelPro
     }
 
     private AepClient CreateClient(ModelProviderConfiguration provider)
-        => CreateClient(provider.Endpoint);
+    {
+        var client = httpClients.CreateClient("agentstration-aep");
+        client.BaseAddress = provider.Endpoint;
+        return new AepClient(
+            client,
+            AepExtensionCredentials.Create(
+                provider.AuthenticationMode,
+                provider.Credential,
+                provider.Namespace,
+                provider.ExtensionScopeRef,
+                provider.Extension.Name,
+                secrets),
+            expectedExtensionId: provider.ExpectedExtensionId);
+    }
+
+    private static void RequireEnabled(ModelProviderConfiguration provider)
+    {
+        if (!provider.ExtensionEnabled)
+            throw new ModelProviderConfigurationException($"Extension registration '{provider.Extension.Name}' is disabled.");
+    }
 
     private AepClient CreateClient(Uri endpoint)
     {

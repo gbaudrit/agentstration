@@ -31,7 +31,8 @@ public interface IAepSourceProvidersClient
 public sealed class AepClient(
     HttpClient httpClient,
     IAepAccessTokenProvider? accessTokenProvider = null,
-    AepTransportSecurityOptions? transportOptions = null) : IAepClient, IAepModelProvidersClient, IAepSourceProvidersClient
+    AepTransportSecurityOptions? transportOptions = null,
+    string? expectedExtensionId = null) : IAepClient, IAepModelProvidersClient, IAepSourceProvidersClient
 {
     private readonly AepTransportSecurityOptions transportOptions = transportOptions ?? new();
     public Task<AepManifest> GetManifestAsync(CancellationToken cancellationToken = default) => DiscoverAsync(cancellationToken);
@@ -42,6 +43,9 @@ public sealed class AepClient(
         var descriptor = await ReadAsync<AepManifest>(response, cancellationToken);
         if (!string.Equals(descriptor.ProtocolVersion, AepProtocol.Version, StringComparison.Ordinal))
             throw new AepProtocolException("protocol_incompatible", $"The extension uses AEP {descriptor.ProtocolVersion}; this client supports AEP {AepProtocol.Version}.", response.StatusCode);
+        if (!string.IsNullOrWhiteSpace(expectedExtensionId)
+            && !string.Equals(descriptor.Extension.Id, expectedExtensionId, StringComparison.Ordinal))
+            throw new AepProtocolException("extension_identity_mismatch", $"Expected extension '{expectedExtensionId}', but endpoint reports '{descriptor.Extension.Id}'.", response.StatusCode);
         return descriptor;
     }
 

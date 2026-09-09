@@ -111,7 +111,25 @@ public partial class Extensions
         {
             if (!Uri.TryCreate(form.Endpoint, UriKind.Absolute, out var endpoint))
                 throw new AgentstrationApiException(T("EndpointMustBeAbsolute"), Guid.NewGuid().ToString("N"));
-            var properties = new ExtensionRegistrationProperties { DisplayName = form.DisplayName, Endpoint = endpoint, Enabled = form.Enabled, ExpectedExtensionId = form.ExpectedExtensionId };
+            ResourceReference? credential = null;
+            if (form.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer)
+            {
+                if (string.IsNullOrWhiteSpace(form.CredentialName))
+                    throw new AgentstrationApiException(T("CredentialRequired"), Guid.NewGuid().ToString("N"));
+                ResourceScopeRef? credentialScope = string.IsNullOrWhiteSpace(form.CredentialScopeRef)
+                    ? null
+                    : ResourceScopeRef.Parse(form.CredentialScopeRef);
+                credential = new(form.CredentialName, credentialScope, ResourceNamespace.Parse(form.CredentialNamespace));
+            }
+            var properties = new ExtensionRegistrationProperties
+            {
+                DisplayName = form.DisplayName,
+                Endpoint = endpoint,
+                Enabled = form.Enabled,
+                ExpectedExtensionId = form.ExpectedExtensionId,
+                AuthenticationMode = form.AuthenticationMode,
+                Credential = credential
+            };
             if (creating)
                 _ = await Client.CreateRegistrationAsync(new(form.Name, properties, form.Namespace, selectedScope), cancellation.Token);
             else
@@ -253,6 +271,10 @@ public partial class Extensions
         public string Endpoint { get; set; } = string.Empty;
         public bool Enabled { get; set; } = true;
         public string? ExpectedExtensionId { get; set; }
+        public AepTransportAuthenticationMode AuthenticationMode { get; set; }
+        public string CredentialName { get; set; } = string.Empty;
+        public string CredentialNamespace { get; set; } = ResourceNamespace.DefaultValue;
+        public string CredentialScopeRef { get; set; } = string.Empty;
 
         public static RegistrationForm From(ExtensionRegistrationResource resource) => new()
         {
@@ -261,7 +283,11 @@ public partial class Extensions
             DisplayName = resource.Definition.DisplayName,
             Endpoint = resource.Definition.Endpoint.AbsoluteUri,
             Enabled = resource.Definition.Enabled,
-            ExpectedExtensionId = resource.Definition.ExpectedExtensionId
+            ExpectedExtensionId = resource.Definition.ExpectedExtensionId,
+            AuthenticationMode = resource.Definition.AuthenticationMode,
+            CredentialName = resource.Definition.Credential?.Name ?? string.Empty,
+            CredentialNamespace = resource.Definition.Credential?.Namespace?.Value ?? resource.Namespace.Value,
+            CredentialScopeRef = resource.Definition.Credential?.ScopeRef?.Value ?? string.Empty
         };
     }
 }

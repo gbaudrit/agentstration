@@ -33,6 +33,16 @@ Provider-specific options and persisted model resources are described in [Model 
 
 Agentstration disables redirects for authenticated AEP requests and requires remote extensions to use HTTPS. The default local profile permits HTTP and private addresses only for `localhost`, `127.0.0.1`, and `::1`. Aspire resolves its local project endpoints through those loopback origins.
 
+An Extension Registration may set `authenticationMode` to `staticBearer` and reference a visible `Secret` through `credential`. The Secret is resolved in the registration's namespace and scope immediately before every AEP request, so replacing or deleting its value takes effect without changing Model Providers or profiles. `authenticationMode: none` must not include a credential, and `staticBearer` requires one. Tokens are request-scoped and are never installed as default HTTP headers or forwarded to MCP/native provider transports.
+
+```yaml
+authenticationMode: staticBearer
+credential:
+  name: aep-extension-token
+  namespace: default
+  scopeRef: /tenants/00000000-0000-0000-0000-000000000001
+```
+
 For an intentional Compose service name or private HTTPS extension, add the exact DNS host to the narrowest applicable list. An HTTP service must be present in both lists when it resolves to a private address:
 
 ```json

@@ -17,6 +17,13 @@ public enum ExtensionRegistrationSource
     [JsonStringEnumMemberName("aspire")] Aspire
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<AepTransportAuthenticationMode>))]
+public enum AepTransportAuthenticationMode
+{
+    [JsonStringEnumMemberName("none")] None,
+    [JsonStringEnumMemberName("staticBearer")] StaticBearer
+}
+
 public sealed record ModelProviderProperties
 {
     public required string DisplayName { get; init; }
@@ -36,6 +43,7 @@ public sealed record ExtensionRegistrationProperties
     public bool Enabled { get; init; } = true;
     public string? ExpectedExtensionId { get; init; }
     public ExtensionRegistrationSource Source { get; init; } = ExtensionRegistrationSource.Manual;
+    public AepTransportAuthenticationMode AuthenticationMode { get; init; }
     public ResourceReference? Credential { get; init; }
 }
 

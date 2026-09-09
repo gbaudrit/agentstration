@@ -21,6 +21,8 @@ public sealed record ModelProviderConfiguration
     public string? DisplayName { get; init; }
     public ExtensionRegistrationSource RegistrationSource { get; init; } = ExtensionRegistrationSource.Manual;
     public string? EndpointDisplayName { get; init; }
+    public ResourceScopeRef? ExtensionScopeRef { get; init; }
+    public AepTransportAuthenticationMode AuthenticationMode { get; init; }
     public ResourceReference? Credential { get; init; }
 }
 
