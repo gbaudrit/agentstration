@@ -153,7 +153,7 @@ public sealed class ExtensionSourceDiscoveryService(
         var name = section["Name"];
         if (string.IsNullOrWhiteSpace(name)) return null;
         var scopeValue = section["ScopeRef"];
-        var scopeRef = string.IsNullOrWhiteSpace(scopeValue) ? null : ResourceScopeRef.Parse(scopeValue);
+        ResourceScopeRef? scopeRef = string.IsNullOrWhiteSpace(scopeValue) ? null : ResourceScopeRef.Parse(scopeValue);
         return new ResourceReference(name, scopeRef, ResourceNamespace.Parse(section["Namespace"]));
     }
 
