@@ -13,6 +13,18 @@ public sealed class SourceManifestReader : ISourceManifestReader
         "apiVersion", "kind", "metadata", "definition"
     };
 
+    private readonly SourceManifestValidator validator;
+
+    public SourceManifestReader()
+        : this(new SourceManifestValidator())
+    {
+    }
+
+    public SourceManifestReader(SourceManifestValidator validator)
+    {
+        this.validator = validator;
+    }
+
     public ParsedSourceManifest Read(string rawManifest)
     {
         ArgumentNullException.ThrowIfNull(rawManifest);
@@ -38,7 +50,16 @@ public sealed class SourceManifestReader : ISourceManifestReader
             var manifest = ResourceManifestSerializer.FromJsonStrict<PublishedSourceVersionManifest>(document.GetRawText());
             var canonical = Canonicalize(document);
             var digest = $"sha256:{Convert.ToHexStringLower(SHA256.HashData(canonical))}";
-            return new ParsedSourceManifest(manifest, rawManifest, digest);
+            var parsed = new ParsedSourceManifest(manifest, rawManifest, digest);
+            try
+            {
+                validator.Validate(manifest);
+            }
+            catch (SourceValidationException exception)
+            {
+                throw new SourceValidationException(exception.Code, exception.Message, parsed);
+            }
+            return parsed;
         }
         catch (SourceValidationException)
         {

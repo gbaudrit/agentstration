@@ -20,6 +20,7 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.AgentFramework;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Tools.SourceRegistry;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -257,6 +258,20 @@ public sealed class DependencyTests
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || name.Contains("Runtime.AgentFramework", StringComparison.Ordinal)
             || name.Contains("Runtime.Local", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void SourceRegistryToolDependsOnPortableManagementContractsOnly()
+    {
+        var references = typeof(SourceRegistryCli).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
+
+        Assert.Contains("Agentstration.Management.Contracts", references);
+        Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Management.Core", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
+            || name.Contains("Agentstration.Web", StringComparison.Ordinal)
+            || name.Contains("Storage.Sqlite", StringComparison.Ordinal)
+            || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)));
+        Assert.AreSame(typeof(SourceManifestReader).Assembly, typeof(SourceManifestValidator).Assembly);
     }
 
     [TestMethod]
