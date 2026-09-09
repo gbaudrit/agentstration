@@ -115,7 +115,7 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
             var loaded = JsonSerializer.Deserialize<AepPairingState>(File.ReadAllText(path))
                 ?? throw new InvalidDataException("The AEP pairing state file is invalid.");
             if (loaded.InstanceId == Guid.Empty || loaded.Status is not ("unpaired" or "paired" or "revoked")
-                || loaded.Status == "paired" && (string.IsNullOrWhiteSpace(loaded.ClientId) || !ValidDigest(loaded.TokenDigest)
+                || loaded.Status == "paired" && (string.IsNullOrWhiteSpace(loaded.ClientId) || !ValidDigest(loaded.TokenDigest ?? string.Empty)
                     || loaded.PreviousTokenDigest is not null && !ValidDigest(loaded.PreviousTokenDigest))
                 || loaded.Status != "paired" && (loaded.TokenDigest is not null || loaded.PreviousTokenDigest is not null))
                 throw new InvalidDataException("The AEP pairing state file is incomplete.");
