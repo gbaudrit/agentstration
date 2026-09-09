@@ -10,9 +10,17 @@ public static class SourceKinds
     public const string SourceProvider = "sourceProvider";
 }
 
-public sealed class SourceValidationException(string code, string message) : Exception(message)
+public sealed class SourceValidationException : Exception
 {
-    public string Code { get; } = code;
+    public SourceValidationException(string code, string message, ParsedSourceManifest? parsedManifest = null)
+        : base(message)
+    {
+        Code = code;
+        ParsedManifest = parsedManifest;
+    }
+
+    public string Code { get; }
+    public ParsedSourceManifest? ParsedManifest { get; }
 }
 
 public sealed class SourceVersionConflictException(string message) : Exception(message);
