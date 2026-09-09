@@ -208,11 +208,13 @@ public sealed class ExtensionRegistrationManagementService(
             || !string.IsNullOrEmpty(definition.Endpoint.Query)
             || !string.IsNullOrEmpty(definition.Endpoint.Fragment))
             throw new ExtensionRegistrationValidationException("Extension endpoint cannot contain credentials, a query string, or a fragment.");
+        // Hosts embedding Management.Core without the HTTP client stack may omit a
+        // transport policy. The web host always registers one and therefore enforces
+        // the production trust boundary at registration time.
         try
         {
-            Agentstration.Aep.Client.AepTransportSecurity.ValidateEndpoint(
-                definition.Endpoint,
-                transportOptions ?? new Agentstration.Aep.Client.AepTransportSecurityOptions());
+            if (transportOptions is not null)
+                Agentstration.Aep.Client.AepTransportSecurity.ValidateEndpoint(definition.Endpoint, transportOptions);
         }
         catch (Agentstration.Aep.Client.AepTransportSecurityException exception)
         {
