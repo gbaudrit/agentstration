@@ -38,7 +38,13 @@ else
 
     <section class="panel">
         <div class="panel-header"><div><p class="eyebrow">@T("Step", 1)</p><h2>@T("SelectProfiles")</h2><p class="muted">@T("SelectProfilesDescription")</p></div></div>
-        @if (view.Catalog.Profiles.Count == 0)
+        @if (sourceProfile is not null && sourceSelection is not null)
+        {
+            <div class="bootstrap-profile-grid">
+                <article class="bootstrap-profile-card selected"><span><strong>@sourceProfile.DisplayName</strong><small><code>@sourceProfile.Name</code> · @ScopeLabel(sourceProfile.Scope) · @T("ResourceCount", sourceProfile.ResourceCount)</small><span>@T("SourceSelection", sourceSelection.Publisher, sourceSelection.SourceName, sourceSelection.Locale)</span><code>@sourceSelection.Path</code></span></article>
+            </div>
+        }
+        else if (view.Catalog.Profiles.Count == 0)
         {
             <EmptyState Title="@T("NoBootstrapProfile")" Message="@T("NoBootstrapProfileMessage")" />
         }
@@ -143,6 +149,12 @@ else
             <dl class="resource-details">
                 <dt>@T("Actor")</dt><dd><code>@selectedApplication.Definition.ActorPrincipalId</code></dd>
                 <dt>@T("Source")</dt><dd>@selectedApplication.Definition.Source</dd>
+                @if (selectedApplication.Definition.SourceProvenance is { } provenance)
+                {
+                    <dt>@T("SourceVersion")</dt><dd><code>@provenance.Publisher/@provenance.SourceName@@@provenance.SourceVersion</code></dd>
+                    <dt>@T("ContentLocale")</dt><dd>@provenance.Locale</dd>
+                    <dt>@T("ContentPath")</dt><dd><code>@provenance.Path</code></dd>
+                }
                 <dt>@T("Target")</dt><dd>@TargetLabel(selectedApplication.Definition.Target)</dd>
                 <dt>@T("Profiles")</dt><dd>@string.Join(" → ", selectedApplication.Definition.Profiles)</dd>
                 <dt>@T("Bindings")</dt><dd>@(selectedApplication.Definition.Bindings.Count == 0 ? T("None") : string.Join(", ", selectedApplication.Definition.Bindings.Select(BindingLabel)))</dd>
@@ -179,12 +191,25 @@ else
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "sourceScope")] public string? SourceScope { get; set; }
+    [SupplyParameterFromQuery(Name = "publisher")] public string? SourcePublisher { get; set; }
+    [SupplyParameterFromQuery(Name = "source")] public string? SourceName { get; set; }
+    [SupplyParameterFromQuery(Name = "versionUid")] public Guid? SourceVersionUid { get; set; }
+    [SupplyParameterFromQuery(Name = "channel")] public string? SourceChannel { get; set; }
+    [SupplyParameterFromQuery(Name = "snapshotUid")] public Guid? SourceSnapshotUid { get; set; }
+    [SupplyParameterFromQuery(Name = "catalog")] public string? SourceCatalog { get; set; }
+    [SupplyParameterFromQuery(Name = "entry")] public string? SourceEntry { get; set; }
+    [SupplyParameterFromQuery(Name = "locale")] public string? SourceLocale { get; set; }
+    [SupplyParameterFromQuery(Name = "path")] public string? SourcePath { get; set; }
+
     private readonly CancellationTokenSource lifetime = new();
     private BootstrapManagementView? view;
     private BootstrapCompositionPreview? preview;
     private BootstrapApplicationResource? lastApplication;
     private BootstrapApplicationResource? selectedApplication;
     private readonly List<string> selectedProfiles = [];
+    private BootstrapSourceProfileSelection? sourceSelection;
+    private BootstrapProfileSummary? sourceProfile;
     private readonly Dictionary<string, BindingInput> bindingTargets = new(StringComparer.Ordinal);
     private readonly Dictionary<BootstrapBindingTargetKind, IReadOnlyList<BootstrapBindingTargetOption>> bindingOptions = [];
     private Guid? selectedTenantId;
@@ -196,9 +221,10 @@ else
     private bool applying;
     private bool confirmApply;
 
-    private BootstrapProfileScope? SelectedScope => selectedProfiles.Count == 0 ? null : view?.Catalog.Profiles.First(profile => profile.Name == selectedProfiles[0]).Scope;
-    private IReadOnlyList<(string Profile, BootstrapProfileBinding Binding)> SelectedBindings => view is null ? [] : selectedProfiles
-        .SelectMany(profile => view.Catalog.Profiles.First(value => value.Name == profile).Bindings.Select(binding => (profile, binding))).ToArray();
+    private BootstrapProfileScope? SelectedScope => sourceProfile?.Scope ?? (selectedProfiles.Count == 0 ? null : view?.Catalog.Profiles.First(profile => profile.Name == selectedProfiles[0]).Scope);
+    private IReadOnlyList<(string Profile, BootstrapProfileBinding Binding)> SelectedBindings => sourceProfile is not null
+        ? sourceProfile.Bindings.Select(binding => (sourceProfile.Name, binding)).ToArray()
+        : view is null ? [] : selectedProfiles.SelectMany(profile => view.Catalog.Profiles.First(value => value.Name == profile).Bindings.Select(binding => (profile, binding))).ToArray();
     private bool CanPreview => selectedProfiles.Count > 0
         && (SelectedScope switch { BootstrapProfileScope.Tenant => selectedTenantId is not null, BootstrapProfileScope.Workspace => selectedWorkspaceId is not null, _ => true })
         && SelectedBindings.All(item => !item.Binding.Required || !string.IsNullOrWhiteSpace(bindingTargets[BindingKey(item.Profile, item.Binding.Name)].Name));
@@ -211,13 +237,24 @@ else
     private async Task LoadAsync()
     {
         busy = true; error = null;
-        try { view = await Service.GetAsync(RequestContext.Current.PrincipalId, lifetime.Token); }
+        try
+        {
+            view = await Service.GetAsync(RequestContext.Current.PrincipalId, lifetime.Token);
+            if (TrySourceSelection() is { } selection)
+            {
+                sourceSelection = selection;
+                sourceProfile = await Service.GetSourceProfileAsync(selection, RequestContext.Current.PrincipalId, lifetime.Token);
+                selectedProfiles.Clear();
+                selectedProfiles.Add(sourceProfile.Name);
+                SyncBindings();
+            }
+        }
         catch (AuthorizationDeniedException) { denied = true; }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
         finally { busy = false; }
     }
 
-    private bool CanSelect(BootstrapProfileSummary profile) => profile.Valid && (SelectedScope is null || selectedProfiles.Contains(profile.Name) || profile.Scope == SelectedScope);
+    private bool CanSelect(BootstrapProfileSummary profile) => sourceSelection is null && profile.Valid && (SelectedScope is null || selectedProfiles.Contains(profile.Name) || profile.Scope == SelectedScope);
     private void ToggleProfile(BootstrapProfileSummary profile, ChangeEventArgs args)
     {
         if (args.Value is true) selectedProfiles.Add(profile.Name); else selectedProfiles.Remove(profile.Name);
@@ -240,7 +277,8 @@ else
                     kind,
                     selectedProfiles,
                     RequestContext.Current.PrincipalId,
-                    lifetime.Token);
+                    lifetime.Token,
+                    sourceSelection);
             foreach (var item in SelectedBindings)
             {
                 var input = bindingTargets[BindingKey(item.Profile, item.Binding.Name)];
@@ -267,7 +305,7 @@ else
     {
         if (!CanPreview) return;
         busy = previewing = true; error = null; lastApplication = null;
-        try { preview = await Service.PreviewAsync(new(selectedProfiles.ToArray(), Target(), Bindings()), RequestContext.Current.PrincipalId, lifetime.Token); }
+        try { preview = await Service.PreviewAsync(Selection(), RequestContext.Current.PrincipalId, lifetime.Token); }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
         finally { busy = previewing = false; }
     }
@@ -278,7 +316,7 @@ else
         busy = applying = true; error = null;
         try
         {
-            lastApplication = await Service.ApplyAsync(new(selectedProfiles.ToArray(), Target(), Bindings()), preview.Digest, RequestContext.Current.PrincipalId, lifetime.Token);
+            lastApplication = await Service.ApplyAsync(Selection(), preview.Digest, RequestContext.Current.PrincipalId, lifetime.Token);
             selectedApplication = lastApplication;
             confirmApply = false; preview = null;
             view = await Service.GetAsync(RequestContext.Current.PrincipalId, lifetime.Token);
@@ -302,6 +340,15 @@ else
         return T("Instance");
     }
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private BootstrapProfileSelection Selection() => new(sourceSelection is null ? selectedProfiles.ToArray() : [], Target(), Bindings(), sourceSelection);
+    private BootstrapSourceProfileSelection? TrySourceSelection()
+    {
+        if (string.IsNullOrWhiteSpace(SourceScope) || string.IsNullOrWhiteSpace(SourcePublisher) || string.IsNullOrWhiteSpace(SourceName)
+            || SourceVersionUid is null || string.IsNullOrWhiteSpace(SourceChannel) || SourceSnapshotUid is null
+            || string.IsNullOrWhiteSpace(SourceCatalog) || string.IsNullOrWhiteSpace(SourceEntry)
+            || string.IsNullOrWhiteSpace(SourceLocale) || string.IsNullOrWhiteSpace(SourcePath)) return null;
+        return new(ResourceScopeRef.Parse(SourceScope), SourcePublisher, SourceName, SourceVersionUid.Value, SourceChannel, SourceSnapshotUid.Value, SourceCatalog, SourceEntry, SourceLocale, SourcePath);
+    }
     private string ScopeLabel(BootstrapProfileScope scope) => T($"Scope.{scope}");
     private string BindingTargetKindLabel(BootstrapBindingTargetKind kind) => T($"BindingTargetKind.{kind}");
     private string DispositionLabel(BootstrapResourceDisposition disposition) => T($"Disposition.{disposition}");

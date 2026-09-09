@@ -6,6 +6,7 @@ using Agentstration.Web.Console;
 using Agentstration.Web.Features.Flows.Designer;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.DependencyInjection;
+using Agentstration.Web.Hosting;
 using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -31,6 +32,7 @@ public static class WebConsoleServiceCollectionExtensions
         services.AddScoped<IResourceSearchProvider, ConsoleResourceSearchProvider>();
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();
+        services.AddScoped<SourceConsoleManagementService>();
         services.AddScoped<IFlowDesignerBackend, FlowDesignerBackend>();
         services.AddScoped<IFlowDesignerResourceProvider, FlowDesignerResourceProvider>();
 
