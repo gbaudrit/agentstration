@@ -31,6 +31,11 @@ public sealed class SourcesLocalizationTests
             Assert.AreEqual("repli depuis fr-FR", strings["FallbackFrom", "fr-FR"].Value);
             Assert.AreEqual("Aucun fournisseur de Sources n’est configuré pour cette instance.", strings["NoConfiguredProviders"].Value);
             Assert.AreEqual("Configurer un fournisseur de Sources", strings["ConfigureProvider"].Value);
+            Assert.AreEqual("Détails de la Source", strings["SourceDetails"].Value);
+            Assert.AreEqual("Vue d’ensemble", strings["Tab.Overview"].Value);
+            Assert.AreEqual("Versions", strings["Tab.Versions"].Value);
+            Assert.AreEqual("Bindings", strings["Tab.Bindings"].Value);
+            Assert.AreEqual("Contenu", strings["Tab.Content"].Value);
         }
         finally
         {

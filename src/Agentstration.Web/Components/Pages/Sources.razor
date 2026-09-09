@@ -101,7 +101,16 @@ else
         <StatusBadge Text="@VerificationLabel(detail.Verification.Status)" Status="@VerificationTone(detail.Verification.Status)" />
     </section>
 
-    <section class="source-detail-grid">
+    <nav class="section-tabs source-tabs" role="tablist" aria-label="@T("SourceDetails")">
+        @foreach (var tab in Enum.GetValues<PageTab>())
+        {
+            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="source-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@TabLabel(tab)</button>
+        }
+    </nav>
+    <main id="source-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
+    @if (activeTab == PageTab.Overview)
+    {
+        <section class="source-detail-grid">
         <article class="panel">
             <div class="panel-header"><div><p class="eyebrow">@T("LocalConfiguration")</p><h2>@T("DisplayName")</h2><p>@T("DisplayNameDescription")</p></div></div>
             <label><span>@T("DisplayName")</span><input @bind="displayName" disabled="@busy" /></label>
@@ -111,9 +120,12 @@ else
             <div class="panel-header"><div><p class="eyebrow">@T("PublishedIdentity")</p><h2>@T("Publisher")</h2></div></div>
             <dl class="resource-details"><dt>@T("Declared")</dt><dd>@PublisherLabel(detail.Verification.DeclaredPublisher)</dd><dt>@T("Verified")</dt><dd>@(detail.Verification.VerifiedPublisher is null ? T("NotVerified") : PublisherLabel(detail.Verification.VerifiedPublisher))</dd><dt>@T("ManifestDigest")</dt><dd><code>@Short(detail.SelectedVersion.Definition.ManifestDigest)</code></dd></dl>
         </article>
-    </section>
+        </section>
+    }
+    else if (activeTab == PageTab.Versions)
+    {
 
-    <section class="panel">
+        <section class="panel">
         <div class="panel-header"><div><p class="eyebrow">@T("ImmutableHistory")</p><h2>@T("Versions")</h2><p>@T("VersionHistoryDescription")</p></div></div>
         <div class="version-strip">
             @foreach (var version in detail.Versions)
@@ -121,9 +133,12 @@ else
                 <button type="button" class="version-card @(version.Uid == detail.SelectedVersion.Uid ? "selected" : null)" @onclick="() => SelectVersion(version.Uid)"><strong>@version.Definition.Version</strong><small>@version.Definition.ImportedAt.ToLocalTime().ToString("g")</small><code>@Short(version.Definition.ManifestDigest)</code></button>
             }
         </div>
-    </section>
+        </section>
+    }
+    else if (activeTab == PageTab.Bindings)
+    {
 
-    <section class="panel">
+        <section class="panel">
         <div class="panel-header"><div><p class="eyebrow">@T("ProviderRouting")</p><h2>@T("Bindings")</h2><p>@T("BindingsDescription")</p></div><StatusBadge Text="@(detail.Bindings.Ready ? T("Ready") : T("NeedsConfiguration"))" Status="@(detail.Bindings.Ready ? UiStatus.Success : UiStatus.Warning)" /></div>
         @if (detail.Bindings.Bindings.Count == 0) { <p>@T("NoBindings")</p> }
         else
@@ -137,9 +152,12 @@ else
             </div>
             <div class="panel-actions"><button class="button-primary" disabled="@busy" @onclick="SaveBindingsAsync">@T("SaveBindings")</button></div>
         }
-    </section>
+        </section>
+    }
+    else
+    {
 
-    <section class="panel">
+        <section class="panel">
         <div class="panel-header"><div><p class="eyebrow">@T("Content")</p><h2>@T("ChannelsAndCatalogs")</h2><p>@T("ChannelsDescription")</p></div></div>
         @if (detail.Channels.Count == 0) { <EmptyState Title="@T("NoChannels")" Message="@T("NoChannelsMessage")" /> }
         @foreach (var channel in detail.Channels)
@@ -167,7 +185,9 @@ else
                 }
             </article>
         }
-    </section>
+        </section>
+    }
+    </main>
 }
 
 @code {
@@ -175,6 +195,7 @@ else
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "versionUid")] public Guid? VersionUid { get; set; }
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
 
     private readonly CancellationTokenSource lifetime = new();
     private IReadOnlyList<SourceConsoleListItem>? sources;
@@ -191,6 +212,7 @@ else
     private bool busy;
     private bool denied;
     private string? error;
+    private PageTab activeTab;
 
     private IReadOnlyList<SourceConsoleListItem> FilteredSources => (sources ?? []).Where(value => string.IsNullOrWhiteSpace(search) || value.Source.Configuration.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) || value.Source.Source.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || value.Source.Source.Definition.Publisher.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
     private bool CanImport => importScope is not null && (importMode == "url" ? Uri.TryCreate(importUrl, UriKind.Absolute, out _) : !string.IsNullOrWhiteSpace(importYaml));
@@ -208,6 +230,7 @@ else
                 displayName = detail.Source.Configuration.Definition.DisplayName;
                 bindingSelections.Clear();
                 foreach (var binding in detail.Bindings.Bindings.Where(value => value.Target is not null)) bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, binding.Target);
+                if (Enum.TryParse<PageTab>(View, true, out var requestedTab)) activeTab = requestedTab;
             }
             else sources = await Service.ListAsync(RequestContext.Current.PrincipalId, lifetime.Token);
         }
@@ -234,7 +257,7 @@ else
     private async Task RefreshChannelAsync(string channel) => await RunAsync(async () => { await Service.RefreshChannelAsync(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, channel, RequestContext.Current.PrincipalId, lifetime.Token); Notify("ChannelRefreshed", F("ChannelRefreshedMessage", channel)); await LoadAsync(); });
     private async Task RefreshSourceAsync() => await RunAsync(async () => { var result = await Service.RefreshSourceAsync(ScopeRef(), Publisher!, Name!, RequestContext.Current.PrincipalId, lifetime.Token); Notify("SourceRefreshed", F("SourceRefreshedMessage", result.Version.Definition.Version)); await LoadAsync(); });
     private async Task ChangeLocaleAsync(ChangeEventArgs args) { catalogLocale = args.Value?.ToString() ?? "en-US"; await LoadAsync(); }
-    private void SelectVersion(Guid uid) => Navigation.NavigateTo($"{SourceUrl(detail!.Source)}&versionUid={uid:D}");
+    private void SelectVersion(Guid uid) => Navigation.NavigateTo($"{SourceUrl(detail!.Source)}&versionUid={uid:D}&view=versions");
 
     private void SetBinding(SourceBindingStatus binding, ChangeEventArgs args)
     {
@@ -284,8 +307,11 @@ else
     private string CompatibilityLabel(SourceChannelCompatibilityStatus value) => T($"Compatibility.{value}");
     private static UiStatus VerificationTone(SourceVerificationStatus value) => value switch { SourceVerificationStatus.Verified => UiStatus.Success, SourceVerificationStatus.Unavailable => UiStatus.Warning, _ => UiStatus.Neutral };
     private static UiStatus CompatibilityTone(SourceChannelCompatibilityStatus value) => value switch { SourceChannelCompatibilityStatus.Compatible => UiStatus.Success, SourceChannelCompatibilityStatus.Incompatible => UiStatus.Danger, _ => UiStatus.Warning };
+    private static string TabId(PageTab tab) => $"source-{tab.ToString().ToLowerInvariant()}-tab";
+    private string TabLabel(PageTab tab) => Localizer[$"Tab.{tab}"];
     private string T(string key) => Localizer[key];
     private string F(string key, params object[] arguments) => Localizer[key, arguments];
     private void Notify(string titleKey, string message) => Notifications.Add(new(Guid.NewGuid(), T(titleKey), message, DateTimeOffset.Now, UiStatus.Success));
+    private enum PageTab { Overview, Versions, Bindings, Content }
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
 }
