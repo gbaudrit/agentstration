@@ -17,7 +17,7 @@ Commit `.config/dotnet-tools.json`. Other contributors and CI restore the pinned
 dotnet tool restore
 ```
 
-The tool shares the Agentstration product version because it implements that release's Source contracts. The dedicated tool workflow publishes the package from the same `v<version>` tag used by the product: suffixed Semantic Versions are NuGet prereleases and versions without a suffix are stable releases. Publication uses short-lived OIDC credentials. No consumer credential is required to install or restore it.
+The tool shares the Agentstration product version because it implements that release's Source contracts. Relevant pushes to `main` publish timestamped development packages with the form `<product-version>.dev.<UTC timestamp>.<run-id>.<attempt>` when the product version already has a prerelease suffix, or `<product-version>-dev...` otherwise. These CI snapshots must always be pinned by their full exact version. The same dedicated workflow publishes official packages from the product's `v<version>` tag: suffixed Semantic Versions are NuGet prereleases and versions without a suffix are stable releases. Publication uses short-lived OIDC credentials. No consumer credential is required to install or restore it.
 
 Update an existing local pin deliberately to another exact version:
 

@@ -1,6 +1,7 @@
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
+    [string]$Version,
     [switch]$NoBuild
 )
 
@@ -28,11 +29,17 @@ New-Item -ItemType Directory -Path $feed, $consumer -Force | Out-Null
 try {
     $packArguments = @("pack", $project, "--configuration", $Configuration, "--output", $feed)
     if ($NoBuild) { $packArguments += "--no-build" }
+    if (-not [string]::IsNullOrWhiteSpace($Version)) { $packArguments += "-p:Version=$Version" }
     & dotnet @packArguments
     if ($LASTEXITCODE -ne 0) { throw "Source Registry tool packaging failed." }
 
-    $version = (& dotnet msbuild $project -nologo -getProperty:Version).Trim()
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($version)) {
+    $packageVersion = if ([string]::IsNullOrWhiteSpace($Version)) {
+        (& dotnet msbuild $project -nologo -getProperty:Version).Trim()
+    }
+    else {
+        $Version
+    }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($packageVersion)) {
         throw "Could not resolve the Source Registry tool version."
     }
 
@@ -42,7 +49,7 @@ try {
         $env:NUGET_PACKAGES = Join-Path $temporaryRoot "packages"
         & dotnet new tool-manifest
         if ($LASTEXITCODE -ne 0) { throw "Temporary tool manifest creation failed." }
-        & dotnet tool install Agentstration.SourceRegistry.Tool --version $version --source $feed --no-cache
+        & dotnet tool install Agentstration.SourceRegistry.Tool --version $packageVersion --source $feed --no-cache
         if ($LASTEXITCODE -ne 0) { throw "Local Source Registry tool installation failed." }
 
         $digest = & dotnet tool run agentstration-source-registry -- source digest $fixture

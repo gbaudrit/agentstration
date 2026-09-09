@@ -11,7 +11,7 @@ The repository keeps reviewable governance files in Git:
 - `.github/workflows/codeql.yml` scans C# on pull requests, `main`, and a weekly schedule;
 - `.github/workflows/dependency-review.yml` blocks pull requests that introduce known vulnerabilities of moderate severity or higher;
 - `.github/workflows/release.yml` validates version tags, rebuilds and retests the product, packages the server and Workplace, and creates GitHub prereleases;
-- `.github/workflows/release-source-registry-tool.yml` independently rebuilds, tests, packages, and publishes the version-aligned Source Registry tool for the same product tags;
+- `.github/workflows/release-source-registry-tool.yml` independently rebuilds, tests, packages, and publishes timestamped development or version-aligned release packages of the Source Registry tool;
 - `.github/dependabot.yml` checks the root and autonomous AEP NuGet manifests plus GitHub Actions each week;
 - `.github/CODEOWNERS`, the pull request template, and issue forms provide lightweight contribution ownership and prompts;
 - `.github/rulesets/main.json` is the reproducible source definition for `main` protection;
@@ -180,7 +180,12 @@ GitHub Actions then repeats restore, Release build, and tests; publishes framewo
 
 ## Source Registry tool releases
 
-`Agentstration.SourceRegistry.Tool` deliberately shares the central product version because it implements the contracts accepted by that Agentstration release. The dedicated `release-source-registry-tool.yml` workflow runs from the same immutable `v<version>` tag, checks that the package resolves the central version, runs the focused tests and installed-package smoke test, and publishes the exact `.nupkg` to NuGet.org. A Semantic Version containing a suffix such as `-alpha.2` is a NuGet prerelease; a version without a suffix is a stable release. No independent tool tag or version file is used.
+`Agentstration.SourceRegistry.Tool` deliberately shares the central product version because it implements the contracts accepted by that Agentstration release. The dedicated `release-source-registry-tool.yml` workflow has two publication paths:
+
+- a relevant push to `main` publishes a development prerelease such as `0.2.0-alpha.1.dev.20260910213045.<run-id>.<attempt>`; the UTC timestamp makes the build recognizable, while the run identity and attempt make concurrent runs and reruns unique;
+- the shared immutable `v<version>` tag publishes the exact central version. A suffix such as `-alpha.2` produces an official NuGet prerelease, while a version without a suffix produces a stable package.
+
+Both paths run the focused tests and installed-package smoke test before publication. There is no independent tool tag or version file. Development packages are CI snapshots, not release identities, and consumers must pin their full exact version.
 
 NuGet.org publication uses trusted publishing and does not use a long-lived API-key secret. The NuGet account `gbaudrit` must own `Agentstration.SourceRegistry.Tool` and configure a trusted publishing policy with:
 
@@ -189,4 +194,4 @@ NuGet.org publication uses trusted publishing and does not use a long-lived API-
 - workflow file: `release-source-registry-tool.yml`;
 - environment: empty, because the release job does not select a GitHub environment.
 
-The policy may remain pending until its first successful publication. Create or reactivate it shortly before pushing the shared release tag; NuGet.org uses the dedicated workflow's GitHub OIDC identity to activate and bind the policy. The package and its `SHA256SUMS` are retained as workflow artifacts, while the product workflow remains responsible for the shared GitHub Release. Package versions are immutable and must never be reused.
+The policy may remain pending until its first successful publication. Create or reactivate it before merging a change that should publish the first development package, or before pushing the shared release tag. NuGet.org uses the dedicated workflow's GitHub OIDC identity to activate and bind the policy. The package and its `SHA256SUMS` are retained as workflow artifacts, while the product workflow remains responsible for the shared GitHub Release. Package versions are immutable and must never be reused.

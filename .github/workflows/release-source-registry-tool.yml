@@ -2,8 +2,21 @@ name: Release Source Registry tool
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+    paths:
+      - '.github/workflows/release-source-registry-tool.yml'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - 'scripts/ci/test-source-registry-tool-package.ps1'
+      - 'src/Agentstration.Management.Abstractions/**'
+      - 'src/Agentstration.Management.Contracts/**'
+      - 'src/Agentstration.Resources/**'
+      - 'src/Agentstration.Tools.SourceRegistry/**'
+      - 'tests/Agentstration.Tools.SourceRegistry.Tests/**'
 
 permissions:
   contents: read
@@ -27,25 +40,37 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: Validate shared product version and tag
+      - name: Resolve product and package versions
         id: version
         shell: pwsh
         run: |
           $project = 'src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj'
-          $version = (dotnet msbuild $project -nologo -getProperty:Version).Trim()
-          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
-            throw "Source Registry tool version '$version' is not a supported Semantic Version."
+          $productVersion = (dotnet msbuild $project -nologo -getProperty:Version).Trim()
+          if ($LASTEXITCODE -ne 0 -or $productVersion -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
+            throw "Source Registry tool product version '$productVersion' is not a supported Semantic Version."
           }
-          if ($env:GITHUB_REF_NAME -ne "v$version") {
-            throw "Tag '$env:GITHUB_REF_NAME' does not match shared product version 'v$version'."
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            if ($env:GITHUB_REF_NAME -ne "v$productVersion") {
+              throw "Tag '$env:GITHUB_REF_NAME' does not match shared product version 'v$productVersion'."
+            }
+            $notes = "docs/releases/$productVersion.md"
+            if (-not (Test-Path -LiteralPath $notes)) {
+              throw "Shared release notes '$notes' are missing."
+            }
+            $packageVersion = $productVersion
+            $channel = if ($productVersion.Contains('-')) { 'prerelease' } else { 'stable' }
           }
-          $notes = "docs/releases/$version.md"
-          if (-not (Test-Path -LiteralPath $notes)) {
-            throw "Shared release notes '$notes' are missing."
+          else {
+            $timestamp = [DateTimeOffset]::UtcNow.ToString('yyyyMMddHHmmss')
+            $separator = if ($productVersion.Contains('-')) { '.' } else { '-' }
+            $packageVersion = '{0}{1}dev.{2}.{3}.{4}' -f $productVersion, $separator, $timestamp, $env:GITHUB_RUN_ID, $env:GITHUB_RUN_ATTEMPT
+            $channel = 'development prerelease'
           }
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "channel=$(if ($version.Contains('-')) { 'prerelease' } else { 'stable' })" >> $env:GITHUB_OUTPUT
+          "product-version=$productVersion" >> $env:GITHUB_OUTPUT
+          "package-version=$packageVersion" >> $env:GITHUB_OUTPUT
+          "channel=$channel" >> $env:GITHUB_OUTPUT
       - name: Require a commit from main
+        if: github.ref_type == 'tag'
         run: |
           git fetch origin main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
@@ -59,14 +84,20 @@ jobs:
           dotnet build tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj
           --configuration Release
           --no-restore
+          -p:Version=${{ steps.version.outputs.package-version }}
       - name: Test tool
         run: >-
           dotnet test tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj
           --configuration Release
           --no-build
+          -p:Version=${{ steps.version.outputs.package-version }}
       - name: Smoke-test package
         shell: pwsh
-        run: ./scripts/ci/test-source-registry-tool-package.ps1 -Configuration Release -NoBuild
+        run: >-
+          ./scripts/ci/test-source-registry-tool-package.ps1
+          -Configuration Release
+          -Version '${{ steps.version.outputs.package-version }}'
+          -NoBuild
       - name: Pack release artifact
         run: >-
           dotnet pack src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj
@@ -74,6 +105,7 @@ jobs:
           --no-restore
           --no-build
           --output artifacts
+          -p:Version=${{ steps.version.outputs.package-version }}
       - name: Write SHA-256 checksum
         shell: pwsh
         run: |
@@ -88,13 +120,13 @@ jobs:
           user: gbaudrit
       - name: Publish ${{ steps.version.outputs.channel }} package to NuGet.org
         run: >-
-          dotnet nuget push artifacts/Agentstration.SourceRegistry.Tool.${{ steps.version.outputs.version }}.nupkg
+          dotnet nuget push artifacts/Agentstration.SourceRegistry.Tool.${{ steps.version.outputs.package-version }}.nupkg
           --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
       - name: Upload validated package artifact
         uses: actions/upload-artifact@v6
         with:
-          name: source-registry-tool-${{ steps.version.outputs.version }}
+          name: source-registry-tool-${{ steps.version.outputs.package-version }}
           path: |
             artifacts/*.nupkg
             artifacts/SHA256SUMS
