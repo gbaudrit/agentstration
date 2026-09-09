@@ -36,10 +36,17 @@ public interface IExtensionsClient
     Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken);
     Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken);
-    Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken);
-    Task<AepPairingCodeResult> RotateEnrollmentCodeAsync(Guid requestId, CancellationToken cancellationToken);
-    Task RejectEnrollmentAsync(Guid requestId, CancellationToken cancellationToken);
-    Task CancelEnrollmentAsync(Guid requestId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([]);
+
+    Task<AepPairingCodeResult> RotateEnrollmentCodeAsync(Guid requestId, CancellationToken cancellationToken) =>
+        Task.FromException<AepPairingCodeResult>(new NotSupportedException("Enrollment administration is not supported by this client."));
+
+    Task RejectEnrollmentAsync(Guid requestId, CancellationToken cancellationToken) =>
+        Task.FromException(new NotSupportedException("Enrollment administration is not supported by this client."));
+
+    Task CancelEnrollmentAsync(Guid requestId, CancellationToken cancellationToken) =>
+        Task.FromException(new NotSupportedException("Enrollment administration is not supported by this client."));
 }
 
 public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClient
