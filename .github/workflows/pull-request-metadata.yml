@@ -3,7 +3,7 @@ name: Pull request metadata
 on:
   pull_request:
     branches: [main]
-    types: [opened, edited, reopened, synchronize]
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -18,6 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Validate title and description
         shell: pwsh
         run: |
@@ -35,6 +39,28 @@ jobs:
           $requiredHeadings = @('## Summary', '## Changes', '## Validation', '## Breaking changes')
           $headingMatches = [regex]::Matches($bodyWithoutComments, '(?m)^## [^\r\n]+[ \t]*\r?$')
           $actualHeadings = @($headingMatches | ForEach-Object { $_.Value.Trim() })
+
+          $labels = @($event.pull_request.labels | ForEach-Object { [string]$_.name })
+          if ($labels -contains 'ai-defect') {
+            $baseRevision = [string]$event.pull_request.base.sha
+            $headRevision = [string]$event.pull_request.head.sha
+            $changedFiles = @(git diff --name-only --diff-filter=AM $baseRevision $headRevision -- 'docs/ai-defects')
+            if ($LASTEXITCODE -ne 0) {
+              $errors.Add("Could not inspect changed AI Defect CAR files.")
+            }
+            else {
+              $recordFiles = @($changedFiles | Where-Object {
+                $_ -cmatch '^docs/ai-defects/[0-9]{4,}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$'
+              })
+
+              if ($recordFiles.Count -eq 0) {
+                $errors.Add("A pull request labeled ai-defect must add or update a numbered CAR under docs/ai-defects/.")
+              }
+              elseif (-not ($recordFiles | Where-Object { $bodyWithoutComments.Contains($_) })) {
+                $errors.Add("The pull request description must link the changed AI Defect CAR.")
+              }
+            }
+          }
 
           if (($actualHeadings.Count -ne $requiredHeadings.Count) -or
               ((Compare-Object -ReferenceObject $requiredHeadings -DifferenceObject $actualHeadings -SyncWindow 0).Count -ne 0)) {
