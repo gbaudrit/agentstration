@@ -32,6 +32,17 @@ public enum AepEnrollmentMode
     [JsonStringEnumMemberName("sharedKeyFile")] SharedKeyFile
 }
 
+public sealed record AepEnrollmentSettingsProperties
+{
+    public bool PairingCodeEnabled { get; init; } = true;
+    public bool SharedKeyFileEnabled { get; init; } = true;
+}
+
+public sealed record AepEnrollmentSettingsResource : Resource
+{
+    public AepEnrollmentSettingsProperties Definition { get; init; } = new();
+}
+
 public sealed record ModelProviderProperties
 {
     public required string DisplayName { get; init; }

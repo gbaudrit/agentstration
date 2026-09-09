@@ -4,6 +4,7 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
+using Agentstration.Web.Api;
 
 namespace Agentstration.Web.Console;
 
@@ -36,6 +37,16 @@ public interface IExtensionsClient
     Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken);
     Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken);
+    Task<AepEnrollmentSettingsSnapshot> GetEnrollmentSettingsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(new AepEnrollmentSettingsSnapshot(true, true, true, true, null));
+
+    Task<AepEnrollmentSettingsSnapshot> UpdateEnrollmentSettingsAsync(
+        bool pairingCodeEnabled,
+        bool sharedKeyFileEnabled,
+        string? etag,
+        CancellationToken cancellationToken) =>
+        Task.FromException<AepEnrollmentSettingsSnapshot>(new NotSupportedException("Enrollment settings are not supported by this client."));
+
     Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([]);
 
@@ -90,6 +101,24 @@ public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClie
 
     public async Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<AepEnrollmentRequestResource[]>(httpClient, "api/aep/enrollments", cancellationToken);
+
+    public Task<AepEnrollmentSettingsSnapshot> GetEnrollmentSettingsAsync(CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<AepEnrollmentSettingsSnapshot>(httpClient, "api/aep/enrollments/settings", cancellationToken);
+
+    public async Task<AepEnrollmentSettingsSnapshot> UpdateEnrollmentSettingsAsync(
+        bool pairingCodeEnabled,
+        bool sharedKeyFileEnabled,
+        string? etag,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PutAsJsonAsync(
+            "api/aep/enrollments/settings",
+            new PutAepEnrollmentSettingsRequest(pairingCodeEnabled, sharedKeyFileEnabled, etag),
+            cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<AepEnrollmentSettingsSnapshot>(cancellationToken)
+            ?? throw new AgentstrationApiException("Agentstration API returned empty enrollment settings.", Guid.NewGuid().ToString("N"));
+    }
 
     public async Task<AepPairingCodeResult> RotateEnrollmentCodeAsync(Guid requestId, CancellationToken cancellationToken)
     {

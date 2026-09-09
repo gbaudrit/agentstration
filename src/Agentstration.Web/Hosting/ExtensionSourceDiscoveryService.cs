@@ -13,6 +13,7 @@ public sealed class ExtensionSourceDiscoveryService(
     ExtensionRegistrationManagementService registrations,
     SecretManagementService secrets,
     IIdentityStore identities,
+    AepEnrollmentSettingsService enrollmentSettings,
     IRequestContextScopeFactory requestScopes)
 {
     public async Task DiscoverForActiveWorkspacesAsync(CancellationToken cancellationToken)
@@ -32,6 +33,8 @@ public sealed class ExtensionSourceDiscoveryService(
 
         foreach (var source in sources.Values)
         {
+            if (!await enrollmentSettings.IsEnabledAsync(source.EnrollmentMode, cancellationToken))
+                throw new ExtensionRegistrationValidationException($"The '{source.EnrollmentMode}' AEP enrollment mode is disabled by the Agentstration enrollment policy.");
             var existing = await registrations.GetExactAsync(
                 ResourceScopeRef.Instance,
                 ResourceNamespace.Default,

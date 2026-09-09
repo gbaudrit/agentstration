@@ -6,4 +6,9 @@
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../../src/Agentstration.Web.Components/wwwroot/images/agentstration-mark.png"
+                      Link="Assets/agentstration-mark.png"
+                      LogicalName="Agentstration.Aep.AspNetCore.Assets.agentstration-mark.png" />
+  </ItemGroup>
 </Project>

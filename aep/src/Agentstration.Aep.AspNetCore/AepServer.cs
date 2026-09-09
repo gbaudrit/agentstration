@@ -115,16 +115,19 @@ public static class AepServerExtensions
         endpoints.MapHealthChecks("/health").AllowAnonymous();
         if (endpoints.ServiceProvider.GetService<AepPairingCoordinator>() is { } pairing)
         {
-            endpoints.MapGet(AepEnrollmentProtocol.PairingPath, (HttpResponse response) =>
+            endpoints.MapGet(AepPairingBrand.Path, () =>
+                Results.Stream(AepPairingBrand.Open(), "image/png"))
+                .AllowAnonymous();
+            endpoints.MapGet(AepEnrollmentProtocol.PairingPath, (HttpRequest request, HttpResponse response) =>
             {
                 ProtectPairingResponse(response);
-                return Results.Content(pairing.PairingForm(), "text/html; charset=utf-8");
+                return Results.Content(pairing.PairingForm(request.Headers.AcceptLanguage, request.Query["theme"]), "text/html; charset=utf-8");
             }).AllowAnonymous();
             endpoints.MapPost(AepEnrollmentProtocol.PairingPath, async (HttpRequest request, HttpResponse response, CancellationToken token) =>
             {
                 ProtectPairingResponse(response);
                 var form = await request.ReadFormAsync(token);
-                var result = await pairing.PairAsync(form["code"].ToString(), token);
+                var result = await pairing.PairAsync(form["code"].ToString(), request.Headers.AcceptLanguage, request.Query["theme"], token);
                 return Results.Content(result.Html, "text/html; charset=utf-8", statusCode: result.Status);
             }).AllowAnonymous();
         }
@@ -139,7 +142,7 @@ public static class AepServerExtensions
     private static void ProtectPairingResponse(HttpResponse response)
     {
         response.Headers.CacheControl = "no-store";
-        response.Headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
+        response.Headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
         response.Headers["Referrer-Policy"] = "no-referrer";
     }
 

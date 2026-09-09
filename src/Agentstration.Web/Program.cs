@@ -111,6 +111,9 @@ builder.Services.AddAgentstration(
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
+builder.Services.AddSingleton(builder.Configuration
+    .GetSection(AepEnrollmentPolicyOptions.SectionName)
+    .Get<AepEnrollmentPolicyOptions>() ?? new());
 builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
 builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();

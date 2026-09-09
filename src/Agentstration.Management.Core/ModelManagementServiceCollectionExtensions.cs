@@ -19,6 +19,7 @@ public static class ModelManagementServiceCollectionExtensions
         services.AddSingleton<IModelDeploymentStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
         services.AddSingleton<IModelProfileReferenceValidator>(provider => provider.GetRequiredService<ModelProfileManagementService>());
         services.AddSingleton<ExtensionRegistrationManagementService>();
+        services.AddSingleton<AepEnrollmentSettingsService>();
         services.AddSingleton<AepEnrollmentService>();
         services.AddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
         services.AddSingleton<ResourceScopeOperationService>();

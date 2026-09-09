@@ -159,6 +159,43 @@ public sealed class AepConformanceTests
     }
 
     [TestMethod]
+    public async Task PairingFormUsesBrowserLanguageAndAgentstrationStyling()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"aep-pairing-ui-{Guid.NewGuid():N}");
+        var stateFile = Path.Combine(directory, "state.json");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await using var factory = PairingFactory(stateFile);
+            using var client = factory.CreateClient();
+            client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("fr-FR,fr;q=0.9,en;q=0.8");
+
+            using var response = await client.GetAsync($"{AepEnrollmentProtocol.PairingPath}?theme=dark");
+            var html = await response.Content.ReadAsStringAsync();
+
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+            StringAssert.Contains(html, "<html lang=\"fr\" class=\"theme-dark\">");
+            StringAssert.Contains(html, "action=\"/aep/enrollment/pair?theme=dark\"");
+            StringAssert.Contains(html, "Associer cette extension AEP");
+            StringAssert.Contains(html, "Code d&#x2019;association");
+            StringAssert.Contains(html, "class=\"brand\"");
+            StringAssert.Contains(html, "prefers-color-scheme:dark");
+            StringAssert.Contains(html, "src=\"/aep/enrollment/agentstration-mark.png\"");
+            StringAssert.Contains(html, "name=\"code\"");
+
+            using var brand = await client.GetAsync("/aep/enrollment/agentstration-mark.png");
+            var image = await brand.Content.ReadAsByteArrayAsync();
+            Assert.AreEqual(HttpStatusCode.OK, brand.StatusCode);
+            Assert.AreEqual("image/png", brand.Content.Headers.ContentType?.MediaType);
+            CollectionAssert.AreEqual(new byte[] { 137, 80, 78, 71 }, image[..4]);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public async Task PairingCredentialRotationOverlapsThenRevokesWithoutReopeningEnrollment()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"aep-pairing-lifecycle-{Guid.NewGuid():N}");

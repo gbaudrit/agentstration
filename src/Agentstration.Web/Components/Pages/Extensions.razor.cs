@@ -4,6 +4,7 @@ using Agentstration.Flow;
 using Agentstration.Flow.Contracts;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
+using Agentstration.Management.Core;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
@@ -29,6 +30,10 @@ public partial class Extensions
     private IReadOnlyList<ExtensionResponse>? extensions;
     private IReadOnlyList<ExtensionRegistrationResource>? registrations;
     private IReadOnlyList<AepEnrollmentRequestResource>? enrollments;
+    private AepEnrollmentSettingsSnapshot? enrollmentSettings;
+    private bool pairingCodeEnabled;
+    private bool sharedKeyFileEnabled;
+    private bool savingEnrollmentSettings;
     private AgentstrationApiException? error;
     private bool loading;
     private bool discovering;
@@ -46,7 +51,9 @@ public partial class Extensions
     private string? activePairingCode;
     private DateTimeOffset? activePairingExpiry;
     private Uri? activePairingUri;
+    private Guid? activeEnrollmentId;
     private bool clipboardFallback;
+    private bool refreshingEnrollmentState;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusLabel(string status) => T($"Status.{status}");
 
@@ -68,13 +75,49 @@ public partial class Extensions
             var extensionsTask = Client.GetExtensionsAsync(cancellation.Token);
             var registrationsTask = Client.GetRegistrationsAsync(cancellation.Token);
             var enrollmentsTask = CanAdministerEnrollments ? Client.GetEnrollmentsAsync(cancellation.Token) : Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([]);
-            await Task.WhenAll(extensionsTask, registrationsTask, enrollmentsTask);
+            var enrollmentSettingsTask = CanAdministerEnrollments
+                ? GetEnrollmentSettingsAsync()
+                : Task.FromResult<AepEnrollmentSettingsSnapshot?>(null);
+            await Task.WhenAll(extensionsTask, registrationsTask, enrollmentsTask, enrollmentSettingsTask);
             extensions = await extensionsTask;
             registrations = await registrationsTask;
             enrollments = await enrollmentsTask;
+            enrollmentSettings = await enrollmentSettingsTask;
+            if (enrollmentSettings is { } settings)
+            {
+                pairingCodeEnabled = settings.PairingCodeEnabled;
+                sharedKeyFileEnabled = settings.SharedKeyFileEnabled;
+            }
         }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
+    }
+
+    private async Task<AepEnrollmentSettingsSnapshot?> GetEnrollmentSettingsAsync() =>
+        await Client.GetEnrollmentSettingsAsync(cancellation.Token);
+
+    private async Task SaveEnrollmentSettingsAsync()
+    {
+        savingEnrollmentSettings = true;
+        error = null;
+        try
+        {
+            enrollmentSettings = await Client.UpdateEnrollmentSettingsAsync(
+                pairingCodeEnabled,
+                sharedKeyFileEnabled,
+                enrollmentSettings?.ETag,
+                cancellation.Token);
+            pairingCodeEnabled = enrollmentSettings.PairingCodeEnabled;
+            sharedKeyFileEnabled = enrollmentSettings.SharedKeyFileEnabled;
+            Notifications.Add(new NotificationItem(
+                Guid.NewGuid(),
+                T("EnrollmentModesSaved"),
+                T("EnrollmentModes.Description"),
+                DateTimeOffset.Now,
+                UiStatus.Success));
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { savingEnrollmentSettings = false; }
     }
 
     private async Task CopyAndOpenAsync(AepEnrollmentRequestResource enrollment)
@@ -87,6 +130,7 @@ public partial class Extensions
             activePairingCode = result.Code;
             activePairingExpiry = result.ExpiresAt;
             activePairingUri = enrollment.Definition.PairingUri;
+            activeEnrollmentId = enrollment.Definition.InstanceId;
             clipboardFallback = !await JavaScript.InvokeAsync<bool>("agentstrationEnrollment.copyAndOpen", cancellation.Token, result.Code, activePairingUri.AbsoluteUri);
             await LoadAsync();
         }
@@ -142,8 +186,54 @@ public partial class Extensions
     private async Task RefreshCountdownAsync()
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-        try { while (await timer.WaitForNextTickAsync(cancellation.Token)) await InvokeAsync(StateHasChanged); }
+        var tick = 0;
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellation.Token))
+            {
+                await InvokeAsync(StateHasChanged);
+                if (++tick % 2 == 0 && activeEnrollmentId is not null)
+                    await InvokeAsync(RefreshEnrollmentStateAsync);
+            }
+        }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+    }
+
+    private async Task RefreshEnrollmentStateAsync()
+    {
+        if (refreshingEnrollmentState || pairingBusy || loading || !CanAdministerEnrollments) return;
+        refreshingEnrollmentState = true;
+        try
+        {
+            var refreshed = await Client.GetEnrollmentsAsync(cancellation.Token);
+            var active = activeEnrollmentId is { } instanceId
+                ? refreshed.SingleOrDefault(value => value.Definition.InstanceId == instanceId)
+                : null;
+            var changed = enrollments is null
+                || refreshed.Count != enrollments.Count
+                || refreshed.Any(value => enrollments.SingleOrDefault(current => current.Definition.InstanceId == value.Definition.InstanceId)?.Definition.State != value.Definition.State);
+            enrollments = refreshed;
+            if (active is null || active.Definition.State != AepEnrollmentState.CodeIssued)
+            {
+                activePairingCode = null;
+                activePairingExpiry = null;
+                activePairingUri = null;
+                activeEnrollmentId = null;
+            }
+            if (changed)
+            {
+                var extensionsTask = Client.GetExtensionsAsync(cancellation.Token);
+                var registrationsTask = Client.GetRegistrationsAsync(cancellation.Token);
+                await Task.WhenAll(extensionsTask, registrationsTask);
+                extensions = await extensionsTask;
+                registrations = await registrationsTask;
+            }
+        }
+        catch (AgentstrationApiException)
+        {
+            // A transient polling failure must not replace the last usable screen state.
+        }
+        finally { refreshingEnrollmentState = false; }
     }
 
     private static bool CanRotate(AepEnrollmentState state) => state is AepEnrollmentState.Pending

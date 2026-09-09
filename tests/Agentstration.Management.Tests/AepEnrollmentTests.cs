@@ -12,6 +12,40 @@ namespace Agentstration.Management.Tests;
 public sealed partial class ModelManagementApiTests
 {
     [TestMethod]
+    public async Task PairingCodeCanBeDisabledAndConfigurationCanLockTheMode()
+    {
+        await using (var factory = Factory())
+        {
+            var context = await GetBootstrapContextAsync(factory);
+            var settings = factory.Services.GetRequiredService<AepEnrollmentSettingsService>();
+            var updated = await settings.UpdateAsync(context, pairingCodeEnabled: false, sharedKeyFileEnabled: true, ifMatch: null, default);
+            Assert.IsFalse(updated.PairingCodeEnabled);
+            Assert.IsTrue(updated.PairingCodeConfigurable);
+
+            var service = factory.Services.GetRequiredService<AepEnrollmentService>();
+            var rejected = await Assert.ThrowsAsync<AepEnrollmentException>(() => service.AnnounceAsync(new(
+                Guid.NewGuid(),
+                context.TenantId,
+                context.WorkspaceId,
+                new AepExtensionIdentity("extension.disabled-pairing", "Disabled pairing", "1.0.0"),
+                new Uri("https://extension.example/"),
+                new Uri("https://extension.example/aep/enrollment/pair")), default));
+            Assert.AreEqual("enrollment_mode_disabled", rejected.Code);
+        }
+
+        await using var lockedFactory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<AepEnrollmentPolicyOptions>();
+            services.AddSingleton(new AepEnrollmentPolicyOptions { PairingCodeAllowed = false });
+        }));
+        var lockedContext = await GetBootstrapContextAsync(lockedFactory);
+        var lockedSettings = lockedFactory.Services.GetRequiredService<AepEnrollmentSettingsService>();
+        var locked = await lockedSettings.UpdateAsync(lockedContext, pairingCodeEnabled: true, sharedKeyFileEnabled: true, ifMatch: null, default);
+        Assert.IsFalse(locked.PairingCodeEnabled);
+        Assert.IsFalse(locked.PairingCodeConfigurable);
+    }
+
+    [TestMethod]
     public async Task PairingAnnouncementsAreIdempotentAndConcurrentClaimsHaveOneWinner()
     {
         await using var factory = Factory();

@@ -27,6 +27,7 @@ public sealed class AepEnrollmentService(
     AepTransportSecurityOptions transportOptions,
     ICurrentRequestContext requestContext,
     ISecurityAuditWriter audit,
+    AepEnrollmentSettingsService enrollmentSettings,
     TimeProvider timeProvider)
 {
     public const int MaximumAttempts = 5;
@@ -35,6 +36,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<AepEnrollmentAnnouncementResponse> AnnounceAsync(AepEnrollmentAnnouncement announcement, CancellationToken cancellationToken)
     {
+        await EnsurePairingCodeEnabledAsync(cancellationToken);
         using var scopeContext = RequestScopes().PushSystem();
         ValidateAnnouncement(announcement);
         var workspace = await identities.GetWorkspaceAsync(announcement.TenantId, announcement.WorkspaceId, cancellationToken);
@@ -99,6 +101,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<AepPairingCodeResult> RotateAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
     {
+        await EnsurePairingCodeEnabledAsync(cancellationToken);
         using var scopeContext = RequestScopes().Push(context);
         await AuthorizeAsync(context, cancellationToken);
         var stored = await GetAsync(context.WorkspaceId, requestId, cancellationToken);
@@ -150,6 +153,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<AepEnrollmentCredential> ClaimAsync(AepEnrollmentClaim claim, CancellationToken cancellationToken)
     {
+        await EnsurePairingCodeEnabledAsync(cancellationToken);
         using var scopeContext = RequestScopes().PushSystem();
         if (claim.RequestId == Guid.Empty || claim.InstanceId != claim.RequestId || claim.WorkspaceId == Guid.Empty
             || string.IsNullOrWhiteSpace(claim.Code) || claim.Code.Length > 64)
@@ -215,6 +219,7 @@ public sealed class AepEnrollmentService(
 
     public async Task<AepEnrollmentReadyResponse> ReadyAsync(AepEnrollmentReady ready, CancellationToken cancellationToken)
     {
+        await EnsurePairingCodeEnabledAsync(cancellationToken);
         using var scopeContext = RequestScopes().PushSystem();
         var stored = await GetAsync(ready.WorkspaceId, ready.RequestId, cancellationToken);
         var definition = stored.Value.Definition;
@@ -488,6 +493,12 @@ public sealed class AepEnrollmentService(
 
     private IRequestContextScopeFactory RequestScopes() => requestContext as IRequestContextScopeFactory
         ?? throw new InvalidOperationException("AEP enrollment requires a mutable Control Plane request context.");
+
+    private async Task EnsurePairingCodeEnabledAsync(CancellationToken cancellationToken)
+    {
+        if (!await enrollmentSettings.IsEnabledAsync(AepEnrollmentMode.PairingCode, cancellationToken))
+            throw new AepEnrollmentException("enrollment_mode_disabled", "Pairing-code enrollment is disabled by the Agentstration enrollment policy.", 403);
+    }
 
     private async Task<StoredResource<AepEnrollmentRequestResource>> GetAsync(Guid workspaceId, Guid requestId, CancellationToken cancellationToken) =>
         await store.GetExactAsync<AepEnrollmentRequestResource>(Address(ResourceScopeRef.Workspace(workspaceId), requestId.ToString("N")), cancellationToken)

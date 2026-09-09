@@ -24,6 +24,14 @@ public static class AepEnrollmentEndpoints
             .WithSummary("Complete AEP pairing and identity verification");
 
         var administration = endpoints.MapGroup("/api/aep/enrollments").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        administration.MapGet("/settings", (AepEnrollmentSettingsService service, CancellationToken token) =>
+            ExecuteAsync(() => service.GetAsync(token)))
+            .Produces<AepEnrollmentSettingsSnapshot>()
+            .WithSummary("Get the effective AEP enrollment-mode policy");
+        administration.MapPut("/settings", (PutAepEnrollmentSettingsRequest body, ICurrentRequestContext current, AepEnrollmentSettingsService service, CancellationToken token) =>
+            ExecuteAsync(() => service.UpdateAsync(current.Current, body.PairingCodeEnabled, body.SharedKeyFileEnabled, body.ETag, token)))
+            .Produces<AepEnrollmentSettingsSnapshot>()
+            .WithSummary("Enable or disable configurable AEP enrollment modes");
         administration.MapGet("/", (ICurrentRequestContext current, AepEnrollmentService service, CancellationToken token) =>
             ExecuteAsync(() => service.ListAsync(current.Current, token)))
             .Produces<IEnumerable<AepEnrollmentRequestResource>>()
@@ -77,3 +85,8 @@ public static class AepEnrollmentEndpoints
         }
     }
 }
+
+public sealed record PutAepEnrollmentSettingsRequest(
+    bool PairingCodeEnabled,
+    bool SharedKeyFileEnabled,
+    string? ETag);
