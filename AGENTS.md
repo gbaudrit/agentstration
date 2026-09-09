@@ -250,11 +250,11 @@ The `ai-defect` label identifies structural, architectural, behavioral, or code-
 When an agent works on an issue labeled `ai-defect`:
 
 - Read `docs/ai-defects/index.md` before changing code.
-- Create or update exactly one AI Defect Record under `docs/ai-defects/`, using the labeled issue number and the repository template.
-- Base the failure analysis on observable evidence. Record faulty assumptions, missed repository context, safeguard gaps, the correction, and a durable prevention measure. Do not include private chain-of-thought, full prompts, or speculation about a model.
+- Create or update exactly one AI Defect CAR under `docs/ai-defects/`, using the labeled issue number and the repository template.
+- Base the causal analysis on observable evidence. Record faulty assumptions, missed repository context, safeguard gaps, the correction, and a durable prevention measure. Do not include private chain-of-thought, full prompts, or speculation about a model.
 - Link the issue, the introducing change when it can be established, the corrective pull request, and any affected ADR. State `Unknown` rather than inventing provenance.
-- Apply `ai-defect` to the corrective pull request and link the record from its `Changes` section.
-- Do not mark the record `Resolved` or `Prevented` until the stated validation has actually completed. If no durable safeguard is added, explain why in the record.
+- Apply `ai-defect` to the corrective pull request and link the CAR from its `Changes` section.
+- Do not mark the CAR `Resolved` or `Prevented` until the stated validation has actually completed. If no durable safeguard is added, explain why in the CAR.
 
 ## Pull Request Description
 
