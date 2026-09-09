@@ -50,31 +50,7 @@ jobs:
             }
             else {
               $recordFiles = @($changedFiles | Where-Object {
-                $_ -cmatch '^docs/ai-defects/[0-9]{4,}-[a-z0-9]+(?:-[a-z0-9]+)*\.md
-              ((Compare-Object -ReferenceObject $requiredHeadings -DifferenceObject $actualHeadings -SyncWindow 0).Count -ne 0)) {
-            $errors.Add("Description must contain exactly these sections in order: $($requiredHeadings -join ', ')")
-          }
-          else {
-            for ($index = 0; $index -lt $headingMatches.Count; $index++) {
-              $contentStart = $headingMatches[$index].Index + $headingMatches[$index].Length
-              $contentEnd = if ($index + 1 -lt $headingMatches.Count) { $headingMatches[$index + 1].Index } else { $bodyWithoutComments.Length }
-              $content = $bodyWithoutComments.Substring($contentStart, $contentEnd - $contentStart).Trim()
-              if ([string]::IsNullOrWhiteSpace($content)) {
-                $errors.Add("Section '$($requiredHeadings[$index])' must not be empty")
-              }
-              elseif ($requiredHeadings[$index] -in @('## Changes', '## Validation') -and $content -notmatch '(?m)^- .+') {
-                $errors.Add("Section '$($requiredHeadings[$index])' must use bullet points")
-              }
-            }
-          }
-
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error $_ -ErrorAction Continue }
-            exit 1
-          }
-
-          Write-Host 'Pull request title and description follow the repository conventions.'
-
+                $_ -cmatch '^docs/ai-defects/[0-9]{4,}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$'
               })
 
               if ($recordFiles.Count -eq 0) {
