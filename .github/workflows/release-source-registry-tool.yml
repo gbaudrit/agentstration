@@ -1,0 +1,101 @@
+name: Release Source Registry tool
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release-source-registry-tool-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-and-publish:
+    name: Validate and publish Source Registry tool
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out tagged revision
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Validate shared product version and tag
+        id: version
+        shell: pwsh
+        run: |
+          $project = 'src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj'
+          $version = (dotnet msbuild $project -nologo -getProperty:Version).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
+            throw "Source Registry tool version '$version' is not a supported Semantic Version."
+          }
+          if ($env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Tag '$env:GITHUB_REF_NAME' does not match shared product version 'v$version'."
+          }
+          $notes = "docs/releases/$version.md"
+          if (-not (Test-Path -LiteralPath $notes)) {
+            throw "Shared release notes '$notes' are missing."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "channel=$(if ($version.Contains('-')) { 'prerelease' } else { 'stable' })" >> $env:GITHUB_OUTPUT
+      - name: Require a commit from main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Restore tool tests
+        run: >-
+          dotnet restore tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj
+          -p:NuGetAudit=true
+          -p:NuGetAuditMode=all
+      - name: Build tool tests
+        run: >-
+          dotnet build tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj
+          --configuration Release
+          --no-restore
+      - name: Test tool
+        run: >-
+          dotnet test tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj
+          --configuration Release
+          --no-build
+      - name: Smoke-test package
+        shell: pwsh
+        run: ./scripts/ci/test-source-registry-tool-package.ps1 -Configuration Release -NoBuild
+      - name: Pack release artifact
+        run: >-
+          dotnet pack src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj
+          --configuration Release
+          --no-restore
+          --no-build
+          --output artifacts
+      - name: Write SHA-256 checksum
+        shell: pwsh
+        run: |
+          $package = @(Get-ChildItem artifacts/*.nupkg -File)
+          if ($package.Count -ne 1) { throw "Expected exactly one Source Registry tool package." }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $package[0].FullName).Hash.ToLowerInvariant()
+          "$hash  $($package[0].Name)" | Set-Content -Encoding utf8NoBOM artifacts/SHA256SUMS
+      - name: Authenticate to NuGet.org with trusted publishing
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: gbaudrit
+      - name: Publish ${{ steps.version.outputs.channel }} package to NuGet.org
+        run: >-
+          dotnet nuget push artifacts/Agentstration.SourceRegistry.Tool.${{ steps.version.outputs.version }}.nupkg
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
+      - name: Upload validated package artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: source-registry-tool-${{ steps.version.outputs.version }}
+          path: |
+            artifacts/*.nupkg
+            artifacts/SHA256SUMS
+          if-no-files-found: error

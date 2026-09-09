@@ -17,7 +17,7 @@ Commit `.config/dotnet-tools.json`. Other contributors and CI restore the pinned
 dotnet tool restore
 ```
 
-Release tags publish the package to NuGet.org through short-lived OIDC credentials. No consumer credential is required to install or restore it.
+The tool shares the Agentstration product version because it implements that release's Source contracts. The dedicated tool workflow publishes the package from the same `v<version>` tag used by the product: suffixed Semantic Versions are NuGet prereleases and versions without a suffix are stable releases. Publication uses short-lived OIDC credentials. No consumer credential is required to install or restore it.
 
 Update an existing local pin deliberately to another exact version:
 

@@ -11,6 +11,7 @@ The repository keeps reviewable governance files in Git:
 - `.github/workflows/codeql.yml` scans C# on pull requests, `main`, and a weekly schedule;
 - `.github/workflows/dependency-review.yml` blocks pull requests that introduce known vulnerabilities of moderate severity or higher;
 - `.github/workflows/release.yml` validates version tags, rebuilds and retests the product, packages the server and Workplace, and creates GitHub prereleases;
+- `.github/workflows/release-source-registry-tool.yml` independently rebuilds, tests, packages, and publishes the version-aligned Source Registry tool for the same product tags;
 - `.github/dependabot.yml` checks the root and autonomous AEP NuGet manifests plus GitHub Actions each week;
 - `.github/CODEOWNERS`, the pull request template, and issue forms provide lightweight contribution ownership and prompts;
 - `.github/rulesets/main.json` is the reproducible source definition for `main` protection;
@@ -165,15 +166,6 @@ Docker Hub publication requires an existing `agentstration/agentstration` reposi
 - `DOCKERHUB_USERNAME`: the Docker Hub account allowed to push the repository;
 - `DOCKERHUB_TOKEN`: a scoped Docker Hub access token with write permission. Do not store an account password.
 
-NuGet.org publication uses trusted publishing and does not use a long-lived API-key secret. The NuGet account `gbaudrit` must own `Agentstration.SourceRegistry.Tool` and configure a trusted publishing policy with:
-
-- repository owner: `gbaudrit`;
-- repository: `agentstration`;
-- workflow file: `release.yml`;
-- environment: empty, because the release job does not select a GitHub environment.
-
-The policy may remain pending until its first successful publication. Create or reactivate it shortly before pushing the release tag; NuGet.org uses the workflow's GitHub OIDC identity to activate and bind the policy.
-
 For example, after the release change has merged, the version and release notes have been advanced to a new immutable version, and all required checks have passed:
 
 ```powershell
@@ -184,4 +176,17 @@ git tag -a "v$version" -m "Agentstration $version"
 git push origin "v$version"
 ```
 
-GitHub Actions then repeats restore, Release build, and tests; smoke-tests and packs `Agentstration.SourceRegistry.Tool`; publishes that exact package to NuGet.org with a short-lived OIDC credential; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. The `.nupkg` is also retained in the workflow artifact and GitHub prerelease. Alpha container releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag or package version. Correct a failed release through a reviewed commit and a new prerelease identifier.
+GitHub Actions then repeats restore, Release build, and tests; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. Alpha container releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag. Correct a failed release through a reviewed commit and a new prerelease identifier.
+
+## Source Registry tool releases
+
+`Agentstration.SourceRegistry.Tool` deliberately shares the central product version because it implements the contracts accepted by that Agentstration release. The dedicated `release-source-registry-tool.yml` workflow runs from the same immutable `v<version>` tag, checks that the package resolves the central version, runs the focused tests and installed-package smoke test, and publishes the exact `.nupkg` to NuGet.org. A Semantic Version containing a suffix such as `-alpha.2` is a NuGet prerelease; a version without a suffix is a stable release. No independent tool tag or version file is used.
+
+NuGet.org publication uses trusted publishing and does not use a long-lived API-key secret. The NuGet account `gbaudrit` must own `Agentstration.SourceRegistry.Tool` and configure a trusted publishing policy with:
+
+- repository owner: `gbaudrit`;
+- repository: `agentstration`;
+- workflow file: `release-source-registry-tool.yml`;
+- environment: empty, because the release job does not select a GitHub environment.
+
+The policy may remain pending until its first successful publication. Create or reactivate it shortly before pushing the shared release tag; NuGet.org uses the dedicated workflow's GitHub OIDC identity to activate and bind the policy. The package and its `SHA256SUMS` are retained as workflow artifacts, while the product workflow remains responsible for the shared GitHub Release. Package versions are immutable and must never be reused.
