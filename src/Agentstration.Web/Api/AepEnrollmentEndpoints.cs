@@ -40,6 +40,14 @@ public static class AepEnrollmentEndpoints
             ExecuteNoContentAsync(() => service.CloseAsync(current.Current, requestId, AepEnrollmentState.Cancelled, token)))
             .Produces(StatusCodes.Status204NoContent)
             .WithSummary("Cancel an AEP enrollment request");
+        administration.MapPost("/{requestId:guid}/rotate-credential", (Guid requestId, ICurrentRequestContext current, AepEnrollmentService service, CancellationToken token) =>
+            ExecuteAsync(() => service.RotateCredentialAsync(current.Current, requestId, token)))
+            .Produces<AepCredentialLifecycleResponse>()
+            .WithSummary("Rotate an active AEP credential without downtime");
+        administration.MapPost("/{requestId:guid}/revoke", (Guid requestId, ICurrentRequestContext current, AepEnrollmentService service, CancellationToken token) =>
+            ExecuteNoContentAsync(() => service.RevokeCredentialAsync(current.Current, requestId, token)))
+            .Produces(StatusCodes.Status204NoContent)
+            .WithSummary("Revoke an active AEP credential");
         return endpoints;
     }
 

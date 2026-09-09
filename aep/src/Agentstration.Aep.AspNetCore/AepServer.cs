@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Aep.Abstractions;
@@ -87,6 +88,30 @@ public static class AepServerExtensions
         protocolEndpoints.Add(endpoints.MapGet($"{AepProtocol.ModelProvidersPath}/{{providerId}}/health", ProviderHealthAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/resolve", ResolveSourceAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.SourceProvidersPath}/{{providerId}}/materialize", MaterializeSourceAsync));
+        if (endpoints.ServiceProvider.GetService<AepPairingStateStore>() is not null)
+        {
+            protocolEndpoints.Add(endpoints.MapPost(AepEnrollmentProtocol.CredentialRotationPath,
+                (AepCredentialRotation request, ClaimsPrincipal principal, AepPairingStateStore state) =>
+                {
+                    var clientId = principal.FindFirst(AepAuthenticationDefaults.ClientIdClaim)?.Value;
+                    if (!string.Equals(clientId, request.ClientId, StringComparison.Ordinal) || request.InstanceId != state.InstanceId)
+                        return Results.Json(new { error = new AepEnrollmentError("identity_mismatch", "The credential identity does not match this extension instance.") }, statusCode: 409);
+                    state.Rotate(request.ClientId, request.AccessToken);
+                    return Results.Ok(new AepCredentialLifecycleResponse("rotated"));
+                }));
+            protocolEndpoints.Add(endpoints.MapPost(AepEnrollmentProtocol.PreviousCredentialRevocationPath,
+                (AepPairingStateStore state) =>
+                {
+                    state.RevokePrevious();
+                    return Results.Ok(new AepCredentialLifecycleResponse("previousRevoked"));
+                }));
+            protocolEndpoints.Add(endpoints.MapPost(AepEnrollmentProtocol.CredentialRevocationPath,
+                (AepPairingStateStore state) =>
+                {
+                    state.Revoke();
+                    return Results.Ok(new AepCredentialLifecycleResponse("revoked"));
+                }));
+        }
         endpoints.MapHealthChecks("/health").AllowAnonymous();
         if (endpoints.ServiceProvider.GetService<AepPairingCoordinator>() is { } pairing)
         {

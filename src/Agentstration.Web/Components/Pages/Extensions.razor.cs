@@ -123,6 +123,22 @@ public partial class Extensions
         finally { pairingBusy = false; }
     }
 
+    private async Task RotateCredentialAsync(AepEnrollmentRequestResource enrollment)
+    {
+        pairingBusy = true;
+        try { await Client.RotateEnrollmentCredentialAsync(enrollment.Definition.InstanceId, cancellation.Token); await LoadAsync(); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { pairingBusy = false; }
+    }
+
+    private async Task RevokeCredentialAsync(AepEnrollmentRequestResource enrollment)
+    {
+        pairingBusy = true;
+        try { await Client.RevokeEnrollmentCredentialAsync(enrollment.Definition.InstanceId, cancellation.Token); await LoadAsync(); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { pairingBusy = false; }
+    }
+
     private async Task RefreshCountdownAsync()
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
@@ -136,7 +152,8 @@ public partial class Extensions
     private static UiStatus EnrollmentStatus(AepEnrollmentState state) => state switch
     {
         AepEnrollmentState.Available => UiStatus.Success,
-        AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled or AepEnrollmentState.Expired or AepEnrollmentState.AttemptsExceeded or AepEnrollmentState.VerificationFailed => UiStatus.Danger,
+        AepEnrollmentState.Disabled => UiStatus.Neutral,
+        AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled or AepEnrollmentState.Expired or AepEnrollmentState.AttemptsExceeded or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Revoked => UiStatus.Danger,
         AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying => UiStatus.Warning,
         _ => UiStatus.Neutral
     };

@@ -12,7 +12,13 @@ using Microsoft.Extensions.Options;
 
 namespace Agentstration.Aep.AspNetCore;
 
-internal sealed record AepPairingState(Guid InstanceId, string Status, string? ClientId, string? TokenDigest);
+internal sealed record AepPairingState(
+    Guid InstanceId,
+    string Status,
+    string? ClientId,
+    string? TokenDigest,
+    string? PreviousTokenDigest = null,
+    IReadOnlyList<string>? RevokedTokenDigests = null);
 
 internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
 {
@@ -28,21 +34,46 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
 
     public Guid InstanceId => state.InstanceId;
     public bool IsPaired => string.Equals(state.Status, "paired", StringComparison.Ordinal);
+    public bool IsRevoked => string.Equals(state.Status, "revoked", StringComparison.Ordinal);
 
-    public bool TryAuthenticate(ReadOnlySpan<byte> suppliedDigest, out string clientId)
+    public AepDynamicCredentialMatch Match(ReadOnlySpan<byte> suppliedDigest, out string clientId)
     {
         lock (sync)
         {
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    clientId = string.Empty;
+                    return AepDynamicCredentialMatch.None;
+                }
+                var persisted = LoadExisting(path);
+                if (persisted.InstanceId != state.InstanceId)
+                {
+                    clientId = string.Empty;
+                    return AepDynamicCredentialMatch.None;
+                }
+                state = persisted;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+            {
+                clientId = string.Empty;
+                return AepDynamicCredentialMatch.None;
+            }
             clientId = state.ClientId ?? string.Empty;
-            if (!IsPaired || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(state.TokenDigest)) return false;
-            var expected = Convert.FromBase64String(state.TokenDigest);
-            try { return CryptographicOperations.FixedTimeEquals(suppliedDigest, expected); }
-            finally { CryptographicOperations.ZeroMemory(expected); }
+            foreach (var revoked in state.RevokedTokenDigests ?? [])
+                if (Matches(revoked, suppliedDigest)) return AepDynamicCredentialMatch.Revoked;
+            if (!IsPaired || string.IsNullOrWhiteSpace(clientId)) return AepDynamicCredentialMatch.None;
+            return Matches(state.TokenDigest, suppliedDigest) | Matches(state.PreviousTokenDigest, suppliedDigest)
+                ? AepDynamicCredentialMatch.Authenticated
+                : AepDynamicCredentialMatch.None;
         }
     }
 
     public void SetPaired(string clientId, string accessToken)
     {
+        if (Encoding.UTF8.GetByteCount(accessToken) < 32)
+            throw new ArgumentException("An AEP credential must contain at least 256 bits of entropy.", nameof(accessToken));
         var tokenBytes = Encoding.UTF8.GetBytes(accessToken);
         var digest = SHA256.HashData(tokenBytes);
         CryptographicOperations.ZeroMemory(tokenBytes);
@@ -51,28 +82,95 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
             lock (sync)
             {
                 if (IsPaired) throw new InvalidOperationException("This extension instance is already paired.");
-                state = state with { Status = "paired", ClientId = clientId, TokenDigest = Convert.ToBase64String(digest) };
+                state = state with { Status = "paired", ClientId = clientId, TokenDigest = Convert.ToBase64String(digest), PreviousTokenDigest = null };
                 WriteAtomic(path, state);
             }
         }
         finally { CryptographicOperations.ZeroMemory(digest); }
     }
 
+    public void Rotate(string clientId, string accessToken)
+    {
+        if (Encoding.UTF8.GetByteCount(accessToken) < 32)
+            throw new ArgumentException("An AEP credential must contain at least 256 bits of entropy.", nameof(accessToken));
+        var digest = TokenDigest(accessToken);
+        try
+        {
+            lock (sync)
+            {
+                if (!IsPaired || !string.Equals(state.ClientId, clientId, StringComparison.Ordinal))
+                    throw new InvalidOperationException("The credential identity does not match this paired extension.");
+                state = state with { PreviousTokenDigest = state.TokenDigest, TokenDigest = Convert.ToBase64String(digest) };
+                WriteAtomic(path, state);
+            }
+        }
+        finally { CryptographicOperations.ZeroMemory(digest); }
+    }
+
+    public void RevokePrevious()
+    {
+        lock (sync)
+        {
+            if (!IsPaired) throw new InvalidOperationException("This extension instance is not paired.");
+            state = state with
+            {
+                RevokedTokenDigests = AppendRevoked(state.RevokedTokenDigests, state.PreviousTokenDigest),
+                PreviousTokenDigest = null
+            };
+            WriteAtomic(path, state);
+        }
+    }
+
+    public void Revoke()
+    {
+        lock (sync)
+        {
+            state = state with
+            {
+                Status = "revoked",
+                RevokedTokenDigests = AppendRevoked(state.RevokedTokenDigests, state.TokenDigest, state.PreviousTokenDigest),
+                TokenDigest = null,
+                PreviousTokenDigest = null
+            };
+            WriteAtomic(path, state);
+        }
+    }
+
+    public static void Reset(string stateFile)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stateFile);
+        var current = LoadOrCreate(stateFile);
+        WriteAtomic(stateFile, new AepPairingState(current.InstanceId, "unpaired", null, null));
+    }
+
     private static AepPairingState LoadOrCreate(string path)
     {
-        if (File.Exists(path))
-        {
-            var loaded = JsonSerializer.Deserialize<AepPairingState>(File.ReadAllText(path))
-                ?? throw new InvalidDataException("The AEP pairing state file is invalid.");
-            if (loaded.InstanceId == Guid.Empty || loaded.Status is not ("unpaired" or "paired")
-                || loaded.Status == "paired" && (string.IsNullOrWhiteSpace(loaded.ClientId) || string.IsNullOrWhiteSpace(loaded.TokenDigest)))
-                throw new InvalidDataException("The AEP pairing state file is incomplete.");
-            return loaded;
-        }
+        if (File.Exists(path)) return LoadExisting(path);
         var created = new AepPairingState(Guid.NewGuid(), "unpaired", null, null);
         WriteAtomic(path, created);
         return created;
     }
+
+    private static AepPairingState LoadExisting(string path)
+    {
+        var loaded = JsonSerializer.Deserialize<AepPairingState>(File.ReadAllText(path))
+            ?? throw new InvalidDataException("The AEP pairing state file is invalid.");
+        if (loaded.InstanceId == Guid.Empty || loaded.Status is not ("unpaired" or "paired" or "revoked")
+            || loaded.Status == "paired" && (string.IsNullOrWhiteSpace(loaded.ClientId) || !ValidDigest(loaded.TokenDigest ?? string.Empty)
+                || loaded.PreviousTokenDigest is not null && !ValidDigest(loaded.PreviousTokenDigest))
+            || loaded.Status != "paired" && (loaded.TokenDigest is not null || loaded.PreviousTokenDigest is not null)
+            || loaded.RevokedTokenDigests is { Count: > 8 }
+            || loaded.RevokedTokenDigests?.Any(value => !ValidDigest(value)) == true)
+            throw new InvalidDataException("The AEP pairing state file is incomplete.");
+        return loaded;
+    }
+
+    private static string[] AppendRevoked(IReadOnlyList<string>? existing, params string?[] candidates) =>
+        (existing ?? [])
+            .Concat(candidates.OfType<string>())
+            .Distinct(StringComparer.Ordinal)
+            .TakeLast(8)
+            .ToArray();
 
     private static void WriteAtomic(string path, AepPairingState value)
     {
@@ -90,6 +188,38 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
+
+    private static byte[] TokenDigest(string accessToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accessToken);
+        var tokenBytes = Encoding.UTF8.GetBytes(accessToken);
+        try { return SHA256.HashData(tokenBytes); }
+        finally { CryptographicOperations.ZeroMemory(tokenBytes); }
+    }
+
+    private static bool Matches(string? encodedDigest, ReadOnlySpan<byte> suppliedDigest)
+    {
+        if (string.IsNullOrWhiteSpace(encodedDigest)) return false;
+        var expected = Convert.FromBase64String(encodedDigest);
+        try { return CryptographicOperations.FixedTimeEquals(suppliedDigest, expected); }
+        finally { CryptographicOperations.ZeroMemory(expected); }
+    }
+
+    private static bool ValidDigest(string value)
+    {
+        try
+        {
+            var digest = Convert.FromBase64String(value);
+            try { return digest.Length == SHA256.HashSizeInBytes; }
+            finally { CryptographicOperations.ZeroMemory(digest); }
+        }
+        catch (FormatException) { return false; }
+    }
+}
+
+public static class AepPairingLifecycle
+{
+    public static void ResetToUnpaired(string stateFile) => AepPairingStateStore.Reset(stateFile);
 }
 
 internal sealed record AepPairingOptions(
@@ -116,7 +246,7 @@ internal sealed class AepPairingCoordinator(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (state.IsPaired) return;
+        if (state.IsPaired || state.IsRevoked) return;
         var delay = TimeSpan.FromSeconds(1);
         while (!stoppingToken.IsCancellationRequested && !state.IsPaired)
         {
@@ -140,13 +270,14 @@ internal sealed class AepPairingCoordinator(
 
     public string PairingForm()
     {
+        if (state.IsRevoked) return Page("Extension credential revoked", "This extension instance requires an explicit local reset before it can enroll again.", includeForm: false);
         if (state.IsPaired) return Page("Extension already paired", "This extension instance is paired and its enrollment form is closed.", includeForm: false);
         return Page("Pair this AEP extension", "Enter the one-time code shown by an Agentstration administrator.", includeForm: true);
     }
 
     public async Task<(int Status, string Html)> PairAsync(string? code, CancellationToken cancellationToken)
     {
-        if (state.IsPaired) return (410, PairingForm());
+        if (state.IsPaired || state.IsRevoked) return (410, PairingForm());
         if (string.IsNullOrWhiteSpace(code) || code.Length > 64)
             return (422, Page("Pairing failed", "The pairing code is invalid.", includeForm: true));
         try

@@ -47,6 +47,12 @@ public interface IExtensionsClient
 
     Task CancelEnrollmentAsync(Guid requestId, CancellationToken cancellationToken) =>
         Task.FromException(new NotSupportedException("Enrollment administration is not supported by this client."));
+
+    Task RotateEnrollmentCredentialAsync(Guid requestId, CancellationToken cancellationToken) =>
+        Task.FromException(new NotSupportedException("Enrollment credential lifecycle is not supported by this client."));
+
+    Task RevokeEnrollmentCredentialAsync(Guid requestId, CancellationToken cancellationToken) =>
+        Task.FromException(new NotSupportedException("Enrollment credential lifecycle is not supported by this client."));
 }
 
 public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClient
@@ -98,6 +104,12 @@ public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClie
 
     public Task CancelEnrollmentAsync(Guid requestId, CancellationToken cancellationToken) =>
         EnrollmentActionAsync(requestId, "cancel", cancellationToken);
+
+    public Task RotateEnrollmentCredentialAsync(Guid requestId, CancellationToken cancellationToken) =>
+        EnrollmentActionAsync(requestId, "rotate-credential", cancellationToken);
+
+    public Task RevokeEnrollmentCredentialAsync(Guid requestId, CancellationToken cancellationToken) =>
+        EnrollmentActionAsync(requestId, "revoke", cancellationToken);
 
     private async Task EnrollmentActionAsync(Guid requestId, string action, CancellationToken cancellationToken)
     {

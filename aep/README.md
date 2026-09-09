@@ -78,6 +78,8 @@ Set `Aep:EnrollmentMode=SharedKeyFile` and `Aep:SharedKeyFile:Path` to a file co
 
 For a manual host, set `Aep:EnrollmentMode=PairingCode` and configure `Aep:PairingCode:AuthorityUrl`, `PublicEndpoint`, `TenantId`, `WorkspaceId`, and a durable writable `StateFile`. The SDK announces its stable instance ID, exposes the same-origin `/aep/enrollment/pair` form, and keeps all functional AEP endpoints authenticated while unpaired. After a successful claim it persists only the issued client ID and token digest; it does not revert to unpaired when the authority is unavailable.
 
+Credential rotation temporarily accepts both the old and new digests, verifies the replacement, then explicitly revokes the old digest. Revocation removes all digests, survives restart, returns `401` on the next functional request, and never reopens pairing. Disaster recovery is a local, explicit operation: restore the state file together with the Agentstration control plane and vault, or call `AepPairingLifecycle.ResetToUnpaired(stateFile)` and approve a new enrollment. Reset preserves the installation instance ID. Never use automatic reset after an authentication failure.
+
 ## CLI
 
 ```powershell

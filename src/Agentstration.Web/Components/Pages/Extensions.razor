@@ -45,6 +45,11 @@
                             <button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button>
                             <button class="button-secondary" @onclick="() => CancelEnrollmentAsync(enrollment)" disabled="@pairingBusy">@T("Cancel")</button>
                         }
+                        else if (enrollment.Definition.State == AepEnrollmentState.Available)
+                        {
+                            <button class="button-secondary" @onclick="() => RotateCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RotateCredential")</button>
+                            <button class="button-danger" @onclick="() => RevokeCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RevokeCredential")</button>
+                        }
                     </td>
                 </tr></Row>
             </DataGrid>
