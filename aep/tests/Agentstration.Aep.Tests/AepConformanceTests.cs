@@ -194,7 +194,10 @@ public sealed class AepConformanceTests
                 Assert.AreEqual(HttpStatusCode.OK,
                     (await replacementClient.PostAsync(AepEnrollmentProtocol.PreviousCredentialRevocationPath, null)).StatusCode);
                 using (var lifecycleState = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile)))
+                {
                     Assert.AreEqual(JsonValueKind.Null, lifecycleState.RootElement.GetProperty("PreviousTokenDigest").ValueKind);
+                    Assert.AreEqual(1, lifecycleState.RootElement.GetProperty("RevokedTokenDigests").GetArrayLength());
+                }
                 using var revokedOriginalClient = factory.CreateClient();
                 revokedOriginalClient.DefaultRequestHeaders.Authorization = new("Bearer", original);
                 Assert.AreEqual(HttpStatusCode.Unauthorized, (await revokedOriginalClient.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);

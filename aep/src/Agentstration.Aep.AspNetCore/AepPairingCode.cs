@@ -17,7 +17,8 @@ internal sealed record AepPairingState(
     string Status,
     string? ClientId,
     string? TokenDigest,
-    string? PreviousTokenDigest = null);
+    string? PreviousTokenDigest = null,
+    IReadOnlyList<string>? RevokedTokenDigests = null);
 
 internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
 {
@@ -35,7 +36,7 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
     public bool IsPaired => string.Equals(state.Status, "paired", StringComparison.Ordinal);
     public bool IsRevoked => string.Equals(state.Status, "revoked", StringComparison.Ordinal);
 
-    public bool TryAuthenticate(ReadOnlySpan<byte> suppliedDigest, out string clientId)
+    public AepDynamicCredentialMatch Match(ReadOnlySpan<byte> suppliedDigest, out string clientId)
     {
         lock (sync)
         {
@@ -44,24 +45,28 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
                 if (!File.Exists(path))
                 {
                     clientId = string.Empty;
-                    return false;
+                    return AepDynamicCredentialMatch.None;
                 }
                 var persisted = LoadExisting(path);
                 if (persisted.InstanceId != state.InstanceId)
                 {
                     clientId = string.Empty;
-                    return false;
+                    return AepDynamicCredentialMatch.None;
                 }
                 state = persisted;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
             {
                 clientId = string.Empty;
-                return false;
+                return AepDynamicCredentialMatch.None;
             }
             clientId = state.ClientId ?? string.Empty;
-            if (!IsPaired || string.IsNullOrWhiteSpace(clientId)) return false;
-            return Matches(state.TokenDigest, suppliedDigest) | Matches(state.PreviousTokenDigest, suppliedDigest);
+            foreach (var revoked in state.RevokedTokenDigests ?? [])
+                if (Matches(revoked, suppliedDigest)) return AepDynamicCredentialMatch.Revoked;
+            if (!IsPaired || string.IsNullOrWhiteSpace(clientId)) return AepDynamicCredentialMatch.None;
+            return Matches(state.TokenDigest, suppliedDigest) | Matches(state.PreviousTokenDigest, suppliedDigest)
+                ? AepDynamicCredentialMatch.Authenticated
+                : AepDynamicCredentialMatch.None;
         }
     }
 
@@ -107,7 +112,11 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
         lock (sync)
         {
             if (!IsPaired) throw new InvalidOperationException("This extension instance is not paired.");
-            state = state with { PreviousTokenDigest = null };
+            state = state with
+            {
+                RevokedTokenDigests = AppendRevoked(state.RevokedTokenDigests, state.PreviousTokenDigest),
+                PreviousTokenDigest = null
+            };
             WriteAtomic(path, state);
         }
     }
@@ -116,7 +125,13 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
     {
         lock (sync)
         {
-            state = state with { Status = "revoked", TokenDigest = null, PreviousTokenDigest = null };
+            state = state with
+            {
+                Status = "revoked",
+                RevokedTokenDigests = AppendRevoked(state.RevokedTokenDigests, state.TokenDigest, state.PreviousTokenDigest),
+                TokenDigest = null,
+                PreviousTokenDigest = null
+            };
             WriteAtomic(path, state);
         }
     }
@@ -143,10 +158,19 @@ internal sealed class AepPairingStateStore : IAepDynamicCredentialStore
         if (loaded.InstanceId == Guid.Empty || loaded.Status is not ("unpaired" or "paired" or "revoked")
             || loaded.Status == "paired" && (string.IsNullOrWhiteSpace(loaded.ClientId) || !ValidDigest(loaded.TokenDigest ?? string.Empty)
                 || loaded.PreviousTokenDigest is not null && !ValidDigest(loaded.PreviousTokenDigest))
-            || loaded.Status != "paired" && (loaded.TokenDigest is not null || loaded.PreviousTokenDigest is not null))
+            || loaded.Status != "paired" && (loaded.TokenDigest is not null || loaded.PreviousTokenDigest is not null)
+            || loaded.RevokedTokenDigests is { Count: > 8 }
+            || loaded.RevokedTokenDigests?.Any(value => !ValidDigest(value)) == true)
             throw new InvalidDataException("The AEP pairing state file is incomplete.");
         return loaded;
     }
+
+    private static IReadOnlyList<string> AppendRevoked(IReadOnlyList<string>? existing, params string?[] candidates) =>
+        (existing ?? [])
+            .Concat(candidates.OfType<string>())
+            .Distinct(StringComparer.Ordinal)
+            .TakeLast(8)
+            .ToArray();
 
     private static void WriteAtomic(string path, AepPairingState value)
     {

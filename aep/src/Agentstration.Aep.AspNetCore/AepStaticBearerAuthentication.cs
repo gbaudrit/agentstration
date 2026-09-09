@@ -75,8 +75,10 @@ internal sealed record AepStaticBearerToken(
 
 internal interface IAepDynamicCredentialStore
 {
-    bool TryAuthenticate(ReadOnlySpan<byte> suppliedDigest, out string clientId);
+    AepDynamicCredentialMatch Match(ReadOnlySpan<byte> suppliedDigest, out string clientId);
 }
+
+internal enum AepDynamicCredentialMatch { None, Authenticated, Revoked }
 
 internal sealed class AepStaticBearerAuthenticationHandler(
     IOptionsMonitor<AepStaticBearerOptions> options,
@@ -99,20 +101,27 @@ internal sealed class AepStaticBearerAuthenticationHandler(
         var suppliedBytes = Encoding.UTF8.GetBytes(suppliedToken);
         var suppliedDigest = SHA256.HashData(suppliedBytes);
         CryptographicOperations.ZeroMemory(suppliedBytes);
+        string? dynamicClientId = null;
+        var dynamicMatch = AepDynamicCredentialMatch.None;
+        foreach (var store in dynamicCredentials)
+        {
+            var result = store.Match(suppliedDigest, out var candidateClientId);
+            if (result == AepDynamicCredentialMatch.Revoked)
+            {
+                dynamicMatch = result;
+                break;
+            }
+            if (result == AepDynamicCredentialMatch.Authenticated && dynamicClientId is null)
+                dynamicClientId = candidateClientId;
+        }
         AepStaticBearerToken? matched = null;
         foreach (var candidate in Options.Tokens)
         {
             if (CryptographicOperations.FixedTimeEquals(suppliedDigest, candidate.Digest))
                 matched = candidate;
         }
-        string? dynamicClientId = null;
-        if (matched is null)
-        {
-            foreach (var store in dynamicCredentials)
-                if (store.TryAuthenticate(suppliedDigest, out dynamicClientId)) break;
-        }
         CryptographicOperations.ZeroMemory(suppliedDigest);
-        if (matched is null && dynamicClientId is null)
+        if (dynamicMatch == AepDynamicCredentialMatch.Revoked || matched is null && dynamicClientId is null)
             return Task.FromResult(AuthenticateResult.Fail("Invalid AEP workload credential."));
 
         var claims = new List<Claim>
