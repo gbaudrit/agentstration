@@ -180,10 +180,11 @@ public sealed class AepConformanceTests
             StringAssert.Contains(html, "Code d&#x2019;association");
             StringAssert.Contains(html, "class=\"brand\"");
             StringAssert.Contains(html, "prefers-color-scheme:dark");
-            StringAssert.Contains(html, "src=\"/aep/enrollment/agentstration-mark.png\"");
+            StringAssert.Contains(html, "class=\"logo-light\" src=\"/aep/enrollment/agentstration-lockup-light.png\"");
+            StringAssert.Contains(html, "class=\"logo-dark\" src=\"/aep/enrollment/agentstration-lockup-dark.png\"");
             StringAssert.Contains(html, "name=\"code\"");
 
-            using var brand = await client.GetAsync("/aep/enrollment/agentstration-mark.png");
+            using var brand = await client.GetAsync("/aep/enrollment/agentstration-lockup-dark.png");
             var image = await brand.Content.ReadAsByteArrayAsync();
             Assert.AreEqual(HttpStatusCode.OK, brand.StatusCode);
             Assert.AreEqual("image/png", brand.Content.Headers.ContentType?.MediaType);

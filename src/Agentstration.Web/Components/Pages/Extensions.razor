@@ -10,18 +10,76 @@
 <PageTitle>@T("Extensions") · Agentstration</PageTitle>
 <PageHeader Title="@T("Extensions")" Description="@T("Extensions.Description")">
     <Actions>
-        <button class="button-secondary" @onclick="DiscoverAsync" disabled="@(loading || discovering)">@(discovering ? T("Discovering") : T("DiscoverExtensions"))</button>
-        <button class="button-primary" @onclick="StartCreate" disabled="@loading">@T("RegisterEndpoint")</button>
+        @if (activeTab is ExtensionTab.Summary or ExtensionTab.Catalog)
+        {
+            <button class="button-secondary" @onclick="DiscoverAsync" disabled="@(loading || discovering)">@(discovering ? T("Discovering") : T("DiscoverExtensions"))</button>
+        }
+        else if (activeTab == ExtensionTab.Endpoints)
+        {
+            <button class="button-primary" @onclick="StartCreate" disabled="@loading">@T("RegisterEndpoint")</button>
+        }
     </Actions>
 </PageHeader>
 
-@if (!string.IsNullOrWhiteSpace(discoveryMessage))
+<ResourceTabs Label="@T("ExtensionTabs")">
+    <button id="extensions-tab-summary" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Summary ? "true" : "false")" aria-controls="extensions-panel-summary" class="@(activeTab == ExtensionTab.Summary ? "active" : null)" data-testid="extensions-tab-summary" @onclick="() => activeTab = ExtensionTab.Summary">@T("Tab.Summary")</button>
+    <button id="extensions-tab-catalog" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Catalog ? "true" : "false")" aria-controls="extensions-panel-catalog" class="@(activeTab == ExtensionTab.Catalog ? "active" : null)" data-testid="extensions-tab-catalog" @onclick="() => activeTab = ExtensionTab.Catalog">@T("Tab.Extensions")</button>
+    @if (CanAdministerEnrollments)
+    {
+        <button id="extensions-tab-enrollments" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Enrollments ? "true" : "false")" aria-controls="extensions-panel-enrollments" class="@(activeTab == ExtensionTab.Enrollments ? "active" : null)" data-testid="extensions-tab-enrollments" @onclick="() => activeTab = ExtensionTab.Enrollments">@T("Tab.Enrollments")</button>
+    }
+    <button id="extensions-tab-endpoints" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Endpoints ? "true" : "false")" aria-controls="extensions-panel-endpoints" class="@(activeTab == ExtensionTab.Endpoints ? "active" : null)" data-testid="extensions-tab-endpoints" @onclick="() => activeTab = ExtensionTab.Endpoints">@T("Tab.Endpoints")</button>
+</ResourceTabs>
+
+@if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
+}
+
+@if (activeTab == ExtensionTab.Summary)
+{
+    <div id="extensions-panel-summary" role="tabpanel" aria-labelledby="extensions-tab-summary">
+        <section class="metric-grid" aria-label="@T("SummaryMetrics")">
+            <MetricCard Label="@T("Tab.Extensions")" Value="@(extensions?.Count.ToString() ?? "—")" Detail="@T("AvailableExtensions", AvailableExtensionCount)" Status="@(AvailableExtensionCount > 0 ? UiStatus.Success : UiStatus.Neutral)" />
+            @if (CanAdministerEnrollments)
+            {
+                <MetricCard Label="@T("Tab.Enrollments")" Value="@(enrollments?.Count.ToString() ?? "—")" Detail="@T("ActiveEnrollments", ActiveEnrollmentCount)" Status="@(ActiveEnrollmentCount > 0 ? UiStatus.Warning : UiStatus.Success)" />
+            }
+            <MetricCard Label="@T("Tab.Endpoints")" Value="@(registrations?.Count.ToString() ?? "—")" Detail="@T("EnabledEndpoints", EnabledRegistrationCount)" Status="@(EnabledRegistrationCount > 0 ? UiStatus.Info : UiStatus.Neutral)" />
+            @if (CanAdministerEnrollments)
+            {
+                <MetricCard Label="@T("EnrollmentModes")" Value="@(enrollmentSettings is null ? "—" : $"{EnabledEnrollmentModeCount}/2")" Detail="@T("EnabledEnrollmentModes", EnabledEnrollmentModeCount)" Status="@(EnabledEnrollmentModeCount > 0 ? UiStatus.Info : UiStatus.Warning)" />
+            }
+        </section>
+        <section class="panel resource-section">
+            <div class="panel-header"><div><p class="eyebrow">@T("Summary")</p><h2>@T("OperationalOverview")</h2><p>@T("OperationalOverview.Description")</p></div></div>
+            <dl class="resource-details">
+                <dt>@T("ExtensionCatalog")</dt><dd><StatusBadge Text="@T("AvailableExtensions", AvailableExtensionCount)" Status="@(AvailableExtensionCount > 0 ? UiStatus.Success : UiStatus.Neutral)" /></dd>
+                @if (CanAdministerEnrollments)
+                {
+                    <dt>@T("EnrollmentQueue")</dt><dd><StatusBadge Text="@T("ActiveEnrollments", ActiveEnrollmentCount)" Status="@(ActiveEnrollmentCount > 0 ? UiStatus.Warning : UiStatus.Success)" /></dd>
+                    <dt>@T("PairingCodeMode")</dt><dd>@T(pairingCodeEnabled ? "Enabled" : "Disabled")</dd>
+                    <dt>@T("SharedKeyFileMode")</dt><dd>@T(sharedKeyFileEnabled ? "Enabled" : "Disabled")</dd>
+                }
+                <dt>@T("RegisteredEndpoints")</dt><dd>@T("EnabledEndpoints", EnabledRegistrationCount)</dd>
+            </dl>
+            <div class="panel-actions">
+                <button class="button-secondary" type="button" @onclick="() => activeTab = ExtensionTab.Catalog">@T("OpenExtensions")</button>
+                @if (CanAdministerEnrollments) { <button class="button-secondary" type="button" @onclick="() => activeTab = ExtensionTab.Enrollments">@T("OpenEnrollments")</button> }
+                <button class="button-secondary" type="button" @onclick="() => activeTab = ExtensionTab.Endpoints">@T("OpenEndpoints")</button>
+            </div>
+        </section>
+    </div>
+}
+
+@if (activeTab == ExtensionTab.Catalog && !string.IsNullOrWhiteSpace(discoveryMessage))
 {
     <p class="inline-info">@discoveryMessage</p>
 }
 
-@if (CanAdministerEnrollments)
+@if (activeTab == ExtensionTab.Enrollments && CanAdministerEnrollments)
 {
+    <div id="extensions-panel-enrollments" role="tabpanel" aria-labelledby="extensions-tab-enrollments">
     <section class="panel resource-section">
         <div class="panel-header">
             <div><p class="eyebrow">@T("EnrollmentPolicy")</p><h2>@T("EnrollmentModes")</h2><p>@T("EnrollmentModes.Description")</p></div>
@@ -58,7 +116,7 @@
                 <Row Context="enrollment"><tr>
                     <td><strong>@enrollment.Definition.ExtensionName</strong> @enrollment.Definition.ExtensionVersion<br /><code>@enrollment.Definition.ExtensionId</code><br /><small>@T("AnnouncedAgo", EnrollmentAge(enrollment))</small></td>
                     <td><code>@enrollment.Definition.Endpoint</code><br /><small>@T("PairingOrigin", enrollment.Definition.PairingUri.GetLeftPart(UriPartial.Authority))</small></td>
-                    <td><StatusBadge Text="@StatusLabel(enrollment.Definition.State.ToString())" Status="@EnrollmentStatus(enrollment.Definition.State)" />
+                    <td><StatusBadge Text="@EnrollmentStatusLabel(enrollment.Definition.State)" Status="@EnrollmentStatus(enrollment.Definition.State)" />
                         @if (enrollment.Definition.CodeExpiresAt is { } expires && enrollment.Definition.State == AepEnrollmentState.CodeIssued)
                         { <br /><small>@T("CodeExpiresIn", SecondsRemaining(expires))</small> }
                     </td>
@@ -96,8 +154,12 @@
             </div>
         }
     </section>
+    </div>
 }
 
+@if (activeTab == ExtensionTab.Endpoints)
+{
+<div id="extensions-panel-endpoints" role="tabpanel" aria-labelledby="extensions-tab-endpoints">
 <section class="panel resource-section">
     <div class="panel-header">
         <div><p class="eyebrow">@T("DiscoverySources")</p><h2>@T("RegisteredEndpoints")</h2><p>@T("RegisteredEndpoints.Description")</p></div>
@@ -159,10 +221,12 @@
         <p>@T("NoRegisteredEndpoint")</p>
     }
 </section>
+</div>
+}
 
 <ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="@T("DeleteExtensionRegistration")" Message="@DeleteMessage" ConfirmLabel="@T("DeleteRegistration")" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
 
-@if (migrationPreview is not null)
+@if (activeTab == ExtensionTab.Catalog && migrationPreview is not null)
 {
     <section class="panel resource-section">
         <div class="panel-header">
@@ -180,20 +244,19 @@
     </section>
 }
 
-@if (loading && extensions is null)
+@if (activeTab == ExtensionTab.Catalog)
 {
-    <LoadingState Message="@T("DiscoveringExtensions")" />
-}
-else if (error is not null)
-{
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
-}
-else if (extensions?.Count == 0)
-{
-    <EmptyState Title="@T("NoExtensionsDiscovered")" Message="@T("NoExtensionsDiscoveredMessage")" />
-}
-else
-{
+<div id="extensions-panel-catalog" role="tabpanel" aria-labelledby="extensions-tab-catalog">
+    @if (loading && extensions is null)
+    {
+        <LoadingState Message="@T("DiscoveringExtensions")" />
+    }
+    else if (extensions?.Count == 0)
+    {
+        <EmptyState Title="@T("NoExtensionsDiscovered")" Message="@T("NoExtensionsDiscoveredMessage")" />
+    }
+    else
+    {
     @foreach (var extension in extensions ?? [])
     {
         <section class="panel resource-section">
@@ -270,4 +333,6 @@ else
             }
         </section>
     }
+    }
+</div>
 }

@@ -25,6 +25,7 @@ public partial class Extensions
     private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
     private static readonly JsonSerializerOptions IndentedWebJsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
+    private ExtensionTab activeTab = ExtensionTab.Summary;
 
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<ExtensionResponse>? extensions;
@@ -56,9 +57,15 @@ public partial class Extensions
     private bool refreshingEnrollmentState;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusLabel(string status) => T($"Status.{status}");
+    private string EnrollmentStatusLabel(AepEnrollmentState status) => T($"EnrollmentStatus.{status}");
 
     private bool CanAdministerEnrollments => Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState state
         && state.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private int AvailableExtensionCount => extensions?.Count(value => string.Equals(value.Status, "available", StringComparison.OrdinalIgnoreCase)) ?? 0;
+    private int EnabledRegistrationCount => registrations?.Count(value => value.Definition.Enabled) ?? 0;
+    private int ActiveEnrollmentCount => enrollments?.Count(value => value.Definition.State is AepEnrollmentState.Pending
+        or AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying) ?? 0;
+    private int EnabledEnrollmentModeCount => (pairingCodeEnabled ? 1 : 0) + (sharedKeyFileEnabled ? 1 : 0);
 
     protected override async Task OnInitializedAsync()
     {
@@ -253,6 +260,7 @@ public partial class Extensions
 
     private async Task DiscoverAsync()
     {
+        activeTab = ExtensionTab.Catalog;
         discovering = true;
         error = null;
         discoveryMessage = null;
@@ -271,6 +279,7 @@ public partial class Extensions
 
     private void StartCreate()
     {
+        activeTab = ExtensionTab.Endpoints;
         form = new();
         selectedScope = null;
         etag = null;
@@ -479,4 +488,6 @@ public partial class Extensions
             CredentialScopeRef = resource.Definition.Credential?.ScopeRef?.Value ?? string.Empty
         };
     }
+
+    private enum ExtensionTab { Summary, Catalog, Enrollments, Endpoints }
 }

@@ -115,8 +115,14 @@ public static class AepServerExtensions
         endpoints.MapHealthChecks("/health").AllowAnonymous();
         if (endpoints.ServiceProvider.GetService<AepPairingCoordinator>() is { } pairing)
         {
-            endpoints.MapGet(AepPairingBrand.Path, () =>
-                Results.Stream(AepPairingBrand.Open(), "image/png"))
+            endpoints.MapGet(AepPairingBrand.MarkPath, () =>
+                Results.Stream(AepPairingBrand.OpenMark(), "image/png"))
+                .AllowAnonymous();
+            endpoints.MapGet(AepPairingBrand.DarkLockupPath, () =>
+                Results.Stream(AepPairingBrand.OpenDarkLockup(), "image/png"))
+                .AllowAnonymous();
+            endpoints.MapGet(AepPairingBrand.LightLockupPath, () =>
+                Results.Stream(AepPairingBrand.OpenLightLockup(), "image/png"))
                 .AllowAnonymous();
             endpoints.MapGet(AepEnrollmentProtocol.PairingPath, (HttpRequest request, HttpResponse response) =>
             {

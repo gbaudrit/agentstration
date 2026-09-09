@@ -14,6 +14,42 @@ namespace Agentstration.Web.Tests;
 public sealed class ExtensionsConsoleTests
 {
     [TestMethod]
+    public async Task ExtensionSectionsUseAccessibleTabs()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false));
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var contextState = new ConsoleContextState(new WritableContextProvider());
+        await contextState.LoadAsync(default);
+        context.Services.AddSingleton(contextState);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+
+        rendered.WaitForAssertion(() =>
+        {
+            var tabs = rendered.FindAll("[role='tab']");
+            Assert.HasCount(4, tabs);
+            Assert.AreEqual("Synthèse", tabs[0].TextContent.Trim());
+            Assert.AreEqual("Extensions", tabs[1].TextContent.Trim());
+            Assert.AreEqual("Enrôlements", tabs[2].TextContent.Trim());
+            Assert.AreEqual("Points de terminaison", tabs[3].TextContent.Trim());
+            Assert.AreEqual("true", tabs[0].GetAttribute("aria-selected"));
+            _ = rendered.Find("#extensions-panel-summary");
+        });
+
+        await rendered.Find("[data-testid='extensions-tab-endpoints']").ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            _ = rendered.Find("#extensions-panel-endpoints");
+            Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("#extensions-panel-catalog"));
+            Assert.AreEqual("Enregistrer un point de terminaison", rendered.Find("header button.button-primary").TextContent.Trim());
+        });
+    }
+
+    [TestMethod]
     public async Task EnrollmentModeDisabledByConfigurationIsVisibleButLocked()
     {
         using var culture = new TestCultureScope("en-US");
@@ -29,6 +65,7 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton(contextState);
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
@@ -55,6 +92,7 @@ public sealed class ExtensionsConsoleTests
         await contextState.LoadAsync(default);
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
         rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Markup, "En attente"));
 
         await rendered.Find("table button.button-primary").ClickAsync(new());
@@ -67,7 +105,7 @@ public sealed class ExtensionsConsoleTests
     }
 
     [TestMethod]
-    public void ConfiguredModelProviderContributionKeepsAnAccessibleAction()
+    public async Task ConfiguredModelProviderContributionKeepsAnAccessibleAction()
     {
         using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
@@ -77,6 +115,7 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton(new NotificationState());
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
@@ -87,7 +126,7 @@ public sealed class ExtensionsConsoleTests
     }
 
     [TestMethod]
-    public void DiscoveredModelProviderContributionOffersConfiguration()
+    public async Task DiscoveredModelProviderContributionOffersConfiguration()
     {
         using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
@@ -97,6 +136,7 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton(new NotificationState());
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {

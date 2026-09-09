@@ -373,7 +373,7 @@ internal sealed class AepPairingCoordinator(
               <meta name="color-scheme" content="light dark">
               <meta name="theme-color" content="#f4f7fb" media="(prefers-color-scheme:light)">
               <meta name="theme-color" content="#080e18" media="(prefers-color-scheme:dark)">
-              <link rel="icon" type="image/png" href="{{{AepPairingBrand.Path}}}">
+              <link rel="icon" type="image/png" href="{{{AepPairingBrand.MarkPath}}}">
               <title>{{{encodedTitle}}} · Agentstration</title>
               <style>
                 :root{color-scheme:light;--bg:#f4f7fb;--surface:#fff;--surface-muted:#f8fafd;--border:#dce4ef;--border-strong:#c5d1e0;--text:#111827;--muted:#64748b;--primary:#3678f6;--primary-hover:#2869da;--primary-soft:#eaf1ff;--glow:#e5eeff;--shadow:0 18px 50px rgba(28,45,77,.12);font-family:Inter,"Segoe UI Variable","Segoe UI",system-ui,sans-serif;font-synthesis:none}
@@ -381,14 +381,15 @@ internal sealed class AepPairingCoordinator(
                 @media(prefers-color-scheme:dark){:root:not(.theme-light):not(.theme-dark){color-scheme:dark;--bg:#080e18;--surface:#111c2b;--surface-muted:#152234;--border:#24344b;--border-strong:#354a65;--text:#f4f7fb;--muted:#9cb0c9;--primary:#6c98ff;--primary-hover:#80a6ff;--primary-soft:#172e54;--glow:#13294c;--shadow:0 20px 55px rgba(0,0,0,.38)}}
                 *{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 0,var(--glow) 0,transparent 44%),var(--bg);color:var(--text)}
                 main{width:min(100%,560px);padding:36px;background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}
-                .brand{display:flex;align-items:center;gap:12px;margin-bottom:28px;font-weight:750;color:var(--text)}.brand img{display:block;width:46px;height:46px;object-fit:contain}
+                .brand{display:flex;align-items:center;margin-bottom:28px}.brand img{display:block;width:min(100%,218px);height:auto}.brand .logo-dark{display:none}:root.theme-dark .brand .logo-light{display:none}:root.theme-dark .brand .logo-dark{display:block}
+                @media(prefers-color-scheme:dark){:root:not(.theme-light):not(.theme-dark) .brand .logo-light{display:none}:root:not(.theme-light):not(.theme-dark) .brand .logo-dark{display:block}}
                 .eyebrow{margin:0 0 8px;color:var(--primary);font:700 .75rem "Cascadia Code",Consolas,monospace;letter-spacing:.09em;text-transform:uppercase}h1{margin:0;font-size:clamp(1.7rem,5vw,2.2rem);line-height:1.15;letter-spacing:-.035em}main>p:not(.eyebrow){margin:14px 0 26px;color:var(--muted);line-height:1.55}
                 form{display:grid;gap:10px}label{font-size:.9rem;font-weight:700}input{width:100%;height:52px;padding:0 15px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface-muted);color:var(--text);font:600 1.15rem/1 Inter,"Segoe UI",system-ui,sans-serif;letter-spacing:.08em;outline:none;box-shadow:inset 0 1px 2px rgba(20,35,58,.08)}input:focus{border-color:var(--primary);background:var(--surface);box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 16%,transparent)}
                 .hint{margin:0 0 8px;color:var(--muted);font-size:.82rem;line-height:1.45}button{min-height:46px;padding:0 20px;border:0;border-radius:10px;color:#fff;background:var(--primary);font:700 .92rem Inter,"Segoe UI",system-ui,sans-serif;cursor:pointer;box-shadow:0 7px 16px color-mix(in srgb,var(--primary) 25%,transparent)}button:hover{background:var(--primary-hover)}button:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 28%,transparent);outline-offset:2px}
                 @media(max-width:520px){body{padding:14px}main{padding:26px 22px;border-radius:14px}}
               </style>
             </head>
-            <body><main><div class="brand"><img src="{{{AepPairingBrand.Path}}}" alt=""><span>Agentstration</span></div><p class="eyebrow">{{{HtmlEncoder.Default.Encode(text.Eyebrow)}}}</p><h1>{{{encodedTitle}}}</h1><p>{{{encodedMessage}}}</p>{{{form}}}</main></body>
+            <body><main><div class="brand" aria-label="Agentstration"><img class="logo-light" src="{{{AepPairingBrand.LightLockupPath}}}" alt=""><img class="logo-dark" src="{{{AepPairingBrand.DarkLockupPath}}}" alt=""></div><p class="eyebrow">{{{HtmlEncoder.Default.Encode(text.Eyebrow)}}}</p><h1>{{{encodedTitle}}}</h1><p>{{{encodedMessage}}}</p>{{{form}}}</main></body>
             </html>
             """;
     }
@@ -420,11 +421,21 @@ internal sealed class AepPairingCoordinator(
 
 internal static class AepPairingBrand
 {
-    public const string Path = "/aep/enrollment/agentstration-mark.png";
-    private const string ResourceName = "Agentstration.Aep.AspNetCore.Assets.agentstration-mark.png";
+    public const string MarkPath = "/aep/enrollment/agentstration-mark.png";
+    public const string DarkLockupPath = "/aep/enrollment/agentstration-lockup-dark.png";
+    public const string LightLockupPath = "/aep/enrollment/agentstration-lockup-light.png";
+    private const string ResourcePrefix = "Agentstration.Aep.AspNetCore.Assets.";
 
-    public static Stream Open() => typeof(AepPairingBrand).Assembly.GetManifestResourceStream(ResourceName)
-        ?? throw new InvalidOperationException($"Embedded pairing brand asset '{ResourceName}' was not found.");
+    public static Stream OpenMark() => Open("agentstration-mark.png");
+    public static Stream OpenDarkLockup() => Open("agentstration-lockup-dark.png");
+    public static Stream OpenLightLockup() => Open("agentstration-lockup-light.png");
+
+    private static Stream Open(string name)
+    {
+        var resourceName = $"{ResourcePrefix}{name}";
+        return typeof(AepPairingBrand).Assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded pairing brand asset '{resourceName}' was not found.");
+    }
 }
 
 internal sealed class AepPairingException(string code, string message, int statusCode) : Exception(message)
