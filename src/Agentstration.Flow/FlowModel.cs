@@ -22,6 +22,7 @@ public enum FlowOrchestrationStrategy { Sequential, Concurrent, Handoff, GroupCh
 public enum FlowCompositionMode { Sequential, Concurrent, Custom }
 public enum FlowRunStatus { Pending, Running, WaitingForInput, Succeeded, Failed, Cancelled, TimedOut, WaitingForChild }
 public enum FlowRunTrigger { Manual, Api, WorkItem, Flow, Schedule, Event }
+public enum FlowInvocationOrigin { Entry, Trigger, Api, Mcp, Agent, Console }
 public enum FlowStepRunStatus { NotStarted, Running, Succeeded, Failed, Skipped, Cancelled }
 public enum FlowRunEventType
 {

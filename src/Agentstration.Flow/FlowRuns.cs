@@ -61,6 +61,10 @@ public sealed record FlowRun
     public FlowRunStatus Status { get; init; } = FlowRunStatus.Pending;
     public FlowRunTrigger Trigger { get; init; }
     public string? StartedBy { get; init; }
+    public FlowInvocationOrigin? InvocationOrigin { get; init; }
+    public string? CallerId { get; init; }
+    public string? CausationId { get; init; }
+    public string? IdempotencyKey { get; init; }
     public string? CorrelationId { get; init; }
     public string? WorkItemResourceId { get; init; }
     public string? ParentFlowRunId { get; init; }

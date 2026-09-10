@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
@@ -11,20 +12,34 @@ namespace Agentstration.Web;
 
 public static partial class FlowEndpoints
 {
-    private static Task<IResult> CreateRunAsync(string id, CreateFlowRunRequest body, HttpContext context, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
+    private static Task<IResult> CreateRunAsync(string id, CreateFlowRunRequest body, HttpContext context, HttpResponse response, RootFlowSubmissionService service, ICurrentRequestContext requestContext, CancellationToken token) =>
         CreateRunCoreAsync(new FlowId(id), body, context, response, service, requestContext, token);
 
-    private static Task<IResult> CreateNamespacedRunAsync(string @namespace, string id, CreateFlowRunRequest body, HttpContext context, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
+    private static Task<IResult> CreateNamespacedRunAsync(string @namespace, string id, CreateFlowRunRequest body, HttpContext context, HttpResponse response, RootFlowSubmissionService service, ICurrentRequestContext requestContext, CancellationToken token) =>
         CreateRunCoreAsync(new FlowId(id, ResourceNamespace.Parse(@namespace)), body, context, response, service, requestContext, token);
 
-    private static Task<IResult> CreateRunCoreAsync(FlowId flowId, CreateFlowRunRequest body, HttpContext context, HttpResponse response, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> CreateRunCoreAsync(FlowId flowId, CreateFlowRunRequest body, HttpContext context, HttpResponse response, RootFlowSubmissionService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         var scope = CurrentScope(requestContext);
         var startedBy = context.Features.Get<ResolvedPrincipalFeature>()?.Principal.DisplayName ?? scope.PrincipalId.ToString("D");
-        var stored = await service.CreateAsync(flowId, body.Version, body.DeploymentResourceId, body.Trigger, startedBy, body.CorrelationId, body.Input, scope, token);
-        response.Headers.Location = $"/api/flowRuns/{stored.Value.Id}";
-        response.Headers.ETag = stored.ETag;
-        return Results.Accepted($"/api/flowRuns/{stored.Value.Id}", stored.Value);
+        var origin = string.Equals(context.Request.Headers["X-Agentstration-Origin"].FirstOrDefault(), "Console", StringComparison.OrdinalIgnoreCase)
+            ? FlowInvocationOrigin.Console
+            : FlowInvocationOrigin.Api;
+        var submission = await service.SubmitAsync(new SubmitRootFlowCommand(
+            scope.WorkspaceId,
+            new FlowReference(flowId, body.Version, body.Version is null, flowId.Namespace),
+            body.Input,
+            origin,
+            startedBy,
+            body.Trigger,
+            context.Request.Headers["Idempotency-Key"].FirstOrDefault(),
+            context.Request.Headers["X-Causation-Id"].FirstOrDefault(),
+            body.CorrelationId,
+            Type: "flow-api",
+            Instruction: $"Execute Flow '{flowId}'."), token);
+        response.Headers.Location = $"/api/flowRuns/{submission.FlowRun.Run.Id}";
+        response.Headers.ETag = submission.FlowRun.ETag;
+        return Results.Accepted($"/api/flowRuns/{submission.FlowRun.Run.Id}", submission.FlowRun.Run);
     });
 
     private static Task<IResult> ListFlowRunsAsync(string id, FlowRunStatus? status, int? skip, int? top, FlowRunService service, ICurrentRequestContext requestContext, CancellationToken token) =>
