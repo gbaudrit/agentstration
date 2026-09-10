@@ -31,7 +31,7 @@ The same `Agentstration.Web` process is the authoritative server for Console and
 
 ## Run with Compose
 
-All Compose definitions live under `deploy/compose`. The colocated [Compose command reference](../../deploy/compose/README.md) provides copy-ready SQLite, PostgreSQL, model-management, log, and shutdown commands. The `base.yml` topology retains the canonical deterministic extension launch without inference servers. Choose one provider-specific topology to run its inference service, AEP extension, and Utilities extension with isolated SharedKeyFile credentials.
+All Compose definitions live under `deploy/compose`. The colocated [Compose command reference](https://github.com/gbaudrit/agentstration/blob/main/deploy/compose/README.md) provides copy-ready SQLite, PostgreSQL, model-management, log, and shutdown commands. The `base.yml` topology retains the canonical deterministic extension launch without inference servers. Choose one provider-specific topology to run its inference service, AEP extension, and Utilities extension with isolated SharedKeyFile credentials.
 
 For a container-owned Ollama instance:
 
