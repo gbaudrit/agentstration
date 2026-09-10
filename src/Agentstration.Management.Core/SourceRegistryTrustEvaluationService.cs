@@ -265,13 +265,14 @@ public sealed class SourceRegistryTrustEvaluationService(
 
     private static SourceRegistryPublisherStatus Accept(
         SourceRegistryPublisherStatus asserted,
-        SourceRegistryTrustPolicy policy) => (asserted, policy) switch
-    {
-        (SourceRegistryPublisherStatus.Revoked, SourceRegistryTrustPolicy.Trusted or SourceRegistryTrustPolicy.Authoritative) => SourceRegistryPublisherStatus.Revoked,
-        (SourceRegistryPublisherStatus.Official, SourceRegistryTrustPolicy.Authoritative) => SourceRegistryPublisherStatus.Official,
-        (SourceRegistryPublisherStatus.Official or SourceRegistryPublisherStatus.Verified, SourceRegistryTrustPolicy.Trusted or SourceRegistryTrustPolicy.Authoritative) => SourceRegistryPublisherStatus.Verified,
-        _ => SourceRegistryPublisherStatus.Declared
-    };
+        SourceRegistryTrustPolicy policy) =>
+        (asserted, policy) switch
+        {
+            (SourceRegistryPublisherStatus.Revoked, SourceRegistryTrustPolicy.Trusted or SourceRegistryTrustPolicy.Authoritative) => SourceRegistryPublisherStatus.Revoked,
+            (SourceRegistryPublisherStatus.Official, SourceRegistryTrustPolicy.Authoritative) => SourceRegistryPublisherStatus.Official,
+            (SourceRegistryPublisherStatus.Official or SourceRegistryPublisherStatus.Verified, SourceRegistryTrustPolicy.Trusted or SourceRegistryTrustPolicy.Authoritative) => SourceRegistryPublisherStatus.Verified,
+            _ => SourceRegistryPublisherStatus.Declared
+        };
 
     private static SourceRegistryPublisherStatus ParseStatus(string status) => status switch
     {
