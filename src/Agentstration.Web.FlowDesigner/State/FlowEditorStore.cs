@@ -16,7 +16,7 @@ public sealed record FlowDesignerDocument(IReadOnlyList<FlowDesignerNode> Nodes,
     {
         var nodes = definition.Steps.Select((step, index) => new FlowDesignerNode(step.Name, step.Type(), step.DisplayName ?? step.Name,
             definition.Designer.NodePositions.TryGetValue(step.Name, out var position) ? position : new(index * 200, 50),
-            step switch { AgentFlowStepDefinition agent => agent.Agent.ResourceId, RouterFlowStepDefinition router => $"{router.Candidates.Count} routes", _ => null })).ToArray();
+            step switch { AgentFlowStepDefinition agent => agent.Agent.ResourceId, RouterFlowStepDefinition router => $"{router.Candidates.Count} routes", FlowCallStepDefinition flow => flow.Flow.ResourceId, _ => null })).ToArray();
         return new(nodes, definition.Transitions.Select(transition => new FlowDesignerLink(transition.Id, transition.FromStep, transition.ToStep, transition.Event)).ToArray());
     }
 }

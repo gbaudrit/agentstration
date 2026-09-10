@@ -92,6 +92,46 @@ else
                             @foreach (var item in agents) { <option value="@item.Name">@item.DisplayName</option> }
                         </select></label>
                     }
+                    else if (SelectedStep is FlowCallStepDefinition flowCall)
+                    {
+                        <label>@T("CalledFlow")
+                            <input disabled="@ReadOnly" list="flow-targets" value="@FlowKey(flowCall.Flow)" @onchange="UpdateFlowTargetAsync" />
+                            <datalist id="flow-targets">
+                                @foreach (var item in flows.Where(item => item.Name != ResourceId || item.Namespace != Namespace))
+                                {
+                                    <option value="@FlowKey(item.Namespace, item.Name)">@item.DisplayName (@item.Namespace.Value)</option>
+                                }
+                            </datalist>
+                        </label>
+                        <label>@T("VersionStrategy")<select disabled="@ReadOnly" value="@flowCall.Flow.VersionStrategy" @onchange="UpdateFlowVersionStrategyAsync">
+                            <option value="@FlowCallVersionStrategy.Active">@T("VersionStrategy.Active")</option>
+                            <option value="@FlowCallVersionStrategy.Exact">@T("VersionStrategy.Exact")</option>
+                        </select></label>
+                        @if (flowCall.Flow.VersionStrategy == FlowCallVersionStrategy.Exact)
+                        {
+                            <label>@T("ExactVersion")<select disabled="@ReadOnly" value="@flowCall.Flow.Version" @onchange="UpdateFlowExactVersionAsync">
+                                @foreach (var version in flowVersions) { <option value="@version.Version">@version.Version</option> }
+                            </select></label>
+                        }
+                        @if (SelectedFlowVersion?.InputSchema is { ValueKind: JsonValueKind.Object } inputSchema
+                            && inputSchema.TryGetProperty("properties", out var inputProperties)
+                            && inputProperties.ValueKind == JsonValueKind.Object)
+                        {
+                            <fieldset class="flow-mapping-editor"><legend>@T("InputMapping")</legend>
+                                @foreach (var property in inputProperties.EnumerateObject())
+                                {
+                                    var propertyName = property.Name;
+                                    <label>@propertyName<input disabled="@ReadOnly" value="@MappingValue(flowCall.InputMapping, propertyName)" @onchange="e => UpdateFlowMappingAsync(propertyName, e)" /></label>
+                                }
+                            </fieldset>
+                        }
+                        @if (SelectedFlowVersion?.OutputSchema is { ValueKind: JsonValueKind.Object } outputSchema
+                            && outputSchema.TryGetProperty("properties", out var outputProperties)
+                            && outputProperties.ValueKind == JsonValueKind.Object)
+                        {
+                            <p class="muted">@T("AvailableOutput"): @string.Join(", ", outputProperties.EnumerateObject().Select(property => property.Name))</p>
+                        }
+                    }
                     else if (SelectedStep is RouterFlowStepDefinition router)
                     {
                         <section class="router-editor">
@@ -163,12 +203,14 @@ else
 }
 
 @code {
-    private static readonly (string Type, string Icon)[] Palette = [("input", "●"), ("agent", "◎"), ("router", "◇"), ("condition", "?"), ("transform", "ƒ"), ("output", "□"), ("failure", "!")];
+    private static readonly (string Type, string Icon)[] Palette = [("input", "●"), ("agent", "◎"), ("flow", "↳"), ("router", "◇"), ("condition", "?"), ("transform", "ƒ"), ("output", "□"), ("failure", "!")];
     private readonly CancellationTokenSource cancellation = new();
     private CancellationTokenSource? autosave;
     private FlowCanvas? canvas;
     private IReadOnlyList<FlowDesignerAgent> agents = [];
     private IReadOnlyList<FlowDesignerAgent> routerAgents = [];
+    private IReadOnlyList<FlowDesignerFlow> flows = [];
+    private IReadOnlyList<FlowDesignerFlowVersion> flowVersions = [];
     private string? loadedResource;
     private string sourceText = string.Empty;
     private string transitionFrom = string.Empty;
@@ -187,6 +229,11 @@ else
     [Parameter] public ResourceNamespace Namespace { get; set; } = ResourceNamespace.Default;
 
     private FlowStepDefinition? SelectedStep => Editor.State.Resource?.Definition.Steps.FirstOrDefault(step => step.Name == Editor.State.Selection.StepName);
+    private FlowDesignerFlowVersion? SelectedFlowVersion => SelectedStep is FlowCallStepDefinition call
+        ? flowVersions.FirstOrDefault(version => version.Version == (call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact
+            ? call.Flow.Version
+            : flows.FirstOrDefault(flow => FlowKey(flow.Namespace, flow.Name) == FlowKey(call.Flow))?.ActiveVersion))
+        : null;
     private string SaveText => T($"SaveState.{Editor.State.SaveState}");
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private FlowDesignerTarget Target => new(Namespace, ResourceId);
@@ -205,6 +252,8 @@ else
             sourceText = loaded.Source;
             Editor.Load(loaded, Target);
             agents = routerAgents = await Resources.GetAgentsAsync(cancellation.Token);
+            flows = await Resources.GetFlowsAsync(cancellation.Token);
+            if (SelectedStep is FlowCallStepDefinition call) await LoadFlowVersionsAsync(call.Flow);
             transitionFrom = loaded.Resource.Definition.EntryStep;
             transitionTo = loaded.Resource.Definition.Steps.Skip(1).FirstOrDefault()?.Name ?? transitionFrom;
         }
@@ -261,12 +310,14 @@ else
         {
             "input" => new InputFlowStepDefinition { Name = name, DisplayName = "Input" },
             "agent" => new AgentFlowStepDefinition { Name = name, DisplayName = "Agent", Agent = new(agents.FirstOrDefault()?.Name ?? UnconfiguredAgent) },
+            "flow" => new FlowCallStepDefinition { Name = name, DisplayName = "Flow", Flow = DefaultFlowReference(), InputMapping = JsonSerializer.SerializeToElement(new { }) },
             "router" => new RouterFlowStepDefinition { Name = name, DisplayName = "Router" },
             "condition" => new ConditionFlowStepDefinition { Name = name, DisplayName = "Condition", Left = "${input.prompt}", Right = "" },
             "transform" => new TransformFlowStepDefinition { Name = name, DisplayName = "Transform", Mapping = JsonSerializer.SerializeToElement(new { }) },
             "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${input}") },
             _ => new FailureFlowStepDefinition { Name = name, DisplayName = "Failure" }
         };
+        if (step is FlowCallStepDefinition flowCall) await LoadFlowVersionsAsync(flowCall.Flow);
         await DispatchAsync(new AddStepCommand(step, new(40 + index * 180, 250))); Editor.SelectStep(name);
     }
 
@@ -274,6 +325,33 @@ else
     private async Task RemoveSelectedAsync() { if (SelectedStep is not null) { await DispatchAsync(new RemoveStepCommand(SelectedStep.Name)); Editor.SelectStep(null); } }
     private Task UpdateDisplayNameAsync(ChangeEventArgs e) => UpdateSelectedAsync(SelectedStep! with { DisplayName = Text(e) });
     private Task UpdateAgentAsync(ChangeEventArgs e) => UpdateSelectedAsync(((AgentFlowStepDefinition)SelectedStep!) with { Agent = new(Text(e)) });
+    private async Task UpdateFlowTargetAsync(ChangeEventArgs e)
+    {
+        if (SelectedStep is not FlowCallStepDefinition call || !TryParseFlowKey(Text(e), out var target)) return;
+        var reference = call.Flow with { ResourceId = target.Name, Namespace = target.Namespace == Namespace ? null : target.Namespace };
+        await LoadFlowVersionsAsync(reference);
+        if (reference.VersionStrategy == FlowCallVersionStrategy.Exact && flowVersions.All(version => version.Version != reference.Version))
+            reference = reference with { Version = flowVersions.FirstOrDefault()?.Version };
+        await UpdateSelectedAsync(call with { Flow = reference });
+    }
+    private async Task UpdateFlowVersionStrategyAsync(ChangeEventArgs e)
+    {
+        if (SelectedStep is not FlowCallStepDefinition call || !Enum.TryParse<FlowCallVersionStrategy>(Text(e), out var strategy)) return;
+        var reference = call.Flow with { VersionStrategy = strategy, Version = strategy == FlowCallVersionStrategy.Exact ? flowVersions.FirstOrDefault()?.Version : null };
+        await UpdateSelectedAsync(call with { Flow = reference });
+    }
+    private Task UpdateFlowExactVersionAsync(ChangeEventArgs e) => SelectedStep is FlowCallStepDefinition call
+        ? UpdateSelectedAsync(call with { Flow = call.Flow with { Version = Text(e) } })
+        : Task.CompletedTask;
+    private Task UpdateFlowMappingAsync(string propertyName, ChangeEventArgs e)
+    {
+        if (SelectedStep is not FlowCallStepDefinition call) return Task.CompletedTask;
+        var mapping = call.InputMapping is { ValueKind: JsonValueKind.Object } value
+            ? value.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal)
+            : new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        mapping[propertyName] = JsonSerializer.SerializeToElement(Text(e));
+        return UpdateSelectedAsync(call with { InputMapping = JsonSerializer.SerializeToElement(mapping) });
+    }
     private Task UpdateSelectedAsync(FlowStepDefinition step) => DispatchAsync(new UpdateStepCommand(step));
 
     private async Task LoadAgentsAsync() { try { loadingAgents = true; routerAgents = await Resources.GetAgentsAsync(cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { loadingAgents = false; } }
@@ -291,10 +369,28 @@ else
     private static string UniqueRoute(string prefix, IReadOnlyCollection<FlowRouterCandidate> candidates) { var route = prefix; var i = 1; while (candidates.Any(candidate => candidate.Route == route)) route = $"{prefix}-{++i}"; return route; }
     private static string RouteKey(string value) { var result = new string(value.Trim().ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-'); return string.IsNullOrWhiteSpace(result) ? "route" : result; }
     private string AgentLabel(string name) => routerAgents.Concat(agents).FirstOrDefault(item => item.Name == name)?.DisplayName ?? name;
+    private FlowCallReference DefaultFlowReference()
+    {
+        var target = flows.FirstOrDefault(item => item.Name != ResourceId || item.Namespace != Namespace);
+        return target is null ? new(UnconfiguredFlow) : new(target.Name, Namespace: target.Namespace == Namespace ? null : target.Namespace);
+    }
+    private async Task LoadFlowVersionsAsync(FlowCallReference reference) => flowVersions = await Resources.GetFlowVersionsAsync(reference.Namespace ?? Namespace, reference.ResourceId, cancellation.Token);
+    private static string FlowKey(ResourceNamespace @namespace, string name) => $"{@namespace.Value}|{name}";
+    private string FlowKey(FlowCallReference reference) => FlowKey(reference.Namespace ?? Namespace, reference.ResourceId);
+    private static bool TryParseFlowKey(string value, out (ResourceNamespace Namespace, string Name) target)
+    {
+        var parts = value.Split('|', 2);
+        if (parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[1])) { target = (ResourceNamespace.Parse(parts[0]), parts[1]); return true; }
+        target = default; return false;
+    }
+    private static string MappingValue(JsonElement? mapping, string propertyName) => mapping is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty(propertyName, out var property)
+        ? property.ValueKind == JsonValueKind.String ? property.GetString() ?? string.Empty : property.GetRawText()
+        : string.Empty;
     private static string Text(ChangeEventArgs e) => e.Value?.ToString()?.Trim() ?? string.Empty;
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
     private static string NextVersion(string value) { var parts = value.Split('.'); return parts.Length == 3 && int.TryParse(parts[2], out var patch) ? $"{parts[0]}.{parts[1]}.{patch + 1}" : "1.0.0"; }
     private const string UnconfiguredAgent = "unconfigured";
+    private const string UnconfiguredFlow = "unconfigured";
 
     public ValueTask DisposeAsync()
     {

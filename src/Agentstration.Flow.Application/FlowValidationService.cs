@@ -3,7 +3,18 @@ using System.Text.RegularExpressions;
 
 namespace Agentstration.Flow.Application;
 
-public sealed record FlowValidationContext(bool ResolveResources = true);
+using Agentstration.Resources;
+
+public sealed record FlowValidationContext(
+    bool ResolveResources = true,
+    WorkspaceId? WorkspaceId = null,
+    FlowId? OwnerFlowId = null);
+
+public sealed record ResolvedFlowCall(
+    FlowId FlowId,
+    string Version,
+    JsonElement? InputSchema,
+    JsonElement? OutputSchema);
 
 public interface IFlowDefinitionValidator
 {
@@ -13,6 +24,17 @@ public interface IFlowDefinitionValidator
 public interface IFlowResourceReferenceResolver
 {
     Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken);
+    Task<ResolvedFlowCall?> ResolveFlowAsync(
+        WorkspaceId workspaceId,
+        ResourceNamespace ownerNamespace,
+        FlowCallReference reference,
+        CancellationToken cancellationToken) => Task.FromResult<ResolvedFlowCall?>(null);
+
+    Task<bool> CreatesFlowCycleAsync(
+        WorkspaceId workspaceId,
+        FlowId ownerFlowId,
+        ResolvedFlowCall target,
+        CancellationToken cancellationToken) => Task.FromResult(false);
 }
 
 public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver resources) : IFlowDefinitionValidator
@@ -87,10 +109,80 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 if (transform.Mode.Equals("Expression", StringComparison.OrdinalIgnoreCase)) ValidateExpression(transform.Expression, issues, step.Name, property: "expression");
                 else ValidateJsonExpressions(transform.Mapping, issues, step.Name, "mapping");
                 break;
+            case FlowCallStepDefinition flowCall:
+                await ValidateFlowCallAsync(flowCall, context, issues, token);
+                break;
             case OutputFlowStepDefinition output:
                 ValidateJsonExpressions(output.OutputMapping, issues, step.Name, "outputMapping");
                 break;
         }
+    }
+
+    private async Task ValidateFlowCallAsync(
+        FlowCallStepDefinition step,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
+    {
+        var reference = step.Flow;
+        if (string.IsNullOrWhiteSpace(reference.ResourceId) || reference.ResourceId.Contains('/', StringComparison.Ordinal))
+        {
+            issues.Add(Error("flow_reference_invalid", "Flow references must use a logical Flow name.", step.Name, property: "flow.resourceId"));
+            return;
+        }
+
+        if (reference.VersionStrategy == FlowCallVersionStrategy.Exact && string.IsNullOrWhiteSpace(reference.Version))
+            issues.Add(Error("flow_version_required", "An exact Flow reference requires a version.", step.Name, property: "flow.version"));
+        if (reference.VersionStrategy == FlowCallVersionStrategy.Active && reference.Version is not null)
+            issues.Add(Error("flow_active_version_must_be_implicit", "An active Flow reference cannot declare an exact version.", step.Name, property: "flow.version"));
+
+        ValidateJsonExpressions(step.InputMapping, issues, step.Name, "inputMapping");
+        if (!context.ResolveResources || context.WorkspaceId is null || context.OwnerFlowId is null) return;
+
+        var target = await resources.ResolveFlowAsync(context.WorkspaceId.Value, context.OwnerFlowId.Value.Namespace, reference, token);
+        if (target is null)
+        {
+            issues.Add(Error("flow_resource_not_found", $"Published Flow '{reference.ResourceId}' was not found for the selected version strategy.", step.Name, property: "flow"));
+            return;
+        }
+
+        if (!ValidContractSchema(target.InputSchema))
+            issues.Add(Error("flow_input_schema_invalid", "The selected Flow has an invalid or unsupported input schema.", step.Name, property: "flow.inputSchema"));
+        if (!ValidContractSchema(target.OutputSchema))
+            issues.Add(Error("flow_output_schema_invalid", "The selected Flow has an invalid or unsupported output schema.", step.Name, property: "flow.outputSchema"));
+        ValidateMappingAgainstSchema(step, target.InputSchema, issues);
+        if (await resources.CreatesFlowCycleAsync(context.WorkspaceId.Value, context.OwnerFlowId.Value, target, token))
+            issues.Add(Error("flow_dependency_cycle", $"Calling Flow '{target.FlowId}' would create a direct or indirect dependency cycle.", step.Name, property: "flow"));
+    }
+
+    private static void ValidateMappingAgainstSchema(FlowCallStepDefinition step, JsonElement? schema, List<FlowValidationIssue> issues)
+    {
+        if (schema is not { ValueKind: JsonValueKind.Object } value) return;
+        if (step.InputMapping is not { ValueKind: JsonValueKind.Object } mapping)
+        {
+            issues.Add(Error("flow_input_mapping_object_required", "The selected Flow requires an object input mapping.", step.Name, property: "inputMapping"));
+            return;
+        }
+
+        var allowed = value.TryGetProperty("properties", out var properties) && properties.ValueKind == JsonValueKind.Object
+            ? properties.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal)
+            : [];
+        foreach (var property in mapping.EnumerateObject().Where(property => !allowed.Contains(property.Name)))
+            issues.Add(Error("flow_input_mapping_unknown", $"Input mapping property '{property.Name}' is not declared by the selected Flow.", step.Name, property: $"inputMapping.{property.Name}"));
+
+        if (!value.TryGetProperty("required", out var required) || required.ValueKind != JsonValueKind.Array) return;
+        var mapped = mapping.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
+        foreach (var property in required.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Where(property => !mapped.Contains(property)))
+            issues.Add(Error("flow_input_mapping_required", $"Required input property '{property}' is not mapped.", step.Name, property: $"inputMapping.{property}"));
+    }
+
+    private static bool ValidContractSchema(JsonElement? schema)
+    {
+        if (schema is null) return true;
+        if (schema.Value.ValueKind != JsonValueKind.Object) return false;
+        if (schema.Value.TryGetProperty("type", out var type)
+            && (type.ValueKind != JsonValueKind.String || !string.Equals(type.GetString(), "object", StringComparison.Ordinal))) return false;
+        return !schema.Value.TryGetProperty("properties", out var properties) || properties.ValueKind == JsonValueKind.Object;
     }
 
     private async Task ValidateResourceAsync(string resourceId, string step, string property, FlowValidationContext context, List<FlowValidationIssue> issues, CancellationToken token)

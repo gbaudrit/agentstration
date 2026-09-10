@@ -443,6 +443,7 @@ public static class FlowTopologyProjector
         RouterFlowStepDefinition router => $"{router.Candidates.Count} routes",
         ConditionFlowStepDefinition condition => condition.Mode,
         TransformFlowStepDefinition transform => transform.Mode,
+        FlowCallStepDefinition flow => flow.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? $"{flow.Flow.ResourceId} · {flow.Flow.Version}" : $"{flow.Flow.ResourceId} · active",
         FailureFlowStepDefinition failure => failure.Code,
         _ => null
     };
