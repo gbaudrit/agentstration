@@ -1,0 +1,361 @@
+{
+  "info": {
+    "_postman_id": "a7a8cdde-0ad5-46fd-b239-ecb8cc9defc2",
+    "name": "Agentstration - Source Registries",
+    "description": "Local smoke-test collection for Source Registry registration management (FR #245). Run the requests in order. The login establishes the authentication cookie and the scripts retain ETags for optimistic concurrency.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5100", "type": "string" },
+    { "key": "userName", "value": "admin", "type": "string" },
+    { "key": "password", "value": "admin", "type": "string" },
+    { "key": "registryName", "value": "postman-test", "type": "string" },
+    { "key": "registryIndexUrl", "value": "https://registry.example/v1/index.json", "type": "string" },
+    { "key": "officialRegistryName", "value": "agentstration-official", "type": "string" },
+    { "key": "registryEtag", "value": "", "type": "string" },
+    { "key": "staleRegistryEtag", "value": "", "type": "string" },
+    { "key": "officialRegistryEtag", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "01 - Authentication",
+      "item": [
+        {
+          "name": "Login as local Platform administrator",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login succeeds', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"{{userName}}\",\n  \"password\": \"{{password}}\",\n  \"rememberMe\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/auth/local/login",
+            "description": "Creates the application authentication cookie. Postman's cookie jar sends it to subsequent requests automatically."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Official Registry",
+      "item": [
+        {
+          "name": "List Source Registries",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Registries are returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.value).to.be.an('array');",
+                  "    pm.expect(body.value.some(x => x.registration.name === pm.collectionVariables.get('officialRegistryName'))).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/sourceregistries" }
+        },
+        {
+          "name": "Get Official Registry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Official Registry is returned with an ETag', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get('ETag')).to.be.ok;",
+                  "});",
+                  "pm.collectionVariables.set('officialRegistryEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/sourceregistries/{{officialRegistryName}}" }
+        },
+        {
+          "name": "Refresh Official Registry (network)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refresh request is handled', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Observed status is returned', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.observed.definition.status).to.be.a('string');",
+                  "});",
+                  "if (pm.response.headers.get('ETag')) pm.collectionVariables.set('officialRegistryEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/sourceregistries/{{officialRegistryName}}/refresh",
+            "description": "Performs a real network refresh against registry.agentstration.io. It can be skipped for a fully offline smoke test."
+          }
+        },
+        {
+          "name": "List Official Registry Refresh History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refresh history is returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.value).to.be.an('array');",
+                  "    pm.expect(body.count).to.eql(body.value.length);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/sourceregistries/{{officialRegistryName}}/refreshes?take=10" }
+        }
+      ]
+    },
+    {
+      "name": "03 - Registration CRUD",
+      "item": [
+        {
+          "name": "Create Disabled Test Registry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Registry is created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.expect(pm.response.json().registration.name).to.eql(pm.collectionVariables.get('registryName'));",
+                  "});",
+                  "pm.test('Created Registry has an ETag', function () {",
+                  "    pm.expect(pm.response.headers.get('ETag')).to.be.ok;",
+                  "});",
+                  "pm.collectionVariables.set('registryEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{registryName}}\",\n  \"properties\": {\n    \"displayName\": \"Postman test Registry\",\n    \"indexUrl\": \"{{registryIndexUrl}}\",\n    \"enabled\": false,\n    \"trustPolicy\": \"untrusted\",\n    \"endpointPolicy\": {\n      \"allowHttp\": false,\n      \"allowPrivateNetwork\": false\n    },\n    \"authenticationMode\": \"none\",\n    \"credential\": null,\n    \"refreshPolicy\": {\n      \"periodicEnabled\": false,\n      \"interval\": \"1.00:00:00\"\n    },\n    \"cachePolicy\": {\n      \"retainedObservations\": 3\n    }\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/sourceregistries",
+            "description": "Creates a disabled registration so this CRUD scenario does not require network access. Delete an existing registration with the same name before rerunning this request."
+          }
+        },
+        {
+          "name": "Get Test Registry and Capture ETag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Registry is returned', function () { pm.response.to.have.status(200); });",
+                  "pm.collectionVariables.set('registryEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/sourceregistries/{{registryName}}" }
+        },
+        {
+          "name": "Update Test Registry with Current ETag",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.collectionVariables.set('staleRegistryEtag', pm.collectionVariables.get('registryEtag'));"]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Registry is updated', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().registration.definition.displayName).to.eql('Postman test Registry updated');",
+                  "});",
+                  "pm.collectionVariables.set('registryEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "{{registryEtag}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"properties\": {\n    \"displayName\": \"Postman test Registry updated\",\n    \"indexUrl\": \"{{registryIndexUrl}}\",\n    \"enabled\": false,\n    \"trustPolicy\": \"trusted\",\n    \"endpointPolicy\": {\n      \"allowHttp\": false,\n      \"allowPrivateNetwork\": false\n    },\n    \"authenticationMode\": \"none\",\n    \"credential\": null,\n    \"refreshPolicy\": {\n      \"periodicEnabled\": false,\n      \"interval\": \"12:00:00\"\n    },\n    \"cachePolicy\": {\n      \"retainedObservations\": 5\n    }\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/sourceregistries/{{registryName}}"
+          }
+        },
+        {
+          "name": "Reject Update with Stale ETag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Stale ETag is rejected', function () { pm.response.to.have.status(409); });"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "{{staleRegistryEtag}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"properties\": {\n    \"displayName\": \"This stale update must fail\",\n    \"indexUrl\": \"{{registryIndexUrl}}\",\n    \"enabled\": false,\n    \"trustPolicy\": \"untrusted\",\n    \"endpointPolicy\": { \"allowHttp\": false, \"allowPrivateNetwork\": false },\n    \"authenticationMode\": \"none\",\n    \"credential\": null,\n    \"refreshPolicy\": { \"periodicEnabled\": false, \"interval\": \"1.00:00:00\" },\n    \"cachePolicy\": { \"retainedObservations\": 3 }\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/sourceregistries/{{registryName}}"
+          }
+        },
+        {
+          "name": "Delete Test Registry with Current ETag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Registry is deleted', function () { pm.response.to.have.status(204); });",
+                  "pm.collectionVariables.unset('registryEtag');",
+                  "pm.collectionVariables.unset('staleRegistryEtag');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "If-Match", "value": "{{registryEtag}}" }],
+            "url": "{{baseUrl}}/api/sourceregistries/{{registryName}}"
+          }
+        },
+        {
+          "name": "Confirm Test Registry Was Deleted",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Deleted Registry is not found', function () { pm.response.to.have.status(404); });"]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/sourceregistries/{{registryName}}" }
+        }
+      ]
+    },
+    {
+      "name": "04 - Policy Validation",
+      "item": [
+        {
+          "name": "Reject HTTP Registry Without Opt-in",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('HTTP endpoint is rejected', function () { pm.response.to.have.status(422); });"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"postman-http-denied\",\n  \"properties\": {\n    \"displayName\": \"HTTP denied\",\n    \"indexUrl\": \"http://registry.internal/v1/index.json\",\n    \"enabled\": false,\n    \"endpointPolicy\": { \"allowHttp\": false, \"allowPrivateNetwork\": false }\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/sourceregistries"
+          }
+        },
+        {
+          "name": "Reject Static Bearer Without Credential",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Missing credential is rejected', function () { pm.response.to.have.status(422); });"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"postman-credential-denied\",\n  \"properties\": {\n    \"displayName\": \"Credential denied\",\n    \"indexUrl\": \"https://registry.example/v1/index.json\",\n    \"enabled\": false,\n    \"authenticationMode\": \"staticBearer\",\n    \"credential\": null\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/sourceregistries"
+          }
+        }
+      ]
+    },
+    {
+      "name": "99 - Session",
+      "item": [
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Logout succeeds', function () { pm.response.to.have.status(204); });"]
+              }
+            }
+          ],
+          "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/api/auth/logout" }
+        }
+      ]
+    }
+  ]
+}

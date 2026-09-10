@@ -47,7 +47,13 @@ internal static class SecretEndpoints
             _ = scope is null
                 ? await service.GetSecretAsync(name, token) ?? throw new SecretResourceNotFoundException(name)
                 : await service.GetSecretExactAsync(scope.Value, name, token) ?? throw new SecretResourceNotFoundException(name);
-            var usages = (scope is null ? await service.GetSecretUsagesAsync(name, token) : await service.GetSecretUsagesAsync(scope.Value, name, token)).Select(value => new SecretUsageResponse(value.Kind, value.Name, value.DisplayName, $"/modelproviders/{Uri.EscapeDataString(value.Name)}")).ToArray();
+            var usages = (scope is null ? await service.GetSecretUsagesAsync(name, token) : await service.GetSecretUsagesAsync(scope.Value, name, token)).Select(value => new SecretUsageResponse(
+                value.Kind,
+                value.Name,
+                value.DisplayName,
+                value.Kind == ResourceKinds.SourceRegistryRegistration
+                    ? $"/api/sourceregistries/{Uri.EscapeDataString(value.Name)}"
+                    : $"/modelproviders/{Uri.EscapeDataString(value.Name)}")).ToArray();
             return Results.Ok(new SecretUsagesResponse(usages, usages.Length));
         })).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         secrets.MapPost("/", async (CreateSecretRequest body, HttpResponse response, SecretManagementService service, CancellationToken token) => await Execute(async () => Resource(await service.CreateSecretAsync(new SecretResource { ApiVersion = ManagementApiVersions.CoreV1, Kind = ResourceKinds.Secret, Metadata = new() { Name = body.Name }, ScopeRef = body.ScopeRef, Definition = body.Properties }, token), response, 201))).RequireAuthorization(AgentstrationPolicies.CanWriteResources);

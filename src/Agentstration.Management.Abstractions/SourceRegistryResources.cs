@@ -1,4 +1,7 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json.Serialization;
+using Agentstration.Resources;
 
 namespace Agentstration.Management.Abstractions;
 
@@ -127,11 +130,86 @@ public static class SourceRegistryWellKnown
     public const string OfficialIndexUrl = "https://registry.agentstration.io/v1/index.json";
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<SourceRegistryTrustPolicy>))]
+public enum SourceRegistryTrustPolicy
+{
+    [JsonStringEnumMemberName("untrusted")] Untrusted,
+    [JsonStringEnumMemberName("trusted")] Trusted,
+    [JsonStringEnumMemberName("authoritative")] Authoritative
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<SourceRegistryAuthenticationMode>))]
+public enum SourceRegistryAuthenticationMode
+{
+    [JsonStringEnumMemberName("none")] None,
+    [JsonStringEnumMemberName("staticBearer")] StaticBearer
+}
+
+public sealed record SourceRegistryEndpointPolicy
+{
+    public bool AllowHttp { get; init; }
+    public bool AllowPrivateNetwork { get; init; }
+}
+
+public static class SourceRegistryNetworkPolicy
+{
+    public static bool IsAddressAllowed(IPAddress address, bool allowPrivateNetwork)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        if (address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any) || address.Equals(IPAddress.Broadcast)
+            || address.IsIPv6Multicast || address.IsIPv6LinkLocal)
+            return false;
+        if (address.AddressFamily == AddressFamily.InterNetwork)
+        {
+            var addressBytes = address.GetAddressBytes();
+            if (addressBytes[0] == 0 || addressBytes[0] >= 224
+                || addressBytes[0] == 169 && addressBytes[1] == 254)
+                return false;
+        }
+        if (allowPrivateNetwork)
+            return !address.Equals(IPAddress.Any) && !address.Equals(IPAddress.IPv6Any) && !address.Equals(IPAddress.Broadcast);
+        if (IPAddress.IsLoopback(address)) return false;
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+            return (address.GetAddressBytes()[0] & 0xfe) != 0xfc;
+        var bytes = address.GetAddressBytes();
+        return bytes[0] != 0
+            && bytes[0] != 10
+            && bytes[0] != 127
+            && !(bytes[0] == 100 && bytes[1] is >= 64 and <= 127)
+            && !(bytes[0] == 172 && bytes[1] is >= 16 and <= 31)
+            && !(bytes[0] == 192 && bytes[1] == 168)
+            && !(bytes[0] == 192 && bytes[1] == 0)
+            && !(bytes[0] == 169 && bytes[1] == 254)
+            && !(bytes[0] == 198 && bytes[1] is 18 or 19)
+            && !(bytes[0] == 198 && bytes[1] == 51 && bytes[2] == 100)
+            && !(bytes[0] == 203 && bytes[1] == 0 && bytes[2] == 113)
+            && bytes[0] < 224;
+    }
+}
+
+public sealed record SourceRegistryRefreshPolicy
+{
+    public bool PeriodicEnabled { get; init; }
+    public TimeSpan Interval { get; init; } = TimeSpan.FromHours(24);
+}
+
+public sealed record SourceRegistryCachePolicy
+{
+    public int RetainedObservations { get; init; } = 3;
+}
+
 public sealed record SourceRegistryRegistrationProperties
 {
     public required string DisplayName { get; init; }
     public required Uri IndexUrl { get; init; }
     public bool Enabled { get; init; } = true;
+    public SourceRegistryTrustPolicy TrustPolicy { get; init; } = SourceRegistryTrustPolicy.Untrusted;
+    public SourceRegistryEndpointPolicy EndpointPolicy { get; init; } = new();
+    public SourceRegistryAuthenticationMode AuthenticationMode { get; init; }
+    public ResourceReference? Credential { get; init; }
+    public SourceRegistryRefreshPolicy RefreshPolicy { get; init; } = new();
+    public SourceRegistryCachePolicy CachePolicy { get; init; } = new();
 }
 
 public sealed record SourceRegistryRegistrationResource : Resource
@@ -148,7 +226,8 @@ public enum SourceRegistryObservedStatus
     [JsonStringEnumMemberName("stale")] Stale,
     [JsonStringEnumMemberName("refreshFailed")] RefreshFailed,
     [JsonStringEnumMemberName("invalid")] Invalid,
-    [JsonStringEnumMemberName("noCompatibleCatalog")] NoCompatibleCatalog
+    [JsonStringEnumMemberName("noCompatibleCatalog")] NoCompatibleCatalog,
+    [JsonStringEnumMemberName("policyDenied")] PolicyDenied
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<SourceRegistryRefreshOutcome>))]
@@ -159,7 +238,8 @@ public enum SourceRegistryRefreshOutcome
     [JsonStringEnumMemberName("unavailable")] Unavailable,
     [JsonStringEnumMemberName("invalid")] Invalid,
     [JsonStringEnumMemberName("noCompatibleCatalog")] NoCompatibleCatalog,
-    [JsonStringEnumMemberName("disabled")] Disabled
+    [JsonStringEnumMemberName("disabled")] Disabled,
+    [JsonStringEnumMemberName("policyDenied")] PolicyDenied
 }
 
 public sealed record SourceRegistryCatalogObservation
@@ -231,6 +311,13 @@ public sealed record RetrievedSourceRegistryDocument(
     bool NotModified,
     string? Content);
 
+public sealed record SourceRegistryRetrievalContext(
+    ResourceScopeRef ConsumerScopeRef,
+    ResourceAddress Consumer,
+    SourceRegistryEndpointPolicy EndpointPolicy,
+    SourceRegistryAuthenticationMode AuthenticationMode,
+    ResourceReference? Credential);
+
 public interface ISourceRegistryDocumentRetriever
 {
     Task<RetrievedSourceRegistryDocument> RetrieveAsync(
@@ -238,6 +325,7 @@ public interface ISourceRegistryDocumentRetriever
         string? etag,
         DateTimeOffset? lastModified,
         int maximumBytes,
+        SourceRegistryRetrievalContext context,
         CancellationToken cancellationToken);
 }
 
