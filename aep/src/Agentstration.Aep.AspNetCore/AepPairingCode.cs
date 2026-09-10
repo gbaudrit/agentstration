@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -323,7 +324,7 @@ internal sealed class AepPairingCoordinator(
             using var readyResponse = await client.PostAsJsonAsync(AepEnrollmentProtocol.ReadyPath,
                 new AepEnrollmentReady(state.InstanceId, state.InstanceId, credential.CompletionToken), AepProtocol.JsonOptions, cancellationToken);
             await EnsureSuccessAsync(readyResponse, cancellationToken);
-            return (200, Page(text, text.PairedTitle, text.PairedMessage, includeForm: false, theme));
+            return (200, Page(text, text.PairedTitle, text.PairedMessage, includeForm: false, theme, autoClose: true));
         }
         catch (AepPairingException exception)
         {
@@ -369,7 +370,13 @@ internal sealed class AepPairingCoordinator(
         throw new AepPairingException(code, message, (int)response.StatusCode);
     }
 
-    private static string Page(PairingPageText text, string title, string message, bool includeForm, string? theme)
+    private static string Page(
+        PairingPageText text,
+        string title,
+        string message,
+        bool includeForm,
+        string? theme,
+        bool autoClose = false)
     {
         var encodedTitle = HtmlEncoder.Default.Encode(title);
         var encodedMessage = HtmlEncoder.Default.Encode(message);
@@ -380,18 +387,32 @@ internal sealed class AepPairingCoordinator(
             _ => null
         };
         var themeAttribute = normalizedTheme is null ? string.Empty : $" class=\"theme-{normalizedTheme}\"";
-        var formAction = normalizedTheme is null
-            ? AepEnrollmentProtocol.PairingPath
-            : $"{AepEnrollmentProtocol.PairingPath}?theme={normalizedTheme}";
+        var themeField = normalizedTheme is null
+            ? string.Empty
+            : $"<input type=\"hidden\" name=\"theme\" value=\"{normalizedTheme}\">";
         var form = includeForm
             ? $"""
-              <form method="post" action="{formAction}">
+              <form method="post" action="{AepEnrollmentProtocol.PairingPath}">
+                {themeField}
                 <label for="pairing-code">{HtmlEncoder.Default.Encode(text.CodeLabel)}</label>
                 <input id="pairing-code" name="code" inputmode="numeric" autocomplete="one-time-code" required maxlength="64" autofocus>
                 <p class="hint">{HtmlEncoder.Default.Encode(text.CodeHint)}</p>
                 <button type="submit">{HtmlEncoder.Default.Encode(text.SubmitLabel)}</button>
               </form>
               """
+            : string.Empty;
+        var closeNotice = autoClose
+            ? $"""
+              <p class="close-notice"
+                 data-auto-close-seconds="10"
+                 data-countdown-plural="{HtmlEncoder.Default.Encode(text.CloseCountdownPlural)}"
+                 data-countdown-singular="{HtmlEncoder.Default.Encode(text.CloseCountdownSingular)}"
+                 data-close-blocked="{HtmlEncoder.Default.Encode(text.CloseBlockedMessage)}">{HtmlEncoder.Default.Encode(string.Format(CultureInfo.InvariantCulture, text.CloseCountdownPlural, 10))}</p>
+              <noscript><p class="close-notice">{HtmlEncoder.Default.Encode(text.CloseBlockedMessage)}</p></noscript>
+              """
+            : string.Empty;
+        var closeScript = autoClose
+            ? $"<script src=\"{AepPairingBrand.CloseScriptPath}\" defer></script>"
             : string.Empty;
         return $$$"""
             <!doctype html>
@@ -414,11 +435,11 @@ internal sealed class AepPairingCoordinator(
                 @media(prefers-color-scheme:dark){:root:not(.theme-light):not(.theme-dark) .brand .logo-light{display:none}:root:not(.theme-light):not(.theme-dark) .brand .logo-dark{display:block}}
                 .eyebrow{margin:0 0 8px;color:var(--primary);font:700 .75rem "Cascadia Code",Consolas,monospace;letter-spacing:.09em;text-transform:uppercase}h1{margin:0;font-size:clamp(1.7rem,5vw,2.2rem);line-height:1.15;letter-spacing:-.035em}main>p:not(.eyebrow){margin:14px 0 26px;color:var(--muted);line-height:1.55}
                 form{display:grid;gap:10px}label{font-size:.9rem;font-weight:700}input{width:100%;height:52px;padding:0 15px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface-muted);color:var(--text);font:600 1.15rem/1 Inter,"Segoe UI",system-ui,sans-serif;letter-spacing:.08em;outline:none;box-shadow:inset 0 1px 2px rgba(20,35,58,.08)}input:focus{border-color:var(--primary);background:var(--surface);box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 16%,transparent)}
-                .hint{margin:0 0 8px;color:var(--muted);font-size:.82rem;line-height:1.45}button{min-height:46px;padding:0 20px;border:0;border-radius:10px;color:#fff;background:var(--primary);font:700 .92rem Inter,"Segoe UI",system-ui,sans-serif;cursor:pointer;box-shadow:0 7px 16px color-mix(in srgb,var(--primary) 25%,transparent)}button:hover{background:var(--primary-hover)}button:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 28%,transparent);outline-offset:2px}
+                .hint{margin:0 0 8px;color:var(--muted);font-size:.82rem;line-height:1.45}.close-notice{padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface-muted);color:var(--muted);font-size:.9rem}button{min-height:46px;padding:0 20px;border:0;border-radius:10px;color:#fff;background:var(--primary);font:700 .92rem Inter,"Segoe UI",system-ui,sans-serif;cursor:pointer;box-shadow:0 7px 16px color-mix(in srgb,var(--primary) 25%,transparent)}button:hover{background:var(--primary-hover)}button:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 28%,transparent);outline-offset:2px}
                 @media(max-width:520px){body{padding:14px}main{padding:26px 22px;border-radius:14px}}
               </style>
             </head>
-            <body><main><div class="brand" aria-label="Agentstration"><img class="logo-light" src="{{{AepPairingBrand.LightLockupPath}}}" alt=""><img class="logo-dark" src="{{{AepPairingBrand.DarkLockupPath}}}" alt=""></div><p class="eyebrow">{{{HtmlEncoder.Default.Encode(text.Eyebrow)}}}</p><h1>{{{encodedTitle}}}</h1><p>{{{encodedMessage}}}</p>{{{form}}}</main></body>
+            <body><main><div class="brand" aria-label="Agentstration"><img class="logo-light" src="{{{AepPairingBrand.LightLockupPath}}}" alt=""><img class="logo-dark" src="{{{AepPairingBrand.DarkLockupPath}}}" alt=""></div><p class="eyebrow">{{{HtmlEncoder.Default.Encode(text.Eyebrow)}}}</p><h1>{{{encodedTitle}}}</h1><p>{{{encodedMessage}}}</p>{{{closeNotice}}}{{{form}}}</main>{{{closeScript}}}</body>
             </html>
             """;
     }
@@ -436,6 +457,9 @@ internal sealed class AepPairingCoordinator(
         string AuthorityUnavailableMessage,
         string PairedTitle,
         string PairedMessage,
+        string CloseCountdownPlural,
+        string CloseCountdownSingular,
+        string CloseBlockedMessage,
         string AlreadyPairedTitle,
         string AlreadyPairedMessage,
         string RevokedTitle,
@@ -443,8 +467,8 @@ internal sealed class AepPairingCoordinator(
     {
         public static PairingPageText For(string? acceptLanguage) =>
             acceptLanguage?.TrimStart().StartsWith("fr", StringComparison.OrdinalIgnoreCase) == true
-                ? new("fr", "Enrôlement d’une extension AEP", "Associer cette extension AEP", "Saisissez le code à usage unique affiché par un administrateur Agentstration.", "Code d’association", "Ce code expire après 60 secondes et ne peut être utilisé qu’une fois.", "Associer l’extension", "Échec de l’association", "Le code d’association est invalide.", "L’autorité d’enrôlement est indisponible.", "Extension associée", "L’identifiant a été installé et le manifeste AEP authentifié a été vérifié.", "Extension déjà associée", "Cette instance d’extension est déjà associée et son formulaire d’enrôlement est fermé.", "Identifiant de l’extension révoqué", "Cette instance d’extension doit être réinitialisée localement avant de pouvoir être enrôlée à nouveau.")
-                : new("en", "AEP extension enrollment", "Pair this AEP extension", "Enter the one-time code shown by an Agentstration administrator.", "Pairing code", "This code expires after 60 seconds and can only be used once.", "Pair extension", "Pairing failed", "The pairing code is invalid.", "The enrollment authority is unavailable.", "Extension paired", "The credential was installed and the authenticated AEP manifest was verified.", "Extension already paired", "This extension instance is paired and its enrollment form is closed.", "Extension credential revoked", "This extension instance requires an explicit local reset before it can enroll again.");
+                ? new("fr", "Enrôlement d’une extension AEP", "Associer cette extension AEP", "Saisissez le code à usage unique affiché par un administrateur Agentstration.", "Code d’association", "Ce code expire après 60 secondes et ne peut être utilisé qu’une fois.", "Associer l’extension", "Échec de l’association", "Le code d’association est invalide.", "L’autorité d’enrôlement est indisponible.", "Extension associée", "L’identifiant a été installé et le manifeste AEP authentifié a été vérifié.", "Cette fenêtre se fermera automatiquement dans {0} secondes.", "Cette fenêtre se fermera automatiquement dans {0} seconde.", "La fermeture automatique a été bloquée. Vous pouvez fermer cette fenêtre manuellement.", "Extension déjà associée", "Cette instance d’extension est déjà associée et son formulaire d’enrôlement est fermé.", "Identifiant de l’extension révoqué", "Cette instance d’extension doit être réinitialisée localement avant de pouvoir être enrôlée à nouveau.")
+                : new("en", "AEP extension enrollment", "Pair this AEP extension", "Enter the one-time code shown by an Agentstration administrator.", "Pairing code", "This code expires after 60 seconds and can only be used once.", "Pair extension", "Pairing failed", "The pairing code is invalid.", "The enrollment authority is unavailable.", "Extension paired", "The credential was installed and the authenticated AEP manifest was verified.", "This window will close automatically in {0} seconds.", "This window will close automatically in {0} second.", "Automatic closing was blocked. You can close this window manually.", "Extension already paired", "This extension instance is paired and its enrollment form is closed.", "Extension credential revoked", "This extension instance requires an explicit local reset before it can enroll again.");
     }
 }
 
@@ -453,6 +477,29 @@ internal static class AepPairingBrand
     public const string MarkPath = "/aep/enrollment/agentstration-mark.png";
     public const string DarkLockupPath = "/aep/enrollment/agentstration-lockup-dark.png";
     public const string LightLockupPath = "/aep/enrollment/agentstration-lockup-light.png";
+    public const string CloseScriptPath = "/aep/enrollment/close.js";
+    public const string CloseScript = """
+        (() => {
+          const notice = document.querySelector('[data-auto-close-seconds]');
+          if (!notice) return;
+          let remaining = Number.parseInt(notice.dataset.autoCloseSeconds, 10);
+          const render = () => {
+            const template = remaining === 1 ? notice.dataset.countdownSingular : notice.dataset.countdownPlural;
+            notice.textContent = template.replace('{0}', remaining.toString());
+          };
+          render();
+          const timer = window.setInterval(() => {
+            remaining -= 1;
+            render();
+            if (remaining > 0) return;
+            window.clearInterval(timer);
+            window.close();
+            window.setTimeout(() => {
+              notice.textContent = notice.dataset.closeBlocked;
+            }, 250);
+          }, 1000);
+        })();
+        """;
     private const string ResourcePrefix = "Agentstration.Aep.AspNetCore.Assets.";
 
     public static Stream OpenMark() => Open("agentstration-mark.png");

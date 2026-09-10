@@ -92,6 +92,7 @@ public sealed class ExtensionsConsoleTests
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<bool>("agentstrationEnrollment.postAndOpen", _ => true).SetResult(true);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false, completesPairing: true);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -119,8 +120,15 @@ public sealed class ExtensionsConsoleTests
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Markup, "Disponible");
+            Assert.IsFalse(rendered.Markup.Contains("123456789", StringComparison.Ordinal));
             Assert.IsGreaterThanOrEqualTo(3, client.EnrollmentCalls);
         }, TimeSpan.FromSeconds(5));
+        var handoff = context.JSInterop.Invocations.Single(value =>
+            string.Equals(value.Identifier, "agentstrationEnrollment.postAndOpen", StringComparison.Ordinal));
+        Assert.AreEqual("123456789", handoff.Arguments[0]?.ToString());
+        Assert.AreEqual("http://localhost:5260/aep/enrollment/pair", handoff.Arguments[1]?.ToString());
+        Assert.IsFalse(context.JSInterop.Invocations.Any(value =>
+            string.Equals(value.Identifier, "agentstrationEnrollment.copyAndOpen", StringComparison.Ordinal)));
     }
 
     [TestMethod]

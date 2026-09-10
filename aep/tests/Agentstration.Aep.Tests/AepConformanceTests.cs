@@ -175,7 +175,8 @@ public sealed class AepConformanceTests
 
             Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
             StringAssert.Contains(html, "<html lang=\"fr\" class=\"theme-dark\">");
-            StringAssert.Contains(html, "action=\"/aep/enrollment/pair?theme=dark\"");
+            StringAssert.Contains(html, "action=\"/aep/enrollment/pair\"");
+            StringAssert.Contains(html, "type=\"hidden\" name=\"theme\" value=\"dark\"");
             StringAssert.Contains(html, "Associer cette extension AEP");
             StringAssert.Contains(html, "Code d&#x2019;association");
             StringAssert.Contains(html, "class=\"brand\"");
@@ -189,6 +190,58 @@ public sealed class AepConformanceTests
             Assert.AreEqual(HttpStatusCode.OK, brand.StatusCode);
             Assert.AreEqual("image/png", brand.Content.Headers.ContentType?.MediaType);
             CollectionAssert.AreEqual(new byte[] { 137, 80, 78, 71 }, image[..4]);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task SuccessfulPairingStartsLocalizedCloseCountdownWhileOtherPagesDoNot()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"aep-pairing-close-{Guid.NewGuid():N}");
+        var stateFile = Path.Combine(directory, "state.json");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await using var factory = PairingFactory(stateFile, successfulAuthority: true);
+            using var client = factory.CreateClient();
+            client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("fr-FR,fr;q=0.9");
+
+            using var initial = await client.GetAsync(AepEnrollmentProtocol.PairingPath);
+            var initialHtml = await initial.Content.ReadAsStringAsync();
+            Assert.AreEqual(HttpStatusCode.OK, initial.StatusCode);
+            Assert.IsFalse(initialHtml.Contains("data-auto-close-seconds", StringComparison.Ordinal));
+            Assert.IsFalse(initialHtml.Contains("/aep/enrollment/close.js", StringComparison.Ordinal));
+
+            using var failed = await client.PostAsync(AepEnrollmentProtocol.PairingPath,
+                new FormUrlEncodedContent(new Dictionary<string, string> { ["code"] = string.Empty }));
+            var failedHtml = await failed.Content.ReadAsStringAsync();
+            Assert.AreEqual(HttpStatusCode.UnprocessableEntity, failed.StatusCode);
+            Assert.IsFalse(failedHtml.Contains("data-auto-close-seconds", StringComparison.Ordinal));
+            Assert.IsFalse(failedHtml.Contains("/aep/enrollment/close.js", StringComparison.Ordinal));
+
+            using var paired = await client.PostAsync(AepEnrollmentProtocol.PairingPath,
+                new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["code"] = "123456789",
+                    ["theme"] = "dark"
+                }));
+            var pairedHtml = await paired.Content.ReadAsStringAsync();
+            Assert.AreEqual(HttpStatusCode.OK, paired.StatusCode);
+            StringAssert.Contains(pairedHtml, "<html lang=\"fr\" class=\"theme-dark\">");
+            StringAssert.Contains(pairedHtml, "data-auto-close-seconds=\"10\"");
+            StringAssert.Contains(pairedHtml, "automatiquement dans 10 secondes.");
+            StringAssert.Contains(pairedHtml, "src=\"/aep/enrollment/close.js\"");
+            Assert.IsFalse(pairedHtml.Contains("123456789", StringComparison.Ordinal));
+
+            using var script = await client.GetAsync("/aep/enrollment/close.js");
+            var scriptContent = await script.Content.ReadAsStringAsync();
+            Assert.AreEqual(HttpStatusCode.OK, script.StatusCode);
+            Assert.AreEqual("text/javascript", script.Content.Headers.ContentType?.MediaType);
+            StringAssert.Contains(scriptContent, "window.close()");
+            StringAssert.Contains(scriptContent, "notice.dataset.closeBlocked");
         }
         finally
         {
@@ -723,7 +776,7 @@ public sealed class AepConformanceTests
             services.AddAepStaticBearerAuthentication(options =>
                 options.AddToken("test-token", "agentstration-test", WorkloadToken, permissions))));
 
-    private static WebApplicationFactory<global::Program> PairingFactory(string stateFile)
+    private static WebApplicationFactory<global::Program> PairingFactory(string stateFile, bool successfulAuthority = false)
     {
         var values = new Dictionary<string, string?>
         {
@@ -737,8 +790,38 @@ public sealed class AepConformanceTests
         return new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
         {
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(values));
-            builder.ConfigureServices((context, services) => services.AddAepEnrollmentAuthentication(context.Configuration));
+            builder.ConfigureServices((context, services) =>
+            {
+                services.AddAepEnrollmentAuthentication(context.Configuration);
+                if (successfulAuthority)
+                {
+                    services.AddHttpClient("aep-enrollment-authority")
+                        .ConfigurePrimaryHttpMessageHandler(() => new PairingAuthorityHandler());
+                }
+            });
         });
+    }
+
+    private sealed class PairingAuthorityHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            object response = request.RequestUri?.AbsolutePath switch
+            {
+                AepEnrollmentProtocol.AnnouncementPath => new AepEnrollmentAnnouncementResponse(Guid.NewGuid(), "pending"),
+                AepEnrollmentProtocol.ClaimPath => new AepEnrollmentCredential(
+                    "agentstration:pairing-close-test",
+                    AepStaticBearerCredentials.Generate("agentstration:pairing-close-test").AccessToken,
+                    "completion-token"),
+                AepEnrollmentProtocol.ReadyPath => new AepEnrollmentReadyResponse("available"),
+                _ => new AepEnrollmentError("not_found", "Unexpected enrollment authority request.")
+            };
+            var status = response is AepEnrollmentError ? HttpStatusCode.NotFound : HttpStatusCode.OK;
+            return Task.FromResult(new HttpResponseMessage(status)
+            {
+                Content = JsonContent.Create(response, options: AepProtocol.JsonOptions)
+            });
+        }
     }
 
     private sealed class MemoryTraceSink : IAepHttpTraceSink

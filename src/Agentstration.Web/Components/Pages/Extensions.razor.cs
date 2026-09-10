@@ -181,7 +181,7 @@ public partial class Extensions
         finally { savingEnrollmentSettings = false; }
     }
 
-    private async Task CopyAndOpenAsync(AepEnrollmentRequestResource enrollment)
+    private async Task EnrollAsync(AepEnrollmentRequestResource enrollment)
     {
         pairingBusy = true;
         error = null;
@@ -195,7 +195,18 @@ public partial class Extensions
             activePairingExpiry = result.ExpiresAt;
             activePairingUri = pairingUri;
             activeEnrollmentId = enrollment.Definition.InstanceId;
-            clipboardFallback = !await JavaScript.InvokeAsync<bool>("agentstrationEnrollment.copyAndOpen", cancellation.Token, result.Code, pairingUri.AbsoluteUri);
+            var opened = await JavaScript.InvokeAsync<bool>(
+                "agentstrationEnrollment.postAndOpen",
+                cancellation.Token,
+                result.Code,
+                pairingUri.AbsoluteUri);
+            clipboardFallback = !opened;
+            if (opened)
+            {
+                activePairingCode = null;
+                activePairingExpiry = null;
+                activePairingUri = null;
+            }
             await LoadAsync();
         }
         catch (JSException) { clipboardFallback = true; }
