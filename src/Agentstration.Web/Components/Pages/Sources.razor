@@ -85,7 +85,7 @@ else if (detail is null)
                     <Row Context="item"><tr>
                         <td><a class="resource-name-link" href="@SourceUrl(item)">@item.Source.Configuration.Definition.DisplayName</a><br /><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></td>
                         <td><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" Compact /></td>
-                        <td><span class="source-origin" title="@Origin(item)">@Origin(item)</span></td>
+                        <td>@if (item.Source.Configuration.Definition.Origin is { } origin) { <a class="text-link source-origin" href="@origin.Url" target="_blank" rel="noopener noreferrer" title="@origin.Url">@origin.Url</a> } else { <span class="source-origin">@T("PastedManifest")</span> }</td>
                         <td><strong>@(item.LatestVersion?.Definition.Version ?? "—")</strong><br /><small>@item.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g") · @F("VersionCount", item.Source.VersionCount)</small></td>
                         <td><StatusBadge Text="@ImportOutcome(item.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(item) ? UiStatus.Success : UiStatus.Danger)" /></td>
                         <td><a class="text-link" href="@SourceUrl(item)">@T("Open") →</a></td>
@@ -124,6 +124,16 @@ else
         <article class="panel">
             <div class="panel-header"><div><p class="eyebrow">@T("PublishedIdentity")</p><h2>@T("Publisher")</h2></div></div>
             <dl class="resource-details"><dt>@T("Declared")</dt><dd>@PublisherLabel(detail.Verification.DeclaredPublisher)</dd><dt>@T("Verified")</dt><dd>@(detail.Verification.VerifiedPublisher is null ? T("NotVerified") : PublisherLabel(detail.Verification.VerifiedPublisher))</dd><dt>@T("ManifestDigest")</dt><dd><code>@Short(detail.SelectedVersion.Definition.ManifestDigest)</code></dd></dl>
+        </article>
+        <article class="panel">
+            <div class="panel-header"><div><p class="eyebrow">@T("SourceActivity")</p><h2>@T("ImportStatus")</h2><p>@T("ImportStatusDescription")</p></div><StatusBadge Text="@ImportOutcome(detail.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(detail.Source) ? UiStatus.Success : UiStatus.Danger)" /></div>
+            <dl class="resource-details">
+                <dt>@T("Origin")</dt><dd>@if (detail.Source.Configuration.Definition.Origin is { } sourceOrigin) { <a class="text-link detail-origin" href="@sourceOrigin.Url" target="_blank" rel="noopener noreferrer">@sourceOrigin.Url</a> } else { @T("PastedManifest") }</dd>
+                <dt>@T("SelectedVersion")</dt><dd><button class="text-button version-link" type="button" @onclick="() => activeTab = PageTab.Versions">@detail.SelectedVersion.Definition.Version</button> <code>@Short(detail.SelectedVersion.Definition.ManifestDigest)</code></dd>
+                <dt>@T("LastSuccessfulImport")</dt><dd>@LastSuccessfulImport()</dd>
+                <dt>@T("LastAttempt")</dt><dd>@detail.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g")</dd>
+            </dl>
+            @if (detail.Source.Observed.Definition.ErrorMessage is { } importError) { <p class="inline-warning">@importError</p> }
         </article>
         @{ var nextRefresh = NextRefresh(); }
         <article class="panel refresh-overview-panel">
@@ -219,8 +229,17 @@ else
         @foreach (var channel in DisplayedChannels)
         {
             <article class="channel-card">
-                <header><div>@if (detail.Channels.Count > 1) { <label class="channel-selector"><span>@T("Channel")</span><select value="@selectedChannelName" @onchange="SelectChannel" aria-label="@T("SelectChannel")">@foreach (var option in detail.Channels) { <option value="@option.Definition.Name">@option.Definition.Name</option> }</select></label> } else { <h3>@channel.Definition.Name</h3> }<p><code>@channel.Definition.Provider.Binding</code> · @channel.Definition.Configuration.OptionSet@@@channel.Definition.Configuration.Version</p></div><div class="channel-actions"><StatusBadge Text="@CompatibilityLabel(channel.Status.Compatibility.Status)" Status="@CompatibilityTone(channel.Status.Compatibility.Status)" /><button class="button-secondary" disabled="@(busy || channel.Status.Compatibility.Status != SourceChannelCompatibilityStatus.Compatible || !detail.Bindings.Ready)" @onclick="() => RefreshChannelAsync(channel.Definition.Name)">@T("RefreshChannel")</button></div></header>
-                <dl class="resource-details"><dt>@T("LastRefresh")</dt><dd>@(channel.Status.Refresh is null ? T("Never") : channel.Status.Refresh.Definition.LastAttemptAt.ToLocalTime().ToString("g"))</dd><dt>@T("Result")</dt><dd>@(channel.Status.Refresh is null ? "—" : RefreshOutcome(channel.Status.Refresh.Definition.LastOutcome))</dd><dt>@T("Snapshot")</dt><dd>@(channel.Status.Refresh?.Definition.CurrentSnapshotUid?.ToString("D") ?? "—")</dd><dt>@T("Verified")</dt><dd>@(channel.Verification is null ? "—" : VerificationLabel(channel.Verification.Status))</dd></dl>
+                <header><div>@if (detail.Channels.Count > 1) { <label class="channel-selector"><span>@T("Channel")</span><select value="@selectedChannelName" @onchange="SelectChannel" aria-label="@T("SelectChannel")">@foreach (var option in detail.Channels) { <option value="@option.Definition.Name">@option.Definition.Name</option> }</select></label> } else { <h3>@channel.Definition.Name</h3> }<p>@F("ChannelContract", channel.Definition.Provider.Binding, channel.Definition.Configuration.OptionSet, channel.Definition.Configuration.Version)</p></div><div class="channel-actions"><StatusBadge Text="@CompatibilityLabel(channel.Status.Compatibility.Status)" Status="@CompatibilityTone(channel.Status.Compatibility.Status)" /><button class="button-secondary" disabled="@(busy || channel.Status.Compatibility.Status != SourceChannelCompatibilityStatus.Compatible || !detail.Bindings.Ready)" @onclick="() => RefreshChannelAsync(channel.Definition.Name)">@T("RefreshChannel")</button></div></header>
+                <dl class="resource-details channel-details">
+                    <dt>@T("Provider")</dt><dd>@if (channel.CurrentSnapshot is { } providerSnapshot) { <a class="text-link" href="@SourceProviderUrl(providerSnapshot.Definition.Provider)">@providerSnapshot.Definition.Provider.Namespace/@providerSnapshot.Definition.Provider.Name</a><small>@F("ProviderGeneration", providerSnapshot.Definition.Provider.ContributionId, providerSnapshot.Definition.Provider.Generation)</small> } else { @T("PendingMaterialization") }</dd>
+                    <dt>@T("Compatibility")</dt><dd>@CompatibilityLabel(channel.Status.Compatibility.Status)</dd>
+                    <dt>@T("LastAttempt")</dt><dd>@(channel.Status.Refresh is null ? T("Never") : channel.Status.Refresh.Definition.LastAttemptAt.ToLocalTime().ToString("g"))</dd>
+                    <dt>@T("Result")</dt><dd>@(channel.Status.Refresh is null ? "—" : RefreshOutcome(channel.Status.Refresh.Definition.LastOutcome))</dd>
+                    <dt>@T("ResolvedRevision")</dt><dd><code>@(channel.CurrentSnapshot is null ? "—" : channel.CurrentSnapshot.Definition.ResolvedRevision)</code></dd>
+                    <dt>@T("Snapshot")</dt><dd>@if (channel.CurrentSnapshot is { } currentSnapshot) { <code>@currentSnapshot.Uid.ToString("D")</code><small>@Short(currentSnapshot.Definition.Artifact.Sha256)</small> } else { <text>—</text> }</dd>
+                    <dt>@T("Verified")</dt><dd>@(channel.Verification is null ? "—" : VerificationLabel(channel.Verification.Status))</dd>
+                </dl>
+                @if (channel.Status.Compatibility.Status != SourceChannelCompatibilityStatus.Compatible && channel.Status.Compatibility.Reason is { } compatibilityReason) { <p class="inline-warning">@RefreshError(channel.Status.Compatibility.ReasonCode, compatibilityReason)</p> }
                 @if (channel.Status.Refresh?.Definition.ErrorMessage is { } refreshError) { <p class="inline-warning">@RefreshError(channel.Status.Refresh.Definition.ErrorCode, refreshError)</p> }
                 @if (channel.CatalogFailure is { } catalogFailure)
                 {
@@ -231,7 +250,7 @@ else
                 }
                 @if (channel.Catalogs.Count > 0)
                 {
-                    <div class="catalog-toolbar"><h4>@T("Catalogs")</h4><label><span>@T("ContentLanguage")</span><select value="@catalogLocale" @onchange="ChangeLocaleAsync"><option value="en-US">English</option><option value="fr-FR">Français</option><option value="neutral">@T("Neutral")</option></select></label></div>
+                    <div class="catalog-toolbar"><h4>@T("Catalogs")</h4><label><span>@T("ContentLanguage")</span><select value="@catalogLocale" @onchange="ChangeLocaleAsync">@foreach (var locale in AvailableCatalogLocales(channel)) { <option value="@locale">@LocaleLabel(channel, locale)</option> }</select></label></div>
                     @foreach (var catalog in channel.Catalogs)
                     {
                         <section class="catalog-card"><div><strong>@catalog.DisplayName</strong><small><code>@catalog.Provenance.CatalogKind/@catalog.Provenance.CatalogName</code> · @catalog.Provenance.CatalogPath</small>@if (catalog.Description is not null) { <p>@catalog.Description</p> }</div>
@@ -314,7 +333,9 @@ else
     private RefreshPolicyForm sourceRefresh = new();
     private RefreshPolicyForm channelRefresh = new();
     private readonly Dictionary<string, RefreshPolicyForm> channelRefreshOverrides = new(StringComparer.Ordinal);
-    private string catalogLocale = CultureInfo.CurrentUICulture.Name is "fr-FR" ? "fr-FR" : "en-US";
+    private string catalogLocale = string.IsNullOrWhiteSpace(CultureInfo.CurrentUICulture.Name)
+        ? "en-US"
+        : CultureInfo.CurrentUICulture.Name;
     private string importMode = "url";
     private string importUrl = string.Empty;
     private string importYaml = string.Empty;
@@ -537,8 +558,8 @@ else
         if (string.IsNullOrWhiteSpace(value)) { bindingSelections.Remove(binding.Name); return; }
         if (value.StartsWith("provider\n", StringComparison.Ordinal))
         {
-            var parts = value.Split('\n', 3);
-            bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, new(parts[2], ResourceScopeRef.Instance, new(parts[1])), null);
+            var parts = value.Split('\n', 4);
+            bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, new(parts[3], ResourceScopeRef.Parse(parts[1]), new(parts[2])), null);
             return;
         }
         var candidateKey = value["candidate\n".Length..];
@@ -560,18 +581,21 @@ else
         ?? ResourceScopeRef.Parse(ScopeRefValue!);
     private IEnumerable<StoredResource<SourceProviderResource>> CompatibleProviders(string targetKind) => targetKind == SourceKinds.SourceProvider ? detail!.Providers : [];
     private IEnumerable<SourceConsoleProviderCandidate> CompatibleProviderCandidates(string targetKind) => targetKind == SourceKinds.SourceProvider ? detail!.ProviderCandidates : [];
-    private static string ProviderValue(SourceProviderResource provider) => $"provider\n{provider.Namespace.Value}\n{provider.Name}";
+    private static string ProviderValue(SourceProviderResource provider) => $"provider\n{provider.ScopeRef!.Value.Value}\n{provider.Namespace.Value}\n{provider.Name}";
     private static string CandidateValue(SourceConsoleProviderCandidate candidate) => $"candidate\n{candidate.Key}";
     private string BindingValue(SourceBindingStatus binding)
     {
         if (!bindingSelections.TryGetValue(binding.Name, out var selection)) return string.Empty;
         return selection.Target is { } target
-            ? $"provider\n{target.Namespace?.Value ?? "default"}\n{target.Name}"
+            ? $"provider\n{target.ScopeRef!.Value.Value}\n{target.Namespace?.Value ?? "default"}\n{target.Name}"
             : selection.Candidate is { } candidate ? CandidateValue(candidate) : string.Empty;
     }
-    private string ConfigureProviderUrl() => $"/sourceproviders/new?returnUrl={Uri.EscapeDataString(SourceUrl(detail!.Source))}";
+    private string ConfigureProviderUrl() => $"/sourceproviders/new?scopeRef={Uri.EscapeDataString(ScopeRef().Value)}&returnUrl={Uri.EscapeDataString(SourceUrl(detail!.Source))}";
+    private static string SourceProviderUrl(SourceProviderSnapshotIdentity provider) =>
+        $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace.Value)}&scopeRef={Uri.EscapeDataString(provider.ScopeRef.Value)}";
     private static string Short(string value) => value.Length <= 14 ? value : value[..14];
-    private static bool IsHealthy(SourceConsoleListItem source) => source.Source.Observed.Definition.LastOutcome != SourceImportOutcome.Rejected;
+    private static bool IsHealthy(SourceConsoleListItem source) => IsHealthy(source.Source);
+    private static bool IsHealthy(SourceView source) => source.Observed.Definition.LastOutcome != SourceImportOutcome.Rejected;
     private string SourceUrl(SourceConsoleListItem source) => SourceUrl(source.Source);
     private string SourceUrl(SourceView source) => $"/settings/sources/{Uri.EscapeDataString(source.Source.Definition.Publisher)}/{Uri.EscapeDataString(source.Source.Name)}?scopeRef={Uri.EscapeDataString(source.Source.ScopeRef!.Value.ToString())}";
     private string BootstrapUrl(SourceConsoleChannelView channel, SourceCatalogView catalog, SourceBootstrapEntryView entry)
@@ -580,6 +604,22 @@ else
         return "/settings/bootstrap?" + string.Join("&", query.Select(value => $"{Uri.EscapeDataString(value.Key)}={Uri.EscapeDataString(value.Value)}"));
     }
     private string Origin(SourceConsoleListItem value) => value.Source.Configuration.Definition.Origin?.Url ?? T("PastedManifest");
+    private string LastSuccessfulImport()
+    {
+        var observed = detail!.Source.Observed.Definition;
+        if (observed.LastSuccessfulAt is null || observed.LastSuccessfulVersionUid is not { } versionUid)
+            return T("Never");
+        var version = detail.Versions.SingleOrDefault(value => value.Uid == versionUid);
+        return F("SuccessfulImportValue", version?.Definition.Version ?? T("UnknownVersion"), observed.LastSuccessfulAt.Value.ToLocalTime().ToString("g"));
+    }
+    private IReadOnlyList<string> AvailableCatalogLocales(SourceConsoleChannelView channel) =>
+        SourceConsoleLocalePresentation.AvailableLocales(channel.Catalogs, catalogLocale);
+    private string LocaleLabel(SourceConsoleChannelView channel, string locale)
+    {
+        var label = locale == "neutral" ? T("Neutral") : CultureInfo.GetCultureInfo(locale).NativeName;
+        var available = SourceConsoleLocalePresentation.IsAvailable(channel.Catalogs, locale);
+        return available ? $"{label} · {locale}" : F("UnavailableLocaleFallback", label, locale);
+    }
     private static string PublisherLabel(SourcePublisher value) => value.DisplayName is null ? value.Name : $"{value.DisplayName} ({value.Name})";
     private string ImportOutcome(SourceImportOutcome value) => T($"ImportOutcome.{value}");
     private string RefreshOutcome(SourceChannelRefreshOutcome value) => T($"RefreshOutcome.{value}");

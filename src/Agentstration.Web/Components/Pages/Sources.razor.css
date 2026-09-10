@@ -18,12 +18,13 @@
 .source-table ::deep code,
 .source-table ::deep small { overflow-wrap: anywhere; }
 .source-origin { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-origin { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+.version-link { padding: 0; vertical-align: baseline; }
 .source-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .source-detail-grid > * { min-width: 0; }
 .source-detail-grid > .panel > label { display: grid; gap: .45rem; }
 .source-detail-grid > .panel > label input { width: 100%; min-width: 0; }
 .source-detail-grid .resource-details dd { min-width: 0; overflow-wrap: anywhere; }
-.refresh-overview-panel { grid-column: 1 / -1; }
 .refresh-overview-panel .panel-header { align-items: center; }
 .refresh-overview-value { display: flex; align-items: baseline; gap: .75rem; padding: 1rem; border: 1px solid var(--border); border-radius: .8rem; background: var(--surface-2); }
 .refresh-overview-value strong { font-size: 1.15rem; }
@@ -66,6 +67,9 @@
 .channel-card > header, .channel-actions, .catalog-toolbar, .catalog-entry { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .channel-card h3, .channel-card h4 { margin: 0; }
 .channel-card header p { margin: .25rem 0 0; color: var(--muted); }
+.channel-details dd { min-width: 0; overflow-wrap: anywhere; }
+.channel-details dd small { display: block; margin-top: .2rem; color: var(--muted); }
+.channel-details dd code { overflow-wrap: anywhere; }
 .channel-selector { display: flex; align-items: center; gap: .65rem; }
 .channel-selector > span { color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .channel-selector select { width: auto; min-width: 10rem; font-weight: 650; }
