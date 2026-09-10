@@ -142,6 +142,10 @@ jobs:
       - name: Test Agentstration
         if: needs.changes.outputs.dotnet == 'true'
         run: dotnet test Agentstration.slnx --configuration Release --no-build
+      - name: Smoke-test Source Registry tool package
+        if: needs.changes.outputs.dotnet == 'true'
+        shell: pwsh
+        run: ./scripts/ci/test-source-registry-tool-package.ps1 -Configuration Release -NoBuild
       - name: Build complete AEP SDK
         if: needs.changes.outputs.dotnet == 'true' && needs.changes.outputs.aep == 'true'
         run: dotnet build aep/Aep.slnx --configuration Release --no-restore

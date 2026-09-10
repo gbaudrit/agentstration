@@ -33,6 +33,7 @@ public partial class Extensions
     private IReadOnlyList<ExtensionInventoryItemResponse>? inventory;
     private IReadOnlyList<ExtensionRegistrationResource>? registrations;
     private IReadOnlyList<AepEnrollmentRequestResource>? enrollments;
+    private IReadOnlyList<SourceProviderSummaryResponse> sourceProviders = [];
     private AepEnrollmentSettingsSnapshot? enrollmentSettings;
     private bool pairingCodeEnabled;
     private bool sharedKeyFileEnabled;
@@ -133,11 +134,15 @@ public partial class Extensions
             var enrollmentSettingsTask = CanAdministerEnrollments
                 ? GetEnrollmentSettingsAsync()
                 : Task.FromResult<AepEnrollmentSettingsSnapshot?>(null);
-            await Task.WhenAll(inventoryTask, registrationsTask, enrollmentsTask, enrollmentSettingsTask);
+            var sourceProvidersClient = Services.GetService(typeof(ISourceProvidersClient)) as ISourceProvidersClient;
+            var sourceProvidersTask = sourceProvidersClient?.GetSourceProvidersAsync(cancellation.Token)
+                ?? Task.FromResult<IReadOnlyList<SourceProviderSummaryResponse>>([]);
+            await Task.WhenAll(inventoryTask, registrationsTask, enrollmentsTask, enrollmentSettingsTask, sourceProvidersTask);
             inventory = await inventoryTask;
             registrations = await registrationsTask;
             enrollments = await enrollmentsTask;
             enrollmentSettings = await enrollmentSettingsTask;
+            sourceProviders = await sourceProvidersTask;
             if (enrollmentSettings is { } settings)
             {
                 pairingCodeEnabled = settings.PairingCodeEnabled;
@@ -445,6 +450,16 @@ public partial class Extensions
     private static string ContributionSummary(ExtensionInventoryItemResponse item) => item.Extension?.Contributions.Count > 0
         ? string.Join(", ", item.Extension.Contributions.Select(value => $"{value.Kind}:{value.Id}"))
         : "—";
+    private IReadOnlyList<SourceProviderSummaryResponse> SourceProviders(ExtensionInventoryItemResponse item) =>
+        item.RegistrationName is null
+            ? []
+            : sourceProviders.Where(provider =>
+                provider.ExtensionNamespace == item.RegistrationNamespace
+                && provider.ExtensionName == item.RegistrationName).ToArray();
+    private static string SourceProviderUrl(SourceProviderSummaryResponse provider) =>
+        $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+    private static string ConfigureSourceProviderUrl(ExtensionInventoryItemResponse item, ExtensionContributionResponse contribution) =>
+        $"/sourceproviders/new?extension={Uri.EscapeDataString(item.RegistrationName!)}&extensionNamespace={Uri.EscapeDataString(item.RegistrationNamespace)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(item.DisplayName)}";
     private static string DetailUrl(ExtensionInventoryItemResponse item) => item.RegistrationName is not null
         ? $"/extensions/{Uri.EscapeDataString(item.RegistrationName)}?namespace={Uri.EscapeDataString(item.RegistrationNamespace)}"
         : $"/extensions/enrollment/{item.EnrollmentInstanceId:D}";

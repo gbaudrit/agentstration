@@ -249,7 +249,28 @@ public sealed class ExtensionsConsoleTests
         });
     }
 
-    private sealed class FakeExtensionsClient(bool configured, AepEnrollmentSettingsSnapshot? settings = null, bool completesPairing = false) : IExtensionsClient
+    [TestMethod]
+    public async Task SourceProviderContributionOffersExplicitConfigurationFromInventory()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false, source: true));
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton<ISourceProvidersClient>(new FakeSourceProvidersClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            var action = rendered.Find(".inventory-contribution-actions a.text-button");
+            Assert.AreEqual("Configure Source provider git", action.TextContent.Trim());
+            StringAssert.StartsWith(action.GetAttribute("href"), "/sourceproviders/new?");
+        });
+    }
+
+    private sealed class FakeExtensionsClient(bool configured, AepEnrollmentSettingsSnapshot? settings = null, bool completesPairing = false, bool source = false) : IExtensionsClient
     {
         private readonly Guid enrollmentId = Guid.NewGuid();
         private bool codeRotated;
@@ -271,7 +292,7 @@ public sealed class ExtensionsConsoleTests
                 "registration:default/llama-cpp-local",
                 extension.RegistrationName,
                 extension.RegistrationNamespace,
-                null,
+                source ? ResourceScopeRef.Instance : null,
                 enrollmentId,
                 extension.Extension!.Name,
                 extension.Extension.Id,
@@ -286,7 +307,7 @@ public sealed class ExtensionsConsoleTests
                 [new ExtensionInventoryConnectionResponse(
                     extension.RegistrationName,
                     extension.RegistrationNamespace,
-                    null,
+                    source ? ResourceScopeRef.Instance : null,
                     extension.Extension.Name,
                     extension.Endpoint,
                     extension.DiscoverySource,
@@ -301,7 +322,7 @@ public sealed class ExtensionsConsoleTests
             new Uri("http://localhost:5270/"),
             "available",
             new ExtensionIdentityResponse("Agentstration.Extensions.LlamaCpp", "llama.cpp", "1.0.0", "Local provider"),
-            [new ExtensionContributionResponse("model-provider", "llama.cpp")],
+            [new ExtensionContributionResponse(source ? "source-provider" : "model-provider", source ? "git" : "llama.cpp")],
             [],
             [],
             configured ? [new ExtensionProviderBindingResponse("llama-cpp-local", "default", "llama.cpp")] : [],
@@ -399,5 +420,17 @@ public sealed class ExtensionsConsoleTests
         public Task<ModelProfileResolutionResponse> GetModelProfileResolutionAsync(string profileName, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeSourceProvidersClient : ISourceProvidersClient
+    {
+        public Task<IReadOnlyList<SourceProviderSummaryResponse>> GetSourceProvidersAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<SourceProviderSummaryResponse>>([]);
+        public Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<SourceProviderResource>> CreateSourceProviderAsync(CreateSourceProviderRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<SourceProviderResource>> UpdateSourceProviderAsync(ResourceNamespace @namespace, string name, PutSourceProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteSourceProviderAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<SourceProviderStatusResponse> GetStatusAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<SourceProviderUsagesResponse> GetUsagesAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

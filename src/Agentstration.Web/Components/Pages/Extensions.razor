@@ -227,7 +227,29 @@
                 <td><a href="@item.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@item.Endpoint</a><br /><small>@SourceLabel(item.RegistrationSource) · @T("ConnectionCount", item.Connections.Count)@if (item.RegistrationName is not null) { <text> · @item.RegistrationNamespace/@item.RegistrationName</text> }</small></td>
                 <td><div class="enrollment-cell">@if (item.EnrollmentStatus is { } enrollmentState) { <StatusBadge Text="@EnrollmentStatusLabel(enrollmentState)" Status="@EnrollmentStatus(enrollmentState)" /> @if (CanAdministerEnrollments && CanRotate(enrollmentState) && IsPairingCode(item)) { <button class="text-button" @onclick="() => EnrollAsync(item)" disabled="@pairingBusy">@T("Enroll")</button> } } else { <span>—</span> }</div></td>
                 <td><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" /></td>
-                <td>@ContributionSummary(item)</td>
+                <td>
+                    @ContributionSummary(item)
+                    @if (item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true)
+                    {
+                        <div class="inventory-contribution-actions">
+                            @foreach (var provider in SourceProviders(item))
+                            {
+                                <a class="text-button" href="@SourceProviderUrl(provider)">@T("OpenSourceProvider", provider.Name)</a>
+                            }
+                            @if (item.RegistrationName is not null && item.RegistrationScopeRef == ResourceScopeRef.Instance)
+                            {
+                                @foreach (var contribution in item.Extension.Contributions.Where(value => value.Kind == "source-provider" && !SourceProviders(item).Any(provider => provider.ContributionId.Equals(value.Id, StringComparison.OrdinalIgnoreCase))))
+                                {
+                                    <a class="text-button" href="@ConfigureSourceProviderUrl(item, contribution)">@T("ConfigureSourceProvider", contribution.Id)</a>
+                                }
+                            }
+                            else
+                            {
+                                <span class="muted">@T("SourceProviderRequiresInstanceExtension")</span>
+                            }
+                        </div>
+                    }
+                </td>
             </tr></Row>
         </DataGrid>
     }

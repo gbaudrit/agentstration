@@ -11,10 +11,11 @@ The repository keeps reviewable governance files in Git:
 - `.github/workflows/codeql.yml` scans C# on pull requests, `main`, and a weekly schedule;
 - `.github/workflows/dependency-review.yml` blocks pull requests that introduce known vulnerabilities of moderate severity or higher;
 - `.github/workflows/release.yml` validates version tags, rebuilds and retests the product, packages the server and Workplace, and creates GitHub prereleases;
+- `.github/workflows/release-source-registry-tool.yml` independently rebuilds, tests, packages, and publishes timestamped development or version-aligned release packages of the Source Registry tool;
 - `.github/dependabot.yml` checks the root and autonomous AEP NuGet manifests plus GitHub Actions each week;
 - `.github/CODEOWNERS`, the pull request template, and issue forms provide lightweight contribution ownership and prompts;
 - `.github/rulesets/main.json` is the reproducible source definition for `main` protection;
-- `.github/labels.json` is the reproducible catalog for issue classification, priority, and agent-triage labels.
+- `.github/labels.json` is the reproducible catalog for issue classification, priority, agent-triage, and AI-defect labels.
 
 Documentation validation and publication remain independent in `documentation.yml` and `publish-documentation.yml`. Publication is manual and has the only workflow permissions needed for GitHub Pages.
 
@@ -54,6 +55,14 @@ When a maintainer supplied the complete classification and the agent only applie
 
 GitHub API clients do not execute issue forms. Automation and coding agents must therefore reproduce the selected form's required sections, labels, and ordering explicitly. Repository-wide instructions for coding agents are maintained in `AGENTS.md`.
 
+## AI defect learning
+
+The `ai-defect` label marks a structural, architectural, behavioral, or code-quality defect introduced by an AI-generated or AI-assisted change. It supplements the issue's type and priority labels; it does not replace either.
+
+When an agent resolves a labeled issue, the corrective pull request must also carry `ai-defect` and add or update one [AI Defect CAR](../ai-defects/index.md). The CAR uses the issue number as its identifier and captures evidence, faulty assumptions, missed signals, safeguard gaps, the correction, prevention, and completed validation. This is distinct from an ADR: a CAR identifies and addresses the causes of a defect, while an ADR records a durable architectural decision.
+
+The pull request metadata check runs when labels change and rejects an `ai-defect` pull request that does not change a numbered CAR under `docs/ai-defects/` or link that CAR from the pull request description.
+
 ## Apply the issue label catalog
 
 GitHub stores labels remotely. Committing `.github/labels.json` documents the intended classification, priority, and agent-triage labels but does not create them by itself.
@@ -84,7 +93,7 @@ Pull requests to `main` run these workflows:
 
 | Check | Purpose | Required by the prepared ruleset |
 |---|---|---|
-| `pull-request-metadata` | Require a Conventional Commit title and the ordered Summary, Changes, Validation, and Breaking changes sections | Yes |
+| `pull-request-metadata` | Require PR metadata and an AI Defect CAR for `ai-defect` remediation | Yes |
 | `build-and-test` | Restore, Release build, tests, and changed-file formatting for Agentstration and the complete AEP solution | Yes |
 | `container` | Validate the production Docker build after code validation | No |
 | `CodeQL / C#` | Static security analysis | No; review after initial successful scans |
@@ -157,13 +166,32 @@ Docker Hub publication requires an existing `agentstration/agentstration` reposi
 - `DOCKERHUB_USERNAME`: the Docker Hub account allowed to push the repository;
 - `DOCKERHUB_TOKEN`: a scoped Docker Hub access token with write permission. Do not store an account password.
 
-For example, after the release change has merged and all required checks have passed:
+For example, after the release change has merged, the version and release notes have been advanced to a new immutable version, and all required checks have passed:
 
 ```powershell
 git switch main
 git pull --ff-only
-git tag -a v0.2.0-alpha.1 -m "Agentstration 0.2.0-alpha.1"
-git push origin v0.2.0-alpha.1
+$version = "0.2.0-alpha.2" # Example; it must match Directory.Build.props and docs/releases/$version.md.
+git tag -a "v$version" -m "Agentstration $version"
+git push origin "v$version"
 ```
 
-GitHub Actions then repeats restore, Release build, and tests; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. Alpha releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag. Correct a failed release through a reviewed commit and a new prerelease identifier.
+GitHub Actions then repeats restore, Release build, and tests; publishes framework-dependent server and Workplace ZIPs plus `SHA256SUMS`; pushes the server/Console image to Docker Hub for `linux/amd64` and `linux/arm64`; records its manifest digest; and creates a GitHub prerelease using the version-specific notes. Alpha container releases publish the immutable version tag and the moving `alpha` channel, never `latest`. Do not move or reuse a published tag. Correct a failed release through a reviewed commit and a new prerelease identifier.
+
+## Source Registry tool releases
+
+`Agentstration.SourceRegistry.Tool` deliberately shares the central product version because it implements the contracts accepted by that Agentstration release. The dedicated `release-source-registry-tool.yml` workflow has two publication paths:
+
+- a relevant push to `main` publishes a development prerelease such as `0.2.0-alpha.1.dev.20260910213045.<run-id>.<attempt>`; the UTC timestamp makes the build recognizable, while the run identity and attempt make concurrent runs and reruns unique;
+- the shared immutable `v<version>` tag publishes the exact central version. A suffix such as `-alpha.2` produces an official NuGet prerelease, while a version without a suffix produces a stable package.
+
+Both paths run the focused tests and installed-package smoke test before publication. There is no independent tool tag or version file. Development packages are CI snapshots, not release identities, and consumers must pin their full exact version.
+
+NuGet.org publication uses trusted publishing and does not use a long-lived API-key secret. The NuGet account `gbaudrit` must own `Agentstration.SourceRegistry.Tool` and configure a trusted publishing policy with:
+
+- repository owner: `gbaudrit`;
+- repository: `agentstration`;
+- workflow file: `release-source-registry-tool.yml`;
+- environment: empty, because the release job does not select a GitHub environment.
+
+The policy may remain pending until its first successful publication. Create or reactivate it before merging a change that should publish the first development package, or before pushing the shared release tag. NuGet.org uses the dedicated workflow's GitHub OIDC identity to activate and bind the policy. The package and its `SHA256SUMS` are retained as workflow artifacts, while the product workflow remains responsible for the shared GitHub Release. Package versions are immutable and must never be reused.

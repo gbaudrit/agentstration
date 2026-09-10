@@ -1,0 +1,56 @@
+@page "/sourceproviders"
+@implements IDisposable
+@inject ISourceProvidersClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SourceProvidersStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")">
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button><a class="button-primary" href="/sourceproviders/new">@T("CreateProvider")</a></Actions>
+</PageHeader>
+
+@if (loading && providers is null)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
+}
+else if (providers?.Count == 0)
+{
+    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/sourceproviders/new">@T("CreateProvider")</a></EmptyState>
+}
+else
+{
+    <DataGrid TItem="SourceProviderSummaryResponse" Items="providers ?? []">
+        <Header><tr><th>@T("Provider")</th><th>@T("Namespace")</th><th>@T("Extension")</th><th>@T("Contribution")</th><th>@T("OwnershipScope")</th><th>@T("Status")</th><th></th></tr></Header>
+        <Row Context="provider"><tr>
+            <td><a class="resource-name-link" href="@DetailsUrl(provider)">@provider.DisplayName</a><br /><code>@provider.Name</code></td>
+            <td><code>@provider.Namespace</code></td>
+            <td><a class="text-button" href="/extensions">@provider.ExtensionNamespace/@provider.ExtensionName</a></td>
+            <td><code>@provider.ContributionId</code></td>
+            <td><ResourceScopeBadge ScopeRef="@provider.ScopeRef" Compact /></td>
+            <td><StatusBadge Text="@StatusLabel(provider.Status)" Status="@ModelManagementUi.Status(provider.Status)" /></td>
+            <td><a class="text-link" href="@DetailsUrl(provider)">@T("ViewDetails") →</a></td>
+        </tr></Row>
+    </DataGrid>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<SourceProviderSummaryResponse>? providers;
+    private AgentstrationApiException? error;
+    private bool loading;
+    private string T(string key) => Localizer[key];
+    private string StatusLabel(string? value) => Localizer[$"Status.{value?.ToLowerInvariant() switch { "available" => "Available", "disabled" => "Disabled", "unavailable" => "Unavailable", "incompatible" => "Incompatible", _ => "Unknown" }}"];
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { providers = await Client.GetSourceProvidersAsync(cancellation.Token); }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private static string DetailsUrl(SourceProviderSummaryResponse provider) => $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

@@ -158,6 +158,7 @@ public static class DependencyInjection
         services.AddSingleton<PackManagementService>();
         services.AddSingleton<PackAuthoringService>();
         services.AddSingleton<PackCompositionService>();
+        services.AddSingleton<Agentstration.Management.Contracts.SourceManifestValidator>();
         services.AddSingleton<ISourceManifestReader, Agentstration.Management.Contracts.SourceManifestReader>();
         services.AddSingleton<ISourceVerificationIndexReader, Agentstration.Management.Contracts.SourceVerificationIndexReader>();
         services.AddHttpClient<ISourceManifestRetriever, HttpSourceManifestRetriever>(client =>

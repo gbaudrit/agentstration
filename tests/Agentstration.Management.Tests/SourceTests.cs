@@ -10,6 +10,7 @@ using Agentstration.Management.Core;
 using Agentstration.Management.Storage.Sqlite;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
+using Agentstration.Tools.SourceRegistry;
 using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -765,6 +766,34 @@ public sealed class SourceTests
     }
 
     [TestMethod]
+    public async Task SourceRegistryToolDigestMatchesTheImportedVersionAsync()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var system = fixture.Context.PushSystem();
+        var manifest = Manifest("1", "Name", includeChannel: true);
+        var imported = await fixture.Service.ImportYamlAsync(manifest, default);
+        var directory = Path.Combine(Path.GetTempPath(), "agentstration source registry parity", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var path = Path.Combine(directory, "source manifest.yaml");
+            await File.WriteAllTextAsync(path, manifest, new UTF8Encoding(false));
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+
+            var exitCode = await SourceRegistryCli.RunAsync(["source", "digest", path], output, error);
+
+            Assert.AreEqual(SourceRegistryCli.SuccessExitCode, exitCode);
+            Assert.AreEqual(imported.Version.Definition.ManifestDigest, output.ToString().Trim());
+            Assert.AreEqual(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public async Task HttpRetrieverStreamsWithinBoundAndRetainsValidatorsAsync()
     {
         var handler = new StubHttpHandler(_ =>
@@ -1135,6 +1164,7 @@ public sealed class SourceTests
                 null!,
                 provider.GetRequiredService<IResourceScopeResolver>()));
             collection.AddSingleton<IResourceReferenceResolver, ResourceReferenceResolver>();
+            collection.AddSingleton<SourceManifestValidator>();
             collection.AddSingleton<ISourceManifestReader, SourceManifestReader>();
             collection.AddSingleton<StubRetriever>();
             collection.AddSingleton<ISourceManifestRetriever>(provider => provider.GetRequiredService<StubRetriever>());

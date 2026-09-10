@@ -1,0 +1,16 @@
+apiVersion: agentstration.io/v1
+kind: SourceRegistry
+metadata:
+  name: agentstration-test
+definition:
+  publishers:
+    - name: agentstration
+      status: Official
+  sources:
+    - publisher: agentstration
+      name: official-samples
+      latest: "1"
+      versions:
+        - version: "1"
+          manifestUrl: valid-source.yaml
+          manifestDigest: sha256:c1668be555d07be29e7aed8b1f619bfba891ed8e90b716eb92dddf7f36aa712e

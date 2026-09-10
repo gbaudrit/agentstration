@@ -224,6 +224,40 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task SourceProvidersClientPreservesNamespaceAndETag()
+    {
+        var provider = new SourceProviderResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.SourceProvider,
+            Metadata = new ResourceMetadata { Name = "git-local", Namespace = new("platform.sources") },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new SourceProviderProperties { DisplayName = "Git", Extension = new("git-extension", ResourceScopeRef.Instance), ContributionId = "git" }
+        };
+        var requests = new List<(HttpMethod Method, string Path, string? IfMatch)>();
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.Method, request.RequestUri!.PathAndQuery, request.Headers.IfMatch.FirstOrDefault()?.ToString()));
+            var response = new HttpResponseMessage(request.Method == HttpMethod.Delete ? HttpStatusCode.NoContent : HttpStatusCode.OK);
+            if (request.Method != HttpMethod.Delete) { response.Content = JsonContent.Create(provider); response.Headers.ETag = new("\"v2\""); }
+            return response;
+        }))
+        {
+            BaseAddress = new("http://localhost/")
+        };
+        var client = new SourceProvidersApiClient(httpClient);
+
+        _ = await client.UpdateSourceProviderAsync(provider.Namespace, provider.Name, new(provider.Definition), "\"v1\"", default);
+        await client.DeleteSourceProviderAsync(provider.Namespace, provider.Name, "\"v2\"", default);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            (HttpMethod.Put, "/api/sourceproviders/git-local?resourceNamespace=platform.sources", "\"v1\""),
+            (HttpMethod.Delete, "/api/sourceproviders/git-local?resourceNamespace=platform.sources", "\"v2\"")
+        }, requests);
+    }
+
+    [TestMethod]
     public async Task ModelManagementClientsPreserveNamespaceInResourceRequests()
     {
         var requests = new List<string>();

@@ -92,6 +92,13 @@
     justify-content: flex-start;
 }
 
+.inventory-contribution-actions {
+    display: grid;
+    gap: 4px;
+    margin-top: var(--space-2);
+    font-size: .75rem;
+}
+
 .enrollment-scope {
     max-width: none;
 }
