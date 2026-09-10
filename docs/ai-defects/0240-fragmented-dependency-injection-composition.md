@@ -2,13 +2,13 @@
 
 ## Status
 
-Open — 2026-09-10
+Prevented — 2026-09-10
 
 ## References
 
 - Issue: #240
 - Introducing change: #30 for the duplicate Runtime execution-scope registration; broader composition growth spans multiple changes
-- Corrective pull request: Pending
+- Corrective pull request: #241
 - Related ADRs: ADR-0001, ADR-0032
 
 ## Defect
@@ -106,5 +106,11 @@ registrations belong and when `TryAdd`, `Replace`, or repeated `Add` is valid.
 ## Validation
 
 - Static diff and whitespace validation completed.
-- .NET restore, build, and MSTest validation pending in GitHub Actions because
-  the local execution environment does not provide the .NET SDK.
+- GitHub Actions CI run 506 passed formatting verification, the complete
+  Agentstration build, the MSTest suite, the Source Registry package smoke
+  test, PostgreSQL migration/restart and concurrency validation, the container
+  build, and Windows host lifecycle validation.
+- Dependency Review run 380, Documentation run 336, and CodeQL run 502 passed.
+- The local execution environment did not provide the .NET SDK; all .NET
+  validation was therefore executed by GitHub Actions against pull request
+  #241.
