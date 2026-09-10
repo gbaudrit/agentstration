@@ -4,7 +4,7 @@ Run these commands from the repository root. Only one provider topology should r
 
 ## SQLite
 
-Minimal deterministic topology:
+Canonical deterministic extension topology without inference servers:
 
 ```powershell
 docker compose -f deploy/compose/base.yml up -d --build --remove-orphans
@@ -41,7 +41,7 @@ Create the ignored environment file once, then replace its disposable developmen
 Copy-Item deploy/compose/.env.postgresql.example deploy/compose/.env.postgresql
 ```
 
-Minimal deterministic topology:
+Canonical deterministic extension topology:
 
 ```powershell
 docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/base.yml -f deploy/compose/postgresql.yml up -d --build --remove-orphans

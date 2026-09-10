@@ -31,7 +31,7 @@ The same `Agentstration.Web` process is the authoritative server for Console and
 
 ## Run with Compose
 
-All Compose definitions live under `deploy/compose`. The colocated [Compose command reference](../../deploy/compose/README.md) provides copy-ready SQLite, PostgreSQL, model-management, log, and shutdown commands. The `base.yml` topology remains a minimal deterministic launch. Choose one provider-specific topology to run its AEP extension together with the Utilities extension.
+All Compose definitions live under `deploy/compose`. The colocated [Compose command reference](../../deploy/compose/README.md) provides copy-ready SQLite, PostgreSQL, model-management, log, and shutdown commands. The `base.yml` topology retains the canonical deterministic extension launch without inference servers. Choose one provider-specific topology to run its inference service, AEP extension, and Utilities extension with isolated SharedKeyFile credentials.
 
 For a container-owned Ollama instance:
 
@@ -86,7 +86,7 @@ The default images are CPU-capable. GPU variants require the corresponding devic
 
 ### PostgreSQL variants
 
-The shared `postgresql.yml` overlay can be combined with the minimal or any provider-specific topology. Create its ignored environment file once and replace the disposable password:
+The shared `postgresql.yml` overlay can be combined with the base or any provider-specific topology. Create its ignored environment file once and replace the disposable password:
 
 ```powershell
 Copy-Item deploy/compose/.env.postgresql.example deploy/compose/.env.postgresql
