@@ -1517,7 +1517,8 @@ public sealed class SourceTests
             if (Content is null)
                 throw new SourceRetrievalException("not_configured", "No test HTTP source is configured.");
             return Task.FromResult(new RetrievedSourceManifest(NotModified ? string.Empty : Content,
-                previousOrigin ?? new SourceManifestOrigin { Url = source.AbsoluteUri }) { NotModified = NotModified });
+                previousOrigin ?? new SourceManifestOrigin { Url = source.AbsoluteUri })
+            { NotModified = NotModified });
         }
     }
 
