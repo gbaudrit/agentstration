@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
+using Agentstration.Flow.Storage.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
@@ -164,8 +165,57 @@ public sealed class ManagedFlowOrchestrationEngine(
     }
 }
 
-public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore store) : IFlowResourceReferenceResolver
+public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore store, IFlowRepository flows) : IFlowResourceReferenceResolver
 {
     public async Task<bool> ExistsAsync(string resourceId, CancellationToken cancellationToken) =>
         await store.GetAsync<AgentResource>(new ResourceKey(ResourceKinds.Agent, resourceId), cancellationToken) is not null;
+
+    public async Task<ResolvedFlowCall?> ResolveFlowAsync(
+        WorkspaceId workspaceId,
+        ResourceNamespace ownerNamespace,
+        FlowCallReference reference,
+        CancellationToken cancellationToken)
+    {
+        var id = reference.Resolve(ownerNamespace);
+        var version = reference.Version;
+        if (reference.VersionStrategy == FlowCallVersionStrategy.Active)
+        {
+            var current = await flows.GetAsync(workspaceId, id, cancellationToken);
+            if (current is null || !current.Value.Enabled || current.Value.ActiveVersion is null) return null;
+            version = current.Value.ActiveVersion;
+        }
+        else if (string.IsNullOrWhiteSpace(version))
+        {
+            return null;
+        }
+
+        var published = await flows.GetVersionAsync(workspaceId, id, version, cancellationToken);
+        return published is null
+            ? null
+            : new ResolvedFlowCall(id, published.Value.Version, published.Value.Graph?.InputSchema, published.Value.Graph?.OutputSchema);
+    }
+
+    public async Task<bool> CreatesFlowCycleAsync(
+        WorkspaceId workspaceId,
+        FlowId ownerFlowId,
+        ResolvedFlowCall target,
+        CancellationToken cancellationToken)
+    {
+        var pending = new Queue<(FlowId Id, string Version)>();
+        var visited = new HashSet<(FlowId Id, string Version)>();
+        pending.Enqueue((target.FlowId, target.Version));
+        while (pending.TryDequeue(out var current))
+        {
+            if (current.Id == ownerFlowId) return true;
+            if (!visited.Add(current)) continue;
+            var published = await flows.GetVersionAsync(workspaceId, current.Id, current.Version, cancellationToken);
+            if (published?.Value.Graph is null) continue;
+            foreach (var call in published.Value.Graph.Steps.OfType<FlowCallStepDefinition>())
+            {
+                var resolved = await ResolveFlowAsync(workspaceId, current.Id.Namespace, call.Flow, cancellationToken);
+                if (resolved is not null) pending.Enqueue((resolved.FlowId, resolved.Version));
+            }
+        }
+        return false;
+    }
 }

@@ -35,6 +35,7 @@ public sealed record WorkSummary(Guid Id, string Title, string Type, string Stat
 public sealed record FlowSummary(string Id, string Name, string Kind, string Version, string Status, int Steps, int ActiveExecutions, DateTimeOffset UpdatedAt)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public string? ActiveVersion { get; init; }
     public string DetailsUrl => ConsoleResourceUrls.Flow(new FlowId(Id, Namespace));
 }
 

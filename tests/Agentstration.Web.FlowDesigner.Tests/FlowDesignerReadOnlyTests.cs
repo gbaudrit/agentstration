@@ -6,6 +6,7 @@ using Agentstration.Resources;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.Components;
 using Agentstration.Web.FlowDesigner.State;
+using AngleSharp.Dom;
 using Blazor.Diagrams.Core.Geometry;
 using Bunit;
 using Bunit.JSInterop;
@@ -76,22 +77,60 @@ public sealed class FlowDesignerReadOnlyTests
         Assert.AreEqual("2 agents disponibles. Les routes sont explicites et restent des références immuables après publication.", strings["AvailableAgents.Many", 2].Value);
     }
 
+    [TestMethod]
+    public void EditablePaletteUsesOneGenericFlowCardAndShowsTheSelectedContract()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "parent"));
+        IElement[] cards = [];
+        rendered.WaitForAssertion(() =>
+        {
+            cards = rendered.FindAll(".step-palette button").Where(button => button.TextContent.Trim().EndsWith("Flow", StringComparison.Ordinal)).ToArray();
+            Assert.HasCount(1, cards);
+        });
+        cards[0].Click();
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Markup, "Called Flow");
+            StringAssert.Contains(rendered.Markup, "article");
+            StringAssert.Contains(rendered.Markup, "summary");
+        });
+    }
+
     private sealed class ResourceProviderStub : IFlowDesignerResourceProvider
     {
         public Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FlowDesignerAgent>>([]);
+        public Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<FlowDesignerFlow>>([new("analysis", "News analysis", new("pack.news"), "2.0.0")]);
+        public Task<IReadOnlyList<FlowDesignerFlowVersion>> GetFlowVersionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<FlowDesignerFlowVersion>>([new("2.0.0",
+                JsonSerializer.SerializeToElement(new { type = "object", properties = new { article = new { type = "string" } } }),
+                JsonSerializer.SerializeToElement(new { type = "object", properties = new { summary = new { type = "string" } } }))]);
     }
 
     private sealed class BackendStub : IFlowDesignerBackend
     {
+        private readonly bool readOnly;
         private readonly FlowDraftResponse draft = CreateDraft();
+        public BackendStub(bool readOnly = true) => this.readOnly = readOnly;
         public int SaveCount { get; private set; }
         public FlowDesignerTarget? LoadedTarget { get; private set; }
         public Task<FlowDesignerLoadResult> LoadAsync(FlowDesignerTarget target, CancellationToken cancellationToken)
         {
             LoadedTarget = target;
             var value = draft.Value;
-            return Task.FromResult(new FlowDesignerLoadResult(new(value.FlowId, value.DisplayName, value.Description, value.Tags, value.Definition), "entryStep: input", PublishedVersion: "2.1.0"));
+            return Task.FromResult(new FlowDesignerLoadResult(new(value.FlowId, value.DisplayName, value.Description, value.Tags, value.Definition), "entryStep: input", ETag: readOnly ? null : draft.ETag, PublishedVersion: readOnly ? "2.1.0" : null));
         }
         public Task<FlowSourceResponse> GetSourceAsync(FlowDesignerTarget target, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowDraftResponse> SaveDraftAsync(FlowDesignerTarget target, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) { SaveCount++; return Task.FromResult(draft); }
