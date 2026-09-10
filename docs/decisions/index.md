@@ -124,3 +124,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 92. [ADR-0092 — Pair manually hosted AEP extensions with workspace-bound codes](0092-pair-aep-extensions-with-workspace-bound-codes.md)
 93. [ADR-0093 — AEP enrollment lifecycle is explicit and audited](0093-aep-enrollment-lifecycle-is-explicit-and-audited.md)
 94. [ADR-0094 — AEP extensions initiate enrollment](0094-aep-extensions-initiate-enrollment.md)
+95. [ADR-0095 — Source Pack installation reuses the Pack lifecycle](0095-source-pack-installation-reuses-pack-lifecycle.md)

@@ -196,6 +196,7 @@ public static class DependencyInjection
         services.AddSingleton(new SourceMaterializationLimits());
         services.AddSingleton<SourceChannelSnapshotService>();
         services.AddSingleton<SourceCatalogService>();
+        services.AddSingleton<SourcePackInstallationService>();
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();

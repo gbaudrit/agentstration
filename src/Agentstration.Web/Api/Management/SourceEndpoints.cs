@@ -14,8 +14,11 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         var sources = group.MapGroup("/sources").RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         sources.MapPost("/imports/yaml", ImportYamlAsync);
         sources.MapPost("/imports/url", ImportUrlAsync);
+        sources.MapPost("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/pack-catalogs/{catalog}/entries/{entry}/preview", PreviewPackAsync);
+        sources.MapPost("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/pack-catalogs/{catalog}/entries/{entry}/install", InstallPackAsync);
         sources.MapGet("", ListAsync);
         sources.MapGet("/{publisher}/{name}", GetAsync);
+        sources.MapDelete("/{publisher}/{name}", DeleteAsync);
         sources.MapGet("/{publisher}/{name}/versions", ListVersionsAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}", GetVersionAsync);
         sources.MapGet("/{publisher}/{name}/versions/{versionUid:guid}/verification", GetVersionVerificationAsync);
@@ -69,6 +72,70 @@ internal sealed class SourceEndpoints : IManagementEndpoint
     private static Task<IResult> ListAsync(SourceManagementService service, CancellationToken cancellationToken) =>
         ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.ListAsync(cancellationToken)));
 
+    private static Task<IResult> PreviewPackAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channel,
+        Guid snapshotUid,
+        string catalog,
+        string entry,
+        string? scopeRef,
+        SourcePackPreviewRequest request,
+        SourceManagementService sources,
+        SourcePackInstallationService service,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.PreviewAsync(
+            new(
+                await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
+                publisher,
+                name,
+                versionUid,
+                channel,
+                snapshotUid,
+                catalog,
+                entry),
+            request.Bindings ?? [],
+            request.ReplaceExisting,
+            new PackRemovalOptions(),
+            cancellationToken)));
+
+    private static Task<IResult> InstallPackAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channel,
+        Guid snapshotUid,
+        string catalog,
+        string entry,
+        string? scopeRef,
+        SourcePackInstallRequest request,
+        HttpResponse response,
+        SourceManagementService sources,
+        SourcePackInstallationService service,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var installed = await service.InstallAsync(
+                new(
+                    await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
+                    publisher,
+                    name,
+                    versionUid,
+                    channel,
+                    snapshotUid,
+                    catalog,
+                    entry),
+                request.ExpectedPreviewDigest,
+                request.ReplaceExisting,
+                request.Bindings ?? [],
+                new PackRemovalOptions(),
+                cancellationToken);
+            response.Headers.ETag = installed.ETag;
+            response.Headers.Location = $"/api/packs/{Uri.EscapeDataString(installed.Value.Definition.Publisher)}/{Uri.EscapeDataString(installed.Value.Definition.PackName)}";
+            return Results.Created(response.Headers.Location, installed.Value);
+        });
+
     private static Task<IResult> GetAsync(
         string publisher,
         string name,
@@ -80,6 +147,26 @@ internal sealed class SourceEndpoints : IManagementEndpoint
                 ? service.GetExactAsync(scope, publisher, name, cancellationToken)
                 : service.GetAsync(publisher, name, cancellationToken))
             ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)))));
+
+    private static Task<IResult> DeleteAsync(
+        string publisher,
+        string name,
+        string? scopeRef,
+        HttpRequest request,
+        SourceManagementService service,
+        CancellationToken cancellationToken) =>
+        ManagementHttp.ExecuteAsync(async () =>
+        {
+            var ifMatch = ManagementHttp.IfMatch(request)
+                ?? throw new ControlPlaneConcurrencyException("Deleting a Source requires If-Match.");
+            await service.DeleteExactAsync(
+                await ResolveScopeAsync(scopeRef, publisher, name, service, cancellationToken),
+                publisher,
+                name,
+                ifMatch,
+                cancellationToken);
+            return Results.NoContent();
+        });
 
     private static Task<IResult> ListVersionsAsync(
         string publisher,

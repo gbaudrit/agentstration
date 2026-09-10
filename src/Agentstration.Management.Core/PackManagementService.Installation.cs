@@ -50,16 +50,25 @@ public sealed partial class PackManagementService
         bool replaceExisting,
         IReadOnlyList<PackBindingSelection> bindings,
         PackRemovalOptions removalOptions,
+        CancellationToken cancellationToken) =>
+        await InstallAsync(archive, replaceExisting, bindings, removalOptions, null, cancellationToken);
+
+    public async Task<StoredResource<InstalledPackResource>> InstallAsync(
+        PackArchive archive,
+        bool replaceExisting,
+        IReadOnlyList<PackBindingSelection> bindings,
+        PackRemovalOptions removalOptions,
+        SourcePackProvenance? sourceProvenance,
         CancellationToken cancellationToken)
     {
         if (scopeOperations is null)
-            return await InstallCoreAsync(archive, replaceExisting, bindings, removalOptions, null, cancellationToken);
+            return await InstallCoreAsync(archive, replaceExisting, bindings, removalOptions, sourceProvenance, null, cancellationToken);
         var targetScopeRef = scopeOperations.TargetScopeRef(archive.Manifest.Definition.TargetScope);
         return await scopeOperations.WriteAsync(
             ResourceKinds.InstalledPack,
             targetScopeRef,
             AuthorizationPermissions.ResourcesWrite,
-            token => InstallCoreAsync(archive, replaceExisting, bindings, removalOptions, targetScopeRef, token),
+            token => InstallCoreAsync(archive, replaceExisting, bindings, removalOptions, sourceProvenance, targetScopeRef, token),
             cancellationToken);
     }
 
@@ -68,6 +77,7 @@ public sealed partial class PackManagementService
         bool replaceExisting,
         IReadOnlyList<PackBindingSelection> bindings,
         PackRemovalOptions removalOptions,
+        SourcePackProvenance? sourceProvenance,
         ResourceScopeRef? targetScopeRef,
         CancellationToken cancellationToken)
     {
@@ -79,7 +89,7 @@ public sealed partial class PackManagementService
         if (prepared.Preview.AlreadyInstalled)
         {
             if (!replaceExisting) throw new PackAlreadyInstalledException(identity);
-            return await UpdateInstallationAsync(archive, prepared, removalOptions, cancellationToken);
+            return await UpdateInstallationAsync(archive, prepared, removalOptions, sourceProvenance, cancellationToken);
         }
 
         var @namespace = identity.Namespace;
@@ -114,6 +124,7 @@ public sealed partial class PackManagementService
                 Description = archive.Manifest.Metadata.Description,
                 Source = archive.Source,
                 SourceArtifact = sourceArtifact,
+                SourceProvenance = sourceProvenance,
                 InstalledAt = now,
                 State = InstalledPackState.Installing,
                 Bindings = resolutions
@@ -208,6 +219,7 @@ public sealed partial class PackManagementService
         PackArchive archive,
         (PackInstallationPreview Preview, IReadOnlyDictionary<PackResourceDocument, IPackResourceHandler> Handlers) prepared,
         PackRemovalOptions removalOptions,
+        SourcePackProvenance? sourceProvenance,
         CancellationToken cancellationToken)
     {
         var identity = new PackIdentity(archive.Manifest.Metadata.Publisher, archive.Manifest.Metadata.Name);
@@ -267,6 +279,7 @@ public sealed partial class PackManagementService
                 Description = archive.Manifest.Metadata.Description,
                 Source = archive.Source,
                 SourceArtifact = sourceArtifact,
+                SourceProvenance = sourceProvenance,
                 InstalledAt = timeProvider.GetUtcNow(),
                 State = InstalledPackState.Installed,
                 Bindings = resolutions,

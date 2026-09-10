@@ -10,7 +10,10 @@ public sealed record SourceConsoleChannelView(
     SourceChannelStatusView Status,
     IReadOnlyList<SourceChannelSnapshotResource> Snapshots,
     SourceChannelSnapshotVerificationView? Verification,
-    IReadOnlyList<SourceCatalogView> Catalogs);
+    IReadOnlyList<SourceCatalogView> Catalogs,
+    SourceConsoleCatalogFailure? CatalogFailure);
+
+public sealed record SourceConsoleCatalogFailure(string Code, string Message);
 
 public sealed record SourceConsoleListItem(SourceView Source, SourceVersionResource? LatestVersion);
 
@@ -44,6 +47,7 @@ public sealed class SourceConsoleManagementService(
     ExtensionManagementService extensions,
     SourceChannelSnapshotService snapshots,
     SourceCatalogService catalogs,
+    SourcePackInstallationService sourcePacks,
     SourceVerificationService verification,
     IPlatformAuthorizationService platformAuthorization)
 {
@@ -117,16 +121,24 @@ public sealed class SourceConsoleManagementService(
                 : null;
             SourceChannelSnapshotVerificationView? snapshotVerification = null;
             IReadOnlyList<SourceCatalogView> discoveredCatalogs = [];
+            SourceConsoleCatalogFailure? catalogFailure = null;
             if (current is not null)
             {
                 snapshotVerification = await verification.VerifySnapshotAsync(selectedVersion, current, cancellationToken);
                 if (status.Compatibility.Status == SourceChannelCompatibilityStatus.Compatible)
                 {
-                    discoveredCatalogs = await catalogs.BrowseAsync(
-                        scopeRef, publisher, name, selectedVersion.Uid, channel.Name, current.Uid, locale, cancellationToken);
+                    try
+                    {
+                        discoveredCatalogs = await catalogs.BrowseAsync(
+                            scopeRef, publisher, name, selectedVersion.Uid, channel.Name, current.Uid, locale, cancellationToken);
+                    }
+                    catch (SourceValidationException exception)
+                    {
+                        catalogFailure = new(exception.Code, exception.Message);
+                    }
                 }
             }
-            channelViews.Add(new(channel, status, history, snapshotVerification, discoveredCatalogs));
+            channelViews.Add(new(channel, status, history, snapshotVerification, discoveredCatalogs, catalogFailure));
         }
 
         var availableProviders = await providers.ListAsync(cancellationToken);
@@ -154,6 +166,18 @@ public sealed class SourceConsoleManagementService(
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         _ = await sources.UpdateDisplayNameExactAsync(
             scopeRef, publisher, name, displayName, etag, cancellationToken);
+    }
+
+    public async Task DeleteSourceAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        string etag,
+        Guid actorPrincipalId,
+        CancellationToken cancellationToken)
+    {
+        await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        await sources.DeleteExactAsync(scopeRef, publisher, name, etag, cancellationToken);
     }
 
     public async Task ConfigureBindingsAsync(
@@ -196,6 +220,31 @@ public sealed class SourceConsoleManagementService(
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         _ = await snapshots.RefreshExactAsync(
             scopeRef, publisher, name, versionUid, channel, cancellationToken);
+    }
+
+    public async Task<SourcePackInstallationPreview> PreviewPackAsync(
+        SourcePackSelection selection,
+        IReadOnlyList<PackBindingSelection> bindings,
+        bool replaceExisting,
+        Guid actorPrincipalId,
+        CancellationToken cancellationToken)
+    {
+        await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        return await sourcePacks.PreviewAsync(
+            selection, bindings, replaceExisting, new PackRemovalOptions(), cancellationToken);
+    }
+
+    public async Task<StoredResource<InstalledPackResource>> InstallPackAsync(
+        SourcePackSelection selection,
+        string expectedPreviewDigest,
+        bool replaceExisting,
+        IReadOnlyList<PackBindingSelection> bindings,
+        Guid actorPrincipalId,
+        CancellationToken cancellationToken)
+    {
+        await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        return await sourcePacks.InstallAsync(
+            selection, expectedPreviewDigest, replaceExisting, bindings, new PackRemovalOptions(), cancellationToken);
     }
 
     public async Task<SourceImportResult> RefreshSourceAsync(

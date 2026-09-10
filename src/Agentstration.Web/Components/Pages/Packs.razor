@@ -72,6 +72,25 @@ else
                 <dt>@T("Source")</dt><dd>@selected.Value.Definition.Source</dd>
                 <dt>@T("Installed")</dt><dd>@selected.Value.Definition.InstalledAt.ToLocalTime().ToString("F")</dd>
             </dl>
+            @if (selected.Value.Definition.SourceProvenance is { } source)
+            {
+                <section class="pack-source-provenance">
+                    <p class="eyebrow">@T("SourceProvenance")</p>
+                    <div class="pack-source-heading">
+                        <div>
+                            <h3>@(sourceDisplayName ?? $"{source.SourcePublisher}/{source.SourceName}")</h3>
+                            @if (sourceDisplayName is not null) { <code>@source.SourcePublisher/@source.SourceName</code> }
+                        </div>
+                        @if (sourceUrl is not null) { <a class="text-button" href="@sourceUrl">@T("OpenSource") →</a> }
+                    </div>
+                    <dl class="resource-details pack-facts">
+                        <dt>@T("SourceVersion")</dt><dd>@source.SourceVersion · <code>@source.ManifestDigest</code></dd>
+                        <dt>@T("Channel")</dt><dd>@source.Channel · <code>@source.ProviderRevision</code></dd>
+                        <dt>@T("Snapshot")</dt><dd><code>@source.SnapshotUid</code> · <code>@source.SnapshotDigest</code></dd>
+                        <dt>@T("CatalogEntry")</dt><dd>@source.CatalogName/@source.EntryName · <code>@source.EntryPath</code></dd>
+                    </dl>
+                </section>
+            }
             <h3>@T("ResourceBindings")</h3>
             @if (selected.Value.Definition.Bindings.Count == 0) { <p class="pack-muted">@T("NoDeclaredBindings")</p> }
             else
