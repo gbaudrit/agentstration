@@ -10,11 +10,7 @@
 <PageTitle>@T("Extensions") · Agentstration</PageTitle>
 <PageHeader Title="@T("Extensions")" Description="@T("Extensions.Description")">
     <Actions>
-        @if (activeTab is ExtensionTab.Summary or ExtensionTab.Catalog)
-        {
-            <button class="button-secondary" @onclick="DiscoverAsync" disabled="@(loading || discovering)">@(discovering ? T("Discovering") : T("DiscoverExtensions"))</button>
-        }
-        else if (activeTab == ExtensionTab.Endpoints)
+        @if (activeTab == ExtensionTab.Catalog)
         {
             <button class="button-primary" @onclick="StartCreate" disabled="@loading">@T("RegisterEndpoint")</button>
         }
@@ -28,7 +24,6 @@
     {
         <button id="extensions-tab-enrollments" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Enrollments ? "true" : "false")" aria-controls="extensions-panel-enrollments" class="@(activeTab == ExtensionTab.Enrollments ? "active" : null)" data-testid="extensions-tab-enrollments" @onclick="() => activeTab = ExtensionTab.Enrollments">@T("Tab.Enrollments")</button>
     }
-    <button id="extensions-tab-endpoints" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Endpoints ? "true" : "false")" aria-controls="extensions-panel-endpoints" class="@(activeTab == ExtensionTab.Endpoints ? "active" : null)" data-testid="extensions-tab-endpoints" @onclick="() => activeTab = ExtensionTab.Endpoints">@T("Tab.Endpoints")</button>
 </ResourceTabs>
 
 @if (error is not null)
@@ -40,15 +35,15 @@
 {
     <div id="extensions-panel-summary" role="tabpanel" aria-labelledby="extensions-tab-summary">
         <section class="metric-grid" aria-label="@T("SummaryMetrics")">
-            <MetricCard Label="@T("Tab.Extensions")" Value="@(extensions?.Count.ToString() ?? "—")" Detail="@T("AvailableExtensions", AvailableExtensionCount)" Status="@(AvailableExtensionCount > 0 ? UiStatus.Success : UiStatus.Neutral)" />
+            <MetricCard Label="@T("Tab.Extensions")" Value="@(inventory?.Count.ToString() ?? "—")" Detail="@T("AvailableExtensions", AvailableExtensionCount)" Status="@(AvailableExtensionCount > 0 ? UiStatus.Success : UiStatus.Neutral)" Url="/extensions?tab=catalog" />
             @if (CanAdministerEnrollments)
             {
-                <MetricCard Label="@T("Tab.Enrollments")" Value="@(enrollments?.Count.ToString() ?? "—")" Detail="@T("ActiveEnrollments", ActiveEnrollmentCount)" Status="@(ActiveEnrollmentCount > 0 ? UiStatus.Warning : UiStatus.Success)" />
+                <MetricCard Label="@T("Tab.Enrollments")" Value="@(enrollments?.Count.ToString() ?? "—")" Detail="@T("ActiveEnrollments", ActiveEnrollmentCount)" Status="@(ActiveEnrollmentCount > 0 ? UiStatus.Warning : UiStatus.Success)" Url="/extensions?tab=enrollments" />
             }
-            <MetricCard Label="@T("Tab.Endpoints")" Value="@(registrations?.Count.ToString() ?? "—")" Detail="@T("EnabledEndpoints", EnabledRegistrationCount)" Status="@(EnabledRegistrationCount > 0 ? UiStatus.Info : UiStatus.Neutral)" />
+            <MetricCard Label="@T("Connections")" Value="@(registrations?.Count.ToString() ?? "—")" Detail="@T("EnabledEndpoints", EnabledRegistrationCount)" Status="@(EnabledRegistrationCount > 0 ? UiStatus.Info : UiStatus.Neutral)" Url="/extensions?tab=catalog" />
             @if (CanAdministerEnrollments)
             {
-                <MetricCard Label="@T("EnrollmentModes")" Value="@(enrollmentSettings is null ? "—" : $"{EnabledEnrollmentModeCount}/2")" Detail="@T("EnabledEnrollmentModes", EnabledEnrollmentModeCount)" Status="@(EnabledEnrollmentModeCount > 0 ? UiStatus.Info : UiStatus.Warning)" />
+                <MetricCard Label="@T("EnrollmentModes")" Value="@(enrollmentSettings is null ? "—" : $"{EnabledEnrollmentModeCount}/2")" Detail="@T("EnabledEnrollmentModes", EnabledEnrollmentModeCount)" Status="@(EnabledEnrollmentModeCount > 0 ? UiStatus.Info : UiStatus.Warning)" Url="/extensions?tab=enrollments" />
             }
         </section>
         <section class="panel resource-section">
@@ -61,20 +56,10 @@
                     <dt>@T("PairingCodeMode")</dt><dd>@T(pairingCodeEnabled ? "Enabled" : "Disabled")</dd>
                     <dt>@T("SharedKeyFileMode")</dt><dd>@T(sharedKeyFileEnabled ? "Enabled" : "Disabled")</dd>
                 }
-                <dt>@T("RegisteredEndpoints")</dt><dd>@T("EnabledEndpoints", EnabledRegistrationCount)</dd>
+                <dt>@T("Connections")</dt><dd>@T("EnabledEndpoints", EnabledRegistrationCount)</dd>
             </dl>
-            <div class="panel-actions">
-                <button class="button-secondary" type="button" @onclick="() => activeTab = ExtensionTab.Catalog">@T("OpenExtensions")</button>
-                @if (CanAdministerEnrollments) { <button class="button-secondary" type="button" @onclick="() => activeTab = ExtensionTab.Enrollments">@T("OpenEnrollments")</button> }
-                <button class="button-secondary" type="button" @onclick="() => activeTab = ExtensionTab.Endpoints">@T("OpenEndpoints")</button>
-            </div>
         </section>
     </div>
-}
-
-@if (activeTab == ExtensionTab.Catalog && !string.IsNullOrWhiteSpace(discoveryMessage))
-{
-    <p class="inline-info">@discoveryMessage</p>
 }
 
 @if (activeTab == ExtensionTab.Enrollments && CanAdministerEnrollments)
@@ -111,30 +96,51 @@
         </div>
         @if (enrollments?.Count > 0)
         {
-            <DataGrid TItem="AepEnrollmentRequestResource" Items="enrollments">
-                <Header><tr><th>@T("Extension")</th><th>@T("Endpoint")</th><th>@T("Status")</th><th>@T("Actions")</th></tr></Header>
-                <Row Context="enrollment"><tr>
-                    <td><strong>@enrollment.Definition.ExtensionName</strong> @enrollment.Definition.ExtensionVersion<br /><code>@enrollment.Definition.ExtensionId</code><br /><small>@T("AnnouncedAgo", EnrollmentAge(enrollment))</small></td>
-                    <td><code>@enrollment.Definition.Endpoint</code><br /><small>@T("PairingOrigin", enrollment.Definition.PairingUri.GetLeftPart(UriPartial.Authority))</small></td>
-                    <td><StatusBadge Text="@EnrollmentStatusLabel(enrollment.Definition.State)" Status="@EnrollmentStatus(enrollment.Definition.State)" />
-                        @if (enrollment.Definition.CodeExpiresAt is { } expires && enrollment.Definition.State == AepEnrollmentState.CodeIssued)
-                        { <br /><small>@T("CodeExpiresIn", SecondsRemaining(expires))</small> }
-                    </td>
-                    <td>
-                        @if (CanRotate(enrollment.Definition.State))
-                        {
-                            <button class="button-primary" @onclick="() => CopyAndOpenAsync(enrollment)" disabled="@pairingBusy">@T("CopyCodeAndOpen")</button>
-                            <button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button>
-                            <button class="button-secondary" @onclick="() => CancelEnrollmentAsync(enrollment)" disabled="@pairingBusy">@T("Cancel")</button>
-                        }
-                        else if (enrollment.Definition.State == AepEnrollmentState.Available)
-                        {
-                            <button class="button-secondary" @onclick="() => RotateCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RotateCredential")</button>
-                            <button class="button-danger" @onclick="() => RevokeCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RevokeCredential")</button>
-                        }
-                    </td>
-                </tr></Row>
-            </DataGrid>
+            <div class="enrollment-list">
+                @foreach (var enrollment in enrollments)
+                {
+                    var requiresScope = enrollment.Definition.TargetScopeRef is null;
+                    <article class="enrollment-card" data-testid="enrollment-card">
+                        <div class="enrollment-card-summary">
+                            <div class="enrollment-identity">
+                                <div><a class="text-button" href="@EnrollmentDetailUrl(enrollment)">@enrollment.Definition.ExtensionName</a> <span class="enrollment-version">@enrollment.Definition.ExtensionVersion</span></div>
+                                <code>@enrollment.Definition.ExtensionId</code>
+                                <small>@T("AnnouncedAgo", EnrollmentAge(enrollment))</small>
+                            </div>
+                            <div class="enrollment-status"><StatusBadge Text="@EnrollmentStatusLabel(enrollment.Definition.State)" Status="@EnrollmentStatus(enrollment.Definition.State)" />
+                                @if (enrollment.Definition.TargetScopeRef is { } enrollmentScope)
+                                { <ResourceScopeBadge ScopeRef="enrollmentScope" Compact /> }
+                                @if (enrollment.Definition.CodeExpiresAt is { } expires && enrollment.Definition.State == AepEnrollmentState.CodeIssued)
+                                { <small>@T("CodeExpiresIn", SecondsRemaining(expires))</small> }
+                            </div>
+                        </div>
+                        <div class="enrollment-endpoint">
+                            <span class="enrollment-label">@T("Endpoint")</span>
+                            <a href="@enrollment.Definition.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@enrollment.Definition.Endpoint</a>
+                            @if (enrollment.Definition.PairingUri is { } pairingUri)
+                            { <small>@T("PairingOriginLabel") <a href="@pairingUri.AbsoluteUri" target="_blank" rel="noopener noreferrer">@pairingUri.GetLeftPart(UriPartial.Authority)</a></small> }
+                        </div>
+                        <div class="enrollment-action-layout">
+                            @if (requiresScope)
+                            {
+                                <div class="enrollment-scope"><ResourceScopeFormField ResourceKind="@ResourceKinds.ExtensionRegistration" Value="@EnrollmentScope(enrollment)" ValueChanged="scope => SetEnrollmentScope(enrollment, scope)" /></div>
+                            }
+                            @if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode && CanRotate(enrollment.Definition.State))
+                            {
+                                <div class="enrollment-actions"><button class="button-primary" @onclick="() => CopyAndOpenAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button><button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button><button class="button-secondary" @onclick="() => CancelEnrollmentAsync(enrollment)" disabled="@pairingBusy">@T("Cancel")</button></div>
+                            }
+                            else if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile && requiresScope)
+                            {
+                                <div class="enrollment-actions"><button class="button-primary" @onclick="() => AssignSharedKeyAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button><button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button></div>
+                            }
+                            else if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode && enrollment.Definition.State == AepEnrollmentState.Available)
+                            {
+                                <div class="enrollment-actions enrollment-management-actions"><button class="button-secondary" @onclick="() => RotateCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RotateCredential")</button><button class="button-danger" @onclick="() => RevokeCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RevokeCredential")</button></div>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
         }
         else if (!loading)
         {
@@ -157,182 +163,78 @@
     </div>
 }
 
-@if (activeTab == ExtensionTab.Endpoints)
+@if (activeTab == ExtensionTab.Catalog && editing)
 {
-<div id="extensions-panel-endpoints" role="tabpanel" aria-labelledby="extensions-tab-endpoints">
 <section class="panel resource-section">
     <div class="panel-header">
-        <div><p class="eyebrow">@T("DiscoverySources")</p><h2>@T("RegisteredEndpoints")</h2><p>@T("RegisteredEndpoints.Description")</p></div>
-        <span>@T("RegistrationCount", registrations?.Count ?? 0)</span>
+        <div><p class="eyebrow">@T("Connection")</p><h2>@T("RegisterEndpoint")</h2><p>@T("RegisteredEndpoints.Description")</p></div>
     </div>
-
-    @if (editing)
-    {
-        <EditForm Model="form" OnValidSubmit="SaveAsync">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-            <div class="form-grid">
-                <label>@T("Name")<InputText @bind-Value="form.Name" disabled="@(!creating)" /></label>
-                <label>@T("Namespace")<InputText @bind-Value="form.Namespace" disabled="@(!creating)" /></label>
-                <label>@T("DisplayName")<InputText @bind-Value="form.DisplayName" /></label>
-                <ResourceScopeFormField ResourceKind="@ResourceKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" Disabled="@(!creating)" />
-                <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
-                <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /><small>@T("ExpectedExtensionId.Help")</small></label>
-                <label>@T("AuthenticationMode")<InputSelect @bind-Value="form.AuthenticationMode"><option value="@AepTransportAuthenticationMode.None">@T("Authentication.None")</option><option value="@AepTransportAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></InputSelect></label>
-                @if (form.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer)
-                {
-                    <label>@T("CredentialName")<InputText @bind-Value="form.CredentialName" /></label>
-                    <label>@T("CredentialNamespace")<InputText @bind-Value="form.CredentialNamespace" /></label>
-                    <label>@T("CredentialScopeRef")<InputText @bind-Value="form.CredentialScopeRef" /><small>@T("CredentialScopeRef.Help")</small></label>
-                }
-                <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
-            </div>
-            <div class="panel-actions">
-                <button class="button-primary" type="submit" disabled="@saving">@(creating ? T("CreateRegistration") : T("SaveChanges"))</button>
-                <button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">@T("Cancel")</button>
-            </div>
-        </EditForm>
-    }
-    else if (registrations?.Count > 0)
-    {
-        <DataGrid TItem="ExtensionRegistrationResource" Items="registrations">
-            <Header><tr><th>@T("Registration")</th><th>@T("Endpoint")</th><th>@T("Discovery")</th><th>@T("Actions")</th></tr></Header>
-            <Row Context="registration"><tr>
-                <td><span class="resource-name-with-scope"><strong>@registration.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="@registration.ScopeRef" Compact /></span><code>@registration.Namespace/@registration.Name</code></td>
-                <td><code>@registration.Definition.Endpoint</code></td>
-                <td><StatusBadge Text="@(registration.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@ModelManagementUi.Status(registration.Definition.Enabled ? "available" : "disabled")" /></td>
-                <td>
-                    @if (registration.Definition.Source == ExtensionRegistrationSource.Manual)
-                    {
-                        <button class="button-secondary" @onclick="() => EditAsync(registration)">@T("Edit")</button>
-                        <button class="button-secondary" @onclick="() => ToggleAsync(registration)">@(registration.Definition.Enabled ? T("Disable") : T("Enable"))</button>
-                        <button class="button-danger" @onclick="() => RequestDelete(registration)">@T("Delete")</button>
-                    }
-                    else
-                    {
-                        <span>@T("ManagedBy", registration.Definition.Source)</span>
-                    }
-                </td>
-            </tr></Row>
-        </DataGrid>
-    }
-    else if (!loading)
-    {
-        <p>@T("NoRegisteredEndpoint")</p>
-    }
-</section>
-</div>
-}
-
-<ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="@T("DeleteExtensionRegistration")" Message="@DeleteMessage" ConfirmLabel="@T("DeleteRegistration")" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
-
-@if (activeTab == ExtensionTab.Catalog && migrationPreview is not null)
-{
-    <section class="panel resource-section">
-        <div class="panel-header">
-            <div><p class="eyebrow">@T("ExplicitMigrationPreview")</p><h2>@migrationPreview.Value.ProfileNamespace/@migrationPreview.Value.ProfileName</h2><p>@T("NoProfileChanged")</p></div>
-            <span>@migrationPreview.Value.Source.Version → @migrationPreview.Value.Target.Version</span>
-        </div>
-        <div class="details-grid">
-            <article><h3>@T("CurrentOptions")</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Source)</pre></article>
-            <article><h3>@T("ProposedOptions")</h3><pre class="runner-json">@FormatOptions(migrationPreview.Value.Target)</pre></article>
+    <EditForm Model="form" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="form-grid">
+            <label>@T("Name")<InputText @bind-Value="form.Name" /></label>
+            <label>@T("Namespace")<InputText @bind-Value="form.Namespace" /></label>
+            <label>@T("DisplayName")<InputText @bind-Value="form.DisplayName" /></label>
+            <ResourceScopeFormField ResourceKind="@ResourceKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" />
+            <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
+            <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /><small>@T("ExpectedExtensionId.Help")</small></label>
+            <label>@T("AuthenticationMode")<InputSelect @bind-Value="form.AuthenticationMode"><option value="@AepTransportAuthenticationMode.None">@T("Authentication.None")</option><option value="@AepTransportAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></InputSelect></label>
+            @if (form.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer)
+            {
+                <label>@T("CredentialName")<InputText @bind-Value="form.CredentialName" /></label>
+                <label>@T("CredentialNamespace")<InputText @bind-Value="form.CredentialNamespace" /></label>
+                <label>@T("CredentialScopeRef")<InputText @bind-Value="form.CredentialScopeRef" /><small>@T("CredentialScopeRef.Help")</small></label>
+            }
+            <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
         </div>
         <div class="panel-actions">
-            <button class="button-primary" @onclick="ApplyMigrationAsync" disabled="@migrating">@(migrating ? T("Applying") : T("ApplyMigration"))</button>
-            <button class="button-secondary" @onclick="CancelMigration" disabled="@migrating">@T("Cancel")</button>
+            <button class="button-primary" type="submit" disabled="@saving">@T("CreateRegistration")</button>
+            <button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">@T("Cancel")</button>
         </div>
-    </section>
+    </EditForm>
+</section>
 }
 
 @if (activeTab == ExtensionTab.Catalog)
 {
 <div id="extensions-panel-catalog" role="tabpanel" aria-labelledby="extensions-tab-catalog">
-    @if (loading && extensions is null)
+    <section class="panel resource-section">
+        <div class="panel-header">
+            <div><p class="eyebrow">@T("ExtensionInventory")</p><h2>@T("Tab.Extensions")</h2><p>@T("ExtensionInventory.Description")</p></div>
+            <span>@T("ExtensionCount", FilteredInventory.Count)</span>
+        </div>
+        <ResourceToolbar Label="@T("InventoryFilters")">
+            <SearchBox @bind-Value="search" Placeholder="@T("SearchExtensions")" />
+            <select aria-label="@T("Availability")" @bind="availabilityFilter"><option value="">@T("AllAvailability")</option>@foreach (var status in AvailabilityFilters) { <option value="@status">@StatusLabel(status)</option> }</select>
+            <select aria-label="@T("Enrollment")" @bind="enrollmentFilter"><option value="">@T("AllEnrollments")</option>@foreach (var status in EnrollmentFilters) { <option value="@status">@EnrollmentStatusLabel(status)</option> }</select>
+            <select aria-label="@T("Origin")" @bind="sourceFilter"><option value="">@T("AllOrigins")</option>@foreach (var source in SourceFilters) { <option value="@source">@SourceLabel(source)</option> }</select>
+        </ResourceToolbar>
+    @if (loading && inventory is null)
     {
         <LoadingState Message="@T("DiscoveringExtensions")" />
     }
-    else if (extensions?.Count == 0)
+    else if (FilteredInventory.Count == 0)
     {
         <EmptyState Title="@T("NoExtensionsDiscovered")" Message="@T("NoExtensionsDiscoveredMessage")" />
     }
     else
     {
-    @foreach (var extension in extensions ?? [])
-    {
-        <section class="panel resource-section">
-            <div class="panel-header">
-                <div>
-                    <p class="eyebrow">@T("AepExtension") · <code>@extension.RegistrationNamespace/@extension.RegistrationName</code> · @extension.DiscoverySource</p>
-                    <h2>@(extension.Extension?.Name ?? extension.RegistrationName)</h2>
-                    <p>@(extension.Extension?.Description ?? extension.Details ?? T("ExtensionIdentityUnavailable"))</p>
-                </div>
-                <StatusBadge Text="@StatusLabel(extension.Status)" Status="@ModelManagementUi.Status(extension.Status)" />
-            </div>
-            <dl class="resource-details">
-                <dt>@T("ExtensionId")</dt><dd><code>@(extension.Extension?.Id ?? "—")</code></dd>
-                <dt>@T("ObservedVersion")</dt><dd>@(extension.Extension?.Version ?? "—")</dd>
-                <dt>@T("AepEndpoint")</dt><dd><code>@extension.Endpoint</code></dd>
-                <dt>@T("Registration")</dt><dd><code>@extension.RegistrationNamespace/@extension.RegistrationName</code></dd>
-                <dt>@T("ModelProviders")</dt><dd>@(extension.Providers.Count == 0 ? "—" : string.Join(", ", extension.Providers.Select(value => $"{value.Namespace}/{value.Name} → {value.ContributionId}")))</dd>
-                <dt>@T("Contributions")</dt><dd>@(extension.Contributions.Count == 0 ? "—" : string.Join(", ", extension.Contributions.Select(value => $"{value.Kind}:{value.Id}")))</dd>
-            </dl>
-
-            @if (extension.Contributions.Any(value => value.Kind == "model-provider"))
-            {
-                <div class="panel-actions">
-                    @foreach (var provider in extension.Providers)
-                    {
-                        <a class="button-secondary" href="@ProviderUrl(provider)">@T("OpenProvider", provider.Name)</a>
-                    }
-                    @foreach (var contribution in extension.Contributions.Where(value => value.Kind == "model-provider" && !extension.Providers.Any(provider => provider.ContributionId == value.Id)))
-                    {
-                        <a class="button-primary" href="@ConfigureProviderUrl(extension, contribution)">@T("ConfigureProvider", contribution.Id)</a>
-                    }
-                </div>
-            }
-
-            <div class="panel-header"><div><h3>@T("OptionContracts")</h3><p>@T("OptionContracts.Description")</p></div><span>@T("SetCount", extension.OptionSets.Count)</span></div>
-            @if (extension.OptionSets.Count == 0)
-            {
-                <p class="inline-warning">@(extension.Status == "available" ? T("NoVersionedOptionContract") : T("ContractsUnavailable"))</p>
-            }
-            else
-            {
-                <DataGrid TItem="ExtensionOptionSetResponse" Items="extension.OptionSets">
-                    <Header><tr><th>@T("OptionSet")</th><th>@T("Target")</th><th>@T("Preferred")</th><th>@T("SupportedVersions")</th></tr></Header>
-                    <Row Context="optionSet"><tr>
-                        <td><code>@optionSet.Id</code></td>
-                        <td>@optionSet.ContributionKind · <code>@optionSet.ContributionId</code> · @optionSet.Scope</td>
-                        <td>@optionSet.PreferredVersion</td>
-                        <td>@foreach (var version in optionSet.Versions) { <div><strong>@version.Version</strong>@(version.Deprecated ? T("DeprecatedSuffix") : null)<br /><code>@version.SchemaDigest</code><details><summary>@T("JsonSchema")</summary><pre class="runner-json">@FormatSchema(version.Schema)</pre></details></div> }</td>
-                    </tr></Row>
-                </DataGrid>
-            }
-
-            <div class="panel-header"><div><h3>@T("PersistedUsage")</h3><p>@T("PersistedUsage.Description")</p></div><span>@T("ProfileCount", extension.Usages.Count)</span></div>
-            @if (extension.Usages.Count > 0)
-            {
-                <DataGrid TItem="ExtensionOptionUsageResponse" Items="extension.Usages">
-                    <Header><tr><th>@T("ModelProfile")</th><th>@T("Contract")</th><th>@T("Status")</th><th>@T("Diagnostics")</th></tr></Header>
-                    <Row Context="usage"><tr>
-                        <td><a href="@ProfileUrl(usage)">@usage.ProfileName</a><br /><small>@usage.ProfileNamespace</small></td>
-                        <td>@if (string.IsNullOrWhiteSpace(usage.OptionSet)) { <span>@T("LegacyUnversionedOptions")</span> } else { <code>@usage.OptionSet@@@usage.Version</code><br /><small>@ShortDigest(usage.SchemaDigest)</small> }</td>
-                        <td><StatusBadge Text="@StatusLabel(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" />
-                            @if (MigrationTarget(extension, usage) is { } targetVersion)
-                            {
-                                <br /><button class="button-secondary" @onclick="() => PreviewMigrationAsync(usage, targetVersion)" disabled="@migrating">@T("MigrateTo", targetVersion)</button>
-                            }
-                        </td>
-                        <td>@(usage.Issues.Count == 0 ? T("Compatible") : string.Join(" ", usage.Issues))</td>
-                    </tr></Row>
-                </DataGrid>
-            }
-            else
-            {
-                <p>@T("NoPersistedUsage")</p>
-            }
-        </section>
+        <DataGrid TItem="ExtensionInventoryItemResponse" Items="FilteredInventory">
+            <Header><tr><th>@T("Extension")</th><th>@T("Connection")</th><th>@T("Enrollment")</th><th>@T("Availability")</th><th>@T("Contributions")</th></tr></Header>
+            <Row Context="item"><tr>
+                <td><a class="text-button" href="@DetailUrl(item)">@item.DisplayName</a> <small>@(item.Version ?? "—")</small><br /><code>@item.ExtensionId</code></td>
+                <td><a href="@item.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@item.Endpoint</a><br /><small>@SourceLabel(item.RegistrationSource) · @T("ConnectionCount", item.Connections.Count)@if (item.RegistrationName is not null) { <text> · @item.RegistrationNamespace/@item.RegistrationName</text> }</small></td>
+                <td><div class="enrollment-cell">@if (item.EnrollmentStatus is { } enrollmentState) { <StatusBadge Text="@EnrollmentStatusLabel(enrollmentState)" Status="@EnrollmentStatus(enrollmentState)" /> @if (CanAdministerEnrollments && CanRotate(enrollmentState) && IsPairingCode(item)) { <button class="text-button" @onclick="() => EnrollAsync(item)" disabled="@pairingBusy">@T("Enroll")</button> } } else { <span>—</span> }</div></td>
+                <td><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" /></td>
+                <td>@ContributionSummary(item)</td>
+            </tr></Row>
+        </DataGrid>
     }
+    </section>
+    @if (activePairingCode is not null)
+    {
+        <div class="inline-warning" role="status"><strong>@T("PairingCode")</strong> <code>@activePairingCode</code>@if (activePairingExpiry is { } expiry) { <span> · @T("CodeExpiresIn", SecondsRemaining(expiry))</span> }@if (clipboardFallback) { <p>@T("ClipboardFallback")</p><button class="button-secondary" @onclick="CopyCodeAsync">@T("Copy")</button><button class="button-secondary" @onclick="OpenExtension">@T("OpenExtension")</button> }</div>
     }
 </div>
 }

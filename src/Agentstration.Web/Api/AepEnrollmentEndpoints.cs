@@ -1,6 +1,7 @@
 using Agentstration.Aep.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
+using Agentstration.Resources;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api;
@@ -10,10 +11,10 @@ public static class AepEnrollmentEndpoints
     public static IEndpointRouteBuilder MapAgentstrationAepEnrollment(this IEndpointRouteBuilder endpoints)
     {
         var publicEndpoints = endpoints.MapGroup("/api/aep/enrollments").AllowAnonymous().RequireRateLimiting("aep-enrollment-public");
-        publicEndpoints.MapPost("/announce", (AepEnrollmentAnnouncement body, AepEnrollmentService service, CancellationToken token) =>
-            ExecuteAsync(() => service.AnnounceAsync(body, token)))
+        publicEndpoints.MapPost("/announce", (AepEnrollmentAnnouncement body, HttpRequest request, AepEnrollmentService service, CancellationToken token) =>
+            ExecuteAsync(() => service.AnnounceAsync(body, EnrollmentProof(request), token)))
             .Produces<AepEnrollmentAnnouncementResponse>()
-            .WithSummary("Announce an AEP extension for pairing");
+            .WithSummary("Announce an AEP extension for enrollment");
         publicEndpoints.MapPost("/claim", (AepEnrollmentClaim body, AepEnrollmentService service, CancellationToken token) =>
             ExecuteAsync(() => service.ClaimAsync(body, token)))
             .Produces<AepEnrollmentCredential>()
@@ -36,6 +37,10 @@ public static class AepEnrollmentEndpoints
             ExecuteAsync(() => service.ListAsync(current.Current, token)))
             .Produces<IEnumerable<AepEnrollmentRequestResource>>()
             .WithSummary("List AEP enrollment requests");
+        administration.MapPost("/{requestId:guid}/assign", (Guid requestId, AssignAepEnrollmentRequest body, ICurrentRequestContext current, AepEnrollmentService service, CancellationToken token) =>
+            ExecuteNoContentAsync(() => service.AssignAsync(current.Current, requestId, body.ScopeRef, token)))
+            .Produces(StatusCodes.Status204NoContent)
+            .WithSummary("Assign an AEP enrollment request to an instance, tenant, or workspace scope");
         administration.MapPost("/{requestId:guid}/rotate", (Guid requestId, ICurrentRequestContext current, AepEnrollmentService service, CancellationToken token) =>
             ExecuteAsync(() => service.RotateAsync(current.Current, requestId, token)))
             .Produces<AepPairingCodeResult>()
@@ -58,6 +63,12 @@ public static class AepEnrollmentEndpoints
             .WithSummary("Revoke an active AEP credential");
         return endpoints;
     }
+
+    private static AepEnrollmentProof? EnrollmentProof(HttpRequest request) =>
+        long.TryParse(request.Headers["X-AEP-Enrollment-Timestamp"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var timestamp)
+        && request.Headers["X-AEP-Enrollment-Signature"].ToString() is { Length: > 0 } signature
+            ? new(timestamp, signature)
+            : null;
 
     private static async Task<IResult> ExecuteAsync<T>(Func<Task<T>> operation)
     {
@@ -90,3 +101,5 @@ public sealed record PutAepEnrollmentSettingsRequest(
     bool PairingCodeEnabled,
     bool SharedKeyFileEnabled,
     string? ETag);
+
+public sealed record AssignAepEnrollmentRequest(ResourceScopeRef ScopeRef);

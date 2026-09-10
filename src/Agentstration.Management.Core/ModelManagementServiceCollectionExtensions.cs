@@ -25,6 +25,7 @@ public static class ModelManagementServiceCollectionExtensions
         services.AddSingleton<ResourceScopeOperationService>();
         services.AddSingleton<ResourceScopeInventoryService>();
         services.AddSingleton<ExtensionManagementService>();
+        services.AddSingleton<ExtensionInventoryService>();
         return services;
     }
 }

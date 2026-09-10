@@ -31,7 +31,33 @@ public interface IModelProvidersClient
 public interface IExtensionsClient
 {
     Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken);
-    Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken);
+    async Task<IReadOnlyList<ExtensionInventoryItemResponse>> GetExtensionInventoryAsync(CancellationToken cancellationToken) =>
+        (await GetExtensionsAsync(cancellationToken)).Select(value => new ExtensionInventoryItemResponse(
+            $"registration:{value.RegistrationNamespace}/{value.RegistrationName}",
+            value.RegistrationName,
+            value.RegistrationNamespace,
+            value.RegistrationScopeRef,
+            null,
+            value.Extension?.Name ?? value.RegistrationName,
+            value.Extension?.Id ?? value.RegistrationName,
+            value.Extension?.Version,
+            value.Endpoint,
+            value.DiscoverySource,
+            value.RegistrationEnabled,
+            value.Status,
+            null,
+            null,
+            value,
+            [new ExtensionInventoryConnectionResponse(
+                value.RegistrationName,
+                value.RegistrationNamespace,
+                value.RegistrationScopeRef,
+                value.Extension?.Name ?? value.RegistrationName,
+                value.Endpoint,
+                value.DiscoverySource,
+                value.RegistrationEnabled,
+                value.EnrollmentMode,
+                value.Status)])).ToArray();
     Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken);
@@ -49,6 +75,9 @@ public interface IExtensionsClient
 
     Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([]);
+
+    Task AssignEnrollmentAsync(Guid requestId, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        Task.FromException(new NotSupportedException("Enrollment administration is not supported by this client."));
 
     Task<AepPairingCodeResult> RotateEnrollmentCodeAsync(Guid requestId, CancellationToken cancellationToken) =>
         Task.FromException<AepPairingCodeResult>(new NotSupportedException("Enrollment administration is not supported by this client."));
@@ -71,13 +100,8 @@ public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClie
     public async Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ExtensionResponse>>(httpClient, "api/extensions", cancellationToken)).Value;
 
-    public async Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken)
-    {
-        using var response = await httpClient.PostAsync("api/extensions/discover", null, cancellationToken);
-        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
-        return await response.Content.ReadFromJsonAsync<ExtensionDiscoveryResponse>(cancellationToken)
-            ?? throw new AgentstrationApiException("Agentstration API returned an empty extension discovery result.", Guid.NewGuid().ToString("N"));
-    }
+    public async Task<IReadOnlyList<ExtensionInventoryItemResponse>> GetExtensionInventoryAsync(CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<ExtensionInventoryItemResponse>>(httpClient, "api/extensions/inventory", cancellationToken)).Value;
 
     public async Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ExtensionRegistrationResource>>(httpClient, "api/extensionregistrations", cancellationToken)).Value;
@@ -101,6 +125,15 @@ public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClie
 
     public async Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<AepEnrollmentRequestResource[]>(httpClient, "api/aep/enrollments", cancellationToken);
+
+    public async Task AssignEnrollmentAsync(Guid requestId, ResourceScopeRef scopeRef, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            $"api/aep/enrollments/{requestId:D}/assign",
+            new AssignAepEnrollmentRequest(scopeRef),
+            cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
 
     public Task<AepEnrollmentSettingsSnapshot> GetEnrollmentSettingsAsync(CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<AepEnrollmentSettingsSnapshot>(httpClient, "api/aep/enrollments/settings", cancellationToken);

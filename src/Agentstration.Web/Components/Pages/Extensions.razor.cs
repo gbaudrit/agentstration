@@ -28,7 +28,9 @@ public partial class Extensions
     private ExtensionTab activeTab = ExtensionTab.Summary;
 
     private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<ExtensionResponse>? extensions;
+    private Task? initialLoad;
+    private bool disposed;
+    private IReadOnlyList<ExtensionInventoryItemResponse>? inventory;
     private IReadOnlyList<ExtensionRegistrationResource>? registrations;
     private IReadOnlyList<AepEnrollmentRequestResource>? enrollments;
     private AepEnrollmentSettingsSnapshot? enrollmentSettings;
@@ -37,8 +39,6 @@ public partial class Extensions
     private bool savingEnrollmentSettings;
     private AgentstrationApiException? error;
     private bool loading;
-    private bool discovering;
-    private string? discoveryMessage;
     private bool saving;
     private bool editing;
     private bool creating;
@@ -55,22 +55,70 @@ public partial class Extensions
     private Guid? activeEnrollmentId;
     private bool clipboardFallback;
     private bool refreshingEnrollmentState;
+    private readonly Dictionary<Guid, ResourceScopeRef?> enrollmentScopes = [];
+    [Parameter, SupplyParameterFromQuery(Name = "tab")]
+    public string? RequestedTab { get; set; }
+    private string search = string.Empty;
+    private string availabilityFilter = string.Empty;
+    private AepEnrollmentState? enrollmentFilter;
+    private string sourceFilter = string.Empty;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusLabel(string status) => T($"Status.{status}");
     private string EnrollmentStatusLabel(AepEnrollmentState status) => T($"EnrollmentStatus.{status}");
 
     private bool CanAdministerEnrollments => Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState state
         && state.HasPermission(AuthorizationPermissions.ResourcesWrite);
-    private int AvailableExtensionCount => extensions?.Count(value => string.Equals(value.Status, "available", StringComparison.OrdinalIgnoreCase)) ?? 0;
+    private int AvailableExtensionCount => inventory?.Count(value => string.Equals(value.AvailabilityStatus, "available", StringComparison.OrdinalIgnoreCase)) ?? 0;
     private int EnabledRegistrationCount => registrations?.Count(value => value.Definition.Enabled) ?? 0;
     private int ActiveEnrollmentCount => enrollments?.Count(value => value.Definition.State is AepEnrollmentState.Pending
         or AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying) ?? 0;
     private int EnabledEnrollmentModeCount => (pairingCodeEnabled ? 1 : 0) + (sharedKeyFileEnabled ? 1 : 0);
+    private IReadOnlyList<ExtensionInventoryItemResponse> FilteredInventory => (inventory ?? [])
+        .Where(value => string.IsNullOrWhiteSpace(search)
+            || value.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || value.ExtensionId.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || (value.RegistrationName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+            || value.Endpoint.AbsoluteUri.Contains(search, StringComparison.OrdinalIgnoreCase))
+        .Where(value => string.IsNullOrWhiteSpace(availabilityFilter)
+            || string.Equals(value.AvailabilityStatus, availabilityFilter, StringComparison.OrdinalIgnoreCase))
+        .Where(value => enrollmentFilter is null || value.EnrollmentStatus == enrollmentFilter)
+        .Where(value => string.IsNullOrWhiteSpace(sourceFilter)
+            || string.Equals(value.RegistrationSource, sourceFilter, StringComparison.OrdinalIgnoreCase))
+        .ToArray();
+    private IReadOnlyList<string> AvailabilityFilters => (inventory ?? []).Select(value => value.AvailabilityStatus).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToArray();
+    private IReadOnlyList<AepEnrollmentState> EnrollmentFilters => (inventory ?? []).Where(value => value.EnrollmentStatus.HasValue).Select(value => value.EnrollmentStatus!.Value).Distinct().Order().ToArray();
+    private IReadOnlyList<string> SourceFilters => (inventory ?? []).Select(value => value.RegistrationSource).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToArray();
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         _ = RefreshCountdownAsync();
-        await LoadAsync();
+        initialLoad = LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || initialLoad is null)
+            return;
+
+        try
+        {
+            await initialLoad;
+            if (!disposed)
+                await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        activeTab = RequestedTab?.ToLowerInvariant() switch
+        {
+            "catalog" => ExtensionTab.Catalog,
+            "enrollments" when CanAdministerEnrollments => ExtensionTab.Enrollments,
+            _ => ExtensionTab.Summary
+        };
     }
 
     private async Task LoadAsync()
@@ -79,14 +127,14 @@ public partial class Extensions
         error = null;
         try
         {
-            var extensionsTask = Client.GetExtensionsAsync(cancellation.Token);
+            var inventoryTask = Client.GetExtensionInventoryAsync(cancellation.Token);
             var registrationsTask = Client.GetRegistrationsAsync(cancellation.Token);
             var enrollmentsTask = CanAdministerEnrollments ? Client.GetEnrollmentsAsync(cancellation.Token) : Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([]);
             var enrollmentSettingsTask = CanAdministerEnrollments
                 ? GetEnrollmentSettingsAsync()
                 : Task.FromResult<AepEnrollmentSettingsSnapshot?>(null);
-            await Task.WhenAll(extensionsTask, registrationsTask, enrollmentsTask, enrollmentSettingsTask);
-            extensions = await extensionsTask;
+            await Task.WhenAll(inventoryTask, registrationsTask, enrollmentsTask, enrollmentSettingsTask);
+            inventory = await inventoryTask;
             registrations = await registrationsTask;
             enrollments = await enrollmentsTask;
             enrollmentSettings = await enrollmentSettingsTask;
@@ -133,15 +181,46 @@ public partial class Extensions
         error = null;
         try
         {
+            if (!await AssignIfRequiredAsync(enrollment)) return;
             var result = await Client.RotateEnrollmentCodeAsync(enrollment.Definition.InstanceId, cancellation.Token);
+            var pairingUri = enrollment.Definition.PairingUri
+                ?? throw new InvalidOperationException("A PairingCode enrollment has no pairing URI.");
             activePairingCode = result.Code;
             activePairingExpiry = result.ExpiresAt;
-            activePairingUri = enrollment.Definition.PairingUri;
+            activePairingUri = pairingUri;
             activeEnrollmentId = enrollment.Definition.InstanceId;
-            clipboardFallback = !await JavaScript.InvokeAsync<bool>("agentstrationEnrollment.copyAndOpen", cancellation.Token, result.Code, activePairingUri.AbsoluteUri);
+            clipboardFallback = !await JavaScript.InvokeAsync<bool>("agentstrationEnrollment.copyAndOpen", cancellation.Token, result.Code, pairingUri.AbsoluteUri);
             await LoadAsync();
         }
         catch (JSException) { clipboardFallback = true; }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { pairingBusy = false; }
+    }
+
+    private ResourceScopeRef? EnrollmentScope(AepEnrollmentRequestResource enrollment) =>
+        enrollment.Definition.TargetScopeRef
+        ?? (enrollmentScopes.TryGetValue(enrollment.Definition.InstanceId, out var scope) ? scope : null);
+
+    private void SetEnrollmentScope(AepEnrollmentRequestResource enrollment, ResourceScopeRef? scope) =>
+        enrollmentScopes[enrollment.Definition.InstanceId] = scope;
+
+    private async Task<bool> AssignIfRequiredAsync(AepEnrollmentRequestResource enrollment)
+    {
+        if (enrollment.Definition.TargetScopeRef is not null) return true;
+        var scope = EnrollmentScope(enrollment);
+        if (scope is null) return false;
+        await Client.AssignEnrollmentAsync(enrollment.Definition.InstanceId, scope.Value, cancellation.Token);
+        return true;
+    }
+
+    private async Task AssignSharedKeyAsync(AepEnrollmentRequestResource enrollment)
+    {
+        pairingBusy = true;
+        error = null;
+        try
+        {
+            if (await AssignIfRequiredAsync(enrollment)) await LoadAsync();
+        }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { pairingBusy = false; }
     }
@@ -229,10 +308,10 @@ public partial class Extensions
             }
             if (changed)
             {
-                var extensionsTask = Client.GetExtensionsAsync(cancellation.Token);
+                var inventoryTask = Client.GetExtensionInventoryAsync(cancellation.Token);
                 var registrationsTask = Client.GetRegistrationsAsync(cancellation.Token);
-                await Task.WhenAll(extensionsTask, registrationsTask);
-                extensions = await extensionsTask;
+                await Task.WhenAll(inventoryTask, registrationsTask);
+                inventory = await inventoryTask;
                 registrations = await registrationsTask;
             }
         }
@@ -258,28 +337,9 @@ public partial class Extensions
     private static string EnrollmentAge(AepEnrollmentRequestResource request) =>
         $"{Math.Max(0, (long)(DateTimeOffset.UtcNow - request.Definition.AnnouncedAt).TotalMinutes)}m";
 
-    private async Task DiscoverAsync()
-    {
-        activeTab = ExtensionTab.Catalog;
-        discovering = true;
-        error = null;
-        discoveryMessage = null;
-        try
-        {
-            var result = await Client.DiscoverAsync(cancellation.Token);
-            await LoadAsync();
-            var available = extensions?.Count(value => value.Status == "available") ?? 0;
-            discoveryMessage = result.Sources == 0
-                ? T("DiscoveryNoSource")
-                : T("DiscoveryCompleted", result.Sources, result.Created, result.Updated, result.Unchanged, available);
-        }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { discovering = false; }
-    }
-
     private void StartCreate()
     {
-        activeTab = ExtensionTab.Endpoints;
+        activeTab = ExtensionTab.Catalog;
         form = new();
         selectedScope = null;
         etag = null;
@@ -371,6 +431,28 @@ public partial class Extensions
 
     private void CancelEdit() => editing = false;
 
+    private async Task EnrollAsync(ExtensionInventoryItemResponse item)
+    {
+        var enrollment = enrollments?.SingleOrDefault(value => value.Definition.InstanceId == item.EnrollmentInstanceId);
+        if (enrollment is not null) await CopyAndOpenAsync(enrollment);
+    }
+
+    private static bool IsPairingCode(ExtensionInventoryItemResponse item) =>
+        item.Extension?.EnrollmentMode == AepEnrollmentMode.PairingCode
+        || string.Equals(item.RegistrationSource, "pairingCode", StringComparison.OrdinalIgnoreCase);
+
+    private string SourceLabel(string source) => T($"Source.{source}");
+    private static string ContributionSummary(ExtensionInventoryItemResponse item) => item.Extension?.Contributions.Count > 0
+        ? string.Join(", ", item.Extension.Contributions.Select(value => $"{value.Kind}:{value.Id}"))
+        : "—";
+    private static string DetailUrl(ExtensionInventoryItemResponse item) => item.RegistrationName is not null
+        ? $"/extensions/{Uri.EscapeDataString(item.RegistrationName)}?namespace={Uri.EscapeDataString(item.RegistrationNamespace)}"
+        : $"/extensions/enrollment/{item.EnrollmentInstanceId:D}";
+    private string EnrollmentDetailUrl(AepEnrollmentRequestResource enrollment) => inventory?
+        .Where(value => value.EnrollmentInstanceId == enrollment.Definition.InstanceId)
+        .Select(DetailUrl)
+        .SingleOrDefault() ?? $"/extensions/enrollment/{enrollment.Definition.InstanceId:D}";
+
     private async Task PreviewMigrationAsync(ExtensionOptionUsageResponse usage, string targetVersion)
     {
         migrating = true;
@@ -451,6 +533,7 @@ public partial class Extensions
 
     public void Dispose()
     {
+        disposed = true;
         cancellation.Cancel();
         cancellation.Dispose();
         GC.SuppressFinalize(this);
@@ -489,5 +572,5 @@ public partial class Extensions
         };
     }
 
-    private enum ExtensionTab { Summary, Catalog, Enrollments, Endpoints }
+    private enum ExtensionTab { Summary, Catalog, Enrollments }
 }

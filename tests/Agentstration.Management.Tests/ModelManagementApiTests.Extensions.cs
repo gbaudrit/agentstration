@@ -47,6 +47,7 @@ public sealed partial class ModelManagementApiTests
             builder.UseEnvironment("Testing");
             builder.UseSetting("AI:Provider", "Managed");
             builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.LlamaCpp:Endpoint", "http://localhost:5275");
+            builder.UseSetting("Agentstration:Extensions:Agentstration.Extensions.LlamaCpp:RegistrationName", "llama-cpp-extension");
             builder.UseSetting("Logging:LogLevel:Default", "Warning");
         });
         using var client = factory.CreateClient();
@@ -117,34 +118,32 @@ public sealed partial class ModelManagementApiTests
     }
 
     [TestMethod]
-    public async Task ExtensionsApiDiscoversConfiguredEndpointAndRefreshesOnCommand()
+    public async Task ExtensionInventoryCombinesConnectionAndAvailabilityState()
     {
-        await using var factory = Factory().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("Agentstration:Extensions:extension.discovered:Endpoint", "http://127.0.0.1:5678");
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IExtensionInspector>();
-                services.AddSingleton<IExtensionInspector, ConfiguredEndpointInspector>();
-            });
-        });
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetFromJsonAsync<ValueResponse<ExtensionInventoryItemResponse>>("/api/extensions/inventory");
+        var extension = response!.Value.Single(value => value.RegistrationName == "ollama-extension");
+
+        Assert.AreEqual("Ollama AEP extension", extension.DisplayName);
+        Assert.AreEqual("aspire", extension.RegistrationSource);
+        Assert.IsTrue(extension.RegistrationEnabled);
+        Assert.AreEqual("unavailable", extension.AvailabilityStatus);
+        Assert.IsNull(extension.EnrollmentStatus);
+        Assert.IsNotNull(extension.Extension);
+        Assert.IsGreaterThanOrEqualTo(1, extension.Connections.Count);
+        StringAssert.Contains(extension.Key, "ollama-extension");
+    }
+
+    [TestMethod]
+    public async Task ExtensionsApiDoesNotAcceptManualDiscoveryCommand()
+    {
+        await using var factory = Factory();
         using var client = factory.CreateClient();
 
         using var discoveryResponse = await client.PostAsync("/api/extensions/discover", null);
-        Assert.AreEqual(HttpStatusCode.OK, discoveryResponse.StatusCode);
-        var discovery = await discoveryResponse.Content.ReadFromJsonAsync<ExtensionDiscoveryResponse>();
-        Assert.IsNotNull(discovery);
-        Assert.IsGreaterThanOrEqualTo(1, discovery.Sources);
-
-        var response = await client.GetFromJsonAsync<ValueResponse<ExtensionResponse>>("/api/extensions");
-        var extension = response!.Value.Single(value => value.RegistrationName == "extension-discovered");
-
-        Assert.AreEqual("configuration", extension.DiscoverySource);
-        Assert.AreEqual("extension.discovered", extension.Extension!.Id);
-        Assert.AreEqual("http://127.0.0.1:5678/", extension.Endpoint.AbsoluteUri);
-        var contribution = extension.Contributions.Single();
-        Assert.AreEqual("model-provider", contribution.Kind);
-        Assert.AreEqual("discovered", contribution.Id);
+        Assert.AreEqual(HttpStatusCode.MethodNotAllowed, discoveryResponse.StatusCode);
     }
 
     [TestMethod]

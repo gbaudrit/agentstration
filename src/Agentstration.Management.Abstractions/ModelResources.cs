@@ -93,12 +93,14 @@ public enum AepEnrollmentState
 public sealed record AepEnrollmentRequestProperties
 {
     public required Guid InstanceId { get; init; }
-    public required Guid TenantId { get; init; }
+    public ResourceScopeRef? TargetScopeRef { get; init; }
+    public Guid? TargetTenantId { get; init; }
     public required string ExtensionId { get; init; }
     public required string ExtensionName { get; init; }
     public required string ExtensionVersion { get; init; }
     public required Uri Endpoint { get; init; }
-    public required Uri PairingUri { get; init; }
+    public Uri? PairingUri { get; init; }
+    public AepEnrollmentMode EnrollmentMode { get; init; } = AepEnrollmentMode.PairingCode;
     public AepEnrollmentState State { get; init; }
     public DateTimeOffset AnnouncedAt { get; init; }
     public DateTimeOffset? CodeIssuedAt { get; init; }

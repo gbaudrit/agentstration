@@ -6,17 +6,15 @@
 @if (targets is null)
 {
     <label>
-        <span>@Localizer["ResourceScope.Label"]</span>
+        <span>@Localizer["ResourceScope.Label"] <HelpTooltip Text="@Localizer["ResourceScope.Help"]" /></span>
         <select disabled><option>@Localizer["ResourceScope.Loading"]</option></select>
-        <small>@Localizer["ResourceScope.Help"]</small>
     </label>
 }
 else if (targets.Count == 0)
 {
     <label>
-        <span>@Localizer["ResourceScope.Label"]</span>
+        <span>@Localizer["ResourceScope.Label"] <HelpTooltip Text="@Localizer["ResourceScope.Help"]" /></span>
         <select disabled><option>@Localizer["ResourceScope.Unavailable"]</option></select>
-        <small>@Localizer["ResourceScope.Help"]</small>
     </label>
 }
 else

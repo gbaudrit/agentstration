@@ -1,5 +1,6 @@
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
+using Agentstration.Management.Abstractions;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets.Abstractions;
 using Microsoft.Extensions.AI;
@@ -110,6 +111,18 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
         CancellationToken cancellationToken = default)
         => await InspectAsync(registrationName, endpoint, CreateClient(endpoint), cancellationToken);
 
+    public async ValueTask<ExtensionInspection> InspectAsync(
+        ExtensionRegistrationResource registration,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        return await InspectAsync(
+            registration.Name,
+            registration.Definition.Endpoint,
+            CreateClient(registration),
+            cancellationToken);
+    }
+
     private static async ValueTask<ExtensionInspection> InspectAsync(
         string registrationName,
         Uri endpoint,
@@ -215,6 +228,23 @@ public sealed class AepModelProvider(IHttpClientFactory httpClients, ISecretReso
         var client = httpClients.CreateClient("agentstration-aep");
         if (client.BaseAddress != endpoint) client.BaseAddress = endpoint;
         return new AepClient(client);
+    }
+
+    private AepClient CreateClient(ExtensionRegistrationResource registration)
+    {
+        var definition = registration.Definition;
+        var client = httpClients.CreateClient("agentstration-aep");
+        if (client.BaseAddress != definition.Endpoint) client.BaseAddress = definition.Endpoint;
+        return new AepClient(
+            client,
+            AepExtensionCredentials.Create(
+                definition.AuthenticationMode,
+                definition.Credential,
+                registration.Namespace,
+                registration.ScopeRef,
+                registration.Name,
+                secrets),
+            expectedExtensionId: definition.ExpectedExtensionId);
     }
 
     private static void ValidateNativeOptions(

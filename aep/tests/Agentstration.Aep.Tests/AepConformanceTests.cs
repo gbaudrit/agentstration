@@ -292,6 +292,25 @@ public sealed class AepConformanceTests
     }
 
     [TestMethod]
+    public void SharedKeyEnrollmentProofBindsTheAnnouncementAndTimestamp()
+    {
+        var sharedKey = new string('k', 43);
+        var announcement = new AepEnrollmentAnnouncement(
+            Guid.NewGuid(),
+            new AepExtensionIdentity("extension.proof", "Proof", "1.0.0"),
+            new Uri("https://extension.example/"),
+            null,
+            AepEnrollmentMethod.SharedKeyFile);
+        const long timestamp = 1_788_883_200;
+        var proof = new AepEnrollmentProof(timestamp, AepEnrollmentProofs.Sign(announcement, timestamp, sharedKey));
+
+        Assert.IsTrue(AepEnrollmentProofs.Verify(announcement, proof, sharedKey));
+        Assert.IsFalse(AepEnrollmentProofs.Verify(announcement with { Endpoint = new Uri("https://attacker.example/") }, proof, sharedKey));
+        Assert.IsFalse(AepEnrollmentProofs.Verify(announcement, proof with { Timestamp = timestamp + 1 }, sharedKey));
+        Assert.IsFalse(AepEnrollmentProofs.Verify(announcement, proof, new string('x', 43)));
+    }
+
+    [TestMethod]
     public async Task AccessTokensAreAppliedPerRequestWithoutMutatingDefaultHeaders()
     {
         using var firstHandler = new CapturingAuthorizationHandler();
@@ -670,8 +689,6 @@ public sealed class AepConformanceTests
             ["Aep:PairingCode:AllowInsecureHttp"] = "true",
             ["Aep:PairingCode:PublicEndpoint"] = "https://extension.example/",
             ["Aep:PairingCode:PairingUri"] = "https://extension.example/aep/enrollment/pair",
-            ["Aep:PairingCode:TenantId"] = Guid.NewGuid().ToString("D"),
-            ["Aep:PairingCode:WorkspaceId"] = Guid.NewGuid().ToString("D"),
             ["Aep:PairingCode:StateFile"] = stateFile
         };
         return new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>

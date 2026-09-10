@@ -89,7 +89,39 @@ public sealed record ExtensionResponse(
     IReadOnlyList<ExtensionOptionUsageResponse> Usages,
     IReadOnlyList<ExtensionProviderBindingResponse> Providers,
     string? Details,
-    string DiscoverySource);
+    string DiscoverySource,
+    bool RegistrationEnabled = true,
+    AepEnrollmentMode EnrollmentMode = AepEnrollmentMode.Disabled,
+    ResourceScopeRef? RegistrationScopeRef = null);
+
+public sealed record ExtensionInventoryItemResponse(
+    string Key,
+    string? RegistrationName,
+    string RegistrationNamespace,
+    ResourceScopeRef? RegistrationScopeRef,
+    Guid? EnrollmentInstanceId,
+    string DisplayName,
+    string ExtensionId,
+    string? Version,
+    Uri Endpoint,
+    string RegistrationSource,
+    bool RegistrationEnabled,
+    string AvailabilityStatus,
+    AepEnrollmentState? EnrollmentStatus,
+    DateTimeOffset? AnnouncedAt,
+    ExtensionResponse? Extension,
+    IReadOnlyList<ExtensionInventoryConnectionResponse> Connections);
+
+public sealed record ExtensionInventoryConnectionResponse(
+    string RegistrationName,
+    string RegistrationNamespace,
+    ResourceScopeRef? RegistrationScopeRef,
+    string DisplayName,
+    Uri Endpoint,
+    string Source,
+    bool Enabled,
+    AepEnrollmentMode EnrollmentMode,
+    string AvailabilityStatus);
 
 public sealed record CreateModelProfileRequest(
     string Name,

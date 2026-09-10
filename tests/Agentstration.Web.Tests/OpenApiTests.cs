@@ -91,7 +91,6 @@ public sealed class OpenApiTests
             ("POST", "/api/modelproviders", AgentstrationPolicies.CanWriteResources),
             ("DELETE", "/api/modelproviders/{providerName}", AgentstrationPolicies.CanDeleteResources),
             ("POST", "/api/modelproviders/{providerName}/test", AgentstrationPolicies.CanExecuteRuns),
-            ("POST", "/api/extensions/discover", AgentstrationPolicies.CanWriteResources),
             ("POST", "/api/toolproviders/{providerName}/test", AgentstrationPolicies.CanExecuteRuns),
             ("POST", "/api/toolproviders/{providerName}/refresh", AgentstrationPolicies.CanWriteResources),
             ("DELETE", "/api/toolexecutionhooks/{hookName}", AgentstrationPolicies.CanDeleteResources),

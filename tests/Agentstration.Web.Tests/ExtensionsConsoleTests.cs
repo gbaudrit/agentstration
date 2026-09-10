@@ -19,7 +19,8 @@ public sealed class ExtensionsConsoleTests
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false));
+        var client = new FakeExtensionsClient(configured: false);
+        context.Services.AddSingleton<IExtensionsClient>(client);
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
         var contextState = new ConsoleContextState(new WritableContextProvider());
@@ -30,22 +31,30 @@ public sealed class ExtensionsConsoleTests
         rendered.WaitForAssertion(() =>
         {
             var tabs = rendered.FindAll("[role='tab']");
-            Assert.HasCount(4, tabs);
+            Assert.HasCount(3, tabs);
             Assert.AreEqual("Synthèse", tabs[0].TextContent.Trim());
             Assert.AreEqual("Extensions", tabs[1].TextContent.Trim());
             Assert.AreEqual("Enrôlements", tabs[2].TextContent.Trim());
-            Assert.AreEqual("Points de terminaison", tabs[3].TextContent.Trim());
             Assert.AreEqual("true", tabs[0].GetAttribute("aria-selected"));
             _ = rendered.Find("#extensions-panel-summary");
+            var metrics = rendered.FindAll("#extensions-panel-summary .metric-card-link");
+            Assert.HasCount(4, metrics);
+            Assert.AreEqual("/extensions?tab=catalog", metrics[0].GetAttribute("href"));
+            Assert.AreEqual("/extensions?tab=enrollments", metrics[1].GetAttribute("href"));
+            Assert.AreEqual("/extensions?tab=catalog", metrics[2].GetAttribute("href"));
+            Assert.AreEqual("/extensions?tab=enrollments", metrics[3].GetAttribute("href"));
+            Assert.IsEmpty(rendered.FindAll("#extensions-panel-summary .panel-actions"));
+            Assert.AreEqual(0, client.ExtensionCalls, "The inventory already contains the extension projection; loading it separately duplicates live AEP inspections.");
         });
 
-        await rendered.Find("[data-testid='extensions-tab-endpoints']").ClickAsync(new());
+        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
-            _ = rendered.Find("#extensions-panel-endpoints");
-            Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("#extensions-panel-catalog"));
+            _ = rendered.Find("#extensions-panel-catalog");
+            Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='extensions-tab-endpoints']"));
             Assert.AreEqual("Enregistrer un point de terminaison", rendered.Find("header button.button-primary").TextContent.Trim());
+            StringAssert.Contains(rendered.Find("table").TextContent, "Enrôlement");
         });
     }
 
@@ -93,9 +102,19 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
         await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
-        rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Markup, "En attente"));
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Markup, "En attente");
+            var card = rendered.Find("[data-testid='enrollment-card']");
+            _ = card.QuerySelector(".enrollment-status") ?? throw new AssertFailedException("The enrollment status stack is missing.");
+            _ = card.QuerySelector(".enrollment-action-layout") ?? throw new AssertFailedException("The enrollment action layout is missing.");
+            Assert.AreEqual("Enrôler l’extension", card.QuerySelector("button.button-primary")?.TextContent.Trim());
+            Assert.AreEqual("/extensions/llama-cpp-local?namespace=default", card.QuerySelector("a.text-button")?.GetAttribute("href"));
+            Assert.IsNotNull(card.QuerySelector("a[href='http://localhost:5260/']"));
+            Assert.IsNotNull(card.QuerySelector("a[href='http://localhost:5260/aep/enrollment/pair']"));
+        });
 
-        await rendered.Find("table button.button-primary").ClickAsync(new());
+        await rendered.Find("[data-testid='enrollment-card'] button.button-primary").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
@@ -114,12 +133,14 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
 
-        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
+            .Add(value => value.RegistrationName, "llama-cpp-local"));
+        var tabs = rendered.WaitForElements("[role='tab']");
+        await tabs[3].ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
-            var action = rendered.Find(".panel-actions a.button-secondary");
+            var action = rendered.Find("table a.button-secondary");
             Assert.AreEqual("Open llama-cpp-local provider", action.TextContent.Trim());
             Assert.AreEqual("/modelproviders/llama-cpp-local?namespace=default", action.GetAttribute("href"));
         });
@@ -135,36 +156,96 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
 
-        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
+            .Add(value => value.RegistrationName, "llama-cpp-local"));
+        var tabs = rendered.WaitForElements("[role='tab']");
+        await tabs[3].ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
-            var action = rendered.Find(".panel-actions a.button-primary");
+            var action = rendered.Find("table a.button-primary");
             Assert.AreEqual("Configure llama.cpp provider", action.TextContent.Trim());
             StringAssert.StartsWith(action.GetAttribute("href"), "/modelproviders/new?");
         });
     }
 
     [TestMethod]
-    public async Task DiscoverButtonInvokesDiscoveryAndShowsResult()
+    public async Task ExtensionInventoryShowsEnrollmentAndAvailabilitySeparately()
     {
-        using var culture = new TestCultureScope("en-US");
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false));
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var contextState = new ConsoleContextState(new WritableContextProvider());
+        await contextState.LoadAsync(default);
+        context.Services.AddSingleton(contextState);
+
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            var row = rendered.Find("tbody tr");
+            StringAssert.Contains(row.TextContent, "En attente");
+            StringAssert.Contains(row.TextContent, "Disponible");
+            Assert.AreEqual("/extensions/llama-cpp-local?namespace=default", row.QuerySelector("a")?.GetAttribute("href"));
+        });
+    }
+
+    [TestMethod]
+    public async Task ExtensionDetailsExposeEnrollmentInformationAndLinks()
+    {
+        using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false);
         context.Services.AddSingleton<IExtensionsClient>(client);
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
-        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        var contextState = new ConsoleContextState(new WritableContextProvider());
+        await contextState.LoadAsync(default);
+        context.Services.AddSingleton(contextState);
 
-        rendered.WaitForAssertion(() => Assert.AreEqual("Discover extensions", rendered.Find("button.button-secondary").TextContent.Trim()));
-        await rendered.Find("button.button-secondary").ClickAsync(new());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
+            .Add(value => value.RegistrationName, "llama-cpp-local"));
+        var tabs = rendered.WaitForElements("[role='tab']");
+        await tabs[2].ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual(1, client.DiscoveryCalls);
-            StringAssert.Contains(rendered.Find(".inline-info").TextContent, "1 source(s)");
+            StringAssert.Contains(rendered.Markup, "Détails de l’enrôlement");
+            Assert.AreEqual("http://localhost:5260/", rendered.Find("a[href='http://localhost:5260/']").TextContent.Trim());
+            Assert.AreEqual("http://localhost:5260/aep/enrollment/pair", rendered.Find("a[href='http://localhost:5260/aep/enrollment/pair']").TextContent.Trim());
+            StringAssert.Contains(rendered.Markup, "En attente");
+            Assert.IsGreaterThanOrEqualTo(1, client.EnrollmentCalls);
+        });
+    }
+
+    [TestMethod]
+    public async Task PairingCodeEnrollmentStartsDirectlyFromTheInventory()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(configured: false);
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var contextState = new ConsoleContextState(new WritableContextProvider());
+        await contextState.LoadAsync(default);
+        context.Services.AddSingleton(contextState);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
+
+        await rendered.Find("tbody button.text-button").ClickAsync(new());
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(1, client.RotateCalls);
+            Assert.IsTrue(context.JSInterop.Invocations.Any(value => value.Identifier == "agentstrationEnrollment.copyAndOpen"));
         });
     }
 
@@ -173,30 +254,59 @@ public sealed class ExtensionsConsoleTests
         private readonly Guid enrollmentId = Guid.NewGuid();
         private bool codeRotated;
         private int postRotateReads;
-        public int DiscoveryCalls { get; private set; }
         public int EnrollmentCalls { get; private set; }
+        public int RotateCalls { get; private set; }
+        public int ExtensionCalls { get; private set; }
 
-        public Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken)
         {
-            DiscoveryCalls++;
-            return Task.FromResult(new ExtensionDiscoveryResponse(1, 1, 0, 0));
+            ExtensionCalls++;
+            return Task.FromResult<IReadOnlyList<ExtensionResponse>>([Extension()]);
         }
 
-        public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ExtensionResponse>>([
-                new(
-                    "llama-cpp-local",
-                    "default",
-                    new Uri("http://localhost:5270/"),
-                    "available",
-                    new ExtensionIdentityResponse("Agentstration.Extensions.LlamaCpp", "llama.cpp", "1.0.0", "Local provider"),
-                    [new ExtensionContributionResponse("model-provider", "llama.cpp")],
-                    [],
-                    [],
-                    configured ? [new ExtensionProviderBindingResponse("llama-cpp-local", "default", "llama.cpp")] : [],
+        public Task<IReadOnlyList<ExtensionInventoryItemResponse>> GetExtensionInventoryAsync(CancellationToken cancellationToken)
+        {
+            var extension = Extension();
+            return Task.FromResult<IReadOnlyList<ExtensionInventoryItemResponse>>([new ExtensionInventoryItemResponse(
+                "registration:default/llama-cpp-local",
+                extension.RegistrationName,
+                extension.RegistrationNamespace,
+                null,
+                enrollmentId,
+                extension.Extension!.Name,
+                extension.Extension.Id,
+                extension.Extension.Version,
+                extension.Endpoint,
+                "pairingCode",
+                true,
+                extension.Status,
+                AepEnrollmentState.Pending,
+                DateTimeOffset.UtcNow,
+                extension,
+                [new ExtensionInventoryConnectionResponse(
+                    extension.RegistrationName,
+                    extension.RegistrationNamespace,
                     null,
-                    "configuration")
-            ]);
+                    extension.Extension.Name,
+                    extension.Endpoint,
+                    extension.DiscoverySource,
+                    true,
+                    AepEnrollmentMode.PairingCode,
+                    extension.Status)])]);
+        }
+
+        private ExtensionResponse Extension() => new(
+            "llama-cpp-local",
+            "default",
+            new Uri("http://localhost:5270/"),
+            "available",
+            new ExtensionIdentityResponse("Agentstration.Extensions.LlamaCpp", "llama.cpp", "1.0.0", "Local provider"),
+            [new ExtensionContributionResponse("model-provider", "llama.cpp")],
+            [],
+            [],
+            configured ? [new ExtensionProviderBindingResponse("llama-cpp-local", "default", "llama.cpp")] : [],
+            null,
+            "configuration");
 
         public Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ExtensionRegistrationResource>>([]);
@@ -215,6 +325,7 @@ public sealed class ExtensionsConsoleTests
 
         public Task<AepPairingCodeResult> RotateEnrollmentCodeAsync(Guid requestId, CancellationToken cancellationToken)
         {
+            RotateCalls++;
             codeRotated = true;
             postRotateReads = 0;
             return Task.FromResult(new AepPairingCodeResult(enrollmentId, "123456789", DateTimeOffset.UtcNow.AddMinutes(1)));
@@ -229,7 +340,8 @@ public sealed class ExtensionsConsoleTests
             Definition = new AepEnrollmentRequestProperties
             {
                 InstanceId = enrollmentId,
-                TenantId = Guid.NewGuid(),
+                TargetScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()),
+                TargetTenantId = Guid.NewGuid(),
                 ExtensionId = "Agentstration.Extensions.Test",
                 ExtensionName = "Test extension",
                 ExtensionVersion = "1.0.0",
@@ -241,7 +353,21 @@ public sealed class ExtensionsConsoleTests
             }
         };
 
-        public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceSnapshot<ExtensionRegistrationResource>(new ExtensionRegistrationResource
+            {
+                ApiVersion = ManagementApiVersions.CoreV1,
+                Kind = ResourceKinds.ExtensionRegistration,
+                Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
+                Generation = 1,
+                Definition = new ExtensionRegistrationProperties
+                {
+                    DisplayName = "llama.cpp",
+                    Endpoint = new Uri("http://localhost:5270/"),
+                    Enabled = true,
+                    Source = ExtensionRegistrationSource.Configuration
+                }
+            }, "\"etag\""));
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();

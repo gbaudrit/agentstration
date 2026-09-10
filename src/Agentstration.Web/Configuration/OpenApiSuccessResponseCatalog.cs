@@ -283,7 +283,7 @@ internal static class OpenApiSuccessResponseCatalog
     {
         if (method == "DELETE" && IsModelManagementPath(path)) return NoContent("Delete the resource");
         if (path == "/api/extensions") return Json<ValueResponse<ExtensionResponse>>(200, "List extensions");
-        if (path == "/api/extensions/discover") return Json<ExtensionDiscoveryResponse>(200, "Discover extensions");
+        if (path == "/api/extensions/inventory") return Json<ValueResponse<ExtensionInventoryItemResponse>>(200, "List extension inventory");
         if (path.StartsWith("/api/extensionregistrations", StringComparison.OrdinalIgnoreCase))
             return path == "/api/extensionregistrations"
                 ? method == "POST" ? Json<ExtensionRegistrationResource>(201, "Create an extension registration") : Json<ValueResponse<ExtensionRegistrationResource>>(200, "List extension registrations")

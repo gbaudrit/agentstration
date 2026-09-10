@@ -116,6 +116,7 @@ builder.Services.AddSingleton(builder.Configuration
     .Get<AepEnrollmentPolicyOptions>() ?? new());
 builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
+builder.Services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
 builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
 builder.Services.AddRateLimiter(options =>
@@ -293,10 +294,10 @@ try
         await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
+        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
             await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
         await app.Services.ApplyDeclarativeBootstrapAsync(app.Lifetime.ApplicationStopping);
-        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
+        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
             await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
     }
     if (bootstrapContext is not null)

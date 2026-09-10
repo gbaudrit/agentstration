@@ -228,8 +228,6 @@ internal sealed record AepPairingOptions(
     Uri AuthorityUrl,
     Uri PublicEndpoint,
     Uri PairingUri,
-    Guid TenantId,
-    Guid WorkspaceId,
     string StateFile);
 
 internal sealed class AepPairingCoordinator(
@@ -256,7 +254,7 @@ internal sealed class AepPairingCoordinator(
             {
                 using var client = Client();
                 using var response = await client.PostAsJsonAsync(AepEnrollmentProtocol.AnnouncementPath, new AepEnrollmentAnnouncement(
-                    state.InstanceId, options.TenantId, options.WorkspaceId, extensionOptions.Value.Extension,
+                    state.InstanceId, extensionOptions.Value.Extension,
                     options.PublicEndpoint, options.PairingUri), AepProtocol.JsonOptions, stoppingToken);
                 await EnsureSuccessAsync(response, stoppingToken);
                 return;
@@ -288,11 +286,11 @@ internal sealed class AepPairingCoordinator(
         {
             using var client = Client();
             using var claimResponse = await client.PostAsJsonAsync(AepEnrollmentProtocol.ClaimPath,
-                new AepEnrollmentClaim(state.InstanceId, state.InstanceId, options.WorkspaceId, code.Trim()), AepProtocol.JsonOptions, cancellationToken);
+                new AepEnrollmentClaim(state.InstanceId, state.InstanceId, code.Trim()), AepProtocol.JsonOptions, cancellationToken);
             var credential = await ReadAsync<AepEnrollmentCredential>(claimResponse, cancellationToken);
             state.SetPaired(credential.ClientId, credential.AccessToken);
             using var readyResponse = await client.PostAsJsonAsync(AepEnrollmentProtocol.ReadyPath,
-                new AepEnrollmentReady(state.InstanceId, state.InstanceId, options.WorkspaceId, credential.CompletionToken), AepProtocol.JsonOptions, cancellationToken);
+                new AepEnrollmentReady(state.InstanceId, state.InstanceId, credential.CompletionToken), AepProtocol.JsonOptions, cancellationToken);
             await EnsureSuccessAsync(readyResponse, cancellationToken);
             return (200, Page(text, text.PairedTitle, text.PairedMessage, includeForm: false, theme));
         }
@@ -458,8 +456,6 @@ internal static class AepPairingRegistration
             throw new InvalidOperationException("The AEP enrollment authority must use HTTPS unless AllowInsecureHttp is explicitly enabled for development.");
         var options = new AepPairingOptions(
             authority, endpoint, pairingUri,
-            Guid.Parse(section["TenantId"] ?? throw new InvalidOperationException("Aep:PairingCode:TenantId is required.")),
-            Guid.Parse(section["WorkspaceId"] ?? throw new InvalidOperationException("Aep:PairingCode:WorkspaceId is required.")),
             section["StateFile"] ?? Path.Combine(AppContext.BaseDirectory, ".aep", "pairing-state.json"));
         services.AddSingleton(options);
         services.AddSingleton<AepPairingStateStore>();

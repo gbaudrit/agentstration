@@ -37,12 +37,11 @@ public static class ResourceScopePolicy
         EnsureAllowed(resource.Kind, scopeRef.Kind);
         if (resource is ExtensionRegistrationResource registration)
         {
-            var expected = registration.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode
-                ? ResourceScopeKind.Workspace
-                : registration.Definition.Source == ExtensionRegistrationSource.Manual
-                    ? ResourceScopeKind.Tenant
-                    : ResourceScopeKind.Instance;
-            if (scopeRef.Kind != expected)
+            var acceptsAnyScope = registration.Definition.EnrollmentMode is AepEnrollmentMode.PairingCode or AepEnrollmentMode.SharedKeyFile;
+            var expected = registration.Definition.Source == ExtensionRegistrationSource.Manual
+                ? ResourceScopeKind.Tenant
+                : ResourceScopeKind.Instance;
+            if (!acceptsAnyScope && scopeRef.Kind != expected)
                 throw new ResourceScopePolicyException(
                     $"Extension registration source '{registration.Definition.Source}' requires a {expected.ToString().ToLowerInvariant()} scope.");
         }

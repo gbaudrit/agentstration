@@ -243,7 +243,7 @@ public sealed class SourceBindingManagementService(
         ExtensionInspection inspection;
         try
         {
-            inspection = await inspector.InspectAsync(extension.Value.Name, extension.Value.Definition.Endpoint, cancellationToken);
+            inspection = await inspector.InspectAsync(extension.Value, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

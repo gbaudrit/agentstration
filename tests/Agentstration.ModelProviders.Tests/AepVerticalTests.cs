@@ -363,6 +363,39 @@ public sealed class AepVerticalTests
     }
 
     [TestMethod]
+    public async Task EnrolledExtensionInspectionUsesItsScopedCredential()
+    {
+        var resolver = new MutableSecretResolver("enrollment-token");
+        var handler = new CredentialRecordingHandler("extension.enrolled");
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://extension.test/") };
+        var provider = new AepModelProvider(new FixedHttpClientFactory(httpClient), resolver);
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var registration = new ExtensionRegistrationResource
+        {
+            ApiVersion = ManagementApiVersions.CoreV1,
+            Kind = ResourceKinds.ExtensionRegistration,
+            Metadata = new ResourceMetadata { Name = "paired-extension" },
+            ScopeRef = scope,
+            Definition = new ExtensionRegistrationProperties
+            {
+                DisplayName = "Paired extension",
+                Endpoint = httpClient.BaseAddress!,
+                ExpectedExtensionId = "extension.enrolled",
+                AuthenticationMode = AepTransportAuthenticationMode.StaticBearer,
+                EnrollmentMode = Agentstration.Management.Abstractions.AepEnrollmentMode.PairingCode,
+                Credential = new ResourceReference("enrollment-secret", scope)
+            }
+        };
+
+        var inspection = await provider.InspectAsync(registration);
+
+        Assert.AreEqual("available", inspection.Status);
+        Assert.HasCount(2, handler.Authorizations);
+        Assert.IsTrue(handler.Authorizations.All(value => value == "Bearer enrollment-token"));
+        Assert.AreEqual(2, resolver.ResolutionCount);
+    }
+
+    [TestMethod]
     public async Task MissingScopedCredentialFailsBeforeDiscoveryIsSent()
     {
         var resolver = new MutableSecretResolver(null);
@@ -566,13 +599,16 @@ public sealed class AepVerticalTests
             RequestCount++;
             if (request.Headers.Authorization is { } authorization)
                 Authorizations.Add(authorization.ToString());
-            var value = request.RequestUri?.AbsolutePath == AepProtocol.DiscoveryPath
-                ? JsonSerializer.Serialize(new AepManifest(
+            var value = request.RequestUri?.AbsolutePath switch
+            {
+                AepProtocol.DiscoveryPath => JsonSerializer.Serialize(new AepManifest(
                     AepProtocol.Version,
                     new(extensionId, "Test", "1.0.0"),
                     new Dictionary<string, AepCapabilityDescriptor>(),
-                    new([new("test", "Test", new(ModelDiscovery: true))])), AepProtocol.JsonOptions)
-                : JsonSerializer.Serialize(new[] { new AepModelDescriptor("test-model", "Test model") }, AepProtocol.JsonOptions);
+                    new([new("test", "Test", new(ModelDiscovery: true))])), AepProtocol.JsonOptions),
+                AepProtocol.ConfigurationPath => JsonSerializer.Serialize(new AepConfigurationCatalog([]), AepProtocol.JsonOptions),
+                _ => JsonSerializer.Serialize(new[] { new AepModelDescriptor("test-model", "Test model") }, AepProtocol.JsonOptions)
+            };
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(value, Encoding.UTF8, "application/json")

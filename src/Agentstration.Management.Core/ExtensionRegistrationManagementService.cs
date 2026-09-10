@@ -119,12 +119,18 @@ public sealed class ExtensionRegistrationManagementService(
     public async Task<StoredResource<ExtensionRegistrationResource>> SynchronizeAsync(
         string name,
         ExtensionRegistrationProperties definition,
+        CancellationToken cancellationToken) =>
+        await SynchronizeAsync(name, definition, ResourceScopeRef.Instance, cancellationToken);
+
+    public async Task<StoredResource<ExtensionRegistrationResource>> SynchronizeAsync(
+        string name,
+        ExtensionRegistrationProperties definition,
+        ResourceScopeRef scopeRef,
         CancellationToken cancellationToken)
     {
         if (definition.Source == ExtensionRegistrationSource.Manual)
             throw new ExtensionRegistrationValidationException("Discovered registrations must identify their configuration source.");
         var @namespace = ResourceNamespace.Default;
-        var scopeRef = ResourceScopeRef.Instance;
         var validated = await ValidateDefinitionAsync(@namespace, name, definition, scopeRef, cancellationToken);
         var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken);
         if (existing is null)
@@ -277,15 +283,16 @@ public sealed class ExtensionRegistrationManagementService(
     private async Task SynchronizeEnrollmentStateAsync(ExtensionRegistrationResource registration, CancellationToken cancellationToken)
     {
         if (registration.Definition.EnrollmentMode != AepEnrollmentMode.PairingCode
-            || registration.ScopeRef is not { Kind: ResourceScopeKind.Workspace } scope)
+            || registration.ScopeRef is not { } scope)
             return;
         var enrollment = (await store.ListExactAsync<AepEnrollmentRequestResource>(
-            scope, ResourceKinds.AepEnrollmentRequest, 0, 200, cancellationToken))
-            .FirstOrDefault(value => string.Equals(value.Value.Definition.RegistrationName, registration.Name, StringComparison.Ordinal));
+            ResourceScopeRef.Instance, ResourceKinds.AepEnrollmentRequest, 0, 200, cancellationToken))
+            .FirstOrDefault(value => value.Value.Definition.TargetScopeRef == scope
+                && string.Equals(value.Value.Definition.RegistrationName, registration.Name, StringComparison.Ordinal));
         if (enrollment is null || enrollment.Value.Definition.State is not (AepEnrollmentState.Available or AepEnrollmentState.Disabled)) return;
         var state = registration.Definition.Enabled ? AepEnrollmentState.Available : AepEnrollmentState.Disabled;
         if (enrollment.Value.Definition.State == state) return;
-        _ = await store.PutExactAsync(scope, enrollment.Value with
+        _ = await store.PutExactAsync(ResourceScopeRef.Instance, enrollment.Value with
         {
             Generation = checked(enrollment.Value.Generation + 1),
             Definition = enrollment.Value.Definition with { State = state, Outcome = state == AepEnrollmentState.Disabled ? "registration_disabled" : "available" }

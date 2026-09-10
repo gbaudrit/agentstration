@@ -68,12 +68,13 @@ public sealed class ModelProviderNavigationTests
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual(6, rendered.FindAll(".metric-help").Count);
+            Assert.AreEqual(7, rendered.FindAll(".metric-help").Count);
             Assert.IsTrue(rendered.FindAll(".metric-help").All(element => element.GetAttribute("tabindex") == "0"));
             Assert.IsTrue(rendered.FindAll(".metric-tooltip").All(element => element.GetAttribute("role") == "tooltip"));
             Assert.IsTrue(rendered.FindAll("label > span").Any(element => element.TextContent.StartsWith("Seed", StringComparison.Ordinal)));
             Assert.IsFalse(rendered.Markup.Contains("Graine", StringComparison.Ordinal));
             Assert.IsTrue(rendered.FindAll(".metric-tooltip").Any(element => element.TextContent.Contains("variabilité des réponses", StringComparison.Ordinal)));
+            Assert.IsTrue(rendered.FindAll(".metric-tooltip").Any(element => element.TextContent.Contains("visible depuis ce périmètre", StringComparison.Ordinal)));
         });
     }
 
@@ -143,7 +144,6 @@ public sealed class ModelProviderNavigationTests
     private sealed class StubExtensionsClient : IExtensionsClient
     {
         public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ExtensionResponse>>([]);
-        public Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();

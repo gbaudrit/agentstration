@@ -18,45 +18,60 @@ public sealed class AepEnrollmentException(string code, string message, int stat
 
 public sealed record AepPairingCodeResult(Guid RequestId, string Code, DateTimeOffset ExpiresAt);
 
+public interface IAepEnrollmentAnnouncementProvisioner
+{
+    AepEnrollmentMethod Method { get; }
+    Task ValidateAsync(AepEnrollmentAnnouncement announcement, AepEnrollmentProof? proof, CancellationToken cancellationToken);
+    Task<string> ProvisionAsync(AepEnrollmentAnnouncement announcement, ResourceScopeRef targetScopeRef, CancellationToken cancellationToken);
+}
+
 public sealed class AepEnrollmentService(
     IControlPlaneStore store,
-    IIdentityStore identities,
     IAuthorizationService authorization,
+    IPlatformAuthorizationService platformAuthorization,
+    ResourceScopeOperationService scopeOperations,
     IEnumerable<ISecretVaultProvider> vaultProviders,
     IHttpClientFactory httpClients,
     AepTransportSecurityOptions transportOptions,
     ICurrentRequestContext requestContext,
     ISecurityAuditWriter audit,
     AepEnrollmentSettingsService enrollmentSettings,
+    IEnumerable<IAepEnrollmentAnnouncementProvisioner> announcementProvisioners,
     TimeProvider timeProvider)
 {
     public const int MaximumAttempts = 5;
     public static readonly TimeSpan CodeLifetime = TimeSpan.FromSeconds(60);
     private const string VaultName = "aep-enrollment-vault";
 
-    public async Task<AepEnrollmentAnnouncementResponse> AnnounceAsync(AepEnrollmentAnnouncement announcement, CancellationToken cancellationToken)
+    public Task<AepEnrollmentAnnouncementResponse> AnnounceAsync(AepEnrollmentAnnouncement announcement, CancellationToken cancellationToken) =>
+        AnnounceAsync(announcement, null, cancellationToken);
+
+    public async Task<AepEnrollmentAnnouncementResponse> AnnounceAsync(
+        AepEnrollmentAnnouncement announcement,
+        AepEnrollmentProof? proof,
+        CancellationToken cancellationToken)
     {
-        await EnsurePairingCodeEnabledAsync(cancellationToken);
+        await EnsureEnrollmentModeEnabledAsync(announcement.Method, cancellationToken);
         using var scopeContext = RequestScopes().PushSystem();
         ValidateAnnouncement(announcement);
-        var workspace = await identities.GetWorkspaceAsync(announcement.TenantId, announcement.WorkspaceId, cancellationToken);
-        if (workspace?.Status != WorkspaceStatus.Active)
-            throw new AepEnrollmentException("workspace_unavailable", "The enrollment workspace is unavailable.", 404);
-        var scope = ResourceScopeRef.Workspace(announcement.WorkspaceId);
+        if (announcement.Method == AepEnrollmentMethod.SharedKeyFile)
+            await ValidateAnnouncementProofAsync(announcement, proof, cancellationToken);
+        var scope = ResourceScopeRef.Instance;
         var name = announcement.InstanceId.ToString("N");
         var existing = await store.GetExactAsync<AepEnrollmentRequestResource>(Address(scope, name), cancellationToken);
         if (existing is not null)
         {
             var definition = existing.Value.Definition;
-            if (definition.TenantId != announcement.TenantId
-                || !string.Equals(definition.ExtensionId, announcement.Extension.Id, StringComparison.Ordinal)
+            if (!string.Equals(definition.ExtensionId, announcement.Extension.Id, StringComparison.Ordinal)
                 || definition.Endpoint != Normalize(announcement.Endpoint)
-                || definition.PairingUri != Normalize(announcement.PairingUri))
+                || definition.PairingUri != NormalizeOptional(announcement.PairingUri)
+                || definition.EnrollmentMode != EnrollmentMode(announcement.Method))
                 throw new AepEnrollmentException("instance_mismatch", "The extension instance is already bound to another enrollment request.", 409);
             return new(announcement.InstanceId, State(definition.State));
         }
 
         var now = timeProvider.GetUtcNow();
+        var initialState = AepEnrollmentState.Pending;
         var resource = new AepEnrollmentRequestResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
@@ -68,35 +83,73 @@ public sealed class AepEnrollmentService(
             Definition = new AepEnrollmentRequestProperties
             {
                 InstanceId = announcement.InstanceId,
-                TenantId = announcement.TenantId,
                 ExtensionId = announcement.Extension.Id.Trim(),
                 ExtensionName = announcement.Extension.Name.Trim(),
                 ExtensionVersion = announcement.Extension.Version.Trim(),
                 Endpoint = Normalize(announcement.Endpoint),
-                PairingUri = Normalize(announcement.PairingUri),
-                State = AepEnrollmentState.Pending,
-                AnnouncedAt = now
+                PairingUri = NormalizeOptional(announcement.PairingUri),
+                EnrollmentMode = EnrollmentMode(announcement.Method),
+                State = initialState,
+                AnnouncedAt = now,
+                Outcome = null
             }
         };
         try { _ = await store.PutExactAsync(scope, resource, null, true, cancellationToken); }
         catch (ControlPlaneConcurrencyException)
         {
             // A simultaneous restart announced the same deterministic instance.
-            return await AnnounceAsync(announcement, cancellationToken);
+            return await AnnounceAsync(announcement, proof, cancellationToken);
         }
         await AuditAsync(SecurityAuditActions.AepEnrollmentAnnounced, resource, null, cancellationToken);
-        return new(announcement.InstanceId, "pending");
+        return new(announcement.InstanceId, State(initialState));
     }
 
     public async Task<IReadOnlyList<AepEnrollmentRequestResource>> ListAsync(RequestContext context, CancellationToken cancellationToken)
     {
         using var scopeContext = RequestScopes().Push(context);
         await AuthorizeAsync(context, cancellationToken);
+        var isPlatformAdministrator = await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken);
         return (await store.ListExactAsync<AepEnrollmentRequestResource>(
-            ResourceScopeRef.Workspace(context.WorkspaceId), ResourceKinds.AepEnrollmentRequest, 0, 200, cancellationToken))
+            ResourceScopeRef.Instance, ResourceKinds.AepEnrollmentRequest, 0, 200, cancellationToken))
             .Select(value => Sanitize(value.Value))
+            .Where(value => value.Definition.TargetScopeRef is null
+                ? isPlatformAdministrator
+                : IsVisibleFrom(value.Definition.TargetScopeRef, context))
             .OrderByDescending(value => value.Definition.AnnouncedAt)
             .ToArray();
+    }
+
+    public async Task AssignAsync(
+        RequestContext context,
+        Guid requestId,
+        ResourceScopeRef targetScopeRef,
+        CancellationToken cancellationToken)
+    {
+        using var scopeContext = RequestScopes().Push(context);
+        var stored = await GetAsync(requestId, cancellationToken);
+        if (!await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken))
+            throw new ResourceScopeAccessDeniedException(ResourceScopeRef.Instance);
+        if (stored.Value.Definition.TargetScopeRef is { } existing)
+        {
+            if (existing != targetScopeRef)
+                throw new AepEnrollmentException("scope_already_assigned", "The enrollment request is already assigned to another scope.", 409);
+            return;
+        }
+        var registrationName = await scopeOperations.WriteAsync(ResourceKinds.ExtensionRegistration, targetScopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        {
+            if (stored.Value.Definition.EnrollmentMode != AepEnrollmentMode.SharedKeyFile) return null;
+            return await ProvisionAnnouncementAsync(Announcement(stored.Value.Definition), targetScopeRef, token);
+        }, cancellationToken);
+        var definition = stored.Value.Definition with
+        {
+            TargetScopeRef = targetScopeRef,
+            TargetTenantId = targetScopeRef.Kind == ResourceScopeKind.Instance ? null : context.TenantId,
+            RegistrationName = registrationName,
+            State = registrationName is null ? stored.Value.Definition.State : AepEnrollmentState.Available,
+            Outcome = registrationName is null ? stored.Value.Definition.Outcome : "available"
+        };
+        using var systemScope = RequestScopes().PushSystem();
+        _ = await UpdateAsync(stored, definition, cancellationToken);
     }
 
     public async Task<AepPairingCodeResult> RotateAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
@@ -104,7 +157,7 @@ public sealed class AepEnrollmentService(
         await EnsurePairingCodeEnabledAsync(cancellationToken);
         using var scopeContext = RequestScopes().Push(context);
         await AuthorizeAsync(context, cancellationToken);
-        var stored = await GetAsync(context.WorkspaceId, requestId, cancellationToken);
+        var stored = await GetAssignedAsync(context, requestId, cancellationToken);
         if (stored.Value.Definition.State is AepEnrollmentState.Available or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying)
             throw new AepEnrollmentException("already_consumed", "The enrollment request has already consumed a code.", 409);
         if (stored.Value.Definition.State is AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled)
@@ -134,7 +187,7 @@ public sealed class AepEnrollmentService(
         await AuthorizeAsync(context, cancellationToken);
         if (state is not (AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled))
             throw new ArgumentOutOfRangeException(nameof(state));
-        var stored = await GetAsync(context.WorkspaceId, requestId, cancellationToken);
+        var stored = await GetVisibleAsync(context, requestId, cancellationToken);
         if (stored.Value.Definition.State is AepEnrollmentState.Available or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying)
             throw new AepEnrollmentException("already_consumed", "The enrollment request has already consumed a code.", 409);
         _ = await UpdateAsync(stored, stored.Value.Definition with
@@ -155,11 +208,12 @@ public sealed class AepEnrollmentService(
     {
         await EnsurePairingCodeEnabledAsync(cancellationToken);
         using var scopeContext = RequestScopes().PushSystem();
-        if (claim.RequestId == Guid.Empty || claim.InstanceId != claim.RequestId || claim.WorkspaceId == Guid.Empty
+        if (claim.RequestId == Guid.Empty || claim.InstanceId != claim.RequestId
             || string.IsNullOrWhiteSpace(claim.Code) || claim.Code.Length > 64)
             throw new AepEnrollmentException("invalid_claim", "The enrollment claim is invalid.");
-        var stored = await GetAsync(claim.WorkspaceId, claim.RequestId, cancellationToken);
+        var stored = await GetAsync(claim.RequestId, cancellationToken);
         var definition = stored.Value.Definition;
+        _ = TargetScope(definition);
         if (definition.InstanceId != claim.InstanceId)
             throw new AepEnrollmentException("request_mismatch", "The code is not bound to this extension instance.", 409);
         if (definition.State != AepEnrollmentState.CodeIssued || definition.CodeExpiresAt is null
@@ -188,7 +242,7 @@ public sealed class AepEnrollmentService(
             throw new AepEnrollmentException(exhausted ? "attempts_exceeded" : "code_invalid", "The pairing code is invalid.", exhausted ? 429 : 422);
         }
 
-        var clientId = $"agentstration:{claim.WorkspaceId:D}:{claim.InstanceId:D}";
+        var clientId = $"agentstration:{TargetScope(definition).Value}:{claim.InstanceId:D}";
         var accessToken = GenerateToken();
         var completion = GenerateToken();
         var completionDigest = Sha256(completion);
@@ -221,7 +275,7 @@ public sealed class AepEnrollmentService(
     {
         await EnsurePairingCodeEnabledAsync(cancellationToken);
         using var scopeContext = RequestScopes().PushSystem();
-        var stored = await GetAsync(ready.WorkspaceId, ready.RequestId, cancellationToken);
+        var stored = await GetAsync(ready.RequestId, cancellationToken);
         var definition = stored.Value.Definition;
         if (definition.InstanceId != ready.InstanceId || definition.State != AepEnrollmentState.CredentialIssued
             || string.IsNullOrWhiteSpace(definition.CompletionDigest) || !FixedEquals(definition.CompletionDigest, Sha256(ready.CompletionToken)))
@@ -256,7 +310,7 @@ public sealed class AepEnrollmentService(
     {
         using var scopeContext = RequestScopes().Push(context);
         await AuthorizeAsync(context, cancellationToken);
-        var stored = await GetAsync(context.WorkspaceId, requestId, cancellationToken);
+        var stored = await GetAssignedAsync(context, requestId, cancellationToken);
         if (stored.Value.Definition.State != AepEnrollmentState.Available)
             throw new AepEnrollmentException("credential_not_active", "The enrollment credential is not active.", 409);
         stored = await UpdateAsync(stored, stored.Value.Definition with { State = AepEnrollmentState.Verifying, Outcome = "rotation_pending" }, cancellationToken);
@@ -266,7 +320,7 @@ public sealed class AepEnrollmentService(
         {
             await SendLifecycleAsync(stored.Value, AepEnrollmentProtocol.CredentialRotationPath, oldToken,
                 new AepCredentialRotation(stored.Value.Definition.InstanceId,
-                    $"agentstration:{context.WorkspaceId:D}:{stored.Value.Definition.InstanceId:D}", newToken), cancellationToken);
+                    $"agentstration:{TargetScope(stored.Value.Definition).Value}:{stored.Value.Definition.InstanceId:D}", newToken), cancellationToken);
             await WriteTokenAsync(stored.Value, newToken, cancellationToken);
             await VerifyAsync(stored.Value, newToken, cancellationToken);
             await SendLifecycleAsync(stored.Value, AepEnrollmentProtocol.PreviousCredentialRevocationPath, newToken, null, cancellationToken);
@@ -287,7 +341,7 @@ public sealed class AepEnrollmentService(
     {
         using var scopeContext = RequestScopes().Push(context);
         await AuthorizeAsync(context, cancellationToken);
-        var stored = await GetAsync(context.WorkspaceId, requestId, cancellationToken);
+        var stored = await GetAssignedAsync(context, requestId, cancellationToken);
         if (stored.Value.Definition.State == AepEnrollmentState.Revoked) return;
         if (stored.Value.Definition.State is not (AepEnrollmentState.Available or AepEnrollmentState.Disabled or AepEnrollmentState.VerificationFailed))
             throw new AepEnrollmentException("credential_not_active", "The enrollment credential is not active.", 409);
@@ -300,7 +354,7 @@ public sealed class AepEnrollmentService(
 
     private async Task<(string Secret, string Registration)> PersistCredentialAndRegistrationAsync(AepEnrollmentRequestResource request, string token, CancellationToken cancellationToken)
     {
-        var scope = request.ScopeRef ?? throw new InvalidOperationException("The enrollment request is unscoped.");
+        var scope = TargetScope(request.Definition);
         var provider = vaultProviders.Single(value => string.Equals(value.ProviderType, "local", StringComparison.OrdinalIgnoreCase));
         var vaultAddress = ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.Vault, VaultName);
         var vaultContext = new SecretVaultContext(scope, vaultAddress, new Dictionary<string, System.Text.Json.JsonElement>());
@@ -375,7 +429,7 @@ public sealed class AepEnrollmentService(
 
     private async Task<string> ReadTokenAsync(AepEnrollmentRequestResource request, CancellationToken cancellationToken)
     {
-        var scope = request.ScopeRef ?? throw new InvalidOperationException("The enrollment request is unscoped.");
+        var scope = TargetScope(request.Definition);
         var provider = vaultProviders.Single(value => string.Equals(value.ProviderType, "local", StringComparison.OrdinalIgnoreCase));
         var secretName = request.Definition.CredentialSecretName
             ?? throw new InvalidOperationException("The enrollment credential reference is unavailable.");
@@ -402,7 +456,7 @@ public sealed class AepEnrollmentService(
     private async Task DeleteTokenAndDisableRegistrationAsync(AepEnrollmentRequestResource request, CancellationToken cancellationToken)
     {
         await EnrollmentVaultProvider().DeleteAsync(EnrollmentVaultContext(request), CredentialName(request), cancellationToken);
-        var scope = request.ScopeRef ?? throw new InvalidOperationException("The enrollment request is unscoped.");
+        var scope = TargetScope(request.Definition);
         var registrationName = request.Definition.RegistrationName
             ?? throw new InvalidOperationException("The enrollment registration reference is unavailable.");
         var address = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.ExtensionRegistration, registrationName);
@@ -471,7 +525,7 @@ public sealed class AepEnrollmentService(
         ?? throw new InvalidOperationException("The enrollment credential reference is unavailable.");
 
     private static SecretVaultContext EnrollmentVaultContext(AepEnrollmentRequestResource request) => new(
-        request.ScopeRef ?? throw new InvalidOperationException("The enrollment request is unscoped."),
+        TargetScope(request.Definition),
         ResourceAddress.Create(ResourceNamespace.Default, ResourceKinds.Vault, VaultName),
         new Dictionary<string, System.Text.Json.JsonElement>());
 
@@ -484,8 +538,8 @@ public sealed class AepEnrollmentService(
             action,
             outcome,
             TargetAccountId: request.Definition.InstanceId,
-            TenantId: request.Definition.TenantId,
-            WorkspaceId: request.ScopeRef?.Kind == ResourceScopeKind.Workspace ? request.ScopeRef.Value.TargetId : null,
+            TenantId: request.Definition.TargetTenantId,
+            WorkspaceId: request.Definition.TargetScopeRef?.Kind == ResourceScopeKind.Workspace ? request.Definition.TargetScopeRef.Value.TargetId : null,
             ReasonCode: reasonCode), cancellationToken);
 
     private async Task AuthorizeAsync(RequestContext context, CancellationToken cancellationToken) =>
@@ -500,33 +554,98 @@ public sealed class AepEnrollmentService(
             throw new AepEnrollmentException("enrollment_mode_disabled", "Pairing-code enrollment is disabled by the Agentstration enrollment policy.", 403);
     }
 
-    private async Task<StoredResource<AepEnrollmentRequestResource>> GetAsync(Guid workspaceId, Guid requestId, CancellationToken cancellationToken) =>
-        await store.GetExactAsync<AepEnrollmentRequestResource>(Address(ResourceScopeRef.Workspace(workspaceId), requestId.ToString("N")), cancellationToken)
+    private async Task<StoredResource<AepEnrollmentRequestResource>> GetAsync(Guid requestId, CancellationToken cancellationToken) =>
+        await store.GetExactAsync<AepEnrollmentRequestResource>(Address(ResourceScopeRef.Instance, requestId.ToString("N")), cancellationToken)
         ?? throw new AepEnrollmentException("request_not_found", "The enrollment request was not found.", 404);
 
-    private Task<StoredResource<AepEnrollmentRequestResource>> UpdateAsync(
+    private async Task<StoredResource<AepEnrollmentRequestResource>> GetVisibleAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
+    {
+        var stored = await GetAsync(requestId, cancellationToken);
+        var visible = stored.Value.Definition.TargetScopeRef is null
+            ? await platformAuthorization.IsPlatformAdministratorAsync(context.PrincipalId, cancellationToken)
+            : IsVisibleFrom(stored.Value.Definition.TargetScopeRef, context);
+        if (!visible)
+            throw new AepEnrollmentException("request_not_found", "The enrollment request was not found.", 404);
+        return stored;
+    }
+
+    private async Task<StoredResource<AepEnrollmentRequestResource>> GetAssignedAsync(RequestContext context, Guid requestId, CancellationToken cancellationToken)
+    {
+        var stored = await GetVisibleAsync(context, requestId, cancellationToken);
+        if (stored.Value.Definition.TargetScopeRef is not { } targetScopeRef)
+            throw new AepEnrollmentException("scope_required", "Select an instance, tenant, or workspace scope before enrolling the extension.", 409);
+        await scopeOperations.WriteAsync(
+            ResourceKinds.ExtensionRegistration,
+            targetScopeRef,
+            AuthorizationPermissions.ResourcesWrite,
+            _ => Task.FromResult(true),
+            cancellationToken);
+        return stored;
+    }
+
+    private async Task<StoredResource<AepEnrollmentRequestResource>> UpdateAsync(
         StoredResource<AepEnrollmentRequestResource> stored,
         AepEnrollmentRequestProperties definition,
-        CancellationToken cancellationToken) => store.PutExactAsync(
-            stored.Value.ScopeRef!.Value,
+        CancellationToken cancellationToken)
+    {
+        using var systemScope = RequestScopes().PushSystem();
+        return await store.PutExactAsync(
+            ResourceScopeRef.Instance,
             stored.Value with { Definition = definition, Generation = checked(stored.Value.Generation + 1), Status = Succeeded() },
             stored.ETag,
             false,
             cancellationToken);
+    }
 
     private void ValidateAnnouncement(AepEnrollmentAnnouncement announcement)
     {
-        if (announcement.InstanceId == Guid.Empty || announcement.TenantId == Guid.Empty || announcement.WorkspaceId == Guid.Empty
+        if (announcement.InstanceId == Guid.Empty
             || string.IsNullOrWhiteSpace(announcement.Extension.Id) || string.IsNullOrWhiteSpace(announcement.Extension.Name)
             || string.IsNullOrWhiteSpace(announcement.Extension.Version))
             throw new AepEnrollmentException("announcement_invalid", "The enrollment announcement is incomplete.");
         try { AepTransportSecurity.ValidateEndpoint(announcement.Endpoint, transportOptions); }
         catch (AepTransportSecurityException exception) { throw new AepEnrollmentException("endpoint_untrusted", exception.Message); }
-        if (!announcement.PairingUri.IsAbsoluteUri || announcement.PairingUri.UserInfo.Length != 0
-            || announcement.PairingUri.Query.Length != 0 || announcement.PairingUri.Fragment.Length != 0
-            || !SameOrigin(announcement.Endpoint, announcement.PairingUri))
+        if (announcement.Method == AepEnrollmentMethod.PairingCode
+            && (announcement.PairingUri is null || !announcement.PairingUri.IsAbsoluteUri || announcement.PairingUri.UserInfo.Length != 0
+                || announcement.PairingUri.Query.Length != 0 || announcement.PairingUri.Fragment.Length != 0
+                || !SameOrigin(announcement.Endpoint, announcement.PairingUri)))
             throw new AepEnrollmentException("pairing_origin_mismatch", "The pairing URI must use the exact announced AEP origin and contain no query or fragment.");
+        if (announcement.Method == AepEnrollmentMethod.SharedKeyFile && announcement.PairingUri is not null)
+            throw new AepEnrollmentException("announcement_invalid", "A SharedKeyFile announcement must not contain a pairing URI.");
     }
+
+    private async Task ValidateAnnouncementProofAsync(
+        AepEnrollmentAnnouncement announcement,
+        AepEnrollmentProof? proof,
+        CancellationToken cancellationToken)
+    {
+        var provisioner = announcementProvisioners.SingleOrDefault(value => value.Method == announcement.Method)
+            ?? throw new AepEnrollmentException("enrollment_mode_unavailable", $"The '{announcement.Method}' enrollment mode is not configured.", 409);
+        await provisioner.ValidateAsync(announcement, proof, cancellationToken);
+    }
+
+    private async Task<string> ProvisionAnnouncementAsync(
+        AepEnrollmentAnnouncement announcement,
+        ResourceScopeRef targetScopeRef,
+        CancellationToken cancellationToken)
+    {
+        var provisioner = announcementProvisioners.SingleOrDefault(value => value.Method == announcement.Method)
+            ?? throw new AepEnrollmentException("enrollment_mode_unavailable", $"The '{announcement.Method}' enrollment mode is not configured.", 409);
+        return await provisioner.ProvisionAsync(announcement, targetScopeRef, cancellationToken);
+    }
+
+    private async Task EnsureEnrollmentModeEnabledAsync(AepEnrollmentMethod method, CancellationToken cancellationToken)
+    {
+        if (!await enrollmentSettings.IsEnabledAsync(EnrollmentMode(method), cancellationToken))
+            throw new AepEnrollmentException("enrollment_mode_disabled", $"The '{method}' enrollment mode is disabled.", 403);
+    }
+
+    private static AepEnrollmentMode EnrollmentMode(AepEnrollmentMethod method) => method switch
+    {
+        AepEnrollmentMethod.PairingCode => AepEnrollmentMode.PairingCode,
+        AepEnrollmentMethod.SharedKeyFile => AepEnrollmentMode.SharedKeyFile,
+        _ => throw new AepEnrollmentException("announcement_invalid", "The enrollment method is unsupported.")
+    };
 
     private static AepEnrollmentRequestResource Sanitize(AepEnrollmentRequestResource resource) => resource with
     {
@@ -535,7 +654,27 @@ public sealed class AepEnrollmentService(
     private static ScopedResourceAddress Address(ResourceScopeRef scope, string name) =>
         ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ResourceKinds.AepEnrollmentRequest, name);
     private static ResourceStatus Succeeded() => new() { ProvisioningState = ProvisioningState.Succeeded };
+    private static ResourceScopeRef TargetScope(AepEnrollmentRequestProperties definition) =>
+        definition.TargetScopeRef
+        ?? throw new AepEnrollmentException("scope_required", "The enrollment request has not been assigned to a resource scope.", 409);
+    private static bool IsVisibleFrom(ResourceScopeRef? targetScopeRef, RequestContext context) => targetScopeRef switch
+    {
+        null => true,
+        { Kind: ResourceScopeKind.Instance } => true,
+        { Kind: ResourceScopeKind.Tenant, TargetId: var targetId } => targetId == context.TenantId,
+        { Kind: ResourceScopeKind.Workspace, TargetId: var targetId } => targetId == context.WorkspaceId,
+        _ => false
+    };
+    private static AepEnrollmentAnnouncement Announcement(AepEnrollmentRequestProperties definition) => new(
+        definition.InstanceId,
+        new AepExtensionIdentity(definition.ExtensionId, definition.ExtensionName, definition.ExtensionVersion),
+        definition.Endpoint,
+        definition.PairingUri,
+        definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            ? AepEnrollmentMethod.SharedKeyFile
+            : AepEnrollmentMethod.PairingCode);
     private static Uri Normalize(Uri value) => new UriBuilder(value) { Host = value.IdnHost.ToLowerInvariant() }.Uri;
+    private static Uri? NormalizeOptional(Uri? value) => value is null ? null : Normalize(value);
     private static bool SameOrigin(Uri left, Uri right) =>
         string.Equals(left.Scheme, right.Scheme, StringComparison.OrdinalIgnoreCase)
         && string.Equals(left.IdnHost, right.IdnHost, StringComparison.OrdinalIgnoreCase)
