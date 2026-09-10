@@ -69,4 +69,19 @@
   <data name="NoRefreshScheduled" xml:space="preserve"><value>Aucune actualisation n’est actuellement planifiée.</value></data>
   <data name="RefreshDueNow" xml:space="preserve"><value>À actualiser maintenant</value></data>
   <data name="ChannelRefreshTarget" xml:space="preserve"><value>Channel {0}</value></data>
+  <data name="SourceActivity" xml:space="preserve"><value>Activité de la Source</value></data>
+  <data name="ImportStatus" xml:space="preserve"><value>État de l’import</value></data>
+  <data name="ImportStatusDescription" xml:space="preserve"><value>Suivez la version exacte importée et la dernière tentative de récupération.</value></data>
+  <data name="SelectedVersion" xml:space="preserve"><value>Version sélectionnée</value></data>
+  <data name="LastSuccessfulImport" xml:space="preserve"><value>Dernier import réussi</value></data>
+  <data name="LastAttempt" xml:space="preserve"><value>Dernière tentative</value></data>
+  <data name="SuccessfulImportValue" xml:space="preserve"><value>Version {0} · {1}</value></data>
+  <data name="UnknownVersion" xml:space="preserve"><value>inconnue</value></data>
+  <data name="Provider" xml:space="preserve"><value>Fournisseur de Sources</value></data>
+  <data name="ProviderGeneration" xml:space="preserve"><value>Contribution {0} · génération {1}</value></data>
+  <data name="PendingMaterialization" xml:space="preserve"><value>En attente de la première matérialisation</value></data>
+  <data name="Compatibility" xml:space="preserve"><value>Compatibilité</value></data>
+  <data name="ResolvedRevision" xml:space="preserve"><value>Révision résolue</value></data>
+  <data name="ChannelContract" xml:space="preserve"><value>Binding {0} · jeu d’options {1}@{2}</value></data>
+  <data name="UnavailableLocaleFallback" xml:space="preserve"><value>{0} · {1} (repli)</value></data>
 </root>

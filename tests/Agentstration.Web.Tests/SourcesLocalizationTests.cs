@@ -55,6 +55,11 @@ public sealed class SourcesLocalizationTests
             Assert.AreEqual("Catalogue indisponible", strings["CatalogUnavailable"].Value);
             Assert.AreEqual("Supprimer la Source", strings["DeleteSourceTitle"].Value);
             Assert.AreEqual("Les Packs déjà installés sont conservés.", strings["DeleteSourceRetainsPacks"].Value);
+            Assert.AreEqual("État de l’import", strings["ImportStatus"].Value);
+            Assert.AreEqual("Dernier import réussi", strings["LastSuccessfulImport"].Value);
+            Assert.AreEqual("Fournisseur de Sources", strings["Provider"].Value);
+            Assert.AreEqual("Révision résolue", strings["ResolvedRevision"].Value);
+            Assert.AreEqual("Deutsch (Deutschland) · de-DE (repli)", strings["UnavailableLocaleFallback", "Deutsch (Deutschland)", "de-DE"].Value);
             Assert.AreEqual(
                 "Git Source Provider — git (configuré à l’enregistrement)",
                 strings["DiscoveredProvider", "Git Source Provider", "git"].Value);

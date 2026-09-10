@@ -9,6 +9,7 @@ public sealed record SourceConsoleChannelView(
     SourceChannelDefinition Definition,
     SourceChannelStatusView Status,
     IReadOnlyList<SourceChannelSnapshotResource> Snapshots,
+    SourceChannelSnapshotResource? CurrentSnapshot,
     SourceChannelSnapshotVerificationView? Verification,
     IReadOnlyList<SourceCatalogView> Catalogs,
     SourceConsoleCatalogFailure? CatalogFailure);
@@ -138,7 +139,7 @@ public sealed class SourceConsoleManagementService(
                     }
                 }
             }
-            channelViews.Add(new(channel, status, history, snapshotVerification, discoveredCatalogs, catalogFailure));
+            channelViews.Add(new(channel, status, history, current, snapshotVerification, discoveredCatalogs, catalogFailure));
         }
 
         var availableProviders = await providers.ListAsync(cancellationToken);
