@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a7a8cdde-0ad5-46fd-b239-ecb8cc9defc2",
     "name": "Agentstration - Source Registries",
-    "description": "Local smoke-test collection for Source Registry registration management (FR #245). Run the requests in order. The login establishes the authentication cookie and the scripts retain ETags for optimistic concurrency.",
+    "description": "Local smoke-test collection for Source Registry registration, discovery, trust, and exact Source import. Run the requests in order. The login establishes the authentication cookie and the scripts retain ETags and an optional discovery selection.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -14,7 +14,10 @@
     { "key": "officialRegistryName", "value": "agentstration-official", "type": "string" },
     { "key": "registryEtag", "value": "", "type": "string" },
     { "key": "staleRegistryEtag", "value": "", "type": "string" },
-    { "key": "officialRegistryEtag", "value": "", "type": "string" }
+    { "key": "officialRegistryEtag", "value": "", "type": "string" },
+    { "key": "discoveredPublisher", "value": "agentstration", "type": "string" },
+    { "key": "discoveredSource", "value": "", "type": "string" },
+    { "key": "discoverySelection", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -335,6 +338,82 @@
               "options": { "raw": { "language": "json" } }
             },
             "url": "{{baseUrl}}/api/sourceregistries"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Discovery and exact import",
+      "item": [
+        {
+          "name": "Search compatible Sources",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Discovery is bounded and available', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.take).to.eql(20);",
+                  "    pm.expect(body.value).to.be.an('array');",
+                  "});",
+                  "const sources = pm.response.json().value;",
+                  "if (sources.length && sources[0].versions.length && sources[0].versions[0].observations.length) {",
+                  "    pm.collectionVariables.set('discoveredPublisher', sources[0].publisher);",
+                  "    pm.collectionVariables.set('discoveredSource', sources[0].name);",
+                  "    pm.collectionVariables.set('discoverySelection', JSON.stringify(sources[0].versions[0].observations[0].selection));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/sourceregistries/discovery?compatibleOnly=true&freshOnly=false&skip=0&take=20",
+            "description": "Reads only cached Registry shards. Run the official refresh first to obtain results."
+          }
+        },
+        {
+          "name": "List discovered publishers",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/sourceregistries/discovery/publishers" }
+        },
+        {
+          "name": "Inspect selected Source",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/sourceregistries/discovery/sources/{{discoveredPublisher}}/{{discoveredSource}}",
+            "description": "Requires discoveredSource to have been captured by the search request."
+          }
+        },
+        {
+          "name": "Import exact retained observation",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('discoverySelection')) {",
+                  "    throw new Error('Run Search compatible Sources after a successful Registry refresh first.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"selection\": {{discoverySelection}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/sourceregistries/discovery/imports",
+            "description": "Re-resolves the retained selection, fetches only its manifest, and imports no Channel content."
           }
         }
       ]

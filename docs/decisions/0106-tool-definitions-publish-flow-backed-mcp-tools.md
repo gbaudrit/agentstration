@@ -1,4 +1,4 @@
-# ADR-0105 — ToolDefinitions publish Flow-backed MCP Tools
+# ADR-0106 — ToolDefinitions publish Flow-backed MCP Tools
 
 ## Status
 
@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Agentstration already consumes external MCP Tools through governed `ToolProvider` and `Tool` resources, while ADR-0104 requires bounded business capabilities to be invocable by Agents and MCP clients without exposing a generic Flow launcher. Static attributed server methods cannot represent Workspace-authored Tools or follow an active published Flow version.
+Agentstration already consumes external MCP Tools through governed `ToolProvider` and `Tool` resources, while ADR-0105 requires bounded business capabilities to be invocable by Agents and MCP clients without exposing a generic Flow launcher. Static attributed server methods cannot represent Workspace-authored Tools or follow an active published Flow version.
 
 A Flow-backed Tool must preserve one public contract, capture the effective immutable Flow version on every call, participate in the ordinary Tool assignment and governance path, and keep Tenant, Workspace, and Principal scope outside model-controlled arguments.
 

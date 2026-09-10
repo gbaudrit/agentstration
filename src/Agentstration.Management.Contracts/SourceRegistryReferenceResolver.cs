@@ -94,4 +94,15 @@ public sealed class SourceRegistryRuntimeReferenceResolver : ISourceRegistryRefe
 {
     public string ResolveRegistryPublicationPath(Uri baseUri, string registryUrl) =>
         SourceRegistryReferenceResolver.ResolveRegistryPublicationPath(baseUri, registryUrl);
+
+    public Uri ResolveManifestUrl(Uri finalIndexUrl, string manifestUrl)
+    {
+        ArgumentNullException.ThrowIfNull(finalIndexUrl);
+        var builder = new UriBuilder(finalIndexUrl) { Query = string.Empty, Fragment = string.Empty };
+        var slash = builder.Path.LastIndexOf('/');
+        builder.Path = slash < 0 ? "/" : builder.Path[..(slash + 1)];
+        var baseUri = builder.Uri;
+        var path = SourceRegistryReferenceResolver.ResolveManifestPublicationPath(baseUri, manifestUrl);
+        return new Uri(baseUri, path);
+    }
 }

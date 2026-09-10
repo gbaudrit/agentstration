@@ -42,6 +42,7 @@ public static class SecurityAuditActions
     public const string SourceRegistryConfigurationUpdated = "source-registry.configuration-updated";
     public const string SourceRegistryDeleted = "source-registry.deleted";
     public const string SourceRegistryRefreshed = "source-registry.refreshed";
+    public const string SourceRegistrySourceImported = "source-registry.source-imported";
 }
 
 public sealed record SecurityAuditEvent(

@@ -182,6 +182,7 @@ public sealed record SourcePackProvenance
     public required string CatalogPath { get; init; }
     public required string EntryName { get; init; }
     public required string EntryPath { get; init; }
+    public SourceRegistryImportProvenance? Registry { get; init; }
 }
 
 public sealed record InstalledPackResource : Resource

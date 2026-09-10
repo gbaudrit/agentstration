@@ -104,7 +104,8 @@ public sealed class SourcePackInstallationService(
             catalog.Provenance.CatalogPath,
             entry.Name,
             entry.Path,
-            archiveDigest);
+            archiveDigest,
+            version.Definition.Origin?.Registry);
         var provenance = new SourcePackProvenance
         {
             SourceUid = source.Uid,
@@ -120,7 +121,8 @@ public sealed class SourcePackInstallationService(
             CatalogName = catalog.Provenance.CatalogName,
             CatalogPath = catalog.Provenance.CatalogPath,
             EntryName = entry.Name,
-            EntryPath = entry.Path
+            EntryPath = entry.Path,
+            Registry = version.Definition.Origin?.Registry
         };
         return new(archive, pin, provenance);
     }

@@ -10,6 +10,12 @@ public static class SourceRegistryEndpoints
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         var registries = endpoints.MapGroup("/api/sourceregistries");
+        registries.MapGet("/discovery", SearchAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        registries.MapGet("/discovery/publishers", ListPublishersAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        registries.MapGet("/discovery/sources/{publisher}/{sourceName}", GetDiscoveredSourceAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        registries.MapPost("/discovery/imports", ImportDiscoveredSourceAsync)
+            .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         registries.MapGet("/", ListAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         registries.MapGet("/{registryName}", GetAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         registries.MapPost("/", CreateAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
@@ -21,6 +27,59 @@ public static class SourceRegistryEndpoints
         registries.MapGet("/trust/sources/{publisher}/{sourceName}/versions/{version}", GetSourceTrustAsync)
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
     }
+
+    private static Task<IResult> SearchAsync(
+        string? search,
+        string? publisher,
+        string? registry,
+        bool? compatibleOnly,
+        bool? freshOnly,
+        bool? conflictsOnly,
+        SourceRegistryTrustPolicy? trustPolicy,
+        SourceRegistryPublisherStatus? publisherStatus,
+        SourceVerificationStatus? verificationStatus,
+        int? skip,
+        int? take,
+        SourceRegistryDiscoveryService service,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () => Results.Ok(await service.SearchAsync(new()
+        {
+            Search = search,
+            Publisher = publisher,
+            Registry = registry,
+            CompatibleOnly = compatibleOnly ?? true,
+            FreshOnly = freshOnly ?? false,
+            ConflictsOnly = conflictsOnly ?? false,
+            TrustPolicy = trustPolicy,
+            PublisherStatus = publisherStatus,
+            VerificationStatus = verificationStatus,
+            Skip = skip ?? 0,
+            Take = take ?? 50
+        }, cancellationToken)));
+
+    private static Task<IResult> ListPublishersAsync(
+        SourceRegistryDiscoveryService service,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () => Results.Ok(
+            new ValueResponse<SourceRegistryDiscoveryPublisher>(await service.ListPublishersAsync(cancellationToken))));
+
+    private static Task<IResult> GetDiscoveredSourceAsync(
+        string publisher,
+        string sourceName,
+        SourceRegistryDiscoveryService service,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () =>
+        {
+            var result = await service.GetAsync(publisher, sourceName, cancellationToken);
+            return result is null ? Results.NotFound() : Results.Ok(result);
+        });
+
+    private static Task<IResult> ImportDiscoveredSourceAsync(
+        ImportSourceRegistryObservationRequest body,
+        SourceRegistryDiscoveryService service,
+        CancellationToken cancellationToken) =>
+        ModelManagementHttp.ExecuteAsync(async () => Results.Ok(
+            await service.ImportAsync(body.Selection, body.ScopeRef, cancellationToken)));
 
     private static Task<IResult> ListAsync(SourceRegistryManagementService service, CancellationToken cancellationToken) =>
         ModelManagementHttp.ExecuteAsync(async () =>

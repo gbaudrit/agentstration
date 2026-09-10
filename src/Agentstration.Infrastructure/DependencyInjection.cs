@@ -215,6 +215,7 @@ public static class DependencyInjection
         services.AddSingleton<ISourceRegistryCacheStore>(_ => new FileSystemSourceRegistryCacheStore(Path.Combine(dataDirectory, "source-registry-cache")));
         services.AddSingleton<SourceRegistryManagementService>();
         services.AddSingleton<SourceRegistryTrustEvaluationService>();
+        services.AddSingleton<SourceRegistryDiscoveryService>();
         services.AddSingleton<ISourceVerificationEvidenceProvider>(services => services.GetRequiredService<SourceRegistryTrustEvaluationService>());
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<ToolDefinitionService>();

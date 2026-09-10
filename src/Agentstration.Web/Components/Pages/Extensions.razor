@@ -127,7 +127,7 @@
                             }
                             @if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode && CanRotate(enrollment.Definition.State))
                             {
-                                <div class="enrollment-actions"><button class="button-primary" @onclick="() => CopyAndOpenAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button><button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button><button class="button-secondary" @onclick="() => CancelEnrollmentAsync(enrollment)" disabled="@pairingBusy">@T("Cancel")</button></div>
+                                <div class="enrollment-actions"><button class="button-primary" @onclick="() => EnrollAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button><button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button><button class="button-secondary" @onclick="() => CancelEnrollmentAsync(enrollment)" disabled="@pairingBusy">@T("Cancel")</button></div>
                             }
                             else if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
                                 && (requiresScope || enrollment.Definition.State == AepEnrollmentState.Unpaired))
