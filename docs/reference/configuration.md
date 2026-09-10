@@ -14,6 +14,29 @@ Do not commit API keys. HTTP payload capture is disabled by default, and sensiti
 
 `Agentstration:Extensions:DiscoverOnStartup` defaults to `false`. PairingCode and SharedKeyFile extensions initiate enrollment and provide their running endpoint, so Agentstration does not need a compiled-in extension catalog. Set it to `true` only for the internal compatibility path that synchronizes explicitly configured endpoints after persistence initialization and declarative bootstrap. This synchronization has no Console action or public HTTP command.
 
+## Official Source registry transport
+
+The official Source registry registration is persisted Management state; its enabled flag and index URL are administered through `/api/sourceregistries`. Host configuration controls only bounded transport behavior:
+
+```json
+{
+  "Agentstration": {
+    "Sources": {
+      "Registries": {
+        "Transport": {
+          "TimeoutSeconds": 15,
+          "MaximumRedirects": 3,
+          "ConnectTimeoutSeconds": 5,
+          "PooledConnectionLifetimeSeconds": 120
+        }
+      }
+    }
+  }
+}
+```
+
+Only public HTTPS JSON/YAML endpoints are accepted. Redirects must remain on the configured origin, automatic redirects are disabled, DNS results are filtered again when connecting, credentials/query/fragment/percent-encoded paths are rejected, and index/shard byte limits remain fixed by the Registry v1 contract. Startup never contacts the registry; refresh is currently manual. Scheduling, retry/backoff, arbitrary private registrations, credentials, discovery merging, trust, import, and cache retention are separate increments.
+
 ## Authentication
 
 `Agentstration:Authentication:Mode` is `Local`, `Oidc`, `Hybrid`, `Development`, or `Disabled`. `Local` is the offline default. `Development` and `Disabled` are rejected outside Development and Testing.

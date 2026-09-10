@@ -24,6 +24,15 @@ public sealed partial class ModelManagementApiTests
         CollectionAssert.AreEquivalent(
             new[] { ResourceScopeKind.Workspace },
             ResourceScopePolicy.AllowedScopes(ResourceKinds.Trigger).ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScopeKind.Instance },
+            ResourceScopePolicy.AllowedScopes(ResourceKinds.SourceRegistryRegistration).ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScopeKind.Instance },
+            ResourceScopePolicy.AllowedScopes(ResourceKinds.SourceRegistryObservedState).ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { ResourceScopeKind.Instance },
+            ResourceScopePolicy.AllowedScopes(ResourceKinds.SourceRegistryRefreshRecord).ToArray());
     }
 
     [TestMethod]

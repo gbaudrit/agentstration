@@ -89,3 +89,9 @@ public static partial class SourceRegistryReferenceResolver
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$", RegexOptions.CultureInvariant)]
     private static partial Regex PathSegmentPattern();
 }
+
+public sealed class SourceRegistryRuntimeReferenceResolver : ISourceRegistryReferenceResolver
+{
+    public string ResolveRegistryPublicationPath(Uri baseUri, string registryUrl) =>
+        SourceRegistryReferenceResolver.ResolveRegistryPublicationPath(baseUri, registryUrl);
+}

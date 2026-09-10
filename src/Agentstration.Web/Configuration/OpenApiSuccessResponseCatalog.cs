@@ -314,6 +314,12 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/usages", StringComparison.OrdinalIgnoreCase)) return Json<SourceProviderUsagesResponse>(200, "List Source Provider usages");
             return Json<SourceProviderResource>(200, method == "PUT" ? "Update a Source Provider" : "Get a Source Provider");
         }
+        if (path.StartsWith("/api/sourceregistries", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path == "/api/sourceregistries") return Json<ValueResponse<SourceRegistryRegistrationView>>(200, "List Source registries");
+            if (path.EndsWith("/refreshes", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistryRefreshHistoryResponse>(200, "List Source registry refreshes");
+            return Json<SourceRegistryRegistrationView>(200, path.EndsWith("/refresh", StringComparison.OrdinalIgnoreCase) ? "Refresh a Source registry" : "Get or update a Source registry");
+        }
         if (path.StartsWith("/api/modelprofiles", StringComparison.OrdinalIgnoreCase))
         {
             if (path == "/api/modelprofiles") return method == "POST" ? Json<ModelProfileResource>(201, "Create a model profile") : Json<ValueResponse<ModelProfileSummaryResponse>>(200, "List model profiles");

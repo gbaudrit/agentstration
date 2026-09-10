@@ -11,7 +11,7 @@ using YamlDotNet.Serialization;
 
 namespace Agentstration.Management.Contracts;
 
-public sealed partial class SourceRegistryIndexReader
+public sealed partial class SourceRegistryIndexReader : ISourceRegistryIndexReader
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly JsonSerializerOptions StrictJsonOptions = new()

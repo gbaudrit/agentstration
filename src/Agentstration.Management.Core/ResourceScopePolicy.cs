@@ -18,7 +18,8 @@ public static class ResourceScopePolicy
     public static IReadOnlySet<ResourceScopeKind> AllowedScopes(string kind) => kind switch
     {
         ResourceKinds.ModelProvider or ResourceKinds.ModelProfile or ResourceKinds.RuntimeProfile => TenantOnly,
-        ResourceKinds.SourceProvider => InstanceOnly,
+        ResourceKinds.SourceProvider or ResourceKinds.SourceRegistryRegistration
+            or ResourceKinds.SourceRegistryObservedState or ResourceKinds.SourceRegistryRefreshRecord => InstanceOnly,
         ResourceKinds.Source or ResourceKinds.SourceVersion or ResourceKinds.SourceConfiguration
             or ResourceKinds.SourceObservedState or ResourceKinds.SourceImportRecord
             or ResourceKinds.SourceChannelSnapshot or ResourceKinds.SourceChannelObservedState

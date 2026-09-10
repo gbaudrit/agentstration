@@ -41,6 +41,9 @@ public static class ResourceKinds
     public const string SourceImportRecord = "SourceImportRecord";
     public const string SourceChannelSnapshot = "SourceChannelSnapshot";
     public const string SourceChannelObservedState = "SourceChannelObservedState";
+    public const string SourceRegistryRegistration = "SourceRegistryRegistration";
+    public const string SourceRegistryObservedState = "SourceRegistryObservedState";
+    public const string SourceRegistryRefreshRecord = "SourceRegistryRefreshRecord";
     public const string SourceChannelRefreshRecord = "SourceChannelRefreshRecord";
 }
 
