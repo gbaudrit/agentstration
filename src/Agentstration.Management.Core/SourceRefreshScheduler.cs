@@ -9,7 +9,8 @@ public sealed class SourceRefreshScheduler(
     SourceManagementService sources,
     SourceChannelSnapshotService channels,
     IRequestContextScopeFactory scopes,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    SourceRegistryManagementService? registries = null)
 {
     public async Task RunDueAsync(CancellationToken cancellationToken)
     {
@@ -24,6 +25,50 @@ public sealed class SourceRefreshScheduler(
             var current = await sources.GetExactAsync(scopeRef, source.Source.Definition.Publisher,
                 source.Source.Name, cancellationToken) ?? source;
             await RefreshChannelsIfDueAsync(current, scopeRef, now, cancellationToken);
+        }
+
+        await ScanDueRegistriesAsync(now, cancellationToken);
+    }
+
+    public async Task RunDueRegistriesAsync(CancellationToken cancellationToken)
+    {
+        using var system = scopes.PushSystem();
+        await ScanDueRegistriesAsync(timeProvider.GetUtcNow(), cancellationToken);
+    }
+
+    private async Task ScanDueRegistriesAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (registries is null) return;
+        foreach (var registry in await registries.ListAsync(cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var registration = registry.Registration;
+            var policy = registration.Definition.RefreshPolicy;
+            if (!registration.Definition.Enabled || !policy.PeriodicEnabled) continue;
+
+            var observed = registry.Observed.Definition;
+            if (observed.LastAttemptedAt is { } lastAttemptedAt
+                && GetNextDue(lastAttemptedAt, observed.ConsecutiveFailures, policy,
+                    $"registry|{registration.Uid:N}") > now)
+                continue;
+
+            using var timeout = new CancellationTokenSource(policy.Timeout, timeProvider);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+            try
+            {
+                _ = await registries.RefreshAsync(registration.Name, SourceRegistryRefreshTrigger.Scheduled,
+                    observed.ConsecutiveFailures, observed.LastAttemptedAt, linked.Token);
+            }
+            catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                await registries.RecordScheduledFailureAsync(registration.Name, "source_registry_refresh_timeout",
+                    "The scheduled Source registry refresh timed out.", observed.ConsecutiveFailures,
+                    cancellationToken);
+            }
+            catch (SourceRegistryOperationException)
+            {
+                // Expected failures are persisted and retried according to the registration policy.
+            }
         }
     }
 
@@ -136,20 +181,40 @@ public sealed class SourceRefreshScheduler(
         int consecutiveFailures,
         SourceRefreshPolicy policy,
         string scheduleKey)
+        => GetNextDue(lastAttempt, consecutiveFailures, policy.MaximumAttempts,
+            TimeSpan.FromSeconds(policy.IntervalSeconds), TimeSpan.FromSeconds(policy.InitialBackoffSeconds),
+            TimeSpan.FromSeconds(policy.MaximumBackoffSeconds), TimeSpan.FromSeconds(policy.JitterSeconds), scheduleKey);
+
+    public static DateTimeOffset GetNextDue(
+        DateTimeOffset lastAttempt,
+        int consecutiveFailures,
+        SourceRegistryRefreshPolicy policy,
+        string scheduleKey)
+        => GetNextDue(lastAttempt, consecutiveFailures, policy.MaximumAttempts, policy.Interval,
+            policy.InitialBackoff, policy.MaximumBackoff, policy.Jitter, scheduleKey);
+
+    private static DateTimeOffset GetNextDue(
+        DateTimeOffset lastAttempt,
+        int consecutiveFailures,
+        int maximumAttempts,
+        TimeSpan interval,
+        TimeSpan initialBackoff,
+        TimeSpan maximumBackoff,
+        TimeSpan jitter,
+        string scheduleKey)
     {
-        var delay = consecutiveFailures is > 0 && consecutiveFailures < int.MaxValue
-            && consecutiveFailures < policy.MaximumAttempts
-            ? TimeSpan.FromSeconds(Math.Min(
-                policy.MaximumBackoffSeconds,
-                policy.InitialBackoffSeconds * Math.Pow(2, consecutiveFailures - 1)))
-            : TimeSpan.FromSeconds(policy.IntervalSeconds + DeterministicJitter(scheduleKey, policy.JitterSeconds));
+        var delay = consecutiveFailures is > 0 and < int.MaxValue && consecutiveFailures < maximumAttempts
+            ? TimeSpan.FromTicks(Math.Min(maximumBackoff.Ticks,
+                (long)Math.Min(long.MaxValue, initialBackoff.Ticks * Math.Pow(2, consecutiveFailures - 1))))
+            : interval + DeterministicJitter(scheduleKey, jitter);
         return lastAttempt + delay;
     }
 
-    private static int DeterministicJitter(string key, int maximumSeconds)
+    private static TimeSpan DeterministicJitter(string key, TimeSpan maximum)
     {
-        if (maximumSeconds == 0) return 0;
+        if (maximum == TimeSpan.Zero) return TimeSpan.Zero;
         var digest = SHA256.HashData(Encoding.UTF8.GetBytes(key));
-        return (int)(BitConverter.ToUInt32(digest) % (uint)(maximumSeconds + 1));
+        var maximumSeconds = checked((uint)maximum.TotalSeconds);
+        return TimeSpan.FromSeconds(BitConverter.ToUInt32(digest) % (maximumSeconds + 1));
     }
 }

@@ -172,6 +172,9 @@ public sealed class SourceRegistryInfrastructureTests
             Assert.IsNotNull(preserved);
             CollectionAssert.AreEqual("index"u8.ToArray(), preserved.Index);
             CollectionAssert.AreEqual("registry"u8.ToArray(), preserved.Catalogs["registry.json"]);
+
+            await cache.RemoveAsync(first.ObservationId, default);
+            Assert.IsNull(await cache.GetAsync(first.ObservationId, default));
         }
         finally
         {
