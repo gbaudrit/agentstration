@@ -44,6 +44,7 @@ public static class ResourceKinds
     public const string SourceRegistryRegistration = "SourceRegistryRegistration";
     public const string SourceRegistryObservedState = "SourceRegistryObservedState";
     public const string SourceRegistryRefreshRecord = "SourceRegistryRefreshRecord";
+    public const string SourceChannelRefreshRecord = "SourceChannelRefreshRecord";
 }
 
 public sealed record ResourceMetadata

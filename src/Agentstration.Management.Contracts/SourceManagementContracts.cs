@@ -11,6 +11,7 @@ public sealed record UpdateOfficialSourceRegistryRequest(string IndexUrl, bool E
 public sealed record SourceRegistryRefreshHistoryResponse(
     IReadOnlyList<SourceRegistryRefreshRecordResource> Value,
     int Count);
+public sealed record UpdateSourceRefreshConfigurationRequest(SourceRefreshConfiguration Refresh);
 
 public sealed record CreateSourceProviderRequest(
     string Name,

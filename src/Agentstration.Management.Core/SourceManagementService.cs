@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -15,6 +16,8 @@ public sealed partial class SourceManagementService(
     ResourceScopeOperationService scopeOperations,
     SourceVerificationService verification)
 {
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> refreshLocks = new(StringComparer.Ordinal);
+
     public async Task<SourceImportResult> ImportYamlAsync(string rawManifest, CancellationToken cancellationToken) =>
         await ImportYamlAsync(rawManifest, null, cancellationToken);
 
@@ -28,7 +31,7 @@ public sealed partial class SourceManagementService(
             ResourceKinds.Source,
             targetScopeRef,
             AuthorizationPermissions.ResourcesWrite,
-            token => ReadAndImportCoreAsync(rawManifest, null, targetScopeRef, token),
+            token => ReadAndImportCoreAsync(rawManifest, null, targetScopeRef, SourceRefreshTrigger.Import, token),
             cancellationToken);
     }
 
@@ -48,9 +51,71 @@ public sealed partial class SourceManagementService(
             async token =>
             {
                 var retrieved = await retrieval.RetrieveAsync(source, token);
-                return await ReadAndImportCoreAsync(retrieved.Content, retrieved.Origin, targetScopeRef, token);
+                return await ReadAndImportCoreAsync(retrieved.Content, retrieved.Origin, targetScopeRef, SourceRefreshTrigger.Import, token);
             },
             cancellationToken);
+    }
+
+    public async Task<SourceImportResult> RefreshExactAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        SourceRefreshTrigger trigger,
+        CancellationToken cancellationToken)
+    {
+        var source = (await GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+        var gate = refreshLocks.GetOrAdd($"{scopeRef}|{publisher}|{name}", _ => new(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            return await scopeOperations.WriteAsync(ResourceKinds.Source, scopeRef, AuthorizationPermissions.ResourcesWrite,
+                token => RefreshLockedAsync(source, trigger, token), cancellationToken);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    public async Task<StoredResource<SourceConfigurationResource>> UpdateRefreshConfigurationExactAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        SourceRefreshConfiguration refresh,
+        string ifMatch,
+        CancellationToken cancellationToken)
+    {
+        ValidateRefreshConfiguration(refresh);
+        var source = (await GetExactAsync(scopeRef, publisher, name, cancellationToken))?.Source
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+        return await scopeOperations.WriteAsync(ResourceKinds.SourceConfiguration, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        {
+            var address = ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceConfiguration, source.Name);
+            var current = await store.GetExactAsync<SourceConfigurationResource>(address, token)
+                ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceConfiguration, source.Name, source.Namespace));
+            return await store.PutExactAsync(scopeRef, current.Value with
+            {
+                Generation = checked(current.Value.Generation + 1),
+                Definition = current.Value.Definition with { Refresh = refresh }
+            }, ifMatch, false, token);
+        }, cancellationToken);
+    }
+
+    public async Task RecordScheduledFailureExactAsync(
+        ResourceScopeRef scopeRef,
+        string publisher,
+        string name,
+        string errorCode,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        var view = await GetExactAsync(scopeRef, publisher, name, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.Source, name, new ResourceNamespace(publisher)));
+        var source = view.Source;
+        await RecordAsync(source, timeProvider.GetUtcNow(), SourceImportOutcome.Rejected, null, null, null,
+            view.Configuration.Definition.Origin,
+            SourceRefreshTrigger.Scheduled, errorCode, errorMessage, cancellationToken);
     }
 
     public async Task<IReadOnlyList<SourceView>> ListAsync(CancellationToken cancellationToken)
@@ -207,6 +272,7 @@ public sealed partial class SourceManagementService(
             async token =>
             {
                 await DeleteChildrenAsync<SourceChannelObservedResource>(scopeRef, ResourceKinds.SourceChannelObservedState, source.Value.Uid, value => value.Definition.SourceUid, token);
+                await DeleteChildrenAsync<SourceChannelRefreshRecordResource>(scopeRef, ResourceKinds.SourceChannelRefreshRecord, source.Value.Uid, value => value.Definition.SourceUid, token);
                 await DeleteChildrenAsync<SourceChannelSnapshotResource>(scopeRef, ResourceKinds.SourceChannelSnapshot, source.Value.Uid, value => value.Definition.SourceUid, token);
                 await DeleteChildrenAsync<SourceImportRecordResource>(scopeRef, ResourceKinds.SourceImportRecord, source.Value.Uid, value => value.Definition.SourceUid, token);
                 await DeleteChildrenAsync<SourceConfigurationResource>(scopeRef, ResourceKinds.SourceConfiguration, source.Value.Uid, value => value.Definition.SourceUid, token);
@@ -240,15 +306,16 @@ public sealed partial class SourceManagementService(
         string rawManifest,
         SourceManifestOrigin? origin,
         ResourceScopeRef scopeRef,
+        SourceRefreshTrigger trigger,
         CancellationToken cancellationToken)
     {
         try
         {
-            return await ImportCoreAsync(manifests.Read(rawManifest), origin, scopeRef, cancellationToken);
+            return await ImportCoreAsync(manifests.Read(rawManifest), origin, scopeRef, trigger, cancellationToken);
         }
         catch (SourceValidationException exception) when (exception.ParsedManifest is { } parsed)
         {
-            await TryRecordRejectedAsync(parsed, origin, scopeRef, exception, cancellationToken);
+            await TryRecordRejectedAsync(parsed, origin, scopeRef, trigger, exception, cancellationToken);
             throw;
         }
     }
@@ -257,6 +324,7 @@ public sealed partial class SourceManagementService(
         ParsedSourceManifest parsed,
         SourceManifestOrigin? origin,
         ResourceScopeRef scopeRef,
+        SourceRefreshTrigger trigger,
         CancellationToken cancellationToken)
     {
         var manifest = parsed.Manifest;
@@ -284,7 +352,7 @@ public sealed partial class SourceManagementService(
         var sameVersion = versions.SingleOrDefault(value => string.Equals(value.Value.Definition.Version, manifest.Definition.Version, StringComparison.Ordinal));
         if (sameVersion is not null && !string.Equals(sameVersion.Value.Definition.ManifestDigest, parsed.Digest, StringComparison.Ordinal))
         {
-            await RecordAsync(source, now, SourceImportOutcome.Rejected, manifest.Definition.Version, parsed.Digest, null, origin,
+            await RecordAsync(source, now, SourceImportOutcome.Rejected, manifest.Definition.Version, parsed.Digest, null, origin, trigger,
                 "source_version_digest_conflict", "The declared Source Version was already imported with a different manifest digest.", cancellationToken);
             throw new SourceVersionConflictException($"Source '{manifest.Definition.Publisher.Name}/{manifest.Metadata.Name}' version '{manifest.Definition.Version}' was already imported with a different manifest digest.");
         }
@@ -344,7 +412,16 @@ public sealed partial class SourceManagementService(
             }, null, true, cancellationToken);
         }
 
-        await RecordAsync(source, now, outcome, manifest.Definition.Version, parsed.Digest, version.Uid, origin, null, null, cancellationToken);
+        else if (origin is not null && configuration.Value.Definition.Origin != origin)
+        {
+            configuration = await store.PutExactAsync(scopeRef, configuration.Value with
+            {
+                Generation = checked(configuration.Value.Generation + 1),
+                Definition = configuration.Value.Definition with { Origin = origin }
+            }, configuration.ETag, false, cancellationToken);
+        }
+
+        await RecordAsync(source, now, outcome, manifest.Definition.Version, parsed.Digest, version.Uid, origin, trigger, null, null, cancellationToken);
         var view = await BuildViewAsync(source, cancellationToken);
         return new SourceImportResult(view, version, outcome, await verification.VerifyDefinitionAsync(version, cancellationToken));
     }
@@ -353,6 +430,7 @@ public sealed partial class SourceManagementService(
         ParsedSourceManifest parsed,
         SourceManifestOrigin? origin,
         ResourceScopeRef scopeRef,
+        SourceRefreshTrigger trigger,
         SourceValidationException exception,
         CancellationToken cancellationToken)
     {
@@ -372,6 +450,7 @@ public sealed partial class SourceManagementService(
             parsed.Digest,
             null,
             origin,
+            trigger,
             exception.Code,
             exception.Message,
             cancellationToken);
@@ -385,6 +464,7 @@ public sealed partial class SourceManagementService(
         string? digest,
         Guid? versionUid,
         SourceManifestOrigin? origin,
+        SourceRefreshTrigger trigger,
         string? errorCode,
         string? errorMessage,
         CancellationToken cancellationToken)
@@ -400,7 +480,9 @@ public sealed partial class SourceManagementService(
             LastSuccessfulVersionUid = versionUid ?? current?.Value.Definition.LastSuccessfulVersionUid,
             LastSuccessfulAt = versionUid is null ? current?.Value.Definition.LastSuccessfulAt : attemptedAt,
             ErrorCode = errorCode,
-            ErrorMessage = errorMessage
+            ErrorMessage = errorMessage,
+            LastTrigger = trigger,
+            ConsecutiveFailures = errorCode is null ? 0 : checked((current?.Value.Definition.ConsecutiveFailures ?? 0) + 1)
         };
         _ = await store.PutExactAsync(scopeRef, new SourceObservedResource
         {
@@ -424,6 +506,7 @@ public sealed partial class SourceManagementService(
                 SourceUid = source.Uid,
                 AttemptedAt = attemptedAt,
                 Outcome = outcome,
+                Trigger = trigger,
                 DeclaredVersion = declaredVersion,
                 ManifestDigest = digest,
                 SourceVersionUid = versionUid,
@@ -433,6 +516,94 @@ public sealed partial class SourceManagementService(
             },
             Status = errorCode is null ? Succeeded() : Failed(errorCode, errorMessage!)
         }, cancellationToken);
+    }
+
+    private async Task<SourceImportResult> RefreshLockedAsync(
+        SourceResource source,
+        SourceRefreshTrigger trigger,
+        CancellationToken cancellationToken)
+    {
+        var scopeRef = RequireScope(source);
+        var configurationAddress = ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceConfiguration, source.Name);
+        var configuration = await store.GetExactAsync<SourceConfigurationResource>(configurationAddress, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceConfiguration, source.Name, source.Namespace));
+        if (configuration.Value.Definition.Origin is not { } origin
+            || !Uri.TryCreate(origin.Url, UriKind.Absolute, out var uri))
+            throw Invalid("source_origin_missing", "The Source has no associated HTTP(S) origin.");
+
+        RetrievedSourceManifest retrieved;
+        try
+        {
+            retrieved = await retrieval.RetrieveAsync(uri, origin, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var code = exception switch
+            {
+                SourceValidationException value => value.Code,
+                SourceRetrievalException value => value.Code,
+                _ => "source_refresh_failed"
+            };
+            await RecordAsync(source, timeProvider.GetUtcNow(), SourceImportOutcome.Rejected, null, null, null,
+                origin, trigger, code, exception.Message, cancellationToken);
+            throw;
+        }
+
+        if (!retrieved.NotModified)
+            return await ReadAndImportCoreAsync(retrieved.Content, retrieved.Origin, scopeRef, trigger, cancellationToken);
+
+        if (configuration.Value.Definition.Origin != retrieved.Origin)
+            _ = await store.PutExactAsync(scopeRef, configuration.Value with
+            {
+                Generation = checked(configuration.Value.Generation + 1),
+                Definition = configuration.Value.Definition with { Origin = retrieved.Origin }
+            }, configuration.ETag, false, cancellationToken);
+
+        var observed = await store.GetExactAsync<SourceObservedResource>(
+            ScopedResourceAddress.Create(scopeRef, source.Namespace, ResourceKinds.SourceObservedState, source.Name), cancellationToken)
+            ?? throw new InvalidOperationException($"Source '{source.Address}' has no observed state.");
+        var versionUid = observed.Value.Definition.LastSuccessfulVersionUid
+            ?? throw new InvalidOperationException($"Source '{source.Address}' has no successful Source Version.");
+        var version = await GetVersionExactAsync(scopeRef, source.Definition.Publisher, source.Name, versionUid, cancellationToken)
+            ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.SourceVersion, versionUid.ToString("D")));
+        await RecordAsync(source, timeProvider.GetUtcNow(), SourceImportOutcome.Unchanged,
+            version.Definition.Version, version.Definition.ManifestDigest, version.Uid, retrieved.Origin, trigger, null, null, cancellationToken);
+        return new(await BuildViewAsync(source, cancellationToken), version, SourceImportOutcome.Unchanged,
+            await verification.VerifyDefinitionAsync(version, cancellationToken));
+    }
+
+    private static void ValidateRefreshConfiguration(SourceRefreshConfiguration refresh)
+    {
+        ArgumentNullException.ThrowIfNull(refresh);
+        ValidatePolicy(refresh.Source, "refresh.source");
+        ValidatePolicy(refresh.Channels, "refresh.channels");
+        foreach (var (channel, policy) in refresh.ChannelOverrides)
+        {
+            if (string.IsNullOrWhiteSpace(channel) || channel.Length > 100)
+                throw Invalid("source_refresh_channel_invalid", "Channel override names must contain 1 to 100 characters.");
+            ValidatePolicy(policy, $"refresh.channelOverrides.{channel}");
+        }
+    }
+
+    private static void ValidatePolicy(SourceRefreshPolicy policy, string field)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        if (policy.IntervalSeconds is < 60 or > 604_800)
+            throw Invalid("source_refresh_interval_invalid", $"{field}.intervalSeconds must be between 60 and 604800.");
+        if (policy.TimeoutSeconds is < 1 or > 300)
+            throw Invalid("source_refresh_timeout_invalid", $"{field}.timeoutSeconds must be between 1 and 300.");
+        if (policy.MaximumAttempts is < 1 or > 10)
+            throw Invalid("source_refresh_attempts_invalid", $"{field}.maximumAttempts must be between 1 and 10.");
+        if (policy.InitialBackoffSeconds is < 1 or > 3600
+            || policy.MaximumBackoffSeconds < policy.InitialBackoffSeconds
+            || policy.MaximumBackoffSeconds > 86_400)
+            throw Invalid("source_refresh_backoff_invalid", $"{field} backoff must be ordered and between 1 and 86400 seconds.");
+        if (policy.JitterSeconds < 0 || policy.JitterSeconds > Math.Min(3600, policy.IntervalSeconds / 2))
+            throw Invalid("source_refresh_jitter_invalid", $"{field}.jitterSeconds must be between 0 and half the interval, capped at 3600.");
     }
 
     private async Task<SourceView> BuildViewAsync(SourceResource source, CancellationToken cancellationToken)
