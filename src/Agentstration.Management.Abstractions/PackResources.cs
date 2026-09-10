@@ -173,7 +173,7 @@ public sealed record SourcePackProvenance
     public required string SourcePublisher { get; init; }
     public required Guid SourceVersionUid { get; init; }
     public required string SourceVersion { get; init; }
-    public required string SourceVersionDigest { get; init; }
+    public required string ManifestDigest { get; init; }
     public required string Channel { get; init; }
     public required string ProviderRevision { get; init; }
     public required Guid SnapshotUid { get; init; }
@@ -181,7 +181,7 @@ public sealed record SourcePackProvenance
     public required string CatalogName { get; init; }
     public required string CatalogPath { get; init; }
     public required string EntryName { get; init; }
-    public required string Path { get; init; }
+    public required string EntryPath { get; init; }
 }
 
 public sealed record InstalledPackResource : Resource

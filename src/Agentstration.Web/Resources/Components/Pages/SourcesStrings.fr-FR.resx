@@ -32,4 +32,5 @@
   <data name="ViewPack" xml:space="preserve"><value>Voir le Pack</value></data>
   <data name="Channel" xml:space="preserve"><value>Channel</value></data>
   <data name="SelectChannel" xml:space="preserve"><value>Sélectionner un Channel</value></data>
+  <data name="PinnedSourceSelectionMessage" xml:space="preserve"><value>Source Version {0} ({1}), Channel {2}, Snapshot {3}, entrée de catalogue {4}. Cette sélection exacte reste épinglée jusqu’à l’installation.</value></data>
 </root>

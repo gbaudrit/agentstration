@@ -38,6 +38,9 @@ public sealed class SourcesLocalizationTests
             Assert.AreEqual("Bindings", strings["Tab.Bindings"].Value);
             Assert.AreEqual("Contenu", strings["Tab.Content"].Value);
             Assert.AreEqual("Pack issu d’une Source épinglée", strings["PinnedSourcePack"].Value);
+            Assert.AreEqual(
+                "Source Version 1 (sha256:abc), Channel stable, Snapshot 123, entrée de catalogue say-hello. Cette sélection exacte reste épinglée jusqu’à l’installation.",
+                strings["PinnedSourceSelectionMessage", "1", "sha256:abc", "stable", "123", "say-hello"].Value);
             Assert.AreEqual("Confirmer l’installation", strings["ConfirmInstallPack"].Value);
             Assert.AreEqual("Réinstaller le Pack", strings["ReinstallPack"].Value);
             Assert.AreEqual("Confirmer la réinstallation", strings["ConfirmReinstallPack"].Value);

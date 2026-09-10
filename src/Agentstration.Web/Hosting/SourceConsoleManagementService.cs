@@ -222,18 +222,21 @@ public sealed class SourceConsoleManagementService(
             scopeRef, publisher, name, versionUid, channel, cancellationToken);
     }
 
-    public async Task<PackInstallationPreview> PreviewPackAsync(
+    public async Task<SourcePackInstallationPreview> PreviewPackAsync(
         SourcePackSelection selection,
         IReadOnlyList<PackBindingSelection> bindings,
+        bool replaceExisting,
         Guid actorPrincipalId,
         CancellationToken cancellationToken)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
-        return await sourcePacks.PreviewAsync(selection, bindings, cancellationToken);
+        return await sourcePacks.PreviewAsync(
+            selection, bindings, replaceExisting, new PackRemovalOptions(), cancellationToken);
     }
 
     public async Task<StoredResource<InstalledPackResource>> InstallPackAsync(
         SourcePackSelection selection,
+        string expectedPreviewDigest,
         bool replaceExisting,
         IReadOnlyList<PackBindingSelection> bindings,
         Guid actorPrincipalId,
@@ -241,7 +244,7 @@ public sealed class SourceConsoleManagementService(
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         return await sourcePacks.InstallAsync(
-            selection, replaceExisting, bindings, new PackRemovalOptions(), cancellationToken);
+            selection, expectedPreviewDigest, replaceExisting, bindings, new PackRemovalOptions(), cancellationToken);
     }
 
     public async Task<SourceImportResult> RefreshSourceAsync(

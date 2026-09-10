@@ -84,10 +84,10 @@ else
                         @if (sourceUrl is not null) { <a class="text-button" href="@sourceUrl">@T("OpenSource") →</a> }
                     </div>
                     <dl class="resource-details pack-facts">
-                        <dt>@T("SourceVersion")</dt><dd>@source.SourceVersion · <code>@source.SourceVersionDigest</code></dd>
+                        <dt>@T("SourceVersion")</dt><dd>@source.SourceVersion · <code>@source.ManifestDigest</code></dd>
                         <dt>@T("Channel")</dt><dd>@source.Channel · <code>@source.ProviderRevision</code></dd>
                         <dt>@T("Snapshot")</dt><dd><code>@source.SnapshotUid</code> · <code>@source.SnapshotDigest</code></dd>
-                        <dt>@T("CatalogEntry")</dt><dd>@source.CatalogName/@source.EntryName · <code>@source.Path</code></dd>
+                        <dt>@T("CatalogEntry")</dt><dd>@source.CatalogName/@source.EntryName · <code>@source.EntryPath</code></dd>
                     </dl>
                 </section>
             }

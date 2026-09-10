@@ -421,11 +421,20 @@ public sealed class SourceTests
             ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
         var selection = new SourcePackSelection(
             ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable",
-            first.Snapshot.Uid, "official-packs", "who-am-i", "catalogs/packs/who-am-i.zip");
+            first.Snapshot.Uid, "official-packs", "who-am-i");
 
-        var preview = await fixture.SourcePacks.PreviewAsync(selection, [], default);
-        Assert.AreEqual("who-am-i", preview.Metadata.Name);
-        Assert.AreEqual("welcome", preview.Resources.Single().Name);
+        var preview = await fixture.SourcePacks.PreviewAsync(selection, [], false, new PackRemovalOptions(), default);
+        Assert.AreEqual("who-am-i", preview.Pack.Metadata.Name);
+        Assert.AreEqual("welcome", preview.Pack.Resources.Single().Name);
+        Assert.AreEqual(imported.Version.Uid, preview.Pin.SourceVersionUid);
+        Assert.AreEqual(imported.Version.Definition.ManifestDigest, preview.Pin.ManifestDigest);
+        Assert.AreEqual(first.Snapshot.Uid, preview.Pin.SnapshotUid);
+        StringAssert.StartsWith(preview.Pin.PackArchiveDigest, "sha256:");
+        StringAssert.StartsWith(preview.PreviewDigest, "sha256:");
+
+        var replacementPreview = await fixture.SourcePacks.PreviewAsync(
+            selection, [], true, new PackRemovalOptions(), default);
+        Assert.AreNotEqual(preview.PreviewDigest, replacementPreview.PreviewDigest);
 
         fixture.Materializer.Revision = "revision-2";
         fixture.Materializer.Content = CatalogArchiveBytes(
@@ -434,17 +443,21 @@ public sealed class SourceTests
         _ = await fixture.Snapshots.RefreshExactAsync(
             ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
 
+        var stale = await Assert.ThrowsExactlyAsync<SourceValidationException>(() => fixture.SourcePacks.InstallAsync(
+            selection, "sha256:stale", false, [], new PackRemovalOptions(), default));
+        Assert.AreEqual("source_pack_preview_stale", stale.Code);
+
         var installed = await fixture.SourcePacks.InstallAsync(
-            selection, false, [], new PackRemovalOptions(), default);
+            selection, preview.PreviewDigest, false, [], new PackRemovalOptions(), default);
         var provenance = installed.Value.Definition.SourceProvenance;
         Assert.IsNotNull(provenance);
         Assert.AreEqual(first.Snapshot.Uid, provenance.SnapshotUid);
         Assert.AreEqual(first.Snapshot.Definition.Artifact.Sha256, provenance.SnapshotDigest);
-        Assert.AreEqual(imported.Version.Definition.ManifestDigest, provenance.SourceVersionDigest);
+        Assert.AreEqual(imported.Version.Definition.ManifestDigest, provenance.ManifestDigest);
         Assert.AreEqual(first.Snapshot.Definition.ResolvedRevision, provenance.ProviderRevision);
         Assert.AreEqual("official-packs", provenance.CatalogName);
         Assert.AreEqual("who-am-i", provenance.EntryName);
-        Assert.AreEqual("catalogs/packs/who-am-i.zip", provenance.Path);
+        Assert.AreEqual("catalogs/packs/who-am-i.zip", provenance.EntryPath);
         Assert.AreEqual("welcome", installed.Value.Definition.ManagedResources.Single().Name);
 
         await fixture.Service.DeleteExactAsync(
@@ -460,7 +473,7 @@ public sealed class SourceTests
     }
 
     [TestMethod]
-    public async Task SourcePackInstallationRejectsPublisherAndPinnedPathMismatchAsync()
+    public async Task SourcePackInstallationRejectsPublisherMismatchAndMissingEntryAsync()
     {
         await using var fixture = await Fixture.CreateAsync();
         using var system = fixture.Context.PushSystem();
@@ -476,14 +489,14 @@ public sealed class SourceTests
             ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable", default);
         var selection = new SourcePackSelection(
             ResourceScopeRef.Instance, "agentstration", "official-samples", imported.Version.Uid, "stable",
-            refreshed.Snapshot.Uid, "official-packs", "who-am-i", "catalogs/packs/who-am-i.zip");
+            refreshed.Snapshot.Uid, "official-packs", "who-am-i");
 
         var publisher = await Assert.ThrowsExactlyAsync<SourceValidationException>(() =>
-            fixture.SourcePacks.PreviewAsync(selection, [], default));
+            fixture.SourcePacks.PreviewAsync(selection, [], false, new PackRemovalOptions(), default));
         Assert.AreEqual("source_pack_publisher_mismatch", publisher.Code);
-        var stale = await Assert.ThrowsExactlyAsync<SourceValidationException>(() =>
-            fixture.SourcePacks.PreviewAsync(selection with { Path = "catalogs/packs/other.zip" }, [], default));
-        Assert.AreEqual("source_pack_selection_stale", stale.Code);
+        var missing = await Assert.ThrowsExactlyAsync<SourceValidationException>(() =>
+            fixture.SourcePacks.PreviewAsync(selection with { EntryName = "other" }, [], false, new PackRemovalOptions(), default));
+        Assert.AreEqual("source_pack_entry_missing", missing.Code);
     }
 
     [TestMethod]

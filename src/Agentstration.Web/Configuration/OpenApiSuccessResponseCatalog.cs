@@ -231,6 +231,12 @@ internal static class OpenApiSuccessResponseCatalog
         }
         if (path.StartsWith("/api/sources", StringComparison.OrdinalIgnoreCase))
         {
+            if (path.Contains("/pack-catalogs/", StringComparison.OrdinalIgnoreCase)
+                && path.EndsWith("/preview", StringComparison.OrdinalIgnoreCase))
+                return Json<SourcePackInstallationPreview>(200, "Preview a Pack installation from a pinned Source snapshot");
+            if (path.Contains("/pack-catalogs/", StringComparison.OrdinalIgnoreCase)
+                && path.EndsWith("/install", StringComparison.OrdinalIgnoreCase))
+                return Json<InstalledPackResource>(201, "Install a Pack from a pinned Source snapshot");
             if (path.EndsWith("/imports/yaml", StringComparison.OrdinalIgnoreCase)
                 || path.EndsWith("/imports/url", StringComparison.OrdinalIgnoreCase))
                 return Json<SourceImportResult>(201, "Import a Source Version");

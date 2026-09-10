@@ -14,8 +14,8 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         var sources = group.MapGroup("/sources").RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         sources.MapPost("/imports/yaml", ImportYamlAsync);
         sources.MapPost("/imports/url", ImportUrlAsync);
-        sources.MapPost("/packs/preview", PreviewPackAsync);
-        sources.MapPost("/packs/install", InstallPackAsync);
+        sources.MapPost("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/pack-catalogs/{catalog}/entries/{entry}/preview", PreviewPackAsync);
+        sources.MapPost("/{publisher}/{name}/versions/{versionUid:guid}/channels/{channel}/snapshots/{snapshotUid:guid}/pack-catalogs/{catalog}/entries/{entry}/install", InstallPackAsync);
         sources.MapGet("", ListAsync);
         sources.MapGet("/{publisher}/{name}", GetAsync);
         sources.MapDelete("/{publisher}/{name}", DeleteAsync);
@@ -73,24 +73,63 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.ListAsync(cancellationToken)));
 
     private static Task<IResult> PreviewPackAsync(
-        SourcePackInstallRequest request,
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channel,
+        Guid snapshotUid,
+        string catalog,
+        string entry,
+        string? scopeRef,
+        SourcePackPreviewRequest request,
+        SourceManagementService sources,
         SourcePackInstallationService service,
         CancellationToken cancellationToken) =>
         ManagementHttp.ExecuteAsync(async () => Results.Ok(await service.PreviewAsync(
-            request.Selection, request.Bindings ?? [], cancellationToken)));
+            new(
+                await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
+                publisher,
+                name,
+                versionUid,
+                channel,
+                snapshotUid,
+                catalog,
+                entry),
+            request.Bindings ?? [],
+            request.ReplaceExisting,
+            new PackRemovalOptions(),
+            cancellationToken)));
 
     private static Task<IResult> InstallPackAsync(
+        string publisher,
+        string name,
+        Guid versionUid,
+        string channel,
+        Guid snapshotUid,
+        string catalog,
+        string entry,
+        string? scopeRef,
         SourcePackInstallRequest request,
         HttpResponse response,
+        SourceManagementService sources,
         SourcePackInstallationService service,
         CancellationToken cancellationToken) =>
         ManagementHttp.ExecuteAsync(async () =>
         {
             var installed = await service.InstallAsync(
-                request.Selection,
+                new(
+                    await ResolveScopeAsync(scopeRef, publisher, name, sources, cancellationToken),
+                    publisher,
+                    name,
+                    versionUid,
+                    channel,
+                    snapshotUid,
+                    catalog,
+                    entry),
+                request.ExpectedPreviewDigest,
                 request.ReplaceExisting,
                 request.Bindings ?? [],
-                new PackRemovalOptions(request.RemoveDashboardReferences),
+                new PackRemovalOptions(),
                 cancellationToken);
             response.Headers.ETag = installed.ETag;
             response.Headers.Location = $"/api/packs/{Uri.EscapeDataString(installed.Value.Definition.Publisher)}/{Uri.EscapeDataString(installed.Value.Definition.PackName)}";

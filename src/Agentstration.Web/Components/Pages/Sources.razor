@@ -235,17 +235,17 @@ else
                 {
                     <div class="source-pack-description"><span>@T("PublishedPackDescription")</span><p>@packPreview.Metadata.Description</p></div>
                 }
-                <p class="pack-pin"><UiIcon Name="pin" /><span>@F("PinnedSnapshotMessage", Short(packSelection.SnapshotUid.ToString("D")), packSelection.EntryName)</span></p>
+                <p class="pack-pin"><UiIcon Name="pin" /><span>@F("PinnedSourceSelectionMessage", sourcePackPreview!.Pin.SourceVersion, Short(sourcePackPreview.Pin.ManifestDigest), sourcePackPreview.Pin.Channel, Short(sourcePackPreview.Pin.SnapshotUid.ToString("D")), sourcePackPreview.Pin.EntryName)</span></p>
                 @if (packPreview.Bindings.Count > 0)
                 {
                     <section class="source-pack-bindings"><h3>@T("PackBindingsTitle")</h3><p>@T("PackBindingsHelp")</p>
                     @foreach (var binding in packPreview.Bindings)
                     {
-                        <label class="source-pack-binding"><span class="source-pack-binding-heading"><span><strong>@BindingKindLabel(binding.TargetKind)</strong><small><code>@binding.Name</code></small></span><StatusBadge Text="@(binding.Required ? T("Required") : T("Optional"))" Status="@(binding.Required ? UiStatus.Info : UiStatus.Neutral)" /></span><select value="@PackBindingValue(binding.Name)" @onchange="args => SetPackBinding(binding.Name, args)"><option value="">@F("SelectPackBindingTarget", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>@if (binding.TargetKind == PackBindingTargetKind.ModelProfile) { @foreach (var item in packModelProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ModelProvider) { @foreach (var item in packModelProviders) { <option value="@BindingValue(item.Name, ResourceNamespace.Default)">@item.Properties.DisplayName — default/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile) { @foreach (var item in packRuntimeProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration) { @foreach (var item in packExtensions) { <option value="@BindingValue(item.Name, item.Namespace)">@item.Definition.DisplayName — @item.Namespace/@item.Name</option> } } else { @foreach (var item in packSecrets) { <option value="@BindingValue(item.Resource.Name, item.Resource.Namespace)">@item.Resource.Definition.DisplayName — @item.Resource.Namespace/@item.Resource.Name</option> } }</select></label>
+                        <label class="source-pack-binding"><span class="source-pack-binding-heading"><span><strong>@BindingKindLabel(binding.TargetKind)</strong><small><code>@binding.Name</code></small></span><StatusBadge Text="@(binding.Required ? T("Required") : T("Optional"))" Status="@(binding.Required ? UiStatus.Info : UiStatus.Neutral)" /></span><select value="@PackBindingValue(binding.Name)" @onchange="args => SetPackBindingAsync(binding.Name, args)"><option value="">@F("SelectPackBindingTarget", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>@if (binding.TargetKind == PackBindingTargetKind.ModelProfile) { @foreach (var item in packModelProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ModelProvider) { @foreach (var item in packModelProviders) { <option value="@BindingValue(item.Name, ResourceNamespace.Default)">@item.Properties.DisplayName — default/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile) { @foreach (var item in packRuntimeProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration) { @foreach (var item in packExtensions) { <option value="@BindingValue(item.Name, item.Namespace)">@item.Definition.DisplayName — @item.Namespace/@item.Name</option> } } else { @foreach (var item in packSecrets) { <option value="@BindingValue(item.Resource.Name, item.Resource.Namespace)">@item.Resource.Definition.DisplayName — @item.Resource.Namespace/@item.Resource.Name</option> } }</select></label>
                     }
                     </section>
                 }
-                @if (packPreview.AlreadyInstalled) { <label class="replace-pack"><input type="checkbox" @bind="replacePack" /> @T("ReplaceInstalledPack")</label> }
+                @if (packPreview.AlreadyInstalled) { <label class="replace-pack"><input type="checkbox" checked="@replacePack" @onchange="SetReplacePackAsync" /> @T("ReplaceInstalledPack")</label> }
                 <section class="source-pack-resources"><header><strong>@PackResourceCount(packPreview.Resources.Count)</strong></header><div>@foreach (var resource in packPreview.Resources) { <article><span><strong>@resource.Name</strong><small>@resource.Kind</small></span><StatusBadge Text="@T($"Change.{resource.Change}")" Status="@ChangeTone(resource.Change)" /></article> }</div></section>
             }
             <div class="dialog-actions"><button class="button-secondary" @onclick="ClosePackPreview">@T("Cancel")</button><button class="button-primary" disabled="@(!CanInstallPack)" @onclick="InstallPackAsync">@(packInstalling ? T("InstallingPack") : reinstallPack ? T("ConfirmReinstallPack") : T("ConfirmInstallPack"))</button></div>
@@ -276,7 +276,8 @@ else
     private bool denied;
     private string? error;
     private SourcePackSelection? packSelection;
-    private PackInstallationPreview? packPreview;
+    private SourcePackInstallationPreview? sourcePackPreview;
+    private PackInstallationPreview? packPreview => sourcePackPreview?.Pack;
     private readonly Dictionary<string, string> packBindingSelections = new(StringComparer.Ordinal);
     private IReadOnlyList<ModelProfileSummaryResponse> packModelProfiles = [];
     private IReadOnlyList<ModelProviderResponse> packModelProviders = [];
@@ -377,15 +378,18 @@ else
     private async Task PreviewPackAsync(SourceConsoleChannelView channel, SourceCatalogView catalog, SourcePackEntryView entry)
     {
         packSelection = new(ScopeRef(), Publisher!, Name!, detail!.SelectedVersion.Uid, channel.Definition.Name,
-            channel.Status.Refresh!.Definition.CurrentSnapshotUid!.Value, catalog.Provenance.CatalogName, entry.Name, entry.Path);
+            channel.Status.Refresh!.Definition.CurrentSnapshotUid!.Value, catalog.Provenance.CatalogName, entry.Name);
         reinstallPack = IsPackInstalled(entry);
-        packPreview = null; packError = null; replacePack = reinstallPack; packBindingSelections.Clear(); packPreviewing = true;
+        sourcePackPreview = null; packError = null; replacePack = reinstallPack; packBindingSelections.Clear(); packPreviewing = true;
         try
         {
-            packPreview = await Service.PreviewPackAsync(packSelection, [], RequestContext.Current.PrincipalId, lifetime.Token);
-            foreach (var binding in packPreview.Bindings.Where(value => value.TargetAvailable && value.Target is not null))
+            sourcePackPreview = await Service.PreviewPackAsync(packSelection, [], replacePack, RequestContext.Current.PrincipalId, lifetime.Token);
+            var preview = sourcePackPreview.Pack;
+            foreach (var binding in preview.Bindings.Where(value => value.TargetAvailable && value.Target is not null))
                 packBindingSelections[binding.Name] = $"{(binding.Target!.Namespace ?? ResourceNamespace.Default).Value}:{binding.Target.Name}";
-            await LoadPackBindingOptionsAsync(packPreview.Bindings);
+            await LoadPackBindingOptionsAsync(preview.Bindings);
+            if (packBindingSelections.Count > 0)
+                sourcePackPreview = await Service.PreviewPackAsync(packSelection, SelectedPackBindings(), replacePack, RequestContext.Current.PrincipalId, lifetime.Token);
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { packError = exception.Message; }
         finally { packPreviewing = false; }
@@ -396,18 +400,40 @@ else
         packInstalling = true; packError = null;
         try
         {
-            var bindings = packPreview.Bindings.Where(value => !string.IsNullOrWhiteSpace(PackBindingValue(value.Name)))
-                .Select(value => new PackBindingSelection(value.Name, ParsePackBinding(PackBindingValue(value.Name)!))).ToArray();
-            var installed = await Service.InstallPackAsync(packSelection, replacePack, bindings, RequestContext.Current.PrincipalId, lifetime.Token);
+            var bindings = SelectedPackBindings();
+            var installed = await Service.InstallPackAsync(packSelection, sourcePackPreview!.PreviewDigest, replacePack, bindings, RequestContext.Current.PrincipalId, lifetime.Token);
             Notify("PackInstalled", F("PackInstalledMessage", installed.Value.Definition.DisplayName ?? installed.Value.Definition.PackName));
             Navigation.NavigateTo($"/packs?publisher={Uri.EscapeDataString(installed.Value.Definition.Publisher)}&name={Uri.EscapeDataString(installed.Value.Definition.PackName)}");
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { packError = exception.Message; }
         finally { packInstalling = false; }
     }
-    private void ClosePackPreview() { if (!packInstalling) { packSelection = null; packPreview = null; packError = null; reinstallPack = false; } }
+    private void ClosePackPreview() { if (!packInstalling) { packSelection = null; sourcePackPreview = null; packError = null; reinstallPack = false; } }
     private string? PackBindingValue(string name) => packBindingSelections.GetValueOrDefault(name);
-    private void SetPackBinding(string name, ChangeEventArgs args) => packBindingSelections[name] = args.Value?.ToString()?.Trim() ?? string.Empty;
+    private async Task SetPackBindingAsync(string name, ChangeEventArgs args)
+    {
+        packBindingSelections[name] = args.Value?.ToString()?.Trim() ?? string.Empty;
+        await RefreshPackPreviewAsync();
+    }
+    private async Task SetReplacePackAsync(ChangeEventArgs args)
+    {
+        replacePack = args.Value is true;
+        await RefreshPackPreviewAsync();
+    }
+    private IReadOnlyList<PackBindingSelection> SelectedPackBindings() => packBindingSelections
+        .Where(value => !string.IsNullOrWhiteSpace(value.Value))
+        .Select(value => new PackBindingSelection(value.Key, ParsePackBinding(value.Value))).ToArray();
+    private async Task RefreshPackPreviewAsync()
+    {
+        if (packSelection is null) return;
+        packPreviewing = true; packError = null;
+        try
+        {
+            sourcePackPreview = await Service.PreviewPackAsync(packSelection, SelectedPackBindings(), replacePack, RequestContext.Current.PrincipalId, lifetime.Token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { packError = exception.Message; sourcePackPreview = null; }
+        finally { packPreviewing = false; }
+    }
     private async Task LoadPackBindingOptionsAsync(IReadOnlyList<PackBindingPreview> bindings)
     {
         if (bindings.Any(value => value.TargetKind == PackBindingTargetKind.ModelProfile)) packModelProfiles = await Services.GetRequiredService<IModelProfilesClient>().GetModelProfilesAsync(null, null, null, lifetime.Token);
