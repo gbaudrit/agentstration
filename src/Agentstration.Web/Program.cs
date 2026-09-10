@@ -1,3 +1,5 @@
+using System.Threading.RateLimiting;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Application.Work;
 using Agentstration.Flow.Application;
 using Agentstration.Infrastructure;
@@ -12,6 +14,7 @@ using Agentstration.Runtime.Core;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Security.AspNetCoreIdentity.PostgreSql;
 using Agentstration.Web;
+using Agentstration.Web.Api;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Configuration;
@@ -19,6 +22,7 @@ using Agentstration.Web.Features.Flows;
 using Agentstration.Web.Features.Workplace;
 using Agentstration.Web.Hosting;
 using Agentstration.Work;
+using Microsoft.AspNetCore.RateLimiting;
 using ModelContextProtocol.AspNetCore;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -107,10 +111,30 @@ builder.Services.AddAgentstration(
 builder.Services.AddAgentstrationModelProviders(
     builder.Configuration,
     useManagedProfileResolver);
+builder.Services.AddSingleton(builder.Configuration
+    .GetSection(AepEnrollmentPolicyOptions.SectionName)
+    .Get<AepEnrollmentPolicyOptions>() ?? new());
 builder.Services.AddAgentstrationModelManagement();
 builder.Services.AddSingleton<ExtensionSourceDiscoveryService>();
+builder.Services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
 builder.Services.AddSingleton<StandardRuntimeProfileSeeder>();
 builder.Services.AddProblemDetails();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = static async (context, token) =>
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new { error = new AepEnrollmentError("rate_limited", "Too many enrollment requests; retry later.") }, token);
+    options.AddPolicy("aep-enrollment-public", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
 builder.Services.AddAgentstrationOpenApi();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
@@ -220,6 +244,7 @@ if (genAiObservability.HttpPayloadCapture.Enabled)
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseRequestLocalization();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<PrincipalResolutionMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
@@ -238,6 +263,7 @@ app.MapAgentstrationIdentityApi();
 app.MapAgentstrationBootstrapProfiles();
 app.MapAgentstrationManagementApi();
 app.MapAgentstrationModelManagementApi();
+app.MapAgentstrationAepEnrollment();
 app.MapAgentstrationWorkApi();
 app.MapAgentstrationWorkplaceApi();
 app.MapAgentstrationWorkOperationsApi();
@@ -268,10 +294,10 @@ try
         await app.Services.GetRequiredService<FlowService>().InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
         await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
+        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
             await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
         await app.Services.ApplyDeclarativeBootstrapAsync(app.Lifetime.ApplicationStopping);
-        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", true))
+        if (builder.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
             await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(app.Lifetime.ApplicationStopping);
     }
     if (bootstrapContext is not null)

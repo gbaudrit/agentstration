@@ -6,4 +6,15 @@
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../../src/Agentstration.Web.Components/wwwroot/images/agentstration-mark.png"
+                      Link="Assets/agentstration-mark.png"
+                      LogicalName="Agentstration.Aep.AspNetCore.Assets.agentstration-mark.png" />
+    <EmbeddedResource Include="../../../src/Agentstration.Web.Components/wwwroot/images/agentstration-lockup-dark.png"
+                      Link="Assets/agentstration-lockup-dark.png"
+                      LogicalName="Agentstration.Aep.AspNetCore.Assets.agentstration-lockup-dark.png" />
+    <EmbeddedResource Include="../../../src/Agentstration.Web.Components/wwwroot/images/agentstration-lockup-light.png"
+                      Link="Assets/agentstration-lockup-light.png"
+                      LogicalName="Agentstration.Aep.AspNetCore.Assets.agentstration-lockup-light.png" />
+  </ItemGroup>
 </Project>

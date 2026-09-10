@@ -16,7 +16,8 @@ public sealed class ExtensionRegistrationInUseException(string name, IReadOnlyLi
 public sealed class ExtensionRegistrationManagementService(
     IControlPlaneStore store,
     IResourceReferenceResolver references,
-    ResourceScopeOperationService scopeOperations)
+    ResourceScopeOperationService scopeOperations,
+    Agentstration.Aep.Client.AepTransportSecurityOptions? transportOptions = null)
 {
     public Task<StoredResource<ExtensionRegistrationResource>?> GetAsync(
         ResourceNamespace @namespace,
@@ -44,7 +45,7 @@ public sealed class ExtensionRegistrationManagementService(
         CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        var scopeRef = resource.ScopeRef ?? DefaultScopeRef(resource.Definition.Source);
+        var scopeRef = resource.ScopeRef ?? DefaultScopeRef(resource.Definition);
         return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             var definition = await ValidateDefinitionAsync(resource.Namespace, resource.Metadata.Name, resource.Definition, scopeRef, token);
@@ -78,7 +79,7 @@ public sealed class ExtensionRegistrationManagementService(
         return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             var validated = await ValidateDefinitionAsync(@namespace, name, definition, scopeRef, token);
-            return await store.PutExactAsync(scopeRef, existing.Value with
+            var updated = await store.PutExactAsync(scopeRef, existing.Value with
             {
                 Generation = checked(existing.Value.Generation + 1),
                 Definition = validated,
@@ -87,6 +88,8 @@ public sealed class ExtensionRegistrationManagementService(
             ifMatch,
             false,
             token);
+            await SynchronizeEnrollmentStateAsync(updated.Value, token);
+            return updated;
         }, cancellationToken);
     }
 
@@ -116,12 +119,18 @@ public sealed class ExtensionRegistrationManagementService(
     public async Task<StoredResource<ExtensionRegistrationResource>> SynchronizeAsync(
         string name,
         ExtensionRegistrationProperties definition,
+        CancellationToken cancellationToken) =>
+        await SynchronizeAsync(name, definition, ResourceScopeRef.Instance, cancellationToken);
+
+    public async Task<StoredResource<ExtensionRegistrationResource>> SynchronizeAsync(
+        string name,
+        ExtensionRegistrationProperties definition,
+        ResourceScopeRef scopeRef,
         CancellationToken cancellationToken)
     {
         if (definition.Source == ExtensionRegistrationSource.Manual)
             throw new ExtensionRegistrationValidationException("Discovered registrations must identify their configuration source.");
         var @namespace = ResourceNamespace.Default;
-        var scopeRef = ResourceScopeRef.Instance;
         var validated = await ValidateDefinitionAsync(@namespace, name, definition, scopeRef, cancellationToken);
         var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken);
         if (existing is null)
@@ -207,7 +216,35 @@ public sealed class ExtensionRegistrationManagementService(
             || !string.IsNullOrEmpty(definition.Endpoint.Query)
             || !string.IsNullOrEmpty(definition.Endpoint.Fragment))
             throw new ExtensionRegistrationValidationException("Extension endpoint cannot contain credentials, a query string, or a fragment.");
+        // Hosts embedding Management.Core without the HTTP client stack may omit a
+        // transport policy. The web host always registers one and therefore enforces
+        // the production trust boundary at registration time.
+        try
+        {
+            if (transportOptions is not null)
+                Agentstration.Aep.Client.AepTransportSecurity.ValidateEndpoint(definition.Endpoint, transportOptions);
+        }
+        catch (Agentstration.Aep.Client.AepTransportSecurityException exception)
+        {
+            throw new ExtensionRegistrationValidationException(exception.Message);
+        }
         var endpoint = Normalize(definition.Endpoint);
+        if (definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            && definition.Source == ExtensionRegistrationSource.Manual)
+            throw new ExtensionRegistrationValidationException("SharedKeyFile enrollment is reserved for orchestrator-managed configuration or Aspire registrations.");
+        if (definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            && definition.AuthenticationMode != AepTransportAuthenticationMode.StaticBearer)
+            throw new ExtensionRegistrationValidationException("SharedKeyFile enrollment requires staticBearer transport authentication.");
+        if (definition.AuthenticationMode == AepTransportAuthenticationMode.None && definition.Credential is not null)
+            throw new ExtensionRegistrationValidationException("An AEP credential requires the staticBearer authentication mode.");
+        if (definition.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer && definition.Credential is null)
+            throw new ExtensionRegistrationValidationException("The staticBearer authentication mode requires a Secret credential.");
+        if (definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            && definition.Source == ExtensionRegistrationSource.Manual)
+            throw new ExtensionRegistrationValidationException("SharedKeyFile enrollment is reserved for configuration and Aspire registrations.");
+        if (definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            && definition.AuthenticationMode != AepTransportAuthenticationMode.StaticBearer)
+            throw new ExtensionRegistrationValidationException("SharedKeyFile enrollment requires staticBearer transport authentication.");
         await ValidateCredentialAsync(@namespace, definition.Credential, ownerScopeRef, cancellationToken);
         var duplicate = (await store.ListVisibleAsync<ExtensionRegistrationResource>(
                 ownerScopeRef, ResourceKinds.ExtensionRegistration, 0, 200, cancellationToken)).FirstOrDefault(value =>
@@ -243,10 +280,31 @@ public sealed class ExtensionRegistrationManagementService(
             throw new ExtensionRegistrationValidationException($"Referenced secret '{address}' does not exist or is not visible from '{ownerScopeRef}'.");
     }
 
-    private ResourceScopeRef DefaultScopeRef(ExtensionRegistrationSource source) =>
-        source == ExtensionRegistrationSource.Manual
-            ? scopeOperations.DefaultScopeRef(ResourceKinds.ExtensionRegistration)
-            : ResourceScopeRef.Instance;
+    private async Task SynchronizeEnrollmentStateAsync(ExtensionRegistrationResource registration, CancellationToken cancellationToken)
+    {
+        if (registration.Definition.EnrollmentMode != AepEnrollmentMode.PairingCode
+            || registration.ScopeRef is not { } scope)
+            return;
+        var enrollment = (await store.ListExactAsync<AepEnrollmentRequestResource>(
+            ResourceScopeRef.Instance, ResourceKinds.AepEnrollmentRequest, 0, 200, cancellationToken))
+            .FirstOrDefault(value => value.Value.Definition.TargetScopeRef == scope
+                && string.Equals(value.Value.Definition.RegistrationName, registration.Name, StringComparison.Ordinal));
+        if (enrollment is null || enrollment.Value.Definition.State is not (AepEnrollmentState.Available or AepEnrollmentState.Disabled)) return;
+        var state = registration.Definition.Enabled ? AepEnrollmentState.Available : AepEnrollmentState.Disabled;
+        if (enrollment.Value.Definition.State == state) return;
+        _ = await store.PutExactAsync(ResourceScopeRef.Instance, enrollment.Value with
+        {
+            Generation = checked(enrollment.Value.Generation + 1),
+            Definition = enrollment.Value.Definition with { State = state, Outcome = state == AepEnrollmentState.Disabled ? "registration_disabled" : "available" }
+        }, enrollment.ETag, false, cancellationToken);
+    }
+
+    private ResourceScopeRef DefaultScopeRef(ExtensionRegistrationProperties definition) =>
+        definition.EnrollmentMode == AepEnrollmentMode.PairingCode
+            ? scopeOperations.TargetScopeRef(ResourceScopeKind.Workspace)
+            : definition.Source == ExtensionRegistrationSource.Manual
+                ? scopeOperations.TargetScopeRef(ResourceScopeKind.Tenant)
+                : ResourceScopeRef.Instance;
 
     private static void ValidateIdentity(ExtensionRegistrationResource resource)
     {

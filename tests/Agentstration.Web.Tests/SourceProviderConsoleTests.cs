@@ -84,7 +84,6 @@ public sealed class SourceProviderConsoleTests
                 Registration("git-extension", ResourceScopeRef.Instance),
                 Registration("tenant-extension", ResourceScopeRef.Tenant(Guid.NewGuid()))
             ]);
-        public Task<ExtensionDiscoveryResponse> DiscoverAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();

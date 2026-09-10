@@ -21,7 +21,7 @@ public sealed class ExtensionLocalizationTests
             var services = new ServiceCollection().AddLogging().AddLocalization(options => options.ResourcesPath = "Resources").BuildServiceProvider();
             var strings = services.GetRequiredService<IStringLocalizer<ExtensionStrings>>();
 
-            Assert.AreEqual("Découvrir les extensions", strings["DiscoverExtensions"].Value);
+            Assert.AreEqual("Enregistrer un point de terminaison", strings["RegisterEndpoint"].Value);
             Assert.AreEqual("Pris en charge", strings["Status.supported"].Value);
             Assert.AreEqual("Migrer vers 2.0", strings["MigrateTo", "2.0"].Value);
         }

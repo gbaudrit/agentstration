@@ -1,6 +1,7 @@
 using System.IO.Pipelines;
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
@@ -10,6 +11,7 @@ using Agentstration.Aep.Inspector;
 using Agentstration.Aep.Validation;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -19,6 +21,8 @@ namespace Agentstration.Aep.Tests;
 [TestClass]
 public sealed class AepConformanceTests
 {
+    private static readonly string WorkloadToken = AepStaticBearerCredentials.Generate("aep-conformance-tests").AccessToken;
+
     [TestMethod]
     public async Task CanonicalClientDiscoversCapabilitiesAndHealth()
     {
@@ -46,6 +50,344 @@ public sealed class AepConformanceTests
         var legacy = await httpClient.GetStringAsync(AepProtocol.LegacyDiscoveryPath);
 
         Assert.AreEqual(canonical, legacy);
+    }
+
+    [TestMethod]
+    public async Task StaticBearerProtectsEveryProtocolEndpointButNotPlatformHealth()
+    {
+        await using var factory = AuthenticatedFactory(AepAuthenticationDefaults.InvokePermission);
+        using var anonymous = factory.CreateClient();
+        using var authenticatedHttp = factory.CreateClient();
+        var authenticated = new AepClient(authenticatedHttp, new StaticAepAccessTokenProvider(WorkloadToken));
+
+        using var discovery = await anonymous.GetAsync(AepProtocol.DiscoveryPath);
+        using var protocolHealth = await anonymous.GetAsync(AepProtocol.HealthPath);
+        using var platformHealth = await anonymous.GetAsync("/health");
+        var manifest = await authenticated.GetManifestAsync();
+
+        Assert.AreEqual(HttpStatusCode.Unauthorized, discovery.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, protocolHealth.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, platformHealth.StatusCode);
+        Assert.AreEqual("sample.hello", manifest.Extension.Id);
+    }
+
+    [TestMethod]
+    public async Task StaticBearerReturnsForbiddenWhenWorkloadLacksInvokePermission()
+    {
+        await using var factory = AuthenticatedFactory("aep.observe");
+        using var httpClient = factory.CreateClient();
+        var client = new AepClient(httpClient, new StaticAepAccessTokenProvider(WorkloadToken));
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => client.GetManifestAsync());
+
+        Assert.AreEqual(HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.AreEqual("authorization_denied", exception.Code);
+    }
+
+    [TestMethod]
+    public void StaticBearerGeneratorCreatesRedacted256BitCredential()
+    {
+        var credential = AepStaticBearerCredentials.Generate("agentstration-test");
+
+        Assert.AreEqual("agentstration-test", credential.ClientId);
+        Assert.AreEqual(32, credential.TokenId.Length);
+        Assert.IsGreaterThanOrEqualTo(43, credential.AccessToken.Length);
+        Assert.AreEqual("***", credential.ToString());
+    }
+
+    [TestMethod]
+    public void SharedKeyFileAcceptsOnlyBoundedSingleLineUtf8Tokens()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"aep-shared-key-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var valid = Path.Combine(directory, "valid.key");
+            File.WriteAllText(valid, WorkloadToken + "\n");
+            Assert.AreEqual(WorkloadToken, AepSharedKeyFile.Read(valid));
+            var shortToken = Path.Combine(directory, "short.key");
+            File.WriteAllText(shortToken, "too-short\n");
+            Assert.ThrowsExactly<InvalidDataException>(() => AepSharedKeyFile.Read(shortToken));
+            var multiline = Path.Combine(directory, "multiline.key");
+            File.WriteAllText(multiline, WorkloadToken + "\nsecond-line\n");
+            Assert.ThrowsExactly<InvalidDataException>(() => AepSharedKeyFile.Read(multiline));
+            Assert.ThrowsExactly<InvalidOperationException>(() => AepSharedKeyFile.Read(Path.Combine(directory, "missing.key")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task PairingCodeKeepsProtocolClosedAndPersistsItsInstanceIdentity()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"aep-pairing-{Guid.NewGuid():N}");
+        var stateFile = Path.Combine(directory, "state.json");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string instanceId;
+            await using (var factory = PairingFactory(stateFile))
+            {
+                using var client = factory.CreateClient();
+                using var discovery = await client.GetAsync(AepProtocol.DiscoveryPath);
+                using var pairing = await client.GetAsync(AepEnrollmentProtocol.PairingPath);
+                var html = await pairing.Content.ReadAsStringAsync();
+
+                Assert.AreEqual(HttpStatusCode.Unauthorized, discovery.StatusCode);
+                Assert.AreEqual(HttpStatusCode.OK, pairing.StatusCode);
+                StringAssert.Contains(html, "name=\"code\"");
+                Assert.IsFalse(html.Contains("?code=", StringComparison.Ordinal));
+                using var state = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile));
+                instanceId = state.RootElement.GetProperty("InstanceId").GetString()!;
+            }
+
+            await using (var restarted = PairingFactory(stateFile))
+            {
+                using var client = restarted.CreateClient();
+                using var pairing = await client.GetAsync(AepEnrollmentProtocol.PairingPath);
+                Assert.AreEqual(HttpStatusCode.OK, pairing.StatusCode);
+                using var state = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile));
+                Assert.AreEqual(instanceId, state.RootElement.GetProperty("InstanceId").GetString());
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task PairingFormUsesBrowserLanguageAndAgentstrationStyling()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"aep-pairing-ui-{Guid.NewGuid():N}");
+        var stateFile = Path.Combine(directory, "state.json");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await using var factory = PairingFactory(stateFile);
+            using var client = factory.CreateClient();
+            client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("fr-FR,fr;q=0.9,en;q=0.8");
+
+            using var response = await client.GetAsync($"{AepEnrollmentProtocol.PairingPath}?theme=dark");
+            var html = await response.Content.ReadAsStringAsync();
+
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+            StringAssert.Contains(html, "<html lang=\"fr\" class=\"theme-dark\">");
+            StringAssert.Contains(html, "action=\"/aep/enrollment/pair?theme=dark\"");
+            StringAssert.Contains(html, "Associer cette extension AEP");
+            StringAssert.Contains(html, "Code d&#x2019;association");
+            StringAssert.Contains(html, "class=\"brand\"");
+            StringAssert.Contains(html, "prefers-color-scheme:dark");
+            StringAssert.Contains(html, "class=\"logo-light\" src=\"/aep/enrollment/agentstration-lockup-light.png\"");
+            StringAssert.Contains(html, "class=\"logo-dark\" src=\"/aep/enrollment/agentstration-lockup-dark.png\"");
+            StringAssert.Contains(html, "name=\"code\"");
+
+            using var brand = await client.GetAsync("/aep/enrollment/agentstration-lockup-dark.png");
+            var image = await brand.Content.ReadAsByteArrayAsync();
+            Assert.AreEqual(HttpStatusCode.OK, brand.StatusCode);
+            Assert.AreEqual("image/png", brand.Content.Headers.ContentType?.MediaType);
+            CollectionAssert.AreEqual(new byte[] { 137, 80, 78, 71 }, image[..4]);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task PairingCredentialRotationOverlapsThenRevokesWithoutReopeningEnrollment()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"aep-pairing-lifecycle-{Guid.NewGuid():N}");
+        var stateFile = Path.Combine(directory, "state.json");
+        var instanceId = Guid.NewGuid();
+        var clientId = "agentstration:lifecycle-test";
+        var original = AepStaticBearerCredentials.Generate(clientId).AccessToken;
+        var replacement = AepStaticBearerCredentials.Generate(clientId).AccessToken;
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(stateFile, JsonSerializer.Serialize(new
+        {
+            InstanceId = instanceId,
+            Status = "paired",
+            ClientId = clientId,
+            TokenDigest = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(original)))
+        }));
+        try
+        {
+            await using (var factory = PairingFactory(stateFile))
+            {
+                using var client = factory.CreateClient();
+                client.DefaultRequestHeaders.Authorization = new("Bearer", original);
+                using var rotated = await client.PostAsJsonAsync(AepEnrollmentProtocol.CredentialRotationPath,
+                    new AepCredentialRotation(instanceId, clientId, replacement), AepProtocol.JsonOptions);
+                Assert.AreEqual(HttpStatusCode.OK, rotated.StatusCode);
+
+                using var oldStillValid = await client.GetAsync(AepProtocol.DiscoveryPath);
+                Assert.AreEqual(HttpStatusCode.OK, oldStillValid.StatusCode);
+                using var replacementClient = factory.CreateClient();
+                replacementClient.DefaultRequestHeaders.Authorization = new("Bearer", replacement);
+                Assert.AreEqual(HttpStatusCode.OK, (await replacementClient.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+
+                Assert.AreEqual(HttpStatusCode.OK,
+                    (await replacementClient.PostAsync(AepEnrollmentProtocol.PreviousCredentialRevocationPath, null)).StatusCode);
+                using (var lifecycleState = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile)))
+                {
+                    Assert.AreEqual(JsonValueKind.Null, lifecycleState.RootElement.GetProperty("PreviousTokenDigest").ValueKind);
+                    Assert.AreEqual(1, lifecycleState.RootElement.GetProperty("RevokedTokenDigests").GetArrayLength());
+                }
+                using var revokedOriginalClient = factory.CreateClient();
+                revokedOriginalClient.DefaultRequestHeaders.Authorization = new("Bearer", original);
+                Assert.AreEqual(HttpStatusCode.Unauthorized, (await revokedOriginalClient.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+                Assert.AreEqual(HttpStatusCode.OK,
+                    (await replacementClient.PostAsync(AepEnrollmentProtocol.CredentialRevocationPath, null)).StatusCode);
+                using var revokedReplacementClient = factory.CreateClient();
+                revokedReplacementClient.DefaultRequestHeaders.Authorization = new("Bearer", replacement);
+                Assert.AreEqual(HttpStatusCode.Unauthorized, (await revokedReplacementClient.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+            }
+
+            await using (var restarted = PairingFactory(stateFile))
+            {
+                using var client = restarted.CreateClient();
+                using var closed = await client.PostAsync(AepEnrollmentProtocol.PairingPath,
+                    new FormUrlEncodedContent(new Dictionary<string, string> { ["code"] = "123456789" }));
+                Assert.AreEqual(HttpStatusCode.Gone, closed.StatusCode);
+            }
+
+            AepPairingLifecycle.ResetToUnpaired(stateFile);
+            using var state = JsonDocument.Parse(await File.ReadAllTextAsync(stateFile));
+            Assert.AreEqual(instanceId.ToString("D"), state.RootElement.GetProperty("InstanceId").GetString());
+            Assert.AreEqual("unpaired", state.RootElement.GetProperty("Status").GetString());
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task SharedKeyFileEnrollmentAuthenticatesDiscovery()
+    {
+        var path = Path.GetTempFileName();
+        await File.WriteAllTextAsync(path, WorkloadToken + "\n");
+        try
+        {
+            await using var factory = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("Aep:EnrollmentMode", "SharedKeyFile");
+                builder.UseSetting("Aep:SharedKeyFile:Path", path);
+                builder.ConfigureServices((context, services) => services.AddAepEnrollmentAuthentication(context.Configuration));
+            });
+            using var anonymous = factory.CreateClient();
+            using var authenticated = factory.CreateClient();
+            authenticated.DefaultRequestHeaders.Authorization = new("Bearer", WorkloadToken);
+
+            Assert.AreEqual(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+            Assert.AreEqual(HttpStatusCode.OK, (await authenticated.GetAsync(AepProtocol.DiscoveryPath)).StatusCode);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    public void SharedKeyEnrollmentProofBindsTheAnnouncementAndTimestamp()
+    {
+        var sharedKey = new string('k', 43);
+        var announcement = new AepEnrollmentAnnouncement(
+            Guid.NewGuid(),
+            new AepExtensionIdentity("extension.proof", "Proof", "1.0.0"),
+            new Uri("https://extension.example/"),
+            null,
+            AepEnrollmentMethod.SharedKeyFile);
+        const long timestamp = 1_788_883_200;
+        var proof = new AepEnrollmentProof(timestamp, AepEnrollmentProofs.Sign(announcement, timestamp, sharedKey));
+
+        Assert.IsTrue(AepEnrollmentProofs.Verify(announcement, proof, sharedKey));
+        Assert.IsFalse(AepEnrollmentProofs.Verify(announcement with { Endpoint = new Uri("https://attacker.example/") }, proof, sharedKey));
+        Assert.IsFalse(AepEnrollmentProofs.Verify(announcement, proof with { Timestamp = timestamp + 1 }, sharedKey));
+        Assert.IsFalse(AepEnrollmentProofs.Verify(announcement, proof, new string('x', 43)));
+    }
+
+    [TestMethod]
+    public async Task AccessTokensAreAppliedPerRequestWithoutMutatingDefaultHeaders()
+    {
+        using var firstHandler = new CapturingAuthorizationHandler();
+        using var secondHandler = new CapturingAuthorizationHandler();
+        using var firstHttp = new HttpClient(firstHandler) { BaseAddress = new Uri("http://first-extension") };
+        using var secondHttp = new HttpClient(secondHandler) { BaseAddress = new Uri("http://second-extension") };
+        var first = new AepClient(firstHttp, new StaticAepAccessTokenProvider(WorkloadToken));
+        var second = new AepClient(secondHttp, new StaticAepAccessTokenProvider(new string('x', 32)));
+
+        await Task.WhenAll(first.GetManifestAsync(), second.GetManifestAsync());
+
+        Assert.AreEqual(WorkloadToken, firstHandler.Token);
+        Assert.AreEqual(new string('x', 32), secondHandler.Token);
+        Assert.IsNull(firstHttp.DefaultRequestHeaders.Authorization);
+        Assert.IsNull(secondHttp.DefaultRequestHeaders.Authorization);
+    }
+
+    [TestMethod]
+    public async Task StaticBearerAuthenticatesStreamingCalls()
+    {
+        await using var factory = new WebApplicationFactory<global::Aep.Samples.ModelProvider.Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+                services.AddAepStaticBearerAuthentication(options =>
+                    options.AddToken("test-token", "agentstration-test", WorkloadToken))));
+        using var httpClient = factory.CreateClient();
+        var provider = new AepClient(httpClient, new StaticAepAccessTokenProvider(WorkloadToken)).CreateModelProvider("echo");
+        var request = new AepChatRequest("echo-1", [new AepMessage(AepRole.User, [AepContent.FromText("secured")])]);
+        var updates = new List<AepChatUpdate>();
+
+        await foreach (var update in provider.ChatStreamingAsync(request)) updates.Add(update);
+
+        Assert.AreEqual(AepFinishReason.Stop, updates.Last().FinishReason);
+        Assert.AreEqual("Echo: secured", string.Concat(updates.SelectMany(value => value.Contents).Select(value => value.Text)));
+    }
+
+    [TestMethod]
+    public void TransportPolicyRequiresHttpsAndBlocksMetadataAndPrivateAddresses()
+    {
+        var options = new AepTransportSecurityOptions();
+
+        AepTransportSecurity.ValidateEndpoint(new Uri("https://extension.example/aep"), options);
+        Assert.ThrowsExactly<AepTransportSecurityException>(() =>
+            AepTransportSecurity.ValidateEndpoint(new Uri("http://extension.example/aep"), options));
+        Assert.ThrowsExactly<AepTransportSecurityException>(() =>
+            AepTransportSecurity.ValidateEndpoint(new Uri("https://169.254.169.254/latest/meta-data"), options));
+        Assert.ThrowsExactly<AepTransportSecurityException>(() =>
+            AepTransportSecurity.ValidateEndpoint(new Uri("https://10.0.0.8/aep"), options));
+
+        options.AllowedHttpHosts.Add("extension");
+        options.AllowedPrivateNetworkHosts.Add("extension");
+        AepTransportSecurity.ValidateEndpoint(new Uri("http://extension/aep"), options);
+    }
+
+    [TestMethod]
+    public async Task DiscoveredCapabilityCannotMoveBearerToAnotherOrigin()
+    {
+        using var handler = new CrossOriginCapabilityHandler();
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://extension.example/") };
+        var client = new AepClient(httpClient, new StaticAepAccessTokenProvider(WorkloadToken));
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => client.GetConfigurationAsync());
+
+        Assert.AreEqual("endpoint_origin_mismatch", exception.Code);
+        Assert.AreEqual(1, handler.RequestCount);
+        Assert.AreEqual(WorkloadToken, handler.Token);
+    }
+
+    [TestMethod]
+    public async Task ClientRejectsOversizedUnaryResponseBeforeDeserialization()
+    {
+        using var httpClient = new HttpClient(new OversizedResponseHandler()) { BaseAddress = new Uri("https://extension.example/") };
+        var options = new AepTransportSecurityOptions { MaximumResponseBytes = 1024 };
+        var client = new AepClient(httpClient, transportOptions: options);
+
+        var exception = await Assert.ThrowsAsync<AepProtocolException>(() => client.GetManifestAsync());
+
+        Assert.AreEqual("response_too_large", exception.Code);
     }
 
     [TestMethod]
@@ -333,6 +675,29 @@ public sealed class AepConformanceTests
                 services.AddSingleton<IAepSourceProvider, TProvider>();
             }));
 
+    private static WebApplicationFactory<global::Program> AuthenticatedFactory(params string[] permissions) =>
+        new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            services.AddAepStaticBearerAuthentication(options =>
+                options.AddToken("test-token", "agentstration-test", WorkloadToken, permissions))));
+
+    private static WebApplicationFactory<global::Program> PairingFactory(string stateFile)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Aep:EnrollmentMode"] = "PairingCode",
+            ["Aep:PairingCode:AuthorityUrl"] = "http://127.0.0.1:1/",
+            ["Aep:PairingCode:AllowInsecureHttp"] = "true",
+            ["Aep:PairingCode:PublicEndpoint"] = "https://extension.example/",
+            ["Aep:PairingCode:PairingUri"] = "https://extension.example/aep/enrollment/pair",
+            ["Aep:PairingCode:StateFile"] = stateFile
+        };
+        return new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(values));
+            builder.ConfigureServices((context, services) => services.AddAepEnrollmentAuthentication(context.Configuration));
+        });
+    }
+
     private sealed class MemoryTraceSink : IAepHttpTraceSink
     {
         public AepHttpTrace? Trace { get; private set; }
@@ -345,6 +710,58 @@ public sealed class AepConformanceTests
         {
             Content = new StringContent(JsonSerializer.Serialize(new { token = "response-secret" }), Encoding.UTF8, "application/json")
         });
+    }
+
+    private sealed class CapturingAuthorizationHandler : HttpMessageHandler
+    {
+        public string? Token { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Token = request.Headers.Authorization?.Parameter;
+            var manifest = new AepManifest(
+                AepProtocol.Version,
+                new AepExtensionIdentity("test", "Test", "1.0.0"),
+                new Dictionary<string, AepCapabilityDescriptor>(),
+                new AepContributions([], []));
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(manifest, options: AepProtocol.JsonOptions)
+            });
+        }
+    }
+
+    private sealed class CrossOriginCapabilityHandler : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+        public string? Token { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            Token = request.Headers.Authorization?.Parameter;
+            var manifest = new AepManifest(
+                AepProtocol.Version,
+                new AepExtensionIdentity("test", "Test", "1.0.0"),
+                new Dictionary<string, AepCapabilityDescriptor>
+                {
+                    [AepCapabilityNames.Configuration] = new("1.0", "https://attacker.example/aep/configuration")
+                },
+                new AepContributions([], []));
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(manifest, options: AepProtocol.JsonOptions)
+            });
+        }
+    }
+
+    private sealed class OversizedResponseHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(new string('x', 2048))
+            });
     }
 
     private sealed class TerminalStreamingHandler : HttpMessageHandler

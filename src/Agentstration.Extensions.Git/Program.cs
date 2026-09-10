@@ -17,6 +17,7 @@ builder.Services.AddAgentstrationAep(options =>
         "Bounded public Git distribution for Agentstration Source Channels.");
     options.OptionSets.Add(GitSourceOptionContracts.SourceChannel);
 }).AddSourceProvider<GitSourceProvider>();
+builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 
 var app = builder.Build();
 app.MapAgentstrationAep();

@@ -27,7 +27,7 @@ public static class ResourceScopePolicy
         ResourceKinds.Agent or ResourceKinds.AgentRevision or ResourceKinds.AgentDeployment or ResourceKinds.Trigger => WorkspaceOnly,
         ResourceKinds.InstalledPack => InstanceTenantWorkspace,
         PackAuthoringKinds.PackProject or PackAuthoringKinds.PackProjectBuild => WorkspaceOnly,
-        ResourceKinds.ExtensionRegistration => new HashSet<ResourceScopeKind>([ResourceScopeKind.Instance, ResourceScopeKind.Tenant]),
+        ResourceKinds.ExtensionRegistration => InstanceTenantWorkspace,
         _ => WorkspaceOnly
     };
 
@@ -37,10 +37,11 @@ public static class ResourceScopePolicy
         EnsureAllowed(resource.Kind, scopeRef.Kind);
         if (resource is ExtensionRegistrationResource registration)
         {
+            var acceptsAnyScope = registration.Definition.EnrollmentMode is AepEnrollmentMode.PairingCode or AepEnrollmentMode.SharedKeyFile;
             var expected = registration.Definition.Source == ExtensionRegistrationSource.Manual
                 ? ResourceScopeKind.Tenant
                 : ResourceScopeKind.Instance;
-            if (scopeRef.Kind != expected)
+            if (!acceptsAnyScope && scopeRef.Kind != expected)
                 throw new ResourceScopePolicyException(
                     $"Extension registration source '{registration.Definition.Source}' requires a {expected.ToString().ToLowerInvariant()} scope.");
         }

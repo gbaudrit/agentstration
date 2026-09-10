@@ -12,7 +12,7 @@ Do not commit API keys. HTTP payload capture is disabled by default, and sensiti
 
 ## Extension discovery
 
-`Agentstration:Extensions:DiscoverOnStartup` defaults to `true`. It synchronizes extension endpoints declared below `Agentstration:Extensions` and Aspire `*-extension` connection strings into every active Workspace after persistence initialization and before declarative bootstrap. A second idempotent pass covers the initial Workspace when bootstrap creates it. Set the option to `false` (or `Agentstration__Extensions__DiscoverOnStartup=false`) to keep discovery manual through the Console or `POST /api/extensions/discover`.
+`Agentstration:Extensions:DiscoverOnStartup` defaults to `false`. PairingCode and SharedKeyFile extensions initiate enrollment and provide their running endpoint, so Agentstration does not need a compiled-in extension catalog. Set it to `true` only for the internal compatibility path that synchronizes explicitly configured endpoints after persistence initialization and declarative bootstrap. This synchronization has no Console action or public HTTP command.
 
 ## Authentication
 

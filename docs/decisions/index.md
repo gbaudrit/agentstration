@@ -119,3 +119,8 @@ Use **Proposed** when implementation or repository evidence does not establish a
 87. [ADR-0087 — Source Channel compatibility uses Semantic Version intervals](0087-source-channel-compatibility-uses-semantic-version-intervals.md)
 88. [ADR-0088 — Source verification binds exact definitions and snapshots](0088-source-verification-binds-exact-definitions-and-snapshots.md)
 89. [ADR-0089 — Source Bootstrap profiles reuse administrative applications](0089-source-bootstrap-profiles-reuse-administrative-applications.md)
+90. [ADR-0090 — AEP credentials are scope-owned and late-bound](0090-aep-credentials-are-scope-owned-and-late-bound.md)
+91. [ADR-0091 — Orchestrators own development AEP shared keys](0091-orchestrators-own-development-aep-shared-keys.md)
+92. [ADR-0092 — Pair manually hosted AEP extensions with workspace-bound codes](0092-pair-aep-extensions-with-workspace-bound-codes.md)
+93. [ADR-0093 — AEP enrollment lifecycle is explicit and audited](0093-aep-enrollment-lifecycle-is-explicit-and-audited.md)
+94. [ADR-0094 — AEP extensions initiate enrollment](0094-aep-extensions-initiate-enrollment.md)

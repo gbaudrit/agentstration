@@ -23,8 +23,79 @@ The main verified settings are:
 | `Agentstration:WorkApi:BaseAddress` | `http://localhost:5100/` | Console-to-Work-API connection on the authoritative server. |
 | `Agentstration:ApiBaseUrl` | `http://localhost:5100/` | Workplace-to-server API connection. |
 | `Agentstration:WorkplaceHubUrl` | `http://localhost:5100/hubs/workplace` | Workplace real-time endpoint. |
+| `Agentstration:Aep:Transport:AllowedHttpHosts` | loopback hosts | Exact local hosts permitted to use clear-text HTTP for AEP development. |
+| `Agentstration:Aep:Transport:AllowedPrivateNetworkHosts` | loopback hosts | Exact hosts whose DNS results may use private address ranges. |
+| `Agentstration:Aep:Transport:BlockPrivateNetworks` | `true` | Blocks private DNS/IP targets unless their host is explicitly allowed. |
 
 Provider-specific options and persisted model resources are described in [Model providers](../concepts/model-providers.md) and [Model profiles](../concepts/model-profiles.md). Do not store secrets in committed settings files.
+
+## AEP outbound transport
+
+Agentstration disables redirects for authenticated AEP requests and requires remote extensions to use HTTPS. The default local profile permits HTTP and private addresses only for `localhost`, `127.0.0.1`, and `::1`. Aspire resolves its local project endpoints through those loopback origins.
+
+An Extension Registration may set `authenticationMode` to `staticBearer` and reference a visible `Secret` through `credential`. The Secret is resolved in the registration's namespace and scope immediately before every AEP request, so replacing or deleting its value takes effect without changing Model Providers or profiles. `authenticationMode: none` must not include a credential, and `staticBearer` requires one. Tokens are request-scoped and are never installed as default HTTP headers or forwarded to MCP/native provider transports.
+
+```yaml
+authenticationMode: staticBearer
+credential:
+  name: aep-extension-token
+  namespace: default
+  scopeRef: /tenants/00000000-0000-0000-0000-000000000001
+```
+
+For orchestrated development, `enrollmentMode: sharedKeyFile` reads the credential through a read-only Secret provider instead of copying it into Management storage:
+
+```yaml
+authenticationMode: staticBearer
+enrollmentMode: sharedKeyFile
+sharedKeyFile:
+  path: /run/aep-keys/ollama/token
+```
+
+The extension initiates SharedKeyFile enrollment just like PairingCode. Configure the extension with the authority and target scope in addition to its local key file:
+
+```text
+Aep__EnrollmentMode=SharedKeyFile
+Aep__SharedKeyFile__Path=/run/aep-keys/ollama/token
+Aep__SharedKeyFile__AuthorityUrl=https://agentstration.example/
+Aep__SharedKeyFile__PublicEndpoint=https://extension.example/
+Aep__SharedKeyFile__StateFile=/var/lib/extension/aep-shared-key.instance
+```
+
+The matching Agentstration configuration declares the same extension ID, `enrollmentMode: sharedKeyFile`, and key-file path, but no endpoint or target scope. The extension retries until the authority is available and signs its timestamped identity and endpoint with HMAC-SHA256. The shared key itself is never sent. Agentstration records one unassigned instance-level candidate; a platform administrator assigns it to an Instance, Tenant, or Workspace scope. A valid proof creates the scoped registration without an administrator-entered code once that assignment is confirmed.
+
+The file must be a single UTF-8 token line containing at least 32 bytes and no more than 4096 bytes; only a final LF or CRLF is tolerated. Missing, unreadable, short, multiline, malformed, or oversized files fail closed. Aspire provisions distinct files automatically beneath the ignored slot data directory. Docker Compose provisions distinct persistent volumes and mounts each extension's key read-only; `docker compose down -v` removes those development credentials.
+
+For a manually hosted extension, PairingCode enrollment creates the first credential through an administrator-approved, workspace-bound flow:
+
+```text
+Aep__EnrollmentMode=PairingCode
+Aep__PairingCode__AuthorityUrl=https://agentstration.example/
+Aep__PairingCode__PublicEndpoint=https://extension.example/
+Aep__PairingCode__PairingUri=https://extension.example/aep/enrollment/pair
+Aep__PairingCode__StateFile=/var/lib/extension/aep-pairing.json
+```
+
+The public endpoint and pairing URI must have the exact same origin. In **Extensions → Enrollment inbox**, a platform administrator first assigns the candidate to an Instance, Tenant, or Workspace scope, then selects **Copy code and open extension**. This creates a fresh 60-second code bound to the server-side assignment and invalidates any previously copied value. The code is entered in the extension form and never appears in a path, query, or fragment. `Aep__PairingCode__AllowInsecureHttp=true` is an explicit local-development escape hatch for the authority URL.
+
+After pairing, the same inbox can rotate or revoke the workload credential. Rotation overlaps the old and replacement digests until the replacement Secret and identity-pinned manifest are verified. Revocation closes the extension on its next request, deletes the vault value, disables the registration, and does not reopen enrollment. Back up the control-plane database, Local Vault master key/data, and extension `StateFile` together. To recover from an intentional full reset, stop the extension and invoke `AepPairingLifecycle.ResetToUnpaired(stateFile)` locally before restarting and approving a new request; authentication failures never trigger this operation automatically.
+
+For an intentional Compose service name or private HTTPS extension, add the exact DNS host to the narrowest applicable list. An HTTP service must be present in both lists when it resolves to a private address:
+
+```json
+{
+  "Agentstration": {
+    "Aep": {
+      "Transport": {
+        "AllowedHttpHosts": [ "localhost", "ollama-extension" ],
+        "AllowedPrivateNetworkHosts": [ "localhost", "ollama-extension" ]
+      }
+    }
+  }
+}
+```
+
+Environment-variable configuration uses numeric array indexes, for example `Agentstration__Aep__Transport__AllowedHttpHosts__0=ollama-extension`. Do not add a broad wildcard or cloud metadata/link-local address. DNS is re-evaluated when bounded pooled connections are renewed; TLS validation retains the platform certificate and hostname checks.
 
 ## PostgreSQL storage profile
 

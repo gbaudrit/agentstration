@@ -830,7 +830,11 @@ public sealed class SourceTests
     [TestMethod]
     public async Task PlatformApiImportsListsAndUpdatesDisplayNameAsync()
     {
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Agentstration:Aep:Transport:AllowedHttpHosts:0", "source-extension.invalid");
+        });
         using var client = factory.CreateClient();
         var context = await client.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
         Assert.IsNotNull(context);

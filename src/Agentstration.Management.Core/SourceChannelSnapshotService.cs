@@ -163,7 +163,18 @@ public sealed class SourceChannelSnapshotService(
             var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
                 provider.Value.Definition.Extension, provider.Value.Namespace, ResourceKinds.ExtensionRegistration, providerScope, cancellationToken)
                 ?? throw Invalid("source_binding_extension_missing", $"Extension registration for Source Provider '{provider.Value.Name}' was not found.");
-            var invocation = new SourceProviderInvocation(extension.Value.Definition.Endpoint, provider.Value.Definition.ContributionId, channel.Configuration);
+            if (!extension.Value.Definition.Enabled)
+                throw Invalid("source_binding_extension_disabled", $"Extension registration for Source Provider '{provider.Value.Name}' is disabled.");
+            var invocation = new SourceProviderInvocation(
+                extension.Value.Definition.Endpoint,
+                provider.Value.Definition.ContributionId,
+                channel.Configuration,
+                extension.Value.Namespace,
+                extension.Value.ScopeRef,
+                extension.Value.Name,
+                extension.Value.Definition.AuthenticationMode,
+                extension.Value.Definition.Credential,
+                extension.Value.Definition.ExpectedExtensionId);
             var resolved = await materializer.ResolveAsync(invocation, cancellationToken);
             var observed = await LoadObservedAsync(scopeRef, source, versionUid, channel.Name, cancellationToken);
             if (observed?.Value.Definition.CurrentSnapshotUid is { } currentUid

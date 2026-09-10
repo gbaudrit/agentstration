@@ -23,6 +23,8 @@ public static class ResourceKinds
     public const string ModelProvider = "ModelProvider";
     public const string SourceProvider = "SourceProvider";
     public const string ExtensionRegistration = "ExtensionRegistration";
+    public const string AepEnrollmentSettings = "AepEnrollmentSettings";
+    public const string AepEnrollmentRequest = "AepEnrollmentRequest";
     public const string ModelProfile = "ModelProfile";
     public const string RuntimeProfile = "RuntimeProfile";
     public const string Secret = "Secret";

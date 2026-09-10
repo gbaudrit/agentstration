@@ -1,3 +1,4 @@
+using Agentstration.Aep.Client;
 using Agentstration.Management.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,9 +13,14 @@ public static class ModelProviderServiceCollectionExtensions
         bool useManagedProfileResolver = true)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        var transportOptions = configuration.GetSection(AepTransportSecurityOptions.SectionName).Get<AepTransportSecurityOptions>() ?? new();
+        transportOptions.Validate();
+        services.AddSingleton(transportOptions);
         services.AddSingleton(configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new());
         services.AddTransient<GenAiHttpPayloadCaptureHandler>();
         services.AddHttpClient("agentstration-aep", client => client.Timeout = TimeSpan.FromSeconds(90))
+            .ConfigurePrimaryHttpMessageHandler(services =>
+                AepSecureHttpMessageHandler.Create(services.GetRequiredService<AepTransportSecurityOptions>()))
             .AddHttpMessageHandler<GenAiHttpPayloadCaptureHandler>();
         services.AddSingleton<AepModelProvider>();
         services.AddSingleton<IModelProvider>(services => services.GetRequiredService<AepModelProvider>());

@@ -12,6 +12,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.Tools.Add(new AepToolContribution("json.compact", "Compact JSON", new("utilities", "json_compact"), "Normalize JSON to a compact representation."));
     options.Tools.Add(new AepToolContribution("text.upper", "Uppercase text", new("utilities", "text_upper"), "Convert text to invariant uppercase."));
 });
+builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
 var app = builder.Build();
 app.MapAgentstrationAep();
