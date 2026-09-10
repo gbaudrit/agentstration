@@ -6,9 +6,9 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Agentstration.Management.Tests;
 
