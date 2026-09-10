@@ -130,6 +130,79 @@ public static class SourceRegistryWellKnown
     public const string OfficialIndexUrl = "https://registry.agentstration.io/v1/index.json";
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<SourceRegistryOriginClassification>))]
+public enum SourceRegistryOriginClassification
+{
+    [JsonStringEnumMemberName("official")] Official,
+    [JsonStringEnumMemberName("agentstrationOwned")] AgentstrationOwned,
+    [JsonStringEnumMemberName("internal")] Internal,
+    [JsonStringEnumMemberName("external")] External
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<SourceRegistryPublisherStatus>))]
+public enum SourceRegistryPublisherStatus
+{
+    [JsonStringEnumMemberName("declared")] Declared,
+    [JsonStringEnumMemberName("verified")] Verified,
+    [JsonStringEnumMemberName("official")] Official,
+    [JsonStringEnumMemberName("revoked")] Revoked
+}
+
+public sealed record SourceRegistryEvidence
+{
+    public required string EvidenceSource { get; init; }
+    public required Guid RegistrationUid { get; init; }
+    public required string RegistrationName { get; init; }
+    public required Guid ObservationId { get; init; }
+    public required string IndexDigest { get; init; }
+    public required string CatalogName { get; init; }
+    public required string CatalogDigest { get; init; }
+    public required DateTimeOffset ObservedAt { get; init; }
+}
+
+public sealed record SourceRegistryOriginTrustView(
+    Guid RegistrationUid,
+    string RegistrationName,
+    Uri Origin,
+    SourceRegistryOriginClassification Classification,
+    SourceRegistryTrustPolicy Policy,
+    string ReasonCode,
+    DateTimeOffset EvaluatedAt,
+    Guid? ObservationId,
+    string? IndexDigest);
+
+public sealed record SourceRegistryPublisherTrustView(
+    string Publisher,
+    SourceRegistryPublisherStatus EffectiveStatus,
+    string ReasonCode,
+    DateTimeOffset EvaluatedAt,
+    IReadOnlyList<SourceRegistryPublisherEvidenceView> Evidence);
+
+public sealed record SourceRegistryPublisherEvidenceView(
+    SourceRegistryPublisherStatus AssertedStatus,
+    SourceRegistryPublisherStatus AcceptedStatus,
+    SourcePublisher Publisher,
+    SourceRegistryTrustPolicy Policy,
+    SourceRegistryOriginClassification OriginClassification,
+    SourceRegistryEvidence Evidence);
+
+public sealed record SourceRegistryVersionEvidenceView(
+    string Publisher,
+    string SourceName,
+    string Version,
+    string ManifestDigest,
+    string ManifestUrl,
+    SourceRegistryPublisherStatus PublisherStatus,
+    SourceRegistryEvidence Evidence);
+
+public sealed record SourceRegistrySourceTrustView(
+    SourceRegistryPublisherTrustView Publisher,
+    SourceVerificationStatus VersionStatus,
+    string VersionReasonCode,
+    string? RequestedManifestDigest,
+    DateTimeOffset EvaluatedAt,
+    IReadOnlyList<SourceRegistryVersionEvidenceView> Evidence);
+
 [JsonConverter(typeof(JsonStringEnumConverter<SourceRegistryTrustPolicy>))]
 public enum SourceRegistryTrustPolicy
 {

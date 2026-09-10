@@ -317,6 +317,8 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.StartsWith("/api/sourceregistries", StringComparison.OrdinalIgnoreCase))
         {
             if (path == "/api/sourceregistries") return Json<ValueResponse<SourceRegistryRegistrationView>>(200, "List Source registries");
+            if (path.Contains("/trust/sources/", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistrySourceTrustView>(200, "Evaluate Source registry evidence");
+            if (path.EndsWith("/trust", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistryOriginTrustView>(200, "Evaluate Source registry origin trust");
             if (path.EndsWith("/refreshes", StringComparison.OrdinalIgnoreCase)) return Json<SourceRegistryRefreshHistoryResponse>(200, "List Source registry refreshes");
             return Json<SourceRegistryRegistrationView>(200, path.EndsWith("/refresh", StringComparison.OrdinalIgnoreCase) ? "Refresh a Source registry" : "Get or update a Source registry");
         }

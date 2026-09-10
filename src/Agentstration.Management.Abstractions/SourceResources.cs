@@ -165,7 +165,9 @@ public enum SourceVerificationStatus
 {
     [JsonStringEnumMemberName("verified")] Verified,
     [JsonStringEnumMemberName("unverified")] Unverified,
-    [JsonStringEnumMemberName("unavailable")] Unavailable
+    [JsonStringEnumMemberName("unavailable")] Unavailable,
+    [JsonStringEnumMemberName("conflict")] Conflict,
+    [JsonStringEnumMemberName("revoked")] Revoked
 }
 
 public sealed record VerifiedSourceIdentity
@@ -244,6 +246,13 @@ public interface ISourceVerificationIndexProvider
 public interface ISourceVerificationIndexReader
 {
     VerifiedSourceIndexManifest Read(string content);
+}
+
+public interface ISourceVerificationEvidenceProvider
+{
+    Task<SourceDefinitionVerificationView?> VerifyDefinitionAsync(
+        SourceVersionResource version,
+        CancellationToken cancellationToken);
 }
 
 public sealed record SourceConfigurationProperties

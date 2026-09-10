@@ -1,4 +1,4 @@
-# ADR-0105 — Notification channels are delivery Flows
+# ADR-0106 — Notification channels are delivery Flows
 
 ## Status
 
