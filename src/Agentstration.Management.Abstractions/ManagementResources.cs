@@ -41,6 +41,7 @@ public static class ResourceKinds
     public const string SourceImportRecord = "SourceImportRecord";
     public const string SourceChannelSnapshot = "SourceChannelSnapshot";
     public const string SourceChannelObservedState = "SourceChannelObservedState";
+    public const string SourceChannelRefreshRecord = "SourceChannelRefreshRecord";
 }
 
 public sealed record ResourceMetadata

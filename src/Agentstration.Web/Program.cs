@@ -172,6 +172,7 @@ if (hostedServicesEnabled)
     builder.Services.AddHostedService<RuntimeRunExecutionWorker>();
     builder.Services.AddHostedService<FlowRunExecutionWorker>();
     builder.Services.AddHostedService<FlowRunRecoveryWorker>();
+    builder.Services.AddHostedService<SourceRefreshWorker>();
 }
 if (testingStorageDirectory is not null)
 {
