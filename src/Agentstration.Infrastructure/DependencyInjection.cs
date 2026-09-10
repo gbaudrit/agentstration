@@ -214,6 +214,7 @@ public static class DependencyInjection
         services.AddSingleton<ISourceRegistryCacheStore>(_ => new FileSystemSourceRegistryCacheStore(Path.Combine(dataDirectory, "source-registry-cache")));
         services.AddSingleton<SourceRegistryManagementService>();
         services.AddSingleton<ToolManagementService>();
+        services.AddSingleton<ToolDefinitionService>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<RuntimeProfileManagementService>();
         services.AddSingleton<ITriggerScheduleCalculator, QuartzTriggerScheduleCalculator>();
@@ -296,6 +297,9 @@ public static class DependencyInjection
             services.AddSqliteFlowStorage(flowConnectionString);
         }
         services.AddSingleton<FlowService>();
+        services.AddSingleton<IToolDefinitionFlowResolver, ToolDefinitionFlowResolver>();
+        services.AddSingleton<IFlowVersionActivationGuard, ToolDefinitionFlowActivationGuard>();
+        services.AddSingleton<IFlowDeletionGuard, ToolDefinitionFlowDeletionGuard>();
         services.AddSingleton<IEntryTargetResolver, EntryTargetResolver>();
         services.AddSingleton<EntryResourceDeletionGuard>();
         services.AddSingleton<IManagementResourceDeletionGuard>(provider => provider.GetRequiredService<EntryResourceDeletionGuard>());
@@ -327,6 +331,8 @@ public static class DependencyInjection
         services.AddSingleton<FlowDraftService>();
         services.AddSingleton<FlowRunService>();
         services.AddSingleton<RootFlowSubmissionService>();
+        services.AddSingleton<IToolDefinitionExecutor, ToolDefinitionExecutor>();
+        services.AddSingleton(provider => new Lazy<IToolDefinitionExecutor>(provider.GetRequiredService<IToolDefinitionExecutor>));
         return services;
     }
 }

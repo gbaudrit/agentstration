@@ -6,7 +6,7 @@
 <PageHeader Title="@T("Title")" Description="@T("Description")">
     <Actions><a class="button-secondary" href="/tools/providers">@T("Providers")</a><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button></Actions>
 </PageHeader>
-<ResourceTabs Label="@T("SectionsLabel")"><a class="active" href="/tools">@T("Catalog")</a><a href="/tools/providers">@T("Providers")</a></ResourceTabs>
+<ResourceTabs Label="@T("SectionsLabel")"><a class="active" href="/tools">@T("Catalog")</a><a href="/tools/definitions">@T("Definitions")</a><a href="/tools/providers">@T("Providers")</a></ResourceTabs>
 
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else if (error is not null) { <ErrorState Message="@error" /> }

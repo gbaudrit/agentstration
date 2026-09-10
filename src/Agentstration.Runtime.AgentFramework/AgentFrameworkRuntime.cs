@@ -282,8 +282,10 @@ public sealed class AgentFrameworkRuntimeFactory(
                 ToolCallId = callId,
                 InvocationId = Guid.NewGuid().ToString("N"),
                 ToolId = tool.Id,
+                ToolNamespace = tool.Namespace,
                 ToolName = tool.Name,
                 ToolProviderId = tool.ProviderId,
+                ToolProviderNamespace = tool.ProviderNamespace,
                 ExternalToolId = tool.ExternalId,
                 Arguments = serializedArguments
             }, cancellationToken);

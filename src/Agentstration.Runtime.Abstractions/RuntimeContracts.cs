@@ -237,6 +237,8 @@ public interface IAgentTool
     string Name { get; }
     string? Description { get; }
     string? ProviderId { get; }
+    ResourceNamespace? Namespace => null;
+    ResourceNamespace? ProviderNamespace => null;
     string? ExternalId { get; }
     JsonElement InputSchema { get; }
     JsonElement? OutputSchema { get; }

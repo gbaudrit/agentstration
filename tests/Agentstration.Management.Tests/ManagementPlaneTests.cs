@@ -112,7 +112,7 @@ public sealed class ManagementPlaneTests
 
         Assert.AreEqual(first.DefinitionHash, second.DefinitionHash);
         Assert.AreEqual("Answer carefully.\nUse sources.", first.EffectiveInstructions);
-        CollectionAssert.AreEqual(new[] { "alpha", "zeta" }, first.EffectiveToolNames.ToArray());
+        CollectionAssert.AreEqual(new[] { "agentstration.sample-pack/alpha", "agentstration.sample-pack/zeta" }, first.EffectiveToolNames.ToArray());
         Assert.AreEqual("reasoning-default", first.ModelProfileName);
         Assert.AreEqual(new ResourceNamespace("agentstration.sample-pack"), first.ModelProfileNamespace);
         Assert.AreEqual("maf-builtin", first.RuntimeProfileName);
