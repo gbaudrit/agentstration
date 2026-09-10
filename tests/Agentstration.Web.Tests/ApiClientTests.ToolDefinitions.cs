@@ -32,7 +32,8 @@ public sealed partial class ApiClientTests
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
             response.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"v2\"");
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var result = await new ToolDefinitionsApiClient(http).UpdateAsync(
             resource.Name,

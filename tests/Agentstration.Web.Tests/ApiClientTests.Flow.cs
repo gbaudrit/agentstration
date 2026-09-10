@@ -55,7 +55,8 @@ public sealed partial class ApiClientTests
         {
             origin = request.Headers.GetValues("X-Agentstration-Origin").Single();
             return new HttpResponseMessage(HttpStatusCode.Accepted) { Content = JsonContent.Create(run) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         _ = await new FlowApiClient(httpClient).CreateFlowRunAsync(flowId.Value,
             new CreateFlowRunRequest(JsonSerializer.SerializeToElement(new { })), default);
@@ -316,7 +317,8 @@ public sealed partial class ApiClientTests
                 },
                 _ => new(HttpStatusCode.NotFound)
             };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var page = await new FlowApiClient(httpClient).GetFlowRunCausalityAsync("child", default);
 
