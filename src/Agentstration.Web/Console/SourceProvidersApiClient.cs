@@ -10,11 +10,21 @@ public interface ISourceProvidersClient
 {
     Task<IReadOnlyList<SourceProviderSummaryResponse>> GetSourceProvidersAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        GetSourceProviderAsync(@namespace, name, cancellationToken);
     Task<ResourceSnapshot<SourceProviderResource>> CreateSourceProviderAsync(CreateSourceProviderRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<SourceProviderResource>> UpdateSourceProviderAsync(ResourceNamespace @namespace, string name, PutSourceProviderRequest request, string etag, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<SourceProviderResource>> UpdateSourceProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, PutSourceProviderRequest request, string etag, CancellationToken cancellationToken) =>
+        UpdateSourceProviderAsync(@namespace, name, request, etag, cancellationToken);
     Task DeleteSourceProviderAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken);
+    Task DeleteSourceProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) =>
+        DeleteSourceProviderAsync(@namespace, name, etag, cancellationToken);
     Task<SourceProviderStatusResponse> GetStatusAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
+    Task<SourceProviderStatusResponse> GetStatusAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        GetStatusAsync(@namespace, name, cancellationToken);
     Task<SourceProviderUsagesResponse> GetUsagesAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
+    Task<SourceProviderUsagesResponse> GetUsagesAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        GetUsagesAsync(@namespace, name, cancellationToken);
 }
 
 public sealed class SourceProvidersApiClient(HttpClient httpClient) : ISourceProvidersClient
@@ -23,27 +33,44 @@ public sealed class SourceProvidersApiClient(HttpClient httpClient) : ISourcePro
         (await ApiResponse.ReadAsync<ValueResponse<SourceProviderSummaryResponse>>(httpClient, "api/sourceproviders", cancellationToken)).Value;
 
     public Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
-        ReadResourceAsync(HttpMethod.Get, Path(@namespace, name), null, null, cancellationToken);
+        GetSourceProviderAsync(ResourceScopeRef.Instance, @namespace, name, cancellationToken);
+
+    public Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        ReadResourceAsync(HttpMethod.Get, Path(scopeRef, @namespace, name), null, null, cancellationToken);
 
     public Task<ResourceSnapshot<SourceProviderResource>> CreateSourceProviderAsync(CreateSourceProviderRequest request, CancellationToken cancellationToken) =>
         ReadResourceAsync(HttpMethod.Post, "api/sourceproviders", JsonContent.Create(request), null, cancellationToken);
 
     public Task<ResourceSnapshot<SourceProviderResource>> UpdateSourceProviderAsync(ResourceNamespace @namespace, string name, PutSourceProviderRequest request, string etag, CancellationToken cancellationToken) =>
-        ReadResourceAsync(HttpMethod.Put, Path(@namespace, name), JsonContent.Create(request), etag, cancellationToken);
+        UpdateSourceProviderAsync(ResourceScopeRef.Instance, @namespace, name, request, etag, cancellationToken);
+
+    public Task<ResourceSnapshot<SourceProviderResource>> UpdateSourceProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, PutSourceProviderRequest request, string etag, CancellationToken cancellationToken) =>
+        ReadResourceAsync(HttpMethod.Put, Path(scopeRef, @namespace, name), JsonContent.Create(request), etag, cancellationToken);
 
     public async Task DeleteSourceProviderAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Delete, Path(@namespace, name));
+        await DeleteSourceProviderAsync(ResourceScopeRef.Instance, @namespace, name, etag, cancellationToken);
+    }
+
+    public async Task DeleteSourceProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Delete, Path(scopeRef, @namespace, name));
         message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         using var response = await httpClient.SendAsync(message, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
     }
 
     public Task<SourceProviderStatusResponse> GetStatusAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<SourceProviderStatusResponse>(httpClient, ChildPath(@namespace, name, "status"), cancellationToken);
+        GetStatusAsync(ResourceScopeRef.Instance, @namespace, name, cancellationToken);
+
+    public Task<SourceProviderStatusResponse> GetStatusAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<SourceProviderStatusResponse>(httpClient, ChildPath(scopeRef, @namespace, name, "status"), cancellationToken);
 
     public Task<SourceProviderUsagesResponse> GetUsagesAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<SourceProviderUsagesResponse>(httpClient, ChildPath(@namespace, name, "usages"), cancellationToken);
+        GetUsagesAsync(ResourceScopeRef.Instance, @namespace, name, cancellationToken);
+
+    public Task<SourceProviderUsagesResponse> GetUsagesAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<SourceProviderUsagesResponse>(httpClient, ChildPath(scopeRef, @namespace, name, "usages"), cancellationToken);
 
     private async Task<ResourceSnapshot<SourceProviderResource>> ReadResourceAsync(HttpMethod method, string path, HttpContent? content, string? etag, CancellationToken cancellationToken)
     {
@@ -59,8 +86,8 @@ public sealed class SourceProvidersApiClient(HttpClient httpClient) : ISourcePro
         return new(value, responseEtag);
     }
 
-    private static string Path(ResourceNamespace @namespace, string name) =>
-        $"api/sourceproviders/{Uri.EscapeDataString(name)}?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}";
-    private static string ChildPath(ResourceNamespace @namespace, string name, string child) =>
-        $"api/sourceproviders/{Uri.EscapeDataString(name)}/{child}?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}";
+    private static string Path(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name) =>
+        $"api/sourceproviders/{Uri.EscapeDataString(name)}?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString(scopeRef.Value)}";
+    private static string ChildPath(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, string child) =>
+        $"api/sourceproviders/{Uri.EscapeDataString(name)}/{child}?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString(scopeRef.Value)}";
 }

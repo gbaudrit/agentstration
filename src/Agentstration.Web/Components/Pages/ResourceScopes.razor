@@ -164,7 +164,7 @@ else
             ResourceKinds.Flow => resource.Namespace.IsDefault ? $"/flows/{name}" : $"/namespaces/{resourceNamespace}/flows/{name}",
             ResourceKinds.Entry => resource.Namespace.IsDefault ? $"/entries/{name}" : $"/namespaces/{resourceNamespace}/entries/{name}",
             ResourceKinds.ModelProvider => $"/modelproviders/{name}?namespace={resourceNamespace}",
-            ResourceKinds.SourceProvider => $"/sourceproviders/{name}?namespace={resourceNamespace}",
+            ResourceKinds.SourceProvider => $"/sourceproviders/{name}?namespace={resourceNamespace}&scopeRef={scopeRef}",
             ResourceKinds.ModelProfile => $"/modelprofiles/{name}?namespace={resourceNamespace}",
             ResourceKinds.RuntimeProfile => $"/runtimeprofiles/{name}?namespace={resourceNamespace}",
             ResourceKinds.Vault => $"/vaults/{name}?scopeRef={scopeRef}",

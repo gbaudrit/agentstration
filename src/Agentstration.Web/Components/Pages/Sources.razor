@@ -558,8 +558,8 @@ else
         if (string.IsNullOrWhiteSpace(value)) { bindingSelections.Remove(binding.Name); return; }
         if (value.StartsWith("provider\n", StringComparison.Ordinal))
         {
-            var parts = value.Split('\n', 3);
-            bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, new(parts[2], ResourceScopeRef.Instance, new(parts[1])), null);
+            var parts = value.Split('\n', 4);
+            bindingSelections[binding.Name] = new(binding.Name, binding.TargetKind, new(parts[3], ResourceScopeRef.Parse(parts[1]), new(parts[2])), null);
             return;
         }
         var candidateKey = value["candidate\n".Length..];
@@ -581,18 +581,18 @@ else
         ?? ResourceScopeRef.Parse(ScopeRefValue!);
     private IEnumerable<StoredResource<SourceProviderResource>> CompatibleProviders(string targetKind) => targetKind == SourceKinds.SourceProvider ? detail!.Providers : [];
     private IEnumerable<SourceConsoleProviderCandidate> CompatibleProviderCandidates(string targetKind) => targetKind == SourceKinds.SourceProvider ? detail!.ProviderCandidates : [];
-    private static string ProviderValue(SourceProviderResource provider) => $"provider\n{provider.Namespace.Value}\n{provider.Name}";
+    private static string ProviderValue(SourceProviderResource provider) => $"provider\n{provider.ScopeRef!.Value.Value}\n{provider.Namespace.Value}\n{provider.Name}";
     private static string CandidateValue(SourceConsoleProviderCandidate candidate) => $"candidate\n{candidate.Key}";
     private string BindingValue(SourceBindingStatus binding)
     {
         if (!bindingSelections.TryGetValue(binding.Name, out var selection)) return string.Empty;
         return selection.Target is { } target
-            ? $"provider\n{target.Namespace?.Value ?? "default"}\n{target.Name}"
+            ? $"provider\n{target.ScopeRef!.Value.Value}\n{target.Namespace?.Value ?? "default"}\n{target.Name}"
             : selection.Candidate is { } candidate ? CandidateValue(candidate) : string.Empty;
     }
-    private string ConfigureProviderUrl() => $"/sourceproviders/new?returnUrl={Uri.EscapeDataString(SourceUrl(detail!.Source))}";
+    private string ConfigureProviderUrl() => $"/sourceproviders/new?scopeRef={Uri.EscapeDataString(ScopeRef().Value)}&returnUrl={Uri.EscapeDataString(SourceUrl(detail!.Source))}";
     private static string SourceProviderUrl(SourceProviderSnapshotIdentity provider) =>
-        $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace.Value)}";
+        $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace.Value)}&scopeRef={Uri.EscapeDataString(provider.ScopeRef.Value)}";
     private static string Short(string value) => value.Length <= 14 ? value : value[..14];
     private static bool IsHealthy(SourceConsoleListItem source) => IsHealthy(source.Source);
     private static bool IsHealthy(SourceView source) => source.Observed.Definition.LastOutcome != SourceImportOutcome.Rejected;

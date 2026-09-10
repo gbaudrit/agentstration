@@ -471,11 +471,12 @@ public partial class Extensions
             ? []
             : sourceProviders.Where(provider =>
                 provider.ExtensionNamespace == item.RegistrationNamespace
-                && provider.ExtensionName == item.RegistrationName).ToArray();
+                && provider.ExtensionName == item.RegistrationName
+                && provider.ExtensionScopeRef == item.RegistrationScopeRef).ToArray();
     private static string SourceProviderUrl(SourceProviderSummaryResponse provider) =>
-        $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+        $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}&scopeRef={Uri.EscapeDataString(provider.ScopeRef!.Value.Value)}";
     private static string ConfigureSourceProviderUrl(ExtensionInventoryItemResponse item, ExtensionContributionResponse contribution) =>
-        $"/sourceproviders/new?extension={Uri.EscapeDataString(item.RegistrationName!)}&extensionNamespace={Uri.EscapeDataString(item.RegistrationNamespace)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(item.DisplayName)}";
+        $"/sourceproviders/new?extension={Uri.EscapeDataString(item.RegistrationName!)}&extensionNamespace={Uri.EscapeDataString(item.RegistrationNamespace)}&extensionScopeRef={Uri.EscapeDataString(item.RegistrationScopeRef!.Value.Value)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(item.DisplayName)}";
     private static string DetailUrl(ExtensionInventoryItemResponse item) => item.RegistrationName is not null
         ? $"/extensions/{Uri.EscapeDataString(item.RegistrationName)}?namespace={Uri.EscapeDataString(item.RegistrationNamespace)}"
         : $"/extensions/enrollment/{item.EnrollmentInstanceId:D}";

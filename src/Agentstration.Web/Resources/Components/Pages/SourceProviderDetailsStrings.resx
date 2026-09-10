@@ -1,5 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
-  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
-  <data name="SourceProvider"><value>Source provider</value></data><data name="CreateProvider"><value>Configure a Source provider</value></data><data name="Description"><value>Bind an instance-owned provider identity to one discovered AEP source-provider contribution.</value></data><data name="Back"><value>Back</value></data><data name="Delete"><value>Delete</value></data><data name="Loading"><value>Loading Source provider…</value></data><data name="ProviderError"><value>The Source provider could not be saved.</value></data><data name="Identity"><value>Identity</value></data><data name="ProviderResource"><value>Source Provider resource</value></data><data name="Name"><value>Name</value></data><data name="Namespace"><value>Namespace</value></data><data name="DisplayName"><value>Display name</value></data><data name="OwnershipScope"><value>Ownership scope</value></data><data name="ExtensionRegistration"><value>Extension registration</value></data><data name="SelectExtension"><value>Select an instance extension</value></data><data name="Contribution"><value>Source-provider contribution</value></data><data name="SelectContribution"><value>Select a contribution</value></data><data name="InstanceOnlyHelp"><value>Source Providers are instance-owned. Tenant and Workspace extension registrations cannot be selected.</value></data><data name="Connection"><value>Observed capability</value></data><data name="ExtensionOwnedEndpoint"><value>Extension-owned endpoint</value></data><data name="ConnectionHelp"><value>The extension registration owns the endpoint and credentials. Repository, ref, path, and locale remain Channel configuration.</value></data><data name="AepEndpoint"><value>AEP endpoint</value></data><data name="ExtensionId"><value>Extension ID</value></data><data name="NotObserved"><value>Not observed</value></data><data name="Source"><value>Registration source</value></data><data name="OptionContracts"><value>Channel option contracts</value></data><data name="NoOptionContracts"><value>No source-channel option contract is advertised for this contribution.</value></data><data name="Cancel"><value>Cancel</value></data><data name="Saving"><value>Saving…</value></data><data name="CreateProviderAction"><value>Configure provider</value></data><data name="SaveChanges"><value>Save changes</value></data><data name="CreatedNotification"><value>Source provider configured</value></data><data name="UpdatedNotification"><value>Source provider updated</value></data><data name="Usages"><value>Source binding usages</value></data><data name="UsageCount.One"><value>{0} binding</value></data><data name="UsageCount.Many"><value>{0} bindings</value></data><data name="UsedWarning"><value>This provider is referenced by {0} and cannot be deleted.</value></data><data name="DeleteDialogTitle"><value>Delete Source provider?</value></data><data name="DeleteDialogMessage"><value>Delete Source provider “{0}”? This cannot be undone.</value></data><data name="DeleteDialogConfirm"><value>Delete provider</value></data><data name="Status.Available"><value>Available</value></data><data name="Status.Disabled"><value>Disabled</value></data><data name="Status.Unavailable"><value>Unavailable</value></data><data name="Status.Incompatible"><value>Incompatible</value></data><data name="Status.Unknown"><value>Unknown</value></data><data name="LastChecked"><value>Checked {0}</value></data>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="SourceProvider"><value>Source provider</value></data>
+  <data name="CreateProvider"><value>Configure a Source provider</value></data>
+  <data name="Description"><value>Bind a scoped provider identity to one visible AEP source-provider contribution.</value></data>
+  <data name="Back"><value>Back</value></data>
+  <data name="Delete"><value>Delete</value></data>
+  <data name="Loading"><value>Loading Source provider…</value></data>
+  <data name="ProviderError"><value>The Source provider could not be saved.</value></data>
+  <data name="Identity"><value>Identity</value></data>
+  <data name="ProviderResource"><value>Source Provider resource</value></data>
+  <data name="Name"><value>Name</value></data>
+  <data name="Namespace"><value>Namespace</value></data>
+  <data name="DisplayName"><value>Display name</value></data>
+  <data name="OwnershipScope"><value>Ownership scope</value></data>
+  <data name="ExtensionRegistration"><value>Extension registration</value></data>
+  <data name="SelectExtension"><value>Select a visible extension</value></data>
+  <data name="Contribution"><value>Source-provider contribution</value></data>
+  <data name="SelectContribution"><value>Select a contribution</value></data>
+  <data name="InstanceOnlyHelp"><value>Source Providers may use an extension owned by the same scope or an ancestor.</value></data>
+  <data name="ScopeRequired"><value>Select an ownership scope.</value></data>
+  <data name="Connection"><value>Observed capability</value></data>
+  <data name="ExtensionOwnedEndpoint"><value>Extension-owned endpoint</value></data>
+  <data name="ConnectionHelp"><value>The extension registration owns the endpoint and credentials. Repository, ref, path, and locale remain Channel configuration.</value></data>
+  <data name="AepEndpoint"><value>AEP endpoint</value></data>
+  <data name="ExtensionId"><value>Extension ID</value></data>
+  <data name="NotObserved"><value>Not observed</value></data>
+  <data name="Source"><value>Registration source</value></data>
+  <data name="OptionContracts"><value>Channel option contracts</value></data>
+  <data name="NoOptionContracts"><value>No source-channel option contract is advertised for this contribution.</value></data>
+  <data name="Cancel"><value>Cancel</value></data>
+  <data name="Saving"><value>Saving…</value></data>
+  <data name="CreateProviderAction"><value>Configure provider</value></data>
+  <data name="SaveChanges"><value>Save changes</value></data>
+  <data name="CreatedNotification"><value>Source provider configured</value></data>
+  <data name="UpdatedNotification"><value>Source provider updated</value></data>
+  <data name="Usages"><value>Source binding usages</value></data>
+  <data name="UsageCount.One"><value>{0} binding</value></data>
+  <data name="UsageCount.Many"><value>{0} bindings</value></data>
+  <data name="UsedWarning"><value>This provider is referenced by {0} and cannot be deleted.</value></data>
+  <data name="DeleteDialogTitle"><value>Delete Source provider?</value></data>
+  <data name="DeleteDialogMessage"><value>Delete Source provider “{0}”? This cannot be undone.</value></data>
+  <data name="DeleteDialogConfirm"><value>Delete provider</value></data>
+  <data name="Status.Available"><value>Available</value></data>
+  <data name="Status.Disabled"><value>Disabled</value></data>
+  <data name="Status.Unavailable"><value>Unavailable</value></data>
+  <data name="Status.Incompatible"><value>Incompatible</value></data>
+  <data name="Status.Unknown"><value>Unknown</value></data>
+  <data name="LastChecked"><value>Checked {0}</value></data>
 </root>

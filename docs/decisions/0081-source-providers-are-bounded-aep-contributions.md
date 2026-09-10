@@ -4,6 +4,8 @@
 
 Accepted
 
+The instance-ownership restriction is superseded by [ADR-0101](0101-source-providers-follow-hierarchical-resource-visibility.md).
+
 ## Context
 
 Sources need replaceable acquisition transports. A Source Channel may use Git or another distribution mechanism, but portable Source definitions must not embed an Agentstration installation's provider resource name or move catalog, Bootstrap, and Pack semantics into an extension. Acquiring mutable selectors also needs a stable boundary between discovering the current content and retaining the exact content used by Agentstration.

@@ -226,13 +226,14 @@ public sealed partial class ApiClientTests
     [TestMethod]
     public async Task SourceProvidersClientPreservesNamespaceAndETag()
     {
+        var scopeRef = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         var provider = new SourceProviderResource
         {
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.SourceProvider,
             Metadata = new ResourceMetadata { Name = "git-local", Namespace = new("platform.sources") },
-            ScopeRef = ResourceScopeRef.Instance,
-            Definition = new SourceProviderProperties { DisplayName = "Git", Extension = new("git-extension", ResourceScopeRef.Instance), ContributionId = "git" }
+            ScopeRef = scopeRef,
+            Definition = new SourceProviderProperties { DisplayName = "Git", Extension = new("git-extension", scopeRef), ContributionId = "git" }
         };
         var requests = new List<(HttpMethod Method, string Path, string? IfMatch)>();
         using var httpClient = new HttpClient(new StubHandler(request =>
@@ -247,13 +248,13 @@ public sealed partial class ApiClientTests
         };
         var client = new SourceProvidersApiClient(httpClient);
 
-        _ = await client.UpdateSourceProviderAsync(provider.Namespace, provider.Name, new(provider.Definition), "\"v1\"", default);
-        await client.DeleteSourceProviderAsync(provider.Namespace, provider.Name, "\"v2\"", default);
+        _ = await client.UpdateSourceProviderAsync(scopeRef, provider.Namespace, provider.Name, new(provider.Definition), "\"v1\"", default);
+        await client.DeleteSourceProviderAsync(scopeRef, provider.Namespace, provider.Name, "\"v2\"", default);
 
         CollectionAssert.AreEqual(new[]
         {
-            (HttpMethod.Put, "/api/sourceproviders/git-local?resourceNamespace=platform.sources", "\"v1\""),
-            (HttpMethod.Delete, "/api/sourceproviders/git-local?resourceNamespace=platform.sources", "\"v2\"")
+            (HttpMethod.Put, "/api/sourceproviders/git-local?resourceNamespace=platform.sources&scopeRef=%2Ftenants%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "\"v1\""),
+            (HttpMethod.Delete, "/api/sourceproviders/git-local?resourceNamespace=platform.sources&scopeRef=%2Ftenants%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "\"v2\"")
         }, requests);
     }
 

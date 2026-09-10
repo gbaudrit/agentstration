@@ -241,16 +241,12 @@
                             {
                                 <a class="text-button" href="@SourceProviderUrl(provider)">@T("OpenSourceProvider", provider.Name)</a>
                             }
-                            @if (item.RegistrationName is not null && item.RegistrationScopeRef == ResourceScopeRef.Instance)
+                            @if (item.RegistrationName is not null && item.RegistrationScopeRef is not null)
                             {
                                 @foreach (var contribution in item.Extension.Contributions.Where(value => value.Kind == "source-provider" && !SourceProviders(item).Any(provider => provider.ContributionId.Equals(value.Id, StringComparison.OrdinalIgnoreCase))))
                                 {
                                     <a class="text-button" href="@ConfigureSourceProviderUrl(item, contribution)">@T("ConfigureSourceProvider", contribution.Id)</a>
                                 }
-                            }
-                            else
-                            {
-                                <span class="muted">@T("SourceProviderRequiresInstanceExtension")</span>
                             }
                         </div>
                     }

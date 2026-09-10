@@ -4,6 +4,8 @@
 
 Accepted
 
+The instance-ownership restriction is superseded by [ADR-0101](0101-source-providers-follow-hierarchical-resource-visibility.md).
+
 ## Context
 
 A portable Source Version must name the acquisition role used by each Channel without embedding an installation-specific Source Provider resource. The local provider can be disabled, unavailable, removed, or expose option contracts that differ from those required by a particular immutable Source Version. Imports must not silently select a provider or overwrite an administrator's existing choice.

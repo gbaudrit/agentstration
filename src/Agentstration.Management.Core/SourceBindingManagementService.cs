@@ -119,7 +119,7 @@ public sealed class SourceBindingManagementService(
 
             var target = new ResourceReference(
                 selection.Target.Name.Trim(),
-                ResourceScopeRef.Instance,
+                selection.Target.ScopeRef,
                 selection.Target.Namespace ?? ResourceNamespace.Default);
             var resolved = await references.ResolveAsync<SourceProviderResource>(
                 target,
@@ -129,7 +129,11 @@ public sealed class SourceBindingManagementService(
                 cancellationToken);
             if (resolved is null)
                 throw Invalid("source_binding_provider_missing", $"Source Provider '{target.Namespace}/{target.Name}' selected for binding '{selection.Name}' was not found.");
-            normalized.Add(selection with { TargetKind = declaration.TargetKind, Target = target });
+            normalized.Add(selection with
+            {
+                TargetKind = declaration.TargetKind,
+                Target = target with { ScopeRef = RequireScope(resolved.Value) }
+            });
         }
 
         var scopeRef = RequireScope(source);

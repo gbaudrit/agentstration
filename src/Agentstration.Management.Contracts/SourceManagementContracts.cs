@@ -17,7 +17,8 @@ public sealed record UpdateSourceRefreshConfigurationRequest(SourceRefreshConfig
 public sealed record CreateSourceProviderRequest(
     string Name,
     SourceProviderProperties Properties,
-    string Namespace = "default");
+    string Namespace = "default",
+    ResourceScopeRef? ScopeRef = null);
 public sealed record PutSourceProviderRequest(SourceProviderProperties Properties);
 public sealed record SourceProviderSummaryResponse(
     string Id,
@@ -29,7 +30,8 @@ public sealed record SourceProviderSummaryResponse(
     string Status,
     string? Details,
     string Namespace = "default",
-    ResourceScopeRef? ScopeRef = null);
+    ResourceScopeRef? ScopeRef = null,
+    ResourceScopeRef? ExtensionScopeRef = null);
 public sealed record SourceProviderStatusResponse(
     string Provider,
     string Status,
