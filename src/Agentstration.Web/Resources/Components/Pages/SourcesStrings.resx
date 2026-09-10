@@ -63,4 +63,10 @@
   <data name="RefreshError.source_compatibility_definition_invalid" xml:space="preserve"><value>The Channel compatibility interval is invalid.</value></data>
   <data name="RefreshError.source_refresh_timeout" xml:space="preserve"><value>The scheduled Source refresh exceeded its configured timeout.</value></data>
   <data name="RefreshError.source_channel_refresh_timeout" xml:space="preserve"><value>The scheduled Channel refresh exceeded its configured timeout.</value></data>
+  <data name="NextRefresh" xml:space="preserve"><value>Next refresh</value></data>
+  <data name="NextRefreshDescription" xml:space="preserve"><value>The next due Source definition or Channel refresh.</value></data>
+  <data name="ConfigureScheduling" xml:space="preserve"><value>Configure scheduling</value></data>
+  <data name="NoRefreshScheduled" xml:space="preserve"><value>No refresh is currently scheduled.</value></data>
+  <data name="RefreshDueNow" xml:space="preserve"><value>Due now</value></data>
+  <data name="ChannelRefreshTarget" xml:space="preserve"><value>Channel {0}</value></data>
 </root>

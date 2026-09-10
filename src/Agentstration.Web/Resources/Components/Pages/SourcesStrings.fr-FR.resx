@@ -63,4 +63,10 @@
   <data name="RefreshError.source_compatibility_definition_invalid" xml:space="preserve"><value>L’intervalle de compatibilité du Channel est invalide.</value></data>
   <data name="RefreshError.source_refresh_timeout" xml:space="preserve"><value>L’actualisation planifiée de la Source a dépassé son délai configuré.</value></data>
   <data name="RefreshError.source_channel_refresh_timeout" xml:space="preserve"><value>L’actualisation planifiée du Channel a dépassé son délai configuré.</value></data>
+  <data name="NextRefresh" xml:space="preserve"><value>Prochaine actualisation</value></data>
+  <data name="NextRefreshDescription" xml:space="preserve"><value>La prochaine actualisation prévue pour la définition de la Source ou un Channel.</value></data>
+  <data name="ConfigureScheduling" xml:space="preserve"><value>Configurer la planification</value></data>
+  <data name="NoRefreshScheduled" xml:space="preserve"><value>Aucune actualisation n’est actuellement planifiée.</value></data>
+  <data name="RefreshDueNow" xml:space="preserve"><value>À actualiser maintenant</value></data>
+  <data name="ChannelRefreshTarget" xml:space="preserve"><value>Channel {0}</value></data>
 </root>

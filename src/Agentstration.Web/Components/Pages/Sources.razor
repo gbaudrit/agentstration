@@ -6,6 +6,7 @@
 @inject SourceConsoleManagementService Service
 @inject IServiceProvider Services
 @inject ICurrentRequestContext RequestContext
+@inject TimeProvider Clock
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SourcesStrings> Localizer
@@ -123,6 +124,18 @@ else
         <article class="panel">
             <div class="panel-header"><div><p class="eyebrow">@T("PublishedIdentity")</p><h2>@T("Publisher")</h2></div></div>
             <dl class="resource-details"><dt>@T("Declared")</dt><dd>@PublisherLabel(detail.Verification.DeclaredPublisher)</dd><dt>@T("Verified")</dt><dd>@(detail.Verification.VerifiedPublisher is null ? T("NotVerified") : PublisherLabel(detail.Verification.VerifiedPublisher))</dd><dt>@T("ManifestDigest")</dt><dd><code>@Short(detail.SelectedVersion.Definition.ManifestDigest)</code></dd></dl>
+        </article>
+        @{ var nextRefresh = NextRefresh(); }
+        <article class="panel refresh-overview-panel">
+            <div class="panel-header"><div><p class="eyebrow">@T("Automation")</p><h2>@T("NextRefresh")</h2><p>@T("NextRefreshDescription")</p></div><button class="text-button" type="button" @onclick="() => activeTab = PageTab.Scheduling">@T("ConfigureScheduling") →</button></div>
+            @if (nextRefresh is null)
+            {
+                <p class="refresh-overview-empty">@T("NoRefreshScheduled")</p>
+            }
+            else
+            {
+                <div class="refresh-overview-value"><strong>@NextRefreshDate(nextRefresh)</strong><span>@nextRefresh.Target</span></div>
+            }
         </article>
         </section>
     }
@@ -576,6 +589,39 @@ else
         var localized = Localizer[$"RefreshError.{code}"];
         return localized.ResourceNotFound ? fallback : localized.Value;
     }
+    private RefreshScheduleSummary? NextRefresh()
+    {
+        if (detail is null) return null;
+        var now = Clock.GetUtcNow();
+        var source = detail.Source.Source;
+        var refresh = detail.Source.Configuration.Definition.Refresh;
+        var candidates = new List<RefreshScheduleSummary>();
+        if (refresh.Source.Enabled && detail.Source.Configuration.Definition.Origin is not null)
+        {
+            candidates.Add(new(SourceRefreshScheduler.GetNextDue(
+                detail.Source.Observed.Definition.LastAttemptAt,
+                detail.Source.Observed.Definition.ConsecutiveFailures,
+                refresh.Source,
+                $"{source.ScopeRef}|{source.Namespace}|{source.Name}|source"),
+                T("SourceDefinitionRefresh")));
+        }
+        foreach (var channel in detail.Channels)
+        {
+            var policy = refresh.ChannelOverrides.TryGetValue(channel.Definition.Name, out var configured)
+                ? configured
+                : refresh.Channels;
+            if (!policy.Enabled) continue;
+            var observed = channel.Status.Refresh?.Definition;
+            var next = observed is null
+                ? now
+                : SourceRefreshScheduler.GetNextDue(observed.LastAttemptAt, observed.ConsecutiveFailures, policy,
+                    $"{source.ScopeRef}|{source.Namespace}|{source.Name}|{detail.SelectedVersion.Uid:N}|{channel.Definition.Name}");
+            candidates.Add(new(next, F("ChannelRefreshTarget", channel.Definition.Name)));
+        }
+        return candidates.OrderBy(value => value.At).FirstOrDefault();
+    }
+    private string NextRefreshDate(RefreshScheduleSummary summary) =>
+        summary.At <= Clock.GetUtcNow() ? T("RefreshDueNow") : summary.At.ToLocalTime().ToString("g");
     private string VerificationLabel(SourceVerificationStatus value) => T($"Verification.{value}");
     private string CompatibilityLabel(SourceChannelCompatibilityStatus value) => T($"Compatibility.{value}");
     private static UiStatus VerificationTone(SourceVerificationStatus value) => value switch { SourceVerificationStatus.Verified => UiStatus.Success, SourceVerificationStatus.Unavailable => UiStatus.Warning, _ => UiStatus.Neutral };
@@ -586,6 +632,7 @@ else
     private string F(string key, params object[] arguments) => Localizer[key, arguments];
     private void Notify(string titleKey, string message) => Notifications.Add(new(Guid.NewGuid(), T(titleKey), message, DateTimeOffset.Now, UiStatus.Success));
     private enum PageTab { Overview, Versions, Bindings, Scheduling }
+    private sealed record RefreshScheduleSummary(DateTimeOffset At, string Target);
     private sealed record RefreshPolicyForm
     {
         public bool Custom { get; set; }

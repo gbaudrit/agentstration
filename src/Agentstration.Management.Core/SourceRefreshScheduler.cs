@@ -129,6 +129,13 @@ public sealed class SourceRefreshScheduler(
         SourceRefreshPolicy policy,
         string scheduleKey,
         DateTimeOffset now)
+        => GetNextDue(lastAttempt, consecutiveFailures, policy, scheduleKey) <= now;
+
+    public static DateTimeOffset GetNextDue(
+        DateTimeOffset lastAttempt,
+        int consecutiveFailures,
+        SourceRefreshPolicy policy,
+        string scheduleKey)
     {
         var delay = consecutiveFailures is > 0 && consecutiveFailures < int.MaxValue
             && consecutiveFailures < policy.MaximumAttempts
@@ -136,7 +143,7 @@ public sealed class SourceRefreshScheduler(
                 policy.MaximumBackoffSeconds,
                 policy.InitialBackoffSeconds * Math.Pow(2, consecutiveFailures - 1)))
             : TimeSpan.FromSeconds(policy.IntervalSeconds + DeterministicJitter(scheduleKey, policy.JitterSeconds));
-        return lastAttempt + delay <= now;
+        return lastAttempt + delay;
     }
 
     private static int DeterministicJitter(string key, int maximumSeconds)
