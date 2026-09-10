@@ -307,6 +307,9 @@ public static class DependencyInjection
         services.AddSingleton<IFlowRunCancellationRegistry, LocalFlowRunCancellationRegistry>();
         services.AddSingleton<IFlowRunExecutionScope, WorkspaceFlowRunExecutionScope>();
         services.AddSingleton<IWorkExecutionScopeAccessor, CurrentWorkExecutionScopeAccessor>();
+        services.AddSingleton<IRootFlowTargetResolver, RootFlowTargetResolver>();
+        services.AddSingleton<IRootFlowRunGateway, RootFlowRunGateway>();
+        services.AddSingleton<IRootFlowSubmissionAuthorizer, RootFlowSubmissionAuthorizer>();
         services.TryAddSingleton<IFlowRunEventSink, NullFlowRunEventSink>();
         services.AddSingleton<IFlowInputRequestSink, WorkplaceFlowInputProjectionSink>();
         services.AddSingleton<IWorkplaceExternalInputResponder, WorkplaceFlowInputResponder>();
@@ -323,6 +326,7 @@ public static class DependencyInjection
         services.AddSingleton<IFlowDefinitionValidator, FlowGraphValidator>();
         services.AddSingleton<FlowDraftService>();
         services.AddSingleton<FlowRunService>();
+        services.AddSingleton<RootFlowSubmissionService>();
         return services;
     }
 }

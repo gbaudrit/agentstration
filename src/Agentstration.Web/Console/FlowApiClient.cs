@@ -134,7 +134,12 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
 
     public async Task<FlowRun> CreateFlowRunAsync(ResourceNamespace @namespace, string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsJsonAsync($"{FlowPath(@namespace, flowId)}/runs", request, JsonOptions, cancellationToken);
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"{FlowPath(@namespace, flowId)}/runs")
+        {
+            Content = JsonContent.Create(request, options: JsonOptions)
+        };
+        message.Headers.Add("X-Agentstration-Origin", "Console");
+        using var response = await httpClient.SendAsync(message, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<FlowRun>(JsonOptions, cancellationToken)
             ?? throw new AgentstrationApiException("Flow API returned an empty Run.", Guid.NewGuid().ToString("N"));

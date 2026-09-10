@@ -151,4 +151,12 @@
   <data name="EventType.ToolCallGovernanceEvaluated"><value>Gouvernance de l’outil évaluée</value></data>
   <data name="EventType.ToolCallCompleted"><value>Appel d’outil terminé</value></data>
   <data name="EventType.ToolCallFailed"><value>Appel d’outil échoué</value></data>
+  <data name="OriginAndCaller"><value>Origine / appelant</value></data>
+  <data name="CausationId"><value>Identifiant de causalité</value></data>
+  <data name="Origin.Entry"><value>Point d’entrée</value></data>
+  <data name="Origin.Trigger"><value>Déclencheur</value></data>
+  <data name="Origin.Api"><value>API</value></data>
+  <data name="Origin.Mcp"><value>MCP</value></data>
+  <data name="Origin.Agent"><value>Agent</value></data>
+  <data name="Origin.Console"><value>Console</value></data>
 </root>

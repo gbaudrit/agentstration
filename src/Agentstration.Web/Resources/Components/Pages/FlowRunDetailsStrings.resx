@@ -151,4 +151,12 @@
   <data name="EventType.ToolCallGovernanceEvaluated"><value>Tool governance evaluated</value></data>
   <data name="EventType.ToolCallCompleted"><value>Tool call completed</value></data>
   <data name="EventType.ToolCallFailed"><value>Tool call failed</value></data>
+  <data name="OriginAndCaller"><value>Origin / caller</value></data>
+  <data name="CausationId"><value>Causation ID</value></data>
+  <data name="Origin.Entry"><value>Entry</value></data>
+  <data name="Origin.Trigger"><value>Trigger</value></data>
+  <data name="Origin.Api"><value>API</value></data>
+  <data name="Origin.Mcp"><value>MCP</value></data>
+  <data name="Origin.Agent"><value>Agent</value></data>
+  <data name="Origin.Console"><value>Console</value></data>
 </root>

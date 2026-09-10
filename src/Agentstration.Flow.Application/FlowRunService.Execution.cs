@@ -143,7 +143,7 @@ public sealed partial class FlowRunService
         return steps;
     }
 
-    private static void ValidateInput(JsonElement? schema, JsonElement input)
+    public static void ValidateInput(JsonElement? schema, JsonElement input)
     {
         if (schema is null || schema.Value.ValueKind != JsonValueKind.Object) return;
         if (schema.Value.TryGetProperty("type", out var rootType) && rootType.GetString() == "object" && input.ValueKind != JsonValueKind.Object)

@@ -1,10 +1,12 @@
 using System.Text.Json;
+using Agentstration.Application.Work;
 using Agentstration.Flow;
 using Agentstration.Flow.Application;
 using Agentstration.Flow.Contracts;
 using Agentstration.Flow.Storage.Abstractions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Work;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web;
@@ -31,6 +33,8 @@ public static partial class FlowEndpoints
         catch (InputRequestAlreadyResolvedException exception) { return Results.Problem(statusCode: 409, title: "input_request_already_resolved", detail: exception.Message); }
         catch (FlowConcurrencyException exception) { return Results.Problem(statusCode: 412, title: "precondition_failed", detail: exception.Message); }
         catch (FlowValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
+        catch (WorkValidationException exception) when (exception.Code == "flow_invocation_idempotency_conflict") { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
+        catch (WorkValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
         catch (ArgumentException exception) { return Results.Problem(statusCode: 400, title: "validation_failed", detail: exception.Message); }
     }
 

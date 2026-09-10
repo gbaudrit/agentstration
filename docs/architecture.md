@@ -173,21 +173,26 @@ POST /api/flows
 POST /api/flows/{id}/versions
   -> immutable FlowVersion snapshot
   -> optional active-version pointer update
-WorkItem -> optional FlowReference (exact or active)
-Flow Run -> resolves exact published FlowReference -> local graph execution or isolated MAF orchestration adapter
+Entry / Trigger / REST / Console -> RootFlowSubmissionService
+  -> trusted FlowRunScope authorization and exact published FlowReference
+  -> one idempotent WorkItem plus one deterministic root FlowRun
+WorkItem execution -> revalidates durable scope -> local graph execution or isolated MAF orchestration adapter
 ```
 
 The Flow module is physically independent and owns editable typed graph drafts, immutable published snapshots, constrained expressions, and the provider-neutral Flow Run model. The graph vocabulary includes one generic `Flow` call and one generic governed `Tool` call; resource catalogs populate their targets without adding provider-specific node types. Flow Application validates their logical references, mappings, and published schemas while remaining independent of Runtime and MCP implementations. The local executor traverses `Input`, `Agent`, `Flow`, `Tool`, `Router`, `Condition`, `Transform`, `Output`, and `Failure` steps sequentially. Infrastructure adapts agent steps, Management resource lookups, and Tool steps to the shared Tool Execution Pipeline. A Tool step records stable logical and per-attempt invocation identities, preserves workspace and principal scope, and projects Tool lifecycle and governance events into its owning Flow Run.
 
 A Flow call creates a deterministic durable child Flow Run for the parent step attempt. The parent persists `WaitingForChild`, clears its execution lease, and releases the worker. The child captures the resolved immutable version, parent/root causality, nesting depth, and the parent's tenant, Workspace, Principal, interaction, and Work Task identities. A terminal child atomically moves a waiting parent back to `Pending`; replay reconstructs completed step outputs and resumes at the calling step. Startup recovery requeues lost parents or children, cancellation walks the active descendant tree, and configured depth and descendant limits bound composition. Both local SQLite and optional PostgreSQL persist these additions inside the existing Flow document payload, so this increment does not require a relational schema migration.
 
+Root Flow callers share `RootFlowSubmissionService`, an Application-owned boundary distinct from child execution. It obtains tenant, Workspace, and Principal scope from the authenticated execution context, reauthorizes submission, resolves active references to an immutable version, validates input before creating Work, and persists structured origin, caller, causation, correlation, and idempotency metadata. A caller-supplied idempotency key deterministically identifies the functional WorkItem; the root FlowRun derives from that Work identity. Both the submission path and the local worker use the same idempotent root-run gateway, so a crash or concurrent queue delivery recovers the same pair. Trigger occurrences retain their existing WorkItem identifier. Execution revalidates the durable scope before observing the run. The existing JSON Work metadata and Flow payload carry these fields, so no relational migration is required.
+
 ### Flow Run vertical
 
 ```text
-Console / API / future Work adapter
+Entry / Trigger / REST / Console
+  -> RootFlowSubmissionService returns or recovers the WorkItem and published root Flow Run
   -> POST published Flow Run returns 202 Accepted
-  -> bounded local Flow queue
-  -> validate input and persist the exact draft or published definition snapshot
+  -> bounded local Work and Flow queues
+  -> persist the exact validated published definition snapshot
   -> traverse typed steps or execute a bounded provider-neutral orchestration through the runtime adapter
   -> persist differential events, transitions, diagnostics, usage, and failures
   -> SignalR updates with persisted replay, cancellation, global and per-Flow history

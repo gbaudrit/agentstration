@@ -33,6 +33,37 @@ namespace Agentstration.Web.Tests;
 public sealed partial class ApiClientTests
 {
     [TestMethod]
+    public async Task FlowConsoleClientMarksRootInvocationOrigin()
+    {
+        string? origin = null;
+        var now = DateTimeOffset.UtcNow;
+        var flowId = new FlowId("console-run");
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
+        var version = new FlowVersion(new WorkspaceId(Guid.NewGuid()), flowId, "1.0.0", null, definition, new Dictionary<string, string>(), now);
+        var run = new FlowRun
+        {
+            WorkspaceId = version.WorkspaceId,
+            Id = "flowrun-console",
+            FlowId = flowId,
+            FlowVersion = version.Version,
+            Scope = new(Guid.NewGuid(), version.WorkspaceId, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = now,
+            DefinitionSnapshot = version
+        };
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            origin = request.Headers.GetValues("X-Agentstration-Origin").Single();
+            return new HttpResponseMessage(HttpStatusCode.Accepted) { Content = JsonContent.Create(run) };
+        })) { BaseAddress = new Uri("http://localhost/") };
+
+        _ = await new FlowApiClient(httpClient).CreateFlowRunAsync(flowId.Value,
+            new CreateFlowRunRequest(JsonSerializer.SerializeToElement(new { })), default);
+
+        Assert.AreEqual("Console", origin);
+    }
+
+    [TestMethod]
     public void FlowConsoleUrlPreservesTheResourceNamespace()
     {
         Assert.AreEqual("/flows/main", ConsoleResourceUrls.Flow(new FlowId("main")));

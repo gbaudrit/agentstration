@@ -43,7 +43,8 @@ public sealed partial class WorkplaceService(
     TimeProvider timeProvider,
     IEnumerable<IWorkplaceEventSink> eventSinks,
     IEnumerable<IWorkplaceExternalInputResponder> externalInputResponders,
-    IWorkplaceContext context)
+    IWorkplaceContext context,
+    RootFlowSubmissionService? rootFlows = null)
 {
     private const int WorkItemQueryPageSize = 200;
     private const string WorkspaceMetadata = "workplace.workspaceId";
@@ -55,6 +56,9 @@ public sealed partial class WorkplaceService(
     private const string TriggerMessageMetadata = "workplace.triggerMessageId";
     private const string ContinuationMetadata = "workplace.continuation";
     private long eventSequence;
+
+    private RootFlowSubmissionService RequiredRootFlows() => rootFlows
+        ?? throw new WorkValidationException("root_flow_submission_unavailable", "Root Flow submission is not configured.");
 
 
 

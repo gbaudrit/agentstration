@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Flow;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -212,11 +213,30 @@ public sealed partial class WorkplaceService
         };
         if (!string.IsNullOrWhiteSpace(context.LastFlowRunId)) metadata[ParentFlowRunMetadata] = context.LastFlowRunId;
         var target = entry.Behavior.Conversation?.ContinuationTarget ?? entry.ResolvedTarget;
-        var stored = await workItems.SubmitAsync(new SubmitWorkItemCommand(
-            interaction.WorkspaceId, "entry-continuation", message.Content, entry.DisplayName, $"Continuation of {entry.DisplayName}", Metadata: metadata,
-            Inputs: [new WorkInput(Structured: JsonSerializer.SerializeToElement(context))],
-            Flow: WorkplaceValidation.FlowReferenceFrom(target)), cancellationToken);
-        var task = ToTask(stored.Value, interaction.TaskId);
+        var continuationInput = JsonSerializer.SerializeToElement(new
+        {
+            prompt = message.Content,
+            inputs = new[] { JsonSerializer.SerializeToElement(context) }
+        });
+        var rootSubmission = await RequiredRootFlows().SubmitAsync(new SubmitRootFlowCommand(
+            interaction.WorkspaceId,
+            WorkplaceValidation.FlowReferenceFrom(target)!,
+            continuationInput,
+            FlowInvocationOrigin.Entry,
+            "workplace-user",
+            FlowRunTrigger.WorkItem,
+            $"entry-continuation:{message.Id:N}",
+            message.Id.ToString("D"),
+            Metadata: metadata,
+            Type: "entry-continuation",
+            Instruction: message.Content,
+            Title: entry.DisplayName,
+            Description: $"Continuation of {entry.DisplayName}",
+            WorkInputs: [new WorkInput(Structured: JsonSerializer.SerializeToElement(context))],
+            InteractionId: interaction.Id.ToString(),
+            WorkTaskId: interaction.TaskId.Value.ToString(),
+            TriggerMessageId: message.Id.ToString("D")), cancellationToken);
+        var task = ToTask(rootSubmission.WorkItem.Value, interaction.TaskId);
         var action = new CreateTaskAction(interaction.TaskId.Value, task.Title, task.Description, $"/tasks/{interaction.TaskId.Value}");
         var processing = interaction with
         {
@@ -239,8 +259,30 @@ public sealed partial class WorkplaceService
         WorkTask? task = null;
         CreateTaskAction? action = null;
         WorkplaceInteraction? updated = null;
-        var stored = await workItems.SubmitAsync(
-            new SubmitWorkItemCommand(interaction.WorkspaceId, "entry", Instruction(entry, values), entry.DisplayName, entry.Description, Metadata: metadata, Inputs: inputs, Attachments: attachments, Flow: WorkplaceValidation.FlowReferenceFrom(entry.ResolvedTarget)),
+        var instruction = Instruction(entry, values);
+        var flowInput = JsonSerializer.SerializeToElement(new
+        {
+            prompt = instruction,
+            inputs = inputs.Select(value => value.Structured ?? JsonSerializer.SerializeToElement(value.Text)).ToArray()
+        });
+        var root = await RequiredRootFlows().SubmitAsync(
+            new SubmitRootFlowCommand(
+                interaction.WorkspaceId,
+                WorkplaceValidation.FlowReferenceFrom(entry.ResolvedTarget)!,
+                flowInput,
+                FlowInvocationOrigin.Entry,
+                "workplace-user",
+                FlowRunTrigger.WorkItem,
+                $"entry:{interaction.Id.Value:N}",
+                interaction.Id.ToString(),
+                Type: "entry",
+                Instruction: instruction,
+                Title: entry.DisplayName,
+                Description: entry.Description,
+                Metadata: metadata,
+                WorkInputs: inputs,
+                Attachments: attachments,
+                InteractionId: interaction.Id.ToString()),
             async (queued, cancellationToken) =>
             {
                 task = ToTask(queued.Value);
@@ -250,7 +292,7 @@ public sealed partial class WorkplaceService
                 await repository.SaveInteractionAsync(updated, expectedInteractionVersion, cancellationToken);
             },
             token);
-        task ??= ToTask(stored.Value);
+        task ??= ToTask(root.WorkItem.Value);
         action ??= new CreateTaskAction(task.Id, task.Title, task.Description, $"/tasks/{task.Id}");
         updated ??= interaction with { Status = InteractionStatus.Processing, TaskId = task.Id, PendingActionId = null, ImmediateResult = action, Version = expectedInteractionVersion + 1 };
         await PublishInteractionAsync(updated, token);
