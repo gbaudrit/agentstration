@@ -106,6 +106,8 @@ public sealed class LocalWorkExecutionWorker(
                 execution.Request.CorrelationId.Value,
                 input,
                 execution.Request.WorkItemId,
+                bool.TryParse(execution.Request.Metadata.GetValueOrDefault(RootFlowSubmissionService.ActiveReferenceMetadata), out var resolvedFromActiveReference)
+                    && resolvedFromActiveReference,
                 execution.Request.Metadata.GetValueOrDefault("workplace.parentFlowRunId"),
                 execution.Request.Metadata.GetValueOrDefault("workplace.interactionId"),
                 execution.Request.Metadata.GetValueOrDefault("workplace.taskId") ?? execution.Request.WorkItemId.Value.ToString("D"),

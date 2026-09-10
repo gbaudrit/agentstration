@@ -67,6 +67,7 @@ public sealed record FlowRun
     public string? IdempotencyKey { get; init; }
     public string? CorrelationId { get; init; }
     public string? WorkItemResourceId { get; init; }
+    public bool ResolvedFromActiveReference { get; init; }
     public string? ParentFlowRunId { get; init; }
     public string? RootFlowRunId { get; init; }
     public int NestingDepth { get; init; }

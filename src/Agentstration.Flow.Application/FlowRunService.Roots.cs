@@ -17,6 +17,7 @@ public sealed record EnsureRootFlowRunCommand(
     string CorrelationId,
     JsonElement Input,
     string WorkItemResourceId,
+    bool ResolvedFromActiveReference,
     string? ParentFlowRunId,
     string? InteractionId,
     string? WorkTaskId,
@@ -55,6 +56,7 @@ public sealed partial class FlowRunService
             IdempotencyKey = command.IdempotencyKey,
             CorrelationId = command.CorrelationId,
             WorkItemResourceId = command.WorkItemResourceId,
+            ResolvedFromActiveReference = command.ResolvedFromActiveReference,
             ParentFlowRunId = command.ParentFlowRunId,
             InteractionId = command.InteractionId,
             WorkTaskId = command.WorkTaskId,
@@ -98,6 +100,7 @@ public sealed partial class FlowRunService
             || run.NestingDepth != 0
             || run.Trigger != command.Trigger
             || !string.Equals(run.WorkItemResourceId, command.WorkItemResourceId, StringComparison.Ordinal)
+            || run.ResolvedFromActiveReference != command.ResolvedFromActiveReference
             || !string.Equals(run.ParentFlowRunId, command.ParentFlowRunId, StringComparison.Ordinal)
             || run.InvocationOrigin != command.Origin
             || !string.Equals(run.CallerId, command.CallerId, StringComparison.Ordinal)

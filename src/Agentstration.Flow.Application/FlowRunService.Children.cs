@@ -80,6 +80,7 @@ public sealed partial class FlowRunService
             Trigger = FlowRunTrigger.Flow,
             StartedBy = parent.StartedBy,
             CorrelationId = parent.CorrelationId,
+            ResolvedFromActiveReference = call.Flow.VersionStrategy == FlowCallVersionStrategy.Active,
             ParentFlowRunId = parent.Id,
             RootFlowRunId = rootRunId,
             NestingDepth = depth,
