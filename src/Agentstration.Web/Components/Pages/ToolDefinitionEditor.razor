@@ -1,0 +1,53 @@
+@page "/tools/definitions/new"
+@page "/tools/definitions/{Name}"
+@inject IToolDefinitionsClient Client
+@inject IFlowApiClient Flows
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
+
+<PageTitle>@T(IsNew ? "NewDefinition" : "EditDefinition") · Agentstration</PageTitle>
+<PageHeader Title="@T(IsNew ? "NewDefinition" : "EditDefinition")" Description="@T("DefinitionEditorDescription")" />
+
+@if (loading) { <LoadingState Message="@T("LoadingDefinitions")" /> }
+else
+{
+    @if (error is not null) { <ErrorState Message="@error" /> }
+    <section class="panel"><div class="panel-header"><h2>@T("Definition")</h2></div>
+        <div class="form-grid">
+            <label><span>@T("Name")</span><input @bind="name" disabled="@(!IsNew)" /></label>
+            <label><span>@T("Namespace")</span><input @bind="namespaceValue" disabled="@(!IsNew)" /></label>
+            <label><span>@T("DisplayName")</span><input @bind="displayName" /></label>
+            <label class="form-span-2"><span>@T("DefinitionDescription")</span><textarea @bind="description" rows="2"></textarea></label>
+            <label><input type="checkbox" @bind="enabled" /> <span>@T("Enabled")</span></label>
+            <label><input type="checkbox" @bind="requiresApproval" /> <span>@T("RequiresApproval")</span></label>
+            <label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="900" @bind="timeoutSeconds" /></label>
+        </div>
+    </section>
+    <section class="panel"><div class="panel-header"><h2>@T("FlowImplementation")</h2></div>
+        <div class="form-grid">
+            <label><span>@T("Flow")</span><select @bind="selectedFlow"><option value="">—</option>@foreach(var flow in flows){<option value="@FlowKey(flow)">@flow.Namespace/@flow.Name (@flow.ActiveVersion)</option>}</select></label>
+            <label><input type="checkbox" @bind="useActiveVersion" /> <span>@T("UseActiveVersion")</span></label>
+            @if (!useActiveVersion) { <label><span>@T("Version")</span><input @bind="flowVersion" /></label> }
+            <div><button class="button-secondary" @onclick="LoadContractAsync">@T("LoadFlowContract")</button></div>
+            <label class="form-span-2"><span>@T("InputSchema")</span><textarea @bind="inputSchema" rows="10"></textarea></label>
+            <label class="form-span-2"><span>@T("OutputSchema")</span><textarea @bind="outputSchema" rows="10"></textarea></label>
+        </div>
+    </section>
+    <div class="page-actions"><button class="button-primary" @onclick="SaveAsync" disabled="@saving">@T("Save")</button><a class="button-secondary" href="/tools/definitions">@T("Cancel")</a>@if(!IsNew){<button class="button-danger" @onclick="DeleteAsync">@T("Delete")</button>}</div>
+}
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name="namespace")] public string? NamespaceQuery { get; set; }
+    private IReadOnlyList<FlowSummary> flows=[]; private string name="",namespaceValue="default",displayName="",description="",selectedFlow="",flowVersion="",inputSchema="{\n  \"type\": \"object\"\n}",outputSchema=""; private bool enabled=true,requiresApproval,useActiveVersion=true,loading=true,saving; private int timeoutSeconds=90; private string? etag,error;
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private string T(string key, params object[] arguments)=>Localizer[key,arguments];
+    protected override async Task OnParametersSetAsync(){loading=true;error=null;try{flows=await Flows.GetFlowsAsync(default);if(!IsNew){var snapshot=await Client.GetAsync(Name!,ResourceNamespace.Parse(NamespaceQuery),default);From(snapshot.Value);etag=snapshot.ETag;}}catch(Exception ex){error=ex.Message;}finally{loading=false;}}
+    private void From(ToolDefinitionResource value){name=value.Name;namespaceValue=value.Namespace.Value;displayName=value.Definition.DisplayName;description=value.Definition.Description??"";enabled=value.Definition.Enabled;requiresApproval=value.Definition.RequiresApproval;timeoutSeconds=value.Definition.InvocationTimeoutSeconds;useActiveVersion=value.Definition.Flow.UseActiveVersion;flowVersion=value.Definition.Flow.Version??"";selectedFlow=$"{(value.Definition.Flow.Namespace??value.Namespace).Value}|{value.Definition.Flow.Name}";inputSchema=Pretty(value.Definition.InputSchema);outputSchema=value.Definition.OutputSchema is null?"":Pretty(value.Definition.OutputSchema.Value);}
+    private async Task LoadContractAsync(){error=null;try{var flow=Selected()??throw new InvalidOperationException(T("SelectFlow"));var version=useActiveVersion?flow.ActiveVersion:flowVersion;if(string.IsNullOrWhiteSpace(version))throw new InvalidOperationException(T("FlowVersionRequired"));var published=await Flows.GetFlowVersionAsync(flow.Namespace,flow.Id,version,default);inputSchema=published.Graph?.InputSchema is {} input?Pretty(input):"{}";outputSchema=published.Graph?.OutputSchema is {} output?Pretty(output):"";flowVersion=version;}catch(Exception ex){error=ex.Message;}}
+    private async Task SaveAsync(){saving=true;error=null;try{var flow=Selected()??throw new InvalidOperationException(T("SelectFlow"));using var input=JsonDocument.Parse(inputSchema);JsonElement? output=null;JsonDocument? outputDocument=null;try{if(!string.IsNullOrWhiteSpace(outputSchema)){outputDocument=JsonDocument.Parse(outputSchema);output=outputDocument.RootElement.Clone();}var properties=new ToolDefinitionProperties{DisplayName=displayName,Description=string.IsNullOrWhiteSpace(description)?null:description,Enabled=enabled,RequiresApproval=requiresApproval,InvocationTimeoutSeconds=timeoutSeconds,InputSchema=input.RootElement.Clone(),OutputSchema=output,Flow=new ToolDefinitionFlowTarget{Name=flow.Id,Namespace=flow.Namespace,UseActiveVersion=useActiveVersion,Version=useActiveVersion?null:flowVersion}};if(IsNew)await Client.CreateAsync(new CreateToolDefinitionRequest(name,properties,namespaceValue),default);else await Client.UpdateAsync(name,ResourceNamespace.Parse(namespaceValue),new PutToolDefinitionRequest(properties),etag!,default);Navigation.NavigateTo("/tools/definitions");}finally{outputDocument?.Dispose();}}catch(Exception ex){error=ex.Message;}finally{saving=false;}}
+    private async Task DeleteAsync(){try{await Client.DeleteAsync(name,ResourceNamespace.Parse(namespaceValue),etag!,default);Navigation.NavigateTo("/tools/definitions");}catch(Exception ex){error=ex.Message;}}
+    private FlowSummary? Selected()=>flows.SingleOrDefault(value=>FlowKey(value)==selectedFlow);
+    private static string FlowKey(FlowSummary flow)=>$"{flow.Namespace.Value}|{flow.Id}";
+    private static string Pretty(JsonElement value)=>JsonSerializer.Serialize(value,new JsonSerializerOptions{WriteIndented=true});
+}

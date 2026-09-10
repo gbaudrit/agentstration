@@ -21,6 +21,8 @@ public sealed class ToolManagementService(IControlPlaneStore store, IEnumerable<
 
     public async Task<StoredResource<ToolProviderResource>> PutProviderAsync(ToolProviderResource resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken)
     {
+        if (string.Equals(resource.Name, AgentstrationToolProvider.Name, StringComparison.Ordinal))
+            throw new ToolResourceValidationException("The Agentstration MCP provider is managed by ToolDefinitions.");
         ValidateProvider(resource);
         var existing = await GetProviderAsync(resource.Metadata.Name, cancellationToken);
         return await store.PutAsync(resource with
@@ -35,6 +37,8 @@ public sealed class ToolManagementService(IControlPlaneStore store, IEnumerable<
     public async Task<ToolProviderDiscoveryResult> TestConnectionAsync(ToolProviderResource provider, CancellationToken cancellationToken)
     {
         ValidateProvider(provider);
+        if (provider.Definition.Mcp?.Internal == true)
+            throw new ToolResourceValidationException("The Agentstration MCP provider is managed by ToolDefinitions.");
         try { return await DiscoveryFor(provider).DiscoverAsync(provider, cancellationToken); }
         catch (Exception exception) when (exception is not OperationCanceledException) { throw new ToolProviderDiscoveryFailedException(exception.Message, exception); }
     }
@@ -44,6 +48,8 @@ public sealed class ToolManagementService(IControlPlaneStore store, IEnumerable<
         var storedProvider = await GetProviderAsync(providerName, cancellationToken)
             ?? throw new ControlPlaneResourceNotFoundException(new(ResourceKinds.ToolProvider, providerName));
         var provider = storedProvider.Value;
+        if (provider.Definition.Mcp?.Internal == true)
+            throw new ToolResourceValidationException("The Agentstration MCP provider is materialized by ToolDefinitions and cannot be refreshed.");
         var now = timeProvider.GetUtcNow();
         ToolProviderDiscoveryResult result;
         try { result = await DiscoveryFor(provider).DiscoverAsync(provider, cancellationToken); }
@@ -167,6 +173,12 @@ public sealed class ToolManagementService(IControlPlaneStore store, IEnumerable<
         {
             var mcp = resource.Definition.Mcp;
             if (mcp is null || resource.Definition.Aep is not null) throw new ToolResourceValidationException("An MCP provider requires only an mcp configuration.");
+            if (mcp.Internal)
+            {
+                if (mcp.Endpoint is not null || !string.IsNullOrWhiteSpace(mcp.Command) || mcp.Arguments.Count > 0 || mcp.EnvironmentReferences.Count > 0)
+                    throw new ToolResourceValidationException("An internal MCP provider cannot configure an external transport.");
+                return;
+            }
             if (mcp.Transport == McpToolProviderTransport.Stdio && string.IsNullOrWhiteSpace(mcp.Command)) throw new ToolResourceValidationException("STDIO MCP command is required.");
             if (mcp.Transport == McpToolProviderTransport.StreamableHttp && (mcp.Endpoint is null || !mcp.Endpoint.IsAbsoluteUri || mcp.Endpoint.Scheme is not ("http" or "https")))
                 throw new ToolResourceValidationException("Streamable HTTP MCP endpoint must be an absolute HTTP(S) URI.");
