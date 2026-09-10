@@ -101,6 +101,8 @@ Configured state, observed state, immutable refresh history, and cached bytes re
 
 Startup only ensures the local official registration and observed-state records; it performs no network request. Deleting an external registration removes desired configuration but preserves immutable refresh history and retained cache bytes for later provenance and retention processing. Registry availability therefore has no effect on direct Source imports or on already imported Sources, snapshots, Bootstrap Profiles, and Packs. See the [registration reference](../reference/source-registries.md) for the complete API and enterprise example.
 
+The Platform-administrator Console mirrors this boundary under **System > Source registries**: registration management and Registry refresh stay separate from imported Source and Channel administration. Discovery shows all retained observations and their independent trust evidence before an exact selection is confirmed; the resulting Source then continues through the existing Source, Channel, Bootstrap, and Pack workflows.
+
 ## Optional verification index
 
 Agentstration can consult a static verification index without making it a startup or offline dependency:
