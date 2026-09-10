@@ -3,6 +3,7 @@ using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Core;
 
@@ -17,7 +18,8 @@ public static class ModelManagementServiceCollectionExtensions
         services.AddSingleton<ModelProfileOptionMigrationService>();
         services.AddSingleton<IModelProfileStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
         services.AddSingleton<IModelDeploymentStore>(provider => provider.GetRequiredService<ModelProfileManagementService>());
-        services.AddSingleton<IModelProfileReferenceValidator>(provider => provider.GetRequiredService<ModelProfileManagementService>());
+        services.Replace(ServiceDescriptor.Singleton<IModelProfileReferenceValidator>(
+            provider => provider.GetRequiredService<ModelProfileManagementService>()));
         services.AddSingleton<ExtensionRegistrationManagementService>();
         services.AddSingleton<AepEnrollmentSettingsService>();
         services.AddSingleton<AepEnrollmentService>();

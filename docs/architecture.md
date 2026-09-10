@@ -82,6 +82,10 @@ Runtime.Storage.Sqlite -> Runtime.Abstractions + EF Core SQLite
 Work.Storage.Sqlite -> Work storage abstractions + EF Core SQLite
 ```
 
+The executable dependency-injection ownership map and registration semantics
+are documented in
+[Dependency injection composition](architecture/dependency-injection.md).
+
 Canonical Management resources and provider-neutral ports live in `Management.Abstractions`; validation and use cases live in `Management.Core`. SQLite and EF Core are confined to module-specific storage projects. Concrete `AIAgent` types are confined to `Runtime.AgentFramework`. Foundry is absent from every central project.
 
 `Agentstration.Resources` contains the neutral namespace, scope-reference, and address value types shared across boundaries. Management resources retain globally unique UIDs and use `(scope, namespace, kind, name)` as their exact logical identity. Canonical scope references are `/instance`, `/tenants/{tenantId}`, and `/workspaces/{workspaceId}`. Existing workspace callers implicitly use their current workspace and the `default` namespace. Relative references inherit their owner's namespace; explicit cross-namespace references retain the supplied namespace. See ADR-0035 and ADR-0079.
