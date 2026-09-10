@@ -68,6 +68,20 @@ public sealed class FileSystemSourceRegistryCacheStore(string rootPath) : ISourc
         return new(observationId, index, catalogs);
     }
 
+    public Task RemoveAsync(Guid observationId, CancellationToken cancellationToken)
+    {
+        if (observationId == Guid.Empty) throw new ArgumentException("A cache observation ID is required.", nameof(observationId));
+        cancellationToken.ThrowIfCancellationRequested();
+        var directory = Descendant(observationId.ToString("N"));
+        if (!Directory.Exists(directory)) return Task.CompletedTask;
+        RejectReparsePoint(root);
+        RejectReparsePoint(directory);
+        foreach (var path in Directory.EnumerateFileSystemEntries(directory, "*", SearchOption.AllDirectories))
+            RejectReparsePoint(path);
+        Directory.Delete(directory, recursive: true);
+        return Task.CompletedTask;
+    }
+
     private string Descendant(string name)
     {
         var path = Path.GetFullPath(Path.Combine(root, name));

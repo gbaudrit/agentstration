@@ -1,6 +1,9 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Text.RegularExpressions;
 using Agentstration.Management.Abstractions;
 using Agentstration.Resources;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Management.Core;
 
@@ -26,8 +29,12 @@ public sealed partial class SourceRegistryManagementService(
     ICurrentRequestContext requestContext,
     IRequestContextScopeFactory requestScopes,
     ISecurityAuditWriter audit,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<SourceRegistryManagementService> logger)
 {
+    public static readonly Meter Meter = new("Agentstration.SourceRegistry");
+    private static readonly Counter<long> RefreshCounter = Meter.CreateCounter<long>("agentstration.source_registry.refreshes");
+    private static readonly Histogram<double> RefreshDuration = Meter.CreateHistogram<double>("agentstration.source_registry.refresh.duration", "s");
     private readonly SemaphoreSlim refreshGate = new(1, 1);
 
     public async Task<SourceRegistryRegistrationView> EnsureOfficialAsync(CancellationToken cancellationToken)
@@ -157,6 +164,7 @@ public sealed partial class SourceRegistryManagementService(
         string? ifMatch,
         CancellationToken cancellationToken)
     {
+        await refreshGate.WaitAsync(cancellationToken);
         var actor = ActorPrincipalId();
         try
         {
@@ -190,10 +198,15 @@ public sealed partial class SourceRegistryManagementService(
             await AuditFailureAsync(SecurityAuditActions.SourceRegistryConfigurationUpdated, "source_registry_update_failed", actor, cancellationToken);
             throw;
         }
+        finally
+        {
+            refreshGate.Release();
+        }
     }
 
     public async Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken)
     {
+        await refreshGate.WaitAsync(cancellationToken);
         var actor = ActorPrincipalId();
         try
         {
@@ -216,19 +229,67 @@ public sealed partial class SourceRegistryManagementService(
             await AuditFailureAsync(SecurityAuditActions.SourceRegistryDeleted, "source_registry_delete_failed", actor, cancellationToken);
             throw;
         }
+        finally
+        {
+            refreshGate.Release();
+        }
     }
 
     public async Task<SourceRegistryRegistrationView> RefreshOfficialAsync(CancellationToken cancellationToken)
         => await RefreshAsync(SourceRegistryWellKnown.OfficialName, cancellationToken);
 
     public async Task<SourceRegistryRegistrationView> RefreshAsync(string name, CancellationToken cancellationToken)
+        => await RefreshAsync(name, SourceRegistryRefreshTrigger.Manual, 0, null, cancellationToken);
+
+    public async Task<SourceRegistryRegistrationView> RefreshAsync(
+        string name,
+        SourceRegistryRefreshTrigger trigger,
+        int retryCount,
+        DateTimeOffset? expectedLastAttemptedAt,
+        CancellationToken cancellationToken)
     {
         var actor = ActorPrincipalId();
         return await scopeOperations.WriteAsync(
             ResourceKinds.SourceRegistryRegistration,
             ResourceScopeRef.Instance,
             AuthorizationPermissions.ResourcesWrite,
-            token => RefreshCoreAsync(name, actor, token),
+            token => RefreshCoreAsync(name, trigger, retryCount, expectedLastAttemptedAt, actor, token),
+            cancellationToken);
+    }
+
+    public async Task RecordScheduledFailureAsync(
+        string name,
+        string code,
+        string message,
+        int retryCount,
+        CancellationToken cancellationToken)
+    {
+        await scopeOperations.WriteAsync(
+            ResourceKinds.SourceRegistryRegistration,
+            ResourceScopeRef.Instance,
+            AuthorizationPermissions.ResourcesWrite,
+            async token =>
+            {
+                await refreshGate.WaitAsync(token);
+                try
+                {
+                    var registration = await GetRegistrationStoredAsync(name, token)
+                        ?? throw new SourceRegistryNotFoundException(name);
+                    if (!registration.Value.Definition.Enabled) return true;
+                    var observed = await EnsureObservedAsync(registration.Value, token);
+                    var completedAt = timeProvider.GetUtcNow();
+                    var attemptedAt = completedAt - registration.Value.Definition.RefreshPolicy.Timeout;
+                    await RecordFailureAsync(registration.Value, observed, attemptedAt,
+                        SourceRegistryRefreshOutcome.Unavailable,
+                        new SourceRegistryOperationException(code, message, unavailable: true),
+                        SourceRegistryRefreshTrigger.Scheduled, retryCount, null, token);
+                    return true;
+                }
+                finally
+                {
+                    refreshGate.Release();
+                }
+            },
             cancellationToken);
     }
 
@@ -250,20 +311,33 @@ public sealed partial class SourceRegistryManagementService(
 
     private async Task<SourceRegistryRegistrationView> RefreshCoreAsync(
         string name,
+        SourceRegistryRefreshTrigger trigger,
+        int retryCount,
+        DateTimeOffset? expectedLastAttemptedAt,
         Guid? actor,
         CancellationToken cancellationToken)
     {
+        if (!Enum.IsDefined(trigger) || retryCount < 0)
+            throw new ArgumentOutOfRangeException(nameof(trigger));
+        using var operationActivity = Activity.Current is null
+            ? new Activity("SourceRegistryRefresh").Start()
+            : null;
+        var correlationId = Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N");
         await refreshGate.WaitAsync(cancellationToken);
         try
         {
             var registration = await GetRegistrationStoredAsync(name, cancellationToken)
                 ?? throw new SourceRegistryNotFoundException(name);
             var observed = await EnsureObservedAsync(registration.Value, cancellationToken);
+            if (trigger == SourceRegistryRefreshTrigger.Scheduled
+                && observed.Value.Definition.LastAttemptedAt != expectedLastAttemptedAt)
+                return new(registration.Value, EffectiveObserved(registration.Value, observed.Value));
             var attemptedAt = timeProvider.GetUtcNow();
             if (!registration.Value.Definition.Enabled)
             {
                 var disabled = new SourceRegistryOperationException("source_registry_disabled", $"Source registry '{name}' is disabled.");
-                await RecordFailureAsync(registration.Value, observed, attemptedAt, SourceRegistryRefreshOutcome.Disabled, disabled, actor, cancellationToken);
+                await RecordFailureAsync(registration.Value, observed, attemptedAt, SourceRegistryRefreshOutcome.Disabled,
+                    disabled, trigger, retryCount, actor, cancellationToken);
                 throw disabled;
             }
 
@@ -287,6 +361,9 @@ public sealed partial class SourceRegistryManagementService(
                         attemptedAt,
                         SourceRegistryRefreshOutcome.NotModified,
                         current,
+                        trigger,
+                        retryCount,
+                        correlationId,
                         actor,
                         cancellationToken);
                     return new(registration.Value, unchanged.Value);
@@ -366,8 +443,12 @@ public sealed partial class SourceRegistryManagementService(
                     attemptedAt,
                     SourceRegistryRefreshOutcome.Succeeded,
                     observation,
+                    trigger,
+                    retryCount,
+                    correlationId,
                     actor,
                     cancellationToken);
+                await CleanupCacheAsync(registration.Value, observation.Id, cancellationToken);
                 return new(registration.Value, storedObserved.Value);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -378,7 +459,8 @@ public sealed partial class SourceRegistryManagementService(
             {
                 var operation = Normalize(exception);
                 var outcome = Outcome(operation);
-                await RecordFailureAsync(registration.Value, observed, attemptedAt, outcome, operation, actor, cancellationToken);
+                await RecordFailureAsync(registration.Value, observed, attemptedAt, outcome, operation,
+                    trigger, retryCount, actor, cancellationToken);
                 throw operation;
             }
         }
@@ -394,27 +476,39 @@ public sealed partial class SourceRegistryManagementService(
         DateTimeOffset attemptedAt,
         SourceRegistryRefreshOutcome outcome,
         SourceRegistryObservation observation,
+        SourceRegistryRefreshTrigger trigger,
+        int retryCount,
+        string correlationId,
         Guid? actor,
         CancellationToken cancellationToken)
     {
         var completedAt = timeProvider.GetUtcNow();
+        var recovered = observed.Value.Definition.ConsecutiveFailures > 0;
+        var durationMilliseconds = DurationMilliseconds(attemptedAt, completedAt);
         var updated = await store.PutExactAsync(ResourceScopeRef.Instance, observed.Value with
         {
             Generation = checked(observed.Value.Generation + 1),
             Definition = observed.Value.Definition with
             {
-                Status = SourceRegistryObservedStatus.Fresh,
+                Status = recovered ? SourceRegistryObservedStatus.Recovered : SourceRegistryObservedStatus.Fresh,
                 LastAttemptedAt = attemptedAt,
                 LastSuccessfulRefreshAt = completedAt,
                 LastOutcome = outcome,
                 LastErrorCode = null,
                 LastErrorMessage = null,
-                Current = observation
+                Current = observation,
+                LastTrigger = trigger,
+                ConsecutiveFailures = 0,
+                LastRetryCount = retryCount,
+                LastDurationMilliseconds = durationMilliseconds,
+                LastRecoveredAt = recovered ? completedAt : observed.Value.Definition.LastRecoveredAt
             },
             Status = SucceededStatus()
         }, observed.ETag, false, cancellationToken);
-        await RecordRefreshAsync(registration.Value, attemptedAt, completedAt, outcome, null, observation, cancellationToken);
+        await RecordRefreshAsync(registration.Value, attemptedAt, completedAt, outcome, null, observation,
+            trigger, retryCount, durationMilliseconds, correlationId, cancellationToken);
         await audit.WriteAsync(new(SecurityAuditActions.SourceRegistryRefreshed, ActorPrincipalId: actor), cancellationToken);
+        ObserveRefresh(registration.Value.Uid, trigger, outcome, retryCount, durationMilliseconds, correlationId);
         return updated;
     }
 
@@ -424,10 +518,14 @@ public sealed partial class SourceRegistryManagementService(
         DateTimeOffset attemptedAt,
         SourceRegistryRefreshOutcome outcome,
         SourceRegistryOperationException exception,
+        SourceRegistryRefreshTrigger trigger,
+        int retryCount,
         Guid? actor,
         CancellationToken cancellationToken)
     {
         var completedAt = timeProvider.GetUtcNow();
+        var durationMilliseconds = DurationMilliseconds(attemptedAt, completedAt);
+        var correlationId = Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N");
         var status = observed.Value.Definition.Current is not null
             ? SourceRegistryObservedStatus.Stale
             : outcome switch
@@ -447,7 +545,13 @@ public sealed partial class SourceRegistryManagementService(
                 LastAttemptedAt = attemptedAt,
                 LastOutcome = outcome,
                 LastErrorCode = exception.Code,
-                LastErrorMessage = exception.Message
+                LastErrorMessage = exception.Message,
+                LastTrigger = trigger,
+                ConsecutiveFailures = observed.Value.Definition.ConsecutiveFailures == int.MaxValue
+                    ? int.MaxValue
+                    : observed.Value.Definition.ConsecutiveFailures + 1,
+                LastRetryCount = retryCount,
+                LastDurationMilliseconds = durationMilliseconds
             },
             Status = new ResourceStatus
             {
@@ -462,12 +566,14 @@ public sealed partial class SourceRegistryManagementService(
                 }]
             }
         }, observed.ETag, false, cancellationToken);
-        await RecordRefreshAsync(registration, attemptedAt, completedAt, outcome, exception, observed.Value.Definition.Current, cancellationToken);
+        await RecordRefreshAsync(registration, attemptedAt, completedAt, outcome, exception,
+            observed.Value.Definition.Current, trigger, retryCount, durationMilliseconds, correlationId, cancellationToken);
         await audit.WriteAsync(new(
             SecurityAuditActions.SourceRegistryRefreshed,
             SecurityAuditOutcome.Failed,
             ActorPrincipalId: actor,
             ReasonCode: exception.Code.Length <= 64 ? exception.Code : "source_registry_refresh_failed"), cancellationToken);
+        ObserveRefresh(registration.Uid, trigger, outcome, retryCount, durationMilliseconds, correlationId);
     }
 
     private Task RecordRefreshAsync(
@@ -477,6 +583,10 @@ public sealed partial class SourceRegistryManagementService(
         SourceRegistryRefreshOutcome outcome,
         SourceRegistryOperationException? exception,
         SourceRegistryObservation? observation,
+        SourceRegistryRefreshTrigger trigger,
+        int retryCount,
+        long durationMilliseconds,
+        string correlationId,
         CancellationToken cancellationToken) =>
         store.CreateImmutableAsync(new SourceRegistryRefreshRecordResource
         {
@@ -493,9 +603,66 @@ public sealed partial class SourceRegistryManagementService(
                 ErrorCode = exception?.Code,
                 ErrorMessage = exception?.Message,
                 ObservationId = observation?.Id,
-                IndexDigest = observation?.IndexDigest
+                IndexDigest = observation?.IndexDigest,
+                Trigger = trigger,
+                RetryCount = retryCount,
+                DurationMilliseconds = durationMilliseconds,
+                CorrelationId = correlationId
             }
         }, cancellationToken);
+
+    private async Task CleanupCacheAsync(
+        SourceRegistryRegistrationResource registration,
+        Guid currentObservationId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var records = await store.ListExactAsync<SourceRegistryRefreshRecordResource>(
+                ResourceScopeRef.Instance, ResourceKinds.SourceRegistryRefreshRecord, 0, int.MaxValue, cancellationToken);
+            var retained = new HashSet<Guid>();
+            var candidates = records
+                .Where(value => value.Value.Definition.RegistrationUid == registration.Uid)
+                .OrderByDescending(value => value.Value.Definition.CompletedAt)
+                .Select(value => value.Value.Definition.ObservationId)
+                .Where(value => value.HasValue)
+                .Select(value => value!.Value)
+                .Distinct()
+                .ToArray();
+            foreach (var observationId in candidates.Take(registration.Definition.CachePolicy.RetainedObservations))
+                retained.Add(observationId);
+            retained.Add(currentObservationId);
+            foreach (var observationId in candidates.Where(value => !retained.Contains(value)))
+                await cache.RemoveAsync(observationId, cancellationToken);
+        }
+        catch (IOException exception)
+        {
+            LogCacheCleanupFailed(logger, registration.Uid, exception);
+        }
+    }
+
+    private void ObserveRefresh(
+        Guid registrationUid,
+        SourceRegistryRefreshTrigger trigger,
+        SourceRegistryRefreshOutcome outcome,
+        int retryCount,
+        long durationMilliseconds,
+        string correlationId)
+    {
+        var tags = new TagList
+        {
+            { "registration.uid", registrationUid.ToString("D") },
+            { "refresh.trigger", trigger.ToString() },
+            { "refresh.result", outcome.ToString() },
+            { "refresh.retry_count", retryCount }
+        };
+        RefreshCounter.Add(1, tags);
+        RefreshDuration.Record(durationMilliseconds / 1000d, tags);
+        LogRefreshCompleted(logger, registrationUid, trigger, durationMilliseconds, outcome, retryCount, correlationId);
+    }
+
+    private static long DurationMilliseconds(DateTimeOffset attemptedAt, DateTimeOffset completedAt) =>
+        Math.Max(0, (long)(completedAt - attemptedAt).TotalMilliseconds);
 
     private async Task<StoredResource<SourceRegistryObservedStateResource>> EnsureObservedAsync(
         SourceRegistryRegistrationResource registration,
@@ -548,21 +715,27 @@ public sealed partial class SourceRegistryManagementService(
             ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, ResourceKinds.SourceRegistryObservedState, name),
             cancellationToken);
 
-    private static SourceRegistryObservedStateResource EffectiveObserved(
+    private SourceRegistryObservedStateResource EffectiveObserved(
         SourceRegistryRegistrationResource registration,
         SourceRegistryObservedStateResource observed) =>
         observed.Definition.Status == EffectiveStatus(registration, observed.Definition)
             ? observed
             : observed with { Definition = observed.Definition with { Status = EffectiveStatus(registration, observed.Definition) } };
 
-    private static SourceRegistryObservedStatus EffectiveStatus(
+    private SourceRegistryObservedStatus EffectiveStatus(
         SourceRegistryRegistrationResource registration,
-        SourceRegistryObservedStateProperties observed) =>
-        registration.Definition.Enabled
-            ? observed.Status == SourceRegistryObservedStatus.Disabled
-                ? observed.Current is null ? SourceRegistryObservedStatus.NeverFetched : SourceRegistryObservedStatus.Fresh
-                : observed.Status
-            : SourceRegistryObservedStatus.Disabled;
+        SourceRegistryObservedStateProperties observed)
+    {
+        if (!registration.Definition.Enabled) return SourceRegistryObservedStatus.Disabled;
+        var status = observed.Status == SourceRegistryObservedStatus.Disabled
+            ? observed.Current is null ? SourceRegistryObservedStatus.NeverFetched : SourceRegistryObservedStatus.Fresh
+            : observed.Status;
+        return status is SourceRegistryObservedStatus.Fresh or SourceRegistryObservedStatus.Recovered
+            && observed.LastSuccessfulRefreshAt is { } lastSuccessful
+            && timeProvider.GetUtcNow() - lastSuccessful >= registration.Definition.RefreshPolicy.StaleAfter
+                ? SourceRegistryObservedStatus.Stale
+                : status;
+    }
 
     private static bool Contains(SourceCompatibilityBounds bounds, SourceSemanticVersion version)
     {
@@ -597,6 +770,18 @@ public sealed partial class SourceRegistryManagementService(
         if (definition.RefreshPolicy.Interval < TimeSpan.FromMinutes(1)
             || definition.RefreshPolicy.Interval > TimeSpan.FromDays(30))
             throw new SourceRegistryOperationException("source_registry_refresh_policy_invalid", "The registry refresh interval must be between one minute and 30 days.");
+        if (definition.RefreshPolicy.Timeout < TimeSpan.FromSeconds(1)
+            || definition.RefreshPolicy.Timeout > TimeSpan.FromMinutes(5)
+            || definition.RefreshPolicy.MaximumAttempts is < 1 or > 10
+            || definition.RefreshPolicy.InitialBackoff < TimeSpan.FromSeconds(1)
+            || definition.RefreshPolicy.MaximumBackoff < definition.RefreshPolicy.InitialBackoff
+            || definition.RefreshPolicy.MaximumBackoff > TimeSpan.FromDays(1)
+            || definition.RefreshPolicy.Jitter < TimeSpan.Zero
+            || definition.RefreshPolicy.Jitter > TimeSpan.FromHours(1)
+            || definition.RefreshPolicy.Jitter > definition.RefreshPolicy.Interval / 2
+            || definition.RefreshPolicy.StaleAfter < definition.RefreshPolicy.Interval
+            || definition.RefreshPolicy.StaleAfter > TimeSpan.FromDays(90))
+            throw new SourceRegistryOperationException("source_registry_refresh_policy_invalid", "The registry refresh timeout, retry, jitter, and staleness settings are outside their supported bounds.");
         if (definition.CachePolicy.RetainedObservations is < 1 or > 100)
             throw new SourceRegistryOperationException("source_registry_cache_policy_invalid", "The registry cache must retain between 1 and 100 observations.");
         ValidateIndexUrl(definition.IndexUrl, definition.EndpointPolicy);
@@ -685,4 +870,18 @@ public sealed partial class SourceRegistryManagementService(
 
     [GeneratedRegex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", RegexOptions.CultureInvariant)]
     private static partial Regex RegistryNamePattern();
+
+    [LoggerMessage(LogLevel.Information,
+        "Source registry {RegistrationUid} refresh ({Trigger}) completed in {DurationMilliseconds} ms with {Result} after {RetryCount} retries; correlation {CorrelationId}")]
+    private static partial void LogRefreshCompleted(
+        ILogger logger,
+        Guid registrationUid,
+        SourceRegistryRefreshTrigger trigger,
+        long durationMilliseconds,
+        SourceRegistryRefreshOutcome result,
+        int retryCount,
+        string correlationId);
+
+    [LoggerMessage(LogLevel.Warning, "Source registry {RegistrationUid} cache cleanup failed")]
+    private static partial void LogCacheCleanupFailed(ILogger logger, Guid registrationUid, Exception exception);
 }

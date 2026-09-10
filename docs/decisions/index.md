@@ -130,3 +130,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 98. [ADR-0098 — Source registry registrations are instance-owned policies](0098-source-registry-registrations-are-instance-owned.md)
 99. [ADR-0099 — Provider-specific Compose owns inference services](0099-provider-specific-compose-owns-inference-services.md)
 100. [ADR-0100 — AEP unenrollment is an explicit recoverable transition](0100-aep-unenrollment-is-an-explicit-recoverable-transition.md)
+101. [ADR-0101 — Source registry refresh joins the shared local scheduling lifecycle](0101-source-registry-refresh-joins-the-shared-local-scheduling-lifecycle.md)

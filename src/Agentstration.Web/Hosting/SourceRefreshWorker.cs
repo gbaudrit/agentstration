@@ -22,7 +22,7 @@ public sealed class SourceRefreshWorker(
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Source refresh scheduling scan failed");
+                logger.LogError(exception, "Source and Registry refresh scheduling scan failed");
             }
         }
     }

@@ -230,6 +230,7 @@ if (openTelemetryEnabled)
                 .AddMeter(
                     WorkItemService.Meter.Name,
                     FlowRunService.Meter.Name,
+                    SourceRegistryManagementService.Meter.Name,
                     AgentFrameworkRuntimeFactory.TelemetrySourceName,
                     GenAiObservabilityOptions.ChatClientSourceName);
             if (otlpEnabled) metrics.AddOtlpExporter();
