@@ -247,6 +247,63 @@ public sealed partial class ModelManagementApiTests
     }
 
     [TestMethod]
+    public async Task InstancePairingEnrollmentCanBeUnenrolledAndEnrolledAgainWithoutADuplicateRegistration()
+    {
+        var handler = new EnrollmentLifecycleHandler("extension.reenrollment-test");
+        await using var factory = EnrollmentFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IHttpClientFactory>();
+            services.AddSingleton<IHttpClientFactory>(new EnrollmentHttpClientFactory(handler));
+        }));
+        var context = await GetBootstrapContextAsync(factory);
+        var service = factory.Services.GetRequiredService<AepEnrollmentService>();
+        var registrations = factory.Services.GetRequiredService<ExtensionRegistrationManagementService>();
+        var initialTarget = ResourceScopeRef.Instance;
+        var reenrollmentTarget = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var instanceId = Guid.NewGuid();
+        _ = await service.AnnounceAsync(new(
+            instanceId,
+            new AepExtensionIdentity("extension.reenrollment-test", "Re-enrollment test", "1.0.0"),
+            new Uri("https://reenrollment.example/"),
+            new Uri("https://reenrollment.example/aep/enrollment/pair")), default);
+        await service.AssignAsync(context, instanceId, initialTarget, default);
+        var firstCode = await service.RotateAsync(context, instanceId, default);
+        var firstCredential = await service.ClaimAsync(new(instanceId, instanceId, firstCode.Code), default);
+        _ = await service.ReadyAsync(new(instanceId, instanceId, firstCredential.CompletionToken), default);
+
+        await service.UnenrollAsync(context, instanceId, default);
+        await service.UnenrollAsync(context, instanceId, default);
+
+        var unenrolled = (await service.ListAsync(context, default)).Single(value => value.Definition.InstanceId == instanceId);
+        Assert.AreEqual(AepEnrollmentState.Unpaired, unenrolled.Definition.State);
+        Assert.AreEqual("unenrolled", unenrolled.Definition.Outcome);
+        Assert.AreEqual(1, handler.UnenrollmentCount);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            var disabled = await registrations.GetExactAsync(initialTarget, ResourceNamespace.Default, $"paired-{instanceId:N}", default);
+            Assert.IsNotNull(disabled);
+            Assert.IsFalse(disabled.Value.Definition.Enabled);
+        }
+
+        await service.AssignAsync(context, instanceId, reenrollmentTarget, default);
+        var secondCode = await service.RotateAsync(context, instanceId, default);
+        var secondCredential = await service.ClaimAsync(new(instanceId, instanceId, secondCode.Code), default);
+        _ = await service.ReadyAsync(new(instanceId, instanceId, secondCredential.CompletionToken), default);
+
+        Assert.AreNotEqual(firstCredential.AccessToken, secondCredential.AccessToken);
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            var enabled = await registrations.GetExactAsync(reenrollmentTarget, ResourceNamespace.Default, $"paired-{instanceId:N}", default);
+            Assert.IsNotNull(enabled);
+            Assert.IsTrue(enabled.Value.Definition.Enabled);
+        }
+        var inventory = await factory.Services.GetRequiredService<ExtensionInventoryService>().ListAsync(context, default);
+        Assert.HasCount(1, inventory.Where(value => value.EnrollmentInstanceId == instanceId).ToArray());
+        var audit = await factory.Services.GetRequiredService<ISecurityAuditStore>().ListLatestAsync(100, default);
+        Assert.IsTrue(audit.Any(value => value.Action == SecurityAuditActions.AepEnrollmentUnenrolled && value.TargetAccountId == instanceId));
+    }
+
+    [TestMethod]
     public async Task SharedKeyAnnouncementProvesPossessionAndCreatesTheRegistration()
     {
         var path = Path.GetTempFileName();
@@ -288,6 +345,29 @@ public sealed partial class ModelManagementApiTests
             Assert.IsNotNull(registration);
             Assert.AreEqual(announcement.Endpoint, registration.Value.Definition.Endpoint);
             Assert.AreEqual(AepEnrollmentMode.SharedKeyFile, registration.Value.Definition.EnrollmentMode);
+
+            await service.UnenrollAsync(context, announcement.InstanceId, default);
+            await service.UnenrollAsync(context, announcement.InstanceId, default);
+            var unenrolled = (await service.ListAsync(context, default)).Single(value => value.Definition.InstanceId == announcement.InstanceId);
+            Assert.AreEqual(AepEnrollmentState.Unpaired, unenrolled.Definition.State);
+            var disabled = await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>().GetExactAsync(
+                targetScope,
+                ResourceNamespace.Default,
+                "extension-shared-key",
+                default);
+            Assert.IsNotNull(disabled);
+            Assert.IsFalse(disabled.Value.Definition.Enabled);
+
+            await service.AssignAsync(context, announcement.InstanceId, targetScope, default);
+            var reenrolled = (await service.ListAsync(context, default)).Single(value => value.Definition.InstanceId == announcement.InstanceId);
+            Assert.AreEqual(AepEnrollmentState.Available, reenrolled.Definition.State);
+            var enabled = await factory.Services.GetRequiredService<ExtensionRegistrationManagementService>().GetExactAsync(
+                targetScope,
+                ResourceNamespace.Default,
+                "extension-shared-key",
+                default);
+            Assert.IsNotNull(enabled);
+            Assert.IsTrue(enabled.Value.Definition.Enabled);
         }
         finally { File.Delete(path); }
     }
@@ -392,6 +472,7 @@ public sealed partial class ModelManagementApiTests
     {
         public AepCredentialRotation? Rotation { get; private set; }
         public int PreviousRevocationCount { get; private set; }
+        public int UnenrollmentCount { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -399,6 +480,8 @@ public sealed partial class ModelManagementApiTests
                 Rotation = await request.Content!.ReadFromJsonAsync<AepCredentialRotation>(AepProtocol.JsonOptions, cancellationToken);
             else if (request.RequestUri?.AbsolutePath == AepEnrollmentProtocol.PreviousCredentialRevocationPath)
                 PreviousRevocationCount++;
+            else if (request.RequestUri?.AbsolutePath == AepEnrollmentProtocol.UnenrollmentPath)
+                UnenrollmentCount++;
 
             if (request.RequestUri?.AbsolutePath != AepProtocol.DiscoveryPath)
                 return new(HttpStatusCode.OK);

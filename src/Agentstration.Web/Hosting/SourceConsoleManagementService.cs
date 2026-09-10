@@ -9,6 +9,7 @@ public sealed record SourceConsoleChannelView(
     SourceChannelDefinition Definition,
     SourceChannelStatusView Status,
     IReadOnlyList<SourceChannelSnapshotResource> Snapshots,
+    SourceChannelSnapshotResource? CurrentSnapshot,
     SourceChannelSnapshotVerificationView? Verification,
     IReadOnlyList<SourceCatalogView> Catalogs,
     SourceConsoleCatalogFailure? CatalogFailure);
@@ -21,6 +22,7 @@ public sealed record SourceConsoleProviderCandidate(
     string Key,
     string RegistrationName,
     ResourceNamespace RegistrationNamespace,
+    ResourceScopeRef RegistrationScopeRef,
     string DisplayName,
     string ContributionId);
 
@@ -49,6 +51,7 @@ public sealed class SourceConsoleManagementService(
     SourceCatalogService catalogs,
     SourcePackInstallationService sourcePacks,
     SourceVerificationService verification,
+    IResourceScopeResolver resourceScopes,
     IPlatformAuthorizationService platformAuthorization)
 {
     public async Task<IReadOnlyList<SourceConsoleListItem>> ListAsync(Guid actorPrincipalId, CancellationToken cancellationToken)
@@ -138,11 +141,11 @@ public sealed class SourceConsoleManagementService(
                     }
                 }
             }
-            channelViews.Add(new(channel, status, history, snapshotVerification, discoveredCatalogs, catalogFailure));
+            channelViews.Add(new(channel, status, history, current, snapshotVerification, discoveredCatalogs, catalogFailure));
         }
 
-        var availableProviders = await providers.ListAsync(cancellationToken);
-        var providerCandidates = await DiscoverProviderCandidatesAsync(availableProviders, cancellationToken);
+        var availableProviders = await providers.ListVisibleAsync(scopeRef, cancellationToken);
+        var providerCandidates = await DiscoverProviderCandidatesAsync(scopeRef, availableProviders, cancellationToken);
         return new(
             source,
             versions,
@@ -280,21 +283,29 @@ public sealed class SourceConsoleManagementService(
     }
 
     private async Task<IReadOnlyList<SourceConsoleProviderCandidate>> DiscoverProviderCandidatesAsync(
+        ResourceScopeRef sourceScopeRef,
         IReadOnlyList<StoredResource<SourceProviderResource>> availableProviders,
         CancellationToken cancellationToken)
     {
         var candidates = new List<SourceConsoleProviderCandidate>();
+        var sourceScope = await resourceScopes.ResolveAsync(sourceScopeRef, cancellationToken)
+            ?? throw new SourceProviderValidationException($"Source scope '{sourceScopeRef}' does not exist.");
+        var visibleScopeRefs = new HashSet<ResourceScopeRef>(
+            [sourceScope.Scope.Ref, .. sourceScope.Ancestors.Select(value => value.Ref)]);
         foreach (var extension in await extensions.ListAsync(cancellationToken))
         {
-            if (!string.Equals(extension.Status, "available", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.Equals(extension.Status, "available", StringComparison.OrdinalIgnoreCase)
+                || extension.RegistrationScopeRef is not { } registrationScopeRef
+                || !visibleScopeRefs.Contains(registrationScopeRef)) continue;
             foreach (var contribution in extension.Contributions.Where(value =>
                 string.Equals(value.Kind, AepContributionKinds.SourceProvider, StringComparison.OrdinalIgnoreCase)))
             {
                 if (availableProviders.Any(provider => References(provider.Value, extension, contribution.Id))) continue;
                 candidates.Add(new(
-                    $"{extension.RegistrationNamespace}\n{extension.RegistrationName}\n{contribution.Id}",
+                    $"{registrationScopeRef.Value}\n{extension.RegistrationNamespace}\n{extension.RegistrationName}\n{contribution.Id}",
                     extension.RegistrationName,
                     new ResourceNamespace(extension.RegistrationNamespace),
+                    registrationScopeRef,
                     extension.Extension?.Name ?? extension.RegistrationName,
                     contribution.Id));
             }
@@ -308,7 +319,8 @@ public sealed class SourceConsoleManagementService(
     {
         var extension = (await extensions.ListAsync(cancellationToken)).SingleOrDefault(value =>
             string.Equals(value.RegistrationNamespace, candidate.RegistrationNamespace.Value, StringComparison.Ordinal)
-            && string.Equals(value.RegistrationName, candidate.RegistrationName, StringComparison.Ordinal));
+            && string.Equals(value.RegistrationName, candidate.RegistrationName, StringComparison.Ordinal)
+            && value.RegistrationScopeRef == candidate.RegistrationScopeRef);
         if (extension is null
             || !string.Equals(extension.Status, "available", StringComparison.OrdinalIgnoreCase)
             || !extension.Contributions.Any(value =>
@@ -323,7 +335,8 @@ public sealed class SourceConsoleManagementService(
         var baseName = Slug($"{candidate.RegistrationName}-{candidate.ContributionId}");
         var name = baseName;
         for (var suffix = 2; availableProviders.Any(value =>
-                 value.Value.Namespace == candidate.RegistrationNamespace
+                 value.Value.ScopeRef == candidate.RegistrationScopeRef
+                 && value.Value.Namespace == candidate.RegistrationNamespace
                  && string.Equals(value.Value.Name, name, StringComparison.Ordinal)); suffix++)
             name = $"{baseName}-{suffix}";
 
@@ -332,11 +345,11 @@ public sealed class SourceConsoleManagementService(
             ApiVersion = ManagementApiVersions.CoreV1,
             Kind = ResourceKinds.SourceProvider,
             Metadata = new ResourceMetadata { Namespace = candidate.RegistrationNamespace, Name = name },
-            ScopeRef = ResourceScopeRef.Instance,
+            ScopeRef = candidate.RegistrationScopeRef,
             Definition = new SourceProviderProperties
             {
                 DisplayName = candidate.DisplayName,
-                Extension = new(candidate.RegistrationName, ResourceScopeRef.Instance, candidate.RegistrationNamespace),
+                Extension = new(candidate.RegistrationName, candidate.RegistrationScopeRef, candidate.RegistrationNamespace),
                 ContributionId = candidate.ContributionId
             }
         };
@@ -360,11 +373,15 @@ public sealed class SourceConsoleManagementService(
         var address = provider.Definition.Extension.Resolve(provider.Namespace, ResourceKinds.ExtensionRegistration);
         return address.Namespace.Value == extension.RegistrationNamespace
             && string.Equals(address.Name, extension.RegistrationName, StringComparison.Ordinal)
+            && provider.Definition.Extension.ScopeRef == extension.RegistrationScopeRef
             && string.Equals(provider.Definition.ContributionId, contributionId, StringComparison.OrdinalIgnoreCase);
     }
 
     private static ResourceReference ProviderReference(SourceProviderResource provider) =>
-        new(provider.Name, ResourceScopeRef.Instance, provider.Namespace);
+        new(
+            provider.Name,
+            provider.ScopeRef ?? throw new SourceProviderValidationException("The Source Provider has no ownership scope."),
+            provider.Namespace);
 
     private static string Slug(string value)
     {

@@ -6,7 +6,7 @@ Ollama, llama.cpp, and LocalAI are implemented as independent AEP contributions 
 
 ## LocalAI
 
-Start an existing LocalAI server on host port 8081. This avoids colliding with the default llama.cpp endpoint on port 8080. A container that listens on 8080 can be published with a host mapping such as `8081:8080`.
+For direct or Aspire startup, start an existing LocalAI server on host port 8081. This avoids colliding with the default llama.cpp endpoint on port 8080. A container that listens on 8080 can be published with a host mapping such as `8081:8080`. Alternatively, `deploy/compose/localai.yml` starts both LocalAI and its AEP extension on an internal Docker network.
 
 Aspire starts only the Agentstration extension. For direct startup:
 
@@ -54,7 +54,9 @@ dotnet test tests/Agentstration.ModelProviders.Tests --filter TestCategory=Integ
 
 ## llama.cpp
 
-Start an existing `llama-server` with a local GGUF model. Giving the model a stable alias makes the Model Profile independent from its filesystem path:
+For direct or Aspire startup, start an existing `llama-server` with a local GGUF model. Giving the model a stable alias makes the Model Profile independent from its filesystem path. Alternatively, `deploy/compose/llama-cpp.yml` starts both llama-server and its AEP extension after a GGUF file is placed in `.models/llama-cpp`.
+
+The native command is:
 
 ```powershell
 llama-server -m C:\models\model.gguf --alias local-gguf --host 127.0.0.1 --port 8080 --jinja

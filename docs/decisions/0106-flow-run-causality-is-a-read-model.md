@@ -1,4 +1,4 @@
-# ADR-0102 — Flow Run causality is a bounded read model
+# ADR-0106 — Flow Run causality is a bounded read model
 
 ## Status
 

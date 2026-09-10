@@ -28,7 +28,7 @@ else
                 <label><span>@T("Name")</span><InputText @bind-Value="model.Name" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Name" /></label>
                 <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
                 <label><span>@T("DisplayName")</span><InputText @bind-Value="model.DisplayName" /><ValidationMessage For="() => model.DisplayName" /></label>
-                <label><span>@T("OwnershipScope")</span><span class="form-readonly"><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Instance" /></span><small>@T("InstanceOnlyHelp")</small></label>
+                <ResourceScopeFormField ResourceKind="@ResourceKinds.SourceProvider" Value="selectedScope" ValueChanged="ScopeChangedAsync" Disabled="@(!IsNew)" />
                 <label><span>@T("ExtensionRegistration")</span><select value="@model.ExtensionId" @onchange="ExtensionChanged"><option value="">@T("SelectExtension")</option>@foreach (var extension in EligibleExtensions) { <option value="@ExtensionKey(extension)">@extension.RegistrationNamespace/@extension.RegistrationName — @(extension.Extension?.Name ?? extension.RegistrationName)</option> }</select><ValidationMessage For="() => model.ExtensionId" /></label>
                 <label><span>@T("Contribution")</span><select @bind="model.ContributionId"><option value="">@T("SelectContribution")</option>@foreach (var contribution in Contributions) { <option value="@contribution.Id">@contribution.Id</option> }</select><ValidationMessage For="() => model.ContributionId" /></label>
             </div>
@@ -59,25 +59,29 @@ else
 @code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "extension")] public string? SuggestedExtension { get; set; }
     [SupplyParameterFromQuery(Name = "extensionNamespace")] public string? SuggestedExtensionNamespace { get; set; }
+    [SupplyParameterFromQuery(Name = "extensionScopeRef")] public string? SuggestedExtensionScopeRef { get; set; }
     [SupplyParameterFromQuery(Name = "contributionId")] public string? SuggestedContributionId { get; set; }
     [SupplyParameterFromQuery(Name = "displayName")] public string? SuggestedDisplayName { get; set; }
     [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private SourceProviderEditorModel? model;
     private IReadOnlyList<ExtensionResponse> extensions = [];
-    private IReadOnlyList<ExtensionRegistrationResource> registrations = [];
     private IReadOnlyList<SourceProviderUsageResponse> usages = [];
     private SourceProviderStatusResponse? status;
     private AgentstrationApiException? error;
     private string? etag;
     private bool saving;
     private bool confirmDelete;
+    private ResourceScopeRef? selectedScope;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
     private IReadOnlyList<ExtensionResponse> EligibleExtensions => extensions.Where(extension =>
-        registrations.Any(registration => registration.ScopeRef == ResourceScopeRef.Instance && registration.Namespace.Value == extension.RegistrationNamespace && registration.Name == extension.RegistrationName)
+        extension.RegistrationScopeRef is { } extensionScope
+        && selectedScope is { } providerScope
+        && IsVisibleFrom(extensionScope, providerScope)
         && (extension.Contributions.Any(value => value.Kind == "source-provider") || !IsNew && model is not null && ExtensionKey(extension) == model.ExtensionId)).ToArray();
     private ExtensionResponse? SelectedExtension => model is null ? null : EligibleExtensions.SingleOrDefault(value => ExtensionKey(value) == model.ExtensionId);
     private IReadOnlyList<ExtensionContributionResponse> Contributions
@@ -99,25 +103,34 @@ else
         error = null;
         try
         {
-            var extensionsTask = ExtensionsClient.GetExtensionsAsync(cancellation.Token);
-            var registrationsTask = ExtensionsClient.GetRegistrationsAsync(cancellation.Token);
-            await Task.WhenAll(extensionsTask, registrationsTask);
-            extensions = await extensionsTask; registrations = await registrationsTask;
+            extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
             if (IsNew)
             {
                 var extensionNamespace = SuggestedExtensionNamespace ?? SelectedNamespace.Value;
-                model = new() { Namespace = SelectedNamespace.Value, ExtensionId = string.IsNullOrWhiteSpace(SuggestedExtension) ? string.Empty : $"{extensionNamespace}:{SuggestedExtension}", ContributionId = SuggestedContributionId ?? string.Empty, DisplayName = SuggestedDisplayName ?? string.Empty };
+                ResourceScopeRef? suggestedScope = string.IsNullOrWhiteSpace(SuggestedExtensionScopeRef) ? null : ResourceScopeRef.Parse(SuggestedExtensionScopeRef);
+                var suggestedExtension = string.IsNullOrWhiteSpace(SuggestedExtension)
+                    ? null
+                    : extensions.SingleOrDefault(value =>
+                        value.RegistrationNamespace == extensionNamespace
+                        && value.RegistrationName == SuggestedExtension
+                        && (suggestedScope is null || value.RegistrationScopeRef == suggestedScope));
+                selectedScope = suggestedScope
+                    ?? suggestedExtension?.RegistrationScopeRef
+                    ?? (string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue));
+                model = new() { Namespace = SelectedNamespace.Value, ExtensionId = suggestedExtension is null ? string.Empty : ExtensionKey(suggestedExtension), ContributionId = SuggestedContributionId ?? string.Empty, DisplayName = SuggestedDisplayName ?? string.Empty };
                 if (SelectedExtension is not null && !Contributions.Any(value => value.Id == model.ContributionId)) model.ContributionId = Contributions.Count == 1 ? Contributions[0].Id : string.Empty;
                 return;
             }
-            var snapshot = await Client.GetSourceProviderAsync(SelectedNamespace, Name!, cancellation.Token);
-            model = SourceProviderEditorModel.FromResource(snapshot.Value); etag = snapshot.ETag;
-            status = await Client.GetStatusAsync(SelectedNamespace, Name!, cancellation.Token);
-            usages = (await Client.GetUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value;
+            var requestedScope = ParseScope();
+            var snapshot = await Client.GetSourceProviderAsync(requestedScope, SelectedNamespace, Name!, cancellation.Token);
+            model = SourceProviderEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag;
+            status = await Client.GetStatusAsync(requestedScope, SelectedNamespace, Name!, cancellation.Token);
+            usages = (await Client.GetUsagesAsync(requestedScope, SelectedNamespace, Name!, cancellation.Token)).Value;
         }
         catch (AgentstrationApiException exception) { error = exception; model ??= new() { Namespace = SelectedNamespace.Value }; }
     }
     private void ExtensionChanged(ChangeEventArgs args) { if (model is null) return; model.ExtensionId = args.Value?.ToString() ?? string.Empty; if (!Contributions.Any(value => value.Id == model.ContributionId)) model.ContributionId = Contributions.Count == 1 ? Contributions[0].Id : string.Empty; }
+    private Task ScopeChangedAsync(ResourceScopeRef? scopeRef) { selectedScope = scopeRef; if (model is not null && SelectedExtension is null) { model.ExtensionId = string.Empty; model.ContributionId = string.Empty; } return Task.CompletedTask; }
     private IReadOnlyList<ExtensionOptionSetResponse> OptionSets(ExtensionResponse extension) => extension.OptionSets.Where(value => value.ContributionKind == "source-provider" && value.ContributionId.Equals(model?.ContributionId, StringComparison.OrdinalIgnoreCase) && value.Scope == "source-channel").ToArray();
     private async Task SaveAsync()
     {
@@ -125,20 +138,26 @@ else
         try
         {
             var wasNew = IsNew; var @namespace = ResourceNamespace.Parse(model.Namespace);
-            var snapshot = wasNew ? await Client.CreateSourceProviderAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateSourceProviderAsync(@namespace, model.Name, model.ToPutRequest(), etag!, cancellation.Token);
+            var scopeRef = selectedScope ?? throw new ArgumentException(T("ScopeRequired"));
+            var snapshot = wasNew ? await Client.CreateSourceProviderAsync(model.ToCreateRequest(scopeRef), cancellation.Token) : await Client.UpdateSourceProviderAsync(scopeRef, @namespace, model.Name, model.ToPutRequest(), etag!, cancellation.Token);
             Notifications.Add(new(Guid.NewGuid(), wasNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
             if (wasNew && IsSafeReturnUrl(ReturnUrl)) Navigation.NavigateTo(ReturnUrl!);
-            else Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name));
+            else Navigation.NavigateTo(DetailsUrl(snapshot.Value.ScopeRef!.Value, snapshot.Value.Namespace, snapshot.Value.Name));
         }
         catch (ArgumentException exception) { error = new(exception.Message, Guid.NewGuid().ToString("N")); }
         catch (AgentstrationApiException exception) { error = exception; }
         finally { saving = false; }
     }
     private void RequestDelete() { if (usages.Count == 0) confirmDelete = true; else error = new(T("UsedWarning", UsageCount(usages.Count)), Guid.NewGuid().ToString("N")); }
-    private async Task DeleteAsync() { if (model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteSourceProviderAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Navigation.NavigateTo("/sourceproviders"); } catch (AgentstrationApiException exception) { error = exception; } }
+    private async Task DeleteAsync() { if (model is null || etag is null || selectedScope is null) return; confirmDelete = false; try { await Client.DeleteSourceProviderAsync(selectedScope.Value, ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Navigation.NavigateTo("/sourceproviders"); } catch (AgentstrationApiException exception) { error = exception; } }
     private static bool IsSafeReturnUrl(string? value) => !string.IsNullOrWhiteSpace(value) && value.StartsWith("/", StringComparison.Ordinal) && !value.StartsWith("//", StringComparison.Ordinal);
-    private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/sourceproviders/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
+    private ResourceScopeRef ParseScope() => string.IsNullOrWhiteSpace(ScopeRefValue) ? ResourceScopeRef.Instance : ResourceScopeRef.Parse(ScopeRefValue);
+    private static string DetailsUrl(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name) => $"/sourceproviders/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString(scopeRef.Value)}";
     private static string SourceUrl(SourceProviderUsageResponse usage) => $"/settings/sources/{Uri.EscapeDataString(usage.Publisher)}/{Uri.EscapeDataString(usage.SourceName)}?scopeRef={Uri.EscapeDataString(usage.SourceScopeRef.Value)}";
-    private static string ExtensionKey(ExtensionResponse extension) => $"{extension.RegistrationNamespace}:{extension.RegistrationName}";
+    private static string ExtensionKey(ExtensionResponse extension) => SourceProviderEditorModel.ExtensionKey(extension.RegistrationScopeRef!.Value, new(extension.RegistrationNamespace), extension.RegistrationName);
+    private static bool IsVisibleFrom(ResourceScopeRef resourceScope, ResourceScopeRef consumerScope) =>
+        resourceScope == ResourceScopeRef.Instance
+        || resourceScope == consumerScope
+        || resourceScope.Kind == ResourceScopeKind.Tenant && consumerScope.Kind == ResourceScopeKind.Workspace;
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

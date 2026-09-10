@@ -51,6 +51,6 @@ else
         catch (AgentstrationApiException exception) { error = exception; }
         finally { loading = false; }
     }
-    private static string DetailsUrl(SourceProviderSummaryResponse provider) => $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+    private static string DetailsUrl(SourceProviderSummaryResponse provider) => $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}&scopeRef={Uri.EscapeDataString(provider.ScopeRef!.Value.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

@@ -28,23 +28,35 @@ public sealed class SourceProviderManagementService(
         ResourceNamespace @namespace,
         string name,
         CancellationToken cancellationToken) =>
+        GetExactAsync(ResourceScopeRef.Instance, @namespace, name, cancellationToken);
+
+    public Task<StoredResource<SourceProviderResource>?> GetExactAsync(
+        ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
+        string name,
+        CancellationToken cancellationToken) =>
         store.GetExactAsync<SourceProviderResource>(
-            ScopedResourceAddress.Create(ResourceScopeRef.Instance, @namespace, ResourceKinds.SourceProvider, name),
+            ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.SourceProvider, name),
             cancellationToken);
 
     public Task<IReadOnlyList<StoredResource<SourceProviderResource>>> ListAsync(CancellationToken cancellationToken) =>
-        store.ListExactAsync<SourceProviderResource>(ResourceScopeRef.Instance, ResourceKinds.SourceProvider, 0, int.MaxValue, cancellationToken);
+        store.ListAllAsync<SourceProviderResource>(ResourceKinds.SourceProvider, cancellationToken);
+
+    public Task<IReadOnlyList<StoredResource<SourceProviderResource>>> ListVisibleAsync(
+        ResourceScopeRef targetScopeRef,
+        CancellationToken cancellationToken) =>
+        store.ListVisibleAsync<SourceProviderResource>(targetScopeRef, ResourceKinds.SourceProvider, 0, int.MaxValue, cancellationToken);
 
     public async Task<StoredResource<SourceProviderResource>> CreateAsync(
         SourceProviderResource resource,
         CancellationToken cancellationToken)
     {
         ValidateIdentity(resource);
-        var scopeRef = resource.ScopeRef ?? ResourceScopeRef.Instance;
+        var scopeRef = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(ResourceKinds.SourceProvider);
         ResourceScopePolicy.EnsureAllowed(resource, scopeRef);
         return await scopeOperations.WriteAsync(resource, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            if (await GetAsync(resource.Namespace, resource.Name, token) is not null)
+            if (await GetExactAsync(scopeRef, resource.Namespace, resource.Name, token) is not null)
                 throw new ControlPlaneConcurrencyException($"Source provider '{resource.Address}' already exists.");
             var definition = await ValidateDefinitionAsync(resource.Namespace, resource.Definition, scopeRef, token);
             return await store.PutExactAsync(scopeRef, resource with
@@ -64,14 +76,25 @@ public sealed class SourceProviderManagementService(
         string? ifMatch,
         CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(@namespace, name, cancellationToken)
+        return await PutExactAsync(ResourceScopeRef.Instance, @namespace, name, definition, ifMatch, cancellationToken);
+    }
+
+    public async Task<StoredResource<SourceProviderResource>> PutExactAsync(
+        ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
+        string name,
+        SourceProviderProperties definition,
+        string? ifMatch,
+        CancellationToken cancellationToken)
+    {
+        var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
             ?? throw new SourceProviderNotFoundException(new(@namespace, ResourceKinds.SourceProvider, name));
-        var scopeRef = existing.Value.ScopeRef
+        var ownerScopeRef = existing.Value.ScopeRef
             ?? throw new SourceProviderValidationException("The Source Provider has no ownership scope.");
-        return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        return await scopeOperations.WriteAsync(existing.Value, ownerScopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
-            var validated = await ValidateDefinitionAsync(@namespace, definition, scopeRef, token);
-            return await store.PutExactAsync(scopeRef, existing.Value with
+            var validated = await ValidateDefinitionAsync(@namespace, definition, ownerScopeRef, token);
+            return await store.PutExactAsync(ownerScopeRef, existing.Value with
             {
                 Generation = checked(existing.Value.Generation + 1),
                 Definition = validated,
@@ -85,6 +108,15 @@ public sealed class SourceProviderManagementService(
         string name,
         CancellationToken cancellationToken)
     {
+        return await GetUsagesExactAsync(ResourceScopeRef.Instance, @namespace, name, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SourceProviderUsage>> GetUsagesExactAsync(
+        ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
+        string name,
+        CancellationToken cancellationToken)
+    {
         var usages = new List<SourceProviderUsage>();
         foreach (var configuration in await store.ListAllAsync<SourceConfigurationResource>(ResourceKinds.SourceConfiguration, cancellationToken))
         {
@@ -93,7 +125,9 @@ public sealed class SourceProviderManagementService(
                          && value.Target is not null))
             {
                 var address = binding.Target!.Resolve(configuration.Value.Namespace, ResourceKinds.SourceProvider);
-                if (address.Namespace != @namespace || !string.Equals(address.Name, name, StringComparison.Ordinal)) continue;
+                if (address.Namespace != @namespace
+                    || !string.Equals(address.Name, name, StringComparison.Ordinal)
+                    || binding.Target.ScopeRef != scopeRef) continue;
                 usages.Add(new(
                     configuration.Value.ScopeRef
                         ?? throw new SourceProviderValidationException("A referencing Source configuration has no ownership scope."),
@@ -110,16 +144,25 @@ public sealed class SourceProviderManagementService(
         string name,
         CancellationToken cancellationToken)
     {
-        var provider = (await GetAsync(@namespace, name, cancellationToken))?.Value
+        return await GetStatusExactAsync(ResourceScopeRef.Instance, @namespace, name, cancellationToken);
+    }
+
+    public async Task<SourceProviderStatus> GetStatusExactAsync(
+        ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var provider = (await GetExactAsync(scopeRef, @namespace, name, cancellationToken))?.Value
             ?? throw new SourceProviderNotFoundException(new(@namespace, ResourceKinds.SourceProvider, name));
         var checkedAt = timeProvider.GetUtcNow();
-        var scopeRef = provider.ScopeRef
+        var ownerScopeRef = provider.ScopeRef
             ?? throw new SourceProviderValidationException("The Source Provider has no ownership scope.");
         var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
             provider.Definition.Extension,
             provider.Namespace,
             ResourceKinds.ExtensionRegistration,
-            scopeRef,
+            ownerScopeRef,
             cancellationToken);
         if (extension is null) return new(name, "unavailable", checkedAt, "The referenced extension registration was not found.");
         if (!extension.Value.Definition.Enabled) return new(name, "disabled", checkedAt, "The referenced extension registration is disabled.");
@@ -155,16 +198,26 @@ public sealed class SourceProviderManagementService(
         string? ifMatch,
         CancellationToken cancellationToken)
     {
-        var existing = await GetAsync(@namespace, name, cancellationToken)
+        await DeleteExactAsync(ResourceScopeRef.Instance, @namespace, name, ifMatch, cancellationToken);
+    }
+
+    public async Task DeleteExactAsync(
+        ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
+        string name,
+        string? ifMatch,
+        CancellationToken cancellationToken)
+    {
+        var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
             ?? throw new SourceProviderNotFoundException(new(@namespace, ResourceKinds.SourceProvider, name));
-        var usages = await GetUsagesAsync(@namespace, name, cancellationToken);
+        var usages = await GetUsagesExactAsync(scopeRef, @namespace, name, cancellationToken);
         if (usages.Count > 0) throw new SourceProviderInUseException(name, usages);
-        var scopeRef = existing.Value.ScopeRef
+        var ownerScopeRef = existing.Value.ScopeRef
             ?? throw new SourceProviderValidationException("The Source Provider has no ownership scope.");
-        await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
+        await scopeOperations.WriteAsync(existing.Value, ownerScopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
             await store.DeleteExactAsync(
-                ScopedResourceAddress.Create(scopeRef, @namespace, ResourceKinds.SourceProvider, name),
+                ScopedResourceAddress.Create(ownerScopeRef, @namespace, ResourceKinds.SourceProvider, name),
                 ifMatch,
                 token);
             return true;
@@ -183,16 +236,23 @@ public sealed class SourceProviderManagementService(
         if (string.IsNullOrWhiteSpace(definition.ContributionId))
             throw new SourceProviderValidationException("An AEP source-provider contribution id is required.");
         var extensionAddress = definition.Extension.Resolve(ownerNamespace, ResourceKinds.ExtensionRegistration);
-        if (await references.ResolveAsync<ExtensionRegistrationResource>(
-                definition.Extension,
-                ownerNamespace,
-                ResourceKinds.ExtensionRegistration,
-                ownerScopeRef,
-                cancellationToken) is null)
+        var extension = await references.ResolveAsync<ExtensionRegistrationResource>(
+            definition.Extension,
+            ownerNamespace,
+            ResourceKinds.ExtensionRegistration,
+            ownerScopeRef,
+            cancellationToken);
+        if (extension is null)
             throw new SourceProviderValidationException($"Referenced extension registration '{extensionAddress}' does not exist.");
         return definition with
         {
             DisplayName = definition.DisplayName.Trim(),
+            Extension = definition.Extension with
+            {
+                ScopeRef = extension.Value.ScopeRef
+                    ?? throw new SourceProviderValidationException("The referenced extension registration has no ownership scope."),
+                Namespace = extension.Value.Namespace
+            },
             ContributionId = definition.ContributionId.Trim()
         };
     }

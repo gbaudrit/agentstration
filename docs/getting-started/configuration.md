@@ -10,6 +10,15 @@ The main verified settings are:
 | `LlamaCpp:Endpoint` | `http://localhost:8080` | Native llama.cpp server used by the autonomous llama.cpp extension and Aspire. |
 | `LocalAI:Endpoint` | `http://localhost:8081` | Native LocalAI server used by the autonomous LocalAI extension and Aspire. Port 8081 avoids the llama.cpp default on 8080. |
 | `LocalAI:ApiKey` | unset | Optional LocalAI Bearer key. Supply it through environment or secret-backed host configuration; never commit it. |
+| `OLLAMA_IMAGE` | `ollama/ollama:0.33.2` | Compose-only Ollama image override. |
+| `LLAMA_CPP_IMAGE` | `ghcr.io/ggml-org/llama.cpp:server-b10830` | Compose-only llama.cpp image override. |
+| `LLAMA_CPP_MODELS_PATH` | `./.models/llama-cpp` | Compose-only host directory containing GGUF models. |
+| `LLAMA_CPP_MODEL` | `model.gguf` | Compose-only GGUF filename passed to llama-server. |
+| `LLAMA_CPP_MODEL_ALIAS` | `local-gguf` | Compose-only stable model alias exposed by llama-server. |
+| `LOCALAI_IMAGE` | `localai/localai:v4.9.0` | Compose-only LocalAI image override. |
+| `LOCALAI_API_KEY` | unset | Compose-only optional LocalAI Bearer key. |
+| `AI_PROVIDER` | `Managed` | Compose-only execution-mode override; use `Deterministic` for the offline fallback. |
+| `AGENTSTRATION_HTTP_PORT` | `5100` | Compose-only host port published for the authoritative server. |
 | `Data:Directory` | `.agentstration` | Base directory for module-owned SQLite databases, key material, Pack archives and Work artifacts. |
 | `Agentstration:Storage:Provider` | `Sqlite` | Relational storage profile: `Sqlite` or `PostgreSql` (case-insensitive). |
 | `Agentstration:InstanceId` | persisted `.agentstration/instance-id` value | Optional explicit AppHost worktree identity used to isolate PostgreSQL volumes and persisted passwords. |
@@ -80,6 +89,8 @@ The public endpoint and pairing URI must have the exact same origin. In **Extens
 
 After pairing, the same inbox can rotate or revoke the workload credential. Rotation overlaps the old and replacement digests until the replacement Secret and identity-pinned manifest are verified. Revocation closes the extension on its next request, deletes the vault value, disables the registration, and does not reopen enrollment. Back up the control-plane database, Local Vault master key/data, and extension `StateFile` together. To recover from an intentional full reset, stop the extension and invoke `AepPairingLifecycle.ResetToUnpaired(stateFile)` locally before restarting and approving a new request; authentication failures never trigger this operation automatically.
 
+For planned maintenance, use **Unenroll extension** from the extension detail screen instead of revocation. PairingCode unenrollment invalidates the active credential on both sides, preserves the stable installation identity and disables its existing registration. The same extension can then receive a new code and re-enable that registration without creating another inventory row. SharedKeyFile unenrollment disables the scoped registration but does not modify the orchestrator-owned key file; selecting **Enroll extension** provisions the same announced instance again. Revocation remains the terminal response when trust must stay closed.
+
 For an intentional Compose service name or private HTTPS extension, add the exact DNS host to the narrowest applicable list. An HTTP service must be present in both lists when it resolves to a private address:
 
 ```json
@@ -101,7 +112,7 @@ Environment-variable configuration uses numeric array indexes, for example `Agen
 
 PostgreSQL uses the `management`, `work`, `flow`, `runtime`, `identity`, and `scheduler` schemas in one database. It does not move file-backed secrets, Data Protection keys, Pack archives, or Work artifacts. Switching from SQLite does not migrate existing data; retain the SQLite files and use a future supported export/import path. PostgreSQL is currently single-instance only because queues and Quartz are not clustered.
 
-For Compose, copy `.env.postgresql.example` to an uncommitted `.env`, replace its disposable password, then run `docker compose -f docker-compose.yml -f docker-compose.postgresql.yml up --build`. The ordinary `docker compose up --build` command remains SQLite. For Aspire, set `Agentstration:Storage:Provider=PostgreSql`; PostgreSQL data is stored in a worktree-isolated Docker volume named `agentstration-<slot>-<instance-id>-postgresql` and SQLite remains the default.
+Compose definitions live under `deploy/compose`. Copy `deploy/compose/.env.postgresql.example` to the ignored `deploy/compose/.env.postgresql`, replace its disposable password, then combine `deploy/compose/postgresql.yml` with `base.yml`, `ollama.yml`, `llama-cpp.yml`, or `localai.yml` from the same directory. For example: `docker compose --env-file deploy/compose/.env.postgresql -f deploy/compose/ollama.yml -f deploy/compose/postgresql.yml up --build`. Without the PostgreSQL overlay, `base.yml` retains the canonical SQLite and deterministic extension topology, while each provider-specific file adds the selected inference service. Compose provisions an isolated SharedKeyFile volume for every included AEP extension. For Aspire, set `Agentstration:Storage:Provider=PostgreSql`; PostgreSQL data is stored in a worktree-isolated Docker volume named `agentstration-<slot>-<instance-id>-postgresql` and SQLite remains the default.
 
 ### Aspire persistence and development slots
 

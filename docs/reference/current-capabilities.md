@@ -38,7 +38,7 @@ flowchart LR
 
 The management plane is the source of truth for agent definitions and desired state; runtime `AIAgent` instances are reconstructible. The Work Plane owns the functional lifecycle, interactions, history, and result of each `WorkItem`. Its architectural principle is **Microsoft-first, provider-neutral, cloud-optional**.
 
-The official static Source registry is available as an optional instance-owned discovery input, and Platform administrators can add independent community or private enterprise registrations. Registrations have ETag-protected CRUD, explicit trust/network/refresh/cache policies, and optional instance Secret references resolved only for exact same-origin requests. A bounded manual refresh retrieves only compatible Registry v1 shards, validates canonical digests, and atomically retains a last-known-good observation with HTTP validators and refresh history. It never imports SourceVersion manifests or makes startup depend on the public network. See [Source registry registrations](source-registries.md).
+The official static Source registry is available as an optional instance-owned discovery input, and Platform administrators can add independent community or private enterprise registrations. Registrations have ETag-protected CRUD, explicit trust/network/refresh/cache policies, and optional instance Secret references resolved only for exact same-origin requests. Manual and opt-in scheduled refreshes retrieve only compatible Registry v1 shards, validate canonical digests, retain a bounded last-known-good cache, and persist conditional HTTP, backoff, staleness, failure, and recovery state across restart. They never import SourceVersion manifests or make startup depend on the public network. See [Source registry registrations](source-registries.md).
 
 ## Schedule Triggers
 
@@ -190,10 +190,10 @@ dotnet run --project src/Agentstration.AppHost
 
 The AppHost exposes the authoritative server, Workplace, and autonomous extensions as separate resources and wires them through service discovery. It connects the Ollama extension to `Ollama:Endpoint` (default `http://localhost:11434`), the llama.cpp extension to `LlamaCpp:Endpoint` (default `http://localhost:8080`), and the LocalAI extension to `LocalAI:Endpoint` (default `http://localhost:8081`). It provisions no inference server or model. Aspire preserves the server's normal `Managed` mode; deterministic execution remains an explicit offline/test override.
 
-Or with containers:
+Or with one provider-specific AEP container topology, for example Ollama:
 
 ```powershell
-docker compose up --build
+docker compose -f deploy/compose/ollama.yml up --build
 ```
 
 ## AI modes

@@ -14,7 +14,8 @@ public sealed class SourceProviderEditorModel
     [Required] public string ExtensionId { get; set; } = string.Empty;
     [Required] public string ContributionId { get; set; } = string.Empty;
 
-    public CreateSourceProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value);
+    public CreateSourceProviderRequest ToCreateRequest(ResourceScopeRef? scopeRef) =>
+        new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value, scopeRef);
     public PutSourceProviderRequest ToPutRequest() => new(ToProperties());
 
     public SourceProviderProperties ToProperties() => new()
@@ -29,16 +30,22 @@ public sealed class SourceProviderEditorModel
         Name = resource.Name,
         Namespace = resource.Namespace.Value,
         DisplayName = resource.Definition.DisplayName,
-        ExtensionId = $"{(resource.Definition.Extension.Namespace ?? resource.Namespace).Value}:{resource.Definition.Extension.Name}",
+        ExtensionId = ExtensionKey(
+            resource.Definition.Extension.ScopeRef
+                ?? throw new ArgumentException("The Source Provider extension reference has no ownership scope."),
+            resource.Definition.Extension.Namespace ?? resource.Namespace,
+            resource.Definition.Extension.Name),
         ContributionId = resource.Definition.ContributionId
     };
 
     private static ResourceReference ParseExtension(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("An extension registration is required.");
-        var separator = value.IndexOf(':');
-        if (separator <= 0 || separator == value.Length - 1) throw new ArgumentException("Extension selection is invalid.");
-        var @namespace = ResourceNamespace.Parse(value[..separator]);
-        return new ResourceReference(value[(separator + 1)..], ResourceScopeRef.Instance, @namespace);
+        var parts = value.Split('\n', 3);
+        if (parts.Length != 3) throw new ArgumentException("Extension selection is invalid.");
+        return new ResourceReference(parts[2], ResourceScopeRef.Parse(parts[0]), ResourceNamespace.Parse(parts[1]));
     }
+
+    public static string ExtensionKey(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name) =>
+        $"{scopeRef.Value}\n{@namespace.Value}\n{name}";
 }

@@ -4,11 +4,14 @@ using System.Text;
 using Agentstration.Management.Abstractions;
 using Agentstration.Management.Contracts;
 using Agentstration.Management.Core;
+using Agentstration.Management.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Web.Api.Models;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Management.Tests;
 
@@ -156,11 +159,300 @@ public sealed class SourceRegistryManagementTests
         Assert.AreEqual("registry-token", created.Value.Definition.Credential!.Name);
     }
 
+    [TestMethod]
+    public async Task RefreshPolicyRejectsUnboundedAttemptsAndPrematureStaleness()
+    {
+        using var fixture = new Fixture();
+        var attempts = await Assert.ThrowsAsync<SourceRegistryOperationException>(() => fixture.Service.CreateAsync(
+            "attempts",
+            Registration("https://registry.example/v1/index.json") with
+            {
+                RefreshPolicy = new SourceRegistryRefreshPolicy { MaximumAttempts = 11 }
+            },
+            default));
+        Assert.AreEqual("source_registry_refresh_policy_invalid", attempts.Code);
+
+        var staleness = await Assert.ThrowsAsync<SourceRegistryOperationException>(() => fixture.Service.CreateAsync(
+            "staleness",
+            Registration("https://registry.example/v1/index.json") with
+            {
+                RefreshPolicy = new SourceRegistryRefreshPolicy
+                {
+                    Interval = TimeSpan.FromHours(2),
+                    StaleAfter = TimeSpan.FromHours(1)
+                }
+            },
+            default));
+        Assert.AreEqual("source_registry_refresh_policy_invalid", staleness.Code);
+    }
+
     private static SourceRegistryRegistrationProperties Registration(string indexUrl) => new()
     {
         DisplayName = "Test registry",
         IndexUrl = new Uri(indexUrl)
     };
+
+    [TestMethod]
+    public async Task SharedSchedulerHonorsManualOnlyBackoffRecoveryAndStaleness()
+    {
+        var clock = new MutableTimeProvider(DateTimeOffset.Parse(
+            "2026-09-10T08:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+        using var fixture = new Fixture(clock);
+        var created = await fixture.Service.CreateAsync(
+            "scheduled",
+            Registration("https://registry.example/v1/index.json"),
+            default);
+
+        await fixture.Scheduler.RunDueRegistriesAsync(default);
+        Assert.IsEmpty(fixture.Documents.Requests);
+
+        var policy = new SourceRegistryRefreshPolicy
+        {
+            PeriodicEnabled = true,
+            Interval = TimeSpan.FromMinutes(10),
+            Timeout = TimeSpan.FromSeconds(5),
+            MaximumAttempts = 3,
+            InitialBackoff = TimeSpan.FromSeconds(30),
+            MaximumBackoff = TimeSpan.FromMinutes(2),
+            Jitter = TimeSpan.Zero,
+            StaleAfter = TimeSpan.FromMinutes(20)
+        };
+        _ = await fixture.Service.UpdateAsync("scheduled",
+            created.Value.Definition with { RefreshPolicy = policy }, created.ETag, default);
+        fixture.EnqueueSuccessfulRefresh("https://registry.example/v1");
+
+        await fixture.Scheduler.RunDueRegistriesAsync(default);
+        var fresh = await fixture.Service.GetAsync("scheduled", default);
+        Assert.AreEqual(SourceRegistryObservedStatus.Fresh, fresh!.Observed.Definition.Status);
+        Assert.AreEqual(SourceRegistryRefreshTrigger.Scheduled, fresh.Observed.Definition.LastTrigger);
+        Assert.AreEqual(0, fresh.Observed.Definition.ConsecutiveFailures);
+
+        fixture.Documents.Failure = new SourceRetrievalException("source_registry_timeout", "The registry request timed out.");
+        clock.Advance(TimeSpan.FromMinutes(10));
+        await fixture.Scheduler.RunDueRegistriesAsync(default);
+        var failed = await fixture.Service.GetAsync("scheduled", default);
+        Assert.AreEqual(SourceRegistryObservedStatus.Stale, failed!.Observed.Definition.Status);
+        Assert.AreEqual(1, failed.Observed.Definition.ConsecutiveFailures);
+        var requestCount = fixture.Documents.Requests.Count;
+
+        clock.Advance(TimeSpan.FromSeconds(29));
+        await fixture.Scheduler.RunDueRegistriesAsync(default);
+        Assert.AreEqual(requestCount, fixture.Documents.Requests.Count);
+
+        fixture.Documents.Failure = null;
+        fixture.Documents.Enqueue(new(
+            new Uri("https://registry.example/v1/index.json"),
+            new Uri("https://registry.example/v1/index.json"),
+            "index.json", "\"index-v1\"", null, true, null));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await fixture.Scheduler.RunDueRegistriesAsync(default);
+        var recovered = await fixture.Service.GetAsync("scheduled", default);
+        Assert.AreEqual(SourceRegistryObservedStatus.Recovered, recovered!.Observed.Definition.Status);
+        Assert.AreEqual(0, recovered.Observed.Definition.ConsecutiveFailures);
+        Assert.AreEqual(1, recovered.Observed.Definition.LastRetryCount);
+        Assert.IsNotNull(recovered.Observed.Definition.LastRecoveredAt);
+
+        clock.Advance(TimeSpan.FromMinutes(20));
+        var stale = await fixture.Service.GetAsync("scheduled", default);
+        Assert.AreEqual(SourceRegistryObservedStatus.Stale, stale!.Observed.Definition.Status);
+        var history = await fixture.Service.ListRefreshesAsync("scheduled", 10, default);
+        Assert.IsTrue(history.All(value => value.Definition.Trigger == SourceRegistryRefreshTrigger.Scheduled));
+        Assert.IsTrue(history.All(value => !string.IsNullOrWhiteSpace(value.Definition.CorrelationId)));
+    }
+
+    [TestMethod]
+    public async Task ScheduledRefreshTimeoutIsBoundedAndRecorded()
+    {
+        using var fixture = new Fixture();
+        _ = await fixture.Service.CreateAsync(
+            "timeout",
+            Registration("https://registry.example/v1/index.json") with
+            {
+                RefreshPolicy = new SourceRegistryRefreshPolicy
+                {
+                    PeriodicEnabled = true,
+                    Interval = TimeSpan.FromMinutes(1),
+                    Timeout = TimeSpan.FromSeconds(1),
+                    Jitter = TimeSpan.Zero
+                }
+            },
+            default);
+        fixture.Documents.BlockUntilCancelled = true;
+
+        await fixture.Scheduler.RunDueRegistriesAsync(default);
+
+        var state = await fixture.Service.GetAsync("timeout", default);
+        Assert.AreEqual(SourceRegistryObservedStatus.RefreshFailed, state!.Observed.Definition.Status);
+        Assert.AreEqual("source_registry_refresh_timeout", state.Observed.Definition.LastErrorCode);
+        Assert.AreEqual(1, state.Observed.Definition.ConsecutiveFailures);
+        var history = await fixture.Service.ListRefreshesAsync("timeout", 10, default);
+        Assert.HasCount(1, history);
+        Assert.AreEqual(SourceRegistryRefreshTrigger.Scheduled, history[0].Definition.Trigger);
+        Assert.IsGreaterThanOrEqualTo(1000, history[0].Definition.DurationMilliseconds);
+    }
+
+    [TestMethod]
+    public async Task ScheduledBackoffSurvivesProcessRestart()
+    {
+        var database = Path.Combine(Path.GetTempPath(), $"agentstration-registry-schedule-{Guid.NewGuid():N}.db");
+        var clock = new MutableTimeProvider(DateTimeOffset.Parse(
+            "2026-09-10T08:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+        try
+        {
+            await using (var first = await DurableFixture.CreateAsync(database, clock))
+            {
+                using var system = first.Context.PushSystem();
+                _ = await first.Service.CreateAsync(
+                    "restart",
+                    Registration("https://registry.example/v1/index.json") with
+                    {
+                        RefreshPolicy = new SourceRegistryRefreshPolicy
+                        {
+                            PeriodicEnabled = true,
+                            Interval = TimeSpan.FromMinutes(10),
+                            InitialBackoff = TimeSpan.FromSeconds(30),
+                            MaximumBackoff = TimeSpan.FromMinutes(2),
+                            Jitter = TimeSpan.Zero
+                        }
+                    },
+                    default);
+                first.Documents.Failure = new SourceRetrievalException("source_registry_unavailable", "Unavailable.");
+                await first.Scheduler.RunDueRegistriesAsync(default);
+                var failed = await first.Service.GetAsync("restart", default);
+                Assert.AreEqual(1, failed!.Observed.Definition.ConsecutiveFailures);
+            }
+
+            clock.Advance(TimeSpan.FromSeconds(29));
+            await using (var restarted = await DurableFixture.CreateAsync(database, clock))
+            {
+                using var system = restarted.Context.PushSystem();
+                restarted.Documents.Failure = new SourceRetrievalException("source_registry_unavailable", "Unavailable.");
+                await restarted.Scheduler.RunDueRegistriesAsync(default);
+                Assert.IsEmpty(restarted.Documents.Requests);
+
+                clock.Advance(TimeSpan.FromSeconds(1));
+                await restarted.Scheduler.RunDueRegistriesAsync(default);
+                Assert.HasCount(1, restarted.Documents.Requests);
+                var failed = await restarted.Service.GetAsync("restart", default);
+                Assert.AreEqual(2, failed!.Observed.Definition.ConsecutiveFailures);
+                var history = await restarted.Service.ListRefreshesAsync("restart", 10, default);
+                CollectionAssert.AreEqual(new[] { 1, 0 }, history.Select(value => value.Definition.RetryCount).ToArray());
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(database)) File.Delete(database);
+        }
+    }
+
+    [TestMethod]
+    public async Task SuccessfulRefreshRetainsOnlyConfiguredCachedObservations()
+    {
+        using var fixture = new Fixture();
+        _ = await fixture.Service.CreateAsync(
+            "retained",
+            Registration("https://registry.example/v1/index.json") with
+            {
+                CachePolicy = new SourceRegistryCachePolicy { RetainedObservations = 1 }
+            },
+            default);
+        fixture.EnqueueSuccessfulRefresh("https://registry.example/v1");
+        var first = await fixture.Service.RefreshAsync("retained", default);
+        fixture.EnqueueSuccessfulRefresh("https://registry.example/v1", "second");
+        var second = await fixture.Service.RefreshAsync("retained", default);
+
+        Assert.IsFalse(fixture.Cache.Contains(first.Observed.Definition.Current!.Id));
+        Assert.IsTrue(fixture.Cache.Contains(second.Observed.Definition.Current!.Id));
+        Assert.HasCount(2, await fixture.Service.ListRefreshesAsync("retained", 10, default));
+    }
+
+    [TestMethod]
+    public void RegistryScheduleUsesBoundedRetryWindowAndDeterministicJitter()
+    {
+        var attemptedAt = DateTimeOffset.Parse(
+            "2026-09-10T08:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var policy = new SourceRegistryRefreshPolicy
+        {
+            Interval = TimeSpan.FromMinutes(10),
+            MaximumAttempts = 3,
+            InitialBackoff = TimeSpan.FromSeconds(30),
+            MaximumBackoff = TimeSpan.FromMinutes(2),
+            Jitter = TimeSpan.FromSeconds(15)
+        };
+
+        Assert.AreEqual(attemptedAt + TimeSpan.FromSeconds(30),
+            SourceRefreshScheduler.GetNextDue(attemptedAt, 1, policy, "registry|one"));
+        Assert.AreEqual(attemptedAt + TimeSpan.FromSeconds(60),
+            SourceRefreshScheduler.GetNextDue(attemptedAt, 2, policy, "registry|one"));
+        var exhausted = SourceRefreshScheduler.GetNextDue(attemptedAt, 3, policy, "registry|one");
+        Assert.IsTrue(exhausted >= attemptedAt + policy.Interval);
+        Assert.IsTrue(exhausted <= attemptedAt + policy.Interval + policy.Jitter);
+        Assert.AreEqual(exhausted,
+            SourceRefreshScheduler.GetNextDue(attemptedAt, 3, policy, "registry|one"));
+    }
+
+    [TestMethod]
+    public async Task ManualAndScheduledRefreshesCannotPublishCompetingObservations()
+    {
+        using var fixture = new Fixture();
+        _ = await fixture.Service.CreateAsync(
+            "coordinated",
+            Registration("https://registry.example/v1/index.json") with
+            {
+                RefreshPolicy = new SourceRegistryRefreshPolicy
+                {
+                    PeriodicEnabled = true,
+                    Interval = TimeSpan.FromMinutes(1),
+                    Jitter = TimeSpan.Zero
+                }
+            },
+            default);
+        fixture.EnqueueSuccessfulRefresh("https://registry.example/v1");
+        fixture.Documents.PauseNextRequest = true;
+
+        var manual = fixture.Service.RefreshAsync("coordinated", default);
+        await fixture.Documents.RequestStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var scheduled = fixture.Scheduler.RunDueRegistriesAsync(default);
+        fixture.Documents.ReleaseRequest.TrySetResult(true);
+        await Task.WhenAll(manual, scheduled);
+
+        Assert.HasCount(2, fixture.Documents.Requests);
+        Assert.HasCount(1, await fixture.Service.ListRefreshesAsync("coordinated", 10, default));
+        var current = await fixture.Service.GetAsync("coordinated", default);
+        Assert.AreEqual(SourceRegistryRefreshTrigger.Manual, current!.Observed.Definition.LastTrigger);
+    }
+
+    [TestMethod]
+    public async Task CallerCancellationDoesNotPublishARefreshFailure()
+    {
+        using var fixture = new Fixture();
+        _ = await fixture.Service.CreateAsync(
+            "cancelled",
+            Registration("https://registry.example/v1/index.json") with
+            {
+                RefreshPolicy = new SourceRegistryRefreshPolicy
+                {
+                    PeriodicEnabled = true,
+                    Interval = TimeSpan.FromMinutes(1),
+                    Timeout = TimeSpan.FromMinutes(1),
+                    Jitter = TimeSpan.Zero
+                }
+            },
+            default);
+        fixture.Documents.PauseNextRequest = true;
+        using var cancellation = new CancellationTokenSource();
+
+        var scheduled = fixture.Scheduler.RunDueRegistriesAsync(cancellation.Token);
+        await fixture.Documents.RequestStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await cancellation.CancelAsync();
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => scheduled);
+
+        var state = await fixture.Service.GetAsync("cancelled", default);
+        Assert.AreEqual(SourceRegistryObservedStatus.NeverFetched, state!.Observed.Definition.Status);
+        Assert.IsNull(state.Observed.Definition.LastAttemptedAt);
+        Assert.IsEmpty(await fixture.Service.ListRefreshesAsync("cancelled", 10, default));
+    }
 
     [TestMethod]
     public async Task DeletingRegistrationPreservesRefreshHistoryAndCachedObservation()
@@ -426,7 +718,7 @@ public sealed class SourceRegistryManagementTests
     {
         private readonly IDisposable systemScope;
 
-        public Fixture()
+        public Fixture(TimeProvider? timeProvider = null)
         {
             var context = new CurrentRequestContext();
             systemScope = context.PushSystem();
@@ -448,7 +740,9 @@ public sealed class SourceRegistryManagementTests
                 context,
                 context,
                 Audit,
-                TimeProvider.System);
+                timeProvider ?? TimeProvider.System,
+                NullLogger<SourceRegistryManagementService>.Instance);
+            Scheduler = new SourceRefreshScheduler(null!, null!, context, timeProvider ?? TimeProvider.System, Service);
         }
 
         public MemoryStore Store { get; }
@@ -457,6 +751,14 @@ public sealed class SourceRegistryManagementTests
         public FakeVersion Version { get; }
         public FakeAudit Audit { get; }
         public SourceRegistryManagementService Service { get; }
+        public SourceRefreshScheduler Scheduler { get; }
+        public void EnqueueSuccessfulRefresh(string baseUrl, string name = "compatible")
+        {
+            var shard = RegistryJson(name);
+            var digest = new SourceRegistryReader().Read(shard, $"registry-{name}.json").RegistryDigest;
+            Documents.Enqueue(Document($"{baseUrl}/index.json", "index.json", IndexJson(digest), $"\"{name}\""));
+            Documents.Enqueue(Document($"{baseUrl}/registry-compatible.json", "registry-compatible.json", shard));
+        }
         public void Dispose() => systemScope.Dispose();
     }
 
@@ -465,16 +767,31 @@ public sealed class SourceRegistryManagementTests
         private readonly Queue<RetrievedSourceRegistryDocument> responses = new();
         public List<(Uri Url, string? ETag, DateTimeOffset? LastModified)> Requests { get; } = [];
         public Exception? Failure { get; set; }
+        public bool BlockUntilCancelled { get; set; }
+        public bool PauseNextRequest { get; set; }
+        public TaskCompletionSource<bool> RequestStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> ReleaseRequest { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public void Enqueue(RetrievedSourceRegistryDocument response) => responses.Enqueue(response);
 
-        public Task<RetrievedSourceRegistryDocument> RetrieveAsync(Uri source, string? etag, DateTimeOffset? lastModified, int maximumBytes, SourceRegistryRetrievalContext context, CancellationToken cancellationToken)
+        public async Task<RetrievedSourceRegistryDocument> RetrieveAsync(Uri source, string? etag, DateTimeOffset? lastModified, int maximumBytes, SourceRegistryRetrievalContext context, CancellationToken cancellationToken)
         {
             Requests.Add((source, etag, lastModified));
             if (Failure is not null) throw Failure;
+            if (PauseNextRequest)
+            {
+                PauseNextRequest = false;
+                RequestStarted.TrySetResult(true);
+                await ReleaseRequest.Task.WaitAsync(cancellationToken);
+            }
+            if (BlockUntilCancelled)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new AssertFailedException("The blocked registry request was not cancelled.");
+            }
             var response = responses.Dequeue();
             Assert.AreEqual(source, response.RequestedUrl);
             Assert.IsTrue(Encoding.UTF8.GetByteCount(response.Content ?? string.Empty) <= maximumBytes);
-            return Task.FromResult(response);
+            return response;
         }
     }
 
@@ -488,6 +805,75 @@ public sealed class SourceRegistryManagementTests
         }
         public Task<SourceRegistryCachedPublication?> GetAsync(Guid observationId, CancellationToken cancellationToken) =>
             Task.FromResult(values.GetValueOrDefault(observationId));
+        public Task RemoveAsync(Guid observationId, CancellationToken cancellationToken)
+        {
+            values.Remove(observationId);
+            return Task.CompletedTask;
+        }
+        public bool Contains(Guid observationId) => values.ContainsKey(observationId);
+    }
+
+    private sealed class MutableTimeProvider(DateTimeOffset value) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => value;
+        public void Advance(TimeSpan duration) => value += duration;
+    }
+
+    private sealed class DurableFixture : IAsyncDisposable
+    {
+        private readonly ServiceProvider services;
+
+        private DurableFixture(ServiceProvider services, CurrentRequestContext context, SourceRegistryManagementService service,
+            SourceRefreshScheduler scheduler, FakeDocuments documents)
+        {
+            this.services = services;
+            Context = context;
+            Service = service;
+            Scheduler = scheduler;
+            Documents = documents;
+        }
+
+        public SourceRegistryManagementService Service { get; }
+        public SourceRefreshScheduler Scheduler { get; }
+        public FakeDocuments Documents { get; }
+        public CurrentRequestContext Context { get; }
+
+        public static async Task<DurableFixture> CreateAsync(string database, TimeProvider timeProvider)
+        {
+            var services = new ServiceCollection()
+                .AddSingleton(timeProvider)
+                .AddSingleton<CurrentRequestContext>()
+                .AddSingleton<ICurrentRequestContext>(provider => provider.GetRequiredService<CurrentRequestContext>())
+                .AddSingleton<IRequestContextScopeFactory>(provider => provider.GetRequiredService<CurrentRequestContext>())
+                .AddSqliteControlPlane($"Data Source={database}")
+                .BuildServiceProvider();
+            var context = services.GetRequiredService<CurrentRequestContext>();
+            using (context.PushSystem())
+                await services.GetRequiredService<IControlPlaneStore>().InitializeAsync(default);
+            var documents = new FakeDocuments();
+            var service = new SourceRegistryManagementService(
+                services.GetRequiredService<IControlPlaneStore>(),
+                new SourceRegistryIndexReader(),
+                new SourceRegistryReader(),
+                new SourceRegistryRuntimeReferenceResolver(),
+                documents,
+                new MemoryCache(),
+                new FakeVersion(),
+                new ResourceScopeOperationService(context, context, null!, null!, null!,
+                    services.GetRequiredService<IResourceScopeResolver>()),
+                context,
+                context,
+                new FakeAudit(),
+                timeProvider,
+                NullLogger<SourceRegistryManagementService>.Instance);
+            return new DurableFixture(services, context, service,
+                new SourceRefreshScheduler(null!, null!, context, timeProvider, service), documents);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await services.DisposeAsync();
+        }
     }
 
     private sealed class FakeVersion : IAgentstrationVersionProvider
