@@ -249,7 +249,7 @@ public sealed class McpToolInvoker(IControlPlaneStore store, ToolProviderAdapter
 {
     public async ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
-        var tool = await store.GetAsync<ToolResource>(new ResourceKey(ResourceKinds.Tool, context.ToolId), cancellationToken)
+        var tool = await store.GetAsync<ToolResource>(new ResourceKey(ResourceKinds.Tool, context.ToolId, context.ToolNamespace ?? default), cancellationToken)
             ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{context.ToolId}' was not found.");
         if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{context.ToolId}' is disabled.");
         if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{context.ToolId}' is no longer available from its provider.");
@@ -259,7 +259,7 @@ public sealed class McpToolInvoker(IControlPlaneStore store, ToolProviderAdapter
             throw new ToolResolutionException("tool_provider_mismatch", $"Tool resource '{context.ToolId}' no longer maps to provider '{context.ToolProviderId}'.");
         if (context.ExternalToolId is not null && !string.Equals(context.ExternalToolId, tool.Value.Definition.ExternalId, StringComparison.Ordinal))
             throw new ToolResolutionException("external_tool_mismatch", $"Tool resource '{context.ToolId}' no longer maps to external Tool '{context.ExternalToolId}'.");
-        var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ResourceKinds.ToolProvider, providerId), cancellationToken)
+        var provider = await store.GetAsync<ToolProviderResource>(new ResourceKey(ResourceKinds.ToolProvider, providerId, context.ToolProviderNamespace ?? default), cancellationToken)
             ?? throw new ToolResolutionException("tool_provider_not_found", $"ToolProvider '{providerId}' was not found.");
         if (!provider.Value.Definition.Enabled) throw new ToolResolutionException("tool_provider_disabled", $"ToolProvider '{providerId}' is disabled.");
         return await providers.InvokeAsync(provider.Value, tool.Value, context.Arguments, cancellationToken);

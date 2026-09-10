@@ -9,6 +9,8 @@ using Agentstration.Management.Abstractions;
 using Agentstration.Management.Core;
 using Agentstration.Resources;
 using Agentstration.Runtime.AgentFramework;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Tools.Mcp;
 using Agentstration.Work;
 
 namespace Agentstration.Infrastructure.Flows;
@@ -195,6 +197,29 @@ public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore s
             : new ResolvedFlowCall(id, published.Value.Version, published.Value.Graph?.InputSchema, published.Value.Graph?.OutputSchema);
     }
 
+    public async Task<ResolvedFlowTool?> ResolveToolAsync(
+        WorkspaceId workspaceId,
+        ResourceNamespace ownerNamespace,
+        FlowToolReference reference,
+        CancellationToken cancellationToken)
+    {
+        _ = workspaceId;
+        var toolNamespace = reference.ResolveNamespace(ownerNamespace);
+        var stored = await store.GetAsync<ToolResource>(
+            new ResourceKey(ResourceKinds.Tool, reference.ResourceId, toolNamespace),
+            cancellationToken);
+        if (stored is null || stored.Value.Definition.Schema is null) return null;
+        var tool = stored.Value;
+        return new ResolvedFlowTool(
+            tool.Metadata.Name,
+            tool.Metadata.Namespace,
+            tool.Definition.Schema.Input.Clone(),
+            tool.Definition.Schema.Output?.Clone(),
+            tool.Definition.Enabled,
+            tool.Definition.Discovery?.Available == true,
+            tool.Definition.RequiresApproval);
+    }
+
     public async Task<bool> CreatesFlowCycleAsync(
         WorkspaceId workspaceId,
         FlowId ownerFlowId,
@@ -218,4 +243,109 @@ public sealed class ManagementFlowResourceReferenceResolver(IControlPlaneStore s
         }
         return false;
     }
+}
+
+public sealed class ManagedFlowToolExecutor(
+    IControlPlaneStore store,
+    IToolExecutionPipeline pipeline) : IFlowToolExecutor
+{
+    public async Task<JsonElement?> ExecuteAsync(
+        FlowToolExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var toolNamespace = request.Tool.ResolveNamespace(request.OwnerFlowId.Namespace);
+        var stored = await store.GetAsync<ToolResource>(
+            new ResourceKey(ResourceKinds.Tool, request.Tool.ResourceId, toolNamespace),
+            cancellationToken);
+        if (stored is null)
+            throw Error("tool_not_found", $"Tool resource '{toolNamespace}/{request.Tool.ResourceId}' was not found.");
+
+        var tool = stored.Value;
+        if (!tool.Definition.Enabled)
+            throw Error("tool_disabled", $"Tool resource '{tool.Address}' is disabled.");
+        if (tool.Definition.Discovery?.Available != true)
+            throw Error("tool_unavailable", $"Tool resource '{tool.Address}' is no longer available from its provider.");
+        if (tool.Definition.RequiresApproval)
+            throw Error("tool_approval_required", $"Tool resource '{tool.Address}' requires approval and cannot be invoked without an approval response.");
+        var providerId = tool.Definition.Provider?.Name
+            ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no ToolProvider mapping.");
+        var externalId = tool.Definition.ExternalId
+            ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no external Tool identity.");
+        var schema = tool.Definition.Schema?.Input
+            ?? throw Error("tool_schema_missing", $"Tool resource '{tool.Address}' has no input schema.");
+        ValidateArguments(request.Arguments, schema);
+
+        var logicalCallId = $"flow:{request.RunId}:step:{request.StepName}";
+        var invocationId = $"{logicalCallId}:attempt:{request.Attempt}";
+        try
+        {
+            var result = await pipeline.ExecuteAsync(new ToolExecutionContext
+            {
+                OwnerKind = ToolExecutionOwnerKind.FlowRun,
+                ToolCallId = logicalCallId,
+                InvocationId = invocationId,
+                ToolId = tool.Metadata.Name,
+                ToolNamespace = tool.Metadata.Namespace,
+                ToolName = externalId,
+                ToolProviderId = providerId,
+                ToolProviderNamespace = tool.Definition.Provider!.Namespace ?? tool.Metadata.Namespace,
+                ExternalToolId = externalId,
+                TenantId = request.Scope.TenantId,
+                WorkspaceId = request.Scope.WorkspaceId,
+                PrincipalId = request.Scope.PrincipalId,
+                RunId = request.RunId,
+                FlowStepId = request.StepName,
+                CorrelationId = request.CorrelationId,
+                Arguments = request.Arguments.Clone()
+            }, cancellationToken);
+            return result?.Clone();
+        }
+        catch (ToolExecutionDeniedException exception)
+        {
+            throw Error(exception.Code, exception.Message, exception);
+        }
+        catch (ToolResolutionException exception)
+        {
+            throw Error(exception.Code, exception.Message, exception);
+        }
+    }
+
+    private static void ValidateArguments(JsonElement arguments, JsonElement schema)
+    {
+        if (arguments.ValueKind != JsonValueKind.Object)
+            throw Error("tool_arguments_object_required", "Tool arguments must be a JSON object.");
+        if (schema.ValueKind != JsonValueKind.Object)
+            throw Error("tool_input_schema_invalid", "The Tool input schema must be a JSON object schema.");
+
+        if (schema.TryGetProperty("required", out var required) && required.ValueKind == JsonValueKind.Array)
+            foreach (var item in required.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String))
+                if (!arguments.TryGetProperty(item.GetString()!, out _))
+                    throw Error("tool_argument_required", $"Tool argument '{item.GetString()}' is required.");
+
+        if (!schema.TryGetProperty("properties", out var properties) || properties.ValueKind != JsonValueKind.Object) return;
+        var schemas = properties.EnumerateObject().ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
+        foreach (var argument in arguments.EnumerateObject())
+        {
+            if (!schemas.TryGetValue(argument.Name, out var propertySchema))
+                throw Error("tool_argument_unknown", $"Tool argument '{argument.Name}' is not declared by the Tool schema.");
+            if (!propertySchema.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String) continue;
+            var valid = type.GetString() switch
+            {
+                "string" => argument.Value.ValueKind == JsonValueKind.String,
+                "number" => argument.Value.ValueKind == JsonValueKind.Number,
+                "integer" => argument.Value.ValueKind == JsonValueKind.Number && argument.Value.TryGetInt64(out _),
+                "boolean" => argument.Value.ValueKind is JsonValueKind.True or JsonValueKind.False,
+                "object" => argument.Value.ValueKind == JsonValueKind.Object,
+                "array" => argument.Value.ValueKind == JsonValueKind.Array,
+                "null" => argument.Value.ValueKind == JsonValueKind.Null,
+                _ => true
+            };
+            if (!valid)
+                throw Error("tool_argument_type_invalid", $"Tool argument '{argument.Name}' does not match schema type '{type.GetString()}'.");
+        }
+    }
+
+    private static FlowValidationException Error(string code, string message, Exception? exception = null) =>
+        new(code, exception is null ? message : $"{message} ({exception.GetType().Name})");
 }

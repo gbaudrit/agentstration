@@ -132,6 +132,43 @@ else
                             <p class="muted">@T("AvailableOutput"): @string.Join(", ", outputProperties.EnumerateObject().Select(property => property.Name))</p>
                         }
                     }
+                    else if (SelectedStep is ToolFlowStepDefinition toolStep)
+                    {
+                        <label>@T("CalledTool")
+                            <input disabled="@ReadOnly" list="tool-targets" value="@ToolKey(toolStep.Tool)" @onchange="UpdateToolTargetAsync" />
+                            <datalist id="tool-targets">
+                                @foreach (var item in tools)
+                                {
+                                    <option value="@ToolKey(item.Namespace, item.Name)">@item.DisplayName (@item.Namespace.Value)</option>
+                                }
+                            </datalist>
+                        </label>
+                        @if (SelectedTool is { } selectedTool)
+                        {
+                            @if (!selectedTool.Enabled || !selectedTool.Available || selectedTool.RequiresApproval)
+                            {
+                                <p class="muted">@ToolState(selectedTool)</p>
+                            }
+                            @if (selectedTool.InputSchema.ValueKind == JsonValueKind.Object
+                                && selectedTool.InputSchema.TryGetProperty("properties", out var toolProperties)
+                                && toolProperties.ValueKind == JsonValueKind.Object)
+                            {
+                                <fieldset class="flow-mapping-editor"><legend>@T("ArgumentsMapping")</legend>
+                                    @foreach (var property in toolProperties.EnumerateObject())
+                                    {
+                                        var propertyName = property.Name;
+                                        <label>@propertyName<input disabled="@ReadOnly" value="@MappingValue(toolStep.ArgumentsMapping, propertyName)" @onchange="e => UpdateToolMappingAsync(propertyName, e)" /></label>
+                                    }
+                                </fieldset>
+                            }
+                            @if (selectedTool.OutputSchema is { ValueKind: JsonValueKind.Object } toolOutput
+                                && toolOutput.TryGetProperty("properties", out var toolOutputProperties)
+                                && toolOutputProperties.ValueKind == JsonValueKind.Object)
+                            {
+                                <p class="muted">@T("AvailableOutput"): @string.Join(", ", toolOutputProperties.EnumerateObject().Select(property => property.Name))</p>
+                            }
+                        }
+                    }
                     else if (SelectedStep is RouterFlowStepDefinition router)
                     {
                         <section class="router-editor">
@@ -203,7 +240,7 @@ else
 }
 
 @code {
-    private static readonly (string Type, string Icon)[] Palette = [("input", "●"), ("agent", "◎"), ("flow", "↳"), ("router", "◇"), ("condition", "?"), ("transform", "ƒ"), ("output", "□"), ("failure", "!")];
+    private static readonly (string Type, string Icon)[] Palette = [("input", "●"), ("agent", "◎"), ("flow", "↳"), ("tool", "⌁"), ("router", "◇"), ("condition", "?"), ("transform", "ƒ"), ("output", "□"), ("failure", "!")];
     private readonly CancellationTokenSource cancellation = new();
     private CancellationTokenSource? autosave;
     private FlowCanvas? canvas;
@@ -211,6 +248,7 @@ else
     private IReadOnlyList<FlowDesignerAgent> routerAgents = [];
     private IReadOnlyList<FlowDesignerFlow> flows = [];
     private IReadOnlyList<FlowDesignerFlowVersion> flowVersions = [];
+    private IReadOnlyList<FlowDesignerTool> tools = [];
     private string? loadedResource;
     private string sourceText = string.Empty;
     private string transitionFrom = string.Empty;
@@ -234,6 +272,9 @@ else
             ? call.Flow.Version
             : flows.FirstOrDefault(flow => FlowKey(flow.Namespace, flow.Name) == FlowKey(call.Flow))?.ActiveVersion))
         : null;
+    private FlowDesignerTool? SelectedTool => SelectedStep is ToolFlowStepDefinition tool
+        ? tools.FirstOrDefault(item => ToolKey(item.Namespace, item.Name) == ToolKey(tool.Tool))
+        : null;
     private string SaveText => T($"SaveState.{Editor.State.SaveState}");
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private FlowDesignerTarget Target => new(Namespace, ResourceId);
@@ -253,6 +294,7 @@ else
             Editor.Load(loaded, Target);
             agents = routerAgents = await Resources.GetAgentsAsync(cancellation.Token);
             flows = await Resources.GetFlowsAsync(cancellation.Token);
+            tools = await Resources.GetToolsAsync(cancellation.Token);
             if (SelectedStep is FlowCallStepDefinition call) await LoadFlowVersionsAsync(call.Flow);
             transitionFrom = loaded.Resource.Definition.EntryStep;
             transitionTo = loaded.Resource.Definition.Steps.Skip(1).FirstOrDefault()?.Name ?? transitionFrom;
@@ -311,6 +353,7 @@ else
             "input" => new InputFlowStepDefinition { Name = name, DisplayName = "Input" },
             "agent" => new AgentFlowStepDefinition { Name = name, DisplayName = "Agent", Agent = new(agents.FirstOrDefault()?.Name ?? UnconfiguredAgent) },
             "flow" => new FlowCallStepDefinition { Name = name, DisplayName = "Flow", Flow = DefaultFlowReference(), InputMapping = JsonSerializer.SerializeToElement(new { }) },
+            "tool" => new ToolFlowStepDefinition { Name = name, DisplayName = T("Step.tool"), Tool = DefaultToolReference(), ArgumentsMapping = JsonSerializer.SerializeToElement(new { }) },
             "router" => new RouterFlowStepDefinition { Name = name, DisplayName = "Router" },
             "condition" => new ConditionFlowStepDefinition { Name = name, DisplayName = "Condition", Left = "${input.prompt}", Right = "" },
             "transform" => new TransformFlowStepDefinition { Name = name, DisplayName = "Transform", Mapping = JsonSerializer.SerializeToElement(new { }) },
@@ -352,6 +395,20 @@ else
         mapping[propertyName] = JsonSerializer.SerializeToElement(Text(e));
         return UpdateSelectedAsync(call with { InputMapping = JsonSerializer.SerializeToElement(mapping) });
     }
+    private Task UpdateToolTargetAsync(ChangeEventArgs e)
+    {
+        if (SelectedStep is not ToolFlowStepDefinition tool || !TryParseToolKey(Text(e), out var target)) return Task.CompletedTask;
+        return UpdateSelectedAsync(tool with { Tool = new(target.Name, target.Namespace == Namespace ? null : target.Namespace), ArgumentsMapping = JsonSerializer.SerializeToElement(new { }) });
+    }
+    private Task UpdateToolMappingAsync(string propertyName, ChangeEventArgs e)
+    {
+        if (SelectedStep is not ToolFlowStepDefinition tool) return Task.CompletedTask;
+        var mapping = tool.ArgumentsMapping is { ValueKind: JsonValueKind.Object } value
+            ? value.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal)
+            : new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        mapping[propertyName] = JsonSerializer.SerializeToElement(Text(e));
+        return UpdateSelectedAsync(tool with { ArgumentsMapping = JsonSerializer.SerializeToElement(mapping) });
+    }
     private Task UpdateSelectedAsync(FlowStepDefinition step) => DispatchAsync(new UpdateStepCommand(step));
 
     private async Task LoadAgentsAsync() { try { loadingAgents = true; routerAgents = await Resources.GetAgentsAsync(cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { loadingAgents = false; } }
@@ -374,6 +431,11 @@ else
         var target = flows.FirstOrDefault(item => item.Name != ResourceId || item.Namespace != Namespace);
         return target is null ? new(UnconfiguredFlow) : new(target.Name, Namespace: target.Namespace == Namespace ? null : target.Namespace);
     }
+    private FlowToolReference DefaultToolReference()
+    {
+        var target = tools.FirstOrDefault();
+        return target is null ? new(UnconfiguredTool) : new(target.Name, target.Namespace == Namespace ? null : target.Namespace);
+    }
     private async Task LoadFlowVersionsAsync(FlowCallReference reference) => flowVersions = await Resources.GetFlowVersionsAsync(reference.Namespace ?? Namespace, reference.ResourceId, cancellation.Token);
     private static string FlowKey(ResourceNamespace @namespace, string name) => $"{@namespace.Value}|{name}";
     private string FlowKey(FlowCallReference reference) => FlowKey(reference.Namespace ?? Namespace, reference.ResourceId);
@@ -383,6 +445,14 @@ else
         if (parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[1])) { target = (ResourceNamespace.Parse(parts[0]), parts[1]); return true; }
         target = default; return false;
     }
+    private static string ToolKey(ResourceNamespace @namespace, string name) => $"{@namespace.Value}|{name}";
+    private string ToolKey(FlowToolReference reference) => ToolKey(reference.Namespace ?? Namespace, reference.ResourceId);
+    private static bool TryParseToolKey(string value, out (ResourceNamespace Namespace, string Name) target) => TryParseFlowKey(value, out target);
+    private string ToolState(FlowDesignerTool tool) => !tool.Enabled
+        ? T("ToolDisabled")
+        : !tool.Available
+            ? T("ToolUnavailable")
+            : tool.RequiresApproval ? T("ToolApprovalRequired") : string.Empty;
     private static string MappingValue(JsonElement? mapping, string propertyName) => mapping is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty(propertyName, out var property)
         ? property.ValueKind == JsonValueKind.String ? property.GetString() ?? string.Empty : property.GetRawText()
         : string.Empty;
@@ -391,6 +461,7 @@ else
     private static string NextVersion(string value) { var parts = value.Split('.'); return parts.Length == 3 && int.TryParse(parts[2], out var patch) ? $"{parts[0]}.{parts[1]}.{patch + 1}" : "1.0.0"; }
     private const string UnconfiguredAgent = "unconfigured";
     private const string UnconfiguredFlow = "unconfigured";
+    private const string UnconfiguredTool = "unconfigured";
 
     public ValueTask DisposeAsync()
     {

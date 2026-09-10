@@ -16,6 +16,15 @@ public sealed record ResolvedFlowCall(
     JsonElement? InputSchema,
     JsonElement? OutputSchema);
 
+public sealed record ResolvedFlowTool(
+    string ResourceId,
+    ResourceNamespace Namespace,
+    JsonElement InputSchema,
+    JsonElement? OutputSchema,
+    bool Enabled,
+    bool Available,
+    bool RequiresApproval);
+
 public interface IFlowDefinitionValidator
 {
     ValueTask<FlowValidationResult> ValidateAsync(FlowGraphDefinition definition, FlowValidationContext context, CancellationToken cancellationToken);
@@ -35,6 +44,12 @@ public interface IFlowResourceReferenceResolver
         FlowId ownerFlowId,
         ResolvedFlowCall target,
         CancellationToken cancellationToken) => Task.FromResult(false);
+
+    Task<ResolvedFlowTool?> ResolveToolAsync(
+        WorkspaceId workspaceId,
+        ResourceNamespace ownerNamespace,
+        FlowToolReference reference,
+        CancellationToken cancellationToken) => Task.FromResult<ResolvedFlowTool?>(null);
 }
 
 public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver resources) : IFlowDefinitionValidator
@@ -112,10 +127,46 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             case FlowCallStepDefinition flowCall:
                 await ValidateFlowCallAsync(flowCall, context, issues, token);
                 break;
+            case ToolFlowStepDefinition tool:
+                await ValidateToolAsync(tool, context, issues, token);
+                break;
             case OutputFlowStepDefinition output:
                 ValidateJsonExpressions(output.OutputMapping, issues, step.Name, "outputMapping");
                 break;
         }
+    }
+
+    private async Task ValidateToolAsync(
+        ToolFlowStepDefinition step,
+        FlowValidationContext context,
+        List<FlowValidationIssue> issues,
+        CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(step.Tool.ResourceId) || step.Tool.ResourceId.Contains('/', StringComparison.Ordinal))
+        {
+            issues.Add(Error("tool_reference_invalid", "Tool references must use a logical Tool name.", step.Name, property: "tool.resourceId"));
+            return;
+        }
+
+        ValidateJsonExpressions(step.ArgumentsMapping, issues, step.Name, "argumentsMapping");
+        if (!context.ResolveResources || context.WorkspaceId is null || context.OwnerFlowId is null) return;
+
+        var target = await resources.ResolveToolAsync(context.WorkspaceId.Value, context.OwnerFlowId.Value.Namespace, step.Tool, token);
+        if (target is null)
+        {
+            issues.Add(Error("tool_resource_not_found", $"Tool '{step.Tool.ResourceId}' was not found.", step.Name, property: "tool"));
+            return;
+        }
+        if (!target.Enabled)
+            issues.Add(Error("tool_disabled", $"Tool '{step.Tool.ResourceId}' is disabled.", step.Name, property: "tool"));
+        if (!target.Available)
+            issues.Add(Error("tool_unavailable", $"Tool '{step.Tool.ResourceId}' is unavailable from its provider.", step.Name, property: "tool"));
+        if (!ValidContractSchema(target.InputSchema))
+        {
+            issues.Add(Error("tool_input_schema_invalid", "The selected Tool has an invalid or unsupported input schema.", step.Name, property: "tool.inputSchema"));
+            return;
+        }
+        ValidateMappingAgainstSchema(step.Name, "argumentsMapping", step.ArgumentsMapping, target.InputSchema, "tool_argument", issues);
     }
 
     private async Task ValidateFlowCallAsync(
@@ -158,22 +209,33 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
     private static void ValidateMappingAgainstSchema(FlowCallStepDefinition step, JsonElement? schema, List<FlowValidationIssue> issues)
     {
         if (schema is not { ValueKind: JsonValueKind.Object } value) return;
-        if (step.InputMapping is not { ValueKind: JsonValueKind.Object } mapping)
+        ValidateMappingAgainstSchema(step.Name, "inputMapping", step.InputMapping, value, "flow_input_mapping", issues);
+    }
+
+    private static void ValidateMappingAgainstSchema(
+        string stepName,
+        string propertyPath,
+        JsonElement? candidate,
+        JsonElement schema,
+        string codePrefix,
+        List<FlowValidationIssue> issues)
+    {
+        if (candidate is not { ValueKind: JsonValueKind.Object } mapping)
         {
-            issues.Add(Error("flow_input_mapping_object_required", "The selected Flow requires an object input mapping.", step.Name, property: "inputMapping"));
+            issues.Add(Error($"{codePrefix}_object_required", "The selected resource requires an object mapping.", stepName, property: propertyPath));
             return;
         }
 
-        var allowed = value.TryGetProperty("properties", out var properties) && properties.ValueKind == JsonValueKind.Object
+        var allowed = schema.TryGetProperty("properties", out var properties) && properties.ValueKind == JsonValueKind.Object
             ? properties.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal)
             : [];
         foreach (var property in mapping.EnumerateObject().Where(property => !allowed.Contains(property.Name)))
-            issues.Add(Error("flow_input_mapping_unknown", $"Input mapping property '{property.Name}' is not declared by the selected Flow.", step.Name, property: $"inputMapping.{property.Name}"));
+            issues.Add(Error($"{codePrefix}_unknown", $"Mapping property '{property.Name}' is not declared by the selected resource.", stepName, property: $"{propertyPath}.{property.Name}"));
 
-        if (!value.TryGetProperty("required", out var required) || required.ValueKind != JsonValueKind.Array) return;
+        if (!schema.TryGetProperty("required", out var required) || required.ValueKind != JsonValueKind.Array) return;
         var mapped = mapping.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
         foreach (var property in required.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Where(property => !mapped.Contains(property)))
-            issues.Add(Error("flow_input_mapping_required", $"Required input property '{property}' is not mapped.", step.Name, property: $"inputMapping.{property}"));
+            issues.Add(Error($"{codePrefix}_required", $"Required property '{property}' is not mapped.", stepName, property: $"{propertyPath}.{property}"));
     }
 
     private static bool ValidContractSchema(JsonElement? schema)

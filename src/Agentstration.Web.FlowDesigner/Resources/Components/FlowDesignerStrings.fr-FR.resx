@@ -17,6 +17,7 @@
   <data name="Steps"><value>Étapes</value></data>
   <data name="Step.input"><value>Entrée</value></data><data name="Step.agent"><value>Agent</value></data><data name="Step.router"><value>Routeur</value></data><data name="Step.condition"><value>Condition</value></data><data name="Step.transform"><value>Transformation</value></data><data name="Step.output"><value>Sortie</value></data><data name="Step.failure"><value>Échec</value></data>
   <data name="Step.flow"><value>Flow</value></data>
+  <data name="Step.tool"><value>Tool</value></data>
   <data name="HorizontalLayout"><value>Disposition horizontale</value></data><data name="VerticalLayout"><value>Disposition verticale</value></data><data name="Center"><value>Centrer</value></data>
   <data name="Inspector"><value>Inspecteur</value></data><data name="SelectStep"><value>Sélectionnez une étape pour la modifier.</value></data>
   <data name="DisplayName"><value>Nom d’affichage</value></data><data name="TechnicalName"><value>Nom technique</value></data><data name="Type"><value>Type</value></data>
@@ -24,6 +25,8 @@
   <data name="CalledFlow"><value>Flow appelé</value></data><data name="VersionStrategy"><value>Stratégie de version</value></data>
   <data name="VersionStrategy.Active"><value>Version active</value></data><data name="VersionStrategy.Exact"><value>Version exacte</value></data>
   <data name="ExactVersion"><value>Version exacte</value></data><data name="InputMapping"><value>Mappage d’entrée</value></data><data name="AvailableOutput"><value>Propriétés de sortie disponibles</value></data>
+  <data name="CalledTool"><value>Tool appelé</value></data><data name="ArgumentsMapping"><value>Mappage des arguments</value></data>
+  <data name="ToolDisabled"><value>Ce Tool est désactivé.</value></data><data name="ToolUnavailable"><value>Ce Tool est indisponible auprès de son fournisseur.</value></data><data name="ToolApprovalRequired"><value>Ce Tool nécessite une approbation avant son appel.</value></data>
   <data name="LoadAgents"><value>Charger les agents</value></data><data name="AddAll"><value>Tout ajouter</value></data>
   <data name="AvailableAgents.One"><value>{0} agent disponible. Les routes sont explicites et restent des références immuables après publication.</value></data>
   <data name="AvailableAgents.Many"><value>{0} agents disponibles. Les routes sont explicites et restent des références immuables après publication.</value></data>

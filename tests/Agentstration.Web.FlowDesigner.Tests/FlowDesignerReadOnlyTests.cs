@@ -107,6 +107,36 @@ public sealed class FlowDesignerReadOnlyTests
         });
     }
 
+    [TestMethod]
+    public void EditablePaletteUsesOneGenericToolCardAndShowsTheSelectedSchema()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(readOnly: false));
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true)
+            .SetResult(new Rectangle(0, 0, 1024, 768));
+
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters
+            .Add(component => component.ResourceId, "parent"));
+        IElement[] cards = [];
+        rendered.WaitForAssertion(() =>
+        {
+            cards = rendered.FindAll(".step-palette button").Where(button => button.TextContent.Trim().EndsWith("Tool", StringComparison.Ordinal)).ToArray();
+            Assert.HasCount(1, cards);
+        });
+        cards[0].Click();
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Markup, "Called Tool");
+            StringAssert.Contains(rendered.Markup, "message");
+            StringAssert.Contains(rendered.Markup, "deliveryId");
+        });
+    }
+
     private sealed class ResourceProviderStub : IFlowDesignerResourceProvider
     {
         public Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(CancellationToken cancellationToken) =>
@@ -117,6 +147,16 @@ public sealed class FlowDesignerReadOnlyTests
             Task.FromResult<IReadOnlyList<FlowDesignerFlowVersion>>([new("2.0.0",
                 JsonSerializer.SerializeToElement(new { type = "object", properties = new { article = new { type = "string" } } }),
                 JsonSerializer.SerializeToElement(new { type = "object", properties = new { summary = new { type = "string" } } }))]);
+        public Task<IReadOnlyList<FlowDesignerTool>> GetToolsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<FlowDesignerTool>>([new(
+                "notification.send",
+                "Send notification",
+                ResourceNamespace.Default,
+                JsonSerializer.SerializeToElement(new { type = "object", properties = new { message = new { type = "string" } } }),
+                JsonSerializer.SerializeToElement(new { type = "object", properties = new { deliveryId = new { type = "string" } } }),
+                Enabled: true,
+                Available: true,
+                RequiresApproval: false)]);
     }
 
     private sealed class BackendStub : IFlowDesignerBackend

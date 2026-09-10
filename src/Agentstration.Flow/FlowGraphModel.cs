@@ -24,6 +24,7 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(ConditionFlowStepDefinition), "condition")]
 [JsonDerivedType(typeof(TransformFlowStepDefinition), "transform")]
 [JsonDerivedType(typeof(FlowCallStepDefinition), "flow")]
+[JsonDerivedType(typeof(ToolFlowStepDefinition), "tool")]
 [JsonDerivedType(typeof(OutputFlowStepDefinition), "output")]
 [JsonDerivedType(typeof(FailureFlowStepDefinition), "failure")]
 public abstract record FlowStepDefinition
@@ -97,6 +98,19 @@ public sealed record FlowCallStepDefinition : FlowStepDefinition
     public JsonElement? InputMapping { get; init; }
 }
 
+public sealed record FlowToolReference(
+    string ResourceId,
+    ResourceNamespace? Namespace = null)
+{
+    public ResourceNamespace ResolveNamespace(ResourceNamespace ownerNamespace) => Namespace ?? ownerNamespace;
+}
+
+public sealed record ToolFlowStepDefinition : FlowStepDefinition
+{
+    public required FlowToolReference Tool { get; init; }
+    public JsonElement? ArgumentsMapping { get; init; }
+}
+
 public sealed record OutputFlowStepDefinition : FlowStepDefinition
 {
     public JsonElement? OutputMapping { get; init; }
@@ -162,6 +176,7 @@ public static class FlowStepDefinitionExtensions
         ConditionFlowStepDefinition => "condition",
         TransformFlowStepDefinition => "transform",
         FlowCallStepDefinition => "flow",
+        ToolFlowStepDefinition => "tool",
         OutputFlowStepDefinition => "output",
         FailureFlowStepDefinition => "failure",
         _ => throw new ArgumentOutOfRangeException(nameof(step))
